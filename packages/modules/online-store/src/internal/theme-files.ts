@@ -22,11 +22,11 @@ export const THEME_LIMITS = {
 
 /**
  * The files a shop may keep in a theme: JSON templates, including alternates such as
- * product.unstitched, section groups, and the theme's settings. Liquid, assets and translations
- * are the platform theme's (ADR-039).
+ * product.unstitched and the customer's under customers/ (ADR-571), section groups, and the
+ * theme's settings. Liquid, assets and translations are the platform theme's (ADR-039).
  */
 const FILENAME =
-  /^(templates\/[a-z0-9_-]+(\.[a-z0-9_-]+)?|sections\/[a-z0-9_-]+|config\/settings_data)\.json$/;
+  /^(templates\/(customers\/)?[a-z0-9_-]+(\.[a-z0-9_-]+)?|sections\/[a-z0-9_-]+|config\/settings_data)\.json$/;
 const TYPE = /^[a-z0-9_-]+$/;
 const BLOCK_TYPE = /^@?[a-z0-9_-]+$/;
 /** Section and block IDs, as Shopify allows them: themes print them into pages' attributes. */
@@ -51,6 +51,7 @@ export function checkThemeFile(
       [...field, 'filename'],
       'INVALID',
       `"${file.filename}" isn't a file a theme can keep: templates/<name>.json, ` +
+        'templates/customers/<name>.json, ' +
         'sections/<group>.json or config/settings_data.json',
     );
     return;

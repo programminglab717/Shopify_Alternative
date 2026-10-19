@@ -1,0 +1,102 @@
+{%- comment -%}
+  The shopper's account (CUS-02, ADR-571): their orders with the shop, the newest first, each
+  opening its page while it has one, and their store credit. The storefront shows it only to a
+  signed-in shopper, and sends others to sign in; in the theme editor, there is no one.
+{%- endcomment -%}
+<div class="page-width section-spacing account">
+  <div class="section-title">
+    <h1>{{ 'customer.account.title' | t }}</h1>
+    {%- if customer -%}
+      <form method="post" action="{{ routes.account_logout_url }}">
+        <button type="submit" class="button button--secondary">{{ 'customer.account.sign_out' | t }}</button>
+      </form>
+    {%- endif -%}
+  </div>
+  {%- if customer -%}
+    <p class="account__who">
+      {%- if customer.first_name -%}
+        <span dir="auto">{{ 'customer.account.greeting' | t: name: customer.first_name }}</span>
+      {% endif -%}
+      <bdi dir="ltr">{{ customer.phone | escape }}</bdi>
+    </p>
+
+    {%- assign credit = customer.store_credit_account -%}
+    {%- if credit.balance > 0 -%}
+      <div class="account__credit">
+        <h2>{{ 'customer.account.store_credit' | t }}</h2>
+        <p class="account__credit-balance">{{ credit.balance | money }}</p>
+        {%- if credit.expiring -%}
+          {%- assign expiring_amount = credit.expiring.amount | money -%}
+          {%- assign expiring_on = credit.expiring.expires_at | date: format: 'day_month_year' -%}
+          <p class="account__muted">
+            {{- 'customer.account.store_credit_expiring' | t: amount: expiring_amount, date: expiring_on -}}
+          </p>
+        {%- endif -%}
+        <p class="account__muted">{{ 'customer.account.store_credit_note' | t }}</p>
+      </div>
+    {%- endif -%}
+
+    <h2>{{ 'customer.account.orders' | t }}</h2>
+    {%- if customer.orders_count == 0 -%}
+      <p>{{ 'customer.account.no_orders' | t }}</p>
+      <a class="button" href="{{ routes.all_products_collection_url }}">{{ 'customer.account.start_shopping' | t }}</a>
+    {%- else -%}
+      <ul class="account__orders" role="list">
+        {%- for order in customer.orders -%}
+          <li class="account__order">
+            <div class="account__order-head">
+              {%- if order.url -%}
+                <a href="{{ order.url }}" aria-label="{{ 'customer.account.view_order' | t: name: order.name }}"><bdi>{{ order.name | escape }}</bdi></a>
+              {%- else -%}
+                <bdi>{{ order.name | escape }}</bdi>
+              {%- endif -%}
+              <span class="account__muted">{{ order.created_at | time_tag: format: 'day_month_year' }}</span>
+            </div>
+            <dl class="account__order-details">
+              <div>
+                <dt>{{ 'customer.account.payment' | t }}</dt>
+                <dd>
+                  {%- if order.cancelled -%}
+                    {{ 'customer.account.cancelled' | t }}
+                  {%- else -%}
+                    {{ order.financial_status_label | escape }}
+                  {%- endif -%}
+                </dd>
+              </div>
+              <div>
+                <dt>{{ 'customer.account.delivery' | t }}</dt>
+                <dd>{{ order.fulfillment_status_label | escape }}</dd>
+              </div>
+              <div>
+                <dt>{{ 'customer.account.items' | t: count: order.item_count }}</dt>
+                <dd>{{ order.total_price | money }}</dd>
+              </div>
+            </dl>
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+  {%- else -%}
+    <a class="button" href="{{ routes.account_login_url }}">{{ 'customer.login.title' | t }}</a>
+  {%- endif -%}
+</div>
+
+{% stylesheet %}
+  .account { max-inline-size: 48rem; }
+  .account__who { margin-block: 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+  .account__muted { color: var(--color-muted); font-size: 0.875rem; }
+  .account__credit { margin-block-end: 2rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
+  .account__credit h2 { margin-block-start: 0; font-size: 1rem; }
+  .account__credit p { margin: 0.25rem 0 0; }
+  .account__credit-balance { font-size: 1.5rem; font-weight: 700; }
+  .account__orders { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.75rem; }
+  .account__order { padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
+  .account__order-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; font-weight: 600; }
+  .account__order-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 0; }
+  .account__order-details dt { color: var(--color-muted); font-size: 0.875rem; }
+  .account__order-details dd { margin: 0; }
+{% endstylesheet %}
+
+{% schema %}
+{ "name": "t:sections.main-account.name" }
+{% endschema %}

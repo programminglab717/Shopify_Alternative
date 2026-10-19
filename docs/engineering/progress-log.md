@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### The storefront's account
+
+* **The storefront signs shoppers in with a code and shows their account, the pages never cached
+  and every other page as it was, Hatti Base's customer templates in both languages** ([ADR-571](../architecture/13-decision-log.md#adr-571--the-storefront-signs-shoppers-in-with-a-code-and-shows-their-account-the-pages-never-cached-and-every-other-page-as-it-was-hatti-bases-customer-templates-in-both-languages),
+  CUS-02).
+* 3519 tests, 8 more: signing in, the account, orders' pages, signing
+  out, caching, Urdu and the limits.
+
 ### ec56bd4 · The sign-in code named in the admin
 
 * **Fix:** the admin's list of messages sent showed the code to sign in on the storefront

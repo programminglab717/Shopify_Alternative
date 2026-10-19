@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-570 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-571 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -578,6 +578,7 @@
 | 568 | A shop chooses its storefront's filters, their order and their words, filters on its products' and variants' custom fields among them, and none chosen keeps every filter as before | Accepted |
 | 569 | The admin's online store has a Filters tab: every filter as before, or the shop's own list, ordered, named in English and Urdu, its custom fields' filters added | Accepted |
 | 570 | A shopper signs in to a shop's storefront with a code to their mobile, and the session reads their orders and store credit, the storefront's pages to follow | Accepted |
+| 571 | The storefront signs shoppers in with a code and shows their account, the pages never cached and every other page as it was, Hatti Base's customer templates in both languages | Accepted |
 
 ---
 
@@ -21248,3 +21249,30 @@
 * **Alternatives:** **A password:** shoppers pay by cash on delivery from phones and remember a
   code better than a password. **Accounts in the customers module:** it is read by messaging and
   orders, so it cannot read them.
+
+## ADR-571 · The storefront signs shoppers in with a code and shows their account, the pages never cached and every other page as it was, Hatti Base's customer templates in both languages
+
+* **Context:** A shopper signs in with a code and the storefront API reads their account
+  (ADR-570), but the storefront had no pages for it, and themes no `customer`.
+* **Decision:**
+  * **Signing in,** at `/account/login` and its Urdu twin: a mobile number, by WhatsApp or SMS,
+    then the code sent to it, the number kept meanwhile in a cookie of ten minutes the page cannot
+    read; a code wrong, run out or tried too often, a number that is not one, or codes asked too
+    often says so in the page's language. Signed in, the session's cookie is set, the page cannot
+    read it, and the shopper goes to their account, or back where they came from on the same shop.
+    Sign-in forms posted from another site are refused, and an address may post them 20 times a
+    minute.
+  * **The account,** at `/account`: their name and number, their store credit and what expires
+    first, and their orders with their state and total, each opening its order's page; signed
+    out, it asks them to sign in. Signing out, by a link or a form, ends the session.
+  * **Never cached:** the account's pages are private and kept by no cache, and only they know who
+    is signed in. Every other page is the same for everyone and cached as before; its header
+    says "Sign in", and a cookie of no secret, as the cart's count does, turns it to "Account".
+  * **Themes** get Shopify's `customer` there: its name, number, orders with their states' words,
+    totals and links, and its store credit, and `routes.account_login_url` and
+    `account_logout_url`; Hatti Base's `customers/login` and `customers/account` templates, in
+    English and Urdu. Shops' themes may keep templates under `customers/`, as Shopify's do.
+* **Consequences:** A shopper sees their orders and credit at any shop they bought from, on any
+  phone, without a password.
+* **Alternatives:** **Who is signed in on every page:** each page would be a request to the core
+  and none could be cached; the header's word is the only thing that differs.

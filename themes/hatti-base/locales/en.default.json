@@ -21,7 +21,9 @@
       },
       "range": "Delivered in {{ min }} to {{ max }} working days"
     },
-    "wishlist": "Wishlist"
+    "wishlist": "Wishlist",
+    "account": "Account",
+    "sign_in": "Sign in"
   },
   "accessibility": {
     "skip_to_content": "Skip to content"
@@ -231,6 +233,49 @@
     "cod": "Pay cash when your order arrives",
     "report": "Report this store to Hatti",
     "verified": "Verified by Hatti"
+  },
+  "customer": {
+    "login": {
+      "title": "Sign in",
+      "intro": "Enter your mobile number and we'll send you a code to sign in. No password needed.",
+      "phone_label": "Mobile number",
+      "channel_label": "Send the code on",
+      "channel_whatsapp": "WhatsApp",
+      "channel_sms": "SMS",
+      "send": "Send code",
+      "code_sent_whatsapp_html": "We sent a code to <bdi dir=\"ltr\">{{ phone }}</bdi> on WhatsApp.",
+      "code_sent_sms_html": "We sent a code to <bdi dir=\"ltr\">{{ phone }}</bdi> by SMS.",
+      "code_label": "Code",
+      "verify": "Sign in",
+      "change_number": "Use another number, or get a new code",
+      "errors": {
+        "invalid_phone": "Enter a Pakistani mobile number, like 0300 1234567.",
+        "too_many_codes": "We have sent this number as many codes as we can for now. Please try again later.",
+        "too_many_requests": "Too many tries. Please wait a minute and try again.",
+        "wrong": "That code is not right. Check it and try again.",
+        "expired": "That code has expired. Ask for a new one.",
+        "too_many_tries": "That code was tried too many times. Ask for a new one."
+      }
+    },
+    "account": {
+      "title": "Your account",
+      "greeting": "Hi {{ name }}",
+      "sign_out": "Sign out",
+      "store_credit": "Store credit",
+      "store_credit_expiring": "{{ amount }} of it expires on {{ date }}.",
+      "store_credit_note": "It is taken off your next order at checkout.",
+      "orders": "Your orders",
+      "no_orders": "You haven't placed an order with us yet.",
+      "start_shopping": "Start shopping",
+      "view_order": "View order {{ name }}",
+      "payment": "Payment",
+      "delivery": "Delivery",
+      "cancelled": "Cancelled",
+      "items": {
+        "one": "{{ count }} item",
+        "other": "{{ count }} items"
+      }
+    }
   },
   "cart": {
     "errors": {

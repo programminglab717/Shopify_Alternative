@@ -20,6 +20,7 @@ import {
   type TopLevelToken,
   type ValueToken,
 } from 'liquidjs';
+import type { LoginForm } from './accounts.js';
 import type { WorkLimiter } from './limits.js';
 import {
   ExternalVideoDrop,
@@ -51,6 +52,8 @@ export interface PageState {
   params: QueryParams;
   /** What a form posted to the page got wrong, by the form's type, as `form.errors` gives it. */
   formErrors: Readonly<Record<string, readonly string[]>>;
+  /** The sign-in page's form, as its route leaves it (ADR-571); null on other pages. */
+  login: LoginForm | null;
 }
 
 export const PAGE = Symbol('page');
@@ -873,7 +876,8 @@ const FORM_ACTIONS: Record<string, string> = {
   contact: '/contact',
   // Shopify's newsletter sign-ups post to /contact as well, in the page's language (ADR-189).
   customer: 'root_url:/contact',
-  customer_login: '/account/login',
+  // A shopper's sign-in (ADR-571): the number's step, in the page's language.
+  customer_login: 'root_url:/account/login',
   storefront_password: 'root_url:/password',
   // Hatti's own, for a sold-out variant's page (ADR-431).
   back_in_stock: 'root_url:/back-in-stock',
@@ -938,9 +942,18 @@ class FormTag extends Tag {
         ? (subject as { comment_post_url?: unknown }).comment_post_url
         : undefined;
     const root = routes.root_url && routes.root_url !== '/' ? routes.root_url : '';
+    const state = pageState(ctx);
+    // The sign-in form posts the number, then the code sent to it (ADR-571).
+    const login = type === 'customer_login' ? state.login : null;
+    const action =
+      typeof commentUrl === 'string'
+        ? `${root}${commentUrl}`
+        : login?.step === 'code'
+          ? `${root}/account/login/verify`
+          : formAction(type, routes);
     const attributes = Object.entries({
       method: 'post',
-      action: typeof commentUrl === 'string' ? `${root}${commentUrl}` : formAction(type, routes),
+      action,
       'accept-charset': 'UTF-8',
       ...(type === 'new_comment' && { id: 'comment_form', class: 'comment-form' }),
       ...options,
@@ -950,12 +963,13 @@ class FormTag extends Tag {
     emitter.write(
       `<form ${attributes}><input type="hidden" name="form_type" value="${attribute(type)}">`,
     );
-    const state = pageState(ctx);
     // A sign-up, a comment, or a wish to hear a variant is back, comes back to its page saying how
     // it went (ADR-189, ADR-220, ADR-431): the fields it got wrong, or that it was taken.
     const prefix = Object.hasOwn(POSTED_PREFIXES, type) ? POSTED_PREFIXES[type]! : null;
     const posted = prefix === null ? {} : state.query;
+    // The sign-in's say what was wrong in the page's language, as Shopify's messages do.
     const errors =
+      login?.errors ??
       state.formErrors[type] ??
       posted[`${prefix}_error`]?.split(',').filter((field) => field !== '') ??
       [];
@@ -968,6 +982,16 @@ class FormTag extends Tag {
         author: '',
         email: '',
         body: '',
+        // Hatti's sign-in, by a code sent to a mobile number (ADR-571): which step it is on; the
+        // number as it was just posted, or where the code went, masked, and how; and where it
+        // goes once signed in.
+        ...(login && {
+          step: login.step,
+          phone: login.phone,
+          phone_masked: login.phoneMasked,
+          channel: login.channel,
+          return_to: login.returnTo,
+        }),
       },
     });
     try {

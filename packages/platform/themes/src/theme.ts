@@ -156,9 +156,12 @@ export function loadTheme(files: ThemeFiles): Theme {
   };
 }
 
-/** The files a shop keeps in its theme, over the platform theme's (ADR-039). */
+/**
+ * The files a shop keeps in its theme, over the platform theme's (ADR-039): its customer's
+ * templates among them, under customers/, as Shopify's (ADR-571).
+ */
 const SHOP_FILE =
-  /^(templates\/[a-z0-9_-]+(\.[a-z0-9_-]+)?|sections\/[a-z0-9_-]+|config\/settings_data)\.json$/;
+  /^(templates\/(customers\/)?[a-z0-9_-]+(\.[a-z0-9_-]+)?|sections\/[a-z0-9_-]+|config\/settings_data)\.json$/;
 
 /**
  * A shop's theme: the platform theme with the shop's own JSON files over it. A file the renderer

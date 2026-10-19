@@ -19,6 +19,14 @@ import {
 import {
   PRODUCT_FEED_PATH,
   StorefrontApiError,
+  type AccountClient,
+  type AccountJson,
+  type AccountLoginStartRequest,
+  type AccountLoginStartResult,
+  type AccountLoginVerifyRequest,
+  type AccountLoginVerifyResult,
+  type AccountOrderLinkResponse,
+  type AccountSessionJson,
   type CartActionName,
   type CartActionResult,
   type CartBodies,
@@ -491,6 +499,78 @@ class FakeCore {
     this.comments.push({ shopId, request });
     if (this.commented instanceof Error) throw this.commented;
     return this.commented;
+  }
+
+  /** The codes asked for to sign in, with the address, and how the core answers (ADR-570). */
+  readonly loginStarts: {
+    shopId: string;
+    request: AccountLoginStartRequest;
+    client?: AccountClient;
+  }[] = [];
+  loginStarted: AccountLoginStartResult | Error = {
+    ok: true,
+    state: 'sent',
+    phone: '0300 ••••567',
+    channel: 'whatsapp',
+  };
+
+  async accountLoginStart(
+    shopId: string,
+    request: AccountLoginStartRequest,
+    client?: AccountClient,
+  ): Promise<AccountLoginStartResult> {
+    this.loginStarts.push({ shopId, request, ...(client && { client }) });
+    if (this.loginStarted instanceof Error) throw this.loginStarted;
+    return this.loginStarted;
+  }
+
+  /** The codes typed, and how the core answers: signed in to the account `accounts` has. */
+  readonly loginVerifies: { shopId: string; request: AccountLoginVerifyRequest }[] = [];
+  loginVerified: AccountLoginVerifyResult | Error = new Error('No answer');
+
+  async accountLoginVerify(
+    shopId: string,
+    request: AccountLoginVerifyRequest,
+  ): Promise<AccountLoginVerifyResult> {
+    this.loginVerifies.push({ shopId, request });
+    if (this.loginVerified instanceof Error) throw this.loginVerified;
+    return this.loginVerified;
+  }
+
+  /** Accounts by their session's secret; orders' pages by order; the sessions signed out. */
+  readonly accounts = new Map<string, AccountJson>();
+  readonly orderLinks = new Map<string, AccountOrderLinkResponse>();
+  readonly signedOut: string[] = [];
+
+  async accountSession(_shopId: string, token: string | null): Promise<AccountSessionJson | null> {
+    const account = token ? this.accounts.get(token) : undefined;
+    if (!account) return null;
+    const now = new Date();
+    return {
+      phone: account.phone,
+      name: account.name,
+      signedInAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+    };
+  }
+
+  async account(_shopId: string, token: string | null): Promise<AccountJson | null> {
+    return (token && this.accounts.get(token)) || null;
+  }
+
+  async accountOrderLink(
+    _shopId: string,
+    token: string | null,
+    orderId: string,
+  ): Promise<AccountOrderLinkResponse | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    return this.orderLinks.get(orderId) ?? null;
+  }
+
+  async accountLogout(_shopId: string, token: string | null): Promise<void> {
+    if (!token) return;
+    this.signedOut.push(token);
+    this.accounts.delete(token);
   }
 }
 
@@ -3131,6 +3211,511 @@ describe('Carts', () => {
   });
 });
 
+/** A session's secret, as the core gives one once a code signs a shopper in (ADR-570). */
+const ACCOUNT_TOKEN = 'sEsSiOn_SeCrEt-0123456789abcdefghijklmnopq';
+
+/** A shopper's account with the sample shop: two orders, one cancelled, and store credit. */
+const ACCOUNT: AccountJson = {
+  phone: '+923217654321',
+  name: 'Ayesha Khan',
+  orders: [
+    {
+      id: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1x',
+      name: '#1002',
+      placedAt: '2026-10-01T09:00:00.000Z',
+      status: 'open',
+      financialStatus: 'pending',
+      fulfillmentStatus: 'fulfilled',
+      total: 1_250_000,
+      currency: 'PKR',
+      itemCount: 2,
+      hasPage: true,
+    },
+    {
+      id: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1y',
+      name: '#1001',
+      placedAt: '2026-08-14T09:00:00.000Z',
+      status: 'cancelled',
+      financialStatus: 'voided',
+      fulfillmentStatus: 'unfulfilled',
+      total: 450_000,
+      currency: 'PKR',
+      itemCount: 1,
+      hasPage: false,
+    },
+  ],
+  storeCredit: {
+    balance: 50_000,
+    currency: 'PKR',
+    expiring: { amount: 20_000, expiresAt: '2026-12-31T00:00:00.000Z' },
+  },
+};
+
+describe("Shoppers' accounts (ADR-571)", () => {
+  let theme: Theme;
+  let core: FakeCore;
+
+  beforeAll(async () => {
+    theme = loadTheme(await readThemeDir(THEME_DIR));
+  });
+
+  const server = (extra: Partial<StorefrontServerOptions> = {}) => {
+    core = new FakeCore();
+    return createStorefrontServer({
+      theme,
+      renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 } }),
+      domain: 'localhost',
+      sample: new MemoryStore(sampleStore()),
+      core,
+      ...extra,
+    });
+  };
+  const form = (fields: Record<string, string>) => new URLSearchParams(fields).toString();
+  const FORM = { host: 'localhost', 'content-type': 'application/x-www-form-urlencoded' };
+  /** The cookie a `Set-Cookie` header of the answer sets, as the browser sends it back. */
+  const kept = (answer: { headers: Record<string, unknown> }, name: string) => {
+    const cookies = [answer.headers['set-cookie'] ?? []].flat() as string[];
+    return cookies.find((cookie) => cookie.startsWith(`${name}=`))?.split(';')[0] ?? null;
+  };
+  const signedIn = () => {
+    core.accounts.set(ACCOUNT_TOKEN, ACCOUNT);
+    return `hatti_account=${ACCOUNT_TOKEN}; hatti_signed_in=1`;
+  };
+
+  it('signs a shopper in with a code sent to their mobile, keeping the session in a cookie only the server reads', async () => {
+    const app = server();
+    const page = await app.inject({ method: 'GET', url: '/account/login', headers: FORM });
+    expect(page.statusCode).toBe(200);
+    expect([page.headers['cache-control'], page.headers['x-robots-tag']]).toEqual([
+      'private, no-store',
+      'noindex',
+    ]);
+    expect(page.headers['cache-tag']).toBeUndefined();
+    expect(page.body).toContain('<title>Sign in · ');
+    expect(page.body).toMatch(
+      /<form method="post" action="\/account\/login" accept-charset="UTF-8" class="login__form">/,
+    );
+    expect(page.body).toContain('name="customer[phone]"');
+    expect(page.body).toMatch(/value="whatsapp" checked>/);
+    // The header's link to the account says "Sign in" to a shopper who is not.
+    expect(page.body).toMatch(
+      /class="header__account" data-account-link data-signed-in="Account">Sign in</,
+    );
+
+    // The number: a code goes to it on WhatsApp, from the shopper's address, in English.
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/account/login',
+      headers: FORM,
+      payload: form({
+        form_type: 'customer_login',
+        'customer[phone]': ' 0321 7654321 ',
+        'customer[channel]': 'whatsapp',
+      }),
+    });
+    expect(sent.statusCode).toBe(200);
+    expect(sent.headers['cache-control']).toBe('private, no-store');
+    expect(core.loginStarts).toEqual([
+      {
+        shopId: 'sample',
+        request: { phone: '0321 7654321', channel: 'whatsapp', locale: 'en' },
+        client: { ip: '127.0.0.1' },
+      },
+    ]);
+    expect(sent.body).toContain('We sent a code to <bdi dir="ltr">0300 ••••567</bdi> on WhatsApp.');
+    expect(sent.body).toMatch(/<form method="post" action="\/account\/login\/verify"/);
+    expect(sent.body).toContain('autocomplete="one-time-code"');
+    // The number as typed waits on the server, in a cookie of ten minutes; never in the page.
+    expect(sent.body).not.toContain('7654321');
+    const waiting = kept(sent, 'hatti_login');
+    expect(waiting).not.toBeNull();
+    expect([sent.headers['set-cookie']].flat()).toEqual([
+      expect.stringMatching(/^hatti_login=[\w-]+; Path=\/; Max-Age=600; HttpOnly; SameSite=Lax$/),
+    ]);
+
+    // The code, right: signed in, and on to the account.
+    core.loginVerified = {
+      ok: true,
+      token: ACCOUNT_TOKEN,
+      session: {
+        phone: '+923217654321',
+        name: 'Ayesha Khan',
+        signedInAt: '2026-10-19T10:00:00.000Z',
+        expiresAt: '2026-11-18T10:00:00.000Z',
+      },
+    };
+    const verified = await app.inject({
+      method: 'POST',
+      url: '/account/login/verify',
+      headers: { ...FORM, cookie: waiting! },
+      payload: form({ form_type: 'customer_login', 'customer[code]': '123 456' }),
+    });
+    expect(core.loginVerifies).toEqual([
+      { shopId: 'sample', request: { phone: '0321 7654321', code: '123456' } },
+    ]);
+    expect([verified.statusCode, verified.headers.location]).toEqual([303, '/account']);
+    expect(verified.headers['cache-control']).toBe('private, no-store');
+    expect(verified.headers['set-cookie']).toEqual([
+      `hatti_account=${ACCOUNT_TOKEN}; Path=/; Max-Age=7776000; HttpOnly; SameSite=Lax`,
+      'hatti_signed_in=1; Path=/; Max-Age=7776000; SameSite=Lax',
+      'hatti_login=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+    ]);
+
+    // Signed in, the sign-in page sends them to their account, or where its link asks.
+    const cookie = signedIn();
+    const again = await app.inject({
+      method: 'GET',
+      url: '/account/login',
+      headers: { host: 'localhost', cookie },
+    });
+    expect([again.statusCode, again.headers.location]).toEqual([302, '/account']);
+    const onward = await app.inject({
+      method: 'GET',
+      url: '/ur/account/login?return_to=%2Fur%2Fcart',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(onward.headers.location).toBe('/ur/cart');
+    await app.close();
+  });
+
+  it('asks for the code by SMS, in Urdu, and over HTTPS keeps its cookies there alone', async () => {
+    const app = server({ secureCookies: true });
+    core.loginStarted = { ok: true, state: 'sent', phone: '0321 ••••321', channel: 'sms' };
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/ur/account/login',
+      headers: FORM,
+      payload: form({ 'customer[phone]': '03217654321', 'customer[channel]': 'sms' }),
+    });
+    expect(core.loginStarts[0]!.request).toEqual({
+      phone: '03217654321',
+      channel: 'sms',
+      locale: 'ur',
+    });
+    expect(sent.body).toContain(
+      'ہم نے <bdi dir="ltr">0321 ••••321</bdi> پر ایس ایم ایس سے کوڈ بھیجا ہے۔',
+    );
+    expect(sent.body).toMatch(/<form method="post" action="\/ur\/account\/login\/verify"/);
+    expect([sent.headers['set-cookie']].flat()[0]).toMatch(/; HttpOnly; SameSite=Lax; Secure$/);
+    core.loginVerified = {
+      ok: true,
+      token: ACCOUNT_TOKEN,
+      session: { phone: '+923217654321', name: null, signedInAt: '', expiresAt: '' },
+    };
+    const verified = await app.inject({
+      method: 'POST',
+      url: '/ur/account/login/verify',
+      headers: { ...FORM, cookie: kept(sent, 'hatti_login')! },
+      payload: form({ 'customer[code]': '123456' }),
+    });
+    expect(verified.headers.location).toBe('/ur/account');
+    for (const cookie of [verified.headers['set-cookie']].flat()) {
+      expect(cookie).toMatch(/; Secure$/);
+    }
+    await app.close();
+  });
+
+  it("says why a sign-in did not go on, in the page's language, and asks again", async () => {
+    const app = server();
+    const post = (url: string, fields: Record<string, string>, cookie?: string) =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { ...FORM, ...(cookie && { cookie }) },
+        payload: form(fields),
+      });
+
+    // Not a mobile number: the number's step again, with what was typed.
+    core.loginStarted = { ok: false, errors: [{ field: 'phone', message: 'Phone is invalid' }] };
+    const invalid = await post('/account/login', { 'customer[phone]': '12345' });
+    expect(invalid.statusCode).toBe(422);
+    expect(invalid.body).toContain(
+      '<div id="LoginError" class="login__error" role="alert"><p>Enter a Pakistani mobile number, like 0300 1234567.</p></div>',
+    );
+    expect(invalid.body).toContain('value="12345"');
+    expect(invalid.body).toContain('aria-invalid="true"');
+    expect(invalid.headers['set-cookie']).toBeUndefined();
+
+    // As many codes as the number may have for now.
+    core.loginStarted = { ok: true, state: 'too_many', phone: '0321 ••••321', channel: 'whatsapp' };
+    const tooMany = await post('/ur/account/login', { 'customer[phone]': '03217654321' });
+    expect(tooMany.statusCode).toBe(429);
+    expect(tooMany.body).toContain(
+      'اس نمبر پر ابھی جتنے کوڈ بھیجے جا سکتے تھے، بھیج دیے گئے ہیں۔ براہ کرم کچھ دیر بعد دوبارہ کوشش کریں۔',
+    );
+    expect(tooMany.headers['set-cookie']).toBeUndefined();
+
+    core.loginStarted = { ok: true, state: 'sent', phone: '0321 ••••321', channel: 'whatsapp' };
+    const sent = await post('/account/login', { 'customer[phone]': '03217654321' });
+    const waiting = kept(sent, 'hatti_login')!;
+
+    // A wrong code: the code's step again, the code still on its way.
+    core.loginVerified = { ok: false, error: 'wrong' };
+    const wrong = await post('/account/login/verify', { 'customer[code]': '000000' }, waiting);
+    expect(wrong.statusCode).toBe(422);
+    expect(wrong.body).toContain('That code is not right. Check it and try again.');
+    expect(wrong.body).toContain('<bdi dir="ltr">0321 ••••321</bdi>');
+    expect(wrong.body).toMatch(/action="\/account\/login\/verify"/);
+    expect(wrong.headers['set-cookie']).toBeUndefined();
+    const urdu = await post('/ur/account/login/verify', { 'customer[code]': '000000' }, waiting);
+    expect(urdu.body).toContain('یہ کوڈ درست نہیں۔ اسے دیکھ کر دوبارہ کوشش کریں۔');
+
+    // Expired, or tried too often: the number's step, for a new code, the old one forgotten.
+    const cleared = 'hatti_login=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax';
+    core.loginVerified = { ok: false, error: 'expired' };
+    const expired = await post('/account/login/verify', { 'customer[code]': '123456' }, waiting);
+    expect(expired.statusCode).toBe(422);
+    expect(expired.body).toContain('That code has expired. Ask for a new one.');
+    expect(expired.body).toMatch(/action="\/account\/login"/);
+    expect(expired.body).toContain('value="03217654321"');
+    expect(expired.headers['set-cookie']).toBe(cleared);
+    core.loginVerified = { ok: false, error: 'too_many' };
+    const tried = await post('/account/login/verify', { 'customer[code]': '123456' }, waiting);
+    expect(tried.statusCode).toBe(429);
+    expect(tried.body).toContain('That code was tried too many times. Ask for a new one.');
+    expect(tried.headers['set-cookie']).toBe(cleared);
+    core.loginVerified = { ok: false, error: 'invalid' };
+    const never = await post('/account/login/verify', { 'customer[code]': '123456' }, waiting);
+    expect(never.body).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
+
+    // No code on its way, or a cookie not written here: asked for the number again.
+    const none = await post('/account/login/verify', { 'customer[code]': '123456' });
+    expect(none.statusCode).toBe(422);
+    expect(none.body).toContain('That code has expired. Ask for a new one.');
+    const forged = await post(
+      '/account/login/verify',
+      { 'customer[code]': '123456' },
+      'hatti_login=bm90LWpzb24',
+    );
+    expect(forged.body).toContain('That code has expired. Ask for a new one.');
+    expect(core.loginVerifies).toHaveLength(5);
+
+    // From another site, nothing is sent; the core unreachable, the shopper is told.
+    const away = { 'sec-fetch-site': 'cross-site' };
+    for (const url of ['/account/login', '/account/login/verify']) {
+      const refused = await app.inject({ method: 'POST', url, headers: { ...FORM, ...away } });
+      expect(refused.statusCode, url).toBe(403);
+    }
+    core.loginStarted = new StorefrontApiError(502, 'Bad gateway');
+    const down = await post('/account/login', { 'customer[phone]': '03217654321' });
+    expect(down.statusCode).toBe(503);
+    await app.close();
+  });
+
+  it('sends a shopper signed in only along paths on the shop', async () => {
+    const app = server();
+    core.loginVerified = {
+      ok: true,
+      token: ACCOUNT_TOKEN,
+      session: { phone: '+923217654321', name: null, signedInAt: '', expiresAt: '' },
+    };
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/account/login',
+      headers: FORM,
+      payload: form({ 'customer[phone]': '03217654321', return_to: '/collections/lawn' }),
+    });
+    // The form carries where to go on.
+    expect(sent.body).toContain('<input type="hidden" name="return_to" value="/collections/lawn">');
+    expect(sent.body).toContain('href="/account/login?return_to=%2Fcollections%2Flawn"');
+    const waiting = kept(sent, 'hatti_login')!;
+    const verify = (returnTo: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/account/login/verify',
+        headers: { ...FORM, cookie: waiting },
+        payload: form({ 'customer[code]': '123456', return_to: returnTo }),
+      });
+    expect((await verify('/collections/lawn?page=2')).headers.location).toBe(
+      '/collections/lawn?page=2',
+    );
+    for (const away of ['//evil.example', 'https://evil.example/', '/\\evil.example', 'cart']) {
+      expect((await verify(away)).headers.location, away).toBe('/account');
+    }
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account/login?return_to=%2F%2Fevil.example',
+      headers: { host: 'localhost' },
+    });
+    expect(page.body).not.toContain('evil.example');
+    await app.close();
+  });
+
+  it('shows a signed-in shopper their orders and store credit, never kept, and others the way to sign in', async () => {
+    const app = server();
+    const cookie = signedIn();
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(page.statusCode).toBe(200);
+    expect([page.headers['cache-control'], page.headers['x-robots-tag']]).toEqual([
+      'private, no-store',
+      'noindex',
+    ]);
+    expect(page.headers['cache-tag']).toBeUndefined();
+    expect(page.headers['set-cookie']).toBeUndefined();
+    const html = page.body;
+    expect(html).toContain('<title>Your account · ');
+    expect(html).toContain('<body class="template-account">');
+    expect(html).toContain('<span dir="auto">Hi Ayesha</span>');
+    expect(html).toContain('<bdi dir="ltr">+923217654321</bdi>');
+    expect(html).toMatch(
+      /class="header__account" data-account-link data-signed-in="Account">Account</,
+    );
+    // Its store credit, and what of it expires soonest.
+    expect(html).toContain('<p class="account__credit-balance">Rs 500</p>');
+    expect(html).toContain('Rs 200 of it expires on 31 December 2026.');
+    // Its orders, the newest first: the one with a page links to it through the storefront.
+    expect(html).toContain(
+      '<a href="/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x" aria-label="View order #1002"><bdi>#1002</bdi></a>',
+    );
+    expect(html).toContain('<dd>Pending</dd>');
+    expect(html).toContain('<dd>Fulfilled</dd>');
+    expect(html).toContain('<dt>2 items</dt>');
+    expect(html).toContain('<dd>Rs 12,500</dd>');
+    expect(html).toMatch(/<bdi>#1001<\/bdi>\s*<span/);
+    expect(html).toContain('<dd>Cancelled</dd>');
+    expect(html).toContain('<form method="post" action="/account/logout">');
+
+    // In Urdu, the words and the statuses are Urdu, and the links stay in it.
+    const urdu = await app.inject({
+      method: 'GET',
+      url: '/ur/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(urdu.statusCode).toBe(200);
+    expect(urdu.body).toContain('<h1>آپ کا اکاؤنٹ</h1>');
+    expect(urdu.body).toContain('<dd>ادائیگی باقی</dd>');
+    expect(urdu.body).toContain('<dd>روانہ ہو گیا</dd>');
+    expect(urdu.body).toContain('<dd>منسوخ</dd>');
+    expect(urdu.body).toContain('href="/ur/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x"');
+    expect(urdu.body).toContain('<form method="post" action="/ur/account/logout">');
+
+    // No orders, no credit, no name.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      name: null,
+      orders: [],
+      storeCredit: { balance: 0, currency: 'PKR', expiring: null },
+    });
+    const empty = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(empty.body).toContain('<p>You haven&#39;t placed an order with us yet.</p>');
+    expect(empty.body).not.toContain('<div class="account__credit">');
+    expect(empty.body).toContain('<p class="account__who"><bdi dir="ltr">+923217654321</bdi>');
+
+    // Not signed in: on to sign in. A session that is over takes its cookies with it.
+    const out = await app.inject({
+      method: 'GET',
+      url: '/ur/account',
+      headers: { host: 'localhost' },
+    });
+    expect([out.statusCode, out.headers.location, out.headers['set-cookie']]).toEqual([
+      302,
+      '/ur/account/login',
+      undefined,
+    ]);
+    const over = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie: 'hatti_account=sEsSiOn_SeCrEt-EnDeD-0123456789abcdef' },
+    });
+    expect([over.statusCode, over.headers.location]).toEqual([302, '/account/login']);
+    expect(over.headers['set-cookie']).toEqual([
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    ]);
+    expect(over.headers['cache-control']).toBe('private, no-store');
+    await app.close();
+  });
+
+  it("keeps the shop's other pages the same for everyone, signed in or not", async () => {
+    const app = server();
+    const cookie = signedIn();
+    const home = await app.inject({
+      method: 'GET',
+      url: '/',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(home.statusCode).toBe(200);
+    expect(home.headers['cache-control']).toMatch(/^public, /);
+    // The page says "Sign in"; its script says "Account" to a shopper with the cookie.
+    expect(home.body).toMatch(/data-account-link data-signed-in="Account">Sign in</);
+    expect(home.body).toContain('hatti_signed_in=1');
+    expect(home.body).not.toContain('Ayesha');
+    await app.close();
+  });
+
+  it("sends a shopper to their order's page, and signs them out", async () => {
+    const app = server();
+    const cookie = signedIn();
+    const [order, other] = ACCOUNT.orders.map((each) => each.id);
+    core.orderLinks.set(order!, { path: '/o/abc123', url: 'http://core.test/o/abc123' });
+    const go = (url: string, headers: Record<string, string> = { cookie }) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...headers } });
+    const opened = await go(`/account/orders/${order}`);
+    expect([opened.statusCode, opened.headers.location, opened.headers['cache-control']]).toEqual([
+      303,
+      'http://core.test/o/abc123',
+      'private, no-store',
+    ]);
+    // An order with no page, or not theirs: the shop's page not found.
+    const missing = await go(`/account/orders/${other}`);
+    expect(missing.statusCode).toBe(404);
+    expect(missing.body).toContain('Page not found');
+    expect(missing.headers['cache-control']).toBe('private, no-store');
+    expect((await go('/account/orders/ord_nobody')).statusCode).toBe(404);
+    // Not signed in: to sign in first, and back.
+    const out = await go(`/ur/account/orders/${order}`, {});
+    expect([out.statusCode, out.headers.location]).toEqual([
+      302,
+      `/ur/account/login?return_to=%2Fur%2Faccount%2Forders%2F${order}`,
+    ]);
+
+    // Signing out ends the session, and its cookies go: by the theme's form, or Shopify's link.
+    const cleared = [
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    ];
+    const posted = await app.inject({
+      method: 'POST',
+      url: '/account/logout',
+      headers: { ...FORM, cookie },
+    });
+    expect([posted.statusCode, posted.headers.location, posted.headers['set-cookie']]).toEqual([
+      303,
+      '/',
+      cleared,
+    ]);
+    expect(posted.headers['cache-control']).toBe('private, no-store');
+    expect(core.signedOut).toEqual([ACCOUNT_TOKEN]);
+    // Looking at the link signs no one out.
+    core.accounts.set(ACCOUNT_TOKEN, ACCOUNT);
+    const looked = await app.inject({
+      method: 'HEAD',
+      url: '/account/logout',
+      headers: { host: 'localhost', cookie },
+    });
+    expect([looked.statusCode, looked.headers['set-cookie']]).toEqual([302, undefined]);
+    expect(core.signedOut).toEqual([ACCOUNT_TOKEN]);
+    const linked = await go('/ur/account/logout');
+    expect([linked.statusCode, linked.headers.location, linked.headers['set-cookie']]).toEqual([
+      302,
+      '/ur',
+      cleared,
+    ]);
+    expect(core.signedOut).toEqual([ACCOUNT_TOKEN, ACCOUNT_TOKEN]);
+    // Signed out, the account sends them to sign in.
+    expect((await go('/account')).headers.location).toBe('/account/login');
+    await app.close();
+  });
+});
+
 describe.skipIf(!redisUrl)('The storefront server', () => {
   const redis = new Redis(redisUrl ?? '', { lazyConnect: true });
   const prefix = `test-sfs-${randomBytes(4).toString('hex')}`;
@@ -3586,6 +4171,48 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     }
     expect(answers).toEqual([...Array<number>(10).fill(200), 429]);
     expect(core.lookups).toHaveLength(10);
+    await app.close();
+  });
+
+  it('limits how often an address can try to sign in (ADR-571)', async () => {
+    const core = new FakeCore();
+    const app = server(core);
+    const answers = [];
+    for (let attempt = 0; attempt < 21; attempt += 1) {
+      const answer = await app.inject({
+        method: 'POST',
+        url: '/ur/account/login',
+        headers: { host: 'bazaar.localhost', 'content-type': 'application/x-www-form-urlencoded' },
+        payload: 'customer%5Bphone%5D=03001234567',
+        remoteAddress: '203.0.113.71',
+      });
+      answers.push(answer.statusCode);
+      if (answer.statusCode === 429) {
+        expect(answer.body).toContain(
+          'بہت زیادہ کوششیں۔ براہ کرم ایک منٹ انتظار کر کے دوبارہ کوشش کریں۔',
+        );
+        expect(answer.headers['cache-control']).toBe('private, no-store');
+      }
+    }
+    expect(answers).toEqual([...Array<number>(20).fill(200), 429]);
+    expect(core.loginStarts).toHaveLength(20);
+    expect(core.loginStarts[0]!.client).toEqual({ ip: '203.0.113.71' });
+    // Codes typed count against the same tries.
+    const typed = await app.inject({
+      method: 'POST',
+      url: '/account/login/verify',
+      headers: {
+        host: 'bazaar.localhost',
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: `hatti_login=${Buffer.from(
+          JSON.stringify({ phone: '03001234567', masked: '0300 ••••567', channel: 'whatsapp' }),
+        ).toString('base64url')}`,
+      },
+      payload: 'customer%5Bcode%5D=123456',
+      remoteAddress: '203.0.113.71',
+    });
+    expect(typed.statusCode).toBe(429);
+    expect(core.loginVerifies).toHaveLength(0);
     await app.close();
   });
 

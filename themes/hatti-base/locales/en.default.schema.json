@@ -85,6 +85,9 @@
     "main-404": {
       "name": "Page not found"
     },
+    "main-account": {
+      "name": "Account"
+    },
     "main-article": {
       "name": "Article"
     },
@@ -106,6 +109,9 @@
           "label": "Products per page"
         }
       }
+    },
+    "main-login": {
+      "name": "Sign in"
     },
     "main-page": {
       "name": "Page"

@@ -53,6 +53,13 @@
           {{- 'general.wishlist' | t }} <span class="count" data-wishlist-count hidden></span>
         </a>
       {%- endif -%}
+      {%- comment -%}
+        The shopper's account (ADR-571): it sends them to sign in when they are not. Pages are the
+        same for every shopper, so a script says "Account" on them once they are signed in.
+      {%- endcomment -%}
+      <a href="{{ routes.account_url }}" class="header__account" data-account-link data-signed-in="{{ 'general.account' | t }}">
+        {%- if customer %}{{ 'general.account' | t }}{% else %}{{ 'general.sign_in' | t }}{% endif -%}
+      </a>
       <a href="{{ routes.cart_url }}" class="header__cart" data-cart-link>
         {{- 'general.cart' | t }} <span class="count" data-cart-count>{{ cart.item_count }}</span>
       </a>
@@ -162,6 +169,13 @@
   if (count) {
     for (const element of document.querySelectorAll('[data-cart-count]')) {
       element.textContent = count[1];
+    }
+  }
+
+  // Whether the shopper is signed in comes from a cookie too, which says nothing more (ADR-571).
+  if (/(?:^|;\s*)hatti_signed_in=1(?:;|$)/.test(document.cookie)) {
+    for (const link of document.querySelectorAll('[data-account-link]')) {
+      link.textContent = link.dataset.signedIn;
     }
   }
 

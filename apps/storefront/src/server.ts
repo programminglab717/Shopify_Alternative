@@ -28,6 +28,8 @@ import {
   PRODUCT_FEED_PATH,
   SEARCH_TERMS_MAX,
   StorefrontApiError,
+  accountCookie,
+  accountCookieCleared,
   checkoutPagePath,
   numberProofCookie,
   type CartItemInput,
@@ -54,6 +56,19 @@ import {
   permalinkItems,
   type CoreBackend,
 } from './cart.js';
+import {
+  CODE_TYPED_MAX,
+  PHONE_TYPED_MAX,
+  accountTokenOf,
+  loginCookie,
+  loginCookieCleared,
+  loginErrorMessage,
+  pendingLoginOf,
+  signedInCookie,
+  signedInCookieCleared,
+  type LoginForm,
+  type LoginProblem,
+} from './accounts.js';
 import { blogFeed, collectionFeed, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
@@ -199,6 +214,14 @@ const REPORTS = { name: 'store-reports', limit: 5, windowMs: 60_000 };
  * for one or two, and a script trying numbers many.
  */
 const TRACKING_LOOKUPS = { name: 'tracking-lookups', limit: 10, windowMs: 60_000 };
+
+/**
+ * Tries at signing in an address may make a minute, codes asked for and codes typed (ADR-571): a
+ * shopper asks for a code or two and types each once or twice, and many share one mobile
+ * network's address; a script trying numbers or codes is stopped here, before the core's own
+ * limits on each number.
+ */
+const ACCOUNT_LOGINS = { name: 'account-logins', limit: 20, windowMs: 60_000 };
 
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
@@ -2324,6 +2347,294 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
   for (const path of ['/blogs/:blog/:article/comments', '/ur/blogs/:blog/:article/comments']) {
     app.post(path, comment);
+  }
+
+  /** Whether cookies set for this request go over HTTPS alone: in production, or as it came. */
+  const secureFor = (request: FastifyRequest) => secure || request.protocol === 'https';
+
+  /**
+   * An answer of the account's (ADR-571): the shopper's own, never kept, at the edge or in the
+   * browser, and not for search engines.
+   */
+  const accountAnswer = (reply: FastifyReply) =>
+    reply.header('cache-control', 'private, no-store').header('x-robots-tag', 'noindex');
+
+  /** Forgets the shopper's session in their browser, and the sign of it pages' scripts read. */
+  const signOutCookies = (request: FastifyRequest, reply: FastifyReply) => {
+    const options = { secure: secureFor(request) };
+    reply.header('set-cookie', [accountCookieCleared(options), signedInCookieCleared(options)]);
+  };
+
+  /** The account cannot be reached, as when the core restarts: said so, rather than failing. */
+  const accountUnavailable = (reply: FastifyReply) =>
+    reply
+      .code(503)
+      .type('text/plain; charset=utf-8')
+      .send('Your account cannot be reached just now. Please try again in a minute.\n');
+
+  /** The page's language, by its address: "/ur/account" is in Urdu. */
+  const languageOf = (request: FastifyRequest) => {
+    const urdu = request.url === '/ur' || request.url.startsWith('/ur/');
+    return { locale: urdu ? 'ur' : 'en', prefix: urdu ? '/ur' : '' };
+  };
+
+  /** The sign-in page, its form as `login` leaves it. */
+  const loginPage = (
+    reply: FastifyReply,
+    found: Found,
+    locale: string,
+    login: LoginForm,
+    status?: number,
+    asked?: FastifyRequest,
+  ) => sendPage(reply, { path: '/account/login', locale, login }, found, status, asked);
+
+  /** Sign-ins come from the shop's own pages, at most {@link ACCOUNT_LOGINS} a minute. */
+  const loginTooMuch = async (request: FastifyRequest): Promise<boolean> =>
+    limiter !== null && !(await limiter.hit(ACCOUNT_LOGINS, request.ip)).allowed;
+
+  /**
+   * Shopify's sign-in page, `/account/login` (CUS-02, ADR-571), in the theme's `customers/login`
+   * template: its form asks for the shopper's mobile number, and posted, has the core send a code
+   * to it, on WhatsApp unless they chose SMS, from their address, then asks for the code. The
+   * number waits in a cookie only the server reads, for ten minutes, as the code does. A shopper
+   * signed in already is sent to their account, or where the link asked.
+   */
+  const login = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { locale, prefix } = languageOf(request);
+    const words = (key: string, values: Record<string, unknown>) =>
+      translation(theme, locale, key, values);
+    const phoneStep = (returnTo: string | null): LoginForm => ({
+      step: 'phone',
+      phone: '',
+      phoneMasked: '',
+      channel: 'whatsapp',
+      errors: [],
+      returnTo,
+    });
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      if (request.method !== 'POST') {
+        const query = Object.fromEntries(new URL(request.url, 'http://storefront').searchParams);
+        const back = localPath(query.return_to);
+        const token = accountTokenOf(request.headers.cookie);
+        if (token) {
+          if (await core.accountSession(found.shopId, token)) {
+            return await reply.redirect(back ?? `${prefix}/account`, 302);
+          }
+          // Its session is over: the cookies that named it go.
+          signOutCookies(request, reply);
+        }
+        return await loginPage(reply, found, locale, phoneStep(back), undefined, request);
+      }
+      if (request.headers['sec-fetch-site'] === 'cross-site') {
+        return await reply
+          .code(403)
+          .type('text/plain; charset=utf-8')
+          .send('Shoppers sign in from the shop itself.\n');
+      }
+      const params = paramsOf(request);
+      const fields = recordOf(params.customer);
+      const text = (name: string) => (typeof fields[name] === 'string' ? fields[name] : '');
+      const form: LoginForm = {
+        ...phoneStep(returnTo(params)),
+        phone: text('phone').trim().slice(0, PHONE_TYPED_MAX),
+        channel: text('channel') === 'sms' ? 'sms' : 'whatsapp',
+      };
+      const refused = (problem: LoginProblem, status: number) =>
+        loginPage(
+          reply,
+          found,
+          locale,
+          { ...form, errors: [loginErrorMessage(problem, words)] },
+          status,
+        );
+      if (await loginTooMuch(request)) return await refused('too_many_requests', 429);
+      const started = await core.accountLoginStart(
+        found.shopId,
+        { phone: form.phone, channel: form.channel, locale },
+        { ip: request.ip },
+      );
+      if (!started.ok) return await refused('invalid_phone', 422);
+      if (started.state === 'too_many') return await refused('too_many_codes', 429);
+      const pending = { phone: form.phone, masked: started.phone, channel: started.channel };
+      reply.header('set-cookie', loginCookie(pending, { secure: secureFor(request) }));
+      return await loginPage(reply, found, locale, {
+        ...form,
+        step: 'code',
+        phone: '',
+        phoneMasked: started.phone,
+        channel: started.channel,
+      });
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
+   * The code a shopper typed (ADR-571), checked by the core against the last one sent to the
+   * number their cookie keeps: right, the session's secret goes in its cookie, and they go on to
+   * their account, or the path on the shop the form asked; wrong, the page asks again, saying
+   * why; expired or tried too often, it asks for the number again, for a new code.
+   */
+  const verify = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { locale, prefix } = languageOf(request);
+    const words = (key: string, values: Record<string, unknown>) =>
+      translation(theme, locale, key, values);
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send('Shoppers sign in from the shop itself.\n');
+    }
+    const params = paramsOf(request);
+    const fields = recordOf(params.customer);
+    const code = (typeof fields.code === 'string' ? fields.code : '')
+      .replace(/\s+/g, '')
+      .slice(0, CODE_TYPED_MAX);
+    const back = returnTo(params);
+    const pending = pendingLoginOf(request.headers.cookie);
+    const options = { secure: secureFor(request) };
+    const said = (problem: LoginProblem) => [loginErrorMessage(problem, words)];
+    const phoneStep = (problem: LoginProblem): LoginForm => ({
+      step: 'phone',
+      phone: pending?.phone ?? '',
+      phoneMasked: '',
+      channel: pending?.channel ?? 'whatsapp',
+      errors: said(problem),
+      returnTo: back,
+    });
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      if (!pending) return await loginPage(reply, found, locale, phoneStep('expired'), 422);
+      const codeStep = (problem: LoginProblem): LoginForm => ({
+        step: 'code',
+        phone: '',
+        phoneMasked: pending.masked,
+        channel: pending.channel,
+        errors: said(problem),
+        returnTo: back,
+      });
+      if (await loginTooMuch(request)) {
+        return await loginPage(reply, found, locale, codeStep('too_many_requests'), 429);
+      }
+      const verified = await core.accountLoginVerify(found.shopId, { phone: pending.phone, code });
+      if (verified.ok) {
+        reply.header('set-cookie', [
+          accountCookie(verified.token, options),
+          signedInCookie(options),
+          loginCookieCleared(options),
+        ]);
+        return await reply.redirect(back ?? `${prefix}/account`, 303);
+      }
+      if (verified.error === 'wrong') {
+        return await loginPage(reply, found, locale, codeStep('wrong'), 422);
+      }
+      // A new code is needed, or the number was never one: it starts again.
+      reply.header('set-cookie', loginCookieCleared(options));
+      const status = verified.error === 'too_many' ? 429 : 422;
+      return await loginPage(reply, found, locale, phoneStep(verified.error), status);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
+   * The shopper's account, `/account` (ADR-571), in the theme's `customers/account` template,
+   * with `customer`: their orders with the shop and their store credit, as the core reads them
+   * for the session their cookie names. Without one, they are sent to sign in.
+   */
+  const accountPage = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { locale, prefix } = languageOf(request);
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      const token = accountTokenOf(request.headers.cookie);
+      const account = token ? await core.account(found.shopId, token) : null;
+      if (!account) {
+        if (token) signOutCookies(request, reply);
+        return await reply.redirect(`${prefix}/account/login`, 302);
+      }
+      const page = { path: '/account', locale, customer: account };
+      return await sendPage(reply, page, found, undefined, request);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
+   * One of the shopper's orders, from their account (ADR-571): on to its page, on the core's
+   * address, as the core links it for their session; the shop's page not found for an order not
+   * theirs, or with no page. Without a session, they sign in first and come back.
+   */
+  const accountOrder = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { locale, prefix } = languageOf(request);
+    const { id } = request.params as { id: string };
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      const token = accountTokenOf(request.headers.cookie);
+      if (!token) {
+        const back = `${prefix}/account/orders/${encodeURIComponent(id)}`;
+        const to = `${prefix}/account/login?${new URLSearchParams({ return_to: back })}`;
+        return await reply.redirect(to, 302);
+      }
+      const link = id.length <= 64 ? await core.accountOrderLink(found.shopId, token, id) : null;
+      if (!link) {
+        const path = `/account/orders/${encodeURIComponent(id)}`;
+        return await sendPage(reply, { path, locale }, found, 404);
+      }
+      return await reply.redirect(link.url, 303);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
+   * Signing out (ADR-571): the core ends the session the cookie names, and the cookie goes; then
+   * the shop's home page. Shopify's themes link to it, so a GET signs out as a POST does.
+   */
+  const logout = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { prefix } = languageOf(request);
+    // A HEAD request, as a link checker's, only looks.
+    if (request.method === 'HEAD') return reply.redirect(prefix || '/', 302);
+    const token = accountTokenOf(request.headers.cookie);
+    try {
+      if (token && core) await core.accountLogout(found.shopId, token);
+    } catch (error) {
+      // The cookie goes all the same: the session ends unused, as sessions do.
+      if (!unreachable(request, error)) throw error;
+    }
+    signOutCookies(request, reply);
+    return reply.redirect(prefix || '/', request.method === 'POST' ? 303 : 302);
+  };
+
+  for (const prefix of ['', '/ur']) {
+    app.get(`${prefix}/account`, accountPage);
+    app.route({ method: ['GET', 'POST'], url: `${prefix}/account/login`, handler: login });
+    app.post(`${prefix}/account/login/verify`, verify);
+    app.get(`${prefix}/account/orders/:id`, accountOrder);
+    app.route({ method: ['GET', 'POST'], url: `${prefix}/account/logout`, handler: logout });
   }
 
   app.get('/*', async (request, reply) => {

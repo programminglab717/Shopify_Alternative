@@ -85,6 +85,9 @@
     "main-404": {
       "name": "صفحہ نہیں ملا"
     },
+    "main-account": {
+      "name": "اکاؤنٹ"
+    },
     "main-article": {
       "name": "مضمون"
     },
@@ -106,6 +109,9 @@
           "label": "ایک صفحے پر پروڈکٹس"
         }
       }
+    },
+    "main-login": {
+      "name": "سائن ان"
     },
     "main-page": {
       "name": "صفحہ"

@@ -1,5 +1,6 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
-import type { CartJson } from '@hatti/storefront-api';
+import type { AccountJson, CartJson } from '@hatti/storefront-api';
+import { customerObject, type LoginForm } from './accounts.js';
 import {
   TranslatedStore,
   type HandledKind,
@@ -136,6 +137,13 @@ export interface PageRequest {
    * storefront's password, when it was not right (ADR-054).
    */
   formErrors?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * The signed-in shopper's account (ADR-571), as `customer`, for the account's own pages, which
+   * are never kept: other pages are the same for everyone, and have none.
+   */
+  customer?: AccountJson | null;
+  /** The sign-in page's form, as its route leaves it: its step, and what went wrong. */
+  login?: LoginForm | null;
 }
 
 /**
@@ -218,6 +226,8 @@ interface PreparedPage {
   query: Readonly<Record<string, string>>;
   /** What a form posted to the page got wrong, by the form's type. */
   formErrors: Readonly<Record<string, readonly string[]>>;
+  /** The sign-in page's form; null on other pages. */
+  login: LoginForm | null;
   /** Content of the platform's own instead of a template's, as a policy's page has (ADR-056). */
   builtIn: string | null;
   theme: Theme;
@@ -265,6 +275,8 @@ function routesFor(prefix: string): Record<string, string> {
     predictive_search_url: `${prefix}/search/suggest`,
     product_recommendations_url: `${prefix}/recommendations/products`,
     account_url: `${prefix}/account`,
+    account_login_url: `${prefix}/account/login`,
+    account_logout_url: `${prefix}/account/logout`,
   };
 }
 
@@ -349,6 +361,7 @@ export class PageRenderer {
       query: page.query,
       params: page.ctx.filters?.params ?? [],
       formErrors: page.formErrors,
+      login: page.login,
       renderSection: () => Promise.resolve(''),
       renderGroup: () => Promise.resolve(''),
     };
@@ -442,6 +455,7 @@ export class PageRenderer {
       query,
       params: ctx.filters?.params ?? [],
       formErrors: prepared.formErrors,
+      login: prepared.login,
       renderSection: (section) =>
         limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
       renderGroup: (group) =>
@@ -670,6 +684,13 @@ export class PageRenderer {
       ),
       // Hatti's: why a change to the cart was refused.
       cart_error: request.cartError ?? null,
+      // The signed-in shopper, on the account's own pages alone (ADR-571); nil elsewhere.
+      customer: request.customer
+        ? customerObject(request.customer, {
+            locale,
+            prefix: locale === theme.defaultLocale ? '' : `/${locale}`,
+          })
+        : null,
       localization: {
         language: { iso_code: locale, name: localeInfo.name, endonym_name: localeInfo.endonym },
         available_languages: [...theme.locales.keys()].map((code) => ({
@@ -688,10 +709,11 @@ export class PageRenderer {
       direction: localeInfo.rtl ? 'rtl' : 'ltr',
       cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
       delivery: deliveryObject(shopDoc),
+      // A customer's templates are under customers/, as Shopify's: `customers/login` is `login`.
       template: {
-        name,
+        name: name.split('/').at(-1),
         suffix: templateFile === `templates/${name}.${suffix}.json` ? suffix : null,
-        directory: null,
+        directory: name.includes('/') ? name.split('/')[0] : null,
       },
       // What search engines and link previews are told of it (ADR-231): its SEO title and
       // description, else its own title and the start of its own text; the home page's are the
@@ -740,6 +762,7 @@ export class PageRenderer {
       timezone: timeZoneOf(shopDoc),
       preview: request.preview ?? null,
       formErrors: request.formErrors ?? {},
+      login: request.login ?? null,
       builtIn,
       editor: request.editor ?? null,
       templateFile,
@@ -1050,6 +1073,9 @@ function route(path: string): Route {
   if (path === '/search' || path === '/search/') return { name: 'search', handle: null };
   // The storefront sends shoppers here while the shop is closed behind its password (ADR-054).
   if (path === '/password') return { name: 'password', handle: null };
+  // A shopper's sign-in and account (ADR-571), which the storefront serves only to them.
+  if (path === '/account') return { name: 'customers/account', handle: null };
+  if (path === '/account/login') return { name: 'customers/login', handle: null };
   const policy = /^\/policies\/([a-z-]+)\/?$/.exec(path);
   if (policy) return { name: 'policy', handle: policy[1]! };
   // The shop's link-in-bio page (ADR-161).
@@ -1229,6 +1255,8 @@ function pageTitle(
   if (titled?.title) return titled.title;
   if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';
   if (name === 'search') return words('sections.search.title') ?? 'Search';
+  if (name === 'customers/login') return words('customer.login.title') ?? 'Sign in';
+  if (name === 'customers/account') return words('customer.account.title') ?? 'Your account';
   return name === '404' ? 'Page not found' : String(shop.name);
 }
 

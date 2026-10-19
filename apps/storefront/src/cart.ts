@@ -33,6 +33,12 @@ export type CoreBackend = Pick<
   | 'watchStock'
   | 'report'
   | 'complainOfRights'
+  | 'accountLoginStart'
+  | 'accountLoginVerify'
+  | 'accountSession'
+  | 'account'
+  | 'accountOrderLink'
+  | 'accountLogout'
 >;
 
 /** The secret naming the shopper's cart, which scripts cannot read. */

@@ -17,6 +17,8 @@ describe('Theme Check', () => {
         file !== 'config/settings_schema.json',
     );
     expect(own.length).toBeGreaterThan(5);
+    // A customer's templates are under customers/, as Shopify's (ADR-571).
+    expect(own).toContain('templates/customers/login.json');
     for (const file of own) {
       expect(checkShopFile(base, file, base.files[file]!), file).toEqual([]);
     }

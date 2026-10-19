@@ -1,0 +1,97 @@
+{%- comment -%}
+  Signing in (CUS-02, ADR-571): the shopper's mobile number, then the code the shop sends to it on
+  WhatsApp or by SMS. The storefront says in `form` which step the form is on, where the code
+  went, masked, and what went wrong; the number waits on the server meanwhile, never in the page.
+{%- endcomment -%}
+<div class="page-width section-spacing login">
+  <h1>{{ 'customer.login.title' | t }}</h1>
+  {%- form 'customer_login', class: 'login__form' -%}
+    {%- if form.return_to -%}
+      <input type="hidden" name="return_to" value="{{ form.return_to | escape }}">
+    {%- endif -%}
+    {%- if form.step == 'code' -%}
+      <p class="login__lead">
+        {%- if form.channel == 'sms' -%}
+          {{ 'customer.login.code_sent_sms_html' | t: phone: form.phone_masked }}
+        {%- else -%}
+          {{ 'customer.login.code_sent_whatsapp_html' | t: phone: form.phone_masked }}
+        {%- endif -%}
+      </p>
+      <label for="LoginCode">{{ 'customer.login.code_label' | t }}</label>
+      <div class="login__field">
+        <input
+          id="LoginCode"
+          type="text"
+          name="customer[code]"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="10"
+          dir="ltr"
+          required
+          {% if form.errors %}aria-invalid="true" aria-describedby="LoginError"{% endif %}
+        >
+        <button class="button" type="submit">{{ 'customer.login.verify' | t }}</button>
+      </div>
+    {%- else -%}
+      <p class="login__lead">{{ 'customer.login.intro' | t }}</p>
+      <label for="LoginPhone">{{ 'customer.login.phone_label' | t }}</label>
+      <input
+        id="LoginPhone"
+        type="tel"
+        name="customer[phone]"
+        value="{{ form.phone | escape }}"
+        autocomplete="tel"
+        inputmode="tel"
+        dir="ltr"
+        required
+        placeholder="0300 1234567"
+        {% if form.errors %}aria-invalid="true" aria-describedby="LoginError"{% endif %}
+      >
+      <fieldset class="login__channels">
+        <legend>{{ 'customer.login.channel_label' | t }}</legend>
+        <label>
+          <input type="radio" name="customer[channel]" value="whatsapp" {% unless form.channel == 'sms' %}checked{% endunless %}>
+          {{ 'customer.login.channel_whatsapp' | t }}
+        </label>
+        <label>
+          <input type="radio" name="customer[channel]" value="sms" {% if form.channel == 'sms' %}checked{% endif %}>
+          {{ 'customer.login.channel_sms' | t }}
+        </label>
+      </fieldset>
+      <button class="button" type="submit">{{ 'customer.login.send' | t }}</button>
+    {%- endif -%}
+    {%- if form.errors -%}
+      <div id="LoginError" class="login__error" role="alert">
+        {%- for error in form.errors -%}
+          <p>{{ error | escape }}</p>
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
+    {%- if form.step == 'code' -%}
+      {%- liquid
+        assign again = routes.account_login_url
+        if form.return_to
+          assign back = form.return_to | url_encode
+          assign again = again | append: '?return_to=' | append: back
+        endif
+      -%}
+      <a class="login__again" href="{{ again }}">{{ 'customer.login.change_number' | t }}</a>
+    {%- endif -%}
+  {%- endform -%}
+</div>
+
+{% stylesheet %}
+  .login { max-inline-size: 28rem; }
+  .login__form { display: grid; gap: 0.75rem; }
+  .login__lead { margin: 0; }
+  .login__field { display: flex; gap: 0.5rem; }
+  .login__form input[type='tel'], .login__form input[type='text'] { flex: 1; min-inline-size: 0; min-block-size: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: 4px; font: inherit; letter-spacing: 0.05em; }
+  .login__channels { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin: 0; padding: 0; border: 0; }
+  .login__channels legend { padding: 0; margin-block-end: 0.25rem; }
+  .login__error { color: #b42318; }
+  .login__error p { margin: 0; }
+{% endstylesheet %}
+
+{% schema %}
+{ "name": "t:sections.main-login.name" }
+{% endschema %}
