@@ -27,6 +27,7 @@ import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { Redis } from 'ioredis';
 import { createApi } from '../api/create-api.js';
+import type { QueryCostOptions } from '../api/query-cost.js';
 import { couriersOf } from '../couriers.js';
 import { hattiGatewayOf } from '../billing.js';
 import { paymentGatewaysOf } from '../payments.js';
@@ -101,6 +102,8 @@ export async function startTestApi(
     ai?: AiGateway;
     /** Hatti's VAPID keys (ADR-506); without them, nothing is pushed to staff's browsers. */
     push?: VapidKeys;
+    /** How queries are costed and throttled (ADR-576); without it, none is. */
+    queryCost?: QueryCostOptions;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -137,6 +140,7 @@ export async function startTestApi(
     ...(options.metaGraph && { metaGraph: options.metaGraph }),
     ...(options.tiktokApi && { tiktokApi: options.tiktokApi }),
     push: options.push ?? null,
+    queryCost: options.queryCost ?? null,
     couriers: couriersOf({ production: false }),
     paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),
     billingGateway:

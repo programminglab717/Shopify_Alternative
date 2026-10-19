@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-575 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-576 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -583,6 +583,7 @@
 | 573 | The admin says who asked each waiting erasure, and shows a customer who acted in the activity log, linked to their page | Accepted |
 | 574 | A shopper buys an order again from their account: what can still be sold goes into their cart at the order's quantities, and the cart says what could not | Accepted |
 | 575 | A signed-in shopper's wishlist is kept with their account and follows them across devices, the browser's list still what pages show, so every page stays cacheable | Accepted |
+| 576 | The Admin API costs each query before it runs and meters it per app or member of staff in each shop, Shopify's leaky bucket, refusing what would overdraw it and saying the cost | Accepted |
 
 ---
 
@@ -21358,3 +21359,31 @@
   sign in, and no page is made per shopper.
 * **Alternatives:** **The wishlist rendered by the server:** each product page would be per shopper
   and uncacheable for a heart.
+
+## ADR-576 · The Admin API costs each query before it runs and meters it per app or member of staff in each shop, Shopify's leaky bucket, refusing what would overdraw it and saying the cost
+
+* **Context:** The Admin API had no limits, to come before any third-party app has a token; shops'
+  custom apps have had tokens since DEV-04. Shopify costs each GraphQL query and meters it with a
+  leaky bucket per app and shop, saying the cost in `extensions.cost`.
+* **Decision:**
+  * **The cost, before it runs,** as Shopify counts it: scalars and enums nothing, an object 1 and
+    what it selects, a connection or paged list 2 and its page times one item and what it selects,
+    a page of `first` or `last` or else 50, a mutation 10 each and its payload, fragments merged as
+    executed, an interface or union its costliest type, `@skip` and `@include` heeded, and
+    introspection 1. An app's query over 1,000, or its bucket, is refused before it runs; a member of staff's is
+    held to their whole bucket, as the admin's costliest page, a courier's statement of 250 lines,
+    costs about 1,009.
+  * **The bucket:** in Redis, one for each app, member of staff or support agent in each shop, an
+    atomic script restoring with time and taking a query's cost only if all of it is there: an
+    app 1,000 points restoring 50 a second, staff 2,000 restoring 100, all set by the host. What
+    a query did not use, its connections returning fewer than asked, is given back after.
+  * **Refused** queries take nothing and say `THROTTLED`, with what is left and when to try again,
+    or `MAX_COST_EXCEEDED`; a mutation refused with an idempotency key frees the key, so trying
+    again runs it. Every answer says its cost and the bucket's state.
+  * **Open when Redis fails:** the query runs unmetered and a warning is logged; the API and every
+    shop's admin stay up.
+* **Consequences:** No app can starve a shop's API, or another shop's, and apps pace themselves by
+  the cost they are told. Lists that come whole with their parent, a product's variants, are
+  counted as one item; buckets by plan are to come.
+* **Alternatives:** **Requests a second:** a page of 250 orders and one product would weigh the
+  same. **Closed when Redis fails:** an outage of the cache would stop every shop's admin.

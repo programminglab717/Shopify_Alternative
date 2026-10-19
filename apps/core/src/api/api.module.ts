@@ -55,6 +55,7 @@ import { GraphQLError } from 'graphql';
 import type { Redis } from 'ioredis';
 import mercurius from 'mercurius';
 import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
+import { queryCostHooks, type QueryCostOptions } from './query-cost.js';
 import { HealthController } from './health.controller.js';
 import { StockWatchController } from './stock-watches.controller.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
@@ -87,6 +88,11 @@ export interface ApiModuleOptions {
   identity: IdentityServiceOptions;
   logger: Logger;
   redis?: Redis | null;
+  /**
+   * How queries are costed and their callers throttled (ADR-576); without it, nothing is, and
+   * answers carry no `extensions.cost`.
+   */
+  queryCost?: QueryCostOptions | null;
   /** Show GraphiQL at /graphiql. */
   graphiql?: boolean;
   /** Replace unexpected error messages with "Internal error". On in production. */
@@ -235,7 +241,12 @@ function formatErrors(maskInternalErrors: boolean): MercuriusDriverConfig['error
         extensions: { code: 'INTERNAL_SERVER_ERROR', requestId },
       });
     });
-    return mercurius.defaultErrorFormatter({ ...execution, errors }, context);
+    const formatted = mercurius.defaultErrorFormatter({ ...execution, errors }, context);
+    // A query refused for its cost tells what it would have cost and what is left (ADR-576).
+    const cost = context.reply.request.queryCost;
+    return cost
+      ? { ...formatted, response: { ...formatted.response, extensions: { cost } } }
+      : formatted;
   };
 }
 
@@ -261,6 +272,9 @@ export class ApiModule {
           // Field resolvers check scopes too: a variant's stock needs read_inventory.
           fieldResolverEnhancers: ['guards'],
           errorFormatter: formatErrors(options.maskInternalErrors ?? true),
+          ...(options.queryCost && {
+            hooks: queryCostHooks(options.queryCost, options.logger),
+          }),
         }),
         IdentityModule.forRoot(options.identity),
         CatalogModule,

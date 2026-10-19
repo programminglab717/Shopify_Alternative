@@ -3,6 +3,7 @@ import { SecretBox } from '@hatti/crypto';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
 import { FBR_DI_URLS } from '@hatti/tax/public';
 import { STATUS_COMPONENTS, type StatusComponent } from '@hatti/trust/public';
+import type { QueryCostLimits } from './api/query-cost.js';
 
 /** "id:base64key,…", newest first. Parsed at startup so a bad key stops the process. */
 const encryptionKeys = () =>
@@ -282,6 +283,17 @@ const apiSchema = z
     /** GraphiQL at /graphiql. Defaults to on in development only. */
     GRAPHIQL: env.flag().optional(),
     /**
+     * The Admin API's buckets of query cost (ADR-576): the points each app holds in each shop, and
+     * how many it restores a second; and each member of staff's, from the admin. Apps get
+     * Shopify's standard bucket, 1,000 restoring 50 a second, unless set. Staff get twice that:
+     * the admin is Hatti's own client, a page of it asks several queries at once, and a person
+     * clicking cannot drain a bucket as a script can.
+     */
+    ADMIN_API_APP_BUCKET_SIZE: z.coerce.number().int().min(1).default(1_000),
+    ADMIN_API_APP_RESTORE_RATE: z.coerce.number().int().min(1).default(50),
+    ADMIN_API_STAFF_BUCKET_SIZE: z.coerce.number().int().min(1).default(2_000),
+    ADMIN_API_STAFF_RESTORE_RATE: z.coerce.number().int().min(1).default(100),
+    /**
      * Where customers reach this API's public pages, such as draft orders' links:
      * "https://hatti.pk". Required in production; http://localhost:PORT otherwise.
      */
@@ -560,6 +572,28 @@ export function passkeysOf(
     rpId: config.PASSKEY_RP_ID ?? publicUrl.hostname,
     rpName: 'Hatti',
     origins: (config.PASSKEY_ORIGINS ?? [publicUrl.origin]).map((origin) => new URL(origin).origin),
+  };
+}
+
+/** The Admin API's buckets of query cost, for apps and for staff (ADR-576). */
+export function queryCostLimitsOf(
+  config: Pick<
+    ApiConfig,
+    | 'ADMIN_API_APP_BUCKET_SIZE'
+    | 'ADMIN_API_APP_RESTORE_RATE'
+    | 'ADMIN_API_STAFF_BUCKET_SIZE'
+    | 'ADMIN_API_STAFF_RESTORE_RATE'
+  >,
+): QueryCostLimits {
+  return {
+    app: {
+      maximum: config.ADMIN_API_APP_BUCKET_SIZE,
+      restoreRate: config.ADMIN_API_APP_RESTORE_RATE,
+    },
+    staff: {
+      maximum: config.ADMIN_API_STAFF_BUCKET_SIZE,
+      restoreRate: config.ADMIN_API_STAFF_RESTORE_RATE,
+    },
   };
 }
 

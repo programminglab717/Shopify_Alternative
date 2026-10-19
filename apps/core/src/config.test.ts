@@ -14,6 +14,7 @@ import {
   loadSupportRequestsConfig,
   loadWorkerConfig,
   passkeysOf,
+  queryCostLimitsOf,
   vapidKeysOf,
 } from './config.js';
 
@@ -345,6 +346,33 @@ describe('API configuration', () => {
     );
     expect(() => loadApiConfig({ ...env, TIKTOK_API_URL: 'business-api' })).toThrow(
       /TIKTOK_API_URL/,
+    );
+  });
+
+  it("sizes the Admin API's buckets of query cost, apps' as Shopify's unless set (ADR-576)", () => {
+    expect(queryCostLimitsOf(loadApiConfig(env))).toEqual({
+      app: { maximum: 1_000, restoreRate: 50 },
+      staff: { maximum: 2_000, restoreRate: 100 },
+    });
+    expect(
+      queryCostLimitsOf(
+        loadApiConfig({
+          ...env,
+          ADMIN_API_APP_BUCKET_SIZE: '2000',
+          ADMIN_API_APP_RESTORE_RATE: '100',
+          ADMIN_API_STAFF_BUCKET_SIZE: '4000',
+          ADMIN_API_STAFF_RESTORE_RATE: '200',
+        }),
+      ),
+    ).toEqual({
+      app: { maximum: 2_000, restoreRate: 100 },
+      staff: { maximum: 4_000, restoreRate: 200 },
+    });
+    expect(() => loadApiConfig({ ...env, ADMIN_API_APP_RESTORE_RATE: '0' })).toThrow(
+      /ADMIN_API_APP_RESTORE_RATE/,
+    );
+    expect(() => loadApiConfig({ ...env, ADMIN_API_STAFF_BUCKET_SIZE: 'lots' })).toThrow(
+      /ADMIN_API_STAFF_BUCKET_SIZE/,
     );
   });
 

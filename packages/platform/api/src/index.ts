@@ -58,6 +58,12 @@ export {
   encodeCursor,
   pageSize,
 } from './graphql/cursor.js';
+export {
+  QUERY_COST,
+  actualQueryCost,
+  requestedQueryCost,
+  type CostedOperation,
+} from './graphql/cost.js';
 export { shopProfile, type ShopProfile, type ShopStatus } from './shop.js';
 export {
   parseSearch,

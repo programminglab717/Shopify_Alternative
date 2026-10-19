@@ -93,6 +93,16 @@ export class IdempotencyStore {
     });
   }
 
+  /** Lets the key go, for a request refused before it ran, so that its retry may claim it. */
+  async release(owner: KeyOwner): Promise<void> {
+    await this.database.tenant(owner.shopId, (tx) =>
+      tx.execute(sql`
+        DELETE FROM platform.idempotency_keys
+         WHERE shop_id = ${owner.shopId} AND actor_id = ${owner.actorId}
+           AND key = ${owner.key}`),
+    );
+  }
+
   /** Keeps the answer to the request that claimed the key. */
   async complete(owner: KeyOwner, statusCode: number, response: string): Promise<void> {
     await this.database.tenant(owner.shopId, (tx) =>
@@ -288,7 +298,10 @@ export function idempotencyHooks(store: IdempotencyStore): {
       const owner = request.idempotencyKey;
       if (owner && typeof payload === 'string') {
         try {
-          await store.complete(owner, reply.statusCode, payload);
+          // Throttled for its cost (ADR-576), the mutation never ran: its retry, with the same
+          // key, runs it, rather than being told again that it was throttled.
+          if (request.queryRefused) await store.release(owner);
+          else await store.complete(owner, reply.statusCode, payload);
         } catch (error) {
           // The work is done; the client still gets its answer. A retry within the minute the
           // key is held is told to wait, and one after it runs again.

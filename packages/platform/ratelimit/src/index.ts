@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { Redis } from 'ioredis';
 
+export { LeakyBuckets, type BucketLimits, type BucketResult } from './leaky-bucket.js';
+
 export interface RateLimit {
   /** Stable name, part of the Redis key, e.g. "sign-in:email". */
   name: string;

@@ -4,9 +4,9 @@ import { Database } from '@hatti/db';
 import { createRedis } from '@hatti/events';
 import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
 import { createLogger } from '@hatti/logger';
-import { RateLimiter } from '@hatti/ratelimit';
+import { LeakyBuckets, RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
-import { loadApiConfig, passkeysOf, vapidKeysOf } from './config.js';
+import { loadApiConfig, passkeysOf, queryCostLimitsOf, vapidKeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
@@ -63,6 +63,8 @@ const app = await createApi({
     google: config.GOOGLE_CLIENT_IDS ? { clientIds: config.GOOGLE_CLIENT_IDS } : null,
     emails: accountEmailsOf(config, logger),
   },
+  // Apps and staff each spend a bucket of query cost in each shop (ADR-576).
+  queryCost: { buckets: new LeakyBuckets(redis), limits: queryCostLimitsOf(config) },
   trustProxy: config.TRUST_PROXY,
   graphiql: config.GRAPHIQL ?? config.NODE_ENV === 'development',
   maskInternalErrors: config.NODE_ENV === 'production',

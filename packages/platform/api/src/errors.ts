@@ -27,6 +27,13 @@ export const ErrorCode = {
   IdempotencyKeyInUse: 'IDEMPOTENCY_KEY_IN_USE',
   /** Hatti's support looks at a shop and changes nothing in it (ADR-156). */
   SupportReadOnly: 'SUPPORT_READ_ONLY',
+  /**
+   * The query costs more than its caller's bucket holds now (ADR-576): it waits for the bucket to
+   * restore, as `extensions.cost.throttleStatus` tells, and tries again.
+   */
+  Throttled: 'THROTTLED',
+  /** The query costs more than any one query may (ADR-576), however long it waits. */
+  MaxCostExceeded: 'MAX_COST_EXCEEDED',
 } as const;
 
 export function unauthenticated(): GraphQLError {
