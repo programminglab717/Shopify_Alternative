@@ -1203,6 +1203,7 @@ describe.skipIf(!server)('CheckoutService', () => {
       proofs: 0,
       codes: 0,
       sessions: 0,
+      wishlists: 0,
     });
     const { rows } = await f.admin.query<{ count: string }>(
       'SELECT count(*) FROM checkout.checkouts',

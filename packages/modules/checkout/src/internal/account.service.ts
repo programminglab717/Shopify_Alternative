@@ -44,6 +44,13 @@ import type {
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { ACCOUNT_DATA, ACCOUNT_DATA_TYPE, accountDataKey } from './account-data.js';
+import {
+  addToWishlistIn,
+  removeFromWishlistIn,
+  wishlistIn,
+  wishlistOwnerIn,
+  type WishlistOwner,
+} from './account-wishlist.js';
 import { CartService } from './cart.service.js';
 import { checkCodeIn, sendCodeIn } from './number-codes.js';
 
@@ -57,7 +64,8 @@ import { checkCodeIn, sendCodeIn } from './number-codes.js';
 // there. Signed in, a shopper asks for their own data, or its erasure, as the shop's staff would
 // for them (CUS-05, ADR-572), through the customers module's own requests. Each order lists what
 // it sold, for the storefront to put in their cart again (ADR-574), saying what can be had now as
-// the cart would: its variant still the shop's, its product on sale, and not sold out.
+// the cart would: its variant still the shop's, its product on sale, and not sold out. Their
+// wishlist is kept with the account (ADR-575): the customer's, or the number's while it has none.
 
 export const ACCOUNT_SESSION = {
   /** Bytes of the token the browser's cookie keeps. */
@@ -383,6 +391,59 @@ export class AccountService {
     );
     // Cancelled by the shop, or carried out, since: as before they asked.
     return erasure ? erasureJson(erasure) : { state: 'none' };
+  }
+
+  /**
+   * The wishlist of the account the session `token` names (ADR-575): its products, the newest
+   * first, by the catalog's IDs, those the shop no longer has left out. Null without a session.
+   */
+  async wishlist(shopId: string, token: string): Promise<string[] | null> {
+    return this.#wishlist(shopId, token, async () => undefined);
+  }
+
+  /**
+   * Adds `productIds`, the newest first, to the wishlist of the account the session `token` names
+   * (ADR-575): those the shop has, each once, those already in it staying where they are, and the
+   * oldest going past the 100 it keeps. The wishlist as it is now; null without a session.
+   */
+  async addToWishlist(
+    shopId: string,
+    token: string,
+    productIds: readonly string[],
+  ): Promise<string[] | null> {
+    return this.#wishlist(shopId, token, (tx, owner) =>
+      addToWishlistIn(tx, shopId, owner, productIds),
+    );
+  }
+
+  /**
+   * Takes the product `productId` off the wishlist of the account the session `token` names
+   * (ADR-575): the wishlist as it is now; null without a session.
+   */
+  async removeFromWishlist(
+    shopId: string,
+    token: string,
+    productId: string,
+  ): Promise<string[] | null> {
+    return this.#wishlist(shopId, token, (tx, owner) =>
+      removeFromWishlistIn(tx, shopId, owner, productId),
+    );
+  }
+
+  /** The wishlist of the session `token` names once `change` changed it; null without one. */
+  async #wishlist(
+    shopId: string,
+    token: string,
+    change: (tx: Tx, owner: WishlistOwner) => Promise<void>,
+  ): Promise<string[] | null> {
+    if (!TOKEN.test(token)) return null;
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, token);
+      if (!session) return null;
+      const owner = await wishlistOwnerIn(tx, shopId, session);
+      await change(tx, owner);
+      return wishlistIn(tx, shopId, owner);
+    });
   }
 
   /** The file `kept`, with a link that downloads it for {@link ACCOUNT_DATA}'s minutes. */

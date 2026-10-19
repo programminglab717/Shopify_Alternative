@@ -23,6 +23,7 @@ import {
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
+  ACCOUNT_WISHLIST_MAX,
   CONTENT_TYPES,
   NUMBER_PROOF_COOKIE,
   PRODUCT_FEED_PATH,
@@ -241,6 +242,16 @@ const ACCOUNT_DATA_REQUESTS = { name: 'account-data-requests', limit: 10, window
  * may ask of their own data: a shopper buys one or two again, and each asks the cart a few times.
  */
 const ACCOUNT_REORDERS = { name: 'account-reorders', limit: 10, windowMs: 60_000 };
+
+/**
+ * What an address may ask of shoppers' wishlists kept with their accounts a minute (ADR-575): a
+ * page's script asks once as a shopper's visit begins, and once for each heart they press; room
+ * for many shoppers behind one mobile network's address, but not for a script.
+ */
+const ACCOUNT_WISHLISTS = { name: 'account-wishlists', limit: 60, windowMs: 60_000 };
+
+/** The longest handle a wishlist's script is asked of, as catalog's handles are at most. */
+const HANDLE_MAX = 255;
 
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
@@ -2824,6 +2835,83 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
+   * The shopper's wishlist kept with their account (ADR-575), for the theme's script, which keeps
+   * it in the browser as well, the pages being the same for every shopper:
+   * `GET /account/wishlist.json` reads it; `POST /account/wishlist` with `{ "handles": [...] }`,
+   * the newest first, adds those products, as the browser's own list joins the account's once
+   * signed in; `POST /account/wishlist/remove` with `{ "handle": "..." }` takes one off. Each
+   * answers `{ "handles": [...] }`, the account's list as it is then, the newest first, of the
+   * products the storefront shows; the core keeps them by the catalog's IDs. JSON alone, from the
+   * shop's own pages alone, at most {@link ACCOUNT_WISHLISTS} a minute from an address, and never
+   * kept. 401 without a session: a session that is over takes its cookies with it.
+   */
+  const wishlist =
+    (change: 'read' | 'add' | 'remove') => async (request: FastifyRequest, reply: FastifyReply) => {
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      accountAnswer(reply);
+      const refuse = (status: number, message: string) => reply.code(status).send({ message });
+      if (!fromShopItself(request)) {
+        return refuse(403, "Wishlists are kept from the shop's own pages.");
+      }
+      if (change !== 'read' && !isJson(request)) return refuse(415, 'Send JSON.');
+      const body = paramsOf(request);
+      const asked = change === 'add' ? handlesOf(body.handles) : null;
+      const handle = change === 'remove' ? handlesOf([body.handle])?.[0] : null;
+      if ((change === 'add' && !asked) || (change === 'remove' && !handle)) {
+        return refuse(
+          422,
+          change === 'add'
+            ? `Send { "handles": [...] }: at most ${ACCOUNT_WISHLIST_MAX} products' handles.`
+            : 'Send { "handle": "..." }: the handle of the product to take off.',
+        );
+      }
+      try {
+        if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+        const token = accountTokenOf(request.headers.cookie);
+        if (!token) return await refuse(401, 'Sign in to keep your wishlist with your account.');
+        if (limiter !== null && !(await limiter.hit(ACCOUNT_WISHLISTS, request.ip)).allowed) {
+          return await refuse(429, 'Too many changes to your wishlist. Please wait a moment.');
+        }
+        const { shopId, store } = found;
+        let productIds: string[] | null;
+        if (asked) {
+          const products = await Promise.all(asked.map((each) => store.productByHandle(each)));
+          productIds = await core.accountWishlistAdd(
+            shopId,
+            token,
+            products.flatMap((product) => (product ? [product.id] : [])),
+          );
+        } else if (handle) {
+          // A product the storefront no longer shows is in the list no longer either.
+          const product = await store.productByHandle(handle);
+          productIds = product
+            ? await core.accountWishlistRemove(shopId, token, product.id)
+            : await core.accountWishlist(shopId, token);
+        } else {
+          productIds = await core.accountWishlist(shopId, token);
+        }
+        if (!productIds) {
+          signOutCookies(request, reply);
+          return await refuse(401, 'Sign in to keep your wishlist with your account.');
+        }
+        const products = await store.products(productIds);
+        return await reply.send({
+          handles: products.flatMap((product) => (product ? [product.handle] : [])),
+        });
+      } catch (error) {
+        if (error instanceof StoreMissingError) {
+          return notFound(reply, 'This shop is not open yet.');
+        }
+        if (!unreachable(request, error)) throw error;
+        return refuse(
+          503,
+          'Your wishlist cannot be reached just now. Please try again in a minute.',
+        );
+      }
+    };
+
+  /**
    * Signing out (ADR-571): the core ends the session the cookie names, and the cookie goes; then
    * the shop's home page. Shopify's themes link to it, so a GET signs out as a POST does.
    */
@@ -2854,6 +2942,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.post(`${prefix}/account/data/export`, dataExport);
     app.get(`${prefix}/account/data/export`, dataDownload);
     app.post(`${prefix}/account/data/erase`, dataErase);
+    app.get(`${prefix}/account/wishlist.json`, wishlist('read'));
+    app.post(`${prefix}/account/wishlist`, wishlist('add'));
+    app.post(`${prefix}/account/wishlist/remove`, wishlist('remove'));
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/logout`, handler: logout });
   }
 
@@ -3015,6 +3106,42 @@ function refererPath(request: FastifyRequest): string | null {
     // No page said, or not an address.
   }
   return null;
+}
+
+/**
+ * Whether a script's request came from the shop's own pages, as its browser says: neither from
+ * another site, nor from another address on the same site, such as another shop's on the
+ * platform's domain. A browser that says nothing of either is let through, as forms' are.
+ */
+function fromShopItself(request: FastifyRequest): boolean {
+  const site = request.headers['sec-fetch-site'];
+  if (site !== undefined && site !== 'same-origin' && site !== 'none') return false;
+  const origin = request.headers.origin;
+  if (origin === undefined) return true;
+  try {
+    return new URL(origin).host === request.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a request's body is JSON, which another site's form cannot send. */
+function isJson(request: FastifyRequest): boolean {
+  return /^application\/json\s*(;|$)/i.test(request.headers['content-type'] ?? '');
+}
+
+/**
+ * The handles a wishlist's script sent, each once, in their order: at most
+ * {@link ACCOUNT_WISHLIST_MAX}, each a handle a product could have. Null for anything else.
+ */
+function handlesOf(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length > ACCOUNT_WISHLIST_MAX) return null;
+  const handles: string[] = [];
+  for (const each of value) {
+    if (typeof each !== 'string' || each === '' || each.length > HANDLE_MAX) return null;
+    if (!handles.includes(each)) handles.push(each);
+  }
+  return handles;
 }
 
 /** A posted form's nested fields, such as Shopify's `contact[...]`; none when it has none. */

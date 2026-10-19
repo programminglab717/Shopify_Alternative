@@ -1,5 +1,6 @@
 import {
   ACCOUNT_TOKEN_HEADER,
+  ACCOUNT_WISHLIST_MAX,
   CLIENT_IP_HEADER,
   accountPath,
   type AccountDataEraseResponse,
@@ -11,10 +12,12 @@ import {
   type AccountOrderLinkResponse,
   type AccountResponse,
   type AccountSessionResponse,
+  type AccountWishlistResponse,
 } from '@hatti/storefront-api';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
@@ -37,8 +40,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
  * `POST …/account/orders/{id}/link` the page of one of its orders, and `POST …/account/logout`
  * signs out. The shopper's own data (ADR-572): `POST …/account/data/export` makes their file, or
  * gives the one kept, and `GET` a new link to it; `POST …/account/data/erase` asks for their
- * erasure. 422 says what was wrong with what was typed; 404, that there is no session, or nothing
- * to link to. The host application checks the storefront key before any of this runs.
+ * erasure. Their wishlist (ADR-575): `GET …/account/wishlist` reads it, `POST` with `productIds`
+ * adds to it, and `DELETE …/account/wishlist/{productId}` takes one off, each answering it as it
+ * is then; IDs that name no product of the shop's are left out. 422 says what was wrong with what was typed or sent; 404, that there is no session, or
+ * nothing to link to. The host application checks the storefront key before any of this runs.
  */
 @Controller(accountPath(':shopId').slice(1))
 export class StorefrontAccountController {
@@ -172,6 +177,71 @@ export class StorefrontAccountController {
     const erasure = token ? await this.accounts.dataErase(shopId, token) : null;
     if (!erasure) throw new NotFoundException();
     return erasure;
+  }
+
+  @Get('wishlist')
+  @Header('cache-control', 'no-store')
+  async wishlist(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountWishlistResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const productIds = token ? await this.accounts.wishlist(shopId, token) : null;
+    if (!productIds) throw new NotFoundException();
+    return { productIds };
+  }
+
+  @Post('wishlist')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async addToWishlist(
+    @Param('shopId') shopId: string,
+    @Body() body: unknown,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountWishlistResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const asked =
+      typeof body === 'object' && body !== null
+        ? (body as Record<string, unknown>).productIds
+        : undefined;
+    if (
+      !Array.isArray(asked) ||
+      asked.length > ACCOUNT_WISHLIST_MAX ||
+      !asked.every((id) => typeof id === 'string')
+    ) {
+      throw new UnprocessableEntityException({
+        errors: [
+          {
+            field: 'productIds',
+            message: `Send a list of at most ${ACCOUNT_WISHLIST_MAX} products' IDs`,
+          },
+        ],
+      } satisfies AccountErrorResponse);
+    }
+    // An ID that could not be a product's names none the shop has, and is left out as those are.
+    const wanted = (asked as string[]).filter((id) => UUID.test(id));
+    const productIds = token ? await this.accounts.addToWishlist(shopId, token, wanted) : null;
+    if (!productIds) throw new NotFoundException();
+    return { productIds };
+  }
+
+  @Delete('wishlist/:productId')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async removeFromWishlist(
+    @Param('shopId') shopId: string,
+    @Param('productId') productId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountWishlistResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    // One that could not be a product's is in no wishlist: the list as it is.
+    const productIds = !token
+      ? null
+      : UUID.test(productId)
+        ? await this.accounts.removeFromWishlist(shopId, token, productId)
+        : await this.accounts.wishlist(shopId, token);
+    if (!productIds) throw new NotFoundException();
+    return { productIds };
   }
 }
 

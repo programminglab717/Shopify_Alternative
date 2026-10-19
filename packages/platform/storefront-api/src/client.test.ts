@@ -441,6 +441,55 @@ describe('StorefrontApiClient', () => {
     );
   });
 
+  it("reads, adds to and takes from a signed-in shopper's wishlist (ADR-575)", async () => {
+    const kurta = '0190a1b2-0000-7000-8000-00000000000a';
+    const shawl = '0190a1b2-0000-7000-8000-00000000000b';
+    const { client, requests } = clientAnswering((request) => {
+      if (request.headers.get('x-hatti-account') !== 'session-secret') {
+        return new Response('Not found', { status: 404 });
+      }
+      if (request.method === 'DELETE') return Response.json({ productIds: [shawl] });
+      return Response.json({ productIds: [kurta, shawl] });
+    });
+    expect(await client.accountWishlist('shop-1', null)).toBeNull();
+    expect(await client.accountWishlistAdd('shop-1', null, [kurta])).toBeNull();
+    expect(await client.accountWishlistRemove('shop-1', null, kurta)).toBeNull();
+    expect(requests).toEqual([]);
+
+    expect(await client.accountWishlist('shop-1', 'session-secret')).toEqual([kurta, shawl]);
+    expect(await client.accountWishlistAdd('shop-1', 'session-secret', [kurta])).toEqual([
+      kurta,
+      shawl,
+    ]);
+    expect(await client.accountWishlistRemove('shop-1', 'session-secret', kurta)).toEqual([shawl]);
+    expect(await client.accountWishlist('shop-1', 'gone')).toBeNull();
+    expect(await client.accountWishlistAdd('shop-1', 'gone', [kurta])).toBeNull();
+    expect(await client.accountWishlistRemove('shop-1', 'gone', kurta)).toBeNull();
+    expect(requests.slice(0, 3).map((request) => [request.method, request.url])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/account/wishlist'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/wishlist'],
+      ['DELETE', `http://core.test/storefront/shops/shop-1/account/wishlist/${kurta}`],
+    ]);
+    expect(await requests[1]!.json()).toEqual({ productIds: [kurta] });
+    expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
+    // An ID is one segment of the path, whatever it holds.
+    await client.accountWishlistRemove('shop-1', 'session-secret', '../data/erase');
+    expect(requests.at(-1)!.url).toBe(
+      'http://core.test/storefront/shops/shop-1/account/wishlist/..%2Fdata%2Ferase',
+    );
+
+    const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
+    await expect(down.accountWishlist('shop-1', 'session-secret')).rejects.toThrow(
+      StorefrontApiError,
+    );
+    await expect(down.accountWishlistAdd('shop-1', 'session-secret', [kurta])).rejects.toThrow(
+      StorefrontApiError,
+    );
+    await expect(down.accountWishlistRemove('shop-1', 'session-secret', kurta)).rejects.toThrow(
+      StorefrontApiError,
+    );
+  });
+
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
     await expect(client.read('shop-1', 'secret')).rejects.toThrow(StorefrontApiError);

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-574 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-575 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -582,6 +582,7 @@
 | 572 | A signed-in shopper downloads their data and asks for its erasure from their account, through the requests staff make, the file kept a day and linked for minutes | Accepted |
 | 573 | The admin says who asked each waiting erasure, and shows a customer who acted in the activity log, linked to their page | Accepted |
 | 574 | A shopper buys an order again from their account: what can still be sold goes into their cart at the order's quantities, and the cart says what could not | Accepted |
+| 575 | A signed-in shopper's wishlist is kept with their account and follows them across devices, the browser's list still what pages show, so every page stays cacheable | Accepted |
 
 ---
 
@@ -21336,3 +21337,24 @@
 * **Alternatives:** **A cart permalink:** it would leave the shopper's cart aside and skip to
   checkout, where nothing can be changed. **A link that adds to the cart:** a link fetched ahead
   by a browser or a preview would fill the cart.
+
+## ADR-575 · A signed-in shopper's wishlist is kept with their account and follows them across devices, the browser's list still what pages show, so every page stays cacheable
+
+* **Context:** Hatti Base keeps a shopper's wishlist in their browser (OS-12): another phone, or a
+  cleared browser, has none. Shoppers now sign in (ADR-570, ADR-571); Shopify's accounts keep it.
+* **Decision:**
+  * **Kept by customer:** a signed-in number's list is its customer's, so every number of theirs
+    sees one list and a merge joins two; a number with no customer yet keeps its own, which moves to
+    the customer it becomes when next read. At most 100 products, the oldest making room; another
+    shop's or an unknown product is skipped, a deleted one drops out when read. Erasure deletes
+    it, the customer's data file includes it, and a number's own list goes with its last session.
+  * **The storefront** reads, adds and removes by product handle, as Hatti Base's script knows them,
+    in JSON, for the same site alone, limited per address and kept by no cache.
+  * **Hatti Base's script,** for a signed-in shopper, once a tab merges the browser's list into the
+    account's and takes the account's back, and tells the account of each heart pressed; the
+    browser's list is still what pages render from. Signed out, nothing changes. The account page
+    may link to the wishlist page, a setting off until the shop has the page.
+* **Consequences:** A shopper's wishlist is the same on their phone and their laptop once they
+  sign in, and no page is made per shopper.
+* **Alternatives:** **The wishlist rendered by the server:** each product page would be per shopper
+  and uncacheable for a heart.

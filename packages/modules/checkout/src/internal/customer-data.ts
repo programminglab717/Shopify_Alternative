@@ -1,7 +1,9 @@
 import { CustomerDataRegistry, type CustomerDataHandler } from '@hatti/customers/public';
 import { toDate, type Tx } from '@hatti/db';
+import { toPublicId } from '@hatti/ids';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { joinWishlistIn } from './account-wishlist.js';
 
 /**
  * Checkout's part in erasing and exporting customers (ADR-199): the browsers that proved their
@@ -13,7 +15,9 @@ import { sql } from 'drizzle-orm';
  * (ADR-570): erased, they go, and their codes to sign in with; merged, the customer kept is the one
  * they read. The files of their own data they asked for from their account (ADR-572) are let go
  * either way, by the worker's sweep, which storage keeps them until: merged, the customer kept may
- * ask for one of everything that is now theirs.
+ * ask for one of everything that is now theirs. Their wishlist kept with their account (ADR-575)
+ * goes when they are erased, with those of their numbers, and is in their file; merged, it joins
+ * the customer kept's.
  */
 export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'checkout',
@@ -28,6 +32,8 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
       UPDATE checkout.account_sessions SET customer_id = ${intoId}
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
     await letGoOfFilesIn(tx, shopId, fromId);
+    // Their wishlist joins the customer's (ADR-575).
+    await joinWishlistIn(tx, shopId, { customerId: fromId }, { customerId: intoId });
   },
 
   async erase(tx, shopId, customer) {
@@ -52,6 +58,12 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
        WHERE shop_id = ${shopId} AND contact_phone = ANY(${sql.param(customer.phones)}::text[])`);
     // The files of their own data they asked for (ADR-572).
     await letGoOfFilesIn(tx, shopId, customer.id);
+    // Their wishlist, and their numbers' own (ADR-575).
+    await tx.execute(sql`
+      DELETE FROM checkout.account_wishlist_items
+       WHERE shop_id = ${shopId}
+         AND (customer_id = ${customer.id}
+              OR phone = ANY(${sql.param(customer.phones)}::text[]))`);
   },
 
   async export(tx, shopId, customer) {
@@ -85,6 +97,16 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
          AND (customer_id = ${customer.id}
               OR phone = ANY(${sql.param(customer.phones)}::text[]))
        ORDER BY created_at, id`);
+    const { rows: wished } = await tx.execute<{
+      phone: string | null;
+      product_id: string;
+      added_at: string | Date;
+    }>(sql`
+      SELECT phone, product_id, added_at FROM checkout.account_wishlist_items
+       WHERE shop_id = ${shopId}
+         AND (customer_id = ${customer.id}
+              OR phone = ANY(${sql.param(customer.phones)}::text[]))
+       ORDER BY added_at DESC, product_id`);
     return {
       numberProofs: rows.map((row) => ({
         number: row.phone,
@@ -109,6 +131,13 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
         signedInAt: toDate(row.created_at),
         lastUsedAt: toDate(row.last_seen_at),
         endsAt: toDate(row.expires_at),
+      })),
+      // Their wishlist kept with their account (ADR-575), the newest first, and those their
+      // numbers kept while no customer had them.
+      wishlist: wished.map((row) => ({
+        productId: toPublicId('product', row.product_id),
+        addedAt: toDate(row.added_at),
+        ...(row.phone && { number: row.phone }),
       })),
     };
   },

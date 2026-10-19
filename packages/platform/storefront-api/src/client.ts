@@ -2,6 +2,7 @@ import {
   ACCOUNT_TOKEN_HEADER,
   accountOrderLinkPath,
   accountPath,
+  accountWishlistItemPath,
   type AccountDataEraseResponse,
   type AccountDataExportResponse,
   type AccountErrorResponse,
@@ -15,6 +16,8 @@ import {
   type AccountResponse,
   type AccountSessionJson,
   type AccountSessionResponse,
+  type AccountWishlistAddRequest,
+  type AccountWishlistResponse,
 } from './accounts.js';
 import {
   CART_TOKEN_HEADER,
@@ -586,6 +589,63 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return (await response.json()) as AccountDataEraseResponse;
+  }
+
+  /**
+   * The wishlist of the account the cookie's `token` names (ADR-575): its products, the newest
+   * first, by the catalog's IDs; null without a session.
+   */
+  async accountWishlist(shopId: string, token: string | null): Promise<string[] | null> {
+    if (!token) return null;
+    return this.#wishlist(
+      await this.#request('GET', accountPath(shopId, 'wishlist'), null, undefined, {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      }),
+    );
+  }
+
+  /**
+   * Adds `productIds`, the newest first, to the wishlist of the account the cookie's `token` names
+   * (ADR-575), as a browser's own list joins it on signing in: the wishlist as it is now; null
+   * without a session.
+   */
+  async accountWishlistAdd(
+    shopId: string,
+    token: string | null,
+    productIds: readonly string[],
+  ): Promise<string[] | null> {
+    if (!token) return null;
+    const body: AccountWishlistAddRequest = { productIds: [...productIds] };
+    return this.#wishlist(
+      await this.#request('POST', accountPath(shopId, 'wishlist'), null, body, {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      }),
+    );
+  }
+
+  /**
+   * Takes the product `productId` off the wishlist of the account the cookie's `token` names
+   * (ADR-575): the wishlist as it is now; null without a session.
+   */
+  async accountWishlistRemove(
+    shopId: string,
+    token: string | null,
+    productId: string,
+  ): Promise<string[] | null> {
+    if (!token) return null;
+    const path = accountWishlistItemPath(shopId, encodeURIComponent(productId));
+    return this.#wishlist(
+      await this.#request('DELETE', path, null, undefined, { [ACCOUNT_TOKEN_HEADER]: token }),
+    );
+  }
+
+  /** A wishlist's answer: its products; null without a session. */
+  async #wishlist(response: Response): Promise<string[] | null> {
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return ((await response.json()) as AccountWishlistResponse).productIds;
   }
 
   #request(

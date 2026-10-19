@@ -23,8 +23,11 @@ const KEPT: Partial<Record<keyof typeof EXPIRING, (at: string) => SQL>> = {
     sql`AND purpose = 'sign_in' AND created_at <= ${at}::timestamptz - interval '1 day'`,
 };
 
-/** How many of each kind a sweep deleted. */
-export type ExpiredCounts = Record<keyof typeof EXPIRING, number>;
+/**
+ * How many of each kind a sweep deleted; and of `wishlists`, the items of numbers' own wishlists
+ * (ADR-575) left with no session.
+ */
+export type ExpiredCounts = Record<keyof typeof EXPIRING | 'wishlists', number>;
 
 /** Rows of each kind found past their time at a time, across shops. */
 export const EXPIRY_BATCH = 1_000;
@@ -35,7 +38,8 @@ export const EXPIRY_BATCH = 1_000;
  * and the sessions signed in, lapsed or signed out (ADR-570). Nothing reads one once it has
  * expired: a secret naming a cart that is gone is never taken up, a checkout's page says it
  * expired, a proof spares no code and a session reads no account. The worker's sweep deletes them, so that shoppers' requests delete none,
- * and a shop that gets no new carts keeps no old ones.
+ * and a shop that gets no new carts keeps no old ones. So too the wishlists kept by a number no
+ * customer has (ADR-575), once the number is signed in nowhere: they go with its last session.
  */
 export class CheckoutExpiry {
   constructor(private readonly db: Database) {}
@@ -52,7 +56,14 @@ export class CheckoutExpiry {
     limit = EXPIRY_BATCH,
     failed?: (shopId: string, error: unknown) => void,
   ): Promise<ExpiredCounts> {
-    const deleted: ExpiredCounts = { checkouts: 0, carts: 0, proofs: 0, codes: 0, sessions: 0 };
+    const deleted: ExpiredCounts = {
+      checkouts: 0,
+      carts: 0,
+      proofs: 0,
+      codes: 0,
+      sessions: 0,
+      wishlists: 0,
+    };
     for (const kind of Object.keys(EXPIRING) as (keyof typeof EXPIRING)[]) {
       const table = EXPIRING[kind];
       const kept = KEPT[kind]?.(at.toISOString()) ?? sql``;
@@ -84,6 +95,48 @@ export class CheckoutExpiry {
           if (!failed) throw error;
           failed(shopId, error);
         }
+      }
+    }
+    deleted.wishlists = await this.#deleteUnsignedWishlists(at, limit, failed);
+    return deleted;
+  }
+
+  /**
+   * Deletes up to `limit` items of the wishlists numbers keep while no customer has them
+   * (ADR-575), whose number no session lasting at `at` is signed in with, across shops: each
+   * shop's in its own transaction, unless the number signed in again since. How many it deleted.
+   */
+  async #deleteUnsignedWishlists(
+    at: Date,
+    limit: number,
+    failed?: (shopId: string, error: unknown) => void,
+  ): Promise<number> {
+    const unsigned = sql`
+      NOT EXISTS (SELECT 1 FROM checkout.account_sessions session
+                   WHERE session.shop_id = item.shop_id AND session.phone = item.phone
+                     AND session.revoked_at IS NULL AND session.expires_at > ${at.toISOString()})`;
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string; id: string }>(sql`
+        SELECT item.shop_id, item.id FROM checkout.account_wishlist_items item
+         WHERE item.phone IS NOT NULL AND ${unsigned}
+         LIMIT ${limit}`),
+    );
+    const byShop = new Map<string, string[]>();
+    for (const row of rows) byShop.set(row.shop_id, [...(byShop.get(row.shop_id) ?? []), row.id]);
+    let deleted = 0;
+    for (const [shopId, ids] of byShop) {
+      try {
+        const { rows: gone } = await this.db.tenant(shopId, (tx) =>
+          tx.execute(sql`
+            DELETE FROM checkout.account_wishlist_items item
+             WHERE item.shop_id = ${shopId} AND item.id = ANY(${sql.param(ids)}::uuid[])
+               AND item.phone IS NOT NULL AND ${unsigned}
+            RETURNING item.id`),
+        );
+        deleted += gone.length;
+      } catch (error) {
+        if (!failed) throw error;
+        failed(shopId, error);
       }
     }
     return deleted;

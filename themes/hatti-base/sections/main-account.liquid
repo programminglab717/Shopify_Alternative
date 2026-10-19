@@ -5,7 +5,9 @@
   order lists what it sold, and while any of it can be had, "Buy again" puts it in the cart
   (ADR-574), which says what could not go. Under
   "Your data" (CUS-05, ADR-572), they download the file of their own data, or ask for its
-  erasure once told what it means and ticking that they understand.
+  erasure once told what it means and ticking that they understand. Where the shop has a wishlist
+  page, as the header may link to, it links to it too: their wishlist is kept with their account
+  once they are signed in (ADR-575).
 {%- endcomment -%}
 <div class="page-width section-spacing account">
   <div class="section-title">
@@ -23,6 +25,18 @@
       {% endif -%}
       <bdi dir="ltr">{{ customer.phone | escape }}</bdi>
     </p>
+
+    {%- if section.settings.wishlist -%}
+      {%- if routes.root_url == '/' -%}
+        {%- assign wishlist_url = '/pages/wishlist' -%}
+      {%- else -%}
+        {%- assign wishlist_url = routes.root_url | append: '/pages/wishlist' -%}
+      {%- endif -%}
+      <p class="account__wishlist">
+        <a href="{{ wishlist_url }}">{{ 'customer.account.wishlist' | t }}</a>
+        <span class="account__muted">{{ 'customer.account.wishlist_note' | t }}</span>
+      </p>
+    {%- endif -%}
 
     {%- assign credit = customer.store_credit_account -%}
     {%- if credit.balance > 0 -%}
@@ -158,6 +172,7 @@
 {% stylesheet %}
   .account { max-inline-size: 48rem; }
   .account__who { margin-block: 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+  .account__wishlist { margin-block: -0.75rem 1.5rem; display: grid; gap: 0.25rem; }
   .account__muted { color: var(--color-muted); font-size: 0.875rem; }
   .account__credit { margin-block-end: 2rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
   .account__credit h2 { margin-block-start: 0; font-size: 1rem; }
@@ -181,5 +196,16 @@
 {% endstylesheet %}
 
 {% schema %}
-{ "name": "t:sections.main-account.name" }
+{
+  "name": "t:sections.main-account.name",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "wishlist",
+      "label": "t:sections.main-account.settings.wishlist.label",
+      "info": "t:sections.main-account.settings.wishlist.info",
+      "default": false
+    }
+  ]
+}
 {% endschema %}

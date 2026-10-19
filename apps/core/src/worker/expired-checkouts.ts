@@ -8,9 +8,9 @@ const BATCH = 1_000;
 /**
  * Deletes carts, checkouts, browsers' proofs of a number, and codes to sign in to shoppers'
  * accounts and the sessions signed in (ADR-570), once they are past their time (ADR-042,
- * ADR-230), across shops, rather than as shoppers' requests make new ones: each sweep,
- * a batch at a time, until a batch comes back short. A shop whose rows could not be deleted is
- * logged, and tried again on the next sweep.
+ * ADR-230), and the wishlists of numbers signed in nowhere since (ADR-575), across shops, rather
+ * than as shoppers' requests make new ones: each sweep, a batch at a time, until a batch comes
+ * back short. A shop whose rows could not be deleted is logged, and tried again on the next sweep.
  */
 export class ExpiredCheckouts {
   constructor(
@@ -20,7 +20,14 @@ export class ExpiredCheckouts {
 
   /** One sweep at `at`: how many of each it deleted. */
   async sweep(at: Date = new Date()): Promise<ExpiredCounts> {
-    const total: ExpiredCounts = { checkouts: 0, carts: 0, proofs: 0, codes: 0, sessions: 0 };
+    const total: ExpiredCounts = {
+      checkouts: 0,
+      carts: 0,
+      proofs: 0,
+      codes: 0,
+      sessions: 0,
+      wishlists: 0,
+    };
     for (;;) {
       const deleted = await this.expiry.deleteExpired(at, BATCH, (shopId, error) =>
         this.logger?.warn({ err: error, shopId }, 'expired carts and checkouts not deleted'),

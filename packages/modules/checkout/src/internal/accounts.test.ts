@@ -10,7 +10,7 @@ import {
 } from '@hatti/customers/public';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
-import { toPublicId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import { ORDER_CUSTOMER_DATA } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ACCOUNT_DATA } from './account-data.js';
@@ -793,6 +793,217 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await f.accountData.deleteExpired()).toBe(1);
     expect(await files()).toEqual([]);
     expect((await auditOf(ayesha))[0]).toEqual(['customer.erased', 'customer', ayesha]);
+  });
+
+  /** Products of `tenant`'s shop, by their titles: their IDs, in order. */
+  const productsOf = async (titles: string[], tenant: TenantContext = f.a) =>
+    (
+      await f.admin.query<{ id: string }>(
+        `INSERT INTO catalog.products (shop_id, title, handle, status)
+         SELECT $1, title, 'product-' || gen_random_uuid(), 'active'
+           FROM unnest($2::text[]) WITH ORDINALITY AS listed (title, position)
+         ORDER BY position
+         RETURNING id`,
+        [tenant.shopId, titles],
+      )
+    ).rows.map((row) => row.id);
+
+  /** The wishlists' items the shop keeps, as whose they are: a customer's, or a number's. */
+  const wished = async () =>
+    (
+      await f.admin.query<{ owner: string; product_id: string }>(
+        `SELECT coalesce(customer_id::text, phone) AS owner, product_id
+           FROM checkout.account_wishlist_items ORDER BY owner, added_at DESC`,
+      )
+    ).rows.map((row) => [row.owner, row.product_id]);
+
+  it("keeps a shopper's wishlist with their account, the newest first, in their shop alone (ADR-575)", async () => {
+    const [kurta, shawl, dupatta, lawn] = (await productsOf([
+      'Kurta',
+      'Shawl',
+      'Dupatta',
+      'Lawn',
+    ])) as [string, string, string, string];
+    const [elsewhere] = (await productsOf(['Elsewhere'], f.b)) as [string];
+    const placed = await order(JAZZ);
+    const token = await signIn(JAZZ);
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([]);
+
+    // A browser's list joins it as it was, the newest first; each again stays where it was.
+    expect(await f.accounts.addToWishlist(f.a.shopId, token, [kurta, shawl])).toEqual([
+      kurta,
+      shawl,
+    ]);
+    expect(await f.accounts.addToWishlist(f.a.shopId, token, [dupatta])).toEqual([
+      dupatta,
+      kurta,
+      shawl,
+    ]);
+    // Products the shop does not have, another shop's among them, are left out.
+    expect(
+      await f.accounts.addToWishlist(f.a.shopId, token, [shawl, lawn, elsewhere, kurta, newId()]),
+    ).toEqual([lawn, dupatta, kurta, shawl]);
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([lawn, dupatta, kurta, shawl]);
+    // Kept as the customer's, as every number of theirs reads it.
+    expect(await wished()).toEqual([
+      [placed.customerId, lawn],
+      [placed.customerId, dupatta],
+      [placed.customerId, kurta],
+      [placed.customerId, shawl],
+    ]);
+
+    // Taken off, once; one not in it changes nothing.
+    expect(await f.accounts.removeFromWishlist(f.a.shopId, token, dupatta)).toEqual([
+      lawn,
+      kurta,
+      shawl,
+    ]);
+    expect(await f.accounts.removeFromWishlist(f.a.shopId, token, dupatta)).toEqual([
+      lawn,
+      kurta,
+      shawl,
+    ]);
+
+    // A product the shop no longer has leaves it once it is read.
+    await f.admin.query('DELETE FROM catalog.products WHERE id = $1', [kurta]);
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([lawn, shawl]);
+    expect(await wished()).toEqual([
+      [placed.customerId, lawn],
+      [placed.customerId, shawl],
+    ]);
+
+    // Another session of the same number reads the same list; the same number in another shop
+    // reads that shop's, and a session reads no other shop's.
+    expect(await f.accounts.wishlist(f.a.shopId, await signIn(JAZZ))).toEqual([lawn, shawl]);
+    const inB = await signIn(JAZZ, f.b);
+    expect(await f.accounts.wishlist(f.b.shopId, inB)).toEqual([]);
+    expect(await f.accounts.addToWishlist(f.b.shopId, inB, [elsewhere, lawn])).toEqual([elsewhere]);
+    expect(await f.accounts.wishlist(f.b.shopId, token)).toBeNull();
+    expect(await f.accounts.addToWishlist(f.b.shopId, token, [elsewhere])).toBeNull();
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([lawn, shawl]);
+
+    // Without a session, nothing.
+    expect(await f.accounts.wishlist(f.a.shopId, 'x'.repeat(43))).toBeNull();
+    expect(await f.accounts.removeFromWishlist(f.a.shopId, 'nope', lawn)).toBeNull();
+    await f.accounts.signOut(f.a.shopId, token);
+    expect(await f.accounts.addToWishlist(f.a.shopId, token, [lawn])).toBeNull();
+  });
+
+  it('keeps the newest 100, the oldest going to make room (ADR-575)', async () => {
+    const titles = Array.from({ length: 103 }, (_, index) => `Product ${index + 1}`);
+    const products = await productsOf(titles);
+    const token = await signIn(JAZZ);
+    // The browser's list, the newest first: those past the 100th go.
+    const kept = (await f.accounts.addToWishlist(f.a.shopId, token, products.slice(1, 102)))!;
+    expect(kept).toEqual(products.slice(1, 101));
+    // One more, and the oldest goes.
+    expect(await f.accounts.addToWishlist(f.a.shopId, token, [products[0]!])).toEqual([
+      products[0],
+      ...products.slice(1, 100),
+    ]);
+    expect(await wished()).toHaveLength(100);
+  });
+
+  it("moves a number's own wishlist to the customer it becomes, joins merged customers' and erases it (ADR-575)", async () => {
+    const [kurta, shawl, dupatta, lawn] = (await productsOf([
+      'Kurta',
+      'Shawl',
+      'Dupatta',
+      'Lawn',
+    ])) as [string, string, string, string];
+    // A number no customer has keeps its own list.
+    const token = await signIn(JAZZ);
+    expect(await f.accounts.addToWishlist(f.a.shopId, token, [kurta, shawl])).toEqual([
+      kurta,
+      shawl,
+    ]);
+    expect(await wished()).toEqual([
+      [JAZZ, kurta],
+      [JAZZ, shawl],
+    ]);
+
+    // Its first order makes it a customer's, whose list it becomes once read.
+    const placed = await order(JAZZ);
+    const ayesha = placed.customerId;
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([kurta, shawl]);
+    expect(await wished()).toEqual([
+      [ayesha, kurta],
+      [ayesha, shawl],
+    ]);
+
+    // Another customer's list, on another number, joins hers when they are merged into her:
+    // each product once, as it was added last.
+    const zong = await signIn(ZONG);
+    const bilal = (await order(ZONG)).customerId;
+    expect(await f.accounts.addToWishlist(f.a.shopId, zong, [dupatta, kurta, lawn])).toEqual([
+      dupatta,
+      kurta,
+      lawn,
+    ]);
+    unwrap(await data.merge(f.a, ayesha, bilal));
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([dupatta, kurta, lawn, shawl]);
+    expect(await f.accounts.wishlist(f.a.shopId, zong)).toEqual([dupatta, kurta, lawn, shawl]);
+    expect(await wished()).toHaveLength(4);
+    // Merged again, nothing changes.
+    await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.merge(tx, f.a.shopId, bilal, ayesha),
+    );
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([dupatta, kurta, lawn, shawl]);
+
+    // In her own file, the newest first.
+    const filed = await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.export(tx, f.a.shopId, { id: ayesha, phones: [JAZZ], email: null }),
+    );
+    expect(filed.wishlist).toEqual(
+      [dupatta, kurta, lawn, shawl].map((id) => ({
+        productId: toPublicId('product', id),
+        addedAt: expect.any(Date) as unknown,
+      })),
+    );
+
+    // Erased, it goes, with the list a number of hers kept while it was no one's; another
+    // shop's, and another number's, stay.
+    const [elsewhere] = (await productsOf(['Elsewhere'], f.b)) as [string];
+    await f.accounts.addToWishlist(f.b.shopId, await signIn(JAZZ, f.b), [elsewhere]);
+    const other = await signIn('+923331234567');
+    await f.accounts.addToWishlist(f.a.shopId, other, [lawn]);
+    await f.admin.query(
+      `INSERT INTO checkout.account_wishlist_items (shop_id, phone, product_id)
+       VALUES ($1, $2, $3)`,
+      [f.a.shopId, '+923009999999', shawl],
+    );
+    await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.erase(
+        tx,
+        f.a.shopId,
+        { id: ayesha, phones: [JAZZ, '+923009999999'], email: null },
+        'system',
+      ),
+    );
+    expect(await wished()).toEqual([
+      [JAZZ, elsewhere],
+      ['+923331234567', lawn],
+    ]);
+  });
+
+  it("sweeps a number's own wishlist once it is signed in nowhere (ADR-575)", async () => {
+    const [kurta, shawl] = (await productsOf(['Kurta', 'Shawl'])) as [string, string];
+    const jazz = await signIn(JAZZ);
+    const zong = await signIn(ZONG);
+    await f.accounts.addToWishlist(f.a.shopId, jazz, [kurta]);
+    await f.accounts.addToWishlist(f.a.shopId, zong, [shawl, kurta]);
+    // Signed in still: kept.
+    expect(await f.expiry.deleteExpired()).toMatchObject({ wishlists: 0 });
+    // Signed out, the number's last session takes its list with it.
+    await f.accounts.signOut(f.a.shopId, zong);
+    expect(await f.expiry.deleteExpired()).toMatchObject({ sessions: 1, wishlists: 2 });
+    expect(await wished()).toEqual([[JAZZ, kurta]]);
+    // A customer's is theirs whether or not they are signed in.
+    await order(JAZZ);
+    await f.accounts.wishlist(f.a.shopId, jazz);
+    await f.accounts.signOut(f.a.shopId, jazz);
+    expect(await f.expiry.deleteExpired()).toMatchObject({ sessions: 1, wishlists: 0 });
+    expect(await wished()).toHaveLength(1);
   });
 
   it('sweeps codes to sign in with once their day is up', async () => {

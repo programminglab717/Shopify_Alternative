@@ -261,6 +261,8 @@
       "title": "Your account",
       "greeting": "Hi {{ name }}",
       "sign_out": "Sign out",
+      "wishlist": "Your wishlist",
+      "wishlist_note": "Kept with your account, on every phone or computer you sign in on.",
       "store_credit": "Store credit",
       "store_credit_expiring": "{{ amount }} of it expires on {{ date }}.",
       "store_credit_note": "It is taken off your next order at checkout.",

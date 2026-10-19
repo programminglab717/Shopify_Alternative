@@ -171,8 +171,10 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
       checkoutsLeft: expect.arrayContaining([
         expect.objectContaining({ number: '+923001234567', remindedAt: null }),
       ]) as unknown,
-      // Never signed in to their account on the storefront (ADR-570).
+      // Never signed in to their account on the storefront (ADR-570), so no wishlist kept with
+      // it (ADR-575).
       accountSessions: [],
+      wishlist: [],
     });
     await f.admin.query(
       `UPDATE checkout.number_proofs

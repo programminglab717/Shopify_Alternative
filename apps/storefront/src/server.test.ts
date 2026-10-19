@@ -625,6 +625,46 @@ class FakeCore {
     this.dataAsked.push(['erase', token]);
     return account.dataRequests.available ? this.erasure : { state: 'none' };
   }
+
+  /**
+   * Wishlists kept with accounts (ADR-575), by the session's secret, the newest first, as the
+   * core keeps them by the products' IDs; and what was asked of them.
+   */
+  readonly wishlists = new Map<string, string[]>();
+  readonly wishlistAsked: ['read' | 'add' | 'remove', string, string[]][] = [];
+
+  async accountWishlist(_shopId: string, token: string | null): Promise<string[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    this.wishlistAsked.push(['read', token, []]);
+    return this.wishlists.get(token) ?? [];
+  }
+
+  async accountWishlistAdd(
+    _shopId: string,
+    token: string | null,
+    productIds: readonly string[],
+  ): Promise<string[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    this.wishlistAsked.push(['add', token, [...productIds]]);
+    const kept = this.wishlists.get(token) ?? [];
+    const added = productIds.filter((id) => !kept.includes(id));
+    this.wishlists.set(token, [...added, ...kept].slice(0, 100));
+    return this.wishlists.get(token)!;
+  }
+
+  async accountWishlistRemove(
+    _shopId: string,
+    token: string | null,
+    productId: string,
+  ): Promise<string[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    this.wishlistAsked.push(['remove', token, [productId]]);
+    this.wishlists.set(
+      token,
+      (this.wishlists.get(token) ?? []).filter((id) => id !== productId),
+    );
+    return this.wishlists.get(token)!;
+  }
 }
 
 /** Where storage gives a shopper's file, as the core signs it for minutes (ADR-572). */
@@ -4323,6 +4363,226 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(core.dataAsked).toEqual([['export', ACCOUNT_TOKEN]]);
     await app.close();
   });
+
+  /** A script's request of the shopper's wishlist, from the shop's own page, as JSON. */
+  const WISHLIST = {
+    host: 'localhost',
+    origin: 'http://localhost',
+    'sec-fetch-site': 'same-origin',
+    'content-type': 'application/json',
+  };
+
+  it("keeps a signed-in shopper's wishlist with their account, by the products' handles (ADR-575)", async () => {
+    const app = server();
+    const cookie = signedIn();
+    const [lawn, khussa, kurta] = sampleStore().products as [ProductDoc, ProductDoc, ProductDoc];
+    const ask = (url: string, payload?: unknown) =>
+      app.inject({
+        method: payload === undefined ? 'GET' : 'POST',
+        url,
+        headers: { ...WISHLIST, cookie },
+        ...(payload !== undefined && { payload: JSON.stringify(payload) }),
+      });
+
+    const empty = await ask('/account/wishlist.json');
+    expect([empty.statusCode, empty.json()]).toEqual([200, { handles: [] }]);
+    expect([empty.headers['cache-control'], empty.headers['x-robots-tag']]).toEqual([
+      'private, no-store',
+      'noindex',
+    ]);
+    expect(empty.headers['cache-tag']).toBeUndefined();
+
+    // The browser's list joins the account's, by the products' IDs, each once, those the shop
+    // does not show left out; the list comes back as it is then, by their handles.
+    const joined = await ask('/account/wishlist', {
+      handles: [khussa.handle, 'no-such-product', lawn.handle, khussa.handle],
+    });
+    expect([joined.statusCode, joined.json()]).toEqual([
+      200,
+      { handles: [khussa.handle, lawn.handle] },
+    ]);
+    expect(joined.headers['cache-control']).toBe('private, no-store');
+    const added = await ask('/ur/account/wishlist', { handles: [kurta.handle] });
+    expect(added.json()).toEqual({ handles: [kurta.handle, khussa.handle, lawn.handle] });
+    expect(core.wishlistAsked).toEqual([
+      ['read', ACCOUNT_TOKEN, []],
+      ['add', ACCOUNT_TOKEN, [khussa.id, lawn.id]],
+      ['add', ACCOUNT_TOKEN, [kurta.id]],
+    ]);
+
+    // Taken off; one the shop no longer shows is in it no longer either.
+    const removed = await ask('/account/wishlist/remove', { handle: khussa.handle });
+    expect(removed.json()).toEqual({ handles: [kurta.handle, lawn.handle] });
+    const unknown = await ask('/account/wishlist/remove', { handle: 'no-such-product' });
+    expect(unknown.json()).toEqual({ handles: [kurta.handle, lawn.handle] });
+    expect(core.wishlistAsked.slice(3)).toEqual([
+      ['remove', ACCOUNT_TOKEN, [khussa.id]],
+      ['read', ACCOUNT_TOKEN, []],
+    ]);
+    core.wishlists.set(ACCOUNT_TOKEN, ['p-gone', lawn.id]);
+    expect((await ask('/ur/account/wishlist.json')).json()).toEqual({ handles: [lawn.handle] });
+
+    // What is not a list of handles, or too long, is not asked of the core.
+    const asked = core.wishlistAsked.length;
+    for (const payload of [
+      { handles: 'khussa' },
+      { handles: [1] },
+      { handles: [''] },
+      { handles: Array.from({ length: 101 }, (_, index) => `product-${index}`) },
+    ]) {
+      expect((await ask('/account/wishlist', payload)).statusCode).toBe(422);
+    }
+    expect((await ask('/account/wishlist/remove', { handle: ['khussa'] })).statusCode).toBe(422);
+    expect(core.wishlistAsked).toHaveLength(asked);
+    await app.close();
+  });
+
+  it('refuses wishlists from other sites and other shops, and from no one signed in (ADR-575)', async () => {
+    const app = server();
+    const cookie = signedIn();
+    const lawn = sampleStore().products[0]!;
+    const refused = [
+      // Another site, or another address on the same site, such as another shop's.
+      { 'sec-fetch-site': 'cross-site' },
+      { 'sec-fetch-site': 'same-site' },
+      { origin: 'https://elsewhere.example' },
+      { origin: 'http://zari.localhost' },
+      { origin: 'null' },
+    ];
+    for (const headers of refused) {
+      for (const [method, url] of [
+        ['GET', '/account/wishlist.json'],
+        ['POST', '/account/wishlist'],
+        ['POST', '/ur/account/wishlist/remove'],
+      ] as const) {
+        const answer = await app.inject({
+          method,
+          url,
+          headers: { host: 'localhost', 'content-type': 'application/json', cookie, ...headers },
+          ...(method === 'POST' && { payload: JSON.stringify({ handles: [lawn.handle] }) }),
+        });
+        expect([answer.statusCode, answer.headers['cache-control']]).toEqual([
+          403,
+          'private, no-store',
+        ]);
+      }
+    }
+    // A form, which another site's page could post, is not JSON.
+    const posted = await app.inject({
+      method: 'POST',
+      url: '/account/wishlist',
+      headers: {
+        host: 'localhost',
+        cookie,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: form({ 'handles[]': lawn.handle }),
+    });
+    expect(posted.statusCode).toBe(415);
+    const plain = await app.inject({
+      method: 'POST',
+      url: '/account/wishlist',
+      headers: { host: 'localhost', cookie, 'content-type': 'text/plain' },
+      payload: JSON.stringify({ handles: [lawn.handle] }),
+    });
+    expect(plain.statusCode).toBe(415);
+    expect(core.wishlistAsked).toEqual([]);
+
+    // A browser that says nothing of where it is may, as forms may.
+    const bare = await app.inject({
+      method: 'GET',
+      url: '/account/wishlist.json',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(bare.statusCode).toBe(200);
+
+    // No one signed in: 401, with nothing asked of the core and no cookies changed.
+    const out = await app.inject({
+      method: 'POST',
+      url: '/account/wishlist',
+      headers: WISHLIST,
+      payload: JSON.stringify({ handles: [lawn.handle] }),
+    });
+    expect([out.statusCode, out.headers['set-cookie'], out.headers['cache-control']]).toEqual([
+      401,
+      undefined,
+      'private, no-store',
+    ]);
+    // A session that is over: 401, its cookies gone.
+    const over = await app.inject({
+      method: 'GET',
+      url: '/account/wishlist.json',
+      headers: { ...WISHLIST, cookie: 'hatti_account=sEsSiOn_SeCrEt-EnDeD-0123456789abcdef' },
+    });
+    expect(over.statusCode).toBe(401);
+    expect(over.headers['set-cookie']).toEqual([
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    ]);
+    expect(core.wishlistAsked).toEqual([['read', ACCOUNT_TOKEN, []]]);
+
+    // The core cannot be reached: said so.
+    core.accountWishlist = () => Promise.reject(new StorefrontApiError(503, 'Restarting'));
+    const down = await app.inject({
+      method: 'GET',
+      url: '/account/wishlist.json',
+      headers: { ...WISHLIST, cookie },
+    });
+    expect(down.statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("links the account to the shop's wishlist page, where the theme says to, and its script keeps the wishlist with the account (ADR-575)", async () => {
+    const files = await readThemeDir(THEME_DIR);
+    const linked = loadTheme({
+      ...files,
+      'templates/customers/account.json': JSON.stringify({
+        sections: { main: { type: 'main-account', settings: { wishlist: true } } },
+        order: ['main'],
+      }),
+    });
+    const app = server({
+      theme: linked,
+      renderer: new PageRenderer(linked, { limits: { timeMs: 10_000 } }),
+    });
+    const cookie = signedIn();
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(page.body).toMatch(
+      /<p class="account__wishlist">\s*<a href="\/pages\/wishlist">Your wishlist<\/a>/,
+    );
+    expect(page.body).toContain(
+      'Kept with your account, on every phone or computer you sign in on.',
+    );
+    const urdu = await app.inject({
+      method: 'GET',
+      url: '/ur/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(urdu.body).toMatch(/<a href="\/ur\/pages\/wishlist">آپ کی پسندیدہ فہرست<\/a>/);
+    // Not unless the theme says so: the shop may have no such page.
+    const plain = server();
+    const unlinked = await plain.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie: signedIn() },
+    });
+    expect(unlinked.statusCode).toBe(200);
+    expect(unlinked.body).not.toContain('<p class="account__wishlist">');
+
+    // Every page's script tells the account of the hearts pressed, and joins the lists once a
+    // visit, for a shopper signed in; the pages themselves are the same for everyone.
+    const home = await plain.inject({ method: 'GET', url: '/', headers: { host: 'localhost' } });
+    expect(home.headers['cache-control']).toMatch(/^public, /);
+    expect(home.body).toContain("this.account('/account/wishlist', { handles: [handle] })");
+    expect(home.body).toContain("this.account('/account/wishlist/remove', { handle })");
+    expect(home.body).toContain("lists.account('/account/wishlist', { handles: lists.handles() })");
+    await app.close();
+    await plain.close();
+  });
 });
 
 describe.skipIf(!redisUrl)('The storefront server', () => {
@@ -4897,6 +5157,37 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     }
     expect(answers).toEqual([...Array<number>(10).fill(303), 429]);
     expect(core.actions).toHaveLength(10);
+    await app.close();
+  });
+
+  it("limits how often an address can ask of shoppers' wishlists (ADR-575)", async () => {
+    const core = new FakeCore();
+    core.accounts.set(ACCOUNT_TOKEN, ACCOUNT);
+    const app = server(core);
+    const answers = [];
+    for (let attempt = 0; attempt < 61; attempt += 1) {
+      const answer = await app.inject({
+        method: attempt % 2 === 0 ? 'GET' : 'POST',
+        url: attempt % 2 === 0 ? '/account/wishlist.json' : '/ur/account/wishlist',
+        headers: {
+          host: 'bazaar.localhost',
+          'content-type': 'application/json',
+          'sec-fetch-site': 'same-origin',
+          cookie: `hatti_account=${ACCOUNT_TOKEN}`,
+        },
+        ...(attempt % 2 === 1 && { payload: JSON.stringify({ handles: ['eid-lawn'] }) }),
+        remoteAddress: '203.0.113.74',
+      });
+      answers.push(answer.statusCode);
+      if (answer.statusCode === 429) {
+        expect(answer.json()).toEqual({
+          message: 'Too many changes to your wishlist. Please wait a moment.',
+        });
+        expect(answer.headers['cache-control']).toBe('private, no-store');
+      }
+    }
+    expect(answers).toEqual([...Array<number>(60).fill(200), 429]);
+    expect(core.wishlistAsked).toHaveLength(60);
     await app.close();
   });
 

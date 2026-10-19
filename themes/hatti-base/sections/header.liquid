@@ -93,10 +93,15 @@
 {% endstylesheet %}
 
 {% javascript %}
+  // Whether the shopper is signed in comes from a cookie, which says nothing more (ADR-571).
+  const signedIn = () => /(?:^|;\s*)hatti_signed_in=1(?:;|$)/.test(document.cookie);
+
   // The shopper's wishlist (OS-12, ADR-418): products' handles, newest first, kept in this
-  // browser alone, since pages are the same for every shopper. The hearts on cards and product
+  // browser, since pages are the same for every shopper. The hearts on cards and product
   // pages add and remove them; the wishlist page and recently viewed read it through
-  // window.HattiWishlist. Storage that cannot be read or written keeps nothing.
+  // window.HattiWishlist. Storage that cannot be read or written keeps nothing. Signed in, the
+  // shopper's account keeps it too (ADR-575), so that it follows them to any browser they sign
+  // in on: each heart pressed tells it, and this browser's list is still what pages show.
   const lists = (window.HattiWishlist = {
     read(key) {
       try {
@@ -121,7 +126,30 @@
       const adding = handles.length === this.handles().length;
       this.write('hatti:wishlist', (adding ? [handle, ...handles] : handles).slice(0, 50));
       document.dispatchEvent(new CustomEvent('hatti:wishlist'));
+      if (signedIn()) {
+        if (adding) this.account('/account/wishlist', { handles: [handle] });
+        else this.account('/account/wishlist/remove', { handle });
+      }
       return adding;
+    },
+    /**
+     * Tells the shopper's account of a change to their wishlist (ADR-575): its handles as it is
+     * then, newest first; null if the account could not be reached, or they are not signed in.
+     */
+    async account(path, body) {
+      try {
+        const response = await fetch(path, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(body),
+          credentials: 'same-origin',
+        });
+        if (!response.ok) return null;
+        const { handles } = await response.json();
+        return Array.isArray(handles) ? handles.filter((handle) => typeof handle === 'string') : null;
+      } catch {
+        return null;
+      }
     },
     remove(handle) {
       if (this.handles().includes(handle)) this.toggle(handle);
@@ -164,6 +192,30 @@
   new MutationObserver(showWishlist).observe(document.body, { childList: true, subtree: true });
   showWishlist();
 
+  // Signed in, once a visit (ADR-575): this browser's wishlist joins the account's, and the
+  // account's, as it is then, becomes this browser's. Signed out, nothing is asked, and the next
+  // sign-in joins them again.
+  try {
+    const joined = 'hatti:wishlist-joined';
+    if (!signedIn()) {
+      sessionStorage.removeItem(joined);
+    } else if (!sessionStorage.getItem(joined)) {
+      sessionStorage.setItem(joined, '1');
+      lists.account('/account/wishlist', { handles: lists.handles() }).then((handles) => {
+        try {
+          // Not joined: the next page tries again.
+          if (!handles) return sessionStorage.removeItem(joined);
+          lists.write('hatti:wishlist', handles.slice(0, 50));
+          document.dispatchEvent(new CustomEvent('hatti:wishlist'));
+        } catch {
+          // Storage that cannot be written keeps nothing.
+        }
+      });
+    }
+  } catch {
+    // Storage that cannot be read or written keeps no list to join.
+  }
+
   // Pages are the same for every shopper, so the cart's count comes from its cookie.
   const count = /(?:^|;\s*)cart_count=(\d+)/.exec(document.cookie);
   if (count) {
@@ -172,8 +224,8 @@
     }
   }
 
-  // Whether the shopper is signed in comes from a cookie too, which says nothing more (ADR-571).
-  if (/(?:^|;\s*)hatti_signed_in=1(?:;|$)/.test(document.cookie)) {
+  // Signed in, the header's link says "Account" (ADR-571).
+  if (signedIn()) {
     for (const link of document.querySelectorAll('[data-account-link]')) {
       link.textContent = link.dataset.signedIn;
     }

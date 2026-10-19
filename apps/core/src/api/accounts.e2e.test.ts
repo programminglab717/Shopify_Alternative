@@ -3,7 +3,12 @@ import { generateAccessToken } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { StorefrontApiClient, StorefrontApiError, accountPath } from '@hatti/storefront-api';
+import {
+  StorefrontApiClient,
+  StorefrontApiError,
+  accountPath,
+  accountWishlistItemPath,
+} from '@hatti/storefront-api';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -320,5 +325,84 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
       { action: 'customer.erasure_requested', subjectId: customerId, actor },
       { action: 'customer.data_exported', subjectId: customerId, actor },
     ]);
+  });
+
+  it("keeps the shopper's wishlist with their account, by the catalog's IDs (ADR-575)", async () => {
+    // Without the storefront's key, nothing; without a session, nothing either.
+    expect(
+      (await app.inject({ method: 'GET', url: accountPath(shop, 'wishlist') })).statusCode,
+    ).toBe(401);
+    expect(await client.accountWishlist(shop, 'x'.repeat(43))).toBeNull();
+    expect(await client.accountWishlistAdd(shop, 'x'.repeat(43), [])).toBeNull();
+
+    const created = await graphql(`
+      mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "3,000" }] }) {
+          product {
+            id
+          }
+        }
+      }
+    `);
+    const { rows } = await admin.query<{ id: string; title: string }>(
+      `SELECT id, title FROM catalog.products WHERE shop_id = $1 ORDER BY title`,
+      [shop],
+    );
+    const [kurta, shawl] = rows.map((row) => row.id) as [string, string];
+    expect(rows.map((row) => row.title)).toEqual(['Kurta', 'Shawl']);
+    expect(created.productCreate.product.id).toMatch(/^prod_/);
+
+    // The customer of the order placed before: kept as theirs.
+    await client.accountLoginStart(shop, { phone: '0300 1234567' });
+    const verified = await client.accountLoginVerify(shop, {
+      phone: '0300 1234567',
+      code: (await codes()).at(-1)!.code,
+    });
+    if (!verified.ok) throw new Error(`Expected signed in, got ${verified.error}`);
+    const session = verified.token;
+    expect(await client.accountWishlist(shop, session)).toEqual([]);
+    // The newest first; IDs that name none of the shop's products left out.
+    expect(
+      await client.accountWishlistAdd(shop, session, [shawl, kurta, newId(), 'prod_nothing']),
+    ).toEqual([shawl, kurta]);
+    expect(await client.accountWishlist(shop, session)).toEqual([shawl, kurta]);
+    expect(await client.accountWishlist(other, session)).toBeNull();
+    const kept = await admin.query<{ customer_id: string | null; phone: string | null }>(
+      'SELECT DISTINCT customer_id, phone FROM checkout.account_wishlist_items',
+    );
+    expect(kept.rows).toEqual([{ customer_id: expect.any(String) as unknown, phone: null }]);
+
+    expect(await client.accountWishlistRemove(shop, session, shawl)).toEqual([kurta]);
+    expect(await client.accountWishlistRemove(shop, session, 'prod_nothing')).toEqual([kurta]);
+
+    // Answers are never kept; what is not a list of IDs, or too long, is refused.
+    const headers = { authorization: `Bearer ${TEST_STOREFRONT_KEY}`, 'x-hatti-account': session };
+    const read = await app.inject({ method: 'GET', url: accountPath(shop, 'wishlist'), headers });
+    expect([read.statusCode, read.headers['cache-control'], read.json()]).toEqual([
+      200,
+      'no-store',
+      { productIds: [kurta] },
+    ]);
+    for (const payload of [{ productIds: kurta }, { productIds: Array(101).fill(kurta) }, {}]) {
+      const refused = await app.inject({
+        method: 'POST',
+        url: accountPath(shop, 'wishlist'),
+        headers,
+        payload,
+      });
+      expect(refused.statusCode).toBe(422);
+      expect(refused.json()).toMatchObject({ errors: [{ field: 'productIds' }] });
+    }
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: accountWishlistItemPath(shop, kurta),
+      headers,
+    });
+    expect([removed.statusCode, removed.json()]).toEqual([200, { productIds: [] }]);
+
+    // Signed out, nothing.
+    await client.accountLogout(shop, session);
+    expect(await client.accountWishlistAdd(shop, session, [kurta])).toBeNull();
+    expect(await client.accountWishlistRemove(shop, session, kurta)).toBeNull();
   });
 });

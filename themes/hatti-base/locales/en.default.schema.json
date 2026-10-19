@@ -86,7 +86,13 @@
       "name": "Page not found"
     },
     "main-account": {
-      "name": "Account"
+      "name": "Account",
+      "settings": {
+        "wishlist": {
+          "label": "Link to the wishlist",
+          "info": "Links to the shopper's wishlist at /pages/wishlist: add a page with that handle and the wishlist template."
+        }
+      }
     },
     "main-article": {
       "name": "Article"

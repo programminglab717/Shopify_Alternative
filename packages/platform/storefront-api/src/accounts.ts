@@ -3,7 +3,8 @@
 // by SMS, and the core gives the storefront a session's secret for the browser's cookie, through
 // which it reads their account: their orders with the shop and their store credit. The secret is
 // the only credential; the storefront sends it in `x-hatti-account`, never in an address. Signed
-// in, a shopper asks for the file of their own data, or for its erasure (ADR-572).
+// in, a shopper asks for the file of their own data, or for its erasure (ADR-572), and their
+// wishlist is kept with their account, as well as in their browser (ADR-575).
 
 import { STOREFRONT_API_PREFIX } from './cart.js';
 
@@ -34,7 +35,7 @@ export function accountCookieCleared(options: { secure: boolean }): string {
 
 /** What a storefront asks of a shop's accounts, each under `…/account`. */
 export type AccountRoute =
-  'login' | 'login/verify' | 'session' | 'logout' | 'data/export' | 'data/erase';
+  'login' | 'login/verify' | 'session' | 'logout' | 'data/export' | 'data/erase' | 'wishlist';
 
 /**
  * A shop's accounts: GET `…/account` reads the account of the session `x-hatti-account` names;
@@ -42,7 +43,9 @@ export type AccountRoute =
  * `…/account/session` reads the session, and POST `…/account/logout` ends it. POST
  * `…/account/data/export` makes the shopper's file, or gives the one kept, and GET links to the
  * one kept, an {@link AccountDataExportResponse}; POST `…/account/data/erase` asks for their
- * erasure, an {@link AccountDataEraseResponse} (ADR-572). Each is 404 without a session.
+ * erasure, an {@link AccountDataEraseResponse} (ADR-572). GET `…/account/wishlist` reads the
+ * account's wishlist and POST adds to it, an {@link AccountWishlistResponse} (ADR-575). Each is 404
+ * without a session.
  */
 export function accountPath(shopId: string, route?: AccountRoute): string {
   return `${STOREFRONT_API_PREFIX}shops/${shopId}/account${route ? `/${route}` : ''}`;
@@ -52,6 +55,17 @@ export function accountPath(shopId: string, route?: AccountRoute): string {
 export function accountOrderLinkPath(shopId: string, orderId: string): string {
   return `${accountPath(shopId)}/orders/${orderId}/link`;
 }
+
+/** DELETE: takes the product `productId` off the account's wishlist (ADR-575). */
+export function accountWishlistItemPath(shopId: string, productId: string): string {
+  return `${accountPath(shopId, 'wishlist')}/${productId}`;
+}
+
+/**
+ * The most products an account's wishlist keeps (ADR-575): adding more, the oldest go to make room,
+ * as many as one request may add.
+ */
+export const ACCOUNT_WISHLIST_MAX = 100;
 
 /** What a shopper typed to sign in, and how they asked for the code. */
 export interface AccountLoginStartRequest {
@@ -270,3 +284,22 @@ export type AccountDataExportResponse =
  * waits; `none` for a number no customer has, of whom the shop keeps nothing to erase.
  */
 export type AccountDataEraseResponse = AccountErasureJson | { state: 'none' };
+
+/**
+ * POST `…/account/wishlist` (ADR-575): products to add to the account's wishlist, by the catalog's
+ * IDs as the storefront's documents name them, the newest first, as the browser keeps its own: at
+ * most {@link ACCOUNT_WISHLIST_MAX}. Those already in it stay where they are, and those the shop
+ * does not have are left out. 422 for a list that is not one of strings, or too long.
+ */
+export interface AccountWishlistAddRequest {
+  productIds: string[];
+}
+
+/**
+ * The account's wishlist (ADR-575): its products, the newest first, at most
+ * {@link ACCOUNT_WISHLIST_MAX}, by the catalog's IDs as the storefront's documents name them;
+ * those the shop no longer has left out. Each of GET, POST and DELETE answers it, as it is now.
+ */
+export interface AccountWishlistResponse {
+  productIds: string[];
+}

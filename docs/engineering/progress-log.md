@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### The account's wishlist
+
+* **A signed-in shopper's wishlist is kept with their account and follows them across devices,
+  the browser's list still what pages show, so every page stays cacheable** ([ADR-575](../architecture/13-decision-log.md#adr-575--a-signed-in-shoppers-wishlist-is-kept-with-their-account-and-follows-them-across-devices-the-browsers-list-still-what-pages-show-so-every-page-stays-cacheable), CUS-02,
+  OS-12).
+* 3545 tests, 10 more: the list kept, merged, erased and swept, the
+  storefront's JSON and its refusals, the client and the HTTP surface.
+
 ### 31993c4 · Buying again
 
 * **A shopper buys an order again from their account: what can still be sold goes into their

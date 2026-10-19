@@ -42,6 +42,9 @@ export type CoreBackend = Pick<
   | 'accountDataExport'
   | 'accountDataExportLink'
   | 'accountDataErase'
+  | 'accountWishlist'
+  | 'accountWishlistAdd'
+  | 'accountWishlistRemove'
 >;
 
 /** The secret naming the shopper's cart, which scripts cannot read. */

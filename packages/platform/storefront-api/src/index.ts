@@ -1,10 +1,12 @@
 export {
   ACCOUNT_COOKIE,
   ACCOUNT_TOKEN_HEADER,
+  ACCOUNT_WISHLIST_MAX,
   accountCookie,
   accountCookieCleared,
   accountOrderLinkPath,
   accountPath,
+  accountWishlistItemPath,
   type AccountDataEraseResponse,
   type AccountDataExportJson,
   type AccountDataExportResponse,
@@ -24,6 +26,8 @@ export {
   type AccountRoute,
   type AccountSessionJson,
   type AccountSessionResponse,
+  type AccountWishlistAddRequest,
+  type AccountWishlistResponse,
 } from './accounts.js';
 export {
   CART_ACTIONS,
