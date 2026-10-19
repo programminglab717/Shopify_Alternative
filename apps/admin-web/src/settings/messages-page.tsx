@@ -71,9 +71,13 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   disabledNotifications: 'messages.which',
 };
 
-/** What is always sent, which the shop cannot turn off: codes at checkout, and Hatti's notices. */
+/**
+ * What is always sent, which the shop cannot turn off: codes at checkout and to sign in to the
+ * storefront, and Hatti's notices.
+ */
 const ALWAYS_SENT = [
   'ONE_TIME_CODE',
+  'ACCOUNT_CODE',
   // Turned on and off with the checkout's own setting (ADR-393, ADR-426).
   'CHECKOUT_REMINDER',
   'CHECKOUT_OFFER',

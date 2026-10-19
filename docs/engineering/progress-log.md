@@ -14,6 +14,14 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-19
+
+### The sign-in code named in the admin
+
+* **Fix:** the admin's list of messages sent showed the code to sign in on the storefront
+  (ADR-570) by its own name, `account code`; it is now "Sign-in code", in Urdu too, among the
+  messages always sent. No tests more; the list's test now shows one.
+
 ## 2026-10-18
 
 ### 5831b08 · Shoppers signed in

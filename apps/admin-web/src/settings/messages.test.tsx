@@ -46,6 +46,21 @@ const MESSAGES = [
     deliveredAt: null,
     readAt: null,
   },
+  {
+    // A code to sign in on the storefront (ADR-570), which belongs to no order.
+    id: 'msg_3',
+    kind: 'ACCOUNT_CODE',
+    channel: 'WHATSAPP',
+    status: 'SENT',
+    recipient: '+92333*****89',
+    orderId: null,
+    error: null,
+    attempts: 1,
+    createdAt: '2026-10-06T09:00:00Z',
+    sentAt: '2026-10-06T09:00:02Z',
+    deliveredAt: null,
+    readAt: null,
+  },
 ];
 
 /** Requests for the shop's own SMS sender name, the newest first (ADR-469). */
@@ -226,6 +241,7 @@ describe('Customer messages', () => {
 
     const sent = await screen.findByRole('region', { name: 'Messages sent' });
     expect(await within(sent).findByText('Confirm your order')).toBeTruthy();
+    expect(within(sent).getByText('Sign-in code')).toBeTruthy();
     expect(within(sent).getByText('Read', { selector: 'span' })).toBeTruthy();
     expect(within(sent).getByText('Number unreachable')).toBeTruthy();
     expect(within(sent).getByText('Tried 3 times')).toBeTruthy();
