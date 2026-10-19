@@ -5,6 +5,7 @@ import {
   UserError,
   actorColumnsOf,
   deniedToRole,
+  hasCapability,
   type TenantContext,
 } from '@hatti/api';
 import { Database } from '@hatti/db';
@@ -200,19 +201,19 @@ export class SupportAccessResolver {
   }
 }
 
-/** Owners and managers see Hatti's support's access; apps with read_settings too. */
+/**
+ * Owners and managers see Hatti's support's access, and custom roles of managers' that keep it
+ * (ADR-578); apps with read_settings too.
+ */
 function managing(tenant: TenantContext): void {
-  if (tenant.actor.kind === 'staff' && !['owner', 'manager'].includes(tenant.actor.role)) {
+  if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'manage_support_access')) {
     throw deniedToRole("Access denied. Only owners and managers see Hatti's support's access.");
   }
 }
 
-/** The owner or a manager, acting: they end support's access, never apps. */
+/** The owner or a manager, acting, or a custom role of managers' that keeps it: never apps. */
 function managingStaff(tenant: TenantContext): { userId: string } {
-  if (
-    tenant.actor.kind !== 'staff' ||
-    (tenant.actor.role !== 'owner' && tenant.actor.role !== 'manager')
-  ) {
+  if (tenant.actor.kind !== 'staff' || !hasCapability(tenant.actor, 'manage_support_access')) {
     throw deniedToRole("Access denied. Only the owner and managers end Hatti's support's access.");
   }
   return { userId: tenant.actor.userId };

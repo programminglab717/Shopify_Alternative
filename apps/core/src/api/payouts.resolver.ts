@@ -4,8 +4,8 @@ import {
   RequireScopes,
   badUserInput,
   deniedToRole,
+  hasCapability,
   shopProfile,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { Database } from '@hatti/db';
@@ -37,9 +37,6 @@ export const PAYOUTS_LIMITS = {
   /** Statements of each kind a report reads at most; past them, it says it is cut short. */
   statements: 2_000,
 };
-
-/** Staff who see what the shop is paid: those who reconcile it (ADR-067, ADR-491). */
-const PAYOUT_ROLES: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
 
 export enum PayoutSourceKind {
   GATEWAY = 'gateway',
@@ -255,7 +252,8 @@ export class PayoutsResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args() args: PayoutsReportArgs,
   ): Promise<PayoutsReport> {
-    if (tenant.actor.kind === 'staff' && !PAYOUT_ROLES.includes(tenant.actor.role)) {
+    // Staff who see what the shop is paid: those who reconcile it (ADR-067, ADR-491).
+    if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'reconcile_payments')) {
       throw deniedToRole(
         'Access denied. Only owners, managers and accountants see what the shop is paid.',
       );

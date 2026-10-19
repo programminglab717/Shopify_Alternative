@@ -5,6 +5,7 @@ import {
   UserError,
   deniedToRole,
   failOne,
+  hasCapability,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -21,12 +22,15 @@ import {
   CustomAppUpdatePayload,
 } from './apps.types.js';
 
-/** Only the owner and managers manage the shop's apps; apps manage none, themselves included. */
+/**
+ * Only the owner and managers manage the shop's apps, and custom roles of managers' that keep it
+ * (ADR-578); apps manage none, themselves included.
+ */
 function managesApps(tenant: TenantContext): void {
   if (tenant.actor.kind !== 'staff') {
     throw deniedToRole("Access denied. A shop's apps are managed by its owner and managers.");
   }
-  if (tenant.actor.role !== 'owner' && tenant.actor.role !== 'manager') {
+  if (!hasCapability(tenant.actor, 'manage_apps')) {
     throw deniedToRole('Access denied. Only the owner and managers manage apps.');
   }
 }

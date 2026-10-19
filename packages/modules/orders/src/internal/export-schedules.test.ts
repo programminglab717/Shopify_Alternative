@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import type { StaffRole, TenantContext } from '@hatti/api';
+import { staffCapabilities, type StaffRole, type TenantContext } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
@@ -412,6 +412,75 @@ describe.skipIf(!server)('Scheduled exports (ADR-183)', () => {
         'Not sent: its member of staff no longer works in the shop, or has no proved email',
     });
     expect(emails.sent).toEqual([]);
+  });
+
+  it("follows a member's custom role, not its preset, as it is now (ADR-578)", async () => {
+    await f.admin.query('DELETE FROM identity.custom_roles');
+    /** A custom role of shop A's, made from `basedOn`, with `capabilities`; its ID. */
+    const customRole = async (name: string, basedOn: StaffRole, capabilities: string[]) => {
+      const id = newId();
+      await f.admin.query(
+        `INSERT INTO identity.custom_roles (id, shop_id, name, based_on, scopes, capabilities)
+         VALUES ($1, $2, $3, $4, '{read_orders}', $5)`,
+        [id, f.a.shopId, name, basedOn, capabilities],
+      );
+      return id;
+    };
+    /** A member of staff in custom role `id`, as their requests are: its capabilities theirs. */
+    const holding = async (basedOn: StaffRole, id: string, capabilities: string[]) => {
+      const userId = await member(basedOn);
+      await f.admin.query(
+        'UPDATE identity.memberships SET custom_role_id = $2 WHERE user_id = $1',
+        [userId, id],
+      );
+      const tenant: TenantContext = {
+        ...f.a,
+        actor: {
+          kind: 'staff',
+          userId,
+          sessionId: newId(),
+          authenticatedAt: new Date(),
+          role: basedOn,
+          customRoleId: id,
+          capabilities: staffCapabilities(basedOn, capabilities),
+        },
+      };
+      return { userId, tenant };
+    };
+    const input = { frequency: 'daily', layout: 'orders', format: 'xlsx' } as const;
+    await placed('2026-10-04T05:00:00Z');
+
+    // A manager's role without exports schedules none.
+    const lead = await customRole('Lead, no exports', 'manager', ['see_customer_numbers']);
+    const noExports = await holding('manager', lead, ['see_customer_numbers']);
+    expect(errorsOf(await schedules.create(noExports.tenant, input, MONDAY))).toEqual([
+      ['input', 'INVALID'],
+    ]);
+    // One that exports, but sees numbers masked, is sent them masked, as a manager's are not.
+    const masked = await customRole('Lead, masked', 'manager', ['export_orders']);
+    const lead2 = await holding('manager', masked, ['export_orders']);
+    const theirs = unwrap(await schedules.create(lead2.tenant, input, MONDAY));
+    const emails = new KeptEmails();
+    const at = new Date('2026-10-05T03:00:00Z');
+    expect(await schedules.run(f.a.shopId, theirs.id, at, emails)).toBe('sent');
+    const [header, row] = xlsxRows(emails.sent[0]!.attachment.content);
+    expect(row![header!.indexOf('Phone')]).toBe('0300 ••••567');
+    // Nor do they delete others' schedules, as managers do.
+    const owners = await schedule(owner, 'owner');
+    expect(errorsOf(await schedules.delete(lead2.tenant, owners.id))).toEqual([
+      ['id', 'NOT_FOUND'],
+    ]);
+    // Their role exports no more: the next is not sent.
+    await f.admin.query("UPDATE identity.custom_roles SET capabilities = '{}' WHERE id = $1", [
+      masked,
+    ]);
+    expect(
+      await schedules.run(f.a.shopId, theirs.id, new Date('2026-10-06T03:00:00Z'), emails),
+    ).toBe('skipped');
+    expect((await schedules.list(f.a)).find((item) => item.id === theirs.id)!.lastError).toBe(
+      "Not sent: its member of staff's role no longer exports orders",
+    );
+    expect(emails.sent).toHaveLength(1);
   });
 
   it("lists the shop's schedules, and deletes a member's own, or any for owners and apps", async () => {

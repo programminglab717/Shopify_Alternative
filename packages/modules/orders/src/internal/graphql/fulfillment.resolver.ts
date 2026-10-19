@@ -13,10 +13,10 @@ import {
   decodeTimeCursor,
   deniedToRole,
   encodeCursor,
+  hasCapability,
   hasScope,
   pageSize,
   type MutationResult,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId } from '@hatti/ids';
@@ -91,13 +91,11 @@ function toFulfillmentEvent(record: FulfillmentEventRecord): FulfillmentEvent {
 
 /**
  * Staff who claim from couriers: owners, managers and accountants, who reconcile their cash
- * (ADR-093). Apps need write_orders.
+ * (ADR-093), and custom roles of theirs that keep it (ADR-578). Apps need write_orders.
  */
-const CLAIMING_ROLES: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
-
 function mayClaim(tenant: TenantContext): void {
   if (tenant.actor.kind === 'staff') {
-    if (!CLAIMING_ROLES.includes(tenant.actor.role)) {
+    if (!hasCapability(tenant.actor, 'claim_from_couriers')) {
       throw deniedToRole(
         'Access denied. Only owners, managers and accountants claim from couriers.',
       );

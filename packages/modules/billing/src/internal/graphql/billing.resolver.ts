@@ -8,6 +8,7 @@ import {
   UserError,
   badUserInput,
   deniedToRole,
+  hasCapability,
   type AiCreditBalance,
   type TenantContext,
 } from '@hatti/api';
@@ -278,9 +279,12 @@ export class BillingResolver {
   }
 }
 
-/** Owners and managers see what the shop pays; apps with read_settings too. */
+/**
+ * Owners and managers see what the shop pays, and custom roles of theirs that keep it (ADR-578);
+ * apps with read_settings too.
+ */
 function managing(tenant: TenantContext): void {
-  if (tenant.actor.kind === 'staff' && !['owner', 'manager'].includes(tenant.actor.role)) {
+  if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'see_billing')) {
     throw deniedToRole('Access denied. Only owners and managers see what the shop pays Hatti.');
   }
 }

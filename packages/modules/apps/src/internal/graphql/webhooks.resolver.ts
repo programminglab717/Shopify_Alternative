@@ -3,6 +3,7 @@ import {
   UserError,
   deniedToRole,
   failOne,
+  hasCapability,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -26,15 +27,15 @@ import {
 } from './webhooks.types.js';
 
 /**
- * Whose subscriptions the caller manages: an app its own alone; the owner and managers any app's.
- * Other staff none.
+ * Whose subscriptions the caller manages: an app its own alone; the owner and managers any app's,
+ * and custom roles of managers' that keep it (ADR-578). Other staff none.
  */
 function ownApp(tenant: TenantContext): string | null {
   switch (tenant.actor.kind) {
     case 'app':
       return tenant.actor.tokenId;
     case 'staff':
-      if (tenant.actor.role === 'owner' || tenant.actor.role === 'manager') return null;
+      if (hasCapability(tenant.actor, 'manage_apps')) return null;
       throw deniedToRole("Access denied. Only the owner and managers manage apps' webhooks.");
     default:
       throw deniedToRole("Access denied. Apps' webhooks are managed by apps and the shop.");

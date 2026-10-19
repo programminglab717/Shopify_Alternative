@@ -3499,6 +3499,73 @@ type CustomAppUpdatePayload {
 }
 
 """
+A shop's own staff role (ADM-01, ADR-578): made from a preset other than the owner's, for good, holding some of its scopes and capabilities, never more. Its members' role is the preset, which says the rest, such as whether they need a second factor.
+"""
+type CustomRole {
+  """The preset it was made from."""
+  basedOn: StaffMemberRole!
+
+  """Some of its preset's capabilities."""
+  capabilities: [StaffCapability!]!
+  createdAt: DateTime!
+
+  """role_…"""
+  id: ID!
+
+  """Up to 40 characters, the shop's alone."""
+  name: String!
+
+  """
+  Its access scopes, such as "write_orders": some of its preset's, or the read of what the preset writes.
+  """
+  scopes: [String!]!
+
+  """Members of staff who hold it."""
+  staffMemberCount: Int!
+  updatedAt: DateTime!
+}
+
+input CustomRoleCreateInput {
+  """The preset it is made from: any but the owner's."""
+  basedOn: StaffMemberRole!
+
+  """Its capabilities, each its preset's."""
+  capabilities: [StaffCapability!]!
+
+  """1 to 40 characters, no other role's of the shop."""
+  name: String!
+
+  """
+  Its access scopes, each one of its preset's, or the read of a resource the preset writes.
+  """
+  scopes: [String!]!
+}
+
+type CustomRoleCreatePayload {
+  customRole: CustomRole
+  userErrors: [UserError!]!
+}
+
+type CustomRoleDeletePayload {
+  deletedCustomRoleId: ID
+  userErrors: [UserError!]!
+}
+
+input CustomRoleUpdateInput {
+  """In place of its capabilities, where given."""
+  capabilities: [StaffCapability!]
+  name: String
+
+  """In place of its scopes, where given."""
+  scopes: [String!]
+}
+
+type CustomRoleUpdatePayload {
+  customRole: CustomRole
+  userErrors: [UserError!]!
+}
+
+"""
 A customer: whoever a mobile number belongs to. Orders find or create their customer by number.
 """
 type Customer {
@@ -7826,6 +7893,21 @@ type Mutation {
   customAppUpdate(id: ID!, input: CustomAppInput!): CustomAppUpdatePayload!
 
   """
+  Makes a custom role (ADR-578) from a preset, with some of its scopes and capabilities, never more; a shop has 50 at most. The owner makes them from any preset but its own; managers, from those below them.
+  """
+  customRoleCreate(input: CustomRoleCreateInput!): CustomRoleCreatePayload!
+
+  """
+  Deletes a custom role no member of staff holds, nor any invitation waiting: give them another role, or take the invitations back, first (IN_USE).
+  """
+  customRoleDelete(id: ID!): CustomRoleDeletePayload!
+
+  """
+  Changes a custom role's name, scopes or capabilities, those given, within its preset's still; its preset stays. Those who hold it have what it says from their next request. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  customRoleUpdate(id: ID!, input: CustomRoleUpdateInput!): CustomRoleUpdatePayload!
+
+  """
   Adds tags to up to 250 customers, each as customerUpdate would. Tags a customer has already, in any case, stay as they are; one with too many is refused.
   """
   customerBulkAddTags(ids: [ID!]!, tags: [String!]!): CustomerBulkPayload!
@@ -8790,13 +8872,18 @@ type Mutation {
   staffAccessRequestDecline(id: ID!): StaffAccessRequestDeclinePayload!
 
   """
-  Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
+  Invites someone to work in the shop in `role`, or in custom role `customRoleId` (ADR-578), by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffInvitationCreate(
     """
     For a collaborator, such as an agency's (ADM-07, ADR-487): the days, 1 to 90, the access lasts once accepted, after which their membership ends by itself; for good unless given.
     """
     accessDays: Int
+
+    """
+    A custom role of the shop's (ADR-578): role_…. Its members' role is the preset it was made from, which `role`, if given, must be.
+    """
+    customRoleId: ID
 
     """Where Hatti emails the link too: the address of whom it is for."""
     email: String
@@ -8808,7 +8895,9 @@ type Mutation {
 
     """Whom it is for, up to 100 characters: "Bilal, for packing"."""
     note: String
-    role: StaffMemberRole!
+
+    """The role preset, unless customRoleId gives a custom role."""
+    role: StaffMemberRole
   ): StaffInvitationCreatePayload!
 
   """
@@ -8834,9 +8923,18 @@ type Mutation {
   staffMemberRemove(id: ID!): StaffMemberRemovePayload!
 
   """
-  Gives a staff member another role, from the next request they make: both roles must be ones the acting member manages, and nobody changes their own. Staff confirm who they are first when they signed in over 15 minutes ago.
+  Gives a staff member another role, a preset or a custom role (ADR-578), from the next request they make: both roles must be ones the acting member manages, and nobody changes their own. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
-  staffMemberRoleUpdate(id: ID!, role: StaffMemberRole!): StaffMemberRoleUpdatePayload!
+  staffMemberRoleUpdate(
+    """
+    A custom role of the shop's (ADR-578): role_…. Its members' role is the preset it was made from, which `role`, if given, must be.
+    """
+    customRoleId: ID
+    id: ID!
+
+    """The role preset, unless customRoleId gives a custom role."""
+    role: StaffMemberRole
+  ): StaffMemberRoleUpdatePayload!
 
   """
   Where to upload files, up to 10 at a time, for an hour: PUT each one there, then make files of them with fileCreate.
@@ -12919,6 +13017,11 @@ type Query {
   """The shop's custom apps, the latest first (DEV-04, ADR-395)."""
   customApps: [CustomApp!]!
 
+  """
+  The shop's custom roles (ADR-578), by name. Staff need to be the owner or a manager.
+  """
+  customRoles: [CustomRole!]!
+
   """A customer by ID, or null if not found."""
   customer(id: ID!): Customer
 
@@ -13520,6 +13623,11 @@ type Query {
   reviewSettings: ReviewSettings!
 
   """
+  The role presets, with the scopes and capabilities each holds: what a custom role made from one holds some of (ADR-578). Staff need to be the owner or a manager.
+  """
+  rolePresets: [RolePreset!]!
+
+  """
   Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, the products that sold most, and by channel, or by where their last visits came from or their campaigns. Worked out from the orders when asked. Its true profit lines are on Growth and bigger plans (ADR-529).
   """
   salesReport(
@@ -14044,6 +14152,18 @@ input ReviewSettingsInput {
 type ReviewSettingsPayload {
   reviewSettings: ReviewSettings
   userErrors: [UserError!]!
+}
+
+"""
+A role preset (ADR-578), with the scopes and capabilities it holds: what a custom role made from it holds some of.
+"""
+type RolePreset {
+  capabilities: [StaffCapability!]!
+
+  """Whether a custom role is made from it: every preset but the owner's."""
+  customizable: Boolean!
+  role: StaffMemberRole!
+  scopes: [String!]!
 }
 
 """
@@ -14966,6 +15086,64 @@ type StaffAccessRequestDeclinePayload {
 }
 
 """
+What staff may do beyond their scopes, which each role preset holds some of and a custom role some of its preset's (ADM-01, ADR-578). What only the owner does is none of them.
+"""
+enum StaffCapability {
+  """
+  Giving an order to anyone, and taking it from whoever has it (ADR-127).
+  """
+  ASSIGN_ORDERS
+
+  """Claims for parcels couriers lost or damaged."""
+  CLAIM_FROM_COURIERS
+
+  """Orders as a file, now or scheduled to their email."""
+  EXPORT_ORDERS
+
+  """The shop's custom apps and apps' webhooks."""
+  MANAGE_APPS
+
+  """Deleting anyone's scheduled export, not their own alone."""
+  MANAGE_EXPORT_SCHEDULES
+
+  """
+  Staff, their invitations, requests for access and custom roles, within the roles their preset manages (ADR-101).
+  """
+  MANAGE_STAFF
+
+  """Seeing Hatti's support's access to the shop, and ending it (ADR-156)."""
+  MANAGE_SUPPORT_ACCESS
+
+  """Deleting anyone's comment on an order (ADR-128)."""
+  MODERATE_COMMENTS
+
+  """
+  Couriers' remittances, gateways' settlements, and the report of what the shop is paid.
+  """
+  RECONCILE_PAYMENTS
+
+  """Recording refunds, and settling those a gateway never answered."""
+  REFUND_ORDERS
+
+  """
+  One number at a time, with orderPhoneReveal or customerPhoneReveal, each on the audit log, where numbers are masked otherwise.
+  """
+  REVEAL_CUSTOMER_NUMBERS
+
+  """What the shop pays Hatti."""
+  SEE_BILLING
+
+  """Customers' mobile numbers whole."""
+  SEE_CUSTOMER_NUMBERS
+
+  """How each confirmation agent and packer did."""
+  SEE_STAFF_PERFORMANCE
+
+  """The shop's verification by Hatti (ADR-465)."""
+  SEE_VERIFICATION
+}
+
+"""
 An invitation to work in the shop, waiting for whoever holds its link to accept it, signed in, before it expires (ADR-101).
 """
 type StaffInvitation {
@@ -14974,6 +15152,11 @@ type StaffInvitation {
   """
   accessDays: Int
   createdAt: DateTime!
+
+  """
+  The custom role it gives (ADR-578), whose preset is its role; null for a preset.
+  """
+  customRole: CustomRole
 
   """
   Where Hatti emailed its link (ADR-167); null when the inviter shares it alone.
@@ -14989,6 +15172,10 @@ type StaffInvitation {
 
   """Whom it is for, as the inviter noted it."""
   note: String
+
+  """
+  The role it gives; for a custom role (customRole), the preset it was made from.
+  """
   role: StaffMemberRole!
 }
 
@@ -15029,6 +15216,11 @@ type StaffInvitationRevokePayload {
 
 """Someone who works in the shop (ADR-101)."""
 type StaffMember {
+  """
+  Their custom role (ADR-578), whose preset is their role; null for a preset.
+  """
+  customRole: CustomRole
+
   """Their email; none for one who opened their account with a phone alone."""
   email: String
 
@@ -15043,6 +15235,10 @@ type StaffMember {
   """When they began working in the shop."""
   joinedAt: DateTime!
   name: String!
+
+  """
+  Their role's preset; for a custom role (customRole), the one it was made from, which says the rest, such as whether they need a second factor.
+  """
   role: StaffMemberRole!
 }
 

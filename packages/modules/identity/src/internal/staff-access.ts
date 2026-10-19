@@ -1,8 +1,9 @@
 import {
   MFA_REQUIRED_ROLES,
-  ROLE_SCOPES,
   SUPPORT_SCOPES,
   isStaffRole,
+  staffCapabilities,
+  staffScopes,
   type TenantContext,
 } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
@@ -33,13 +34,19 @@ interface Row extends Record<string, unknown> {
   shop_currency: string | null;
   /** The owner's grant open now, for Hatti's support in a shop it does not work in (ADR-156). */
   support_grant_id: string | null;
+  /** The membership's custom role (ADR-578), with its scopes and capabilities; null for a preset's. */
+  custom_role_id: string | null;
+  custom_scopes: string[] | null;
+  custom_capabilities: string[] | null;
 }
 
 /**
  * Turns a staff access token plus the shop a request names into a tenant context, for the
- * Admin API: a member of its staff in their role, or Hatti's support, reading alone, while the
- * shop's owner allows it (ADR-156). Uses the request-serving login: the identity tables stay out
- * of its reach, and one SECURITY DEFINER function answers the question.
+ * Admin API: a member of its staff in their role, with its preset's scopes and capabilities or
+ * their custom role's (ADR-578), or Hatti's support, reading alone, while the shop's owner allows
+ * it (ADR-156). Uses the request-serving login: the identity tables stay out of its reach, and
+ * one SECURITY DEFINER function answers the question, on every request, so that a change to a
+ * member's role or their custom role counts from their next.
  */
 export class StaffAccessResolver {
   constructor(private readonly db: Db) {}
@@ -77,17 +84,21 @@ export class StaffAccessResolver {
     if (MFA_REQUIRED_ROLES.has(role) && !row.mfa_verified) {
       return { ok: false, reason: 'mfa_required' };
     }
+    // A custom role's, within its preset's still; else the preset's.
+    const custom = row.custom_role_id !== null;
     return {
       ok: true,
       tenant: {
         shopId,
         currency,
-        scopes: new Set(ROLE_SCOPES[role]),
+        scopes: new Set(staffScopes(role, custom ? (row.custom_scopes ?? []) : null)),
         actor: {
           kind: 'staff',
           userId: row.user_id,
           sessionId: row.session_id,
           role,
+          customRoleId: row.custom_role_id,
+          capabilities: staffCapabilities(role, custom ? (row.custom_capabilities ?? []) : null),
           authenticatedAt: toDate(row.authenticated_at),
         },
       },

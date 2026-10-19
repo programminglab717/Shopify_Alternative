@@ -2,7 +2,9 @@ import {
   InputChecker,
   actorColumnsOf,
   failOne,
+  hasCapability,
   shopProfile,
+  staffCapabilities,
   type MutationResult,
   type StaffRole,
   type TenantContext,
@@ -22,7 +24,6 @@ import {
   type ScheduledExportSender,
 } from './export-schedule-email.js';
 import {
-  EXPORT_ROLES,
   OrderExportService,
   type ExportFormatValue,
   type ExportLayoutValue,
@@ -119,6 +120,8 @@ type Recipient = {
   role: StaffRole;
   /** Their account's own (ADR-194). */
   language: 'en' | 'ur';
+  /** Their custom role's capabilities (ADR-578); null for their preset's. */
+  capabilities: string[] | null;
 };
 
 @Injectable()
@@ -141,7 +144,7 @@ export class ExportScheduleService {
     if (actor.kind !== 'staff') {
       return failOne(['input'], 'INVALID', 'Only staff schedule exports: each goes to their email');
     }
-    if (!EXPORT_ROLES.includes(actor.role)) {
+    if (!hasCapability(actor, 'export_orders')) {
       return failOne(['input'], 'INVALID', 'Only owners, managers and accountants export orders');
     }
     const check = new InputChecker();
@@ -229,14 +232,14 @@ export class ExportScheduleService {
   }
 
   /**
-   * Deletes a scheduled export: a member of staff's own, or any for owners, managers and apps.
-   * Its ID.
+   * Deletes a scheduled export: a member of staff's own, or any for owners, managers, custom roles
+   * of theirs that keep it (ADR-578), and apps. Its ID.
    */
   async delete(tenant: TenantContext, id: string): Promise<MutationResult<string>> {
     const { actor } = tenant;
     return this.db.tenant(tenant.shopId, async (tx) => {
       const mine =
-        actor.kind === 'staff' && actor.role !== 'owner' && actor.role !== 'manager'
+        actor.kind === 'staff' && !hasCapability(actor, 'manage_export_schedules')
           ? sql`AND user_id = ${actor.userId}`
           : sql``;
       const { rows } = await tx.execute<{ id: string; user_id: string }>(sql`
@@ -315,7 +318,8 @@ export class ExportScheduleService {
         'Not sent: its member of staff no longer works in the shop, or has no proved email',
       );
     }
-    if (!EXPORT_ROLES.includes(recipient.role)) {
+    const capabilities = staffCapabilities(recipient.role, recipient.capabilities);
+    if (!capabilities.has('export_orders')) {
       return unsent("Not sent: its member of staff's role no longer exports orders");
     }
     const exported = await this.exports.export(
@@ -329,6 +333,7 @@ export class ExportScheduleService {
           userId: row.user_id,
           sessionId: row.id,
           role: recipient.role,
+          capabilities,
           authenticatedAt: at,
         },
       },
@@ -413,7 +418,8 @@ export class ExportScheduleService {
  */
 async function recipientIn(tx: Tx, shopId: string, userId: string): Promise<Recipient | null> {
   const { rows } = await tx.execute<Recipient>(
-    sql`SELECT email, name, role, language FROM identity.staff_email(${userId}, ${shopId})`,
+    sql`SELECT email, name, role, language, capabilities
+          FROM identity.staff_email(${userId}, ${shopId})`,
   );
   return rows[0] ?? null;
 }

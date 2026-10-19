@@ -1,9 +1,16 @@
 import 'reflect-metadata';
-import type { StaffRole, TenantContext } from '@hatti/api';
+import {
+  phoneAccess,
+  staffCapabilities,
+  type StaffCapability,
+  type StaffRole,
+  type TenantContext,
+} from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { CustomerResolver } from './graphql/customer.resolver.js';
 import { toBlocklistEntry, toConsentEventConnection, toCustomer } from './graphql/mappers.js';
 import { customersFixture, unwrap, type CustomersFixture } from './test-support.js';
 
@@ -110,6 +117,46 @@ describe.skipIf(!server)("Who sees customers' numbers", () => {
     // Nothing was revealed in the other shop, so nothing was logged.
     const other = await f.db.tenant(f.b.shopId, (tx) => listAudit(tx, f.b.shopId, { first: 10 }));
     expect(other.items).toEqual([]);
+  });
+
+  it("follows a custom role's capabilities, not its preset's (ADR-578)", async () => {
+    const customer = unwrap(await f.customers.create(f.a, { phone: '0300 1234567' }));
+    /** A member of staff in a custom role made from `role`, holding `capabilities`. */
+    const custom = (role: StaffRole, capabilities: StaffCapability[]): TenantContext => ({
+      ...f.a,
+      actor: {
+        kind: 'staff',
+        userId: newId(),
+        sessionId: newId(),
+        authenticatedAt: new Date(),
+        role,
+        customRoleId: newId(),
+        capabilities: staffCapabilities(role, capabilities),
+      },
+    });
+    const resolver = new CustomerResolver(f.customers, f.blocklist, f.data);
+    const reveal = (tenant: TenantContext) =>
+      resolver
+        .customerPhoneReveal(tenant, toPublicId('customer', customer.id))
+        .then((payload) => payload.phone)
+        .catch((error: Error) => error.message);
+    // A confirmation agent's role without the reveal sees numbers masked, and reveals none.
+    const caller = custom('confirmation_agent', []);
+    expect(phoneAccess(caller)).toBe('masked');
+    expect(toCustomer(customer, caller).phone).toBe('0300 ••••567');
+    expect(await reveal(caller)).toBe("Access denied. This role sees customers' numbers masked.");
+    expect(await reveal(custom('confirmation_agent', ['reveal_customer_numbers']))).toBe(
+      '+923001234567',
+    );
+    // A manager's without whole numbers sees them masked, revealing one as agents do.
+    const lead = custom('manager', ['reveal_customer_numbers']);
+    expect([phoneAccess(lead), toCustomer(customer, lead).phone]).toEqual([
+      'reveal',
+      '0300 ••••567',
+    ]);
+    expect(await reveal(lead)).toBe('+923001234567');
+    // And never more than their preset: a packer's sees them masked, whatever it says.
+    expect(phoneAccess(custom('packer', ['see_customer_numbers']))).toBe('masked');
   });
 
   it('logs merges, erasures and exports too', async () => {

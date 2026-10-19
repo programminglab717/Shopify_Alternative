@@ -1,7 +1,8 @@
 // Drizzle mirror of db/migrations/0002_identity.sql, 0069_passkeys.sql,
 // 0070_staff_invitations.sql, 0100_support_access.sql, 0103_phone_sign_up.sql,
 // 0107_google_sign_in.sql, 0108_account_emails.sql, 0109_invitations_by_email.sql,
-// 0111_email_feedback.sql and 0112_email_change.sql, which are the source of truth.
+// 0111_email_feedback.sql, 0112_email_change.sql and 0271_custom_roles.sql, which are the source of
+// truth.
 import {
   bigint,
   boolean,
@@ -227,6 +228,8 @@ export const invitations = identitySchema.table('invitations', {
   revokedAt: at('revoked_at'),
   /** For a collaborator (ADR-487): the days the access it gives lasts; null for good. */
   accessDays: integer('access_days'),
+  /** The custom role it gives (ADR-578), `role` its preset; null for a preset's. */
+  customRoleId: uuid('custom_role_id'),
 });
 
 /** An account's request to work in a shop for some days (ADR-488). */
@@ -257,11 +260,25 @@ export const memberships = identitySchema.table(
       .default('active'),
     /** When a collaborator's access ends (ADR-487); null for good. */
     expiresAt: at('expires_at'),
+    /** Their custom role (ADR-578), `role` its preset; null for a preset's. */
+    customRoleId: uuid('custom_role_id'),
     createdAt: at('created_at').notNull().defaultNow(),
     updatedAt: at('updated_at').notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.shopId] })],
 );
+
+/** A shop's own staff role (ADR-578), made from a preset, holding some of what it holds. */
+export const customRoles = identitySchema.table('custom_roles', {
+  id: uuid('id').primaryKey(),
+  shopId: uuid('shop_id').notNull(),
+  name: text('name').notNull(),
+  basedOn: text('based_on').notNull(),
+  scopes: text('scopes').array().notNull().default([]),
+  capabilities: text('capabilities').array().notNull().default([]),
+  createdAt: at('created_at').notNull().defaultNow(),
+  updatedAt: at('updated_at').notNull().defaultNow(),
+});
 
 /** Hatti's own support agents (ADR-156), added and removed by Hatti. */
 export const supportAgents = identitySchema.table('support_agents', {

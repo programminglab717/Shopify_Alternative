@@ -6,8 +6,8 @@ import {
   UserError,
   badUserInput,
   deniedToRole,
+  hasCapability,
   type MutationResult,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
@@ -42,9 +42,6 @@ import {
   PaymentSession,
   PaymentSessionStatus,
 } from './payments.types.js';
-
-/** Staff who settle refunds: those who refund orders, owners and managers. */
-const REFUND_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 /**
  * Payment gateways, the shop's accounts with them, and its orders' payments online (PAY-01,
@@ -188,7 +185,9 @@ export class PaymentsResolver {
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: PaymentRefundSettleInput,
   ): Promise<PaymentRefundSettlePayload> {
-    if (tenant.actor.kind === 'staff' && !REFUND_ROLES.includes(tenant.actor.role)) {
+    // Staff who settle refunds: those who refund orders, owners and managers, and custom roles of
+    // theirs that keep it (ADR-578).
+    if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'refund_orders')) {
       throw deniedToRole('Access denied. Only owners and managers refund orders.');
     }
     const result = await this.payments.settleRefund(tenant, uuidOf('paymentRefund', id), input);

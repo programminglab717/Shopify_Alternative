@@ -3,8 +3,8 @@ import {
   RequireScopes,
   badUserInput,
   deniedToRole,
+  hasCapability,
   pageSize,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
@@ -17,9 +17,6 @@ import {
   ConfirmationAgentsArgs,
 } from './agent-performance.types.js';
 import { share, toDelivery } from './cod-health.resolver.js';
-
-/** Staff who see how each agent did: owners and managers. */
-const MANAGING_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 @Resolver()
 export class AgentPerformanceResolver {
@@ -38,7 +35,8 @@ export class AgentPerformanceResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args() args: ConfirmationAgentsArgs,
   ): Promise<ConfirmationAgent[]> {
-    if (tenant.actor.kind === 'staff' && !MANAGING_ROLES.includes(tenant.actor.role)) {
+    // Staff who see how each agent did: owners and managers, and custom roles that keep it.
+    if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'see_staff_performance')) {
       throw deniedToRole("Access denied. Only owners and managers see agents' performance.");
     }
     const result = await this.agents.report(tenant, {

@@ -5,8 +5,8 @@ import {
   UserError,
   accessDenied,
   deniedToRole,
+  hasCapability,
   hasScope,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import type { CurrencyCode } from '@hatti/money';
@@ -14,12 +14,6 @@ import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
 import { RefundService } from '../refund.service.js';
 import { toOrder, toRefund, toRefundMethodValue, uuidOf } from './mappers.js';
 import { OrderRefundInput, OrderRefundPayload, RefundMethod } from './order.types.js';
-
-/**
- * Staff who may refund: owners and managers, whose Orders access is full
- * (docs/design/02-information-architecture.md §6). Apps need only write_orders.
- */
-const REFUND_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 @Resolver()
 export class RefundResolver {
@@ -42,7 +36,9 @@ export class RefundResolver {
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: OrderRefundInput,
   ): Promise<OrderRefundPayload> {
-    if (tenant.actor.kind === 'staff' && !REFUND_ROLES.includes(tenant.actor.role)) {
+    // Staff who refund: owners and managers, whose Orders access is full, and custom roles of
+    // theirs that keep it (ADR-578). Apps need only write_orders.
+    if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'refund_orders')) {
       throw deniedToRole('Access denied. Only owners and managers refund orders.');
     }
     // Store credit is the shop's to give as its scope says, refund or not (ADR-184).

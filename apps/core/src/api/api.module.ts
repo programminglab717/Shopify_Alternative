@@ -80,6 +80,11 @@ import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
 import { StaffResolver } from './staff.resolver.js';
+import {
+  CustomRoleResolver,
+  StaffInvitationCustomRoleResolver,
+  StaffMemberCustomRoleResolver,
+} from './custom-roles.resolver.js';
 import { SupportAccessResolver } from './support.resolver.js';
 
 export interface ApiModuleOptions {
@@ -317,6 +322,9 @@ export class ApiModule {
         AuditResolver,
         ActivityResolver,
         StaffResolver,
+        CustomRoleResolver,
+        StaffMemberCustomRoleResolver,
+        StaffInvitationCustomRoleResolver,
         SupportAccessResolver,
         OrderAgreementResolver,
         OrderAssignmentResolver,

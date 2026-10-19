@@ -20,6 +20,13 @@ export {
   type SnsMessage,
   type SuppressionLift,
 } from '../internal/email-feedback.js';
+export {
+  CUSTOM_ROLE_LIMITS,
+  type CustomRoleCreateInput,
+  type CustomRoleRecord,
+  type CustomRoleUpdateInput,
+  type StaffRoleChoice,
+} from '../internal/custom-roles.js';
 export { AuthError, type AuthErrorCode } from '../internal/errors.js';
 export { IdentityModule } from '../internal/identity.module.js';
 export {
@@ -91,6 +98,7 @@ export {
   staffOfPhone,
   staffPhonesIn,
   type AccessRequestRecord,
+  type CustomRoleName,
   type InvitationPreview,
   type OwnerEmailRecord,
   type StaffInvitationRecord,

@@ -9,8 +9,11 @@ import {
   InputChecker,
   Money,
   PublicSite,
+  PRESET_CAPABILITIES,
   REAUTHENTICATION_WINDOW_MS,
   ROLE_SCOPES,
+  STAFF_CAPABILITIES,
+  STAFF_ROLES,
   RequestLoaders,
   RequireRecentAuthentication,
   RequireScopes,
@@ -22,6 +25,7 @@ import {
   decodeCursor,
   encodeCursor,
   generateAccessToken,
+  hasCapability,
   hasScope,
   hashAccessToken,
   isPublicAddress,
@@ -32,8 +36,12 @@ import {
   recentlyAuthenticated,
   actorColumnsOf,
   rollbackResult,
+  scopeWithin,
   shownPhone,
+  staffCapabilities,
+  staffScopes,
   supportColumnsOf,
+  type StaffCapability,
   type SupportActor,
   type TenantContext,
 } from './index.js';
@@ -244,6 +252,81 @@ describe('scopes', () => {
     for (const role of ['packer', 'marketer', 'accountant'] as const) {
       expect(seen(staff(role))).toEqual(['masked', '0300 ••••567']);
     }
+  });
+
+  it('gives each preset the capabilities its role was checked for by name before custom roles (ADR-578)', () => {
+    // Who did each before, as the modules listed them: EXPORT_ROLES, REFUND_ROLES, CLAIMING_ROLES,
+    // RECONCILING_ROLES and PAYOUT_ROLES, MODERATING_ROLES, MANAGING_ROLES, and the owner-or-manager
+    // checks of staff, apps, billing, verification, support's access and assigning orders.
+    const OWNERS_AND_MANAGERS = ['owner', 'manager'];
+    const AND_ACCOUNTANTS = ['owner', 'manager', 'accountant'];
+    const before: Record<(typeof STAFF_CAPABILITIES)[number], string[]> = {
+      see_customer_numbers: OWNERS_AND_MANAGERS,
+      reveal_customer_numbers: ['owner', 'manager', 'confirmation_agent'],
+      export_orders: AND_ACCOUNTANTS,
+      manage_export_schedules: OWNERS_AND_MANAGERS,
+      refund_orders: OWNERS_AND_MANAGERS,
+      assign_orders: OWNERS_AND_MANAGERS,
+      moderate_comments: OWNERS_AND_MANAGERS,
+      see_staff_performance: OWNERS_AND_MANAGERS,
+      reconcile_payments: AND_ACCOUNTANTS,
+      claim_from_couriers: AND_ACCOUNTANTS,
+      manage_staff: OWNERS_AND_MANAGERS,
+      manage_apps: OWNERS_AND_MANAGERS,
+      see_billing: OWNERS_AND_MANAGERS,
+      see_verification: OWNERS_AND_MANAGERS,
+      manage_support_access: OWNERS_AND_MANAGERS,
+    };
+    expect(Object.keys(before)).toEqual([...STAFF_CAPABILITIES]);
+    for (const capability of STAFF_CAPABILITIES) {
+      const holders = STAFF_ROLES.filter((role) => PRESET_CAPABILITIES[role].includes(capability));
+      expect(holders, capability).toEqual(before[capability]);
+      // As a member of staff in each preset is checked.
+      for (const role of STAFF_ROLES) {
+        const actor = {
+          kind: 'staff' as const,
+          userId: 'u',
+          sessionId: 's',
+          authenticatedAt: new Date(),
+          role,
+        };
+        expect(hasCapability(actor, capability), `${role} ${capability}`).toBe(
+          before[capability].includes(role),
+        );
+      }
+    }
+    // Apps and Hatti's support hold none: their scopes say what they may do.
+    expect(hasCapability({ kind: 'app', tokenId: 't' }, 'export_orders')).toBe(false);
+  });
+
+  it("lets a custom role's capabilities and scopes narrow its preset's, never widen them (ADR-578)", () => {
+    const agent = (capabilities: StaffCapability[]): TenantContext => ({
+      ...tenant('read_orders'),
+      actor: {
+        kind: 'staff',
+        userId: 'u',
+        sessionId: 's',
+        authenticatedAt: new Date(),
+        role: 'confirmation_agent',
+        customRoleId: 'r',
+        capabilities: staffCapabilities('confirmation_agent', capabilities),
+      },
+    });
+    expect(phoneAccess(agent(['reveal_customer_numbers']))).toBe('reveal');
+    expect(phoneAccess(agent([]))).toBe('masked');
+    // Beyond the preset counts for nothing, as when a preset holds less than it did.
+    expect(phoneAccess(agent(['see_customer_numbers', 'reveal_customer_numbers']))).toBe('reveal');
+    expect([...staffCapabilities('accountant', ['refund_orders', 'export_orders'])]).toEqual([
+      'export_orders',
+    ]);
+    expect([...staffCapabilities('accountant', null)]).toEqual(PRESET_CAPABILITIES.accountant);
+    // Scopes: the preset's, or a custom role's within them, a read of what the preset writes too.
+    expect(staffScopes('packer', null)).toEqual(ROLE_SCOPES.packer);
+    expect(
+      staffScopes('packer', ['read_orders', 'read_products', 'write_products', 'nope']),
+    ).toEqual(['read_orders', 'read_products']);
+    expect(scopeWithin('read_orders', ROLE_SCOPES.packer)).toBe(true);
+    expect(scopeWithin('read_customers', ROLE_SCOPES.packer)).toBe(false);
   });
 
   it('treats write as implying read', () => {

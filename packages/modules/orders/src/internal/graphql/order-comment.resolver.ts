@@ -2,7 +2,7 @@ import {
   CurrentTenant,
   RequireScopes,
   UserError,
-  type StaffRole,
+  hasCapability,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
@@ -15,9 +15,6 @@ import {
   OrderCommentDeletePayload,
   OrderCommentUpdatePayload,
 } from './order.types.js';
-
-/** Staff who delete anyone's comment, as they may anything on an order: owners and managers. */
-const MODERATING_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 /** Comments on an order's timeline (ORD-02, ADR-128), which `Order.events` reads with the rest. */
 @Resolver()
@@ -70,7 +67,9 @@ export class OrderCommentResolver {
     @Args('id', { type: () => ID }) id: string,
   ): Promise<OrderCommentDeletePayload> {
     const commentId = uuidOf('orderComment', id);
-    const anyones = tenant.actor.kind === 'staff' && MODERATING_ROLES.includes(tenant.actor.role);
+    // Staff who delete anyone's comment, as they may anything on an order: owners and managers,
+    // and custom roles that keep it.
+    const anyones = hasCapability(tenant.actor, 'moderate_comments');
     const result = await this.comments.delete(tenant, commentId, { anyones });
     return Object.assign(new OrderCommentDeletePayload(), {
       deletedCommentId: result.ok ? toPublicId('orderComment', commentId) : null,

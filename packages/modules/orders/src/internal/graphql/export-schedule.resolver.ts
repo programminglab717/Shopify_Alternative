@@ -5,6 +5,7 @@ import {
   UserError,
   deniedToRole,
   failOne,
+  hasCapability,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
@@ -15,11 +16,7 @@ import {
   type ExportFrequencyValue,
   type ExportScheduleRecord,
 } from '../export-schedule.service.js';
-import {
-  EXPORT_ROLES,
-  type ExportFormatValue,
-  type ExportLayoutValue,
-} from '../order-export.service.js';
+import type { ExportFormatValue, ExportLayoutValue } from '../order-export.service.js';
 import {
   OrderExportFrequency,
   OrderExportSchedule,
@@ -31,7 +28,7 @@ import { OrderExportFormat, OrderExportLayout } from './export.types.js';
 
 /** Staff who may not export orders may not schedule exports either, nor see who does. */
 function exportingOnly(tenant: TenantContext): void {
-  if (tenant.actor.kind === 'staff' && !EXPORT_ROLES.includes(tenant.actor.role)) {
+  if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'export_orders')) {
     throw deniedToRole('Access denied. Only owners, managers and accountants export orders.');
   }
 }

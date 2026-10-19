@@ -1,4 +1,5 @@
 import {
+  InputChecker,
   MFA_REQUIRED_ROLES,
   UserErrorsRollback,
   failOne,
@@ -31,6 +32,19 @@ import {
   invitationEmail,
   type AccountEmailLanguage,
 } from './account-emails.js';
+import {
+  CUSTOM_ROLE_LIMITS,
+  checkedBasedOn,
+  checkedCapabilities,
+  checkedName,
+  checkedScopes,
+  customRoleIn,
+  toCustomRole,
+  type CustomRoleCreateInput,
+  type CustomRoleRecord,
+  type CustomRoleUpdateInput,
+  type StaffRoleChoice,
+} from './custom-roles.js';
 import { suppressed } from './email-feedback.js';
 import { AuthError } from './errors.js';
 import { developmentStoreTransferred } from './partners.service.js';
@@ -45,6 +59,7 @@ import {
 import {
   accessRequests,
   authEvents,
+  customRoles,
   invitations,
   memberships,
   passkeys,
@@ -93,13 +108,22 @@ export function managedRoles(role: StaffRole): readonly StaffRole[] {
   }
 }
 
+/** A custom role, as the staff who hold it and invitations to it name it (ADR-578). */
+export interface CustomRoleName {
+  id: string;
+  name: string;
+}
+
 /** Someone who works in a shop, as its owner and managers see them. */
 export interface StaffMemberRecord {
   userId: string;
   name: string;
   /** Null for one who opened their account with a phone alone (ADR-159). */
   email: string | null;
+  /** Their role's preset; for a custom role, the one it was made from. */
   role: StaffRole;
+  /** Their custom role (ADR-578); null for a preset's. */
+  customRole: CustomRoleName | null;
   joinedAt: Date;
   /** When a collaborator's access ends (ADR-487); null for staff for good. */
   expiresAt: Date | null;
@@ -223,6 +247,8 @@ export async function ownerEmailIn(tx: ShopTx, shopId: string): Promise<OwnerEma
 export interface StaffInvitationRecord {
   id: string;
   role: StaffRole;
+  /** The custom role it gives (ADR-578), `role` its preset; null for a preset's. */
+  customRole: CustomRoleName | null;
   /** Whom it is for, as the inviter noted it. */
   note: string | null;
   /** Where Hatti emailed its link (ADR-167); null when the inviter shares it alone. */
@@ -282,21 +308,15 @@ export class StaffService {
   /** The shop's staff: its owner first, then everyone else as they joined. */
   async staffOf(shopId: string): Promise<StaffMemberRecord[]> {
     const rows = await this.db
-      .select({
-        userId: users.id,
-        name: users.name,
-        email: users.email,
-        role: memberships.role,
-        joinedAt: memberships.createdAt,
-        expiresAt: memberships.expiresAt,
-      })
+      .select(STAFF_COLUMNS)
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(customRoles, ofCustomRole(memberships))
       .where(
         and(eq(memberships.shopId, shopId), eq(memberships.status, 'active'), current(this.now())),
       )
       .orderBy(sql`${memberships.role} = 'owner' DESC`, asc(memberships.createdAt), asc(users.id));
-    return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
+    return rows.flatMap(toStaffMember);
   }
 
   /**
@@ -316,29 +336,38 @@ export class StaffService {
   /** Invitations neither accepted, taken back nor expired, the newest first. */
   async invitationsOf(shopId: string): Promise<StaffInvitationRecord[]> {
     const rows = await this.db
-      .select({ invitation: invitations, inviter: users.name })
+      .select({
+        invitation: invitations,
+        inviter: users.name,
+        customRoleId: customRoles.id,
+        customRoleName: customRoles.name,
+      })
       .from(invitations)
       .innerJoin(users, eq(users.id, invitations.invitedBy))
+      .leftJoin(customRoles, ofCustomRole(invitations))
       .where(and(eq(invitations.shopId, shopId), pending(this.now())))
       .orderBy(desc(invitations.createdAt), desc(invitations.id));
     return rows.flatMap((row) => {
-      const invitation = toInvitation(row.invitation, row.inviter);
+      const customRole =
+        row.customRoleId && row.customRoleName !== null
+          ? { id: row.customRoleId, name: row.customRoleName }
+          : null;
+      const invitation = toInvitation(row.invitation, row.inviter, customRole);
       return invitation ? [invitation] : [];
     });
   }
 
   /**
-   * Invites someone to the shop in `role`, by the link `token` makes, shown this once and good
-   * for 7 days. The acting member must manage the role. With `limit`, the shop's plan's limit on
-   * staff (ADR-154), its members and the invitations waiting stay within it. With `email`, Hatti
-   * emails the link there too, in `language`, 20 a day for a shop at most (ADR-167): `emailed`
-   * says whether it went.
+   * Invites someone to the shop in `role`, or in custom role `customRoleId`, its preset their role
+   * (ADR-578), by the link `token` makes, shown this once and good for 7 days. The acting member
+   * must manage the role. With `limit`, the shop's plan's limit on staff (ADR-154), its members
+   * and the invitations waiting stay within it. With `email`, Hatti emails the link there too, in
+   * `language`, 20 a day for a shop at most (ADR-167): `emailed` says whether it went.
    */
   async invite(
     actor: { userId: string },
     shopId: string,
-    input: {
-      role: string;
+    input: StaffRoleChoice & {
       note?: string | null;
       email?: string | null;
       language?: AccountEmailLanguage | null;
@@ -375,7 +404,7 @@ export class StaffService {
         tx,
         actor,
         shopId,
-        input.role,
+        { role: input.role, customRoleId: input.customRoleId },
         note,
         email,
         limit,
@@ -442,7 +471,7 @@ export class StaffService {
           tx,
           actor,
           shopId,
-          row.role,
+          { role: row.role, customRoleId: row.customRoleId },
           row.note,
           row.email,
           limit,
@@ -512,7 +541,7 @@ export class StaffService {
     tx: Tx,
     actor: { userId: string },
     shopId: string,
-    role: string,
+    choice: StaffRoleChoice,
     note: string | null,
     email: string | null,
     limit: PlanLimit | null,
@@ -520,6 +549,9 @@ export class StaffService {
     accessDays: number | null = null,
   ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string; shop: string }>> {
     const acting = await actingRole(tx, actor.userId, shopId);
+    const chosen = await chosenRole(tx, shopId, choice, field);
+    if (!chosen.ok) return chosen;
+    const { role, customRole } = chosen.value;
     const denied = mayManage(acting, role, field ?? ['role']);
     if (denied) return denied;
     const now = this.now();
@@ -581,9 +613,10 @@ export class StaffService {
         createdAt: now,
         expiresAt: new Date(now.getTime() + STAFF_LIMITS.invitationMs),
         accessDays,
+        customRoleId: customRole?.id ?? null,
       })
       .returning();
-    const invitation = toInvitation(row!, await nameOf(tx, actor.userId));
+    const invitation = toInvitation(row!, await nameOf(tx, actor.userId), customRole);
     return { ok: true, value: { invitation: invitation!, token, shop: shop?.name ?? '' } };
   }
 
@@ -609,20 +642,38 @@ export class StaffService {
       if (denied) return denied;
       await tx.update(invitations).set({ revokedAt: this.now() }).where(eq(invitations.id, row.id));
       await this.recordEvent(tx, actor.userId, 'staff_invitation_revoked', client);
-      const invitation = toInvitation(row, await nameOf(tx, row.invitedBy));
+      const invitation = toInvitation(
+        row,
+        await nameOf(tx, row.invitedBy),
+        row.customRoleId ? await customRoleIn(tx, shopId, row.customRoleId) : null,
+      );
       return { ok: true, value: invitation! };
     });
   }
 
-  /** Gives a staff member another role; both must be ones the acting member manages. */
+  /**
+   * Gives a staff member another role, a preset or a custom role, its preset their role
+   * (ADR-578); both must be ones the acting member manages.
+   */
   async changeRole(
     actor: { userId: string },
     shopId: string,
     userId: string,
-    role: string,
+    role: string | StaffRoleChoice,
     client: ClientInfo = {},
-  ): Promise<MutationResult<{ member: StaffMemberRecord; previousRole: StaffRole }>> {
-    type Result = MutationResult<{ member: StaffMemberRecord; previousRole: StaffRole }>;
+  ): Promise<
+    MutationResult<{
+      member: StaffMemberRecord;
+      previousRole: StaffRole;
+      /** The custom role they held before; null for a preset's. */
+      previousCustomRoleId: string | null;
+    }>
+  > {
+    type Result = MutationResult<{
+      member: StaffMemberRecord;
+      previousRole: StaffRole;
+      previousCustomRoleId: string | null;
+    }>;
     return this.db.transaction(async (tx): Promise<Result> => {
       const acting = await actingRole(tx, actor.userId, shopId);
       const target = await memberOf(tx, userId, shopId);
@@ -630,17 +681,28 @@ export class StaffService {
       if (userId === actor.userId) {
         return failOne(['id'], 'INVALID', 'Your own role is changed by the owner');
       }
-      const denied = mayManage(acting, target.role, ['id']) ?? mayManage(acting, role, ['role']);
+      const chosen = await chosenRole(tx, shopId, typeof role === 'string' ? { role } : role);
+      if (!chosen.ok) return chosen;
+      const customRoleId = chosen.value.customRole?.id ?? null;
+      const denied =
+        mayManage(acting, target.role, ['id']) ?? mayManage(acting, chosen.value.role, ['role']);
       if (denied) return denied;
-      if (role !== target.role) {
+      if (chosen.value.role !== target.role || customRoleId !== target.customRoleId) {
         await tx
           .update(memberships)
-          .set({ role, updatedAt: this.now() })
+          .set({ role: chosen.value.role, customRoleId, updatedAt: this.now() })
           .where(and(eq(memberships.userId, userId), eq(memberships.shopId, shopId)));
         await this.recordEvent(tx, actor.userId, 'staff_role_changed', client);
       }
       const [member] = (await this.staffIn(tx, shopId)).filter((each) => each.userId === userId);
-      return { ok: true, value: { member: member!, previousRole: target.role } };
+      return {
+        ok: true,
+        value: {
+          member: member!,
+          previousRole: target.role,
+          previousCustomRoleId: target.customRoleId,
+        },
+      };
     });
   }
 
@@ -684,7 +746,11 @@ export class StaffService {
         .update(memberships)
         .set({ role: 'manager', updatedAt: now })
         .where(member(actor.userId));
-      await tx.update(memberships).set({ role: 'owner', updatedAt: now }).where(member(userId));
+      // The owner holds every power: a custom role they held goes.
+      await tx
+        .update(memberships)
+        .set({ role: 'owner', customRoleId: null, updatedAt: now })
+        .where(member(userId));
       // A partner's development store opens as it goes to its client (ADR-504).
       await developmentStoreTransferred(tx, shopId, userId, now);
       await this.recordEvent(tx, actor.userId, 'shop_handed_over', client);
@@ -780,6 +846,7 @@ export class StaffService {
           userId: auth.userId,
           shopId: invitation.shopId,
           role,
+          customRoleId: invitation.customRoleId,
           // A collaborator's access ends by itself (ADR-487).
           expiresAt: invitation.accessDays
             ? new Date(now.getTime() + invitation.accessDays * 24 * 3_600_000)
@@ -1129,22 +1196,190 @@ export class StaffService {
       .catch(() => false);
   }
 
+  /** The shop's custom roles (ADR-578), by name, each with how many of its staff hold it. */
+  async customRolesOf(shopId: string): Promise<CustomRoleRecord[]> {
+    const rows = await this.db
+      .select({ role: customRoles, members: membersHolding(this.now()) })
+      .from(customRoles)
+      .where(eq(customRoles.shopId, shopId))
+      .orderBy(sql`lower(${customRoles.name})`, asc(customRoles.id));
+    return rows.flatMap((row) => {
+      const role = toCustomRole(row.role, row.members);
+      return role ? [role] : [];
+    });
+  }
+
+  /**
+   * Makes a custom role (ADR-578) from a preset the acting member manages, the owner's never: a
+   * name of 1 to 40 characters no other of the shop's has, whatever its case, and some of the
+   * preset's scopes and capabilities, never more. 50 a shop at most.
+   */
+  async createCustomRole(
+    actor: { userId: string },
+    shopId: string,
+    input: CustomRoleCreateInput,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<CustomRoleRecord>> {
+    return this.db.transaction(async (tx): Promise<MutationResult<CustomRoleRecord>> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const refused = mayManageStaff(acting, ['input']);
+      if (refused) return refused;
+      const check = new InputChecker();
+      const name = await checkedName(tx, check, shopId, input.name, null);
+      const basedOn = checkedBasedOn(check, input.basedOn);
+      const scopes = basedOn ? checkedScopes(check, basedOn, input.scopes) : [];
+      const capabilities = basedOn ? checkedCapabilities(check, basedOn, input.capabilities) : [];
+      if (!check.ok || !name || !basedOn) return { ok: false, errors: check.errors };
+      const denied = mayManage(acting, basedOn, ['input', 'basedOn']);
+      if (denied) return denied;
+      const [made] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(customRoles)
+        .where(eq(customRoles.shopId, shopId));
+      if ((made?.count ?? 0) >= CUSTOM_ROLE_LIMITS.perShop) {
+        return failOne(
+          ['input'],
+          'TOO_MANY',
+          `A shop has ${CUSTOM_ROLE_LIMITS.perShop} custom roles at most: delete one first`,
+        );
+      }
+      const now = this.now();
+      const [row] = await tx
+        .insert(customRoles)
+        .values({
+          id: newId(),
+          shopId,
+          name,
+          basedOn,
+          scopes,
+          capabilities,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      await this.recordEvent(tx, actor.userId, 'custom_role_created', client);
+      return { ok: true, value: toCustomRole(row!, 0)! };
+    });
+  }
+
+  /**
+   * Changes a custom role of a preset the acting member manages (ADR-578): its name, scopes or
+   * capabilities, those given, within its preset's still. Its preset stays. Those who hold it
+   * have what it says from their next request.
+   */
+  async updateCustomRole(
+    actor: { userId: string },
+    shopId: string,
+    id: string,
+    input: CustomRoleUpdateInput,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<CustomRoleRecord>> {
+    return this.db.transaction(async (tx): Promise<MutationResult<CustomRoleRecord>> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const refused = mayManageStaff(acting, ['id']);
+      if (refused) return refused;
+      const row = await customRoleIn(tx, shopId, id, 'update');
+      const basedOn = row && isStaffRole(row.basedOn) ? row.basedOn : null;
+      if (!row || !basedOn) return failOne(['id'], 'NOT_FOUND', 'Custom role not found');
+      const denied = mayManage(acting, basedOn, ['id']);
+      if (denied) return denied;
+      const check = new InputChecker();
+      const changes: Partial<typeof customRoles.$inferInsert> = {};
+      if (input.name !== undefined && input.name !== null) {
+        changes.name = (await checkedName(tx, check, shopId, input.name, row.id)) ?? undefined;
+      }
+      if (input.scopes) changes.scopes = checkedScopes(check, basedOn, input.scopes);
+      if (input.capabilities) {
+        changes.capabilities = checkedCapabilities(check, basedOn, input.capabilities);
+      }
+      if (!check.ok) return { ok: false, errors: check.errors };
+      const [updated] = await tx
+        .update(customRoles)
+        .set({ ...changes, updatedAt: this.now() })
+        .where(eq(customRoles.id, row.id))
+        .returning();
+      await this.recordEvent(tx, actor.userId, 'custom_role_updated', client);
+      const [held] = await tx
+        .select({ members: membersHolding(this.now()) })
+        .from(customRoles)
+        .where(eq(customRoles.id, row.id));
+      return { ok: true, value: toCustomRole(updated!, held?.members ?? 0)! };
+    });
+  }
+
+  /**
+   * Deletes a custom role of a preset the acting member manages (ADR-578), which no member of
+   * staff holds, nor any invitation waiting: those are given another role, or taken back, first.
+   * The custom role deleted.
+   */
+  async deleteCustomRole(
+    actor: { userId: string },
+    shopId: string,
+    id: string,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<CustomRoleRecord>> {
+    return this.db.transaction(async (tx): Promise<MutationResult<CustomRoleRecord>> => {
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const refused = mayManageStaff(acting, ['id']);
+      if (refused) return refused;
+      const row = await customRoleIn(tx, shopId, id, 'update');
+      if (!row || !isStaffRole(row.basedOn)) {
+        return failOne(['id'], 'NOT_FOUND', 'Custom role not found');
+      }
+      const denied = mayManage(acting, row.basedOn, ['id']);
+      if (denied) return denied;
+      const now = this.now();
+      // Collaborators whose access ended, not swept yet, hold it no more (ADR-487).
+      await tx
+        .delete(memberships)
+        .where(
+          and(
+            eq(memberships.shopId, shopId),
+            eq(memberships.customRoleId, row.id),
+            isNotNull(memberships.expiresAt),
+            lte(memberships.expiresAt, now),
+          ),
+        );
+      const [members] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(memberships)
+        .where(and(eq(memberships.shopId, shopId), eq(memberships.customRoleId, row.id)));
+      const [waiting] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invitations)
+        .where(
+          and(eq(invitations.shopId, shopId), eq(invitations.customRoleId, row.id), pending(now)),
+        );
+      const holding = members?.count ?? 0;
+      const invited = waiting?.count ?? 0;
+      if (holding + invited > 0) {
+        const held = [
+          holding > 0 && `${holding} ${holding === 1 ? 'member' : 'members'} of staff`,
+          invited > 0 && `${invited} ${invited === 1 ? 'invitation' : 'invitations'} waiting`,
+        ].filter(Boolean);
+        return failOne(
+          ['id'],
+          'IN_USE',
+          `${held.join(' and ')} ${holding + invited === 1 ? 'has' : 'have'} this role: give ` +
+            'them another, or take the invitations back, first',
+        );
+      }
+      await tx.delete(customRoles).where(eq(customRoles.id, row.id));
+      await this.recordEvent(tx, actor.userId, 'custom_role_deleted', client);
+      return { ok: true, value: toCustomRole(row, 0)! };
+    });
+  }
+
   private async staffIn(tx: Executor, shopId: string): Promise<StaffMemberRecord[]> {
     const rows = await tx
-      .select({
-        userId: users.id,
-        name: users.name,
-        email: users.email,
-        role: memberships.role,
-        joinedAt: memberships.createdAt,
-        expiresAt: memberships.expiresAt,
-      })
+      .select(STAFF_COLUMNS)
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(customRoles, ofCustomRole(memberships))
       .where(
         and(eq(memberships.shopId, shopId), eq(memberships.status, 'active'), current(this.now())),
       );
-    return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
+    return rows.flatMap(toStaffMember);
   }
 
   private async recordEvent(
@@ -1162,6 +1397,84 @@ export class StaffService {
       occurredAt: this.now(),
     });
   }
+}
+
+/** What a member of staff's row says of them, their custom role's name with it. */
+const STAFF_COLUMNS = {
+  userId: users.id,
+  name: users.name,
+  email: users.email,
+  role: memberships.role,
+  joinedAt: memberships.createdAt,
+  expiresAt: memberships.expiresAt,
+  customRoleId: customRoles.id,
+  customRoleName: customRoles.name,
+};
+
+/** The custom role a membership or an invitation holds, of its shop. */
+function ofCustomRole(row: typeof memberships | typeof invitations) {
+  return and(eq(customRoles.shopId, row.shopId), eq(customRoles.id, row.customRoleId));
+}
+
+/** How many members of staff hold the custom role of the row, who still work in the shop. */
+function membersHolding(now: Date) {
+  return sql<number>`(
+    SELECT count(*)::int FROM ${memberships}
+     WHERE ${memberships.shopId} = ${customRoles.shopId}
+       AND ${memberships.customRoleId} = ${customRoles.id}
+       AND ${memberships.status} = 'active'
+       AND (${memberships.expiresAt} IS NULL OR ${memberships.expiresAt} > ${now.toISOString()}))`;
+}
+
+function toStaffMember(row: {
+  userId: string;
+  name: string;
+  email: string | null;
+  role: string;
+  joinedAt: Date;
+  expiresAt: Date | null;
+  customRoleId: string | null;
+  customRoleName: string | null;
+}): StaffMemberRecord[] {
+  if (!isStaffRole(row.role)) return [];
+  const { customRoleId, customRoleName, ...member } = row;
+  return [
+    {
+      ...member,
+      role: row.role,
+      customRole:
+        customRoleId && customRoleName !== null ? { id: customRoleId, name: customRoleName } : null,
+    },
+  ];
+}
+
+/**
+ * The role `choice` gives: a preset, or a custom role of the shop's, locked so that it is not
+ * deleted meanwhile, whose preset is the role. Errors name `field`, where given, in place of the
+ * input each is about.
+ */
+async function chosenRole(
+  tx: Tx,
+  shopId: string,
+  choice: StaffRoleChoice,
+  field: string[] | null = null,
+): Promise<MutationResult<{ role: string; customRole: typeof customRoles.$inferSelect | null }>> {
+  if (choice.customRoleId) {
+    const customRole = await customRoleIn(tx, shopId, choice.customRoleId);
+    if (!customRole) {
+      return failOne(field ?? ['customRoleId'], 'NOT_FOUND', 'Custom role not found');
+    }
+    if (choice.role && choice.role !== customRole.basedOn) {
+      return failOne(
+        field ?? ['role'],
+        'INVALID',
+        "A custom role's members have the role it was made from: give one or the other",
+      );
+    }
+    return { ok: true, value: { role: customRole.basedOn, customRole } };
+  }
+  if (!choice.role) return failOne(field ?? ['role'], 'BLANK', 'Choose a role or a custom role');
+  return { ok: true, value: { role: choice.role, customRole: null } };
 }
 
 /** Memberships not past their end (ADR-487): staff for good, and collaborators still in time. */
@@ -1246,9 +1559,13 @@ async function memberOf(
   tx: Tx,
   userId: string,
   shopId: string,
-): Promise<{ role: StaffRole; expiresAt: Date | null } | null> {
+): Promise<{ role: StaffRole; customRoleId: string | null; expiresAt: Date | null } | null> {
   const [row] = await tx
-    .select({ role: memberships.role, expiresAt: memberships.expiresAt })
+    .select({
+      role: memberships.role,
+      customRoleId: memberships.customRoleId,
+      expiresAt: memberships.expiresAt,
+    })
     .from(memberships)
     .where(
       and(
@@ -1258,7 +1575,16 @@ async function memberOf(
       ),
     )
     .for('update');
-  return row && isStaffRole(row.role) ? { role: row.role, expiresAt: row.expiresAt } : null;
+  return row && isStaffRole(row.role)
+    ? { role: row.role, customRoleId: row.customRoleId, expiresAt: row.expiresAt }
+    : null;
+}
+
+/** Why `acting` may not manage staff at all, at `field`; null when it may. */
+function mayManageStaff(acting: StaffRole | null, field: string[]): MutationResult<never> | null {
+  return !acting || managedRoles(acting).length === 0
+    ? failOne(field, 'INVALID', 'Only the owner and managers manage staff')
+    : null;
 }
 
 /** Why `acting` may not manage `role`, at `field`; null when it may. */
@@ -1267,9 +1593,8 @@ function mayManage(
   role: string,
   field: string[],
 ): MutationResult<never> | null {
-  if (!acting || managedRoles(acting).length === 0) {
-    return failOne(field, 'INVALID', 'Only the owner and managers manage staff');
-  }
+  const refused = mayManageStaff(acting, field);
+  if (refused || !acting) return refused;
   if (role === 'owner') {
     return failOne(field, 'INVALID', 'A shop has one owner, who is never invited or changed so');
   }
@@ -1303,11 +1628,13 @@ async function nameOf(tx: Executor, userId: string): Promise<string> {
 function toInvitation(
   row: typeof invitations.$inferSelect,
   inviter: string,
+  customRole: CustomRoleName | null,
 ): StaffInvitationRecord | null {
   if (!isStaffRole(row.role)) return null;
   return {
     id: row.id,
     role: row.role,
+    customRole: customRole ? { id: customRole.id, name: customRole.name } : null,
     note: row.note,
     email: row.email,
     invitedBy: { userId: row.invitedBy, name: inviter },

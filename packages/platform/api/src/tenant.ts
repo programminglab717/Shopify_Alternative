@@ -177,18 +177,118 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
 export type PhoneAccess = 'full' | 'reveal' | 'masked';
 
 /**
- * Owners and managers see numbers whole. Confirmation agents call customers, so they see numbers
- * masked and reveal one when they need it, which is logged. Packers, marketers and accountants
- * see them masked.
+ * What staff may do beyond their scopes, which each role preset holds as {@link
+ * PRESET_CAPABILITIES} says and a custom role holds some of (ADM-01, ADR-578):
+ *
+ * - `see_customer_numbers`: customers' mobile numbers whole.
+ * - `reveal_customer_numbers`: one number at a time, revealed on the audit log, where they are
+ *   masked otherwise.
+ * - `export_orders`: orders as a file, now or scheduled to their email (ADR-183).
+ * - `manage_export_schedules`: delete anyone's scheduled export, not their own alone.
+ * - `refund_orders`: record refunds, and settle those a gateway never answered.
+ * - `assign_orders`: give an order to anyone, and take it from whoever has it (ADR-127).
+ * - `moderate_comments`: delete anyone's comment on an order (ADR-128).
+ * - `see_staff_performance`: how each confirmation agent and packer did.
+ * - `reconcile_payments`: couriers' remittances, gateways' settlements, and what the shop is paid.
+ * - `claim_from_couriers`: claims for parcels couriers lost or damaged (ADR-093).
+ * - `manage_staff`: staff, their invitations, requests for access and custom roles, within the
+ *   roles their preset manages (ADR-101).
+ * - `manage_apps`: the shop's custom apps and apps' webhooks.
+ * - `see_billing`: what the shop pays Hatti.
+ * - `see_verification`: the shop's verification by Hatti (ADR-465).
+ * - `manage_support_access`: see Hatti's support's access to the shop, and end it (ADR-156).
+ *
+ * What only the owner does is no capability: their role says it, and no custom role is one.
  */
-export const ROLE_PHONE_ACCESS: Readonly<Record<StaffRole, PhoneAccess>> = {
-  owner: 'full',
-  manager: 'full',
-  confirmation_agent: 'reveal',
-  packer: 'masked',
-  marketer: 'masked',
-  accountant: 'masked',
+export const STAFF_CAPABILITIES = [
+  'see_customer_numbers',
+  'reveal_customer_numbers',
+  'export_orders',
+  'manage_export_schedules',
+  'refund_orders',
+  'assign_orders',
+  'moderate_comments',
+  'see_staff_performance',
+  'reconcile_payments',
+  'claim_from_couriers',
+  'manage_staff',
+  'manage_apps',
+  'see_billing',
+  'see_verification',
+  'manage_support_access',
+] as const;
+export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
+
+export function isStaffCapability(value: string): value is StaffCapability {
+  return (STAFF_CAPABILITIES as readonly string[]).includes(value);
+}
+
+/**
+ * The capabilities each role preset holds. Owners and managers hold them all. Confirmation agents
+ * call customers, so they see numbers masked and reveal one when they need it, which is logged.
+ * Accountants export orders, reconcile what the shop is paid and claim from couriers. Packers and
+ * marketers hold none: they see numbers masked, and exports of marketers' would need an approval
+ * flow that does not exist yet (docs/architecture/11-security-and-compliance.md §2.1).
+ */
+export const PRESET_CAPABILITIES: Readonly<Record<StaffRole, readonly StaffCapability[]>> = {
+  owner: STAFF_CAPABILITIES,
+  manager: STAFF_CAPABILITIES,
+  confirmation_agent: ['reveal_customer_numbers'],
+  packer: [],
+  marketer: [],
+  accountant: ['export_orders', 'reconcile_payments', 'claim_from_couriers'],
 };
+
+const PRESET_CAPABILITY_SETS: Readonly<Record<StaffRole, ReadonlySet<StaffCapability>>> = {
+  owner: new Set(PRESET_CAPABILITIES.owner),
+  manager: new Set(PRESET_CAPABILITIES.manager),
+  confirmation_agent: new Set(PRESET_CAPABILITIES.confirmation_agent),
+  packer: new Set(PRESET_CAPABILITIES.packer),
+  marketer: new Set(PRESET_CAPABILITIES.marketer),
+  accountant: new Set(PRESET_CAPABILITIES.accountant),
+};
+
+/**
+ * Whether `scope` is within `granted`: one of them, or the read of a resource they write. A
+ * custom role's scopes are within its preset's so, each of them.
+ */
+export function scopeWithin(scope: AccessScope, granted: readonly AccessScope[]): boolean {
+  return (
+    granted.includes(scope) ||
+    (scope.startsWith('read_') &&
+      granted.includes(`write_${scope.slice('read_'.length)}` as AccessScope))
+  );
+}
+
+/**
+ * The scopes of a member of staff in `role`: its preset's, or their custom role's (ADR-578), as
+ * far as they are within the preset's still.
+ */
+export function staffScopes(role: StaffRole, custom: readonly string[] | null): AccessScope[] {
+  const preset = ROLE_SCOPES[role];
+  if (!custom) return [...preset];
+  return custom.filter(
+    (scope): scope is AccessScope => isAccessScope(scope) && scopeWithin(scope, preset),
+  );
+}
+
+/**
+ * The capabilities of a member of staff in `role`: its preset's, or their custom role's
+ * (ADR-578), as far as the preset holds them still.
+ */
+export function staffCapabilities(
+  role: StaffRole,
+  custom: readonly string[] | null,
+): ReadonlySet<StaffCapability> {
+  const preset = PRESET_CAPABILITY_SETS[role];
+  if (!custom) return preset;
+  return new Set(
+    custom.filter(
+      (capability): capability is StaffCapability =>
+        isStaffCapability(capability) && preset.has(capability),
+    ),
+  );
+}
 
 /**
  * Roles that must pass two-step verification before using a shop: owners, and roles with finance,
@@ -207,7 +307,15 @@ export type Actor =
       readonly kind: 'staff';
       readonly userId: string;
       readonly sessionId: string;
+      /** Their role's preset; for a custom role, the preset it was made from. */
       readonly role: StaffRole;
+      /** Their custom role (ADR-578); null or absent for a preset's. */
+      readonly customRoleId?: string | null;
+      /**
+       * What they may do beyond their scopes: their custom role's capabilities; absent, their
+       * preset's ({@link hasCapability}).
+       */
+      readonly capabilities?: ReadonlySet<StaffCapability>;
       /**
        * When they last proved who they are in this session: signing in, or re-authenticating
        * since (ADR-103).
@@ -270,13 +378,25 @@ export function hasScope(tenant: TenantContext, scope: AccessScope): boolean {
 }
 
 /**
- * How much of customers' numbers the caller sees. Apps see what their scopes allow, whole; Hatti's
- * support sees them masked.
+ * Whether the caller is a member of staff with `capability`: their custom role's, or else their
+ * preset's. Apps and Hatti's support hold none: what apps may do their scopes say.
+ */
+export function hasCapability(actor: Actor, capability: StaffCapability): boolean {
+  if (actor.kind !== 'staff') return false;
+  return (actor.capabilities ?? PRESET_CAPABILITY_SETS[actor.role]).has(capability);
+}
+
+/**
+ * How much of customers' numbers the caller sees: staff as their capabilities say, whole, masked
+ * with a logged reveal, or masked. Apps see what their scopes allow, whole; Hatti's support sees
+ * them masked.
  */
 export function phoneAccess(tenant: TenantContext): PhoneAccess {
-  switch (tenant.actor.kind) {
+  const { actor } = tenant;
+  switch (actor.kind) {
     case 'staff':
-      return ROLE_PHONE_ACCESS[tenant.actor.role];
+      if (hasCapability(actor, 'see_customer_numbers')) return 'full';
+      return hasCapability(actor, 'reveal_customer_numbers') ? 'reveal' : 'masked';
     case 'support':
       return 'masked';
     default:

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### Roles of a shop's own
+
+* **A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's
+  name is checked by capabilities each preset holds as before** ([ADR-578](../architecture/13-decision-log.md#adr-578--a-shop-makes-roles-of-its-own-each-narrowed-from-a-preset-and-what-was-checked-by-a-roles-name-is-checked-by-capabilities-each-preset-holds-as-before), ADM-01).
+* 3597 tests, 8 more: the presets' capabilities, roles made and
+  assigned, access following them, exports and numbers by capability, and the API; every suite
+  touched run whole.
+
 ### fc78e43 · Throttles waited out in the admin
 
 * **The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and

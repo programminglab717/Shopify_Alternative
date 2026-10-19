@@ -3,8 +3,8 @@ import {
   RequireScopes,
   badUserInput,
   deniedToRole,
+  hasCapability,
   pageSize,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
@@ -12,9 +12,6 @@ import { Args, Query, Resolver } from '@nestjs/graphql';
 import { PackerPerformanceService } from '../packer-performance.service.js';
 import { ConfirmationAgentKind } from './agent-performance.types.js';
 import { Packer, PackersArgs } from './packer-performance.types.js';
-
-/** Staff who see how every packer did: owners and managers. */
-const MANAGING_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 @Resolver()
 export class PackerPerformanceResolver {
@@ -34,7 +31,9 @@ export class PackerPerformanceResolver {
   ): Promise<Packer[]> {
     const actor = tenant.actor;
     let onlyStaff: string | undefined;
-    if (actor.kind === 'staff' && !MANAGING_ROLES.includes(actor.role)) {
+    // Staff who see how every packer did: owners and managers, and custom roles that keep it
+    // (ADR-578). Packers, custom or not, see themselves.
+    if (actor.kind === 'staff' && !hasCapability(actor, 'see_staff_performance')) {
       if (actor.role !== 'packer') {
         throw deniedToRole('Access denied. Only owners, managers and packers see packing counts.');
       }

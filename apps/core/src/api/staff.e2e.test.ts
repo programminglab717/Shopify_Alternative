@@ -1446,6 +1446,240 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(retried.statusCode).toBe(200);
       expect(retried.json().data.customersExport.userErrors).toEqual([]);
     });
+    it("lets the owner make the shop's own roles and give them, whose members' access follows them (ADM-01, ADR-578)", async () => {
+      const shopF = newId();
+      await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop F')`, [shopF]);
+      await admin.query(
+        `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+         VALUES ($1, 'growth', 'monthly', now(), now() + interval '1 month')`,
+        [shopF],
+      );
+      const owner = await signUp();
+      await grant(owner.userId, shopF, 'owner');
+      await enableTwoStep(owner.accessToken);
+      const as = (token: string, query: string) =>
+        graphql(token, shopF, query).then((response) => response.json() as Json);
+      const ROLE = 'customRole { id name basedOn scopes capabilities staffMemberCount } ';
+      const ERRORS = 'userErrors { field code message }';
+
+      // What each preset holds, for the admin's editor: the owner's is never a custom role's.
+      const presets = (
+        await as(owner.accessToken, '{ rolePresets { role capabilities customizable } }')
+      ).data.rolePresets;
+      expect(presets.map((preset: Json) => [preset.role, preset.customizable])).toEqual([
+        ['OWNER', false],
+        ['MANAGER', true],
+        ['CONFIRMATION_AGENT', true],
+        ['PACKER', true],
+        ['MARKETER', true],
+        ['ACCOUNTANT', true],
+      ]);
+      expect(presets[2].capabilities).toEqual(['REVEAL_CUSTOMER_NUMBERS']);
+      expect(presets[5].capabilities).toEqual([
+        'EXPORT_ORDERS',
+        'RECONCILE_PAYMENTS',
+        'CLAIM_FROM_COURIERS',
+      ]);
+
+      const create = (input: string) =>
+        as(
+          owner.accessToken,
+          `mutation { customRoleCreate(input: ${input}) { ${ROLE} ${ERRORS} } }`,
+        );
+      const made = await create(
+        `{ name: "Caller, masked", basedOn: CONFIRMATION_AGENT,
+           scopes: ["read_orders", "read_customers"], capabilities: [] }`,
+      );
+      const caller = made.data.customRoleCreate.customRole;
+      expect(caller).toEqual({
+        id: expect.stringMatching(/^role_/),
+        name: 'Caller, masked',
+        basedOn: 'CONFIRMATION_AGENT',
+        scopes: ['read_orders', 'read_customers'],
+        capabilities: [],
+        staffMemberCount: 0,
+      });
+      // Never beyond its preset, nor the owner's.
+      expect(
+        (
+          await create(
+            `{ name: "Packer plus", basedOn: PACKER, scopes: ["write_products"],
+               capabilities: [EXPORT_ORDERS] }`,
+          )
+        ).data.customRoleCreate.userErrors,
+      ).toEqual([
+        {
+          field: ['input', 'scopes', '0'],
+          code: 'INVALID',
+          message: "write_products is beyond the packer role's",
+        },
+        {
+          field: ['input', 'capabilities', '0'],
+          code: 'INVALID',
+          message: "export_orders is beyond the packer role's",
+        },
+      ]);
+      expect(
+        (await create('{ name: "Boss", basedOn: OWNER, scopes: [], capabilities: [] }')).data
+          .customRoleCreate.userErrors[0],
+      ).toMatchObject({ field: ['input', 'basedOn'], code: 'INVALID' });
+
+      // Invited to it, an agent works in it.
+      const invited = await as(
+        owner.accessToken,
+        `mutation { staffInvitationCreate(customRoleId: "${caller.id}") {
+           invitation { role customRole { name } } token ${ERRORS} } }`,
+      );
+      expect(invited.data.staffInvitationCreate).toMatchObject({
+        invitation: { role: 'CONFIRMATION_AGENT', customRole: { name: 'Caller, masked' } },
+        userErrors: [],
+      });
+      const agent = await signUp();
+      const accepted = await post(
+        '/auth/invitations/accept',
+        { token: invited.data.staffInvitationCreate.token },
+        agent.accessToken,
+      );
+      expect(accepted.json().shop.role).toBe('confirmation_agent');
+
+      const { token: appToken, hash, hint } = generateAccessToken();
+      await admin.query(
+        `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+         VALUES ($1, 'test', $2, $3, $4)`,
+        [shopF, hash, hint, ['write_products', 'write_orders']],
+      );
+      const app = async (query: string) =>
+        (
+          await api.app.inject({
+            method: 'POST',
+            url: ADMIN_GRAPHQL_PATH,
+            headers: { 'x-hatti-access-token': appToken, 'idempotency-key': randomUUID() },
+            payload: { query },
+          })
+        ).json().data;
+      const product = await app(
+        'mutation { productCreate(input: { title: "Kurta", status: ACTIVE, ' +
+          'variants: [{ price: "2,000" }] }) { product { variants { id } } } }',
+      );
+      const orderId = (
+        await app(
+          `mutation { orderCreate(input: {
+             lineItems: [{ variantId: "${product.productCreate.product.variants[0].id}", quantity: 1 }]
+             paymentMethod: CASH_ON_DELIVERY
+             shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                                address1: "House 12, Street 4", city: "Karachi" } }) {
+             order { id } } }`,
+        )
+      ).orderCreate.order.id as string;
+
+      // Its scopes alone, and numbers masked with no reveal.
+      expect(
+        (await as(agent.accessToken, `{ order(id: "${orderId}") { phone } }`)).data.order,
+      ).toEqual({ phone: '0300 ••••567' });
+      expect(
+        (await as(agent.accessToken, '{ products(first: 1) { nodes { id } } }')).errors[0]
+          .extensions.code,
+      ).toBe('ACCESS_DENIED');
+      const reveal = `mutation { orderPhoneReveal(id: "${orderId}") { phone } }`;
+      expect((await as(agent.accessToken, reveal)).errors[0].extensions.code).toBe('ACCESS_DENIED');
+      // Changed, it counts from their next request.
+      const updated = await as(
+        owner.accessToken,
+        `mutation { customRoleUpdate(id: "${caller.id}",
+           input: { capabilities: [REVEAL_CUSTOMER_NUMBERS] }) { ${ROLE} ${ERRORS} } }`,
+      );
+      expect(updated.data.customRoleUpdate.customRole).toMatchObject({
+        capabilities: ['REVEAL_CUSTOMER_NUMBERS'],
+        staffMemberCount: 1,
+      });
+      expect((await as(agent.accessToken, reveal)).data.orderPhoneReveal).toEqual({
+        phone: '+923001234567',
+      });
+
+      // A manager in a role without exports or staff exports none, and manages no one.
+      const lead = await create(
+        '{ name: "Lead", basedOn: MANAGER, scopes: ["write_orders"], capabilities: [ASSIGN_ORDERS] }',
+      );
+      const leadId = lead.data.customRoleCreate.customRole.id;
+      const manager = await signUp();
+      await grant(manager.userId, shopF, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const changed = await as(
+        owner.accessToken,
+        `mutation { staffMemberRoleUpdate(id: "${toPublicId('user', manager.userId)}",
+           customRoleId: "${leadId}") { staffMember { role customRole { name } } ${ERRORS} } }`,
+      );
+      expect(changed.data.staffMemberRoleUpdate).toEqual({
+        staffMember: { role: 'MANAGER', customRole: { name: 'Lead' } },
+        userErrors: [],
+      });
+      expect(
+        (await as(manager.accessToken, 'mutation { ordersExport { rowCount } }')).errors[0],
+      ).toMatchObject({
+        message: 'Access denied. Only owners, managers and accountants export orders.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      expect(
+        (await as(manager.accessToken, '{ customRoles { id } }')).errors[0].extensions.code,
+      ).toBe('ACCESS_DENIED');
+      expect(
+        (await as(manager.accessToken, `{ order(id: "${orderId}") { phone } }`)).data.order,
+      ).toEqual({ phone: '0300 ••••567' });
+
+      // Held, a custom role is not deleted; the owner sees who holds each.
+      const STAFF =
+        '{ staffMembers { role customRole { name } } customRoles { name staffMemberCount } }';
+      expect((await as(owner.accessToken, STAFF)).data).toEqual({
+        staffMembers: [
+          { role: 'OWNER', customRole: null },
+          { role: 'CONFIRMATION_AGENT', customRole: { name: 'Caller, masked' } },
+          { role: 'MANAGER', customRole: { name: 'Lead' } },
+        ],
+        customRoles: [
+          { name: 'Caller, masked', staffMemberCount: 1 },
+          { name: 'Lead', staffMemberCount: 1 },
+        ],
+      });
+      const remove = (id: string) =>
+        as(
+          owner.accessToken,
+          `mutation { customRoleDelete(id: "${id}") { deletedCustomRoleId ${ERRORS} } }`,
+        );
+      expect((await remove(leadId)).data.customRoleDelete).toEqual({
+        deletedCustomRoleId: null,
+        userErrors: [
+          {
+            field: ['id'],
+            code: 'IN_USE',
+            message:
+              '1 member of staff has this role: give them another, or take the invitations ' +
+              'back, first',
+          },
+        ],
+      });
+      await as(
+        owner.accessToken,
+        `mutation { staffMemberRoleUpdate(id: "${toPublicId('user', manager.userId)}",
+           role: MANAGER) { ${ERRORS} } }`,
+      );
+      expect((await remove(leadId)).data.customRoleDelete).toEqual({
+        deletedCustomRoleId: leadId,
+        userErrors: [],
+      });
+      const log = await as(
+        owner.accessToken,
+        '{ auditLog(first: 6) { nodes { action subjectId } } }',
+      );
+      expect(log.data.auditLog.nodes.map((node: Json) => node.action)).toEqual([
+        'staff.custom_role_deleted',
+        'staff.role_changed',
+        'staff.role_changed',
+        'staff.custom_role_created',
+        'order.phone_revealed',
+        'staff.custom_role_updated',
+      ]);
+    });
+
     it('lets the owner hand the shop to a manager, and no one else (ADR-104)', async () => {
       const shopD = newId();
       await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop D')`, [shopD]);

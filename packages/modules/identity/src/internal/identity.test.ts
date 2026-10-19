@@ -351,6 +351,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         schema.passkeyChallenges,
         schema.invitations,
         schema.memberships,
+        schema.customRoles,
         schema.supportAgents,
         schema.supportGrants,
         schema.authEvents,
@@ -1391,6 +1392,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           createdAt: new Date(clock),
           expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),
           accessDays: null,
+          customRole: null,
         },
         token: expect.stringMatching(/^hsi_/),
         emailed: true,
@@ -1466,6 +1468,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         createdAt: new Date(clock),
         expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),
         accessDays: null,
+        customRole: null,
       });
       expect(await staff().invitationsOf(shopId)).toEqual([invitation]);
       expect(await staff().preview(token)).toEqual({
@@ -1772,6 +1775,371 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'staff_removed',
         'staff_invitation_revoked',
       ]);
+    });
+
+    describe('custom roles (ADM-01, ADR-578)', () => {
+      const join = async (shopId: string, role: StaffRole) => {
+        const account = await signUp();
+        await service.grantMembership({ userId: account.userId, shopId, role });
+        return account;
+      };
+      /** A confirmation agent's role that sees numbers masked and reveals none. */
+      const caller = {
+        name: 'Caller, masked',
+        basedOn: 'confirmation_agent',
+        scopes: ['read_products', 'write_orders'],
+        capabilities: [],
+      };
+
+      it("makes a shop's own roles from its presets, never holding more than theirs", async () => {
+        const { shopId, owner } = await shopWithOwner();
+        const manager = await join(shopId, 'manager');
+        const packer = await join(shopId, 'packer');
+        const s = staff();
+        const made = await s.createCustomRole(manager, shopId, caller, client());
+        expect(made).toEqual({
+          ok: true,
+          value: {
+            id: expect.any(String),
+            name: 'Caller, masked',
+            basedOn: 'confirmation_agent',
+            scopes: ['read_products', 'write_orders'],
+            capabilities: [],
+            members: 0,
+            createdAt: new Date(clock),
+            updatedAt: new Date(clock),
+          },
+        });
+        if (!made.ok) throw new Error('expected a custom role');
+        // Nothing beyond its preset, nor what is no scope or capability; the read of what it
+        // writes is within it, and each is kept once, in the API's order.
+        expect(
+          errorsOf(
+            await s.createCustomRole(owner, shopId, {
+              name: 'Packer plus',
+              basedOn: 'packer',
+              scopes: ['write_orders', 'read_customers', 'write_nothing', 'read_orders'],
+              capabilities: ['export_orders', 'fly'],
+            }),
+          ),
+        ).toEqual([
+          ['input.scopes.1', 'INVALID'],
+          ['input.scopes.2', 'INVALID'],
+          ['input.capabilities.0', 'INVALID'],
+          ['input.capabilities.1', 'INVALID'],
+        ]);
+        const reader = await s.createCustomRole(owner, shopId, {
+          name: 'Order reader',
+          basedOn: 'accountant',
+          scopes: ['read_orders', 'read_products', 'read_orders'],
+          capabilities: ['reconcile_payments', 'export_orders'],
+        });
+        expect(reader).toMatchObject({
+          ok: true,
+          value: {
+            scopes: ['read_products', 'read_orders'],
+            capabilities: ['export_orders', 'reconcile_payments'],
+          },
+        });
+        expect(
+          messageOf(
+            await s.createCustomRole(owner, shopId, {
+              ...caller,
+              name: 'Packer plus',
+              basedOn: 'packer',
+              capabilities: ['see_customer_numbers'],
+            }),
+          ),
+        ).toBe("see_customer_numbers is beyond the packer role's");
+        // Never the owner's; a name once a shop, whatever its case, of 1 to 40 characters.
+        expect(
+          await s.createCustomRole(owner, shopId, { ...caller, name: 'Boss', basedOn: 'owner' }),
+        ).toEqual({
+          ok: false,
+          errors: [
+            {
+              field: ['input', 'basedOn'],
+              code: 'INVALID',
+              message: "A shop has one owner: a custom role is made from another role's preset",
+            },
+          ],
+        });
+        expect(
+          errorsOf(
+            await s.createCustomRole(owner, shopId, { ...caller, name: ' caller, MASKED ' }),
+          ),
+        ).toEqual([['input.name', 'TAKEN']]);
+        expect(
+          errorsOf(await s.createCustomRole(owner, shopId, { ...caller, name: 'x'.repeat(41) })),
+        ).toEqual([['input.name', 'TOO_LONG']]);
+        expect(errorsOf(await s.createCustomRole(owner, shopId, { ...caller, name: ' ' }))).toEqual(
+          [['input.name', 'BLANK']],
+        );
+        // As staff are managed: managers make roles below them, other staff none.
+        expect(
+          messageOf(
+            await s.createCustomRole(manager, shopId, {
+              ...caller,
+              name: 'Deputy',
+              basedOn: 'manager',
+            }),
+          ),
+        ).toBe('Only the owner invites and manages managers');
+        expect(
+          messageOf(await s.createCustomRole(packer, shopId, { ...caller, name: 'Mine' })),
+        ).toBe('Only the owner and managers manage staff');
+
+        // Changed as given, within its preset still; its preset stays.
+        const id = made.value.id;
+        expect(
+          await s.updateCustomRole(owner, shopId, id, {
+            name: 'Caller',
+            capabilities: ['reveal_customer_numbers'],
+          }),
+        ).toMatchObject({
+          ok: true,
+          value: {
+            name: 'Caller',
+            basedOn: 'confirmation_agent',
+            scopes: ['read_products', 'write_orders'],
+            capabilities: ['reveal_customer_numbers'],
+          },
+        });
+        expect(
+          errorsOf(
+            await s.updateCustomRole(owner, shopId, id, {
+              name: 'order READER',
+              scopes: ['write_customers'],
+              capabilities: ['refund_orders'],
+            }),
+          ),
+        ).toEqual([
+          ['input.name', 'TAKEN'],
+          ['input.scopes.0', 'INVALID'],
+          ['input.capabilities.0', 'INVALID'],
+        ]);
+        expect(errorsOf(await s.updateCustomRole(packer, shopId, id, { name: 'Mine' }))).toEqual([
+          ['id', 'INVALID'],
+        ]);
+        // Each shop its own.
+        const other = await shopWithOwner('Other');
+        expect(
+          errorsOf(await s.updateCustomRole(other.owner, other.shopId, id, { name: 'Mine' })),
+        ).toEqual([['id', 'NOT_FOUND']]);
+        expect(await s.customRolesOf(other.shopId)).toEqual([]);
+        expect(
+          (await s.customRolesOf(shopId)).map((role) => [role.name, role.basedOn, role.members]),
+        ).toEqual([
+          ['Caller', 'confirmation_agent', 0],
+          ['Order reader', 'accountant', 0],
+        ]);
+        const events = await admin.query(
+          `SELECT kind FROM identity.auth_events WHERE kind LIKE 'custom_role_%' AND user_id = ANY($1)
+            ORDER BY occurred_at, id`,
+          [[owner.userId, manager.userId]],
+        );
+        expect(events.rows.map((row) => row.kind)).toEqual([
+          'custom_role_created',
+          'custom_role_created',
+          'custom_role_updated',
+        ]);
+      });
+
+      it("gives one by invitation or a change of role, its members' access following it", async () => {
+        const { shopId, owner } = await shopWithOwner();
+        const manager = await join(shopId, 'manager');
+        const s = staff();
+        const made = await s.createCustomRole(owner, shopId, caller);
+        const deputy = await s.createCustomRole(owner, shopId, {
+          name: 'Deputy',
+          basedOn: 'manager',
+          scopes: ['write_orders', 'write_settings'],
+          capabilities: ['manage_staff'],
+        });
+        if (!made.ok || !deputy.ok) throw new Error('expected custom roles');
+        const customRoleId = made.value.id;
+
+        const invited = await s.invite(manager, shopId, { customRoleId });
+        if (!invited.ok) throw new Error('expected an invitation');
+        expect(invited.value.invitation).toMatchObject({
+          role: 'confirmation_agent',
+          customRole: { id: customRoleId, name: 'Caller, masked' },
+        });
+        expect((await s.invitationsOf(shopId))[0]!.customRole).toEqual({
+          id: customRoleId,
+          name: 'Caller, masked',
+        });
+        const agent = await signUp();
+        expect(await s.accept(agent, invited.value.token)).toMatchObject({
+          role: 'confirmation_agent',
+          mfaRequired: false,
+        });
+        const member = async () =>
+          (await s.staffOf(shopId)).find((each) => each.userId === agent.userId);
+        expect(await member()).toMatchObject({
+          role: 'confirmation_agent',
+          customRole: { id: customRoleId, name: 'Caller, masked' },
+        });
+        // Their access is the custom role's: its scopes, and no capability.
+        const access = async () => {
+          const resolved = await resolver.resolve(agent.tokens.accessToken, shopId);
+          if (!resolved.ok || resolved.tenant.actor.kind !== 'staff') throw new Error('no access');
+          const { actor, scopes } = resolved.tenant;
+          return {
+            role: actor.role,
+            customRoleId: actor.customRoleId,
+            scopes: [...scopes],
+            capabilities: [...actor.capabilities!],
+          };
+        };
+        expect(await access()).toEqual({
+          role: 'confirmation_agent',
+          customRoleId,
+          scopes: ['read_products', 'write_orders'],
+          capabilities: [],
+        });
+        // Changed, from their next request.
+        await s.updateCustomRole(owner, shopId, customRoleId, {
+          scopes: ['read_orders', 'read_customers'],
+          capabilities: ['reveal_customer_numbers'],
+        });
+        expect(await access()).toMatchObject({
+          scopes: ['read_orders', 'read_customers'],
+          capabilities: ['reveal_customer_numbers'],
+        });
+        expect((await s.customRolesOf(shopId))[0]!.members).toBe(1);
+        // A preset's again, by a change of role: its scopes and capabilities whole.
+        expect(
+          await s.changeRole(manager, shopId, agent.userId, 'confirmation_agent'),
+        ).toMatchObject({
+          ok: true,
+          value: {
+            member: { role: 'confirmation_agent', customRole: null },
+            previousRole: 'confirmation_agent',
+            previousCustomRoleId: customRoleId,
+          },
+        });
+        expect(await access()).toMatchObject({
+          customRoleId: null,
+          scopes: [
+            'read_products',
+            'read_inventory',
+            'read_locations',
+            'write_orders',
+            'read_customers',
+            'read_store_credit_accounts',
+            'read_gift_cards',
+            'write_conversations',
+          ],
+          capabilities: ['reveal_customer_numbers'],
+        });
+        // And the custom role again, by its ID, with its preset or none.
+        expect(
+          await s.changeRole(manager, shopId, agent.userId, {
+            role: 'confirmation_agent',
+            customRoleId,
+          }),
+        ).toMatchObject({
+          ok: true,
+          value: { member: { customRole: { id: customRoleId } }, previousCustomRoleId: null },
+        });
+        expect(
+          errorsOf(
+            await s.changeRole(manager, shopId, agent.userId, { role: 'packer', customRoleId }),
+          ),
+        ).toEqual([['role', 'INVALID']]);
+        expect(
+          errorsOf(await s.changeRole(manager, shopId, agent.userId, { customRoleId: newId() })),
+        ).toEqual([['customRoleId', 'NOT_FOUND']]);
+        expect(errorsOf(await s.changeRole(manager, shopId, agent.userId, {}))).toEqual([
+          ['role', 'BLANK'],
+        ]);
+        // A manager's custom role is the owner's to give, as managers are.
+        expect(
+          messageOf(
+            await s.changeRole(manager, shopId, agent.userId, { customRoleId: deputy.value.id }),
+          ),
+        ).toBe('Only the owner invites and manages managers');
+        expect(messageOf(await s.invite(manager, shopId, { customRoleId: deputy.value.id }))).toBe(
+          'Only the owner invites and manages managers',
+        );
+        // Another shop's custom role is not found here.
+        const other = await shopWithOwner('Other');
+        const theirs = await s.createCustomRole(other.owner, other.shopId, caller);
+        if (!theirs.ok) throw new Error('expected a custom role');
+        expect(errorsOf(await s.invite(owner, shopId, { customRoleId: theirs.value.id }))).toEqual([
+          ['customRoleId', 'NOT_FOUND'],
+        ]);
+
+        // A deputy is a manager to whatever reads their role, their second factor among it.
+        await s.changeRole(owner, shopId, manager.userId, { customRoleId: deputy.value.id });
+        expect(await resolver.resolve(manager.tokens.accessToken, shopId)).toEqual({
+          ok: false,
+          reason: 'mfa_required',
+        });
+        // Handed the shop, the owner holds every power: their custom role goes.
+        const session = await auth(manager.tokens.accessToken);
+        const { secret } = await service.setUpTotp(session);
+        await service.confirmTotp(session, code(secret), client());
+        expect(await s.transferOwnership(owner, shopId, manager.userId)).toMatchObject({
+          ok: true,
+          value: { owner: { role: 'owner', customRole: null } },
+        });
+      });
+
+      it('deletes one that no member of staff holds, nor any invitation waiting', async () => {
+        const { shopId, owner } = await shopWithOwner();
+        const s = staff();
+        const made = await s.createCustomRole(owner, shopId, caller);
+        if (!made.ok) throw new Error('expected a custom role');
+        const customRoleId = made.value.id;
+        const first = await join(shopId, 'packer');
+        const second = await join(shopId, 'packer');
+        for (const member of [first, second]) {
+          await s.changeRole(owner, shopId, member.userId, { customRoleId });
+        }
+        const spent = await s.invite(owner, shopId, { customRoleId });
+        const waiting = await s.invite(owner, shopId, { customRoleId });
+        if (!spent.ok || !waiting.ok) throw new Error('expected invitations');
+        await s.accept(await signUp(), spent.value.token);
+        expect(await s.deleteCustomRole(owner, shopId, customRoleId)).toEqual({
+          ok: false,
+          errors: [
+            {
+              field: ['id'],
+              code: 'IN_USE',
+              message:
+                '3 members of staff and 1 invitation waiting have this role: give them another, ' +
+                'or take the invitations back, first',
+            },
+          ],
+        });
+        // Given other roles, or gone, and the invitation taken back, it goes.
+        await s.changeRole(owner, shopId, first.userId, 'packer');
+        await s.remove(owner, shopId, second.userId);
+        const accepted = (await s.staffOf(shopId)).find(
+          (member) => member.customRole?.id === customRoleId,
+        );
+        await s.remove(owner, shopId, accepted!.userId);
+        expect(errorsOf(await s.deleteCustomRole(owner, shopId, customRoleId))).toEqual([
+          ['id', 'IN_USE'],
+        ]);
+        await s.revokeInvitation(owner, shopId, waiting.value.invitation.id);
+        expect(await s.deleteCustomRole(owner, shopId, customRoleId, client())).toMatchObject({
+          ok: true,
+          value: { id: customRoleId, name: 'Caller, masked' },
+        });
+        expect(await s.customRolesOf(shopId)).toEqual([]);
+        expect(errorsOf(await s.deleteCustomRole(owner, shopId, customRoleId))).toEqual([
+          ['id', 'NOT_FOUND'],
+        ]);
+        // Invitations spent or taken back forget it.
+        const { rows } = await admin.query(
+          'SELECT custom_role_id FROM identity.invitations WHERE id = ANY($1)',
+          [[spent.value.invitation.id, waiting.value.invitation.id]],
+        );
+        expect(rows).toEqual([{ custom_role_id: null }, { custom_role_id: null }]);
+      });
     });
 
     it('lets an invitation lapse after 7 days, and keeps 50 waiting at most', async () => {

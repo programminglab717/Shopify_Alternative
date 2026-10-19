@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-577 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-578 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -585,6 +585,7 @@
 | 575 | A signed-in shopper's wishlist is kept with their account and follows them across devices, the browser's list still what pages show, so every page stays cacheable | Accepted |
 | 576 | The Admin API costs each query before it runs and meters it per app or member of staff in each shop, Shopify's leaky bucket, refusing what would overdraw it and saying the cost | Accepted |
 | 577 | The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and gives up after three tries with plain words | Accepted |
+| 578 | A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's name is checked by capabilities each preset holds as before | Accepted |
 
 ---
 
@@ -21405,3 +21406,29 @@
   of failing.
 * **Alternatives:** **Retrying at once:** a throttled request would be refused again until the
   bucket fills, each refusal one more round trip.
+
+## ADR-578 · A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's name is checked by capabilities each preset holds as before
+
+* **Context:** Staff have six presets (ADM-01); custom roles are V1's, with a permission to see
+  customers' numbers (security §2.1). About twenty checks across the modules asked a role's name,
+  so a role of the shop's own could not be fitted in without changing what they ask.
+* **Decision:**
+  * **Capabilities** name what those checks allowed: seeing customers' numbers whole, revealing
+    them, exporting orders, managing others' export schedules, refunding, assigning orders,
+    moderating comments, seeing staff's performance, reconciling payments, claiming from couriers,
+    managing staff, apps, billing, verification and support access. Each preset holds exactly what
+    its checks allowed before, a table test proving it; numbers whole, revealed or masked follow
+    the first two.
+  * **A custom role** is named by the shop, based on any preset but the owner's, which it keeps,
+    and holds a subset of its preset's scopes, the read of what it writes counting, and of its
+    capabilities: it never grants more. Up to 50 a shop, their names apart; owners and managers
+    make them for the roles they manage, and a change asks who they are. A member or an invitation
+    holds one, the database keeping its role its preset; one in use is not deleted.
+  * **Access** is read each request: a role's change counts from the member's next, intersected
+    with its preset as it is then. The owner's actions, MFA and alerts stay by preset.
+  * The API gives the shop's roles, the presets with their scopes and capabilities, and a member's
+    or invitation's role.
+* **Consequences:** A shop gives a packer who also confirms, or an accountant who may not export,
+  exactly that.
+* **Alternatives:** **Roles of any scopes:** a role could grant what no preset does, beyond the
+  owner's say. **Roles by name in every check:** each new role would mean changing each module.

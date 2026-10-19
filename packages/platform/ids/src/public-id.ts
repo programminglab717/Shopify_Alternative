@@ -113,6 +113,7 @@ export const ID_PREFIXES = {
   storeAppeal: 'apl',
   rightsComplaint: 'ipc',
   accessRequest: 'acr',
+  customRole: 'role',
   metafield: 'mtf',
   metafieldDefinition: 'mfd',
   paymentSettlement: 'pst',

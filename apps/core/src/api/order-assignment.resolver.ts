@@ -6,6 +6,7 @@ import {
   UserError,
   badUserInput,
   deniedToRole,
+  hasCapability,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
@@ -135,13 +136,13 @@ export class OrderAssignmentResolver {
   }
 }
 
-/** Owners, managers and apps give orders to anyone, and take them from whoever has them. */
+/**
+ * Owners, managers, custom roles of theirs that keep it (ADR-578) and apps give orders to anyone,
+ * and take them from whoever has them.
+ */
 function mayReassign(tenant: TenantContext): boolean {
   const { actor } = tenant;
-  return (
-    actor.kind === 'app' ||
-    (actor.kind === 'staff' && (actor.role === 'owner' || actor.role === 'manager'))
-  );
+  return actor.kind === 'app' || hasCapability(actor, 'assign_orders');
 }
 
 function staffMemberOf(tenant: TenantContext): string | null {

@@ -4,7 +4,6 @@ import {
   phoneAccess,
   shopProfile,
   type MutationResult,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
@@ -31,13 +30,6 @@ export const EXPORT_LIMITS = {
   /** Rows of an export with a row per line item. */
   lines: 50_000,
 } as const;
-
-/**
- * Staff who may export orders: owners and managers, and accountants, who reconcile them. Exports
- * by other roles, such as marketers, need an approval flow that does not exist yet
- * (docs/architecture/11-security-and-compliance.md §2.1). Apps need only read_orders.
- */
-export const EXPORT_ROLES: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
 
 /** A row per order, or a row per line item with its order's details beside it. */
 export const EXPORT_LAYOUTS = ['orders', 'line_items'] as const;

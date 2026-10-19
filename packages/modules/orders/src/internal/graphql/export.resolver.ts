@@ -4,12 +4,12 @@ import {
   RequireScopes,
   UserError,
   deniedToRole,
+  hasCapability,
   type TenantContext,
 } from '@hatti/api';
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import {
   EXPORT_LIMITS,
-  EXPORT_ROLES,
   OrderExportService,
   type ExportFormatValue,
   type ExportLayoutValue,
@@ -35,7 +35,7 @@ export class OrderExportResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args() args: OrdersExportArgs,
   ): Promise<OrdersExportPayload> {
-    if (tenant.actor.kind === 'staff' && !EXPORT_ROLES.includes(tenant.actor.role)) {
+    if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'export_orders')) {
       throw deniedToRole('Access denied. Only owners, managers and accountants export orders.');
     }
     const result = await this.exports.export(tenant, {

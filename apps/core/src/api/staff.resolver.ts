@@ -6,6 +6,7 @@ import {
   UserError,
   actorColumnsOf,
   deniedToRole,
+  hasCapability,
   type FieldError,
   type StaffRole,
   type TenantContext,
@@ -18,6 +19,7 @@ import {
   type AccessRequestRecord,
   type StaffInvitationRecord,
   type StaffMemberRecord,
+  type StaffRoleChoice,
 } from '@hatti/identity/public';
 import { OrderService } from '@hatti/orders/public';
 import { Optional } from '@nestjs/common';
@@ -72,8 +74,15 @@ export class StaffMember {
   })
   email!: string | null;
 
-  @Field(() => StaffMemberRole)
+  @Field(() => StaffMemberRole, {
+    description:
+      "Their role's preset; for a custom role (customRole), the one it was made from, which says " +
+      'the rest, such as whether they need a second factor.',
+  })
   role!: StaffMemberRole;
+
+  /** Their custom role's ID (ADR-578), which `customRole` reads; null for a preset's. */
+  customRoleUuid!: string | null;
 
   @Field(() => GraphQLISODateTime, { description: 'When they began working in the shop.' })
   joinedAt!: Date;
@@ -95,8 +104,13 @@ export class StaffInvitation {
   @Field(() => ID)
   id!: string;
 
-  @Field(() => StaffMemberRole)
+  @Field(() => StaffMemberRole, {
+    description: 'The role it gives; for a custom role (customRole), the preset it was made from.',
+  })
   role!: StaffMemberRole;
+
+  /** The custom role it gives (ADR-578), which `customRole` reads; null for a preset's. */
+  customRoleUuid!: string | null;
 
   @Field(() => String, { nullable: true, description: 'Whom it is for, as the inviter noted it.' })
   note!: string | null;
@@ -267,7 +281,7 @@ export class StaffAccessRequestDeclinePayload {
   userErrors!: UserError[];
 }
 
-const ROLES = {
+export const ROLES = {
   owner: StaffMemberRole.OWNER,
   manager: StaffMemberRole.MANAGER,
   confirmation_agent: StaffMemberRole.CONFIRMATION_AGENT,
@@ -394,16 +408,30 @@ export class StaffResolver {
 
   @Mutation(() => StaffInvitationCreatePayload, {
     description:
-      'Invites someone to work in the shop in `role`, by a link the inviter sends them, good for ' +
-      '7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at ' +
-      'most (ADR-167). The owner invites any role but its own; managers, those below them. Staff ' +
-      'confirm who they are first when they signed in over 15 minutes ago.',
+      'Invites someone to work in the shop in `role`, or in custom role `customRoleId` (ADR-578), ' +
+      'by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti ' +
+      'emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but ' +
+      'its own; managers, those below them. Staff confirm who they are first when they signed in ' +
+      'over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
   @RequireRecentAuthentication()
   async staffInvitationCreate(
     @CurrentTenant() tenant: TenantContext,
-    @Args('role', { type: () => StaffMemberRole }) role: StaffMemberRole,
+    @Args('role', {
+      type: () => StaffMemberRole,
+      nullable: true,
+      description: 'The role preset, unless customRoleId gives a custom role.',
+    })
+    role?: StaffMemberRole | null,
+    @Args('customRoleId', {
+      type: () => ID,
+      nullable: true,
+      description:
+        "A custom role of the shop's (ADR-578): role_…. Its members' role is the preset it was " +
+        'made from, which `role`, if given, must be.',
+    })
+    customRoleId?: string | null,
     @Args('note', {
       type: () => String,
       nullable: true,
@@ -435,23 +463,28 @@ export class StaffResolver {
   ): Promise<StaffInvitationCreatePayload> {
     const actor = managingStaff(tenant);
     const limit = (await this.allowance?.limitOf(tenant.shopId, 'staff')) ?? null;
-    const result = await this.staff.invite(
-      actor,
-      tenant.shopId,
-      {
-        role: roleOf(role),
-        note,
-        email,
-        // Unless given, the inviter's own, which the staff service reads (ADR-194).
-        language: language ? (language === EmailLanguage.UR ? 'ur' : 'en') : null,
-        accessDays,
-      },
-      {},
-      limit,
-    );
+    const choice = roleChoice(role, customRoleId);
+    const result = choice.ok
+      ? await this.staff.invite(
+          actor,
+          tenant.shopId,
+          {
+            ...choice.value,
+            note,
+            email,
+            // Unless given, the inviter's own, which the staff service reads (ADR-194).
+            language: language ? (language === EmailLanguage.UR ? 'ur' : 'en') : null,
+            accessDays,
+          },
+          {},
+          limit,
+        )
+      : choice;
     if (result.ok) {
-      await this.audit(tenant, 'staff.invited', 'staffInvitation', result.value.invitation.id, {
-        role,
+      const { invitation } = result.value;
+      await this.audit(tenant, 'staff.invited', 'staffInvitation', invitation.id, {
+        role: ROLES[invitation.role],
+        ...customRoleOf(invitation),
         ...(accessDays !== null && accessDays !== undefined && { accessDays }),
       });
     }
@@ -505,6 +538,7 @@ export class StaffResolver {
         result.value.invitation.id,
         {
           role: ROLES[result.value.invitation.role],
+          ...customRoleOf(result.value.invitation),
           replaced: toPublicId('staffInvitation', result.value.replaced),
         },
       );
@@ -533,6 +567,7 @@ export class StaffResolver {
     if (result.ok) {
       await this.audit(tenant, 'staff.invitation_revoked', 'staffInvitation', result.value.id, {
         role: ROLES[result.value.role],
+        ...customRoleOf(result.value),
       });
     }
     return Object.assign(new StaffInvitationRevokePayload(), {
@@ -543,26 +578,51 @@ export class StaffResolver {
 
   @Mutation(() => StaffMemberRoleUpdatePayload, {
     description:
-      'Gives a staff member another role, from the next request they make: both roles must be ' +
-      'ones the acting member manages, and nobody changes their own. Staff confirm who they are ' +
-      'first when they signed in over 15 minutes ago.',
+      'Gives a staff member another role, a preset or a custom role (ADR-578), from the next ' +
+      'request they make: both roles must be ones the acting member manages, and nobody changes ' +
+      'their own. Staff confirm who they are first when they signed in over 15 minutes ago.',
   })
   @RequireScopes('write_settings')
   @RequireRecentAuthentication()
   async staffMemberRoleUpdate(
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,
-    @Args('role', { type: () => StaffMemberRole }) role: StaffMemberRole,
+    @Args('role', {
+      type: () => StaffMemberRole,
+      nullable: true,
+      description: 'The role preset, unless customRoleId gives a custom role.',
+    })
+    role?: StaffMemberRole | null,
+    @Args('customRoleId', {
+      type: () => ID,
+      nullable: true,
+      description:
+        "A custom role of the shop's (ADR-578): role_…. Its members' role is the preset it was " +
+        'made from, which `role`, if given, must be.',
+    })
+    customRoleId?: string | null,
   ): Promise<StaffMemberRoleUpdatePayload> {
     const actor = managingStaff(tenant);
     const userId = tryFromPublicId(id, 'user');
-    const result = userId
-      ? await this.staff.changeRole(actor, tenant.shopId, userId, roleOf(role))
-      : notFound('Staff member not found');
-    if (result.ok && result.value.previousRole !== result.value.member.role) {
-      await this.audit(tenant, 'staff.role_changed', 'user', result.value.member.userId, {
+    const choice = roleChoice(role, customRoleId);
+    const result = !userId
+      ? notFound('Staff member not found')
+      : choice.ok
+        ? await this.staff.changeRole(actor, tenant.shopId, userId, choice.value)
+        : choice;
+    if (
+      result.ok &&
+      (result.value.previousRole !== result.value.member.role ||
+        result.value.previousCustomRoleId !== (result.value.member.customRole?.id ?? null))
+    ) {
+      const { previousCustomRoleId, member } = result.value;
+      await this.audit(tenant, 'staff.role_changed', 'user', member.userId, {
         from: ROLES[result.value.previousRole],
-        to: role,
+        ...(previousCustomRoleId && {
+          fromCustomRole: toPublicId('customRole', previousCustomRoleId),
+        }),
+        to: ROLES[member.role],
+        ...(member.customRole && { toCustomRole: toPublicId('customRole', member.customRole.id) }),
       });
     }
     return Object.assign(new StaffMemberRoleUpdatePayload(), {
@@ -652,12 +712,15 @@ export class StaffResolver {
   }
 }
 
-/** The acting staff member: the owner or a manager. Apps manage no staff. */
-function managingStaff(tenant: TenantContext): { userId: string } {
+/**
+ * The acting staff member: the owner or a manager, or a custom role of managers' that keeps it
+ * (ADR-578), who manages the roles below managers as managers do. Apps manage no staff.
+ */
+export function managingStaff(tenant: TenantContext): { userId: string } {
   if (tenant.actor.kind !== 'staff') {
     throw deniedToRole('Access denied. Staff are managed by the owner and managers, not apps.');
   }
-  if (tenant.actor.role !== 'owner' && tenant.actor.role !== 'manager') {
+  if (!hasCapability(tenant.actor, 'manage_staff')) {
     throw deniedToRole('Access denied. Only the owner and managers manage staff.');
   }
   return { userId: tenant.actor.userId };
@@ -674,12 +737,30 @@ function owning(tenant: TenantContext): { userId: string } {
   return { userId: tenant.actor.userId };
 }
 
-function roleOf(role: StaffMemberRole): StaffRole {
+export function roleOf(role: StaffMemberRole): StaffRole {
   return role.toLowerCase() as StaffRole;
 }
 
-function notFound(message: string, field = ['id']): { ok: false; errors: FieldError[] } {
+export function notFound(message: string, field = ['id']): { ok: false; errors: FieldError[] } {
   return { ok: false, errors: [{ field, code: 'NOT_FOUND', message }] };
+}
+
+/** A preset, or a custom role by its public ID (ADR-578), as the staff service takes it. */
+function roleChoice(
+  role: StaffMemberRole | null | undefined,
+  customRoleId: string | null | undefined,
+): { ok: true; value: StaffRoleChoice } | { ok: false; errors: FieldError[] } {
+  if (!customRoleId) return { ok: true, value: { role: role ? roleOf(role) : null } };
+  const id = tryFromPublicId(customRoleId, 'customRole');
+  if (!id) return notFound('Custom role not found', ['customRoleId']);
+  return { ok: true, value: { role: role ? roleOf(role) : null, customRoleId: id } };
+}
+
+/** An invitation's custom role, as the audit log names it. */
+function customRoleOf(invitation: StaffInvitationRecord): { customRole?: string } {
+  return invitation.customRole
+    ? { customRole: toPublicId('customRole', invitation.customRole.id) }
+    : {};
 }
 
 function toStaffMember(record: StaffMemberRecord): StaffMember {
@@ -688,6 +769,7 @@ function toStaffMember(record: StaffMemberRecord): StaffMember {
     name: record.name,
     email: record.email,
     role: ROLES[record.role],
+    customRoleUuid: record.customRole?.id ?? null,
     joinedAt: record.joinedAt,
     expiresAt: record.expiresAt,
   });
@@ -697,6 +779,7 @@ function toStaffInvitation(record: StaffInvitationRecord): StaffInvitation {
   return Object.assign(new StaffInvitation(), {
     id: toPublicId('staffInvitation', record.id),
     role: ROLES[record.role],
+    customRoleUuid: record.customRole?.id ?? null,
     note: record.note,
     email: record.email,
     invitedBy: record.invitedBy.name,

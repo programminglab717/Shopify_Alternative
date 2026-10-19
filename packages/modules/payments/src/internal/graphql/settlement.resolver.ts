@@ -5,8 +5,8 @@ import {
   UserError,
   accessDenied,
   deniedToRole,
+  hasCapability,
   hasScope,
-  type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
@@ -32,13 +32,12 @@ import {
 
 /**
  * Staff who reconcile what the shop is paid: owners, managers and accountants, as for couriers'
- * remittances (ADR-067). Apps need write_orders to import, and read_orders to read.
+ * remittances (ADR-067), and custom roles of theirs that keep it (ADR-578). Apps need
+ * write_orders to import, and read_orders to read.
  */
-const RECONCILING_ROLES: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
-
 function mayReconcile(tenant: TenantContext, writing: boolean): void {
   if (tenant.actor.kind === 'staff') {
-    if (!RECONCILING_ROLES.includes(tenant.actor.role)) {
+    if (!hasCapability(tenant.actor, 'reconcile_payments')) {
       throw deniedToRole(
         "Access denied. Only owners, managers and accountants reconcile gateways' settlements.",
       );

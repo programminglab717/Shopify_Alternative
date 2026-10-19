@@ -4,6 +4,7 @@ import {
   RequireScopes,
   UserError,
   deniedToRole,
+  hasCapability,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
@@ -139,11 +140,14 @@ export class ShopVerificationSubmitPayload {
   userErrors!: UserError[];
 }
 
-/** Owners and managers see it; the owner alone asks. */
+/**
+ * Owners and managers see it, and custom roles of managers' that keep it (ADR-578); the owner
+ * alone asks.
+ */
 function staff(tenant: TenantContext, owner: boolean): void {
   if (
     tenant.actor.kind !== 'staff' ||
-    (tenant.actor.role !== 'owner' && (owner || tenant.actor.role !== 'manager'))
+    (tenant.actor.role !== 'owner' && (owner || !hasCapability(tenant.actor, 'see_verification')))
   ) {
     throw deniedToRole(
       owner
