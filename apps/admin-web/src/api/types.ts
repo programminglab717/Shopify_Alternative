@@ -1365,7 +1365,7 @@ export interface DraftVariantsData {
 
 export interface ActivityActor {
   id: string;
-  kind: 'APP' | 'STAFF' | 'SUPPORT';
+  kind: 'APP' | 'STAFF' | 'SUPPORT' | 'CUSTOMER';
   role: string | null;
 }
 
@@ -3147,10 +3147,14 @@ export interface CustomerErasureCancelData {
   customerErasureCancel: { userErrors: UserError[] };
 }
 
+/** Who asked for a customer's erasure: staff or an app, or the customer from their account. */
+export type CustomerErasureRequester = 'STAFF' | 'APP' | 'CUSTOMER';
+
 export interface CustomerErasureRequestsData {
   customerErasureRequests: {
     nodes: {
       requestedAt: string;
+      requestedBy: CustomerErasureRequester;
       scheduledAt: string;
       customer: { id: string; displayName: string; phone: string };
     }[];

@@ -394,7 +394,10 @@ export function CustomerCare({ customer }: { customer: CustomerDetail }) {
   );
 }
 
-/** Customers' erasures waiting to happen, the soonest first, each a tap from its customer. */
+/**
+ * Customers' erasures waiting to happen, the soonest first, each a tap from its customer, with
+ * who asked: staff, an app, or the customer from their account (ADR-573).
+ */
 export function ErasuresPage() {
   const { t, locale } = useLocale();
   const shop = useShop();
@@ -438,7 +441,8 @@ export function ErasuresPage() {
                   {t('care.erasedOn', {
                     date: formatDateTime(each.scheduledAt, timezone, locale),
                     asked: formatDate(each.requestedAt, timezone, locale),
-                  })}
+                  })}{' '}
+                  · {t(`care.askedBy.${each.requestedBy}`)}
                 </span>
               </Link>
             </li>

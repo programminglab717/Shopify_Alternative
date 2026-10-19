@@ -97,6 +97,28 @@ describe('The activity log in the admin', () => {
                 occurredAt: LATER,
                 actor: { id: 'usr_1', kind: 'STAFF', role: 'owner' },
               },
+              // The customer, from their account (ADR-573); and staff, for them, as before.
+              {
+                id: 'aud_2',
+                action: 'customer.data_exported',
+                subjectId: 'cus_7',
+                occurredAt: LATER,
+                actor: { id: 'cus_7', kind: 'CUSTOMER', role: null },
+              },
+              {
+                id: 'aud_3',
+                action: 'customer.erasure_requested',
+                subjectId: 'cus_7',
+                occurredAt: LATER,
+                actor: { id: 'cus_7', kind: 'CUSTOMER', role: null },
+              },
+              {
+                id: 'aud_4',
+                action: 'customer.data_exported',
+                subjectId: 'cus_1',
+                occurredAt: LATER,
+                actor: { id: 'usr_1', kind: 'STAFF', role: 'owner' },
+              },
             ],
             pageInfo: { hasNextPage: false },
           },
@@ -137,7 +159,16 @@ describe('The activity log in the admin', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Numbers seen and exports' }));
     const seen = await screen.findByRole('link', { name: 'Customer number seen' });
     expect(seen.getAttribute('href')).toBe('/shop_1/customers/cus_1');
-    expect(screen.getByText('Sana')).toBeTruthy();
+    expect(screen.getAllByText('Sana')).toHaveLength(2);
+    // What the customer did from their account reads as theirs, they a tap from their page.
+    expect(hrefOf('Downloaded their data from their account')).toBe('/shop_1/customers/cus_7');
+    expect(hrefOf('Customer erasure asked for')).toBe('/shop_1/customers/cus_7');
+    expect(hrefOf('Customer data exported')).toBe('/shop_1/customers/cus_1');
+    const customers = screen.getAllByRole('link', { name: 'The customer' });
+    expect(customers.map((each) => each.getAttribute('href'))).toEqual([
+      '/shop_1/customers/cus_7',
+      '/shop_1/customers/cus_7',
+    ]);
   });
 
   it('reads an event with no subject or verb the admin knows as it is named', () => {

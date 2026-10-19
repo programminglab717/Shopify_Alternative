@@ -6714,6 +6714,7 @@ export const CustomerErasureRequestsQuery = /* GraphQL */ `
     customerErasureRequests(first: 100) {
       nodes {
         requestedAt
+        requestedBy
         scheduledAt
         customer {
           id

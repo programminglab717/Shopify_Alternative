@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### Who asked, in the admin
+
+* **The admin says who asked each waiting erasure, and shows a customer who acted in the activity
+  log, linked to their page** ([ADR-573](../architecture/13-decision-log.md#adr-573--the-admin-says-who-asked-each-waiting-erasure-and-shows-a-customer-who-acted-in-the-activity-log-linked-to-their-page), CUS-05).
+* 3529 tests, none more: the care page's and the activity log's tests now hold them.
+
 ### 2bf19ec · Data requests from the account
 
 * **A signed-in shopper downloads their data and asks for its erasure from their account,

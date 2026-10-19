@@ -40,15 +40,46 @@ export function describe(type: string, t: Translate): string {
   });
 }
 
-/** Who did it: a member of staff by name, or by role once they have gone; an app; support. */
+/**
+ * What an entry says happened, in the customer's own words where they did it from their account
+ * and it reads otherwise (ADR-573): "Downloaded their data from their account".
+ */
+function describeBy(type: string, actor: ActivityActor, t: Translate): string {
+  const ownKey = `activity.byCustomer.${type}`;
+  return actor.kind === 'CUSTOMER' && known(ownKey) ? t(ownKey) : describe(type, t);
+}
+
+/**
+ * Who did it: a member of staff by name, or by role once they have gone; an app; support; the
+ * customer themselves.
+ */
 function who(actor: ActivityActor, names: Map<string, string>, t: Translate): string {
   if (actor.kind === 'APP') return t('activity.app');
   if (actor.kind === 'SUPPORT') return t('activity.support');
+  if (actor.kind === 'CUSTOMER') return t('activity.customer');
   const name = names.get(actor.id);
   if (name) return name;
   return actor.role
     ? t(roleLabel(actor.role.toUpperCase() as StaffMemberRole))
     : t('activity.someone');
+}
+
+/** Who did it, the customer a tap from their page in the admin (ADR-573). */
+function Who({ actor, names }: { actor: ActivityActor; names: Map<string, string> }) {
+  const { t } = useLocale();
+  const shopId = useShop().id;
+  if (actor.kind === 'CUSTOMER' && actor.id.startsWith('cus_')) {
+    return (
+      <Link
+        to="/$shopId/customers/$customerId"
+        params={{ shopId, customerId: actor.id }}
+        className="underline"
+      >
+        {t('activity.customer')}
+      </Link>
+    );
+  }
+  return <span dir="auto">{who(actor, names, t)}</span>;
 }
 
 /** The page an entry's subject has in the admin, where it has one. */
@@ -166,7 +197,7 @@ function Entries({
                 <SubjectLink id={entry.subjectId} label={entry.what} />
               </span>
               <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                <span dir="auto">{who(entry.actor, names, t)}</span> ·{' '}
+                <Who actor={entry.actor} names={names} /> ·{' '}
                 {formatDateTime(entry.occurredAt, timezone, locale)}
               </span>
             </li>
@@ -199,7 +230,10 @@ function Changes() {
   }
   return (
     <Entries
-      entries={data.activityLog.nodes.map((node) => ({ ...node, what: describe(node.type, t) }))}
+      entries={data.activityLog.nodes.map((node) => ({
+        ...node,
+        what: describeBy(node.type, node.actor, t),
+      }))}
       names={new Map(data.staffMembers.map((member) => [member.id, member.name]))}
       more={data.activityLog.pageInfo.hasNextPage && first < MOST}
       busy={query.isFetching}
@@ -222,7 +256,10 @@ function Sensitive() {
   }
   return (
     <Entries
-      entries={data.auditLog.nodes.map((node) => ({ ...node, what: describe(node.action, t) }))}
+      entries={data.auditLog.nodes.map((node) => ({
+        ...node,
+        what: describeBy(node.action, node.actor, t),
+      }))}
       names={new Map(data.staffMembers.map((member) => [member.id, member.name]))}
       more={data.auditLog.pageInfo.hasNextPage && first < MOST}
       busy={query.isFetching}

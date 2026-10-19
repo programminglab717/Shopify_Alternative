@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-572 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-573 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -580,6 +580,7 @@
 | 570 | A shopper signs in to a shop's storefront with a code to their mobile, and the session reads their orders and store credit, the storefront's pages to follow | Accepted |
 | 571 | The storefront signs shoppers in with a code and shows their account, the pages never cached and every other page as it was, Hatti Base's customer templates in both languages | Accepted |
 | 572 | A signed-in shopper downloads their data and asks for its erasure from their account, through the requests staff make, the file kept a day and linked for minutes | Accepted |
+| 573 | The admin says who asked each waiting erasure, and shows a customer who acted in the activity log, linked to their page | Accepted |
 
 ---
 
@@ -21301,3 +21302,15 @@
   yet told when their erasure is done (ADR-110).
 * **Alternatives:** **The file sent on WhatsApp:** a message is not a safe place for every order
   and address a customer has. **A link kept on the page:** a page copied or cached would carry it.
+
+## ADR-573 · The admin says who asked each waiting erasure, and shows a customer who acted in the activity log, linked to their page
+
+* **Context:** A shopper asks for their data and its erasure from their account, recorded as the
+  customer's own requests (ADR-572); the admin knew only staff and apps as who asked or acted.
+* **Decision:**
+  * **Erasures waiting** say who asked: the customer from their account, staff, or an app.
+  * **The activity log** shows a customer as "The customer", linked to their page, and a customer
+    downloading their data in their own words; staff's exports read as before. English and Urdu.
+* **Consequences:** Staff know an erasure came from the shopper before they cancel it.
+* **Alternatives:** **The customer's name as the actor:** an erased customer's name is gone, and
+  their page says who they are.

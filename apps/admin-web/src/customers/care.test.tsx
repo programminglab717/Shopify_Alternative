@@ -109,8 +109,21 @@ function core(role: StaffRole) {
               nodes: [
                 {
                   requestedAt: LAST,
+                  requestedBy: 'STAFF',
                   scheduledAt: LATER,
                   customer: { id: 'cus_3', displayName: 'Bilal Ahmed', phone: '+923331234567' },
+                },
+                {
+                  requestedAt: LAST,
+                  requestedBy: 'CUSTOMER',
+                  scheduledAt: LATER,
+                  customer: { id: 'cus_4', displayName: 'Hina Malik', phone: '+923001112233' },
+                },
+                {
+                  requestedAt: LAST,
+                  requestedBy: 'APP',
+                  scheduledAt: LATER,
+                  customer: { id: 'cus_5', displayName: 'Usman Ali', phone: '+923004445566' },
                 },
               ],
             },
@@ -247,7 +260,12 @@ describe("Customers' care", () => {
     vi.stubGlobal('fetch', core('manager').fetcher);
     renderAdmin('/shop_1/customers/erasures');
     expect(await screen.findByText('Bilal Ahmed')).toBeTruthy();
-    expect(screen.getByText(/^Erased on .*; asked on /)).toBeTruthy();
+    // Who asked, quietly beside when: staff, the customer from their account, an app (ADR-573).
+    expect(
+      screen
+        .getAllByText(/^Erased on .*; asked on /)
+        .map((each) => each.textContent?.split(' · ')[1]),
+    ).toEqual(['Asked by staff', 'Asked by the customer from their account', 'Asked by an app']);
     cleanup();
 
     vi.stubGlobal('fetch', core('confirmation_agent').fetcher);
