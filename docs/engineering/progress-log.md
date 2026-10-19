@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### The Admin API's query cost
+### 43f1c76 · The Admin API's query cost
 
 * **The Admin API costs each query before it runs and meters it per app or member of staff in
   each shop, Shopify's leaky bucket, refusing what would overdraw it and saying the cost**
