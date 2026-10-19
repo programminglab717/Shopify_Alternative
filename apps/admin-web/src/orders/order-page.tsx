@@ -29,6 +29,7 @@ import type {
   OrderMutationData,
   OrderStage,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatDateTime, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -106,7 +107,7 @@ export function validateOrderSearch(search: Record<string, unknown>): OrderSearc
 
 function Actions({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const { scan } = useSearch({ from: '/$shopId/orders/$orderId' });
   const confirm = useAdminMutation<OrderMutationData, { id: string }>(OrderConfirmMutation);
   const pack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkPackedMutation);
@@ -138,7 +139,7 @@ function Actions({ order }: { order: OrderDetail }) {
     }
   };
 
-  const open = order.status === 'OPEN' && WORKS_PARCELS.includes(role);
+  const open = order.status === 'OPEN' && permits(shop, WORKS_PARCELS);
   const canConfirm = open && !order.overPlanLimit && CONFIRMABLE.includes(order.stage);
   const canPack = open && !order.overPlanLimit && order.stage === 'TO_PACK';
   // Collected at the counter instead of sent (ADR-389).
@@ -424,7 +425,7 @@ export function OrderPage() {
           <Section title={t('order.items')}>
             <OrderItems order={order} />
           </Section>
-          {(HANDLES_MONEY.includes(shop.role) ||
+          {(permits(shop, HANDLES_MONEY) ||
             Number(order.amountPaid.amount) > 0 ||
             order.refunds.length > 0 ||
             paymentSessions.length > 0) && (
@@ -469,7 +470,7 @@ export function OrderPage() {
               </p>
             ) : (
               <div className="flex flex-col gap-1">
-                {order.customer && READS_CUSTOMERS.includes(shop.role) ? (
+                {order.customer && permits(shop, READS_CUSTOMERS) ? (
                   <Link
                     to="/$shopId/customers/$customerId"
                     params={{ shopId: shop.id, customerId: order.customer.id }}
@@ -494,7 +495,7 @@ export function OrderPage() {
                 )}
               </div>
             )}
-            {!order.overPlanLimit && SENDS_LINKS.includes(shop.role) && (
+            {!order.overPlanLimit && permits(shop, SENDS_LINKS) && (
               <CustomerLink order={order} timezone={timezone} />
             )}
           </Section>

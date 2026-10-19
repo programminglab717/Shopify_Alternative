@@ -21,7 +21,7 @@ import type {
   MenusData,
   PagesData,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -36,7 +36,7 @@ import { TextField } from '../ui/field';
 import { MenuUrduCard } from '../urdu/urdu-pages';
 
 /** Those who change the shop's menus, as its navigation: owners and managers. */
-export const EDITS_MENUS: readonly StaffRole[] = ['owner', 'manager'];
+export const EDITS_MENUS = gate(['owner', 'manager'], 'write_online_store_navigation');
 
 /** Three levels of links at most, as the core keeps them. */
 const LEVELS = 3;
@@ -581,7 +581,8 @@ function MenuForm({ menu }: { menu: Menu | null }) {
  */
 export function MenuEditorPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const { menuId } = useParams({ from: '/$shopId/online-store/menus/$menuId' });
   const query = useAdminQuery<MenusData>(['menus'], MenusQuery, {}, { enabled: menuId !== 'new' });
   const back = (
@@ -596,7 +597,7 @@ export function MenuEditorPage() {
     </Link>
   );
 
-  if (!EDITS_MENUS.includes(role)) return <EmptyState title={t('menus.cannot')} />;
+  if (!permits(shop, EDITS_MENUS)) return <EmptyState title={t('menus.cannot')} />;
   if (menuId === 'new') {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">

@@ -11,7 +11,7 @@ import {
 } from '../api/operations';
 import type { OrderDetail, ParcelUserErrorsData, StaffData } from '../api/types';
 import { useMe } from '../auth/context';
-import type { StaffRole } from '../auth/session';
+import { can, gate, hasCapability, permits } from '../auth/permissions';
 import { formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { parseTags, TextArea } from '../products/product-form';
@@ -23,8 +23,17 @@ import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { WORKS_PARCELS } from './parcels';
 
-/** Owners and managers give orders to anyone, take them from whoever has them, and delete any comment. */
-const LEADS: readonly StaffRole[] = ['owner', 'manager'];
+/**
+ * Owners and managers give orders to anyone, from the shop's staff, and take them from whoever has
+ * them (`assign_orders`).
+ */
+const ASSIGNS = gate(
+  ['owner', 'manager'],
+  (shop) => hasCapability(shop, 'assign_orders') && can(shop, 'read_settings'),
+);
+
+/** And delete anyone's comment (`moderate_comments`). */
+const MODERATES = gate(['owner', 'manager'], 'moderate_comments');
 
 /** A comment's longest, as the core takes it. */
 const COMMENT_MOST = 2000;
@@ -35,9 +44,9 @@ const COMMENT_MOST = 2000;
  */
 export function Assignment({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const me = useMe().data?.user.id;
-  const leads = LEADS.includes(role);
+  const leads = permits(shop, ASSIGNS);
   const staff = useAdminQuery<StaffData>(['staff'], StaffQuery, undefined, { enabled: leads });
   const assign = useAdminMutation<
     ParcelUserErrorsData,
@@ -51,7 +60,7 @@ export function Assignment({ order }: { order: OrderDetail }) {
       async () => (await assign.mutateAsync({ id: order.id, staffMemberId })).orderAssign!,
     );
 
-  if (!WORKS_PARCELS.includes(role)) {
+  if (!permits(shop, WORKS_PARCELS)) {
     return order.assignee ? (
       <p className="text-secondary">{t('order.assignee', { name: order.assignee.name })}</p>
     ) : null;
@@ -143,7 +152,7 @@ function EditComment({ event, onDone }: { event: Event; onDone: () => void }) {
  */
 export function Timeline({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t, locale } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const me = useMe().data?.user.id;
   const [message, setMessage] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -152,7 +161,7 @@ export function Timeline({ order, timezone }: { order: OrderDetail; timezone: st
   );
   const remove = useAdminMutation<ParcelUserErrorsData, { id: string }>(OrderCommentDeleteMutation);
   const { problem, attempt } = useAttempt();
-  const writes = WORKS_PARCELS.includes(role);
+  const writes = permits(shop, WORKS_PARCELS);
   const ready = message.trim().length > 0 && message.length <= COMMENT_MOST;
 
   const submit = async (form: FormEvent) => {
@@ -204,7 +213,7 @@ export function Timeline({ order, timezone }: { order: OrderDetail; timezone: st
                     {formatRelative(event.createdAt, timezone, locale)}
                     {event.editedAt ? ` · ${t('details.edited')}` : ''}
                   </span>
-                  {(own || (comment && LEADS.includes(role))) && (
+                  {(own || (comment && permits(shop, MODERATES))) && (
                     <span className="flex gap-3 pt-1">
                       {own && (
                         <button
@@ -242,7 +251,7 @@ export function Timeline({ order, timezone }: { order: OrderDetail; timezone: st
 /** The order's note and tags (ORD-02), changed by those who work orders. */
 export function NoteAndTags({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState(order.note ?? '');
   const [tags, setTags] = useState(order.tags.join(', '));
@@ -250,7 +259,7 @@ export function NoteAndTags({ order }: { order: OrderDetail }) {
     OrderUpdateMutation,
   );
   const { problem, attempt } = useAttempt();
-  const writes = WORKS_PARCELS.includes(role);
+  const writes = permits(shop, WORKS_PARCELS);
 
   const submit = async (form: FormEvent) => {
     form.preventDefault();
@@ -346,7 +355,7 @@ type AddressFields = Record<
  */
 export function DeliveryAddress({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const address = order.shippingAddress;
   const blank = (): AddressFields => ({
     name: address.name ?? '',
@@ -364,7 +373,7 @@ export function DeliveryAddress({ order }: { order: OrderDetail }) {
   );
   const { problem, attempt } = useAttempt();
   const correctable =
-    WORKS_PARCELS.includes(role) && order.status !== 'CANCELLED' && order.fulfillments.length === 0;
+    permits(shop, WORKS_PARCELS) && order.status !== 'CANCELLED' && order.fulfillments.length === 0;
   const ready = ['name', 'phone', 'address1', 'city'].every(
     (key) => fields[key as keyof AddressFields].trim().length > 0,
   );

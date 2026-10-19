@@ -18,11 +18,12 @@ import type {
   ReviewSettingsData,
   ReviewSettingsUpdateData,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { OPENS_SETTINGS } from '../settings/settings-page';
+import { SETS_SETTINGS } from '../settings/settings-page';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
@@ -273,7 +274,7 @@ export function ReviewsPage() {
     ProductReviewsQuery,
     { first: PAGE, after: cursor, status },
   );
-  const moderates = EDITS_PRODUCTS.includes(shop.role);
+  const moderates = permits(shop, EDITS_PRODUCTS);
   const shown = query.data?.productReviews ?? [];
   /** The oldest shown, to go on from, when the page is full. */
   const last = shown.length === PAGE ? shown.at(-1)!.id : null;
@@ -290,7 +291,7 @@ export function ReviewsPage() {
         {t('reviews.title')}
       </h1>
       <p className="text-secondary">{t('reviews.intro')}</p>
-      {OPENS_SETTINGS.includes(shop.role) && <ReviewSettingsForm />}
+      {permits(shop, SETS_SETTINGS) && <ReviewSettingsForm />}
       <div role="tablist" className="flex flex-wrap gap-2">
         {STATUSES.map((each) => (
           <button

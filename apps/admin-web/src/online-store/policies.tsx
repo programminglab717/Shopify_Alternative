@@ -18,7 +18,7 @@ import type {
   UserError,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -31,7 +31,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { BodyArea, normalized, useBody } from './body-field';
 
 /** Those who set the shop's legal policies (`write_legal_policies`): owners and managers. */
-export const SETS_POLICIES: readonly StaffRole[] = ['owner', 'manager'];
+export const SETS_POLICIES = gate(['owner', 'manager'], 'write_legal_policies');
 
 /** The policies a shop keeps, in Shopify's order. */
 export const POLICY_TYPES: readonly ShopPolicyType[] = [
@@ -325,7 +325,8 @@ function UrduForm({
  */
 export function PolicyPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const { policy: param } = useParams({ from: '/$shopId/online-store/policies/$policy' });
   const type = typeOf(param);
   const query = useAdminQuery<PoliciesData>(['policies'], PoliciesQuery);
@@ -340,7 +341,7 @@ export function PolicyPage() {
       {t('policies.back')}
     </Link>
   );
-  if (!SETS_POLICIES.includes(role)) return <EmptyState title={t('policies.cannot')} />;
+  if (!permits(shop, SETS_POLICIES)) return <EmptyState title={t('policies.cannot')} />;
   if (!type) return <EmptyState title={t('policies.notFound')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {

@@ -17,6 +17,7 @@ import type {
   ParcelClaimValue,
   ParcelUserErrorsData,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -134,10 +135,10 @@ function ClaimForm({ id, worth, onDone }: { id: string; worth: MoneyValue; onDon
 /** Lost parcels, the longest lost first, each with its worth and its claim, or none yet. */
 export function Lost() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const query = useAdminQuery<LostParcelsData>(['lostParcels'], LostParcelsQuery);
   const [claiming, setClaiming] = useState<string | null>(null);
-  const claims = CLAIMS.includes(role);
+  const claims = permits(shop, CLAIMS);
 
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) return <ErrorState message={errorText(query.error, t)} />;

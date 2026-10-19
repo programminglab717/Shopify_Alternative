@@ -22,7 +22,7 @@ import type {
   ParcelUserErrorsData,
   UserError,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { formatCount, formatDateTime, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
@@ -39,12 +39,10 @@ import { RestockForm } from './restock-form';
 import type { Restock } from './restock-form';
 
 /** Those who move a parcel along, as the core lets them (`write_orders`). */
-export const WORKS_PARCELS: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'confirmation_agent',
-  'packer',
-];
+export const WORKS_PARCELS = gate(
+  ['owner', 'manager', 'confirmation_agent', 'packer'],
+  'write_orders',
+);
 
 /** Steps shown before "all steps": the latest few are what staff look for. */
 const FIRST_STEPS = 3;
@@ -396,7 +394,7 @@ export function ShipForm({
 }
 
 /** Those who hand parcels to couriers' riders, and see the pickups (ADR-380). */
-const SEES_PICKUPS: readonly StaffRole[] = ['owner', 'manager', 'packer'];
+const SEES_PICKUPS = gate(['owner', 'manager', 'packer'], 'read_orders');
 
 /**
  * A parcel's last hand-over to its courier's rider (SHP-02, SHP-04, ADR-381): when, to whom and
@@ -405,7 +403,8 @@ const SEES_PICKUPS: readonly StaffRole[] = ['owner', 'manager', 'packer'];
  */
 function HandedOver({ handOver, timezone }: { handOver: ParcelHandOverValue; timezone: string }) {
   const { t, locale } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const when = formatRelative(handOver.handedOverAt, timezone, locale);
   return (
     <div className="flex flex-col gap-2">
@@ -422,7 +421,7 @@ function HandedOver({ handOver, timezone }: { handOver: ParcelHandOverValue; tim
       {handOver.unseen && (
         <Alert tone="warning">
           {t('parcels.unseen')}{' '}
-          {SEES_PICKUPS.includes(role) && (
+          {permits(shop, SEES_PICKUPS) && (
             <Link
               to="/$shopId/shipping"
               params={{ shopId }}
@@ -450,7 +449,7 @@ function Parcel({
   pickup: boolean;
 }) {
   const { t, locale } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const [open, setOpen] = useState<Open>(null);
   const [allSteps, setAllSteps] = useState(false);
   const delivered = useAdminMutation<ParcelUserErrorsData, { id: string }>(
@@ -461,10 +460,10 @@ function Parcel({
   );
   const lost = useAdminMutation<ParcelUserErrorsData, { id: string }>(ParcelMarkLostMutation);
   const { problem, attempt } = useAttempt();
-  const works = WORKS_PARCELS.includes(role);
+  const works = permits(shop, WORKS_PARCELS);
   // A parcel back with items written off is claimed from its courier; a claim withdrawn, again.
   const claimable =
-    CLAIMS.includes(role) &&
+    permits(shop, CLAIMS) &&
     parcel.status === 'RETURNED' &&
     (!parcel.claim || parcel.claim.status === 'WITHDRAWN');
   const badge = STATUS_BADGES[parcel.status];

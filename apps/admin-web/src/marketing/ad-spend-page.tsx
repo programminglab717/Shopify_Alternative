@@ -11,6 +11,7 @@ import type {
   AdSpendSource,
   UserError,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText, userErrorText } from '../i18n/errors';
 import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -323,7 +324,7 @@ function RecentSpend() {
 export function AdSpendPage() {
   const { t } = useLocale();
   const shop = useShop();
-  const allowed = SETS_META.includes(shop.role);
+  const allowed = permits(shop, SETS_META);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">

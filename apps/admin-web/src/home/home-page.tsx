@@ -11,7 +11,7 @@ import {
 import { ApiError } from '../api/client';
 import { HomeQuery, HomeStockQuery, SetupChecklistQuery } from '../api/operations';
 import type { HomeData, HomeStockData, OrderStage, SetupChecklistData, Tally } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits, type Gate } from '../auth/permissions';
 import { RECONCILES_CASH } from '../cash/cash-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney } from '../i18n/format';
@@ -28,11 +28,11 @@ import { SeenAt } from '../offline/seen-at';
 
 type HomeKey = Exclude<keyof HomeData['home'], 'today' | 'parcelsUnseen' | 'deliveriesToRescue'>;
 
-/** A page of its own that a next action opens, for the roles that use it. */
+/** A page of its own that a next action opens, for those who use it. */
 interface Opens {
   to: '/$shopId/returns' | '/$shopId/cash';
   tab?: ReturnsTab;
-  roles: readonly StaffRole[];
+  gate: Gate;
 }
 
 /**
@@ -50,11 +50,11 @@ const NEXT: readonly { key: HomeKey; stage?: OrderStage; opens?: Opens }[] = [
   { key: 'returning', stage: 'RETURNING' },
   {
     key: 'returnsToReceive',
-    opens: { to: '/$shopId/returns', tab: 'customer', roles: READS_RETURNS },
+    opens: { to: '/$shopId/returns', tab: 'customer', gate: READS_RETURNS },
   },
-  { key: 'cashToCollect', opens: { to: '/$shopId/cash', roles: RECONCILES_CASH } },
-  { key: 'lostToClaim', opens: { to: '/$shopId/returns', tab: 'lost', roles: CLAIMS } },
-  { key: 'claimsOpen', opens: { to: '/$shopId/returns', tab: 'claims', roles: CLAIMS } },
+  { key: 'cashToCollect', opens: { to: '/$shopId/cash', gate: RECONCILES_CASH } },
+  { key: 'lostToClaim', opens: { to: '/$shopId/returns', tab: 'lost', gate: CLAIMS } },
+  { key: 'claimsOpen', opens: { to: '/$shopId/returns', tab: 'claims', gate: CLAIMS } },
 ];
 
 function NextAction({
@@ -68,8 +68,9 @@ function NextAction({
   stage?: OrderStage;
   opens?: Opens;
 }) {
-  const { id: shopId, role } = useShop();
-  const page = opens && opens.roles.includes(role) ? opens : undefined;
+  const shop = useShop();
+  const shopId = shop.id;
+  const page = opens && permits(shop, opens.gate) ? opens : undefined;
   const body = (
     <>
       <span className="flex flex-1 flex-col">
@@ -161,7 +162,7 @@ function StockOnHome({ location }: { location: string | undefined }) {
 }
 
 /** The roles that see parcels the courier has not seen: those who hand them over (ADR-380). */
-const SEES_UNSEEN: readonly StaffRole[] = ['owner', 'manager', 'packer'];
+const SEES_UNSEEN = gate(['owner', 'manager', 'packer'], 'read_orders');
 
 /**
  * Parcels handed to a rider a day ago and more that the courier's tracking still has as only
@@ -169,8 +170,9 @@ const SEES_UNSEEN: readonly StaffRole[] = ['owner', 'manager', 'packer'];
  */
 function ParcelsUnseen({ count }: { count: number }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!count || !SEES_UNSEEN.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!count || !permits(shop, SEES_UNSEEN)) return null;
   return (
     <Card>
       <Link
@@ -198,8 +200,9 @@ function ParcelsUnseen({ count }: { count: number }) {
  */
 function DeliveriesToRescue({ count }: { count: number }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!count || !READS_RETURNS.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!count || !permits(shop, READS_RETURNS)) return null;
   return (
     <Card>
       <Link
@@ -275,11 +278,14 @@ function StockRunningLow({ stock }: { stock: HomeStockData['home']['lowStock'] }
   );
 }
 
+/** Those who set the shop up: its settings are theirs (`read_settings`). */
+const SETS_UP = gate(['owner', 'manager'], 'read_settings');
+
 /** The setup checklist (ONB-02), for owners and managers until every step is done. */
 function SetupChecklist() {
   const { t } = useLocale();
   const shop = useShop();
-  const allowed = shop.role === 'owner' || shop.role === 'manager';
+  const allowed = permits(shop, SETS_UP);
   const checklist = useAdminQuery<SetupChecklistData>(
     ['setupChecklist'],
     SetupChecklistQuery,

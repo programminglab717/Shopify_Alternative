@@ -3,7 +3,7 @@ import { Copy, Link2, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { OrderLinkCreateMutation } from '../api/operations';
 import type { OrderDetail, OrderLinkCreateData } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -13,7 +13,7 @@ import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 
 /** Those who send customers their order's link: those who speak with them, as drafts' links. */
-export const SENDS_LINKS: readonly StaffRole[] = ['owner', 'manager', 'confirmation_agent'];
+export const SENDS_LINKS = gate(['owner', 'manager', 'confirmation_agent'], 'write_orders');
 
 /**
  * The customer's link to the order, where they confirm or cancel it while it waits for them and

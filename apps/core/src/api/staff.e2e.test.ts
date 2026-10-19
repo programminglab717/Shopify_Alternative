@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { generateAccessToken, type StaffRole } from '@hatti/api';
+import { ROLE_SCOPES, generateAccessToken, type StaffRole } from '@hatti/api';
 import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
@@ -198,6 +198,10 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
             name: 'Shop A',
             role: 'confirmation_agent',
             mfaRequired: false,
+            // What they may do there, for the admin to show them (ADR-580).
+            scopes: ROLE_SCOPES.confirmation_agent,
+            capabilities: ['reveal_customer_numbers'],
+            customRole: null,
           },
         ],
       });
@@ -1613,6 +1617,28 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         staffMember: { role: 'MANAGER', customRole: { name: 'Lead' } },
         userErrors: [],
       });
+      // The admin is told as much, to show them what they can use (ADR-580).
+      const shopsOf = async (token: string) =>
+        (await get('/auth/me', token)).json().shops as Json[];
+      expect(await shopsOf(manager.accessToken)).toEqual([
+        {
+          id: toPublicId('shop', shopF),
+          name: 'Shop F',
+          role: 'manager',
+          mfaRequired: true,
+          scopes: ['write_orders'],
+          capabilities: ['assign_orders'],
+          customRole: { id: leadId, name: 'Lead' },
+        },
+      ]);
+      expect(await shopsOf(agent.accessToken)).toMatchObject([
+        {
+          role: 'confirmation_agent',
+          scopes: ['read_orders', 'read_customers'],
+          capabilities: ['reveal_customer_numbers'],
+          customRole: { id: caller.id, name: 'Caller, masked' },
+        },
+      ]);
       expect(
         (await as(manager.accessToken, 'mutation { ordersExport { rowCount } }')).errors[0],
       ).toMatchObject({

@@ -28,11 +28,12 @@ import type {
   WhatsAppTemplatesSyncData,
   WhatsAppTemplateStatus,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { problemText, TextArea } from '../products/product-form';
-import { OPENS_SETTINGS } from '../settings/settings-page';
+import { SETS_SETTINGS } from '../settings/settings-page';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
@@ -75,11 +76,11 @@ export function BackToMarketing() {
   );
 }
 
-/** Where a shop without a number connects one: settings, for those who open them. */
+/** Where a shop without a number connects one: settings, for those who change them. */
 export function NoNumberHint() {
   const { t } = useLocale();
   const shop = useShop();
-  return OPENS_SETTINGS.includes(shop.role) ? (
+  return permits(shop, SETS_SETTINGS) ? (
     <Link
       to="/$shopId/settings/whatsapp"
       params={{ shopId: shop.id }}

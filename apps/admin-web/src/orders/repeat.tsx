@@ -11,6 +11,7 @@ import type {
   OrderMergeSplitData,
   OrderMutationData,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { useLocale } from '../i18n/locale';
 import { useAttempt } from '../returns/parcel';
 import { useAdminMutation, useShop } from '../shell/shop-context';
@@ -42,7 +43,7 @@ export function RepeatBanner({
   const { problem, attempt } = useAttempt();
   const earlier = order.repeatOf;
   if (!earlier || order.status !== 'OPEN') return null;
-  const works = WORKS_PARCELS.includes(shop.role);
+  const works = permits(shop, WORKS_PARCELS);
 
   const onMerge = async () => {
     const ok = await attempt(

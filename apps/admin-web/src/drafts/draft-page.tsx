@@ -8,6 +8,7 @@ import {
   DraftOrderQuery,
 } from '../api/operations';
 import type { DraftOrderData, DraftOrderDetail, UserError } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -260,7 +261,7 @@ export function DraftPage() {
           {formatDate(draft.createdAt, timezone, locale)}
         </span>
         <span className="flex-1" />
-        {draft.status === 'OPEN' && TAKES_DRAFTS.includes(shop.role) && (
+        {draft.status === 'OPEN' && permits(shop, TAKES_DRAFTS) && (
           <Link
             to="/$shopId/drafts/$draftId/edit"
             params={{ shopId: shop.id, draftId: draft.id }}
@@ -340,7 +341,7 @@ export function DraftPage() {
         )}
         {draft.note && <p dir="auto">{draft.note}</p>}
       </FormSection>
-      {draft.status === 'OPEN' && TAKES_DRAFTS.includes(shop.role) && <Actions draft={draft} />}
+      {draft.status === 'OPEN' && permits(shop, TAKES_DRAFTS) && <Actions draft={draft} />}
     </div>
   );
 }

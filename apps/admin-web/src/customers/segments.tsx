@@ -21,6 +21,7 @@ import type {
   SegmentsData,
   SegmentValue,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -461,9 +462,10 @@ function WithFilters({
 /** The shop's segments (CUS-03): each with how many customers it holds now. */
 export function SegmentsPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const query = useAdminQuery<SegmentsData>(['segments'], SegmentsQuery);
-  if (!KEEPS_SEGMENTS.includes(role)) return <EmptyState title={t('segments.cannot')} />;
+  if (!permits(shop, KEEPS_SEGMENTS)) return <EmptyState title={t('segments.cannot')} />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       <Link
@@ -526,8 +528,8 @@ export function SegmentsPage() {
 /** A new segment, for those who keep them. */
 export function NewSegmentPage() {
   const { t } = useLocale();
-  const { role } = useShop();
-  if (!KEEPS_SEGMENTS.includes(role)) return <EmptyState title={t('segments.cannot')} />;
+  const shop = useShop();
+  if (!permits(shop, KEEPS_SEGMENTS)) return <EmptyState title={t('segments.cannot')} />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       <BackToSegments />
@@ -589,12 +591,12 @@ function DeleteSegment({ segment }: { segment: SegmentValue }) {
 /** A segment of the shop's (CUS-03): its conditions changed, its members seen, or deleted. */
 export function SegmentPage() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const { segmentId } = useParams({ from: '/$shopId/customers/segments/$segmentId' });
   const query = useAdminQuery<SegmentData>(['segment', segmentId], SegmentQuery, {
     id: segmentId,
   });
-  if (!KEEPS_SEGMENTS.includes(role)) return <EmptyState title={t('segments.cannot')} />;
+  if (!permits(shop, KEEPS_SEGMENTS)) return <EmptyState title={t('segments.cannot')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {
     return (

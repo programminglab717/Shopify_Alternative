@@ -7,6 +7,7 @@ import type {
   PaymentRefundValue,
   PaymentSessionValue,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
@@ -16,7 +17,7 @@ import { useAdminMutation, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { HANDLES_MONEY } from './money';
+import { REFUNDS } from './money';
 
 /** How long the core waits for a gateway's answer to a refund before it may be settled by hand. */
 export const ANSWER_MINUTES = 5;
@@ -160,8 +161,8 @@ export function OnlinePayments({
   timezone: string;
 }) {
   const { t, locale } = useLocale();
-  const { role } = useShop();
-  const settles = HANDLES_MONEY.includes(role);
+  const shop = useShop();
+  const settles = permits(shop, REFUNDS);
   const [said, setSaid] = useState('');
 
   return (

@@ -10,7 +10,7 @@ import type {
   CodRemittanceOutcome,
   CodRemittanceOutcomeCounts,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -23,7 +23,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
 /** The roles that reconcile what couriers owe, as the core allows (ADR-066, ADR-067). */
-export const RECONCILES_CASH: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
+export const RECONCILES_CASH = gate(['owner', 'manager', 'accountant'], 'reconcile_payments');
 
 /** Days from which cash a courier still holds is late: couriers pay over weekly or fortnightly. */
 export const LATE_DAYS = 15;

@@ -14,7 +14,7 @@ import type {
   DiscountCodeValue,
   UserError,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { endOfDayIn, formatDate, startOfDayIn } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -31,7 +31,7 @@ import { BuyGetFields } from './buy-get';
 import { AutomaticDiscounts } from './automatic-discounts';
 
 /** The roles that make and end discount codes (the core's write_discounts). */
-export const MANAGES_DISCOUNTS: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+export const MANAGES_DISCOUNTS = gate(['owner', 'manager', 'marketer'], 'write_discounts');
 
 const STATUS_BADGES = {
   ACTIVE: { colour: 'delivered', icon: CircleCheck },
@@ -352,9 +352,9 @@ function CodeRow({ code, edits }: { code: DiscountCodeValue; edits: boolean }) {
  */
 export function DiscountsPage() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const query = useAdminQuery<DiscountCodesData>(['discountCodes'], DiscountCodesQuery);
-  const edits = MANAGES_DISCOUNTS.includes(role);
+  const edits = permits(shop, MANAGES_DISCOUNTS);
   const [making, setMaking] = useState(false);
   const [made, setMade] = useState<string | null>(null);
 

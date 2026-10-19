@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { startOfDay } from '../analytics/period';
 import { PackersQuery } from '../api/operations';
 import type { PackerValue, PackersData } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { can, gate, hasCapability, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -14,9 +14,14 @@ import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 
 /** The roles that see every packer's counts: those who run the shop, as the core has it. */
-export const SEES_PACKERS: readonly StaffRole[] = ['owner', 'manager'];
+export const SEES_PACKERS = gate(['owner', 'manager'], 'see_staff_performance');
 /** The roles that see packing counts at all: packers see their own (ADR-376). */
-export const SEES_PACKING: readonly StaffRole[] = [...SEES_PACKERS, 'packer'];
+export const SEES_PACKING = gate(
+  [...SEES_PACKERS.roles, 'packer'],
+  (shop) =>
+    can(shop, 'read_orders') &&
+    (shop.role === 'packer' || hasCapability(shop, 'see_staff_performance')),
+);
 
 /** The periods packing is counted over, in days: today, this week, this month. */
 const PERIODS = [1, 7, 30] as const;
@@ -83,8 +88,8 @@ export function PackersPage() {
   const { t } = useLocale();
   const shop = useShop();
   const timezone = useShopTimezone();
-  const allowed = SEES_PACKING.includes(shop.role);
-  const managing = SEES_PACKERS.includes(shop.role);
+  const allowed = permits(shop, SEES_PACKING);
+  const managing = permits(shop, SEES_PACKERS);
   const [days, setDays] = useState<Days>(1);
   const period = useMemo(
     () => ({

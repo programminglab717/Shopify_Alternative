@@ -20,7 +20,7 @@ import type {
   RefundMethod,
   StagedUploadsCreateData,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { can, gate, permits } from '../auth/permissions';
 import { formatDate, formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -32,8 +32,17 @@ import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
-/** Those who give money back or record it received, as the core lets them for refunds. */
-export const HANDLES_MONEY: readonly StaffRole[] = ['owner', 'manager'];
+/** Those who record money received for an order, or mark it paid (`write_orders`). */
+export const HANDLES_MONEY = gate(['owner', 'manager'], 'write_orders');
+
+/** Those who give money back, and settle refunds a gateway never answered (`refund_orders`). */
+export const REFUNDS = gate(['owner', 'manager'], 'refund_orders');
+
+/** Those who pay for an order with its customer's store credit. */
+const PAYS_WITH_CREDIT = gate(
+  ['owner', 'manager'],
+  (shop) => can(shop, 'write_orders') && can(shop, 'write_store_credit_account_transactions'),
+);
 
 /** Ways staff give money back; EXCHANGE is a return's own. */
 const METHODS: readonly RefundMethod[] = [
@@ -412,12 +421,13 @@ function PayWithCredit({
 
 export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t, locale } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const [open, setOpen] = useState<'refund' | 'paid' | 'credit' | 'record' | null>(null);
   const [done, setDone] = useState('');
   const markPaid = useAdminMutation<ParcelUserErrorsData, { id: string }>(OrderMarkAsPaidMutation);
   const { problem, attempt } = useAttempt();
-  const handles = HANDLES_MONEY.includes(role);
+  const handles = permits(shop, HANDLES_MONEY);
+  const refunds = permits(shop, REFUNDS);
   const most = refundable(order);
   const unpaid =
     order.status !== 'CANCELLED' && cents(order.amountPaid.amount) < cents(order.totalPrice.amount);
@@ -427,7 +437,10 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
   const advance = order.paymentMethod === 'CASH_ON_DELIVERY' && cents(waiting) > 0;
   // Store credit pays an order still open with nothing of it shipped.
   const creditPays =
-    handles && unpaid && order.customer !== null && UNSHIPPED.includes(order.stage);
+    permits(shop, PAYS_WITH_CREDIT) &&
+    unpaid &&
+    order.customer !== null &&
+    UNSHIPPED.includes(order.stage);
   const credit = useAdminQuery<CustomerStoreCreditData>(
     ['customerStoreCredit', order.customer?.id, false],
     CustomerStoreCreditQuery,
@@ -545,7 +558,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
       )}
       {done && <Alert tone="success">{done}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
-      {handles && open === 'refund' && (
+      {refunds && open === 'refund' && (
         <RefundForm
           order={order}
           most={most}
@@ -555,7 +568,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           }}
         />
       )}
-      {handles && open === 'credit' && (
+      {hasCredit && open === 'credit' && (
         <PayWithCredit
           order={order}
           balance={balance}
@@ -597,7 +610,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           </Button>
         </div>
       )}
-      {handles && open === null && (unpaid || cents(most) > 0) && (
+      {open === null && ((handles && unpaid) || hasCredit || (refunds && cents(most) > 0)) && (
         <div className="flex flex-wrap gap-2">
           {hasCredit && (
             <Button
@@ -610,7 +623,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
               {t('money.credit.start', { balance: formatMoney(balance) })}
             </Button>
           )}
-          {unpaid && (
+          {handles && unpaid && (
             <Button
               variant={cents(waiting) > 0 ? 'primary' : 'secondary'}
               onClick={() => {
@@ -622,7 +635,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
             </Button>
           )}
           {/* Paid in full would leave the courier nothing to collect: not while it waits for its advance. */}
-          {unpaid && !advance && (
+          {handles && unpaid && !advance && (
             <Button
               variant="secondary"
               onClick={() => {
@@ -633,7 +646,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
               {t('money.paid.start')}
             </Button>
           )}
-          {cents(most) > 0 && (
+          {refunds && cents(most) > 0 && (
             <Button
               variant="secondary"
               onClick={() => {

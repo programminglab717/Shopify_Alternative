@@ -25,7 +25,7 @@ import type {
   UrduResource,
   UserError,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
@@ -38,7 +38,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 
 /** Those who write the shop's Urdu (`write_translations`): owners, managers and marketers. */
-export const WRITES_URDU: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+export const WRITES_URDU = gate(['owner', 'manager', 'marketer'], 'write_translations');
 
 /**
  * Something of the shop's whose words may be put in Urdu: a product, collection, page, blog,

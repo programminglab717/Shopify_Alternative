@@ -3,6 +3,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { InventoryTransfersQuery } from '../api/operations';
 import type { InventoryTransferStatus, InventoryTransfersData } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -26,7 +27,8 @@ export const TRANSFER_STATUS_LABELS: Record<InventoryTransferStatus, MessageKey>
  */
 export function TransfersPage() {
   const { t, locale } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const timezone = useShopTimezone();
   const [status, setStatus] = useState<InventoryTransferStatus>('IN_TRANSIT');
   const [after, setAfter] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export function TransfersPage() {
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('transfers.title')}
         </h1>
-        {EDITS_STOCK.includes(role) && (
+        {permits(shop, EDITS_STOCK) && (
           <Link
             to="/$shopId/transfers/new"
             params={{ shopId }}

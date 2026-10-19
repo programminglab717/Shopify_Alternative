@@ -9,7 +9,7 @@ import {
   ThemesQuery,
 } from '../api/operations';
 import type { OnlineStoreTheme, ThemesData, UserError } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -21,7 +21,7 @@ import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
 /** Those who change the shop's themes: its owner and managers, as the core allows. */
-export const EDITS_THEMES: readonly StaffRole[] = ['owner', 'manager'];
+export const EDITS_THEMES = gate(['owner', 'manager'], 'write_themes');
 
 /** The choice, when adding a theme, of starting from the platform theme rather than a copy. */
 const PLATFORM = '';

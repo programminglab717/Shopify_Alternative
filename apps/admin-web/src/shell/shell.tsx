@@ -35,6 +35,7 @@ import { MARKETS } from '../marketing/broadcasts-page';
 import { MAKES_PAYMENT_LINKS } from '../payment-links/payment-links-page';
 import { READS_RETURNS } from '../returns/parcel';
 import { OPENS_SETTINGS } from '../settings/settings-page';
+import { gate, permits, type Access, type Gate } from '../auth/permissions';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -68,8 +69,8 @@ interface NavItem {
   /** A shorter name for the phone's bottom bar, where the label is too long. */
   short?: MessageKey;
   icon: LucideIcon;
-  /** Roles that see it (docs/design/02 §6); every role when missing. */
-  roles?: readonly StaffRole[];
+  /** Those who see it (docs/design/02 §6): the roles it is for, and what it needs; all when missing. */
+  gate?: Gate;
   /** Whether it is active on its own path alone, not the paths under it. */
   exact?: boolean;
   /** Kept in the phone's bottom bar when there are more sections than it holds. */
@@ -88,49 +89,50 @@ export const NAV: readonly NavItem[] = [
     label: 'nav.desk',
     short: 'nav.deskShort',
     icon: Headset,
-    roles: ['owner', 'manager', 'confirmation_agent'],
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
     primary: true,
   },
-  { to: '/$shopId/inbox', label: 'nav.inbox', icon: MessagesSquare, roles: READS_INBOX },
+  { to: '/$shopId/inbox', label: 'nav.inbox', icon: MessagesSquare, gate: READS_INBOX },
   {
     to: '/$shopId/shipping',
     label: 'nav.shipping',
     icon: Truck,
-    roles: ['owner', 'manager', 'packer'],
+    gate: gate(['owner', 'manager', 'packer'], 'write_orders'),
     primary: true,
   },
-  { to: '/$shopId/returns', label: 'nav.returns', icon: Undo2, roles: READS_RETURNS },
+  { to: '/$shopId/returns', label: 'nav.returns', icon: Undo2, gate: READS_RETURNS },
   { to: '/$shopId/products', label: 'nav.products', icon: Package },
   { to: '/$shopId/stock', label: 'nav.stock', icon: Boxes },
   {
     to: '/$shopId/customers',
     label: 'nav.customers',
     icon: Users,
-    roles: READS_CUSTOMERS,
+    gate: READS_CUSTOMERS,
   },
-  { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, roles: MANAGES_DISCOUNTS },
-  { to: '/$shopId/marketing', label: 'nav.marketing', icon: Megaphone, roles: MARKETS },
+  { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, gate: MANAGES_DISCOUNTS },
+  { to: '/$shopId/marketing', label: 'nav.marketing', icon: Megaphone, gate: MARKETS },
   {
     to: '/$shopId/payment-links',
     label: 'nav.paymentLinks',
     icon: Link2,
-    roles: MAKES_PAYMENT_LINKS,
+    gate: MAKES_PAYMENT_LINKS,
   },
   {
     to: '/$shopId/online-store',
     label: 'nav.onlineStore',
     icon: Store,
-    roles: OPENS_ONLINE_STORE,
+    gate: OPENS_ONLINE_STORE,
   },
-  { to: '/$shopId/analytics', label: 'nav.analytics', icon: ChartColumn, roles: READS_ANALYTICS },
-  { to: '/$shopId/cash', label: 'nav.cash', icon: Wallet, roles: RECONCILES_CASH },
-  { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, roles: OPENS_SETTINGS },
+  { to: '/$shopId/analytics', label: 'nav.analytics', icon: ChartColumn, gate: READS_ANALYTICS },
+  { to: '/$shopId/cash', label: 'nav.cash', icon: Wallet, gate: RECONCILES_CASH },
+  { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, gate: OPENS_SETTINGS },
   { to: '/$shopId/help', label: 'nav.help', icon: LifeBuoy },
 ];
 
-/** The sections a role sees. */
-export function sectionsOf(role: StaffRole): NavItem[] {
-  return NAV.filter((item) => !item.roles || item.roles.includes(role));
+/** The sections a member sees in a shop, those they can open; a role alone, its preset's. */
+export function sectionsOf(member: Access | StaffRole): NavItem[] {
+  const shop = typeof member === 'string' ? { role: member } : member;
+  return NAV.filter((item) => !item.gate || permits(shop, item.gate));
 }
 
 /** Those the phone's bottom bar shows, and whether "More" has the rest. */
@@ -139,13 +141,13 @@ function bottomOf(items: NavItem[]): { shown: NavItem[]; more: boolean } {
   return { shown: items.filter((item) => item.primary).slice(0, BOTTOM_SLOTS - 1), more: true };
 }
 
-/** "More" on a phone: every section the role sees, the bottom bar's and the rest. */
+/** "More" on a phone: every section the member sees, the bottom bar's and the rest. */
 export function MorePage() {
   const { t } = useLocale();
   const { shopId } = useParams({ from: '/$shopId' });
   const me = useMe();
-  const role = me.data?.shops.find((each) => each.id === shopId)?.role;
-  if (!role) return null;
+  const shop = me.data?.shops.find((each) => each.id === shopId);
+  if (!shop) return null;
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
@@ -155,7 +157,7 @@ export function MorePage() {
         aria-label={t('nav.more')}
         className="flex flex-col divide-y divide-line rounded-card border border-line bg-surface"
       >
-        {sectionsOf(role).map((item) => (
+        {sectionsOf(shop).map((item) => (
           <Link
             key={item.to}
             to={item.to}
@@ -213,7 +215,7 @@ export function Shell() {
     );
   }
 
-  const items = sectionsOf(shop.role);
+  const items = sectionsOf(shop);
   const bottom = bottomOf(items);
   const signOut = async () => {
     await store.signOut();

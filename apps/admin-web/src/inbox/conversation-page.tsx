@@ -37,6 +37,7 @@ import type {
   ConversationValue,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
+import { permits } from '../auth/permissions';
 import { shownPhone } from '../customers/customers-page';
 import { errorText, userErrorText } from '../i18n/errors';
 import { formatCount, formatDateTime } from '../i18n/format';
@@ -209,7 +210,7 @@ export function ConversationPage() {
   const shop = useShop();
   const timezone = useShopTimezone();
   const { conversationId } = useParams({ from: '/$shopId/inbox/$conversationId' });
-  const works = WORKS_INBOX.includes(shop.role);
+  const works = permits(shop, WORKS_INBOX);
   const query = useAdminQuery<ConversationData>(
     ['conversation', conversationId],
     ConversationQuery,

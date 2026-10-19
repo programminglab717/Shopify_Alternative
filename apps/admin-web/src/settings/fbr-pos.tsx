@@ -25,6 +25,7 @@ import type {
   TaxSettings,
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -36,7 +37,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { Problems, SelectField, settingProblem } from './settings-form';
-import { OPENS_SETTINGS } from './settings-page';
+import { SETS_SETTINGS } from './settings-page';
 
 const SYSTEMS: readonly FbrSystem[] = ['POS', 'DIGITAL_INVOICING'];
 const ENVIRONMENTS: readonly FbrEnvironment[] = ['SANDBOX', 'PRODUCTION'];
@@ -590,7 +591,7 @@ function FiscalInvoices({ connected }: { connected: FbrSystem | null }) {
 export function FbrPosSection({ settings }: { settings: TaxSettings }) {
   const { t } = useLocale();
   const shop = useShop();
-  const allowed = OPENS_SETTINGS.includes(shop.role);
+  const allowed = permits(shop, SETS_SETTINGS);
   const query = useAdminQuery<FbrPosData>(['fbrPos'], FbrPosQuery, undefined, {
     enabled: allowed,
   });

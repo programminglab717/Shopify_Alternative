@@ -5,7 +5,7 @@ import { HIGH_RETURNS, percent } from '../analytics/cod-health';
 import { type Days, PeriodTabs, usePeriod } from '../analytics/period';
 import { ConfirmationAgentsQuery } from '../api/operations';
 import type { ConfirmationAgentValue, ConfirmationAgentsData } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -15,7 +15,7 @@ import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 
 /** The roles that see how each agent of the desk did: those who run it, as the core has it. */
-export const SEES_AGENTS: readonly StaffRole[] = ['owner', 'manager'];
+export const SEES_AGENTS = gate(['owner', 'manager'], 'see_staff_performance');
 
 /** One of an agent's figures: what it counts, how many, and what that is of. */
 function Stat({
@@ -126,7 +126,7 @@ function Agent({ agent, name }: { agent: ConfirmationAgentValue; name: string | 
 export function AgentsPage() {
   const { t } = useLocale();
   const shop = useShop();
-  const allowed = SEES_AGENTS.includes(shop.role);
+  const allowed = permits(shop, SEES_AGENTS);
   const [days, setDays] = useState<Days>(30);
   const { from, before } = usePeriod(days);
   const query = useAdminQuery<ConfirmationAgentsData>(

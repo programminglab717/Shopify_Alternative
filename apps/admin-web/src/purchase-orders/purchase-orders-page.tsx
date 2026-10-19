@@ -3,6 +3,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { PurchaseOrdersQuery } from '../api/operations';
 import type { PurchaseOrderStatus, PurchaseOrdersData } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -41,7 +42,8 @@ export function useDay() {
  */
 export function PurchaseOrdersPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const day = useDay();
   const { supplier } = useSearch({ from: '/$shopId/purchase-orders' });
   const [status, setStatus] = useState<PurchaseOrderStatus>('OPEN');
@@ -75,7 +77,7 @@ export function PurchaseOrdersPage() {
           >
             {t('po.suppliers')}
           </Link>
-          {EDITS_STOCK.includes(role) && (
+          {permits(shop, EDITS_STOCK) && (
             <Link
               to="/$shopId/purchase-orders/new"
               params={{ shopId }}

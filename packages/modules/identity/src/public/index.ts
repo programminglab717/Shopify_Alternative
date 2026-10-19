@@ -41,6 +41,7 @@ export {
   type GoogleConnection,
   type GoogleSignInResult,
   type IdentityServiceOptions,
+  type MemberShop,
   type OpenedShop,
   type PhoneSignInResult,
   type Reauthentication,

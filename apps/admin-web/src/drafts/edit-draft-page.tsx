@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import { DraftOrderQuery, DraftOrderUpdateMutation } from '../api/operations';
 import type { DraftOrderData, DraftOrderDetail, DraftSource, UserError } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -87,7 +88,7 @@ export function EditDraftPage() {
     </Link>
   );
 
-  if (!TAKES_DRAFTS.includes(shop.role)) return <EmptyState title={t('drafts.cannot')} />;
+  if (!permits(shop, TAKES_DRAFTS)) return <EmptyState title={t('drafts.cannot')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {
     return (

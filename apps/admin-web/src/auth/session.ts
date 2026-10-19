@@ -17,13 +17,24 @@ export interface Tokens {
 export type StaffRole =
   'owner' | 'manager' | 'confirmation_agent' | 'packer' | 'marketer' | 'accountant';
 
-/** A shop the account works in, and its role there. */
+/** A shop the account works in, its role there, and what it may do there. */
 export interface ShopAccess {
   id: string;
   name: string;
+  /** Its role preset: a custom role's, where it holds one. */
   role: StaffRole;
   /** Whether its role needs a second factor proved in the session. */
   mfaRequired: boolean;
+  /**
+   * Its API scopes there, its custom role's or else its preset's, as each of its requests resolves
+   * them (ADR-580). Missing where the core said only the role, as on opening a shop: its role
+   * decides then (`src/auth/permissions.ts`).
+   */
+  scopes?: string[];
+  /** Its capabilities there, likewise (ADR-578). */
+  capabilities?: string[];
+  /** The shop's own role it holds, made from its preset; null for the preset's. */
+  customRole?: { id: string; name: string } | null;
 }
 
 export interface AccountUser {

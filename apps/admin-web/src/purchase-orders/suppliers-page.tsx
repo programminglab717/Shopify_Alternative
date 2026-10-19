@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { SupplierCreateMutation, SupplierUpdateMutation, SuppliersQuery } from '../api/operations';
 import type { Supplier, SupplierPurchasing, SuppliersData, UserError } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -111,10 +112,11 @@ function Bought({ purchasing }: { purchasing: SupplierPurchasing }) {
 
 export function SuppliersPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const query = useAdminQuery<SuppliersData>(['suppliers'], SuppliersQuery);
   const [editing, setEditing] = useState<string | null>(null);
-  const edits = EDITS_STOCK.includes(role);
+  const edits = permits(shop, EDITS_STOCK);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">

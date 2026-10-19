@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { DraftOrdersQuery } from '../api/operations';
 import type { DraftOrdersData } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -14,7 +14,7 @@ import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 
 /** The roles that take orders as drafts over the phone or in a chat (ORD-03). */
-export const TAKES_DRAFTS: readonly StaffRole[] = ['owner', 'manager', 'confirmation_agent'];
+export const TAKES_DRAFTS = gate(['owner', 'manager', 'confirmation_agent'], 'write_orders');
 
 type Status = 'OPEN' | 'COMPLETED';
 
@@ -50,7 +50,7 @@ export function DraftsPage() {
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('drafts.title')}
         </h1>
-        {TAKES_DRAFTS.includes(shop.role) && (
+        {permits(shop, TAKES_DRAFTS) && (
           <Link
             to="/$shopId/drafts/new"
             params={{ shopId: shop.id }}
@@ -78,7 +78,7 @@ export function DraftsPage() {
       <SavedSearches
         resource="DRAFT_ORDER"
         query={q}
-        manages={TAKES_DRAFTS.includes(shop.role)}
+        manages={permits(shop, TAKES_DRAFTS)}
         onApply={(next) => {
           setWords(next ?? '');
           setQ(next);

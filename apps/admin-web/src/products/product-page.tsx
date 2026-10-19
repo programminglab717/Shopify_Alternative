@@ -22,6 +22,7 @@ import type {
   TaxSettingsData,
   UserError,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -567,7 +568,7 @@ function ProductView() {
     );
   }
   const { product, location } = query.data;
-  const edits = EDITS_PRODUCTS.includes(shop.role);
+  const edits = permits(shop, EDITS_PRODUCTS);
   if (!product) {
     return (
       <div className="mx-auto flex max-w-5xl flex-col gap-4">

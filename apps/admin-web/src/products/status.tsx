@@ -2,7 +2,7 @@ import { Archive, CircleCheck, ImageOff, NotebookPen, Package } from 'lucide-rea
 import type { LucideIcon } from 'lucide-react';
 import type { OrderStage as BadgeColour } from '@hatti/tokens';
 import type { MoneyValue, ProductStatus, ProductThumbnail } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -42,7 +42,7 @@ export function ProductStatusBadge({ status }: { status: ProductStatus }) {
 }
 
 /** The roles that add and change products; every other role sees them (docs/design/02 §6). */
-export const EDITS_PRODUCTS: readonly StaffRole[] = ['owner', 'manager'];
+export const EDITS_PRODUCTS = gate(['owner', 'manager'], 'write_products');
 
 /** A product's first image, small, or a placeholder while it has none ready. */
 export function ProductThumb({

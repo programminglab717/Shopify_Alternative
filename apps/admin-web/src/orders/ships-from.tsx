@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LocationsQuery, OrderLocationChangeMutation } from '../api/operations';
 import type { LocationsData, OrderDetail, UserError } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { SelectField } from '../settings/settings-form';
@@ -70,10 +71,10 @@ function MoveForm({ order, onDone }: { order: OrderDetail; onDone: () => void })
  */
 export function ShipsFrom({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const [moving, setMoving] = useState(false);
   const movable =
-    WORKS_PARCELS.includes(role) &&
+    permits(shop, WORKS_PARCELS) &&
     order.status === 'OPEN' &&
     !order.overPlanLimit &&
     order.stage !== 'TO_BOOK' &&

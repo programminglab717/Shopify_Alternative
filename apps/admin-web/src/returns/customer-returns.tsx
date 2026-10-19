@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { PackageCheck } from 'lucide-react';
 import { OpenReturnsQuery, ReturnReceiveMutation } from '../api/operations';
 import type { OpenReturnsData, ParcelUserErrorsData } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -16,11 +17,12 @@ import { CHECKS_IN, SLOW_RETURN_DAYS, trackingText, useAttempt } from './parcel'
  */
 export function CustomerReturns() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const query = useAdminQuery<OpenReturnsData>(['openReturns'], OpenReturnsQuery);
   const receive = useAdminMutation<ParcelUserErrorsData, { id: string }>(ReturnReceiveMutation);
   const { problem, attempt } = useAttempt();
-  const works = CHECKS_IN.includes(role);
+  const works = permits(shop, CHECKS_IN);
 
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) return <ErrorState message={errorText(query.error, t)} />;

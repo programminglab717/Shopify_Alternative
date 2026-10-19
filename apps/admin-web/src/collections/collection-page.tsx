@@ -18,6 +18,7 @@ import type {
   CollectionRule,
   CollectionSortOrder,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -376,7 +377,7 @@ export function CollectionPage() {
   const query = useAdminQuery<CollectionData>(['collection', collectionId], CollectionQuery, {
     id: collectionId,
   });
-  const edits = EDITS_PRODUCTS.includes(shop.role);
+  const edits = permits(shop, EDITS_PRODUCTS);
 
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {

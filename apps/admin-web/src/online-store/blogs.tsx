@@ -16,6 +16,7 @@ import type {
   CommentPolicy,
   ContentMutationData,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -26,7 +27,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { usePageState, WRITES_PAGES } from './pages';
+import { usePageState, WRITES_BLOGS } from './pages';
 import { BlogUrduCard } from '../urdu/urdu-pages';
 
 const POLICIES: readonly CommentPolicy[] = ['MODERATED', 'AUTO_PUBLISHED', 'CLOSED'];
@@ -279,12 +280,13 @@ function DeleteBlog({ blog }: { blog: BlogSummary }) {
  */
 export function BlogPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const state = usePageState();
   const { blogId } = useParams({ from: '/$shopId/online-store/blogs/$blogId' });
   const query = useAdminQuery<BlogData>(['blog', blogId], BlogQuery, { id: blogId });
 
-  if (!WRITES_PAGES.includes(role)) return <EmptyState title={t('pages.cannot')} />;
+  if (!permits(shop, WRITES_BLOGS)) return <EmptyState title={t('pages.cannot')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {
     return (

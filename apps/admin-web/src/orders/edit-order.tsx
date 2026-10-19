@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { OrderEditChargesMutation, OrderEditLineItemsMutation } from '../api/operations';
 import type { MoneyValue, OrderDetail, OrderEditData, OrderStage } from '../api/types';
+import { permits } from '../auth/permissions';
 import { ProductPicker } from '../drafts/new-draft-page';
 import type { PickedVariant } from '../drafts/new-draft-page';
 import { formatCount, formatMoney } from '../i18n/format';
@@ -410,10 +411,11 @@ function ChargesForm({ order, onDone }: { order: OrderDetail; onDone: (said: str
  */
 export function OrderItems({ order }: { order: OrderDetail }) {
   const { t, locale } = useLocale();
-  const { role, id: shopId } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const [open, setOpen] = useState<'items' | 'charges' | 'merge' | 'split' | null>(null);
   const [done, setDone] = useState<Made | null>(null);
-  const works = WORKS_PARCELS.includes(role);
+  const works = permits(shop, WORKS_PARCELS);
   const editable = works && changeable(order);
   const packed =
     works &&

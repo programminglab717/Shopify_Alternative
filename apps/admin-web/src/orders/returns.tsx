@@ -18,6 +18,7 @@ import type {
   ReturnDetail,
   ReturnReason,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { formatCount, formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -424,10 +425,10 @@ function ReturnItem({
  */
 export function OrderReturns({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const [recording, setRecording] = useState(false);
   const [done, setDone] = useState('');
-  const works = WORKS_PARCELS.includes(role);
+  const works = permits(shop, WORKS_PARCELS);
   const left = returnable(order);
   const canReturn = works && [...left.values()].some((count) => count > 0);
 

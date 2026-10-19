@@ -1,16 +1,10 @@
-import {
-  MFA_REQUIRED_ROLES,
-  SUPPORT_SCOPES,
-  isStaffRole,
-  staffCapabilities,
-  staffScopes,
-  type TenantContext,
-} from '@hatti/api';
+import { MFA_REQUIRED_ROLES, SUPPORT_SCOPES, isStaffRole, type TenantContext } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
 import { toDate, type Db } from '@hatti/db';
 import { isUuid } from '@hatti/ids';
 import { isCurrencyCode } from '@hatti/money';
 import { sql } from 'drizzle-orm';
+import { memberAccess } from './custom-roles.js';
 import { ACCESS_TOKEN_PATTERN } from './identity.service.js';
 
 export type StaffAccessResult =
@@ -85,20 +79,25 @@ export class StaffAccessResolver {
       return { ok: false, reason: 'mfa_required' };
     }
     // A custom role's, within its preset's still; else the preset's.
-    const custom = row.custom_role_id !== null;
+    const { scopes, capabilities } = memberAccess(
+      role,
+      row.custom_role_id === null
+        ? null
+        : { scopes: row.custom_scopes, capabilities: row.custom_capabilities },
+    );
     return {
       ok: true,
       tenant: {
         shopId,
         currency,
-        scopes: new Set(staffScopes(role, custom ? (row.custom_scopes ?? []) : null)),
+        scopes: new Set(scopes),
         actor: {
           kind: 'staff',
           userId: row.user_id,
           sessionId: row.session_id,
           role,
           customRoleId: row.custom_role_id,
-          capabilities: staffCapabilities(role, custom ? (row.custom_capabilities ?? []) : null),
+          capabilities,
           authenticatedAt: toDate(row.authenticated_at),
         },
       },

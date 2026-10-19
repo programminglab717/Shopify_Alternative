@@ -158,8 +158,8 @@ export function ShopsPage() {
                   <Store aria-hidden className="size-5 text-secondary" />
                   <span className="flex flex-1 flex-col">
                     <span className="font-medium">{shop.name}</span>
-                    <span className="text-secondary">
-                      {t(`shops.role.${shop.role}` as MessageKey)}
+                    <span className="text-secondary" dir="auto">
+                      {shop.customRole?.name ?? t(`shops.role.${shop.role}` as MessageKey)}
                     </span>
                   </span>
                   <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />

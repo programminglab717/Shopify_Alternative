@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-579 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-580 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -587,6 +587,7 @@
 | 577 | The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and gives up after three tries with plain words | Accepted |
 | 578 | A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's name is checked by capabilities each preset holds as before | Accepted |
 | 579 | The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations and role changes offer them beside the presets | Accepted |
+| 580 | The admin shows each member what their own scopes and capabilities let them use, a custom role's member no more than it holds | Accepted |
 
 ---
 
@@ -21452,3 +21453,27 @@
   still shown by a member's preset, the core refusing what their role does not allow.
 * **Alternatives:** **One list of every scope:** grouped by area, view and edit read as a shop
   thinks of its work.
+
+## ADR-580 · The admin shows each member what their own scopes and capabilities let them use, a custom role's member no more than it holds
+
+* **Context:** A shop's own roles narrow a preset's scopes and capabilities, and the core checks
+  each request against them (ADR-578), but the admin still showed pages, sections and actions by
+  the member's preset alone (ADR-579). A custom role's member saw what they could not use, and
+  each tap ended in the core's refusal.
+* **Decision:**
+  * **`/auth/me` says what a member holds in each shop:** their scopes and capabilities, as each of
+    their requests resolves them (one `memberAccess` in identity serves both), and the custom role
+    they hold, by its ID and name.
+  * **Gates, not role lists:** each of the admin's gates names the presets whose work it is and
+    what it needs, a scope (a write holding its read, as in the core), a capability, or a test of
+    both. `permits(shop, gate)` asks both: a preset's member passes just as their role did, which a
+    table test proves gate by gate and for the sidebar, and a custom role's member only while they
+    hold what it needs. The sidebar, the phone's bottom bar, settings' sections and the pages'
+    actions all read gates.
+  * **A session the core told only the role**, as one opened before it said more, is let in by
+    the role, the core still refusing what it does not hold.
+* **Consequences:** A custom role's member sees the sections and actions they can use, and no
+  others. Push alerts and the invitation's email still go by preset.
+* **Alternatives:** **Scopes and capabilities alone, without the roles:** a preset's member would
+  see pages their role was never meant to, where a scope is shared across roles' work, such as a
+  packer's `write_orders` opening the Confirmation Desk.

@@ -6,6 +6,7 @@ import {
   SmsSenderWithdrawMutation,
 } from '../api/operations';
 import type { SmsSenderData, SmsSenderRequestData, SmsSenderWithdrawData } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -15,6 +16,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { SETS_SETTINGS } from './settings-page';
 
 /** A name as operators register it (ADR-469): 3 to 11 letters, digits and spaces, a letter too. */
 export function senderNameOf(value: string): string | null {
@@ -34,7 +36,7 @@ export function senderNameOf(value: string): string | null {
  */
 export function SmsSenderCard() {
   const { t, locale } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const timezone = useShopTimezone();
   const query = useAdminQuery<SmsSenderData>(['smsSender'], SmsSenderQuery);
   const ask = useAdminMutation<SmsSenderRequestData, { name: string }>(SmsSenderRequestMutation);
@@ -43,7 +45,7 @@ export function SmsSenderCard() {
   );
   const [typed, setTyped] = useState('');
   const [problems, setProblems] = useState<string[]>([]);
-  const mayAsk = role === 'owner' || role === 'manager';
+  const mayAsk = permits(shop, SETS_SETTINGS);
 
   let body;
   if (query.isPending) body = <Loading label={t('state.loading')} />;

@@ -10,6 +10,7 @@ import type {
   CollectionsData,
   StarterKitApplied,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -53,7 +54,7 @@ export function CollectionsPage() {
   const query = useAdminQuery<CollectionsData>(['collections', searched], CollectionsQuery, {
     query: searched || null,
   });
-  const edits = EDITS_PRODUCTS.includes(shop.role);
+  const edits = permits(shop, EDITS_PRODUCTS);
   const [applied, setApplied] = useState<StarterKitApplied | null>(null);
   // A shop with few collections yet is offered a kit for what it sells (ADR-486).
   const offersKit =
@@ -161,7 +162,7 @@ export function NewCollectionPage() {
   const [any, setAny] = useState(false);
   const [sortOrder, setSortOrder] = useState<CollectionSortOrder>('MANUAL');
 
-  if (!EDITS_PRODUCTS.includes(shop.role)) return <EmptyState title={t('product.cannotEdit')} />;
+  if (!permits(shop, EDITS_PRODUCTS)) return <EmptyState title={t('product.cannotEdit')} />;
 
   const ready = title.trim() !== '' && (!byRules || rulesComplete(rules));
   const onSubmit = async (event: FormEvent) => {

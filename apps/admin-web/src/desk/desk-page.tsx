@@ -30,6 +30,8 @@ import type {
   OrderMutationData,
   OrderPhoneRevealData,
 } from '../api/types';
+import { permits } from '../auth/permissions';
+import { REVEALS_NUMBERS } from '../customers/customers-page';
 import { errorText } from '../i18n/errors';
 import {
   formatCount,
@@ -67,7 +69,8 @@ function DealtOrder({
   onDone: () => void;
 }) {
   const { t, locale } = useLocale();
-  const shopId = useShop().id;
+  const shop = useShop();
+  const shopId = shop.id;
   const { order } = item;
   const reveal = useAdminMutation<OrderPhoneRevealData, { id: string }>(OrderPhoneRevealMutation);
   const confirm = useAdminMutation<OrderMutationData, { id: string }>(OrderConfirmMutation);
@@ -162,7 +165,7 @@ function DealtOrder({
         </span>
         <div className="flex flex-wrap items-center gap-2">
           <span className="num">{phone ? formatPhone(phone) : order.phone}</span>
-          {masked && !revealed && (
+          {masked && !revealed && permits(shop, REVEALS_NUMBERS) && (
             <Button
               variant="tertiary"
               icon={<Eye aria-hidden className="size-5" />}
@@ -363,7 +366,8 @@ function DealtOrder({
  */
 export function DeskPage() {
   const { t, locale } = useLocale();
-  const { id: shopId, role } = useShop();
+  const access = useShop();
+  const shopId = access.id;
   // Asked again every half minute while open: an order that falls due shows at an empty desk.
   const queue = useAdminQuery<ConfirmationQueueData>(
     ['confirmationQueue'],
@@ -410,7 +414,7 @@ export function DeskPage() {
           <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
             {t('desk.title')}
           </h1>
-          {SEES_AGENTS.includes(role) && (
+          {permits(access, SEES_AGENTS) && (
             <Link
               to="/$shopId/desk/agents"
               params={{ shopId }}

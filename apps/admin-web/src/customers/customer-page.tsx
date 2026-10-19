@@ -19,7 +19,7 @@ import type {
   CustomerPhoneRevealData,
   CustomerUpdateData,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -31,13 +31,13 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { useWide } from '../ui/wide';
-import { shownPhone } from './customers-page';
+import { REVEALS_NUMBERS, shownPhone } from './customers-page';
 import { CustomerCare, MarketingConsent } from './care';
 import { READS_CREDIT, StoreCredit } from './store-credit';
 import { SeenAt } from '../offline/seen-at';
 
 /** The roles that change customers and the blocklist (docs/design/02 §6). */
-const EDITS_CUSTOMERS: readonly StaffRole[] = ['owner', 'manager'];
+const EDITS_CUSTOMERS = gate(['owner', 'manager'], 'write_customers');
 
 const REASONS: readonly BlocklistReason[] = [
   'FAKE_ORDERS',
@@ -50,6 +50,7 @@ const REASONS: readonly BlocklistReason[] = [
 /** Their number, a tap from a call or a WhatsApp chat once staff may see it whole. */
 function Contact({ customer }: { customer: CustomerDetail }) {
   const { t } = useLocale();
+  const shop = useShop();
   const reveal = useAdminMutation<CustomerPhoneRevealData, { id: string }>(
     CustomerPhoneRevealMutation,
   );
@@ -78,7 +79,7 @@ function Contact({ customer }: { customer: CustomerDetail }) {
     <FormSection title={t('customer.contact')}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="num">{phone ? shownPhone(phone) : customer.phone}</span>
-        {masked && !revealed && (
+        {masked && !revealed && permits(shop, REVEALS_NUMBERS) && (
           <Button
             variant="tertiary"
             icon={<Eye aria-hidden className="size-5" />}
@@ -419,7 +420,7 @@ export function CustomerPage() {
       </div>
     );
   }
-  const edits = EDITS_CUSTOMERS.includes(shop.role);
+  const edits = permits(shop, EDITS_CUSTOMERS);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-8">
@@ -457,7 +458,7 @@ export function CustomerPage() {
         <div className="flex flex-col gap-4">
           {wide && <Contact customer={customer} />}
           <NoteAndTags customer={customer} edits={edits} />
-          {READS_CREDIT.includes(shop.role) && <StoreCredit customerId={customer.id} />}
+          {permits(shop, READS_CREDIT) && <StoreCredit customerId={customer.id} />}
           {edits && <Blocklist customer={customer} timezone={details.timezone} />}
           {edits && <MarketingConsent customer={customer} />}
           {edits && <CustomerCare customer={customer} />}

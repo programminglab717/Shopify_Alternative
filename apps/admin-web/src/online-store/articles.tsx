@@ -23,6 +23,7 @@ import type {
   ContentMutationData,
   ShopFileData,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDateTime, localInput } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -36,7 +37,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { BodyArea, normalized, useBody } from './body-field';
-import { usePageState, WRITES_PAGES } from './pages';
+import { usePageState, WRITES_BLOGS } from './pages';
 import { ArticleUrduCard } from '../urdu/urdu-pages';
 
 type When = 'now' | 'later' | 'hidden';
@@ -308,10 +309,10 @@ function BackToBlog({ blog }: { blog: { id: string; title: string } }) {
 /** A new article in a blog (OS-07), for those who write the shop's content. */
 export function NewArticlePage() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const { blogId } = useParams({ from: '/$shopId/online-store/blogs/$blogId/articles/new' });
   const query = useAdminQuery<BlogData>(['blog', blogId], BlogQuery, { id: blogId });
-  if (!WRITES_PAGES.includes(role)) return <EmptyState title={t('pages.cannot')} />;
+  if (!permits(shop, WRITES_BLOGS)) return <EmptyState title={t('pages.cannot')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError || !query.data.blog) {
     return <ErrorState message={query.isError ? errorText(query.error, t) : t('blogs.notFound')} />;
@@ -510,12 +511,12 @@ function DeleteArticle({ article }: { article: ArticleDetail }) {
 /** An article of the shop's (OS-07): written and scheduled, its comments moderated, or deleted. */
 export function ArticleEditorPage() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const state = usePageState();
   const { articleId } = useParams({ from: '/$shopId/online-store/articles/$articleId' });
   const query = useAdminQuery<ArticleData>(['article', articleId], ArticleQuery, { id: articleId });
 
-  if (!WRITES_PAGES.includes(role)) return <EmptyState title={t('pages.cannot')} />;
+  if (!permits(shop, WRITES_BLOGS)) return <EmptyState title={t('pages.cannot')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {
     return (

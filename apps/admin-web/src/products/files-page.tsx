@@ -19,6 +19,7 @@ import type {
   ProductsImportData,
   ProductsImportResult,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -414,8 +415,9 @@ function StockCount() {
 /** Products and stock in and out of Hatti by file (CAT-05, ONB-05), for owners and managers. */
 export function ProductFilesPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!EDITS_PRODUCTS.includes(role)) return <EmptyState title={t('files.cannot')} />;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, EDITS_PRODUCTS)) return <EmptyState title={t('files.cannot')} />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       <Link

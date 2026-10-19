@@ -1,6 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import type { StaffRole } from '../auth/session';
+import { gate, permits, type Gate } from '../auth/permissions';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { useShop } from '../shell/shop-context';
@@ -13,7 +13,7 @@ import { GoogleTab } from './google';
 import { LinkPageTab } from './link-page';
 import { EDITS_MENUS, MenusList } from './menus';
 import { MetaTab, SETS_META } from './meta';
-import { PagesList, WRITES_PAGES } from './pages';
+import { PagesList, WRITES_BLOGS, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
 import { RedirectsTab } from './redirects';
 import { SpeedTab } from './speed';
@@ -50,44 +50,49 @@ export function validateOnlineStoreSearch(search: Record<string, unknown>): {
     : {};
 }
 
+/** Those who set the storefront's preferences, filters and link page (`write_settings`). */
+const SETS_STOREFRONT = gate(['owner', 'manager'], 'write_settings');
+
 /** Each tab, who works in it, and what it shows. */
-const TABS: Record<
-  OnlineStoreTab,
-  { label: MessageKey; roles: readonly StaffRole[]; body: () => ReactNode }
-> = {
-  pages: { label: 'onlineStore.pages', roles: WRITES_PAGES, body: () => <PagesList /> },
-  blogs: { label: 'onlineStore.blogs', roles: WRITES_PAGES, body: () => <BlogsList /> },
-  menus: { label: 'onlineStore.menus', roles: EDITS_MENUS, body: () => <MenusList /> },
+const TABS: Record<OnlineStoreTab, { label: MessageKey; gate: Gate; body: () => ReactNode }> = {
+  pages: { label: 'onlineStore.pages', gate: WRITES_PAGES, body: () => <PagesList /> },
+  blogs: { label: 'onlineStore.blogs', gate: WRITES_BLOGS, body: () => <BlogsList /> },
+  menus: { label: 'onlineStore.menus', gate: EDITS_MENUS, body: () => <MenusList /> },
   policies: {
     label: 'onlineStore.policies',
-    roles: SETS_POLICIES,
+    gate: SETS_POLICIES,
     body: () => <PoliciesList />,
   },
   storefront: {
     label: 'onlineStore.storefront',
-    roles: EDITS_MENUS,
+    gate: SETS_STOREFRONT,
     body: () => <StorefrontPreferencesTab />,
   },
-  filters: { label: 'onlineStore.filters', roles: EDITS_MENUS, body: () => <FiltersTab /> },
-  themes: { label: 'onlineStore.themes', roles: EDITS_THEMES, body: () => <ThemesTab /> },
+  filters: { label: 'onlineStore.filters', gate: SETS_STOREFRONT, body: () => <FiltersTab /> },
+  themes: { label: 'onlineStore.themes', gate: EDITS_THEMES, body: () => <ThemesTab /> },
   builder: {
     label: 'onlineStore.builder',
-    roles: EDITS_THEMES,
+    gate: EDITS_THEMES,
     body: () => <StoreBuilderTab />,
   },
-  speed: { label: 'onlineStore.speed', roles: EDITS_THEMES, body: () => <SpeedTab /> },
-  redirects: { label: 'onlineStore.redirects', roles: EDITS_MENUS, body: () => <RedirectsTab /> },
-  links: { label: 'onlineStore.linkPage', roles: EDITS_MENUS, body: () => <LinkPageTab /> },
-  meta: { label: 'onlineStore.meta', roles: SETS_META, body: () => <MetaTab /> },
-  tiktok: { label: 'onlineStore.tiktok', roles: SETS_META, body: () => <TikTokTab /> },
-  google: { label: 'onlineStore.google', roles: SETS_META, body: () => <GoogleTab /> },
-  urdu: { label: 'onlineStore.urdu', roles: WRITES_URDU, body: () => <UrduOverview /> },
+  speed: {
+    label: 'onlineStore.speed',
+    gate: gate(EDITS_THEMES.roles, 'read_themes'),
+    body: () => <SpeedTab />,
+  },
+  redirects: { label: 'onlineStore.redirects', gate: EDITS_MENUS, body: () => <RedirectsTab /> },
+  links: { label: 'onlineStore.linkPage', gate: SETS_STOREFRONT, body: () => <LinkPageTab /> },
+  meta: { label: 'onlineStore.meta', gate: SETS_META, body: () => <MetaTab /> },
+  tiktok: { label: 'onlineStore.tiktok', gate: SETS_META, body: () => <TikTokTab /> },
+  google: { label: 'onlineStore.google', gate: SETS_META, body: () => <GoogleTab /> },
+  urdu: { label: 'onlineStore.urdu', gate: WRITES_URDU, body: () => <UrduOverview /> },
 };
 
-/** The roles that see the online store at all: those who work in any of its tabs. */
-export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
-  ...new Set([...WRITES_PAGES, ...EDITS_MENUS, ...EDITS_THEMES, ...SETS_META, ...WRITES_URDU]),
-];
+/** Those who see the online store at all: those who work in any of its tabs. */
+export const OPENS_ONLINE_STORE = gate(
+  [...new Set(ONLINE_STORE_TABS.flatMap((tab) => TABS[tab].gate.roles))],
+  (shop) => ONLINE_STORE_TABS.some((tab) => permits(shop, TABS[tab].gate)),
+);
 
 /**
  * The online store (OS-02, OS-06, OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies,
@@ -101,7 +106,7 @@ export function OnlineStorePage() {
   const shop = useShop();
   const navigate = useNavigate();
   const search = useSearch({ from: '/$shopId/online-store' });
-  const tabs = ONLINE_STORE_TABS.filter((tab) => TABS[tab].roles.includes(shop.role));
+  const tabs = ONLINE_STORE_TABS.filter((tab) => permits(shop, TABS[tab].gate));
   if (tabs.length === 0) return <EmptyState title={t('pages.cannot')} />;
   const tab = search.tab && tabs.includes(search.tab) ? search.tab : tabs[0]!;
 

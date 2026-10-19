@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### The admin by a member's own permissions
+
+* **The admin shows each member what their own scopes and capabilities let them use, a custom
+  role's member no more than it holds** ([ADR-580](../architecture/13-decision-log.md#adr-580--the-admin-shows-each-member-what-their-own-scopes-and-capabilities-let-them-use-a-custom-roles-member-no-more-than-it-holds), ADM-01).
+* 3616 tests, 7 more: gates read as the core reads scopes, each preset
+  shown what it was before, the sidebar, settings, staff and exports narrowed for a custom role,
+  and `/auth/me` saying what each member holds.
+
 ### 693a87b · The Roles tab
 
 * **The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations

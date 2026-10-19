@@ -8,6 +8,7 @@ import {
   ReturningParcelsQuery,
 } from '../api/operations';
 import type { ParcelCheckInData, ParcelUserErrorsData, ReturningParcelsData } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -91,13 +92,13 @@ function CheckIn() {
 
 function ComingBack() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const query = useAdminQuery<ReturningParcelsData>(['returningParcels'], ReturningParcelsQuery);
   const checkIn = useAdminMutation<ParcelCheckInData, { id: string }>(ParcelCheckInMutation);
   const markLost = useAdminMutation<ParcelUserErrorsData, { id: string }>(ParcelMarkLostMutation);
   const [losing, setLosing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const works = CHECKS_IN.includes(role);
+  const works = permits(shop, CHECKS_IN);
 
   const act = async (run: () => Promise<{ userErrors: { message: string }[] }>) => {
     setProblem(null);
@@ -213,10 +214,11 @@ function ComingBack() {
  */
 export function ReturnsPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const navigate = useNavigate();
   const tab: ReturnsTab = useSearch({ from: '/$shopId/returns' }).tab ?? 'back';
-  const tabs = RETURNS_TABS.filter((each) => each !== 'claims' || CLAIMS.includes(role));
+  const tabs = RETURNS_TABS.filter((each) => each !== 'claims' || permits(shop, CLAIMS));
   const showing = tabs.includes(tab) ? tab : 'back';
 
   return (

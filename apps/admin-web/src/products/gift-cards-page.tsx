@@ -26,7 +26,7 @@ import type {
   GiftCardPayloadData,
   GiftCardsData,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -40,15 +40,13 @@ import { TextField } from '../ui/field';
 import { FormSection, parsePrice } from './product-form';
 
 /** Those who look gift cards up, as the core lets them read them (ADR-448). */
-export const READS_GIFT_CARDS: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'accountant',
-  'confirmation_agent',
-];
+export const READS_GIFT_CARDS = gate(
+  ['owner', 'manager', 'accountant', 'confirmation_agent'],
+  'read_gift_cards',
+);
 
 /** Those who issue, change and deactivate them: owners and managers. */
-const EDITS_GIFT_CARDS: readonly StaffRole[] = ['owner', 'manager'];
+const EDITS_GIFT_CARDS = gate(['owner', 'manager'], 'write_gift_cards');
 
 type CardState = 'ACTIVE' | 'USED_UP' | 'EXPIRED' | 'DEACTIVATED';
 
@@ -351,7 +349,7 @@ export function GiftCardsPage() {
   const cards = useAdminQuery<GiftCardsData>(['giftCards', query], GiftCardsQuery, {
     query: query || null,
   });
-  const edits = EDITS_GIFT_CARDS.includes(shop.role);
+  const edits = permits(shop, EDITS_GIFT_CARDS);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">

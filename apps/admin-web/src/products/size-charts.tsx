@@ -25,6 +25,7 @@ import type {
   SizeChartUpdateData,
   UserError,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -156,7 +157,7 @@ export function SizeChartsPage() {
   const { t } = useLocale();
   const shop = useShop();
   const query = useAdminQuery<SizeChartsData>(['sizeCharts'], SizeChartsQuery);
-  const edits = EDITS_PRODUCTS.includes(shop.role);
+  const edits = permits(shop, EDITS_PRODUCTS);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
@@ -258,7 +259,7 @@ function ChartForm({ chart }: { chart: SizeChart | null }) {
   const { t } = useLocale();
   const shop = useShop();
   const navigate = useNavigate();
-  const edits = EDITS_PRODUCTS.includes(shop.role);
+  const edits = permits(shop, EDITS_PRODUCTS);
   const create = useAdminMutation<SizeChartCreateData, { input: SizeChartInput }>(
     SizeChartCreateMutation,
   );

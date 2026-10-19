@@ -6,6 +6,7 @@ import type {
   InventoryReportRowValue,
   InventoryReportSortKey,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -72,7 +73,7 @@ export function StockReport({ days }: { days: Days }) {
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) return <ErrorState message={errorText(query.error, t)} />;
   const report = query.data.inventoryReport;
-  const worth = SEES_STOCK_WORTH.includes(shop.role);
+  const worth = permits(shop, SEES_STOCK_WORTH);
 
   return (
     <FormSection title={t('stockReport.title')} hint={t('stockReport.hint')}>

@@ -9,7 +9,7 @@ import type {
   ConversationValue,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { shownPhone } from '../customers/customers-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatRelative } from '../i18n/format';
@@ -22,15 +22,13 @@ import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 const PAGE = 50;
 
 /** The roles that read the shop's WhatsApp conversations; packers and accountants see none. */
-export const READS_INBOX: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'confirmation_agent',
-  'marketer',
-];
+export const READS_INBOX = gate(
+  ['owner', 'manager', 'confirmation_agent', 'marketer'],
+  'read_conversations',
+);
 
 /** Those who answer customers, mark conversations read and close them; marketers only read. */
-export const WORKS_INBOX: readonly StaffRole[] = ['owner', 'manager', 'confirmation_agent'];
+export const WORKS_INBOX = gate(['owner', 'manager', 'confirmation_agent'], 'write_conversations');
 
 type InboxTab = 'open' | 'unread' | 'closed';
 

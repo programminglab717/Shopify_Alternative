@@ -10,7 +10,7 @@ import type {
   SegmentsData,
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -22,7 +22,7 @@ import { Button } from '../ui/button';
 import { Alert, EmptyState } from '../ui/feedback';
 
 /** Those who take customers in and out of Hatti: owners and managers (CUS-07). */
-export const MOVES_CUSTOMERS: readonly StaffRole[] = ['owner', 'manager'];
+export const MOVES_CUSTOMERS = gate(['owner', 'manager'], 'write_customers');
 
 /** A file the browser saves, as an export does. */
 function save(csv: string, name: string) {
@@ -236,8 +236,9 @@ function ImportCustomers() {
 /** Customers in and out of Hatti (CUS-07): exported as CSV, and imported from one. */
 export function CustomersTransferPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!MOVES_CUSTOMERS.includes(role)) return <EmptyState title={t('moving.cannot')} />;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, MOVES_CUSTOMERS)) return <EmptyState title={t('moving.cannot')} />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       <Link

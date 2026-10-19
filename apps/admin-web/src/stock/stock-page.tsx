@@ -30,7 +30,7 @@ import type {
   StockSearchData,
   UserError,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { can, gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -49,10 +49,13 @@ import { StockCount } from './stock-count';
 import { StockChanges } from './stock-changes';
 
 /** Those who change stock, as the core lets them (`write_inventory`); every role sees it. */
-export const EDITS_STOCK: readonly StaffRole[] = ['owner', 'manager'];
+export const EDITS_STOCK = gate(['owner', 'manager'], 'write_inventory');
 
 /** Those who see what the stock cost the shop, as they see its profit. */
-export const SEES_STOCK_WORTH: readonly StaffRole[] = ['owner', 'manager'];
+export const SEES_STOCK_WORTH = gate(
+  ['owner', 'manager'],
+  (shop) => can(shop, 'read_inventory') && can(shop, 'read_products'),
+);
 
 /** What the stock on hand is worth at cost, in all and at each location (ADR-369). */
 function StockWorth() {
@@ -408,9 +411,9 @@ function CountForm({
 
 function Level({ itemId, level }: { itemId: string; level: StockLevel }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const [open, setOpen] = useState<'adjust' | 'count' | 'move' | null>(null);
-  const edits = EDITS_STOCK.includes(role);
+  const edits = permits(shop, EDITS_STOCK);
   const figures: [MessageKey, number][] = [
     ['stock.onHand', level.onHand],
     ['stock.committed', level.committed],
@@ -475,7 +478,7 @@ function Level({ itemId, level }: { itemId: string; level: StockLevel }) {
 /** A variant's stock at each location, changed by those who may, and its history. */
 function StockItem({ itemId }: { itemId: string }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const word = useWord();
   const [counting, setCounting] = useState(false);
   const query = useAdminQuery<InventoryItemData>(['inventoryItem', itemId], InventoryItemQuery, {
@@ -492,7 +495,7 @@ function StockItem({ itemId }: { itemId: string }) {
       {item.inventoryLevels.length === 0 ? (
         <div className="flex flex-col gap-2">
           <p className="text-secondary">{t('stock.notCounted')}</p>
-          {EDITS_STOCK.includes(role) &&
+          {permits(shop, EDITS_STOCK) &&
             primary &&
             (counting ? (
               <CountForm
@@ -634,7 +637,7 @@ const variantTitle = (product: string, variant: string) =>
 /** What the shop calls low, changed by those who change stock. */
 function Threshold({ threshold }: { threshold: number }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const update = useAdminMutation<Mutated, { input: { lowStockThreshold: number } }>(
     InventorySettingsUpdateMutation,
   );
@@ -658,7 +661,7 @@ function Threshold({ threshold }: { threshold: number }) {
     return (
       <p className="flex flex-wrap items-center gap-x-2 text-secondary">
         {t('stock.threshold', { count: formatCount(threshold) })}
-        {EDITS_STOCK.includes(role) && (
+        {permits(shop, EDITS_STOCK) && (
           <Button
             variant="tertiary"
             onClick={() => {
@@ -808,7 +811,8 @@ function FindStock() {
  */
 export function StockPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const navigate = useNavigate();
   // What runs low where the branch is, as its orders are (ADR-359); none chosen, for sale online.
   const where = useOrdersLocation(undefined);
@@ -819,7 +823,7 @@ export function StockPage() {
     { enabled: where.ready },
   );
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
-  const edits = EDITS_STOCK.includes(role);
+  const edits = permits(shop, EDITS_STOCK);
   const low = query.data?.inventoryLowStock.nodes ?? [];
   const choose = (variantId: string, on: boolean) =>
     setChosen((now) => {
@@ -852,7 +856,7 @@ export function StockPage() {
             <ArrowLeftRight aria-hidden className="size-5" />
             {t('transfers.title')}
           </Link>
-          {EDITS_STOCK.includes(role) && (
+          {permits(shop, EDITS_STOCK) && (
             <Link
               to="/$shopId/products/files"
               params={{ shopId }}
@@ -864,7 +868,7 @@ export function StockPage() {
           )}
         </div>
       </div>
-      {SEES_STOCK_WORTH.includes(role) && <StockWorth />}
+      {permits(shop, SEES_STOCK_WORTH) && <StockWorth />}
       {!where.ready || query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (

@@ -5,7 +5,8 @@ import { vi } from 'vitest';
 import { browserFetch } from './api/client';
 import { SessionProvider } from './auth/context';
 import { SessionStore } from './auth/session';
-import type { StaffRole } from './auth/session';
+import type { AccessScope, StaffCapability } from './auth/permissions';
+import type { ShopAccess, StaffRole } from './auth/session';
 import { LocaleProvider } from './i18n/locale';
 import { createAdminRouter } from './router';
 
@@ -13,6 +14,113 @@ import { createAdminRouter } from './router';
 // each GraphQL operation by its name, and the admin rendered at a path.
 
 export const LATER = new Date(Date.now() + 3_600_000).toISOString();
+
+const EDIT_CATALOG: readonly AccessScope[] = [
+  'write_products',
+  'write_inventory',
+  'write_locations',
+];
+const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory', 'read_locations'];
+const RUNS_SHOP: readonly AccessScope[] = [
+  ...EDIT_CATALOG,
+  'write_orders',
+  'write_customers',
+  'write_segments',
+  'write_settings',
+  'write_themes',
+  'write_online_store_navigation',
+  'write_online_store_pages',
+  'write_content',
+  'write_domains',
+  'write_legal_policies',
+  'write_translations',
+  'write_discounts',
+  'write_files',
+  'write_pixels',
+  'write_marketing_events',
+  'read_store_credit_accounts',
+  'write_store_credit_account_transactions',
+  'write_gift_cards',
+  'write_conversations',
+];
+
+/** Each preset's scopes, as the core's (`ROLE_SCOPES` in @hatti/api) are. */
+export const PRESET_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
+  owner: RUNS_SHOP,
+  manager: RUNS_SHOP,
+  confirmation_agent: [
+    ...VIEW_CATALOG,
+    'write_orders',
+    'read_customers',
+    'read_store_credit_accounts',
+    'read_gift_cards',
+    'write_conversations',
+  ],
+  packer: [...VIEW_CATALOG, 'write_orders'],
+  marketer: [
+    ...VIEW_CATALOG,
+    'read_orders',
+    'read_customers',
+    'write_segments',
+    'write_online_store_pages',
+    'write_content',
+    'write_translations',
+    'write_discounts',
+    'write_files',
+    'write_pixels',
+    'write_marketing_events',
+    'read_conversations',
+  ],
+  accountant: [
+    ...VIEW_CATALOG,
+    'read_orders',
+    'read_store_credit_accounts',
+    'read_store_credit_account_transactions',
+    'read_gift_cards',
+  ],
+};
+
+/** Every capability, in the core's order (`STAFF_CAPABILITIES` in @hatti/api). */
+export const CAPABILITIES: readonly StaffCapability[] = [
+  'see_customer_numbers',
+  'reveal_customer_numbers',
+  'export_orders',
+  'manage_export_schedules',
+  'refund_orders',
+  'assign_orders',
+  'moderate_comments',
+  'see_staff_performance',
+  'reconcile_payments',
+  'claim_from_couriers',
+  'manage_staff',
+  'manage_apps',
+  'see_billing',
+  'see_verification',
+  'manage_support_access',
+];
+
+/** Each preset's capabilities, as the core's (`PRESET_CAPABILITIES`) are. */
+export const PRESET_CAPABILITIES: Readonly<Record<StaffRole, readonly StaffCapability[]>> = {
+  owner: CAPABILITIES,
+  manager: CAPABILITIES,
+  confirmation_agent: ['reveal_customer_numbers'],
+  packer: [],
+  marketer: [],
+  accountant: ['export_orders', 'reconcile_payments', 'claim_from_couriers'],
+};
+
+/** A preset's member's access to `shop_1`, as `/auth/me` gives it (ADR-580). */
+export function presetAccess(role: StaffRole): ShopAccess {
+  return {
+    id: 'shop_1',
+    name: 'Zari',
+    role,
+    mfaRequired: false,
+    scopes: [...PRESET_SCOPES[role]],
+    capabilities: [...PRESET_CAPABILITIES[role]],
+    customRole: null,
+  };
+}
 
 /** A session kept as a reload finds it: signed in, the second step proved. */
 export function signedIn(): void {
@@ -49,16 +157,20 @@ export interface Sent {
 }
 
 /**
- * A fake core: `/auth/me` puts the member in `shop_1` with `role`, and each Admin API request is
- * answered by `answer` with its operation's name and variables, and kept in `sent`.
+ * A fake core: `/auth/me` puts the member in `shop_1` with `role`, its preset's scopes and
+ * capabilities or `account.shop`'s, and each Admin API request is answered by `answer` with its
+ * operation's name and variables, and kept in `sent`.
  */
 export function fakeCore(
   role: StaffRole,
   answer: (operation: string, variables: Record<string, unknown>) => unknown,
   /** `/auth` paths other than `/auth/me`, answered by `auth`; a status of its own where given. */
   auth: (path: string, body: unknown, method: string) => unknown = () => ({}),
-  /** Laid over `/auth/me`'s account: its user's details, its Google account. */
-  account: { user?: object; google?: object | null } = {},
+  /**
+   * Laid over `/auth/me`'s account: its user's details, its Google account, and its access to
+   * `shop_1`, as a custom role's member's (ADR-578).
+   */
+  account: { user?: object; google?: object | null; shop?: Partial<ShopAccess> } = {},
 ) {
   const sent: Sent[] = [];
   /** Files put to storage's signed URLs, as a browser uploads them. */
@@ -80,10 +192,11 @@ export function fakeCore(
     }
     const method = init?.method ?? 'GET';
     if (path === '/auth/me') {
+      const { shop, ...rest } = account;
       return json({
         session: { id: 'ses_1', mfaVerified: true },
-        shops: [{ id: 'shop_1', name: 'Zari', role, mfaRequired: false }],
-        ...account,
+        shops: [{ ...presetAccess(role), ...shop }],
+        ...rest,
         user: { id: 'usr_1', name: 'Sana', language: 'en', ...account.user },
       });
     }

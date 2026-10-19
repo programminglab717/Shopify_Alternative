@@ -18,6 +18,7 @@ import type {
   ProductUpdateData,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -82,7 +83,7 @@ export function SnapProductPage() {
   const [step, setStep] = useState<Step | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
 
-  if (!EDITS_PRODUCTS.includes(shop.role)) return <EmptyState title={t('product.cannotEdit')} />;
+  if (!permits(shop, EDITS_PRODUCTS)) return <EmptyState title={t('product.cannotEdit')} />;
   const ai = drafting.data?.productCopyDrafting;
   const aiReady = Boolean(ai?.available && ai.usedToday < ai.limitPerDay && ai.creditsLeft !== 0);
 

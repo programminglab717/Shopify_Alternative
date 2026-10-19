@@ -13,7 +13,7 @@ import type {
   BlocklistRemoveData,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -27,7 +27,7 @@ import { TextField } from '../ui/field';
 import { shownPhone } from './customers-page';
 
 /** Who keeps the shop's blocked numbers, as they block a customer from their page. */
-export const KEEPS_BLOCKLIST: readonly StaffRole[] = ['owner', 'manager'];
+export const KEEPS_BLOCKLIST = gate(['owner', 'manager'], 'write_customers');
 
 const REASONS: readonly BlocklistReason[] = [
   'FAKE_ORDERS',
@@ -261,7 +261,7 @@ function Numbers({ search, onSaid }: { search: string; onSaid: (said: string) =>
 export function BlockedPage() {
   const { t } = useLocale();
   const shop = useShop();
-  const allowed = KEEPS_BLOCKLIST.includes(shop.role);
+  const allowed = permits(shop, KEEPS_BLOCKLIST);
   const [words, setWords] = useState('');
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);

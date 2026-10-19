@@ -10,7 +10,7 @@ import {
   PageUpdateMutation,
 } from '../api/operations';
 import type { PageData, PageMutationData, PagesData, PageSummary } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -25,7 +25,10 @@ import { PageUrduCard } from '../urdu/urdu-pages';
 import { BodyArea, normalized, useBody } from './body-field';
 
 /** Those who write the shop's pages, which are content: marketers too (ADR-176). */
-export const WRITES_PAGES: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+export const WRITES_PAGES = gate(['owner', 'manager', 'marketer'], 'write_online_store_pages');
+
+/** Those who write its blogs and their articles, likewise (`write_content`). */
+export const WRITES_BLOGS = gate(['owner', 'manager', 'marketer'], 'write_content');
 
 /**
  * Whether a page or article shows on the storefront now, waits for its date, or is hidden. The
@@ -227,8 +230,8 @@ function PageForm({ page }: { page?: NonNullable<PageData['page']> }) {
 /** A new page (OS-07), for those who write the shop's content. */
 export function NewPagePage() {
   const { t } = useLocale();
-  const { role } = useShop();
-  if (!WRITES_PAGES.includes(role)) return <EmptyState title={t('pages.cannot')} />;
+  const shop = useShop();
+  if (!permits(shop, WRITES_PAGES)) return <EmptyState title={t('pages.cannot')} />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       <BackToPages />
@@ -296,12 +299,12 @@ function DeletePage({ page }: { page: PageSummary }) {
 /** A page of the shop's (OS-07): its title, body and whether it shows, changed or deleted. */
 export function PageEditorPage() {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   const state = usePageState();
   const { pageId } = useParams({ from: '/$shopId/online-store/pages/$pageId' });
   const query = useAdminQuery<PageData>(['page', pageId], PageQuery, { id: pageId });
 
-  if (!WRITES_PAGES.includes(role)) return <EmptyState title={t('pages.cannot')} />;
+  if (!permits(shop, WRITES_PAGES)) return <EmptyState title={t('pages.cannot')} />;
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) {
     return (

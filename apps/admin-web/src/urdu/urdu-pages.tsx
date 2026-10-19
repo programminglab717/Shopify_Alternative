@@ -19,7 +19,7 @@ import type {
   ProductData,
   ProductDetail,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { can, gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
@@ -88,7 +88,13 @@ const homeInUrdu = (shopId: string, t: Translate): UrduSection[] => [
 ];
 
 /** Those who change menus and the storefront's preferences, and write its Urdu. */
-const MENUS_IN_URDU: readonly StaffRole[] = ['owner', 'manager'];
+const MENUS_IN_URDU = gate(
+  ['owner', 'manager'],
+  (shop) =>
+    can(shop, 'write_translations') &&
+    can(shop, 'read_online_store_navigation') &&
+    can(shop, 'read_settings'),
+);
 
 const BACK =
   'inline-flex min-h-10 max-w-full items-center gap-1 self-start text-secondary hover:text-text';
@@ -107,7 +113,7 @@ function UrduPage({
   sections: readonly UrduSection[];
 }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const shop = useShop();
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       {back}
@@ -117,7 +123,7 @@ function UrduPage({
         </h1>
         <p className="text-secondary">{t('urdu.intro')}</p>
       </div>
-      {WRITES_URDU.includes(role) ? (
+      {permits(shop, WRITES_URDU) ? (
         <UrduWords sections={sections} />
       ) : (
         <EmptyState title={t('urdu.cannot')} />
@@ -230,8 +236,9 @@ export function PageUrduPage() {
 /** How much of a product is in Urdu, on its page, and the way to its Urdu. */
 export function ProductUrduCard({ product }: { product: ProductDetail }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!WRITES_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, WRITES_URDU)) return null;
   return (
     <UrduSummary
       sections={productInUrdu(product, t)}
@@ -251,8 +258,9 @@ export function ProductUrduCard({ product }: { product: ProductDetail }) {
 /** How much of a collection is in Urdu, on its page, and the way to its Urdu. */
 export function CollectionUrduCard({ collectionId }: { collectionId: string }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!WRITES_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, WRITES_URDU)) return null;
   return (
     <UrduSummary
       sections={collectionInUrdu(collectionId, t)}
@@ -272,8 +280,9 @@ export function CollectionUrduCard({ collectionId }: { collectionId: string }) {
 /** How much of a page is in Urdu, on its page, and the way to its Urdu. */
 export function PageUrduCard({ pageId }: { pageId: string }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!WRITES_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, WRITES_URDU)) return null;
   return (
     <UrduSummary
       sections={pageInUrdu(pageId, t)}
@@ -347,9 +356,10 @@ export function ArticleUrduPage() {
 /** A menu's title and each of its links in Urdu; owners and managers, who change menus. */
 export function MenuUrduPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const { menuId } = useParams({ from: '/$shopId/online-store/menus/$menuId/urdu' });
-  const allowed = MENUS_IN_URDU.includes(role);
+  const allowed = permits(shop, MENUS_IN_URDU);
   const query = useAdminQuery<MenusData>(['menus'], MenusQuery, {}, { enabled: allowed });
   if (!allowed) return <EmptyState title={t('menus.cannot')} />;
   const menu = query.data?.menus.nodes.find((each) => each.id === menuId);
@@ -396,8 +406,9 @@ export function HomeUrduPage() {
 /** How much of a blog is in Urdu, on its page, and the way to its Urdu. */
 export function BlogUrduCard({ blogId }: { blogId: string }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!WRITES_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, WRITES_URDU)) return null;
   return (
     <UrduSummary
       sections={blogInUrdu(blogId, t)}
@@ -417,8 +428,9 @@ export function BlogUrduCard({ blogId }: { blogId: string }) {
 /** How much of an article is in Urdu, on its page, and the way to its Urdu. */
 export function ArticleUrduCard({ articleId }: { articleId: string }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!WRITES_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, WRITES_URDU)) return null;
   return (
     <UrduSummary
       sections={articleInUrdu(articleId, t)}
@@ -438,8 +450,9 @@ export function ArticleUrduCard({ articleId }: { articleId: string }) {
 /** How much of a menu is in Urdu, on its page, and the way to its Urdu. */
 export function MenuUrduCard({ menu }: { menu: { id: string; items: readonly MenuLink[] } }) {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!MENUS_IN_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, MENUS_IN_URDU)) return null;
   return (
     <UrduSummary
       sections={menuInUrdu(menu, t)}
@@ -459,8 +472,9 @@ export function MenuUrduCard({ menu }: { menu: { id: string; items: readonly Men
 /** How much of the home page's words are in Urdu, beside them, and the way to their Urdu. */
 export function HomeUrduCard() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
-  if (!MENUS_IN_URDU.includes(role)) return null;
+  const shop = useShop();
+  const shopId = shop.id;
+  if (!permits(shop, MENUS_IN_URDU)) return null;
   return (
     <UrduSummary
       sections={homeInUrdu(shopId, t)}

@@ -4,6 +4,8 @@ import {
   MFA_REQUIRED_ROLES,
   REAUTHENTICATION_WINDOW_MS,
   isStaffRole,
+  type AccessScope,
+  type StaffCapability,
   type StaffRole,
 } from '@hatti/api';
 import {
@@ -54,6 +56,7 @@ import {
   type AccountEmailLanguage,
   type AccountEmailSender,
 } from './account-emails.js';
+import { memberAccess } from './custom-roles.js';
 import {
   liftSuppression,
   suppressed,
@@ -91,6 +94,7 @@ import {
 } from './phone-codes.js';
 import {
   authEvents,
+  customRoles,
   emailTokens,
   googleAccounts,
   googleNonces,
@@ -365,6 +369,17 @@ export interface ShopAccess {
   role: StaffRole;
   /** The role needs two-step verification before it can use the shop. */
   mfaRequired: boolean;
+}
+
+/**
+ * A shop the user works in, with what they may do there (ADR-580): their scopes and capabilities,
+ * their custom role's where they hold one (ADR-578), as each of their requests resolves them, so
+ * that the admin shows them what they can use.
+ */
+export interface MemberShop extends ShopAccess {
+  scopes: AccessScope[];
+  capabilities: StaffCapability[];
+  customRole: { id: string; name: string } | null;
 }
 
 /** A shop the user just opened, with the handle its storefront took. */
@@ -2318,7 +2333,7 @@ export class IdentityService {
   async me(auth: AuthenticatedSession): Promise<{
     user: UserProfile;
     session: SessionSummary;
-    shops: ShopAccess[];
+    shops: MemberShop[];
     /** The Google account that signs them in, where one is connected (ADR-164). */
     google: GoogleConnection | null;
   }> {
@@ -2328,9 +2343,24 @@ export class IdentityService {
       .from(googleAccounts)
       .where(eq(googleAccounts.userId, auth.userId));
     const rows = await this.db
-      .select({ shopId: memberships.shopId, role: memberships.role, name: shops.name })
+      .select({
+        shopId: memberships.shopId,
+        role: memberships.role,
+        name: shops.name,
+        customRoleId: customRoles.id,
+        customRoleName: customRoles.name,
+        customScopes: customRoles.scopes,
+        customCapabilities: customRoles.capabilities,
+      })
       .from(memberships)
       .innerJoin(shops, and(eq(shops.id, memberships.shopId), eq(shops.status, 'active')))
+      .leftJoin(
+        customRoles,
+        and(
+          eq(customRoles.shopId, memberships.shopId),
+          eq(customRoles.id, memberships.customRoleId),
+        ),
+      )
       .where(
         and(
           eq(memberships.userId, auth.userId),
@@ -2347,18 +2377,29 @@ export class IdentityService {
         mfaVerified: auth.mfaVerified,
         authenticatedAt: auth.authenticatedAt,
       },
-      shops: rows.flatMap((row) =>
-        isStaffRole(row.role)
-          ? [
-              {
-                id: toPublicId('shop', row.shopId),
-                name: row.name,
-                role: row.role,
-                mfaRequired: MFA_REQUIRED_ROLES.has(row.role),
-              },
-            ]
-          : [],
-      ),
+      shops: rows.flatMap((row): MemberShop[] => {
+        if (!isStaffRole(row.role)) return [];
+        // As each of their requests resolves it: their custom role's, else their preset's.
+        const custom =
+          row.customRoleId === null
+            ? null
+            : { scopes: row.customScopes, capabilities: row.customCapabilities };
+        const { scopes, capabilities } = memberAccess(row.role, custom);
+        return [
+          {
+            id: toPublicId('shop', row.shopId),
+            name: row.name,
+            role: row.role,
+            mfaRequired: MFA_REQUIRED_ROLES.has(row.role),
+            scopes,
+            capabilities: [...capabilities],
+            customRole:
+              row.customRoleId === null || row.customRoleName === null
+                ? null
+                : { id: toPublicId('customRole', row.customRoleId), name: row.customRoleName },
+          },
+        ];
+      }),
       google: google ?? null,
     };
   }

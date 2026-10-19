@@ -21,7 +21,7 @@ import type {
   PaymentLinkUpdateData,
   PaymentLinkValue,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { ProductPicker } from '../drafts/new-draft-page';
 import { errorText } from '../i18n/errors';
 import { endOfDayIn, formatCount, formatDate, formatMoney } from '../i18n/format';
@@ -36,7 +36,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
 /** Those who make and close payment links (PAY-04): owners and managers, as they sell. */
-export const MAKES_PAYMENT_LINKS: readonly StaffRole[] = ['owner', 'manager'];
+export const MAKES_PAYMENT_LINKS = gate(['owner', 'manager'], 'write_orders');
 
 /** A link's items at most, as the core takes them. */
 const MOST_ITEMS = 20;
@@ -360,8 +360,8 @@ function LinkRow({ link, edits }: { link: PaymentLinkValue; edits: boolean }) {
  */
 export function PaymentLinksPage() {
   const { t } = useLocale();
-  const { role } = useShop();
-  const edits = MAKES_PAYMENT_LINKS.includes(role);
+  const shop = useShop();
+  const edits = permits(shop, MAKES_PAYMENT_LINKS);
   const query = useAdminQuery<PaymentLinksData>(['paymentLinks'], PaymentLinksQuery, undefined, {
     enabled: edits,
   });

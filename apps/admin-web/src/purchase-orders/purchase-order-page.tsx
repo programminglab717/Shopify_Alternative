@@ -17,6 +17,7 @@ import type {
   UserError,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -473,7 +474,8 @@ function Close({ order }: { order: PurchaseOrder }) {
 /** A purchase order: its supplier, where the goods go, and each line, how much came of it. */
 export function PurchaseOrderPage() {
   const { t } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const day = useDay();
   const [editing, setEditing] = useState(false);
   const { purchaseOrderId } = useParams({ from: '/$shopId/purchase-orders/$purchaseOrderId' });
@@ -505,7 +507,7 @@ export function PurchaseOrderPage() {
       </div>
     );
   }
-  const edits = EDITS_STOCK.includes(role) && order.status === 'OPEN';
+  const edits = permits(shop, EDITS_STOCK) && order.status === 'OPEN';
   if (editing && edits) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-4">

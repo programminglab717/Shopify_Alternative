@@ -20,7 +20,7 @@ import type {
 } from '../api/types';
 import { useMe } from '../auth/context';
 import { useRecentAuthentication } from '../auth/confirm-identity';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatDateTime, startOfDayIn } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -35,7 +35,7 @@ import type { OrdersSearch } from './orders-page';
 import { STAGES } from './stage';
 
 /** Those who take the shop's orders out as files (ORD-11): owners, managers and accountants. */
-export const EXPORTS_ORDERS: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
+export const EXPORTS_ORDERS = gate(['owner', 'manager', 'accountant'], 'export_orders');
 
 const FORMATS: readonly OrderExportFormat[] = ['XLSX', 'CSV'];
 const LAYOUTS: readonly OrderExportLayout[] = ['ORDERS', 'LINE_ITEMS'];
@@ -366,7 +366,7 @@ export function OrdersExportPage() {
   const { t } = useLocale();
   const shop = useShop();
   const search = useSearch({ from: '/$shopId/orders/export' });
-  if (!EXPORTS_ORDERS.includes(shop.role)) return <EmptyState title={t('exports.cannot')} />;
+  if (!permits(shop, EXPORTS_ORDERS)) return <EmptyState title={t('exports.cannot')} />;
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       <Link

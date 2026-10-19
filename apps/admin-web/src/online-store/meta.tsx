@@ -18,7 +18,7 @@ import type {
   MetaConversionsDeleteData,
   MetaConversionsUpdateData,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
 import { formatDateTime } from '../i18n/format';
@@ -32,7 +32,7 @@ import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
 /** Who sets where the shop's orders go to Meta, and sees how they went (ADR-143). */
-export const SETS_META: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+export const SETS_META = gate(['owner', 'manager', 'marketer'], 'write_pixels');
 
 export const MOMENTS: readonly ConversionMoment[] = ['PLACED', 'CONFIRMED', 'DELIVERED'];
 

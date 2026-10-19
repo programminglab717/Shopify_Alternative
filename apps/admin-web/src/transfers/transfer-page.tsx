@@ -17,6 +17,7 @@ import type {
   UserError,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -313,7 +314,8 @@ function Close({ transfer }: { transfer: InventoryTransfer }) {
 /** A transfer: where it left and where it goes, and each line, how much of it arrived. */
 export function TransferPage() {
   const { t, locale } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const timezone = useShopTimezone();
   const { transferId } = useParams({ from: '/$shopId/transfers/$transferId' });
   const query = useAdminQuery<InventoryTransferData>(
@@ -342,7 +344,7 @@ export function TransferPage() {
       </div>
     );
   }
-  const edits = EDITS_STOCK.includes(role) && transfer.status === 'IN_TRANSIT';
+  const edits = permits(shop, EDITS_STOCK) && transfer.status === 'IN_TRANSIT';
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">

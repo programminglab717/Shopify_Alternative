@@ -16,7 +16,7 @@ import type { FormEvent } from 'react';
 import { CustomersQuery } from '../api/operations';
 import type { CustomerListItem, CustomersData } from '../api/types';
 import { useSessionStore } from '../auth/context';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney, formatPhone, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -31,18 +31,25 @@ import { SeenAt } from '../offline/seen-at';
 const PAGE = 50;
 
 /** The roles that see customers; packers and accountants see none (docs/design/02 §6). */
-export const READS_CUSTOMERS: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'confirmation_agent',
-  'marketer',
-];
+export const READS_CUSTOMERS = gate(
+  ['owner', 'manager', 'confirmation_agent', 'marketer'],
+  'read_customers',
+);
 
 /** Those who keep segments, for marketing: owners, managers and marketers (CUS-03). */
-export const KEEPS_SEGMENTS: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+/**
+ * Those who see a number masked and reveal it, one at a time, on the activity log
+ * (`reveal_customer_numbers`); those who see them whole have nothing to reveal.
+ */
+export const REVEALS_NUMBERS = gate(
+  ['owner', 'manager', 'confirmation_agent'],
+  'reveal_customer_numbers',
+);
+
+export const KEEPS_SEGMENTS = gate(['owner', 'manager', 'marketer'], 'write_segments');
 
 /** Who adds customers by hand and sees the erasures waiting (CUS-01, CUS-05). */
-const ADDS_CUSTOMERS: readonly StaffRole[] = ['owner', 'manager'];
+const ADDS_CUSTOMERS = gate(['owner', 'manager'], 'write_customers');
 
 /** The customers list's search: the words searched for. */
 export interface CustomersSearch {
@@ -132,7 +139,7 @@ export function CustomersPage() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
   const [tagging, setTagging] = useState(false);
-  const tags = ADDS_CUSTOMERS.includes(shop.role);
+  const tags = permits(shop, ADDS_CUSTOMERS);
 
   const customers = useInfiniteQuery({
     queryKey: ['admin', shop.id, 'customers', q ?? null],
@@ -179,7 +186,7 @@ export function CustomersPage() {
           {t('customers.title')}
         </h1>
         <div className="flex flex-wrap gap-2">
-          {KEEPS_SEGMENTS.includes(shop.role) && (
+          {permits(shop, KEEPS_SEGMENTS) && (
             <Link
               to="/$shopId/customers/segments"
               params={{ shopId: shop.id }}
@@ -189,7 +196,7 @@ export function CustomersPage() {
               {t('segments.title')}
             </Link>
           )}
-          {ADDS_CUSTOMERS.includes(shop.role) && (
+          {permits(shop, ADDS_CUSTOMERS) && (
             <>
               <Link
                 to="/$shopId/customers/blocked"
@@ -217,7 +224,7 @@ export function CustomersPage() {
               </Link>
             </>
           )}
-          {MOVES_CUSTOMERS.includes(shop.role) && (
+          {permits(shop, MOVES_CUSTOMERS) && (
             <Link
               to="/$shopId/customers/transfer"
               params={{ shopId: shop.id }}

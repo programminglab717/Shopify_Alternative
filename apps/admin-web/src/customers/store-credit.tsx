@@ -13,7 +13,7 @@ import type {
   StoreCreditMoveData,
   StoreCreditTransaction,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { endOfDayIn, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -26,18 +26,19 @@ import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
 /** Those who see what a customer's store credit holds (ORD-09), as the core lets them read it. */
-export const READS_CREDIT: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'confirmation_agent',
-  'accountant',
-];
+export const READS_CREDIT = gate(
+  ['owner', 'manager', 'confirmation_agent', 'accountant'],
+  'read_store_credit_accounts',
+);
 
 /** Those who read its ledger: what was given, spent and taken back. */
-const READS_LEDGER: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
+const READS_LEDGER = gate(
+  ['owner', 'manager', 'accountant'],
+  'read_store_credit_account_transactions',
+);
 
 /** Those who give credit and take it back by hand: owners and managers. */
-export const MOVES_CREDIT: readonly StaffRole[] = ['owner', 'manager'];
+export const MOVES_CREDIT = gate(['owner', 'manager'], 'write_store_credit_account_transactions');
 
 const cents = (amount: string) => Math.round(Number(amount) * 100);
 
@@ -207,9 +208,9 @@ function Ledger({ lines, timezone }: { lines: StoreCreditTransaction[]; timezone
  */
 export function StoreCredit({ customerId }: { customerId: string }) {
   const { t } = useLocale();
-  const { role } = useShop();
+  const access = useShop();
   const shop = useShopDetails();
-  const ledger = READS_LEDGER.includes(role);
+  const ledger = permits(access, READS_LEDGER);
   const query = useAdminQuery<CustomerStoreCreditData>(
     ['customerStoreCredit', customerId, ledger],
     ledger ? CustomerStoreCreditLedgerQuery : CustomerStoreCreditQuery,
@@ -223,7 +224,7 @@ export function StoreCredit({ customerId }: { customerId: string }) {
   const balance =
     accounts.find((each) => each.balance.currencyCode === currencyCode)?.balance.amount ?? '0.00';
   const lines = accounts.flatMap((each) => each.transactions?.nodes ?? []);
-  const moves = MOVES_CREDIT.includes(role);
+  const moves = permits(access, MOVES_CREDIT);
   const timezone = shop?.timezone ?? 'Asia/Karachi';
 
   return (

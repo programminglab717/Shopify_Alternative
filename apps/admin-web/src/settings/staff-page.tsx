@@ -21,6 +21,7 @@ import type {
 } from '../api/types';
 import { ME_KEY, useMe } from '../auth/context';
 import { useRecentAuthentication } from '../auth/confirm-identity';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -32,7 +33,7 @@ import { TextField } from '../ui/field';
 import { AccessRequests } from './access-requests';
 import { RoleName, RoleOptions, RolesTab, useCustomRoles } from './custom-roles';
 import { SelectField } from './settings-form';
-import { apiRole, BackToSettings, roleLabel } from './settings-page';
+import { apiRole, BackToSettings, MANAGES_STAFF, roleLabel } from './settings-page';
 
 /** Roles from the most to the least power over the shop. */
 const ROLES: readonly StaffMemberRole[] = [
@@ -241,7 +242,8 @@ export function StaffPage() {
     { staffInvitationResend: StaffInvitationCreateData['staffInvitationCreate'] },
     { id: string; language: 'EN' | 'UR' }
   >(StaffInvitationResendMutation);
-  const managed = rolesManagedBy(apiRole(shop.role));
+  // The roles they give and take: none without `manage_staff` (ADR-580).
+  const managed = permits(shop, MANAGES_STAFF) ? rolesManagedBy(apiRole(shop.role)) : [];
   const customRoles = useCustomRoles(managed.length > 0);
   // The shop's roles the member may give: those made from a preset they manage.
   const assignable = (customRoles.data?.customRoles ?? []).filter((each) =>

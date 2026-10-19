@@ -35,7 +35,7 @@ import type {
   SegmentsData,
   WhatsAppTemplatesData,
 } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -50,7 +50,7 @@ import { TextField } from '../ui/field';
 import { NoNumberHint } from './templates-page';
 
 /** Who sends the shop's broadcasts and writes its templates (ADR-420): marketers too. */
-export const MARKETS: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+export const MARKETS = gate(['owner', 'manager', 'marketer'], 'write_marketing_events');
 
 /** The broadcasts a page shows at a time. */
 const PAGE = 20;

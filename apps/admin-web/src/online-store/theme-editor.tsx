@@ -19,6 +19,7 @@ import {
   ThemeFilesUpsertMutation,
 } from '../api/operations';
 import type { ThemeChoicesData, ThemeEditorData, UserError } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -960,9 +961,10 @@ function Editor({
 /** The theme editor's page: the theme, and what its settings may point at in the shop. */
 export function ThemeEditorPage() {
   const { t, locale } = useLocale();
-  const { id: shopId, role } = useShop();
+  const shop = useShop();
+  const shopId = shop.id;
   const { themeId } = useParams({ from: '/$shopId/online-store/themes/$themeId' });
-  const edits = EDITS_THEMES.includes(role);
+  const edits = permits(shop, EDITS_THEMES);
   const query = useAdminQuery<ThemeEditorData>(
     ['theme-editor', themeId, locale],
     ThemeEditorQuery,

@@ -19,7 +19,7 @@ import {
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { TAKES_DRAFTS } from '../drafts/drafts-page';
 import { SEES_ABANDONED } from './abandoned-page';
 import {
@@ -77,12 +77,10 @@ const PRINTS: readonly OrderStage[] = ['TO_PACK', 'TO_BOOK'];
 const PAGE = 50;
 
 /** Those who change orders, and so keep the list's searches: all but marketers and accountants. */
-export const SAVES_ORDER_SEARCHES: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'confirmation_agent',
-  'packer',
-];
+export const SAVES_ORDER_SEARCHES = gate(
+  ['owner', 'manager', 'confirmation_agent', 'packer'],
+  'write_orders',
+);
 
 /** The orders list's search: a stage tab, the words searched for, and where they ship from. */
 export interface OrdersSearch {
@@ -196,7 +194,7 @@ export function OrdersPage() {
   const bulk = stage ? BULK[stage] : undefined;
   const prints = stage !== undefined && PRINTS.includes(stage);
   // Those who change orders tag them on any tab, and cancel those not yet shipped.
-  const changes = SAVES_ORDER_SEARCHES.includes(shop.role);
+  const changes = permits(shop, SAVES_ORDER_SEARCHES);
   const cancels = changes && stage !== undefined && CANCELLABLE.includes(stage);
   const selecting = Boolean(bulk) || prints || changes;
   const [panel, setPanel] = useState<'print' | 'tags' | 'cancel' | null>(null);
@@ -308,7 +306,7 @@ export function OrdersPage() {
           {t('orders.title')}
         </h1>
         <span className="flex flex-wrap gap-2">
-          {EXPORTS_ORDERS.includes(shop.role) && (
+          {permits(shop, EXPORTS_ORDERS) && (
             <Link
               to="/$shopId/orders/export"
               params={{ shopId: shop.id }}
@@ -319,7 +317,7 @@ export function OrdersPage() {
               {t('exports.link')}
             </Link>
           )}
-          {TAKES_DRAFTS.includes(shop.role) && (
+          {permits(shop, TAKES_DRAFTS) && (
             <Link
               to="/$shopId/drafts"
               params={{ shopId: shop.id }}
@@ -329,7 +327,7 @@ export function OrdersPage() {
               {t('drafts.title')}
             </Link>
           )}
-          {SEES_ABANDONED.includes(shop.role) && (
+          {permits(shop, SEES_ABANDONED) && (
             <Link
               to="/$shopId/abandoned-checkouts"
               params={{ shopId: shop.id }}
@@ -358,7 +356,7 @@ export function OrdersPage() {
       <SavedSearches
         resource="ORDER"
         query={q}
-        manages={SAVES_ORDER_SEARCHES.includes(shop.role)}
+        manages={permits(shop, SAVES_ORDER_SEARCHES)}
         onApply={(query) => {
           setWords(query ?? '');
           choose({ stage, q: query });
@@ -401,7 +399,7 @@ export function OrdersPage() {
       </div>
       {stage === 'TO_PACK' && (
         <div className="flex flex-wrap gap-2">
-          {WORKS_PARCELS.includes(shop.role) && shown[0] && (
+          {permits(shop, WORKS_PARCELS) && shown[0] && (
             // The orders to pack worked through by scanning, one after another (ADR-374).
             <Link
               to="/$shopId/orders/$orderId"
@@ -413,7 +411,7 @@ export function OrdersPage() {
               {t('orders.packByScan')}
             </Link>
           )}
-          {SEES_PACKING.includes(shop.role) && (
+          {permits(shop, SEES_PACKING) && (
             // How many orders each packer packed, or a packer their own (ADR-376).
             <Link
               to="/$shopId/orders/packers"
@@ -421,7 +419,7 @@ export function OrdersPage() {
               className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
             >
               <PackageCheck aria-hidden className="size-5" />
-              {t(SEES_PACKERS.includes(shop.role) ? 'orders.packers' : 'orders.packedByMe')}
+              {t(permits(shop, SEES_PACKERS) ? 'orders.packers' : 'orders.packedByMe')}
             </Link>
           )}
         </div>

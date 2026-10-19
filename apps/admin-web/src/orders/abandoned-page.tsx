@@ -3,12 +3,12 @@ import { CircleCheck, Clock, MessageCircle, Send, TicketPercent } from 'lucide-r
 import { useState } from 'react';
 import { AbandonedCheckoutsQuery } from '../api/operations';
 import type { AbandonedCheckout, AbandonedCheckoutsData } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDateTime, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { OPENS_SETTINGS } from '../settings/settings-page';
+import { SETS_SETTINGS } from '../settings/settings-page';
 import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -18,12 +18,10 @@ import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
  * Those who see the checkouts shoppers left (CHK-12): those who work orders, and marketers, who
  * win customers back. Numbers are masked for those who see them so.
  */
-export const SEES_ABANDONED: readonly StaffRole[] = [
-  'owner',
-  'manager',
-  'confirmation_agent',
-  'marketer',
-];
+export const SEES_ABANDONED = gate(
+  ['owner', 'manager', 'confirmation_agent', 'marketer'],
+  'read_orders',
+);
 
 /** The checkouts a page shows at a time. */
 const PAGE = 50;
@@ -176,7 +174,7 @@ export function AbandonedPage() {
               `checkoutPage.offerAfter.${recovery.offerAfterHours ?? 24}` as MessageKey,
             ).toLowerCase(),
           })} `}
-        {OPENS_SETTINGS.includes(shop.role) && (
+        {permits(shop, SETS_SETTINGS) && (
           <Link
             to="/$shopId/settings/checkout"
             params={{ shopId: shop.id }}

@@ -13,6 +13,7 @@ import type {
   ProductCreateData,
   UserError,
 } from '../api/types';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -106,7 +107,7 @@ export function NewProductPage() {
   /** A variant's price: its own, or the one for all. */
   const priceOf = (values: string[]) => draftOf(values).price.trim() || price;
 
-  if (!EDITS_PRODUCTS.includes(shop.role)) return <EmptyState title={t('product.cannotEdit')} />;
+  if (!permits(shop, EDITS_PRODUCTS)) return <EmptyState title={t('product.cannotEdit')} />;
 
   const setDraft = (values: string[], change: Partial<VariantDraft>) =>
     setVariants((current) => ({

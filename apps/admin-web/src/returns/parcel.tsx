@@ -1,20 +1,20 @@
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import type { UserError } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
 import { useShop } from '../shell/shop-context';
 
 /** The roles that see parcels coming back: those who check them in, and those who claim. */
-export const READS_RETURNS: readonly StaffRole[] = ['owner', 'manager', 'packer', 'accountant'];
+export const READS_RETURNS = gate(['owner', 'manager', 'packer', 'accountant'], 'read_orders');
 
 /** Those who check parcels in and mark them lost, as the core lets them (`write_orders`). */
-export const CHECKS_IN: readonly StaffRole[] = ['owner', 'manager', 'packer'];
+export const CHECKS_IN = gate(['owner', 'manager', 'packer'], 'write_orders');
 
 /** Those who claim from couriers and settle the claims, as the core lets them (ADR-093). */
-export const CLAIMS: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
+export const CLAIMS = gate(['owner', 'manager', 'accountant'], 'claim_from_couriers');
 
 /** Days on the way back from which a courier is slow, worth a call. */
 export const SLOW_RETURN_DAYS = 14;

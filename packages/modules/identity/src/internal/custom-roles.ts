@@ -8,6 +8,8 @@ import {
   isStaffCapability,
   isStaffRole,
   scopeWithin,
+  staffCapabilities,
+  staffScopes,
   type AccessScope,
   type StaffCapability,
   type StaffRole,
@@ -151,6 +153,27 @@ export function checkedBasedOn(check: InputChecker, basedOn: string): StaffRole 
     return null;
   }
   return basedOn;
+}
+
+/** What a member of staff holds in a shop: their scopes and their capabilities. */
+export interface MemberAccess {
+  scopes: AccessScope[];
+  capabilities: ReadonlySet<StaffCapability>;
+}
+
+/**
+ * A member of staff's access in `role`: their custom role's scopes and capabilities, as far as
+ * its preset holds them still, where `custom` is one's, or else the preset's. What each request
+ * resolves, and what the admin is told of the shops it opens (ADR-580), alike.
+ */
+export function memberAccess(
+  role: StaffRole,
+  custom: { scopes: readonly string[] | null; capabilities: readonly string[] | null } | null,
+): MemberAccess {
+  return {
+    scopes: staffScopes(role, custom ? (custom.scopes ?? []) : null),
+    capabilities: staffCapabilities(role, custom ? (custom.capabilities ?? []) : null),
+  };
 }
 
 /** The shop's custom role `id`, shared-locked so that it is not deleted meanwhile; null if none. */

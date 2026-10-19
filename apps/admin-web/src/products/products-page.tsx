@@ -22,6 +22,7 @@ import type { FormEvent } from 'react';
 import { ProductsQuery } from '../api/operations';
 import type { ProductListItem, ProductStatus, ProductsData } from '../api/types';
 import { useSessionStore } from '../auth/context';
+import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -187,7 +188,7 @@ export function ProductsPage() {
   };
 
   const shown = products.data?.pages.flatMap((page) => page.products.nodes) ?? [];
-  const edits = EDITS_PRODUCTS.includes(shop.role);
+  const edits = permits(shop, EDITS_PRODUCTS);
   const names = new Map(shown.map((product) => [product.id, product.title]));
   const ids = [...selected];
 
@@ -236,7 +237,7 @@ export function ProductsPage() {
             <Tag aria-hidden className="size-5" />
             {t('sales.title')}
           </Link>
-          {READS_GIFT_CARDS.includes(shop.role) && (
+          {permits(shop, READS_GIFT_CARDS) && (
             <Link
               to="/$shopId/products/gift-cards"
               params={{ shopId: shop.id }}

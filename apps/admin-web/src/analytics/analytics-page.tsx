@@ -3,7 +3,7 @@ import { Gauge } from 'lucide-react';
 import { useState } from 'react';
 import { SalesQuery } from '../api/operations';
 import type { MoneyValue, SalesData, SalesTotalsValue } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits } from '../auth/permissions';
 import { SEES_AGENTS } from '../desk/agents-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney, formatTimes } from '../i18n/format';
@@ -20,7 +20,7 @@ import { StockReport } from './stock-report';
 import { LiveView, Visits } from './visits';
 
 /** The roles that read the shop's sales (the core asks read_orders; these are the ones who plan). */
-export const READS_ANALYTICS: readonly StaffRole[] = ['owner', 'manager', 'marketer', 'accountant'];
+export const READS_ANALYTICS = gate(['owner', 'manager', 'marketer', 'accountant'], 'read_orders');
 
 const amount = (money: MoneyValue | null) => Number(money?.amount ?? 0);
 
@@ -211,7 +211,7 @@ export function AnalyticsPage() {
       <CodHealth from={from} before={before} />
       <CourierPerformance from={from} before={before} />
       <StockReport days={days} />
-      {SEES_AGENTS.includes(shop.role) && (
+      {permits(shop, SEES_AGENTS) && (
         <Link
           to="/$shopId/desk/agents"
           params={{ shopId: shop.id }}

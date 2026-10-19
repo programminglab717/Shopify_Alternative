@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto';
-import { SUPPORT_SCOPES, type StaffRole } from '@hatti/api';
+import { PRESET_CAPABILITIES, ROLE_SCOPES, SUPPORT_SCOPES, type StaffRole } from '@hatti/api';
 import { SecretBox, base32Decode, sha256, totp } from '@hatti/crypto';
 import { Database, pgError } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -1998,6 +1998,20 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           scopes: ['read_products', 'write_orders'],
           capabilities: [],
         });
+        // And the admin is told as much of the shop, to show them what they can use (ADR-580).
+        const shopsOf = async (account: { tokens: { accessToken: string } }) =>
+          (await service.me(await auth(account.tokens.accessToken))).shops;
+        expect(await shopsOf(agent)).toEqual([
+          {
+            id: toPublicId('shop', shopId),
+            name: expect.any(String),
+            role: 'confirmation_agent',
+            mfaRequired: false,
+            scopes: ['read_products', 'write_orders'],
+            capabilities: [],
+            customRole: { id: toPublicId('customRole', customRoleId), name: 'Caller, masked' },
+          },
+        ]);
         // Changed, from their next request.
         await s.updateCustomRole(owner, shopId, customRoleId, {
           scopes: ['read_orders', 'read_customers'],
@@ -2007,6 +2021,9 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           scopes: ['read_orders', 'read_customers'],
           capabilities: ['reveal_customer_numbers'],
         });
+        expect(await shopsOf(agent)).toMatchObject([
+          { scopes: ['read_orders', 'read_customers'], capabilities: ['reveal_customer_numbers'] },
+        ]);
         expect((await s.customRolesOf(shopId))[0]!.members).toBe(1);
         // A preset's again, by a change of role: its scopes and capabilities whole.
         expect(
@@ -2033,6 +2050,9 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           ],
           capabilities: ['reveal_customer_numbers'],
         });
+        expect(await shopsOf(agent)).toMatchObject([
+          { customRole: null, scopes: ROLE_SCOPES.confirmation_agent },
+        ]);
         // And the custom role again, by its ID, with its preset or none.
         expect(
           await s.changeRole(manager, shopId, agent.userId, {
@@ -2073,6 +2093,15 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
 
         // A deputy is a manager to whatever reads their role, their second factor among it.
         await s.changeRole(owner, shopId, manager.userId, { customRoleId: deputy.value.id });
+        expect(await shopsOf(manager)).toMatchObject([
+          {
+            role: 'manager',
+            mfaRequired: true,
+            scopes: ['write_orders', 'write_settings'],
+            capabilities: ['manage_staff'],
+            customRole: { id: toPublicId('customRole', deputy.value.id), name: 'Deputy' },
+          },
+        ]);
         expect(await resolver.resolve(manager.tokens.accessToken, shopId)).toEqual({
           ok: false,
           reason: 'mfa_required',
@@ -2207,7 +2236,15 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         },
       ]);
       expect((await service.me(session)).shops).toEqual([
-        { id: opened.id, name: 'Zari Fashions', role: 'owner', mfaRequired: true },
+        {
+          id: opened.id,
+          name: 'Zari Fashions',
+          role: 'owner',
+          mfaRequired: true,
+          scopes: ROLE_SCOPES.owner,
+          capabilities: PRESET_CAPABILITIES.owner,
+          customRole: null,
+        },
       ]);
       // The worker hears of it, to publish its storefront.
       const { rows: events } = await admin.query(
@@ -2284,9 +2321,26 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       await grant(userId, shopA, 'packer');
       await grant(userId, shopB, 'manager');
       const me = await service.me(await auth(tokens.accessToken));
+      // With what they may do in each (ADR-580): their preset's scopes and capabilities.
       expect(me.shops).toEqual([
-        { id: toPublicId('shop', shopA), name: 'Shop A', role: 'packer', mfaRequired: false },
-        { id: toPublicId('shop', shopB), name: 'Shop B', role: 'manager', mfaRequired: true },
+        {
+          id: toPublicId('shop', shopA),
+          name: 'Shop A',
+          role: 'packer',
+          mfaRequired: false,
+          scopes: ['read_products', 'read_inventory', 'read_locations', 'write_orders'],
+          capabilities: [],
+          customRole: null,
+        },
+        {
+          id: toPublicId('shop', shopB),
+          name: 'Shop B',
+          role: 'manager',
+          mfaRequired: true,
+          scopes: ROLE_SCOPES.manager,
+          capabilities: PRESET_CAPABILITIES.manager,
+          customRole: null,
+        },
       ]);
     });
 
