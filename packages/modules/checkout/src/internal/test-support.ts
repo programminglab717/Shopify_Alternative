@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PublicSite, StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
-import { BlocklistService, CustomerService } from '@hatti/customers/public';
+import {
+  BlocklistService,
+  CustomerDataRegistry,
+  CustomerDataService,
+  CustomerService,
+} from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { BrandService, FileService } from '@hatti/files/public';
@@ -12,10 +17,12 @@ import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { MessagesService } from '@hatti/messaging/public';
 import { AbandonedCheckoutService } from './abandoned.service.js';
+import { AccountDataExpiry } from './account-data.js';
 import { AccountService } from './account.service.js';
 import {
   BankTransferService,
   FulfillmentService,
+  ORDER_CUSTOMER_DATA,
   OnlinePayments,
   OrderService,
   type GatewayFormStart,
@@ -29,6 +36,7 @@ import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { CheckoutService } from './checkout.service.js';
 import { CodRulesService } from './cod-rules.service.js';
+import { CHECKOUT_CUSTOMER_DATA } from './customer-data.js';
 import { CheckoutMarketingService } from './marketing.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
 import { DeliveryService } from './delivery.service.js';
@@ -130,6 +138,10 @@ export interface CheckoutFixture {
   expiry: CheckoutExpiry;
   /** Shoppers' accounts on the storefront, signed in to by a code (ADR-570). */
   accounts: AccountService;
+  /** Customers' data, merged, erased and exported with orders' and checkout's (ADR-572). */
+  customerData: CustomerDataService;
+  /** Shoppers' files of their own data let go once their day is up (ADR-572). */
+  accountData: AccountDataExpiry;
   orders: OrderService;
   /** The shop's gateway, as the payments module would give it: none unless a test sets one. */
   payments: StubPayments;
@@ -218,6 +230,10 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     baseUrl: 'https://hatti.test/storage',
     secret: 's'.repeat(32),
   });
+  const registry = new CustomerDataRegistry();
+  registry.register(ORDER_CUSTOMER_DATA);
+  registry.register(CHECKOUT_CUSTOMER_DATA);
+  const customerData = new CustomerDataService(db, registry);
   return {
     testDb,
     db,
@@ -248,7 +264,15 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       new PublicSite('https://hatti.test'),
     ),
     expiry: new CheckoutExpiry(db),
-    accounts: new AccountService(db, new MessagesService(db), new PublicSite('https://hatti.test')),
+    accounts: new AccountService(
+      db,
+      new MessagesService(db),
+      new PublicSite('https://hatti.test'),
+      storage,
+      customerData,
+    ),
+    customerData,
+    accountData: new AccountDataExpiry(db, storage),
     orders,
     payments,
     fulfillments: new FulfillmentService(db, stock),
@@ -301,6 +325,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.number_proofs;
         DELETE FROM checkout.number_codes;
         DELETE FROM checkout.account_sessions;
+        DELETE FROM checkout.account_data_exports;
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
         DELETE FROM checkout.cod_settings;

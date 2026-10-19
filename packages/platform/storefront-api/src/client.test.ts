@@ -320,6 +320,7 @@ describe('StorefrontApiClient', () => {
       name: 'Ayesha Khan',
       orders: [],
       storeCredit: { balance: 50_000, currency: 'PKR', expiring: null },
+      dataRequests: { available: true, erasureWaitDays: 10, export: null, erasure: null },
     };
     const link = { path: '/o/abc', url: 'http://core.test/o/abc' };
     const { client, requests } = clientAnswering((request) => {
@@ -358,6 +359,54 @@ describe('StorefrontApiClient', () => {
     const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
     await expect(down.account('shop-1', 'session-secret')).rejects.toThrow(StorefrontApiError);
     await expect(down.accountLogout('shop-1', 'session-secret')).rejects.toThrow(
+      StorefrontApiError,
+    );
+  });
+
+  it("asks for a signed-in shopper's own file and erasure (ADR-572)", async () => {
+    const file = {
+      state: 'ready',
+      made: true,
+      url: 'http://storage.test/customer-data/1.json?signed',
+      readyAt: '2026-10-19T10:00:00.000Z',
+      expiresAt: '2026-10-20T10:00:00.000Z',
+    } as const;
+    const erasure = {
+      state: 'waiting',
+      requestedAt: '2026-10-19T10:00:00.000Z',
+      eraseAfter: '2026-10-29T10:00:00.000Z',
+    } as const;
+    const { client, requests } = clientAnswering((request) => {
+      if (request.headers.get('x-hatti-account') !== 'session-secret') {
+        return new Response('Not found', { status: 404 });
+      }
+      if (request.url.endsWith('/data/erase')) return Response.json(erasure);
+      return Response.json(request.method === 'GET' ? { ...file, made: false } : file);
+    });
+    expect(await client.accountDataExport('shop-1', null)).toBeNull();
+    expect(await client.accountDataExportLink('shop-1', null)).toBeNull();
+    expect(await client.accountDataErase('shop-1', null)).toBeNull();
+    expect(requests).toEqual([]);
+
+    expect(await client.accountDataExport('shop-1', 'session-secret')).toEqual(file);
+    expect(await client.accountDataExportLink('shop-1', 'session-secret')).toEqual({
+      ...file,
+      made: false,
+    });
+    expect(await client.accountDataErase('shop-1', 'session-secret')).toEqual(erasure);
+    expect(await client.accountDataExport('shop-1', 'gone')).toBeNull();
+    expect(await client.accountDataExportLink('shop-1', 'gone')).toBeNull();
+    expect(await client.accountDataErase('shop-1', 'gone')).toBeNull();
+    expect(requests.slice(0, 3).map((request) => [request.method, request.url])).toEqual([
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/data/export'],
+      ['GET', 'http://core.test/storefront/shops/shop-1/account/data/export'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/data/erase'],
+    ]);
+    const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
+    await expect(down.accountDataExport('shop-1', 'session-secret')).rejects.toThrow(
+      StorefrontApiError,
+    );
+    await expect(down.accountDataErase('shop-1', 'session-secret')).rejects.toThrow(
       StorefrontApiError,
     );
   });

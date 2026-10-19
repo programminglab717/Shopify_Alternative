@@ -18,7 +18,10 @@ export {
 export {
   CUSTOMER_DATA_FORMAT,
   CustomerDataService,
+  ERASURE_WAIT_DAYS,
   type CustomerDataExport,
+  type ErasureRequestRecord,
+  type OwnErasureRecord,
   type WaitingErasureRecord,
 } from '../internal/customer-data.service.js';
 export {
@@ -132,7 +135,9 @@ export {
   CONSENT_SOURCES,
   MARKETING_CHANNELS,
   MARKETING_STATES,
+  ERASURE_REQUESTER_KINDS,
   type BlockReasonValue,
+  type ErasureRequesterKind,
   type ConsentSourceValue,
   type MarketingChannelValue,
   type MarketingStateValue,

@@ -10,7 +10,7 @@ import {
 } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { listAudit, type AuditEntry as AuditEntryRecord } from '@hatti/events';
-import { PublicIdError, isUuid, parsePublicId, toPublicId } from '@hatti/ids';
+import { PublicIdError, isUuid, parsePublicId, toPublicId, type IdKind } from '@hatti/ids';
 import {
   Args,
   ArgsType,
@@ -28,25 +28,34 @@ export enum AuditActorKind {
   APP = 'APP',
   STAFF = 'STAFF',
   SUPPORT = 'SUPPORT',
+  CUSTOMER = 'CUSTOMER',
 }
 
 registerEnumType(AuditActorKind, {
   name: 'AuditActorKind',
   valuesMap: {
     SUPPORT: { description: "Hatti's support, looking while the owner lets it (ADR-156)." },
+    CUSTOMER: {
+      description:
+        'The customer themselves, asking for their data or its erasure from their account on the ' +
+        'online store (ADR-572).',
+    },
   },
 });
 
 @ObjectType({
   description:
-    "Who did something: an app, by its access token, a staff member, or Hatti's support agent.",
+    "Who did something: an app, by its access token, a staff member, Hatti's support agent, or " +
+    'a customer, asking for themselves from their account.',
 })
 export class AuditActor {
   @Field(() => AuditActorKind)
   kind!: AuditActorKind;
 
   @Field(() => ID, {
-    description: "The access token (tok_…), or the staff member or Hatti's support agent (usr_…).",
+    description:
+      "The access token (tok_…), the staff member or Hatti's support agent (usr_…), or the " +
+      'customer (cus_…), who may since have been erased.',
   })
   id!: string;
 
@@ -123,6 +132,14 @@ export class AuditLogArgs {
   action?: string | null;
 }
 
+/** The kind of public ID each kind of actor has. */
+const AUDIT_ACTOR_IDS = {
+  app: 'accessToken',
+  staff: 'user',
+  support: 'user',
+  customer: 'customer',
+} as const satisfies Record<AuditEntryRecord['actorKind'], IdKind>;
+
 function toAuditEntry(record: AuditEntryRecord): AuditEntry {
   return Object.assign(new AuditEntry(), {
     id: toPublicId('auditEntry', record.id),
@@ -130,7 +147,7 @@ function toAuditEntry(record: AuditEntryRecord): AuditEntry {
     subjectId: toPublicId(record.subjectType, record.subjectId),
     actor: Object.assign(new AuditActor(), {
       kind: record.actorKind.toUpperCase() as AuditActorKind,
-      id: toPublicId(record.actorKind === 'app' ? 'accessToken' : 'user', record.actorId),
+      id: toPublicId(AUDIT_ACTOR_IDS[record.actorKind], record.actorId),
       role: record.actorRole,
     }),
     details: JSON.stringify(record.details),

@@ -1,7 +1,8 @@
 // Shoppers' accounts on the storefront (CUS-02, ADR-571), as Shopify's customer accounts: the
 // shop's sign-in page asks for a mobile number, the core sends a code to it, and the code typed
 // signs the shopper in, the session's secret kept in a cookie only the server reads (ADR-570).
-// Their account page lists their orders with the shop and their store credit, from `customer`.
+// Their account page lists their orders with the shop and their store credit, from `customer`,
+// and from it they ask for the file of their own data, or for its erasure (ADR-572).
 // Pages are kept at the edge and are the same for every shopper, so only the account's own pages,
 // never kept, read the session; the others learn that a shopper is signed in from a cookie their
 // scripts read, which says nothing more.
@@ -148,6 +149,52 @@ export function loginErrorMessage(
   }
 }
 
+/**
+ * What the account page says of what a shopper just asked of their own data (ADR-572), named in
+ * its address, `?data_request=export_ready`, so that it comes back to the page saying it.
+ */
+export const DATA_NOTICES = [
+  'export_ready',
+  'export_none',
+  'export_gone',
+  'erase_requested',
+  'erase_none',
+  'erase_unconfirmed',
+  'too_many_requests',
+] as const;
+
+export type DataNotice = (typeof DATA_NOTICES)[number];
+
+/** The notice an account page's address names; null for none, or one not of {@link DATA_NOTICES}. */
+export function dataNoticeOf(value: unknown): DataNotice | null {
+  return (DATA_NOTICES as readonly unknown[]).includes(value) ? (value as DataNotice) : null;
+}
+
+/** The theme's words for a notice of what the shopper asked of their data, or the English. */
+export function dataNoticeMessage(
+  notice: DataNotice,
+  translate: (key: string, values: Record<string, unknown>) => string | null,
+): string {
+  const say = (english: string) =>
+    translate(`customer.account.data.notices.${notice}`, {}) ?? english;
+  switch (notice) {
+    case 'export_ready':
+      return say('Your data is ready. Download it below.');
+    case 'export_none':
+      return say("We don't keep any data about you yet, so there is nothing to download.");
+    case 'export_gone':
+      return say('That file is no longer kept. Ask for a new one.');
+    case 'erase_requested':
+      return say('We have your request to delete your data.');
+    case 'erase_none':
+      return say("We don't keep any data about you, so there is nothing to delete.");
+    case 'erase_unconfirmed':
+      return say('Tick the box to say you understand what deleting your data means.');
+    case 'too_many_requests':
+      return say('Too many tries. Please wait a minute and try again.');
+  }
+}
+
 type FinancialStatus = AccountOrderJson['financialStatus'];
 type FulfillmentStatus = AccountOrderJson['fulfillmentStatus'];
 
@@ -203,11 +250,16 @@ const STATUS_LABELS: Readonly<
  * Shopify's `customer`, for the account's pages (ADR-571): the shopper's name and number, their
  * orders with the shop, each linking to its page through the storefront while it has one, and
  * their store credit. Money is in paisa, as everywhere in Liquid here; links are under `prefix`,
- * "/ur" for the Urdu pages.
+ * "/ur" for the Urdu pages. Hatti's `data_requests` say what they asked of their own data
+ * (ADR-572), with the notice of what they just asked, in the page's language.
  */
 export function customerObject(
   account: AccountJson,
-  options: { locale: string; prefix: string },
+  options: {
+    locale: string;
+    prefix: string;
+    notice?: { code: DataNotice; message: string } | null;
+  },
 ): Record<string, unknown> {
   const labels = STATUS_LABELS[options.locale] ?? STATUS_LABELS.en!;
   const name = account.name?.trim() || null;
@@ -228,6 +280,7 @@ export function customerObject(
     url: order.hasPage ? `${options.prefix}/account/orders/${encodeURIComponent(order.id)}` : null,
   }));
   const credit = account.storeCredit;
+  const data = account.dataRequests;
   return {
     name,
     first_name: first,
@@ -245,6 +298,24 @@ export function customerObject(
         amount: credit.expiring.amount,
         expires_at: credit.expiring.expiresAt,
       },
+    },
+    // Hatti's: their own data (ADR-572). Whether the shop keeps any; their file kept, which
+    // downloads through the storefront; their erasure waiting, or held; and the days one waits.
+    data_requests: {
+      available: data.available,
+      erasure_wait_days: data.erasureWaitDays,
+      export: data.export && {
+        state: data.export.state,
+        url: `${options.prefix}/account/data/export`,
+        ready_at: data.export.readyAt,
+        expires_at: data.export.expiresAt,
+      },
+      erasure: data.erasure && {
+        state: data.erasure.state,
+        requested_at: data.erasure.requestedAt,
+        erase_after: data.erasure.eraseAfter,
+      },
+      notice: options.notice ?? null,
     },
   };
 }

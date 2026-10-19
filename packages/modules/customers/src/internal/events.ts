@@ -59,18 +59,22 @@ export interface CustomerMergedPayload {
 
 /**
  * A customer's personal data was erased at their request; the customer is gone. The actor asked
- * for it: at once, or ahead of time, when `requestedAt` says when (ADR-110).
+ * for it: at once, or ahead of time, when `requestedAt` says when (ADR-110); `customer` for the
+ * customer themselves, from their account (ADR-572), by their own ID.
  */
 export interface CustomerErasedPayload {
-  actorKind: 'app' | 'staff';
+  actorKind: 'app' | 'staff' | 'customer';
   actorId: string;
   requestedAt?: string;
 }
 
-/** A customer's erasure was asked for, to happen at `dueAt` unless cancelled first (ADR-110). */
+/**
+ * A customer's erasure was asked for, to happen at `dueAt` unless cancelled first (ADR-110): by
+ * staff or an app, or by the customer from their account (ADR-572).
+ */
 export interface CustomerErasureRequestedPayload {
   dueAt: string;
-  actorKind: 'app' | 'staff';
+  actorKind: 'app' | 'staff' | 'customer';
   actorId: string;
 }
 

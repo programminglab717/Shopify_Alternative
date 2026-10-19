@@ -1,12 +1,15 @@
 import { InputChecker, PublicSite, shopProfile, type FieldError } from '@hatti/api';
 import {
+  CustomerDataService,
+  ERASURE_WAIT_DAYS,
   customerExistsIn,
   customerOfPhoneIn,
   storeCreditOfCustomerIn,
+  type OwnErasureRecord,
 } from '@hatti/customers/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, toDate, type Tx } from '@hatti/db';
-import { toPublicId, tryFromPublicId } from '@hatti/ids';
+import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import {
   MESSAGE_LANGUAGES,
   MessagesService,
@@ -15,9 +18,19 @@ import {
 } from '@hatti/messaging/public';
 import { ORDER_LINK_PATH, accountOrderLinkIn, accountOrdersIn } from '@hatti/orders/public';
 import { maskPkMobile } from '@hatti/pk';
-import type { AccountJson, AccountSessionJson } from '@hatti/storefront-api';
+import { ObjectStorage } from '@hatti/storage';
+import type {
+  AccountDataEraseResponse,
+  AccountDataExportJson,
+  AccountDataExportResponse,
+  AccountDataRequestsJson,
+  AccountErasureJson,
+  AccountJson,
+  AccountSessionJson,
+} from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { ACCOUNT_DATA, ACCOUNT_DATA_TYPE, accountDataKey } from './account-data.js';
 import { checkCodeIn, sendCodeIn } from './number-codes.js';
 
 // Shoppers' accounts on a shop's storefront (CUS-02, ADR-570): a shopper signs in with their
@@ -27,7 +40,8 @@ import { checkCodeIn, sendCodeIn } from './number-codes.js';
 // it proved. Through it the storefront reads the account of the customer the number is now: their
 // orders, numbers merged into them too, and their store credit. A number no customer has signs in
 // all the same, to an account with nothing in it, so that signing in says nothing of who shops
-// there.
+// there. Signed in, a shopper asks for their own data, or its erasure, as the shop's staff would
+// for them (CUS-05, ADR-572), through the customers module's own requests.
 
 export const ACCOUNT_SESSION = {
   /** Bytes of the token the browser's cookie keeps. */
@@ -60,6 +74,14 @@ export type SignInVerify =
   | { kind: 'signed_in'; token: string; session: AccountSessionRecord }
   | { kind: 'wrong' | 'expired' | 'too_many' | 'invalid' };
 
+/** A file of the shopper's own data kept for the day, as {@link AccountService} reads it. */
+interface KeptExport {
+  key: string;
+  customerId: string;
+  readyAt: Date;
+  expiresAt: Date;
+}
+
 /** A session signed in, as the storefront reads it. */
 export interface AccountSessionRecord {
   id: string;
@@ -78,6 +100,8 @@ export class AccountService {
     private readonly db: Database,
     private readonly messages: MessagesService,
     private readonly site: PublicSite,
+    private readonly storage: ObjectStorage,
+    private readonly data: CustomerDataService,
   ) {}
 
   /**
@@ -184,7 +208,8 @@ export class AccountService {
 
   /**
    * The account of the session `token` names: the number, the customer's name, their latest
-   * orders with the shop and their store credit in its currency. Null without a session.
+   * orders with the shop, their store credit in its currency, and what they asked of their own
+   * data (ADR-572). Null without a session.
    */
   async account(shopId: string, token: string): Promise<AccountJson | null> {
     if (!TOKEN.test(token)) return null;
@@ -198,6 +223,16 @@ export class AccountService {
       const credit = session.customerId
         ? await storeCreditOfCustomerIn(tx, shopId, session.customerId, currency)
         : { balance: 0n, expiring: null };
+      const kept = session.customerId ? await keptExportIn(tx, shopId, session.customerId) : null;
+      const erasure = session.customerId
+        ? await this.data.ownErasureIn(tx, shopId, session.customerId)
+        : null;
+      const dataRequests: AccountDataRequestsJson = {
+        available: session.customerId !== null,
+        erasureWaitDays: ERASURE_WAIT_DAYS,
+        export: kept && exportJson(kept),
+        erasure: erasure && erasureJson(erasure),
+      };
       return {
         phone: session.phone,
         name: session.name,
@@ -221,8 +256,115 @@ export class AccountService {
             expiresAt: credit.expiring.expiresAt.toISOString(),
           },
         },
+        dataRequests,
       };
     });
+  }
+
+  /**
+   * The file of the own data of the shopper whose session `token` names (CUS-05, ADR-572), with
+   * a link that downloads it for {@link ACCOUNT_DATA}'s minutes: the customer's export, made as
+   * the shop's staff make it, the audit log naming the customer as who asked, and kept by storage
+   * for a day; the one kept given again until then, so a customer has one made a day at most.
+   * `none` for a number no customer has, of whom the shop keeps nothing to give; null without a
+   * session.
+   */
+  async dataExport(shopId: string, token: string): Promise<AccountDataExportResponse | null> {
+    if (!TOKEN.test(token)) return null;
+    // Put in storage before the transaction commits: let go again should it not.
+    let stored: string | null = null;
+    try {
+      return await this.db.tenant(shopId, async (tx): Promise<AccountDataExportResponse | null> => {
+        const session = await sessionIn(tx, shopId, token);
+        if (!session) return null;
+        const customerId = session.customerId;
+        if (!customerId) return { state: 'none' };
+        // One at a time for a customer, so that two asking at once have one file between them.
+        await tx.execute(sql`
+          SELECT pg_advisory_xact_lock(
+            hashtextextended(${`account_data_export:${customerId}`}, 0))`);
+        const kept = await keptExportIn(tx, shopId, customerId);
+        if (kept) return { ...this.#linked(kept), made: false };
+        // In a transaction of its own, which holds the customer as it reads them.
+        const file = await this.data.exportOwn(shopId, customerId);
+        // Erased since the session read them.
+        if (!file.ok) return { state: 'none' };
+        const id = newId();
+        const key = accountDataKey(shopId, id);
+        const body = Buffer.from(file.value.json);
+        await this.storage.put(key, body, ACCOUNT_DATA_TYPE);
+        stored = key;
+        const { rows } = await tx.execute<{
+          created_at: string | Date;
+          expires_at: string | Date;
+        }>(sql`
+          INSERT INTO checkout.account_data_exports (shop_id, id, customer_id, key, size,
+                                                     expires_at)
+          VALUES (${shopId}, ${id}, ${customerId}, ${key}, ${body.length},
+                  now() + ${`${ACCOUNT_DATA.keepHours} hours`}::interval)
+          RETURNING created_at, expires_at`);
+        const made = {
+          key,
+          customerId,
+          readyAt: toDate(rows[0]!.created_at),
+          expiresAt: toDate(rows[0]!.expires_at),
+        };
+        return { ...this.#linked(made), made: true };
+      });
+    } catch (error) {
+      if (stored) await this.storage.delete(stored).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  /**
+   * A new link to the file of their own data kept for the shopper whose session `token` names
+   * (ADR-572), as {@link dataExport} gives one; null without a session, or a file kept.
+   */
+  async dataExportLink(
+    shopId: string,
+    token: string,
+  ): Promise<Exclude<AccountDataExportResponse, { state: 'none' }> | null> {
+    if (!TOKEN.test(token)) return null;
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, token);
+      if (!session?.customerId) return null;
+      const kept = await keptExportIn(tx, shopId, session.customerId);
+      return kept && { ...this.#linked(kept), made: false };
+    });
+  }
+
+  /**
+   * Asks for the erasure of the shopper whose session `token` names (CUS-05, ADR-572), as the
+   * shop's staff would for them: in {@link ERASURE_WAIT_DAYS} days, unless the shop cancels it
+   * first, the request, its event and the audit log naming the customer as who asked. Asking
+   * again, or once the shop has, changes nothing. How it waits: held while an order of theirs is
+   * open, or the shop owes them store credit. `none` for a number no customer has, of whom the
+   * shop keeps nothing to erase; null without a session.
+   */
+  async dataErase(shopId: string, token: string): Promise<AccountDataEraseResponse | null> {
+    const session = await this.session(shopId, token);
+    if (!session) return null;
+    const customerId = session.customerId;
+    if (!customerId) return { state: 'none' };
+    const asked = await this.data.requestOwnErasure(shopId, customerId);
+    // Erased since the session read them.
+    if (!asked.ok) return { state: 'none' };
+    const erasure = await this.db.tenant(shopId, (tx) =>
+      this.data.ownErasureIn(tx, shopId, customerId),
+    );
+    // Cancelled by the shop, or carried out, since: as before they asked.
+    return erasure ? erasureJson(erasure) : { state: 'none' };
+  }
+
+  /** The file `kept`, with a link that downloads it for {@link ACCOUNT_DATA}'s minutes. */
+  #linked(kept: KeptExport): AccountDataExportJson & { url: string } {
+    return {
+      ...exportJson(kept),
+      url: this.storage.signDownload(kept.key, ACCOUNT_DATA.linkSeconds, {
+        filename: `customer-${toPublicId('customer', kept.customerId)}.json`,
+      }),
+    };
   }
 
   /**
@@ -264,6 +406,48 @@ export class AccountService {
       return { path, url: this.site.url(path) };
     });
   }
+}
+
+/** The file of the customer `customerId`'s own data storage keeps, if it does (ADR-572). */
+async function keptExportIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+): Promise<KeptExport | null> {
+  const { rows } = await tx.execute<{
+    key: string;
+    created_at: string | Date;
+    expires_at: string | Date;
+  }>(sql`
+    SELECT key, created_at, expires_at FROM checkout.account_data_exports
+     WHERE shop_id = ${shopId} AND customer_id = ${customerId} AND expires_at > now()
+     ORDER BY created_at DESC
+     LIMIT 1`);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    key: row.key,
+    customerId,
+    readyAt: toDate(row.created_at),
+    expiresAt: toDate(row.expires_at),
+  };
+}
+
+function exportJson(kept: KeptExport): AccountDataExportJson {
+  return {
+    state: 'ready',
+    readyAt: kept.readyAt.toISOString(),
+    expiresAt: kept.expiresAt.toISOString(),
+  };
+}
+
+/** A customer's erasure waiting, as their account shows it: held while anything holds it. */
+function erasureJson(erasure: OwnErasureRecord): AccountErasureJson {
+  return {
+    state: erasure.holds.length > 0 ? 'held' : 'waiting',
+    requestedAt: erasure.request.requestedAt.toISOString(),
+    eraseAfter: erasure.request.dueAt.toISOString(),
+  };
 }
 
 /** The session as the storefront is given it. */

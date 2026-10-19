@@ -407,10 +407,29 @@ export class CustomerErasureRequestPayload {
   userErrors!: UserError[];
 }
 
+export enum CustomerErasureRequester {
+  STAFF = 'STAFF',
+  APP = 'APP',
+  CUSTOMER = 'CUSTOMER',
+}
+
+registerEnumType(CustomerErasureRequester, {
+  name: 'CustomerErasureRequester',
+  description: "Who asked for a customer's erasure.",
+  valuesMap: {
+    STAFF: { description: 'A member of staff, for the customer (customerErasureRequest).' },
+    APP: { description: 'An app, for the customer (customerErasureRequest).' },
+    CUSTOMER: {
+      description: 'The customer themselves, signed in to their account on the online store.',
+    },
+  },
+});
+
 @ObjectType({
   description:
-    "A customer's erasure waiting to happen, as asked (customerErasureRequest), until " +
-    'customerErasureCancel stops it. Who asked is in the audit log.',
+    "A customer's erasure waiting to happen, as asked (customerErasureRequest, or the customer " +
+    'from their account), until customerErasureCancel stops it. Which member of staff or app ' +
+    'asked is in the audit log.',
 })
 export class CustomerErasureRequest {
   @Field(() => Customer, { description: 'The customer to erase.' })
@@ -418,6 +437,13 @@ export class CustomerErasureRequest {
 
   @Field(() => GraphQLISODateTime, { description: 'When it was asked for.' })
   requestedAt!: Date;
+
+  @Field(() => CustomerErasureRequester, {
+    description:
+      'Who asked: staff or an app, for the customer, or the customer themselves, from their ' +
+      'account on the online store.',
+  })
+  requestedBy!: CustomerErasureRequester;
 
   @Field(() => GraphQLISODateTime, {
     description: "When the customer's personal data will be erased, unless it is cancelled first.",

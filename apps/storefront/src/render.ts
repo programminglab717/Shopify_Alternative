@@ -1,6 +1,6 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
 import type { AccountJson, CartJson } from '@hatti/storefront-api';
-import { customerObject, type LoginForm } from './accounts.js';
+import { customerObject, type DataNotice, type LoginForm } from './accounts.js';
 import {
   TranslatedStore,
   type HandledKind,
@@ -142,6 +142,11 @@ export interface PageRequest {
    * are never kept: other pages are the same for everyone, and have none.
    */
   customer?: AccountJson | null;
+  /**
+   * What the account page says of what the shopper just asked of their own data (ADR-572), in
+   * the page's language, as `customer.data_requests.notice`.
+   */
+  dataNotice?: { code: DataNotice; message: string } | null;
   /** The sign-in page's form, as its route leaves it: its step, and what went wrong. */
   login?: LoginForm | null;
 }
@@ -689,6 +694,7 @@ export class PageRenderer {
         ? customerObject(request.customer, {
             locale,
             prefix: locale === theme.defaultLocale ? '' : `/${locale}`,
+            notice: request.dataNotice ?? null,
           })
         : null,
       localization: {

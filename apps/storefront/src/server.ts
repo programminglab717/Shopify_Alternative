@@ -60,12 +60,15 @@ import {
   CODE_TYPED_MAX,
   PHONE_TYPED_MAX,
   accountTokenOf,
+  dataNoticeMessage,
+  dataNoticeOf,
   loginCookie,
   loginCookieCleared,
   loginErrorMessage,
   pendingLoginOf,
   signedInCookie,
   signedInCookieCleared,
+  type DataNotice,
   type LoginForm,
   type LoginProblem,
 } from './accounts.js';
@@ -222,6 +225,12 @@ const TRACKING_LOOKUPS = { name: 'tracking-lookups', limit: 10, windowMs: 60_000
  * limits on each number.
  */
 const ACCOUNT_LOGINS = { name: 'account-logins', limit: 20, windowMs: 60_000 };
+
+/**
+ * What an address may ask of shoppers' own data a minute, their files and erasures (ADR-572): a
+ * shopper asks once or twice, and the core makes one file a customer a day whatever is asked.
+ */
+const ACCOUNT_DATA_REQUESTS = { name: 'account-data-requests', limit: 10, windowMs: 60_000 };
 
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
@@ -2549,25 +2558,45 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
+   * The account page, with what the shopper just asked of their own data said in the page's
+   * language (ADR-572); without a session, on to sign in.
+   */
+  const accountPageOf = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    found: Found,
+    notice: DataNotice | null,
+    status?: number,
+  ) => {
+    const { locale, prefix } = languageOf(request);
+    const token = accountTokenOf(request.headers.cookie);
+    const account = token ? await core!.account(found.shopId, token) : null;
+    if (!account) {
+      if (token) signOutCookies(request, reply);
+      return reply.redirect(`${prefix}/account/login`, request.method === 'POST' ? 303 : 302);
+    }
+    const dataNotice = notice && {
+      code: notice,
+      message: dataNoticeMessage(notice, (key, values) => translation(theme, locale, key, values)),
+    };
+    const page = { path: '/account', locale, customer: account, dataNotice };
+    return sendPage(reply, page, found, status, request.method === 'GET' ? request : undefined);
+  };
+
+  /**
    * The shopper's account, `/account` (ADR-571), in the theme's `customers/account` template,
    * with `customer`: their orders with the shop and their store credit, as the core reads them
-   * for the session their cookie names. Without one, they are sent to sign in.
+   * for the session their cookie names, and what they just asked of their own data, as its
+   * address says (ADR-572). Without one, they are sent to sign in.
    */
   const accountPage = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     accountAnswer(reply);
-    const { locale, prefix } = languageOf(request);
     try {
       if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
-      const token = accountTokenOf(request.headers.cookie);
-      const account = token ? await core.account(found.shopId, token) : null;
-      if (!account) {
-        if (token) signOutCookies(request, reply);
-        return await reply.redirect(`${prefix}/account/login`, 302);
-      }
-      const page = { path: '/account', locale, customer: account };
-      return await sendPage(reply, page, found, undefined, request);
+      const query = Object.fromEntries(new URL(request.url, 'http://storefront').searchParams);
+      return await accountPageOf(request, reply, found, dataNoticeOf(query.data_request));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
@@ -2608,6 +2637,109 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
+   * What a shopper asks of their own data from their account, posted (ADR-572): from the shop's
+   * own pages alone, as signing in is, and at most {@link ACCOUNT_DATA_REQUESTS} a minute from an
+   * address. With `confirmed`, it is asked only once the shopper ticked `customer[confirm]`,
+   * saying they understand what it means. `ask` asks the core with the session's secret: null
+   * without a session, which is sent to sign in; otherwise the notice for the account page to
+   * say, which it comes back to.
+   */
+  const dataRequest =
+    (
+      ask: (shopId: string, token: string) => Promise<DataNotice | null>,
+      options: { confirmed: boolean },
+    ) =>
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      accountAnswer(reply);
+      const { prefix } = languageOf(request);
+      if (request.headers['sec-fetch-site'] === 'cross-site') {
+        return reply
+          .code(403)
+          .type('text/plain; charset=utf-8')
+          .send("Shoppers ask for their data from the shop's own pages.\n");
+      }
+      try {
+        if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+        const token = accountTokenOf(request.headers.cookie);
+        if (!token) return await reply.redirect(`${prefix}/account/login`, 303);
+        if (limiter !== null && !(await limiter.hit(ACCOUNT_DATA_REQUESTS, request.ip)).allowed) {
+          return await accountPageOf(request, reply, found, 'too_many_requests', 429);
+        }
+        if (options.confirmed && recordOf(paramsOf(request).customer).confirm !== '1') {
+          return await accountPageOf(request, reply, found, 'erase_unconfirmed', 422);
+        }
+        const notice = await ask(found.shopId, token);
+        if (notice === null) {
+          signOutCookies(request, reply);
+          return await reply.redirect(`${prefix}/account/login`, 303);
+        }
+        const back = new URLSearchParams({ data_request: notice });
+        return await reply.redirect(`${prefix}/account?${back.toString()}#your-data`, 303);
+      } catch (error) {
+        if (error instanceof StoreMissingError) {
+          return notFound(reply, 'This shop is not open yet.');
+        }
+        if (!unreachable(request, error)) throw error;
+        return accountUnavailable(reply);
+      }
+    };
+
+  /** "Download my data" (ADR-572): the core makes the shopper's file, or gives the one kept. */
+  const dataExport = dataRequest(
+    async (shopId, token) => {
+      const file = await core!.accountDataExport(shopId, token);
+      if (!file) return null;
+      return file.state === 'none' ? 'export_none' : 'export_ready';
+    },
+    { confirmed: false },
+  );
+
+  /**
+   * "Delete my data" (ADR-572), once the shopper ticked that they understand: the core asks for
+   * their erasure, as the shop's staff would for them.
+   */
+  const dataErase = dataRequest(
+    async (shopId, token) => {
+      const erasure = await core!.accountDataErase(shopId, token);
+      if (!erasure) return null;
+      return erasure.state === 'none' ? 'erase_none' : 'erase_requested';
+    },
+    { confirmed: true },
+  );
+
+  /**
+   * The shopper's file kept (ADR-572): on to storage, through a link the core signs for minutes,
+   * made anew each time, so that the page never holds one. Without a file kept, back to the
+   * account, saying so; without a session, to sign in first, and back.
+   */
+  const dataDownload = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { prefix } = languageOf(request);
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      const token = accountTokenOf(request.headers.cookie);
+      if (!token) {
+        const to = `${prefix}/account/login?${new URLSearchParams({ return_to: `${prefix}/account` })}`;
+        return await reply.redirect(to, 302);
+      }
+      const file = await core.accountDataExportLink(found.shopId, token);
+      if (!file) {
+        const back = new URLSearchParams({ data_request: 'export_gone' });
+        return await reply.redirect(`${prefix}/account?${back.toString()}#your-data`, 302);
+      }
+      return await reply.redirect(file.url, 303);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
    * Signing out (ADR-571): the core ends the session the cookie names, and the cookie goes; then
    * the shop's home page. Shopify's themes link to it, so a GET signs out as a POST does.
    */
@@ -2634,6 +2766,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/login`, handler: login });
     app.post(`${prefix}/account/login/verify`, verify);
     app.get(`${prefix}/account/orders/:id`, accountOrder);
+    app.post(`${prefix}/account/data/export`, dataExport);
+    app.get(`${prefix}/account/data/export`, dataDownload);
+    app.post(`${prefix}/account/data/erase`, dataErase);
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/logout`, handler: logout });
   }
 

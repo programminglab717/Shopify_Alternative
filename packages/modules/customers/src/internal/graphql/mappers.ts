@@ -33,6 +33,7 @@ import {
   CustomerConnection,
   CustomerEdge,
   CustomerErasureRequest,
+  CustomerErasureRequester,
   CustomerErasureRequestConnection,
   CustomerErasureRequestEdge,
   CustomerMarketingConsent,
@@ -205,6 +206,7 @@ export function toCustomerErasureRequestConnection(
     Object.assign(new CustomerErasureRequest(), {
       customer: toCustomer(record.customer, tenant),
       requestedAt: record.request.requestedAt,
+      requestedBy: record.request.requestedBy.toUpperCase() as CustomerErasureRequester,
       scheduledAt: record.request.dueAt,
     }),
   );

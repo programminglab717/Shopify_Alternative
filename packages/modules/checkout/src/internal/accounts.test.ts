@@ -8,9 +8,11 @@ import {
   StoreCreditService,
 } from '@hatti/customers/public';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { listAudit } from '@hatti/events';
 import { toPublicId } from '@hatti/ids';
 import { ORDER_CUSTOMER_DATA } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ACCOUNT_DATA } from './account-data.js';
 import { ACCOUNT_SESSION, type SignInVerify } from './account.service.js';
 import { parseAction } from './cart-lines.js';
 import type { CheckoutForm } from './checkout.service.js';
@@ -175,6 +177,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       name: null,
       orders: [],
       storeCredit: { balance: 0, currency: 'PKR', expiring: null },
+      dataRequests: { available: false, erasureWaitDays: 10, export: null, erasure: null },
     });
     // Not in another shop.
     expect(await f.accounts.session(f.b.shopId, signedIn.token)).toBeNull();
@@ -512,6 +515,172 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     // a customer the shop no longer has.
     const fresh = await signIn(JAZZ);
     expect((await f.accounts.account(f.a.shopId, fresh))!.orders).toEqual([]);
+  });
+
+  /** What the shop's audit log says of the customer `id`, the newest first. */
+  const auditOf = async (id: string) =>
+    (
+      await f.db.tenant(f.a.shopId, (tx) => listAudit(tx, f.a.shopId, { first: 20, subjectId: id }))
+    ).items.map((entry) => [entry.action, entry.actorKind, entry.actorId]);
+
+  /** Files of shoppers' own data the shop keeps, the oldest first. */
+  const files = async () =>
+    (
+      await f.admin.query<{ customer_id: string; key: string }>(
+        'SELECT customer_id, key FROM checkout.account_data_exports ORDER BY created_at',
+      )
+    ).rows;
+
+  it('gives a shopper the file of their own data, made once a day and kept for it (ADR-572)', async () => {
+    // A number no customer has: nothing to give, and nothing made.
+    const nobody = await signIn(ZONG);
+    expect(await f.accounts.dataExport(f.a.shopId, nobody)).toEqual({ state: 'none' });
+    expect((await f.accounts.account(f.a.shopId, nobody))!.dataRequests).toEqual({
+      available: false,
+      erasureWaitDays: 10,
+      export: null,
+      erasure: null,
+    });
+    // Without a session, nothing.
+    expect(await f.accounts.dataExport(f.a.shopId, 'x'.repeat(43))).toBeNull();
+    expect(await f.accounts.dataExport(f.a.shopId, 'not a token')).toBeNull();
+    expect(await f.accounts.dataExportLink(f.a.shopId, 'x'.repeat(43))).toBeNull();
+
+    const placed = await order(JAZZ);
+    const ayesha = placed.customerId;
+    const token = await signIn(JAZZ);
+    expect(await f.accounts.dataExportLink(f.a.shopId, token)).toBeNull();
+    const made = (await f.accounts.dataExport(f.a.shopId, token))!;
+    if (made.state !== 'ready') throw new Error(`Expected a file, got ${made.state}`);
+    expect(made).toMatchObject({ state: 'ready', made: true });
+    expect(new Date(made.expiresAt).getTime() - new Date(made.readyAt).getTime()).toBe(
+      ACCOUNT_DATA.keepHours * 3_600_000,
+    );
+    // Kept by storage under the shop's own prefix, behind a signed link that names the file.
+    const [kept] = await files();
+    expect(kept).toEqual({
+      customer_id: ayesha,
+      key: expect.stringMatching(
+        new RegExp(`^shops/${f.a.shopId}/customer-data/[0-9a-f-]{36}\\.json$`),
+      ) as unknown,
+    });
+    const url = new URL(made.url);
+    expect(`${url.origin}${url.pathname}`).toBe(`https://hatti.test/storage/${kept!.key}`);
+    expect(f.storage.verify('GET', kept!.key, Object.fromEntries(url.searchParams))).toEqual({
+      method: 'GET',
+      filename: `customer-${toPublicId('customer', ayesha)}.json`,
+    });
+    // The file staff would give them: their orders, and their account's sessions among the rest.
+    const stored = (await f.storage.read(kept!.key))!;
+    expect(stored.contentType).toBe('application/json');
+    const file = JSON.parse(stored.body.toString('utf8')) as Record<string, unknown>;
+    expect(file).toMatchObject({
+      format: 'hatti.customer-data/1',
+      customer: { id: toPublicId('customer', ayesha), name: 'Ayesha Khan', phone: JAZZ },
+      orders: [expect.objectContaining({ name: `#${placed.number}` })],
+      accountSessions: [expect.objectContaining({ number: JAZZ })],
+    });
+
+    // Asked again the same day, the same file, with a new link: none is made.
+    const again = (await f.accounts.dataExport(f.a.shopId, token))!;
+    expect(again).toEqual({ ...made, made: false, url: expect.any(String) as unknown });
+    expect(await f.accounts.dataExportLink(f.a.shopId, token)).toEqual({
+      ...made,
+      made: false,
+      url: expect.any(String) as unknown,
+    });
+    expect(await files()).toHaveLength(1);
+    expect((await f.accounts.account(f.a.shopId, token))!.dataRequests).toEqual({
+      available: true,
+      erasureWaitDays: 10,
+      export: { state: 'ready', readyAt: made.readyAt, expiresAt: made.expiresAt },
+      erasure: null,
+    });
+    // Made once, by the customer themselves, as the audit log says.
+    expect(await auditOf(ayesha)).toEqual([['customer.data_exported', 'customer', ayesha]]);
+    // Not another shop's.
+    expect(await f.accounts.dataExport(f.b.shopId, token)).toBeNull();
+
+    // A day on, storage lets it go, and another is made when asked.
+    await f.admin.query(
+      `UPDATE checkout.account_data_exports
+          SET created_at = created_at - interval '25 hours',
+              expires_at = expires_at - interval '25 hours'`,
+    );
+    expect((await f.accounts.account(f.a.shopId, token))!.dataRequests.export).toBeNull();
+    expect(await f.accounts.dataExportLink(f.a.shopId, token)).toBeNull();
+    expect(await f.accountData.deleteExpired()).toBe(1);
+    expect(await f.storage.head(kept!.key)).toBeNull();
+    expect(await files()).toEqual([]);
+    expect(await f.accounts.dataExport(f.a.shopId, token)).toMatchObject({ made: true });
+    expect(await auditOf(ayesha)).toEqual([
+      ['customer.data_exported', 'customer', ayesha],
+      ['customer.data_exported', 'customer', ayesha],
+    ]);
+
+    // Merged into another, their file is let go, and the customer kept may ask for one of all
+    // that is now theirs.
+    const [newer] = await files();
+    const bilal = unwrap(await customers.create(f.a, { phone: '0333 1234567', name: 'Bilal' }));
+    unwrap(await data.merge(f.a, bilal.id, ayesha));
+    expect((await f.accounts.account(f.a.shopId, token))!.dataRequests.export).toBeNull();
+    expect(await f.accountData.deleteExpired()).toBe(1);
+    expect(await f.storage.head(newer!.key)).toBeNull();
+    expect(await f.accounts.dataExport(f.a.shopId, token)).toMatchObject({ made: true });
+    expect(await files()).toEqual([{ customer_id: bilal.id, key: expect.any(String) as unknown }]);
+  });
+
+  it("files a shopper's erasure as staff would, once, saying how it waits (ADR-572)", async () => {
+    // A number no customer has: nothing to erase.
+    const nobody = await signIn('+923331234567');
+    expect(await f.accounts.dataErase(f.a.shopId, nobody)).toEqual({ state: 'none' });
+    expect(await f.accounts.dataErase(f.a.shopId, 'x'.repeat(43))).toBeNull();
+
+    // A customer with an order still open: held until it closes.
+    const placed = await order(JAZZ);
+    const ayesha = placed.customerId;
+    const token = await signIn(JAZZ);
+    const held = (await f.accounts.dataErase(f.a.shopId, token))!;
+    if (held.state === 'none') throw new Error('Expected an erasure');
+    expect(held.state).toBe('held');
+    expect(new Date(held.eraseAfter).getTime() - new Date(held.requestedAt).getTime()).toBe(
+      10 * DAY_MS,
+    );
+    // Asked again, the same request; so too when staff ask, and the customer is named as who
+    // asked, in the staff's list of erasures waiting.
+    expect(await f.accounts.dataErase(f.a.shopId, token)).toEqual(held);
+    unwrap(await data.requestErasure(f.a, ayesha));
+    const waiting = await data.waitingErasures(f.a, { first: 10 });
+    expect(waiting.items.map((item) => [item.customer.id, item.request.requestedBy])).toEqual([
+      [ayesha, 'customer'],
+    ]);
+    expect((await f.accounts.account(f.a.shopId, token))!.dataRequests.erasure).toEqual(held);
+    expect(await auditOf(ayesha)).toEqual([['customer.erasure_requested', 'customer', ayesha]]);
+
+    // The order closed, it only waits for its day; and the shop may still cancel it.
+    unwrap(await f.orders.cancel(f.a, placed.id, { reason: 'customer' }));
+    expect((await f.accounts.account(f.a.shopId, token))!.dataRequests.erasure).toEqual({
+      ...held,
+      state: 'waiting',
+    });
+    unwrap(await data.cancelErasure(f.a, ayesha));
+    expect((await f.accounts.account(f.a.shopId, token))!.dataRequests.erasure).toBeNull();
+
+    // Asked for again, and carried out by the worker's sweep once due: their file goes with
+    // them, as their session does.
+    const asked = (await f.accounts.dataErase(f.a.shopId, token))!;
+    if (asked.state === 'none') throw new Error('Expected an erasure');
+    expect(asked.state).toBe('waiting');
+    await f.accounts.dataExport(f.a.shopId, token);
+    const due = new Date(new Date(asked.eraseAfter).getTime() + 1_000);
+    expect(await data.eraseDue(f.a.shopId, due)).toEqual({
+      erased: 1,
+      waiting: 0,
+    });
+    expect(await f.accounts.account(f.a.shopId, token)).toBeNull();
+    expect(await f.accountData.deleteExpired()).toBe(1);
+    expect(await files()).toEqual([]);
+    expect((await auditOf(ayesha))[0]).toEqual(['customer.erased', 'customer', ayesha]);
   });
 
   it('sweeps codes to sign in with once their day is up', async () => {

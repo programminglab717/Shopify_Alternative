@@ -2,6 +2,8 @@ import {
   ACCOUNT_TOKEN_HEADER,
   CLIENT_IP_HEADER,
   accountPath,
+  type AccountDataEraseResponse,
+  type AccountDataExportResponse,
   type AccountErrorResponse,
   type AccountLoginStartResponse,
   type AccountLoginVerifyErrorResponse,
@@ -33,8 +35,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
  * `code` signs in, answering the session's secret once; and, with that secret in
  * `x-hatti-account`, `GET …/account/session` reads the session, `GET …/account` the account,
  * `POST …/account/orders/{id}/link` the page of one of its orders, and `POST …/account/logout`
- * signs out. 422 says what was wrong with what was typed. The host application checks the
- * storefront key before any of this runs.
+ * signs out. The shopper's own data (ADR-572): `POST …/account/data/export` makes their file, or
+ * gives the one kept, and `GET` a new link to it; `POST …/account/data/erase` asks for their
+ * erasure. 422 says what was wrong with what was typed; 404, that there is no session, or nothing
+ * to link to. The host application checks the storefront key before any of this runs.
  */
 @Controller(accountPath(':shopId').slice(1))
 export class StorefrontAccountController {
@@ -130,6 +134,44 @@ export class StorefrontAccountController {
     const link = token ? await this.accounts.orderLink(shopId, token, orderId) : null;
     if (!link) throw new NotFoundException();
     return link;
+  }
+
+  @Post('data/export')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async dataExport(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountDataExportResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const file = token ? await this.accounts.dataExport(shopId, token) : null;
+    if (!file) throw new NotFoundException();
+    return file;
+  }
+
+  @Get('data/export')
+  @Header('cache-control', 'no-store')
+  async dataExportLink(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountDataExportResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const file = token ? await this.accounts.dataExportLink(shopId, token) : null;
+    if (!file) throw new NotFoundException();
+    return file;
+  }
+
+  @Post('data/erase')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async dataErase(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountDataEraseResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const erasure = token ? await this.accounts.dataErase(shopId, token) : null;
+    if (!erasure) throw new NotFoundException();
+    return erasure;
   }
 }
 

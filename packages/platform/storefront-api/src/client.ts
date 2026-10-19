@@ -2,6 +2,8 @@ import {
   ACCOUNT_TOKEN_HEADER,
   accountOrderLinkPath,
   accountPath,
+  type AccountDataEraseResponse,
+  type AccountDataExportResponse,
   type AccountErrorResponse,
   type AccountJson,
   type AccountLoginStartRequest,
@@ -509,6 +511,81 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return (await response.json()) as AccountOrderLinkResponse;
+  }
+
+  /**
+   * Makes the file of the shopper's own data, of the account the cookie's `token` names, or gives
+   * the one kept for the day (ADR-572): a link that downloads it for a few minutes; or `none`, as
+   * the shop keeps nothing of them. Null without a session.
+   */
+  async accountDataExport(
+    shopId: string,
+    token: string | null,
+  ): Promise<AccountDataExportResponse | null> {
+    if (!token) return null;
+    const response = await this.#request(
+      'POST',
+      accountPath(shopId, 'data/export'),
+      null,
+      {},
+      {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      },
+    );
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as AccountDataExportResponse;
+  }
+
+  /**
+   * A new link to the file kept of the shopper's own data (ADR-572), which downloads it for a few
+   * minutes; null without a session, or a file kept.
+   */
+  async accountDataExportLink(
+    shopId: string,
+    token: string | null,
+  ): Promise<Exclude<AccountDataExportResponse, { state: 'none' }> | null> {
+    if (!token) return null;
+    const response = await this.#request(
+      'GET',
+      accountPath(shopId, 'data/export'),
+      null,
+      undefined,
+      { [ACCOUNT_TOKEN_HEADER]: token },
+    );
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as Exclude<AccountDataExportResponse, { state: 'none' }>;
+  }
+
+  /**
+   * Asks for the erasure of the shopper whose account the cookie's `token` names (ADR-572), as
+   * the shop's staff would for them: how it waits; or `none`, as the shop keeps nothing of them.
+   * Null without a session.
+   */
+  async accountDataErase(
+    shopId: string,
+    token: string | null,
+  ): Promise<AccountDataEraseResponse | null> {
+    if (!token) return null;
+    const response = await this.#request(
+      'POST',
+      accountPath(shopId, 'data/erase'),
+      null,
+      {},
+      {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      },
+    );
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as AccountDataEraseResponse;
   }
 
   #request(

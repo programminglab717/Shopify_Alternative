@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### Data requests from the account
+
+* **A signed-in shopper downloads their data and asks for its erasure from their account,
+  through the requests staff make, the file kept a day and linked for minutes** ([ADR-572](../architecture/13-decision-log.md#adr-572--a-signed-in-shopper-downloads-their-data-and-asks-for-its-erasure-from-their-account-through-the-requests-staff-make-the-file-kept-a-day-and-linked-for-minutes),
+  CUS-02, CUS-05).
+* 3529 tests, 10 more: files made, reused and swept, erasures filed and
+  read back, the storefront's forms and their limits, and the HTTP surface.
+
 ### 6d092df · The storefront's account
 
 * **The storefront signs shoppers in with a code and shows their account, the pages never cached

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-571 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-572 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -579,6 +579,7 @@
 | 569 | The admin's online store has a Filters tab: every filter as before, or the shop's own list, ordered, named in English and Urdu, its custom fields' filters added | Accepted |
 | 570 | A shopper signs in to a shop's storefront with a code to their mobile, and the session reads their orders and store credit, the storefront's pages to follow | Accepted |
 | 571 | The storefront signs shoppers in with a code and shows their account, the pages never cached and every other page as it was, Hatti Base's customer templates in both languages | Accepted |
+| 572 | A signed-in shopper downloads their data and asks for its erasure from their account, through the requests staff make, the file kept a day and linked for minutes | Accepted |
 
 ---
 
@@ -21276,3 +21277,27 @@
   phone, without a password.
 * **Alternatives:** **Who is signed in on every page:** each page would be a request to the core
   and none could be cached; the header's word is the only thing that differs.
+
+## ADR-572 · A signed-in shopper downloads their data and asks for its erasure from their account, through the requests staff make, the file kept a day and linked for minutes
+
+* **Context:** Staff export a customer's data and file their erasure (CUS-05, ADR-123, ADR-110,
+  ADR-132); a shopper now has an account (ADR-570, ADR-571) but could ask for neither.
+* **Decision:**
+  * **Their file:** asked from the account, the customers module's own export is made, as the
+    customer, and kept in storage for a day, a second ask that day giving the same file; the
+    account links to it, and each click is given a signed link of five minutes, so the page holds
+    none. A worker sweep deletes files past their day; a merge or erasure stops their links at
+    once. Each file is audited, the customer its actor.
+  * **Their erasure:** filed through the customers module's intake, the customer recorded as who
+    asked, once while one is open; it waits ten days, which the shop may cancel within, and is
+    held while an order is open or store credit is left, as staff's are. The page says so first,
+    and that orders stay for the shop's accounts without a name, number or address, and asks the
+    shopper to say they understand.
+  * **The account** says what was asked and how it stands. The storefront's forms are refused from
+    another site and limited per address; their outcome is said in the page's language.
+  * Staff see who asked an erasure, staff, an app or the customer, and the activity log shows a
+    customer as its actor.
+* **Consequences:** A shopper exercises their rights without asking the shop. The shopper is not
+  yet told when their erasure is done (ADR-110).
+* **Alternatives:** **The file sent on WhatsApp:** a message is not a safe place for every order
+  and address a customer has. **A link kept on the page:** a page copied or cached would carry it.

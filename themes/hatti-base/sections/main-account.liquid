@@ -1,7 +1,9 @@
 {%- comment -%}
   The shopper's account (CUS-02, ADR-571): their orders with the shop, the newest first, each
   opening its page while it has one, and their store credit. The storefront shows it only to a
-  signed-in shopper, and sends others to sign in; in the theme editor, there is no one.
+  signed-in shopper, and sends others to sign in; in the theme editor, there is no one. Under
+  "Your data" (CUS-05, ADR-572), they download the file of their own data, or ask for its
+  erasure once told what it means and ticking that they understand.
 {%- endcomment -%}
 <div class="page-width section-spacing account">
   <div class="section-title">
@@ -76,6 +78,59 @@
         {%- endfor -%}
       </ul>
     {%- endif -%}
+
+    {%- assign data = customer.data_requests -%}
+    <section class="account__data" id="your-data" aria-labelledby="your-data-title">
+      <h2 id="your-data-title">{{ 'customer.account.data.title' | t }}</h2>
+      {%- if data.notice -%}
+        <p class="account__notice" role="status">{{ data.notice.message | escape }}</p>
+      {%- endif -%}
+      {%- if data.available -%}
+        <div class="account__data-part">
+          <h3>{{ 'customer.account.data.export_title' | t }}</h3>
+          <p>{{ 'customer.account.data.export_intro' | t }}</p>
+          {%- if data.export -%}
+            {%- assign kept_until = data.export.expires_at | date: format: 'day_month_year' -%}
+            <a class="button" href="{{ data.export.url }}">{{ 'customer.account.data.export_download' | t }}</a>
+            <p class="account__muted">{{ 'customer.account.data.export_kept' | t: date: kept_until }}</p>
+          {%- else -%}
+            {%- form 'customer_data_export' -%}
+              <button type="submit" class="button button--secondary">{{ 'customer.account.data.export_button' | t }}</button>
+            {%- endform -%}
+          {%- endif -%}
+        </div>
+        <div class="account__data-part">
+          <h3>{{ 'customer.account.data.erase_title' | t }}</h3>
+          {%- if data.erasure -%}
+            {%- assign erase_after = data.erasure.erase_after | date: format: 'day_month_year' -%}
+            {%- if data.erasure.state == 'held' -%}
+              <p>{{ 'customer.account.data.erase_held' | t: date: erase_after }}</p>
+            {%- else -%}
+              <p>{{ 'customer.account.data.erase_waiting' | t: date: erase_after }}</p>
+            {%- endif -%}
+            <p class="account__muted">{{ 'customer.account.data.erase_cancel' | t }}</p>
+          {%- else -%}
+            <p>{{ 'customer.account.data.erase_intro' | t }}</p>
+            <ul class="account__data-rules">
+              <li>{{ 'customer.account.data.erase_rule_wait' | t: count: data.erasure_wait_days }}</li>
+              <li>{{ 'customer.account.data.erase_rule_orders' | t }}</li>
+              <li>{{ 'customer.account.data.erase_rule_credit' | t }}</li>
+              <li>{{ 'customer.account.data.erase_rule_kept' | t }}</li>
+              <li>{{ 'customer.account.data.erase_rule_account' | t }}</li>
+            </ul>
+            {%- form 'customer_data_erase', class: 'account__erase' -%}
+              <label class="account__confirm">
+                <input type="checkbox" name="customer[confirm]" value="1" required>
+                <span>{{ 'customer.account.data.erase_confirm' | t }}</span>
+              </label>
+              <button type="submit" class="button button--secondary">{{ 'customer.account.data.erase_button' | t }}</button>
+            {%- endform -%}
+          {%- endif -%}
+        </div>
+      {%- else -%}
+        <p>{{ 'customer.account.data.none' | t }}</p>
+      {%- endif -%}
+    </section>
   {%- else -%}
     <a class="button" href="{{ routes.account_login_url }}">{{ 'customer.login.title' | t }}</a>
   {%- endif -%}
@@ -95,6 +150,13 @@
   .account__order-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 0; }
   .account__order-details dt { color: var(--color-muted); font-size: 0.875rem; }
   .account__order-details dd { margin: 0; }
+  .account__data { margin-block-start: 2.5rem; }
+  .account__notice { padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
+  .account__data-part { margin-block-end: 1.5rem; }
+  .account__data-part h3 { margin-block-end: 0.25rem; font-size: 1rem; }
+  .account__data-rules { padding-inline-start: 1.25rem; display: grid; gap: 0.25rem; }
+  .account__erase { display: grid; justify-items: start; gap: 0.75rem; }
+  .account__confirm { display: flex; align-items: center; gap: 0.5rem; }
 {% endstylesheet %}
 
 {% schema %}

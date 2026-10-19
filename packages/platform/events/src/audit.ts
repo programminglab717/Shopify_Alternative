@@ -4,8 +4,8 @@ import { sql, type SQL } from 'drizzle-orm';
 
 /**
  * Something a staff member or an app did that the shop may need to account for later, such as
- * revealing a customer's number or exporting customers; or what Hatti's support looked at
- * (ADR-156).
+ * revealing a customer's number or exporting customers; what Hatti's support looked at
+ * (ADR-156); or what a customer asked of their own data from their account (ADR-572).
  */
 export interface NewAuditEntry {
   /** "subject.verb", e.g. "customer.phone_revealed". */
@@ -13,10 +13,10 @@ export interface NewAuditEntry {
   /** What it was done to, as a kind of public ID: "customer", "order", "shop". */
   subjectType: IdKind;
   subjectId: string;
-  actorKind: 'app' | 'staff' | 'support';
-  /** The access token, the staff member, or Hatti's support agent. */
+  actorKind: 'app' | 'staff' | 'support' | 'customer';
+  /** The access token, the staff member, Hatti's support agent, or the customer. */
   actorId: string;
-  /** The staff member's role at the time; null for apps and support. */
+  /** The staff member's role at the time; null for apps, support and customers. */
   actorRole: string | null;
   /** More about it. Never contact details. */
   details?: Record<string, unknown>;
@@ -63,7 +63,7 @@ export async function listAudit(
     action: string;
     subject_type: IdKind;
     subject_id: string;
-    actor_kind: 'app' | 'staff' | 'support';
+    actor_kind: 'app' | 'staff' | 'support' | 'customer';
     actor_id: string;
     actor_role: string | null;
     details: Record<string, unknown>;

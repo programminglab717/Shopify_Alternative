@@ -206,4 +206,104 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
     expect(await client.accountSession(shop, verified.token)).toBeNull();
     expect(await client.accountOrderLink(shop, verified.token, order.id)).toBeNull();
   });
+
+  it("gives the shopper their own data, and files their erasure for the shop's staff to see (ADR-572)", async () => {
+    // Without a session, nothing; with the storefront's key alone, nothing either.
+    for (const route of ['data/export', 'data/erase'] as const) {
+      expect((await app.inject({ method: 'POST', url: accountPath(shop, route) })).statusCode).toBe(
+        401,
+      );
+    }
+    expect(await client.accountDataExport(shop, 'x'.repeat(43))).toBeNull();
+    expect(await client.accountDataErase(shop, 'x'.repeat(43))).toBeNull();
+
+    // The customer of the order placed before.
+    await client.accountLoginStart(shop, { phone: '0300 1234567' });
+    const verified = await client.accountLoginVerify(shop, {
+      phone: '0300 1234567',
+      code: (await codes()).at(-1)!.code,
+    });
+    if (!verified.ok) throw new Error(`Expected signed in, got ${verified.error}`);
+    const session = verified.token;
+    expect((await client.account(shop, session))!.dataRequests).toEqual({
+      available: true,
+      erasureWaitDays: 10,
+      export: null,
+      erasure: null,
+    });
+    expect(await client.accountDataExportLink(shop, session)).toBeNull();
+
+    // Their file, made once and kept for the day, downloaded from storage through its link.
+    const file = (await client.accountDataExport(shop, session))!;
+    if (file.state !== 'ready') throw new Error(`Expected a file, got ${file.state}`);
+    expect(file).toMatchObject({ state: 'ready', made: true });
+    const url = new URL(file.url);
+    expect(url.pathname).toMatch(
+      new RegExp(`^/storage/shops/${shop}/customer-data/[0-9a-f-]{36}\\.json$`),
+    );
+    const downloaded = await app.inject({ method: 'GET', url: `${url.pathname}${url.search}` });
+    expect(downloaded.statusCode).toBe(200);
+    expect(downloaded.json()).toMatchObject({
+      format: 'hatti.customer-data/1',
+      customer: { name: 'Ayesha Khan', phone: '+923001234567' },
+      orders: [expect.objectContaining({ phone: '+923001234567' })],
+    });
+    const again = (await client.accountDataExport(shop, session))!;
+    expect(again).toMatchObject({ made: false, readyAt: file.readyAt });
+    expect(await client.accountDataExportLink(shop, session)).toMatchObject({
+      made: false,
+      readyAt: file.readyAt,
+    });
+    expect((await client.account(shop, session))!.dataRequests.export).toEqual({
+      state: 'ready',
+      readyAt: file.readyAt,
+      expiresAt: file.expiresAt,
+    });
+
+    // Their erasure, held by their open order; asked again, the same.
+    const erasure = (await client.accountDataErase(shop, session))!;
+    expect(erasure).toMatchObject({ state: 'held' });
+    expect(await client.accountDataErase(shop, session)).toEqual(erasure);
+
+    // The shop's staff see it among the erasures waiting, asked for by the customer, and the
+    // audit log names the customer as who asked for both.
+    await admin.query(`UPDATE apps.access_tokens SET scopes = $2 WHERE shop_id = $1`, [
+      shop,
+      ['write_products', 'write_orders', 'read_customers', 'read_settings'],
+    ]);
+    const data = await graphql(`
+      {
+        customerErasureRequests(first: 5) {
+          nodes {
+            requestedBy
+            customer {
+              id
+            }
+          }
+        }
+        auditLog(first: 5) {
+          nodes {
+            action
+            subjectId
+            actor {
+              kind
+              id
+              role
+            }
+          }
+        }
+      }
+    `);
+    const [waiting] = data.customerErasureRequests.nodes as {
+      requestedBy: string;
+      customer: { id: string };
+    }[];
+    expect(waiting!.requestedBy).toBe('CUSTOMER');
+    const customerId = waiting!.customer.id;
+    const actor = { kind: 'CUSTOMER', id: customerId, role: null };
+    expect(data.auditLog.nodes).toEqual([
+      { action: 'customer.erasure_requested', subjectId: customerId, actor },
+      { action: 'customer.data_exported', subjectId: customerId, actor },
+    ]);
+  });
 });

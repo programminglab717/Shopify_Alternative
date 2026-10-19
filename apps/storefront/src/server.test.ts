@@ -20,6 +20,9 @@ import {
   PRODUCT_FEED_PATH,
   StorefrontApiError,
   type AccountClient,
+  type AccountDataEraseResponse,
+  type AccountDataExportJson,
+  type AccountDataExportResponse,
   type AccountJson,
   type AccountLoginStartRequest,
   type AccountLoginStartResult,
@@ -572,7 +575,60 @@ class FakeCore {
     this.signedOut.push(token);
     this.accounts.delete(token);
   }
+
+  /**
+   * What shoppers asked of their own data (ADR-572), by the session's secret; the files kept, and
+   * how their erasure waits once asked for.
+   */
+  readonly dataAsked: ['export' | 'link' | 'erase', string][] = [];
+  readonly dataFiles = new Map<string, AccountDataExportJson>();
+  erasure: AccountDataEraseResponse = {
+    state: 'waiting',
+    requestedAt: '2026-10-19T10:00:00.000Z',
+    eraseAfter: '2026-10-29T10:00:00.000Z',
+  };
+
+  async accountDataExport(
+    _shopId: string,
+    token: string | null,
+  ): Promise<AccountDataExportResponse | null> {
+    const account = token ? this.accounts.get(token) : undefined;
+    if (!token || !account) return null;
+    this.dataAsked.push(['export', token]);
+    if (!account.dataRequests.available) return { state: 'none' };
+    const file = this.dataFiles.get(token) ?? {
+      state: 'ready',
+      readyAt: '2026-10-19T10:00:00.000Z',
+      expiresAt: '2026-10-20T10:00:00.000Z',
+    };
+    const made = !this.dataFiles.has(token);
+    this.dataFiles.set(token, file);
+    return { ...file, made, url: SIGNED_FILE };
+  }
+
+  async accountDataExportLink(
+    _shopId: string,
+    token: string | null,
+  ): Promise<Exclude<AccountDataExportResponse, { state: 'none' }> | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    this.dataAsked.push(['link', token]);
+    const file = this.dataFiles.get(token);
+    return file ? { ...file, made: false, url: SIGNED_FILE } : null;
+  }
+
+  async accountDataErase(
+    _shopId: string,
+    token: string | null,
+  ): Promise<AccountDataEraseResponse | null> {
+    const account = token ? this.accounts.get(token) : undefined;
+    if (!token || !account) return null;
+    this.dataAsked.push(['erase', token]);
+    return account.dataRequests.available ? this.erasure : { state: 'none' };
+  }
 }
+
+/** Where storage gives a shopper's file, as the core signs it for minutes (ADR-572). */
+const SIGNED_FILE = 'https://storage.test/shops/1/customer-data/1.json?expires=300&signature=x';
 
 /** A preview link's token, as the core seals them. */
 const PREVIEW_TOKEN = 'v1.k1.cHJldmlldy1pdiE.c2VhbGVkLWNsYWltcy1hbmQtdGFn';
@@ -3249,6 +3305,7 @@ const ACCOUNT: AccountJson = {
     currency: 'PKR',
     expiring: { amount: 20_000, expiresAt: '2026-12-31T00:00:00.000Z' },
   },
+  dataRequests: { available: true, erasureWaitDays: 10, export: null, erasure: null },
 };
 
 describe("Shoppers' accounts (ADR-571)", () => {
@@ -3712,6 +3769,285 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(core.signedOut).toEqual([ACCOUNT_TOKEN, ACCOUNT_TOKEN]);
     // Signed out, the account sends them to sign in.
     expect((await go('/account')).headers.location).toBe('/account/login');
+    await app.close();
+  });
+
+  it('gives a signed-in shopper the file of their own data, coming back to their account saying so (ADR-572)', async () => {
+    const app = server();
+    const cookie = signedIn();
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(page.body).toContain('<h2 id="your-data-title">Your data</h2>');
+    expect(page.body).toMatch(
+      /<form method="post" action="\/account\/data\/export" accept-charset="UTF-8"><input type="hidden" name="form_type" value="customer_data_export">\s*<button type="submit" class="button button--secondary">Download my data<\/button>/,
+    );
+    expect(page.body).not.toContain('role="status"');
+
+    const asked = await app.inject({
+      method: 'POST',
+      url: '/account/data/export',
+      headers: { ...FORM, cookie },
+      payload: form({ form_type: 'customer_data_export' }),
+    });
+    expect([asked.statusCode, asked.headers.location, asked.headers['cache-control']]).toEqual([
+      303,
+      '/account?data_request=export_ready#your-data',
+      'private, no-store',
+    ]);
+    expect(core.dataAsked).toEqual([['export', ACCOUNT_TOKEN]]);
+    // Back on the account, saying so, with the file to download while it is kept.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      dataRequests: { ...ACCOUNT.dataRequests, export: core.dataFiles.get(ACCOUNT_TOKEN)! },
+    });
+    const ready = await app.inject({
+      method: 'GET',
+      url: '/account?data_request=export_ready',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(ready.statusCode).toBe(200);
+    expect(ready.body).toContain(
+      '<p class="account__notice" role="status">Your data is ready. Download it below.</p>',
+    );
+    expect(ready.body).toContain(
+      '<a class="button" href="/account/data/export">Download your file</a>',
+    );
+    expect(ready.body).toContain('Your file is kept until 20 October 2026.');
+    expect(ready.body).not.toContain('value="customer_data_export"');
+    // Downloaded through a link the core signs each time, which the page never holds.
+    expect(ready.body).not.toContain('storage.test');
+    const download = await app.inject({
+      method: 'GET',
+      url: '/account/data/export',
+      headers: { host: 'localhost', cookie },
+    });
+    expect([download.statusCode, download.headers.location]).toEqual([303, SIGNED_FILE]);
+    expect(download.headers['cache-control']).toBe('private, no-store');
+    // Gone since: back to the account, saying so.
+    core.dataFiles.clear();
+    const gone = await app.inject({
+      method: 'GET',
+      url: '/ur/account/data/export',
+      headers: { host: 'localhost', cookie },
+    });
+    expect([gone.statusCode, gone.headers.location]).toEqual([
+      302,
+      '/ur/account?data_request=export_gone#your-data',
+    ]);
+    const goneSaid = await app.inject({
+      method: 'GET',
+      url: '/ur/account?data_request=export_gone',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(goneSaid.body).toContain('یہ فائل اب محفوظ نہیں۔ نئی فائل منگوائیں۔');
+    // A notice the page does not know says nothing.
+    const unknown = await app.inject({
+      method: 'GET',
+      url: '/account?data_request=%3Cscript%3E',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(unknown.body).not.toContain('role="status"');
+
+    // A number the shop keeps nothing of: nothing to download, as the page says, in Urdu too.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      orders: [],
+      dataRequests: { ...ACCOUNT.dataRequests, available: false },
+    });
+    const none = await app.inject({
+      method: 'POST',
+      url: '/ur/account/data/export',
+      headers: { ...FORM, cookie },
+      payload: form({ form_type: 'customer_data_export' }),
+    });
+    expect(none.headers.location).toBe('/ur/account?data_request=export_none#your-data');
+    const noneSaid = await app.inject({
+      method: 'GET',
+      url: '/ur/account?data_request=export_none',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(noneSaid.body).toContain(
+      'ہمارے پاس ابھی آپ کا کوئی ڈیٹا محفوظ نہیں، اس لیے ڈاؤن لوڈ کرنے کو کچھ نہیں۔',
+    );
+    expect(noneSaid.body).toContain('<p>ہمارے پاس ابھی آپ کا کوئی ڈیٹا محفوظ نہیں۔</p>');
+    expect(noneSaid.body).not.toContain('customer_data_erase');
+    await app.close();
+  });
+
+  it("asks for a shopper's erasure only once they say they understand what it means (ADR-572)", async () => {
+    const app = server();
+    const cookie = signedIn();
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    // What happens, as the core's rules have it, and the box to tick.
+    expect(page.body).toContain(
+      'Your data is deleted after 10 days. Until then the shop can cancel the request',
+    );
+    expect(page.body).toContain('deleting waits until it has been delivered or cancelled.');
+    expect(page.body).toContain('deleting waits until the shop has settled it with you.');
+    expect(page.body).toContain('but without your name, number, email or address.');
+    expect(page.body).toMatch(
+      /<form method="post" action="\/account\/data\/erase" accept-charset="UTF-8" class="account__erase"><input type="hidden" name="form_type" value="customer_data_erase">/,
+    );
+    expect(page.body).toContain(
+      '<input type="checkbox" name="customer[confirm]" value="1" required>',
+    );
+    expect(page.body).toContain('<span>I understand</span>');
+
+    // Not ticked: the page again, saying why, and nothing asked.
+    const unticked = await app.inject({
+      method: 'POST',
+      url: '/account/data/erase',
+      headers: { ...FORM, cookie },
+      payload: form({ form_type: 'customer_data_erase' }),
+    });
+    expect(unticked.statusCode).toBe(422);
+    expect(unticked.headers['cache-control']).toBe('private, no-store');
+    expect(unticked.body).toContain(
+      'Tick the box to say you understand what deleting your data means.',
+    );
+    expect(core.dataAsked).toEqual([]);
+    const untickedUrdu = await app.inject({
+      method: 'POST',
+      url: '/ur/account/data/erase',
+      headers: { ...FORM, cookie },
+      payload: form({ 'customer[confirm]': 'yes' }),
+    });
+    expect(untickedUrdu.statusCode).toBe(422);
+    expect(untickedUrdu.body).toContain(
+      'اپنا ڈیٹا حذف کرنے کا مطلب سمجھنے کی تصدیق کے لیے خانے پر نشان لگائیں۔',
+    );
+    expect(core.dataAsked).toEqual([]);
+
+    // Ticked: asked for, and back on the account, saying so.
+    const asked = await app.inject({
+      method: 'POST',
+      url: '/ur/account/data/erase',
+      headers: { ...FORM, cookie },
+      payload: form({ form_type: 'customer_data_erase', 'customer[confirm]': '1' }),
+    });
+    expect([asked.statusCode, asked.headers.location]).toEqual([
+      303,
+      '/ur/account?data_request=erase_requested#your-data',
+    ]);
+    expect(core.dataAsked).toEqual([['erase', ACCOUNT_TOKEN]]);
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      dataRequests: {
+        ...ACCOUNT.dataRequests,
+        erasure: core.erasure as Exclude<AccountDataEraseResponse, { state: 'none' }>,
+      },
+    });
+    const urdu = await app.inject({
+      method: 'GET',
+      url: '/ur/account?data_request=erase_requested',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(urdu.body).toContain('آپ کا ڈیٹا حذف کرنے کی درخواست ہمیں مل گئی ہے۔');
+    expect(urdu.body).toContain('درخواست منسوخ کرنے کے لیے دکان سے رابطہ کریں۔');
+    expect(urdu.body).not.toContain('customer_data_erase');
+    const english = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(english.body).toContain('<p>Your data will be deleted after 29 October 2026.</p>');
+    // Held by an open order, or store credit left, it says so.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      dataRequests: {
+        ...ACCOUNT.dataRequests,
+        erasure: {
+          state: 'held',
+          requestedAt: '2026-10-19T10:00:00.000Z',
+          eraseAfter: '2026-10-29T10:00:00.000Z',
+        },
+      },
+    });
+    const held = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(held.body).toContain(
+      'Your data will be deleted after 29 October 2026, once your open orders are closed and any store credit left is settled.',
+    );
+
+    // A number the shop keeps nothing of: nothing to delete.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      dataRequests: { ...ACCOUNT.dataRequests, available: false },
+    });
+    const none = await app.inject({
+      method: 'POST',
+      url: '/account/data/erase',
+      headers: { ...FORM, cookie },
+      payload: form({ 'customer[confirm]': '1' }),
+    });
+    expect(none.headers.location).toBe('/account?data_request=erase_none#your-data');
+    await app.close();
+  });
+
+  it("refuses shoppers' data requests from other sites, and from no one signed in (ADR-572)", async () => {
+    const app = server();
+    const cookie = signedIn();
+    for (const url of ['/account/data/export', '/ur/account/data/erase']) {
+      const elsewhere = await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...FORM, cookie, 'sec-fetch-site': 'cross-site' },
+        payload: form({ 'customer[confirm]': '1' }),
+      });
+      expect(elsewhere.statusCode).toBe(403);
+      expect(elsewhere.headers['cache-control']).toBe('private, no-store');
+    }
+    expect(core.dataAsked).toEqual([]);
+    // The shop's own pages may.
+    const own = await app.inject({
+      method: 'POST',
+      url: '/account/data/export',
+      headers: { ...FORM, cookie, 'sec-fetch-site': 'same-origin' },
+    });
+    expect(own.statusCode).toBe(303);
+
+    // No one signed in: to sign in first.
+    for (const url of ['/account/data/export', '/account/data/erase']) {
+      const out = await app.inject({
+        method: 'POST',
+        url,
+        headers: FORM,
+        payload: form({ 'customer[confirm]': '1' }),
+      });
+      expect([out.statusCode, out.headers.location]).toEqual([303, '/account/login']);
+    }
+    const download = await app.inject({
+      method: 'GET',
+      url: '/ur/account/data/export',
+      headers: { host: 'localhost' },
+    });
+    expect([download.statusCode, download.headers.location]).toEqual([
+      302,
+      '/ur/account/login?return_to=%2Fur%2Faccount',
+    ]);
+    // A session that is over: to sign in, its cookies gone.
+    const over = await app.inject({
+      method: 'POST',
+      url: '/account/data/erase',
+      headers: { ...FORM, cookie: 'hatti_account=sEsSiOn_SeCrEt-EnDeD-0123456789abcdef' },
+      payload: form({ 'customer[confirm]': '1' }),
+    });
+    expect([over.statusCode, over.headers.location]).toEqual([303, '/account/login']);
+    expect(over.headers['set-cookie']).toEqual([
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    ]);
+    expect(core.dataAsked).toEqual([['export', ACCOUNT_TOKEN]]);
     await app.close();
   });
 });
@@ -4213,6 +4549,36 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     });
     expect(typed.statusCode).toBe(429);
     expect(core.loginVerifies).toHaveLength(0);
+    await app.close();
+  });
+
+  it("limits how often an address can ask for shoppers' own data (ADR-572)", async () => {
+    const core = new FakeCore();
+    core.accounts.set(ACCOUNT_TOKEN, ACCOUNT);
+    const app = server(core);
+    const answers = [];
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      const answer = await app.inject({
+        method: 'POST',
+        url: attempt % 2 === 0 ? '/ur/account/data/export' : '/ur/account/data/erase',
+        headers: {
+          host: 'bazaar.localhost',
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: `hatti_account=${ACCOUNT_TOKEN}`,
+        },
+        payload: 'customer%5Bconfirm%5D=1',
+        remoteAddress: '203.0.113.72',
+      });
+      answers.push(answer.statusCode);
+      if (answer.statusCode === 429) {
+        expect(answer.body).toContain(
+          'بہت زیادہ کوششیں۔ براہ کرم ایک منٹ انتظار کر کے دوبارہ کوشش کریں۔',
+        );
+        expect(answer.headers['cache-control']).toBe('private, no-store');
+      }
+    }
+    expect(answers).toEqual([...Array<number>(10).fill(303), 429]);
+    expect(core.dataAsked).toHaveLength(10);
     await app.close();
   });
 

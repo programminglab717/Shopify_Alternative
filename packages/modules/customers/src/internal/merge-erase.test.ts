@@ -343,6 +343,69 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
     ]);
   });
 
+  it('takes a customer asking for their own erasure and file, naming them as who asked (ADR-572)', async () => {
+    const ayesha = unwrap(await f.customers.create(f.a, { phone: JAZZ, name: 'Ayesha' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(
+      await f.db.tenant(f.a.shopId, (tx) => f.data.ownErasureIn(tx, f.a.shopId, ayesha.id)),
+    ).toBeNull();
+    const asked = unwrap(await f.data.requestOwnErasure(f.a.shopId, ayesha.id));
+    expect(asked).toMatchObject({ customerId: ayesha.id, requestedBy: 'customer' });
+    expect(asked.dueAt.getTime() - asked.requestedAt.getTime()).toBe(
+      ERASURE_WAIT_DAYS * 86_400_000,
+    );
+    // Asking again, or staff asking, changes nothing: the first request stands.
+    expect(unwrap(await f.data.requestOwnErasure(f.a.shopId, ayesha.id))).toEqual(asked);
+    expect(unwrap(await f.data.requestErasure(f.staff, ayesha.id))).toEqual(asked);
+    expect(errorsOf(await f.data.requestOwnErasure(f.b.shopId, ayesha.id))).toEqual([
+      ['id', 'NOT_FOUND'],
+    ]);
+    // What holds it, as the sweep would find it: nothing, then an open order.
+    const own = () =>
+      f.db.tenant(f.a.shopId, (tx) => f.data.ownErasureIn(tx, f.a.shopId, ayesha.id));
+    expect(await own()).toEqual({ request: asked, holds: [] });
+    f.handler.blockers = ['Their orders must be closed or cancelled first; still open: #1001'];
+    expect(await own()).toEqual({ request: asked, holds: f.handler.blockers });
+    f.handler.blockers = [];
+    // Staff see who asked in the list.
+    const listed = await f.data.waitingErasures(f.a, { first: 10 });
+    expect(listed.items.map((item) => item.request.requestedBy)).toEqual(['customer']);
+
+    // Their own file, as staff would give it them.
+    const file = unwrap(await f.data.exportOwn(f.a.shopId, ayesha.id));
+    expect(file.fileName).toBe(`customer-${toPublicId('customer', ayesha.id)}.json`);
+    expect(JSON.parse(file.json)).toMatchObject({ customer: { name: 'Ayesha', phone: JAZZ } });
+    expect(errorsOf(await f.data.exportOwn(f.b.shopId, ayesha.id))).toEqual([['id', 'NOT_FOUND']]);
+
+    // Carried out by the sweep, the customer named as who asked.
+    const due = new Date(asked.dueAt.getTime() + 1_000);
+    expect(await f.data.eraseDue(f.a.shopId, due)).toEqual({ erased: 1, waiting: 0 });
+    expect((await f.outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      [
+        'customer.erasure_requested',
+        { dueAt: asked.dueAt.toISOString(), actorKind: 'customer', actorId: ayesha.id },
+      ],
+      [
+        'customer.erased',
+        {
+          actorKind: 'customer',
+          actorId: ayesha.id,
+          requestedAt: asked.requestedAt.toISOString(),
+        },
+      ],
+    ]);
+    const audit = await f.db.tenant(f.a.shopId, (tx) =>
+      listAudit(tx, f.a.shopId, { first: 10, subjectId: ayesha.id }),
+    );
+    expect(
+      audit.items.map((entry) => [entry.action, entry.actorKind, entry.actorId, entry.actorRole]),
+    ).toEqual([
+      ['customer.erased', 'customer', ayesha.id, null],
+      ['customer.data_exported', 'customer', ayesha.id, null],
+      ['customer.erasure_requested', 'customer', ayesha.id, null],
+    ]);
+  });
+
   it('lists the erasures waiting, the soonest first, a page at a time', async () => {
     const ask = async (phone: string, name: string, dueAt: string) => {
       const customer = unwrap(await f.customers.create(f.a, { phone, name }));
@@ -377,7 +440,15 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
     ]);
     const all = await f.data.waitingErasures(f.a, { first: 10 });
     expect(all.items.map((item) => [item.customer.id, item.request])).toEqual([
-      [sana.id, { customerId: sana.id, requestedAt: expect.any(Date), dueAt: expect.any(Date) }],
+      [
+        sana.id,
+        {
+          customerId: sana.id,
+          requestedAt: expect.any(Date),
+          dueAt: expect.any(Date),
+          requestedBy: 'app',
+        },
+      ],
       [ayesha.id, expect.objectContaining({ customerId: ayesha.id })],
       [bilal.id, expect.objectContaining({ customerId: bilal.id })],
     ]);

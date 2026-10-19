@@ -346,11 +346,11 @@ type ArticleUpdatePayload {
 }
 
 """
-Who did something: an app, by its access token, a staff member, or Hatti's support agent.
+Who did something: an app, by its access token, a staff member, Hatti's support agent, or a customer, asking for themselves from their account.
 """
 type AuditActor {
   """
-  The access token (tok_…), or the staff member or Hatti's support agent (usr_…).
+  The access token (tok_…), the staff member or Hatti's support agent (usr_…), or the customer (cus_…), who may since have been erased.
   """
   id: ID!
   kind: AuditActorKind!
@@ -361,6 +361,11 @@ type AuditActor {
 
 enum AuditActorKind {
   APP
+
+  """
+  The customer themselves, asking for their data or its erasure from their account on the online store (ADR-572).
+  """
+  CUSTOMER
   STAFF
 
   """Hatti's support, looking while the owner lets it (ADR-156)."""
@@ -3678,7 +3683,7 @@ type CustomerErasureCancelPayload {
 }
 
 """
-A customer's erasure waiting to happen, as asked (customerErasureRequest), until customerErasureCancel stops it. Who asked is in the audit log.
+A customer's erasure waiting to happen, as asked (customerErasureRequest, or the customer from their account), until customerErasureCancel stops it. Which member of staff or app asked is in the audit log.
 """
 type CustomerErasureRequest {
   """The customer to erase."""
@@ -3686,6 +3691,11 @@ type CustomerErasureRequest {
 
   """When it was asked for."""
   requestedAt: DateTime!
+
+  """
+  Who asked: staff or an app, for the customer, or the customer themselves, from their account on the online store.
+  """
+  requestedBy: CustomerErasureRequester!
 
   """
   When the customer's personal data will be erased, unless it is cancelled first.
@@ -3710,6 +3720,20 @@ type CustomerErasureRequestPayload {
   """
   erasureScheduledAt: DateTime
   userErrors: [UserError!]!
+}
+
+"""Who asked for a customer's erasure."""
+enum CustomerErasureRequester {
+  """An app, for the customer (customerErasureRequest)."""
+  APP
+
+  """
+  The customer themselves, signed in to their account on the online store.
+  """
+  CUSTOMER
+
+  """A member of staff, for the customer (customerErasureRequest)."""
+  STAFF
 }
 
 """A row an import could not take, and why."""

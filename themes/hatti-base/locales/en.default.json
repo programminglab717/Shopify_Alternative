@@ -274,6 +274,39 @@
       "items": {
         "one": "{{ count }} item",
         "other": "{{ count }} items"
+      },
+      "data": {
+        "title": "Your data",
+        "none": "We don't keep any data about you yet.",
+        "export_title": "Download your data",
+        "export_intro": "Get a file of everything this shop keeps about you, such as your details and your orders.",
+        "export_button": "Download my data",
+        "export_download": "Download your file",
+        "export_kept": "Your file is kept until {{ date }}. After that, you can ask for a new one.",
+        "erase_title": "Delete your data",
+        "erase_intro": "You can ask the shop to delete your personal data. This is what happens:",
+        "erase_rule_wait": {
+          "one": "Your data is deleted after {{ count }} day. Until then the shop can cancel the request, so contact the shop if you change your mind.",
+          "other": "Your data is deleted after {{ count }} days. Until then the shop can cancel the request, so contact the shop if you change your mind."
+        },
+        "erase_rule_orders": "If an order of yours is still open, deleting waits until it has been delivered or cancelled.",
+        "erase_rule_credit": "If you have store credit left, deleting waits until the shop has settled it with you.",
+        "erase_rule_kept": "The shop keeps your orders for its accounts, such as the items, the amounts and the city they went to, but without your name, number, email or address.",
+        "erase_rule_account": "You are signed out and your account is emptied. If you order again later, you start afresh.",
+        "erase_confirm": "I understand",
+        "erase_button": "Delete my data",
+        "erase_waiting": "Your data will be deleted after {{ date }}.",
+        "erase_held": "Your data will be deleted after {{ date }}, once your open orders are closed and any store credit left is settled.",
+        "erase_cancel": "Changed your mind? Contact the shop to cancel the request.",
+        "notices": {
+          "export_ready": "Your data is ready. Download it below.",
+          "export_none": "We don't keep any data about you yet, so there is nothing to download.",
+          "export_gone": "That file is no longer kept. Ask for a new one.",
+          "erase_requested": "We have your request to delete your data.",
+          "erase_none": "We don't keep any data about you, so there is nothing to delete.",
+          "erase_unconfirmed": "Tick the box to say you understand what deleting your data means.",
+          "too_many_requests": "Too many tries. Please wait a minute and try again."
+        }
       }
     }
   },

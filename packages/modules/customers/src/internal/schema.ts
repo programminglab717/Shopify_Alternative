@@ -86,6 +86,13 @@ export const customerPhones = customersSchema.table(
 );
 
 /**
+ * Who asks for a customer's erasure: staff or an app on their behalf, or the customer themselves,
+ * from their account on the storefront (ADR-572).
+ */
+export const ERASURE_REQUESTER_KINDS = ['app', 'staff', 'customer'] as const;
+export type ErasureRequesterKind = (typeof ERASURE_REQUESTER_KINDS)[number];
+
+/**
  * Erasures asked for after a waiting period, one per customer, until the worker's sweep carries
  * them out or staff cancel them (ADR-110).
  */
@@ -96,7 +103,7 @@ export const erasureRequests = customersSchema.table(
     customerId: uuid('customer_id').notNull(),
     requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
     dueAt: timestamp('due_at', { withTimezone: true }).notNull(),
-    actorKind: text('actor_kind', { enum: BLOCKER_KINDS }).notNull(),
+    actorKind: text('actor_kind', { enum: ERASURE_REQUESTER_KINDS }).notNull(),
     actorId: uuid('actor_id').notNull(),
     actorRole: text('actor_role'),
   },

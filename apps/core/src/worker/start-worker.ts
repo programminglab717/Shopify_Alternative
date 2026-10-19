@@ -8,7 +8,11 @@ import {
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
-import { AbandonedCheckoutService, CheckoutExpiry } from '@hatti/checkout/public';
+import {
+  AbandonedCheckoutService,
+  AccountDataExpiry,
+  CheckoutExpiry,
+} from '@hatti/checkout/public';
 import {
   CustomerService,
   SegmentFieldRegistry,
@@ -117,6 +121,7 @@ import { DomainNotices } from './domain-notices.js';
 import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
+import { AccountDataFiles } from './account-data-files.js';
 import { ExpiredMemberships } from './expired-memberships.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
@@ -477,6 +482,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => expired.stop());
+    // Shoppers' files of their own data let go once their day is up (ADR-572).
+    const accountFiles = new AccountDataFiles(
+      new AccountDataExpiry(database, workerStorage(config)),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => accountFiles.stop());
     // Shoppers who typed their number at checkout and left reminded once, as their shop says
     // (ADR-393).
     const checkoutReminders = new CheckoutReminders(

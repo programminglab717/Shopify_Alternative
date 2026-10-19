@@ -1,5 +1,5 @@
 import { CustomerDataRegistry, type CustomerDataHandler } from '@hatti/customers/public';
-import { toDate } from '@hatti/db';
+import { toDate, type Tx } from '@hatti/db';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
@@ -11,7 +11,9 @@ import { sql } from 'drizzle-orm';
  * Checkouts they left after typing their number (ADR-393) lose what they typed, and are in their
  * file. So do the sessions signed in to their account on the storefront with one of their numbers
  * (ADR-570): erased, they go, and their codes to sign in with; merged, the customer kept is the one
- * they read.
+ * they read. The files of their own data they asked for from their account (ADR-572) are let go
+ * either way, by the worker's sweep, which storage keeps them until: merged, the customer kept may
+ * ask for one of everything that is now theirs.
  */
 export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'checkout',
@@ -25,6 +27,7 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       UPDATE checkout.account_sessions SET customer_id = ${intoId}
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
+    await letGoOfFilesIn(tx, shopId, fromId);
   },
 
   async erase(tx, shopId, customer) {
@@ -47,6 +50,8 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
          SET contact_name = NULL, contact_phone = NULL, contact_at = NULL, contact_lines = NULL,
              contact_subtotal = NULL, kept_until = NULL, reminder_token_hash = NULL
        WHERE shop_id = ${shopId} AND contact_phone = ANY(${sql.param(customer.phones)}::text[])`);
+    // The files of their own data they asked for (ADR-572).
+    await letGoOfFilesIn(tx, shopId, customer.id);
   },
 
   async export(tx, shopId, customer) {
@@ -108,6 +113,16 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
     };
   },
 };
+
+/**
+ * Lets go of the files of the customer `customerId`'s own data (ADR-572): their time is up now, and
+ * the worker's sweep has storage delete them; nothing gives them out meanwhile.
+ */
+async function letGoOfFilesIn(tx: Tx, shopId: string, customerId: string): Promise<void> {
+  await tx.execute(sql`
+    UPDATE checkout.account_data_exports SET expires_at = least(expires_at, now())
+     WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
+}
 
 /** Adds checkout to merges, erasure and exports when the application starts. */
 @Injectable()

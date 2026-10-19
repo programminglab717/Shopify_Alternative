@@ -28,7 +28,13 @@ import {
 import { numbersOf } from './phones.js';
 import type { CustomerRecord, Page } from './records.js';
 import { LIMITS, customerSearchText } from './rules.js';
-import { consentEvents, customerPhones, customers, erasureRequests } from './schema.js';
+import {
+  consentEvents,
+  customerPhones,
+  customers,
+  erasureRequests,
+  type ErasureRequesterKind,
+} from './schema.js';
 import {
   mergeStoreCreditIn,
   storeCreditAccountsIn,
@@ -47,6 +53,33 @@ export interface ErasureRequestRecord {
   requestedAt: Date;
   /** When the worker's sweep may erase the customer. */
   dueAt: Date;
+  /** Who asked: staff or an app, or the customer themselves, from their account (ADR-572). */
+  requestedBy: ErasureRequesterKind;
+}
+
+/** A customer's own erasure, as their account shows it (ADR-572). */
+export interface OwnErasureRecord {
+  request: ErasureRequestRecord;
+  /**
+   * Why it cannot happen yet, as sentences for the merchant: an order of theirs still open, or
+   * store credit left. The worker's sweep waits for them, past its time if need be.
+   */
+  holds: string[];
+}
+
+/**
+ * Who asks for a customer's erasure or their file, as the audit log records them: staff or an app,
+ * or the customer themselves, from their account (ADR-572), by their own ID.
+ */
+interface Requester {
+  actorKind: ErasureRequesterKind;
+  actorId: string;
+  actorRole: string | null;
+}
+
+/** The customer `id`, asking for themselves. */
+function customerRequester(id: string): Requester {
+  return { actorKind: 'customer', actorId: id, actorRole: null };
 }
 
 /**
@@ -55,7 +88,7 @@ export interface ErasureRequestRecord {
  */
 interface Erasure {
   actor: Actor | 'system';
-  by: { actorKind: 'app' | 'staff'; actorId: string; actorRole: string | null };
+  by: Requester;
   requestedAt?: Date;
 }
 
@@ -68,7 +101,12 @@ export interface WaitingErasureRecord {
 }
 
 function toErasureRequest(row: typeof erasureRequests.$inferSelect): ErasureRequestRecord {
-  return { customerId: row.customerId, requestedAt: row.requestedAt, dueAt: row.dueAt };
+  return {
+    customerId: row.customerId,
+    requestedAt: row.requestedAt,
+    dueAt: row.dueAt,
+    requestedBy: row.actorKind,
+  };
 }
 
 /** A customer's own data, as a file to give them. */
@@ -266,7 +304,39 @@ export class CustomerDataService {
     tenant: TenantContext,
     id: string,
   ): Promise<MutationResult<ErasureRequestRecord>> {
-    const shopId = tenant.shopId;
+    return this.#requestErasure(tenant.shopId, id, actorColumnsOf(tenant.actor));
+  }
+
+  /**
+   * Asks for the customer `id`'s erasure, as {@link requestErasure} does, for the customer
+   * themselves, from their account on the storefront (ADR-572): the request, the event and the
+   * audit log name them as who asked. Asking again, or once staff have, changes nothing.
+   */
+  async requestOwnErasure(
+    shopId: string,
+    id: string,
+  ): Promise<MutationResult<ErasureRequestRecord>> {
+    return this.#requestErasure(shopId, id, customerRequester(id));
+  }
+
+  /**
+   * The customer `customerId`'s erasure waiting to happen, in the caller's transaction, with what
+   * holds it until it can (ADR-572); null while none waits.
+   */
+  async ownErasureIn(tx: Tx, shopId: string, customerId: string): Promise<OwnErasureRecord | null> {
+    const [row] = await tx
+      .select()
+      .from(erasureRequests)
+      .where(and(eq(erasureRequests.shopId, shopId), eq(erasureRequests.customerId, customerId)));
+    if (!row) return null;
+    return { request: toErasureRequest(row), holds: await this.#holdsIn(tx, shopId, customerId) };
+  }
+
+  async #requestErasure(
+    shopId: string,
+    id: string,
+    by: Requester,
+  ): Promise<MutationResult<ErasureRequestRecord>> {
     return this.db.tenant(shopId, async (tx) => {
       const [current] = await tx
         .select({ id: customers.id })
@@ -279,7 +349,6 @@ export class CustomerDataService {
         .from(erasureRequests)
         .where(and(eq(erasureRequests.shopId, shopId), eq(erasureRequests.customerId, id)));
       if (existing) return { ok: true, value: toErasureRequest(existing) };
-      const by = actorColumnsOf(tenant.actor);
       const [row] = await tx
         .insert(erasureRequests)
         .values({
@@ -484,19 +553,7 @@ export class CustomerDataService {
       .delete(customerPhones)
       .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.customerId, id)))
       .returning({ phone: customerPhones.phone });
-    const blockers: string[] = [];
-    // Store credit the shop still owes them would go with them (ADR-184).
-    for (const account of await storeCreditAccountsIn(tx, shopId, id)) {
-      if (account.balance > 0n) {
-        blockers.push(
-          `They have ${formatMoney(money(account.balance, account.currency))} of store credit ` +
-            'left: debit it, once it is given to them another way, before erasing them',
-        );
-      }
-    }
-    for (const handler of this.registry.handlers) {
-      blockers.push(...(await handler.erasureBlockers(tx, shopId, id)));
-    }
+    const blockers = await this.#holdsIn(tx, shopId, id);
     if (blockers.length > 0) {
       throw new UserErrorsRollback(
         blockers.map((message) => ({ field: ['id'], code: 'IN_USE', message })),
@@ -529,6 +586,28 @@ export class CustomerDataService {
   }
 
   /**
+   * Why the customer `id` cannot be erased yet, as sentences for the merchant: store credit the
+   * shop still owes them, and what other modules have of theirs still under way, such as an open
+   * order. None if they can be.
+   */
+  async #holdsIn(tx: Tx, shopId: string, id: string): Promise<string[]> {
+    const holds: string[] = [];
+    // Store credit the shop still owes them would go with them (ADR-184).
+    for (const account of await storeCreditAccountsIn(tx, shopId, id)) {
+      if (account.balance > 0n) {
+        holds.push(
+          `They have ${formatMoney(money(account.balance, account.currency))} of store credit ` +
+            'left: debit it, once it is given to them another way, before erasing them',
+        );
+      }
+    }
+    for (const handler of this.registry.handlers) {
+      holds.push(...(await handler.erasureBlockers(tx, shopId, id)));
+    }
+    return holds;
+  }
+
+  /**
    * Everything the shop keeps of a customer, as a file to give them at their request (ADR-102):
    * their profile, numbers and marketing consent with its history, and what other modules keep
    * of them, such as their orders and drafts. The shop's defences against fraud, its blocklist
@@ -536,7 +615,22 @@ export class CustomerDataService {
    * the shop's audit log.
    */
   async export(tenant: TenantContext, id: string): Promise<MutationResult<CustomerDataExport>> {
-    const shopId = tenant.shopId;
+    return this.#export(tenant.shopId, id, actorColumnsOf(tenant.actor));
+  }
+
+  /**
+   * The customer `id`'s own file, as {@link export} makes it, for the customer themselves, from
+   * their account on the storefront (ADR-572): the audit log names them as who asked.
+   */
+  async exportOwn(shopId: string, id: string): Promise<MutationResult<CustomerDataExport>> {
+    return this.#export(shopId, id, customerRequester(id));
+  }
+
+  async #export(
+    shopId: string,
+    id: string,
+    by: Requester,
+  ): Promise<MutationResult<CustomerDataExport>> {
     return this.db.tenant(shopId, async (tx): Promise<MutationResult<CustomerDataExport>> => {
       // Shared: a merge or erasure of theirs under way finishes first, and the next one waits.
       const [customer] = await tx
@@ -603,7 +697,7 @@ export class CustomerDataService {
         action: 'customer.data_exported',
         subjectType: 'customer',
         subjectId: id,
-        ...actorColumnsOf(tenant.actor),
+        ...by,
       });
       return {
         ok: true,

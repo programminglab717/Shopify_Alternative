@@ -2,7 +2,8 @@
 // shopper signs in with their mobile number and a one-time code the core sends it, on WhatsApp or
 // by SMS, and the core gives the storefront a session's secret for the browser's cookie, through
 // which it reads their account: their orders with the shop and their store credit. The secret is
-// the only credential; the storefront sends it in `x-hatti-account`, never in an address.
+// the only credential; the storefront sends it in `x-hatti-account`, never in an address. Signed
+// in, a shopper asks for the file of their own data, or for its erasure (ADR-572).
 
 import { STOREFRONT_API_PREFIX } from './cart.js';
 
@@ -32,12 +33,16 @@ export function accountCookieCleared(options: { secure: boolean }): string {
 }
 
 /** What a storefront asks of a shop's accounts, each under `…/account`. */
-export type AccountRoute = 'login' | 'login/verify' | 'session' | 'logout';
+export type AccountRoute =
+  'login' | 'login/verify' | 'session' | 'logout' | 'data/export' | 'data/erase';
 
 /**
  * A shop's accounts: GET `…/account` reads the account of the session `x-hatti-account` names;
  * POST `…/account/login` sends a code, POST `…/account/login/verify` checks it and signs in, GET
- * `…/account/session` reads the session, and POST `…/account/logout` ends it.
+ * `…/account/session` reads the session, and POST `…/account/logout` ends it. POST
+ * `…/account/data/export` makes the shopper's file, or gives the one kept, and GET links to the
+ * one kept, an {@link AccountDataExportResponse}; POST `…/account/data/erase` asks for their
+ * erasure, an {@link AccountDataEraseResponse} (ADR-572). Each is 404 without a session.
  */
 export function accountPath(shopId: string, route?: AccountRoute): string {
   return `${STOREFRONT_API_PREFIX}shops/${shopId}/account${route ? `/${route}` : ''}`;
@@ -146,6 +151,49 @@ export interface AccountOrderJson {
   hasPage: boolean;
 }
 
+/**
+ * The file of the shopper's own data (ADR-572), as the shop's staff can give it them (ADR-102):
+ * made when they ask, at most once a day, and kept until `expiresAt`, a day on, the same file
+ * given again until then. It downloads through a link that lasts minutes, which
+ * {@link accountPath}'s `data/export` gives each time.
+ */
+export interface AccountDataExportJson {
+  state: 'ready';
+  /** ISO 8601: when it was made. */
+  readyAt: string;
+  /** ISO 8601: when storage lets it go, and another may be made. */
+  expiresAt: string;
+}
+
+/**
+ * The shopper's erasure, asked for by them or by the shop for them, waiting to happen (ADR-110):
+ * `waiting` until `eraseAfter`, unless the shop cancels it first; `held` while something of
+ * theirs is still under way, an order open or store credit the shop owes them, which it waits
+ * for, past `eraseAfter` if need be.
+ */
+export interface AccountErasureJson {
+  state: 'waiting' | 'held';
+  /** ISO 8601: when it was asked for. */
+  requestedAt: string;
+  /** ISO 8601: the soonest it happens. */
+  eraseAfter: string;
+}
+
+/** What the shopper asked of their own data (ADR-572), for their account page to say. */
+export interface AccountDataRequestsJson {
+  /**
+   * Whether the shop keeps them as a customer, with data to give or erase; false for a number
+   * no customer has.
+   */
+  available: boolean;
+  /** Days an erasure waits once asked for, while the shop can still cancel it. */
+  erasureWaitDays: number;
+  /** Their file kept; null while none is. */
+  export: AccountDataExportJson | null;
+  /** Their erasure waiting; null while none is. */
+  erasure: AccountErasureJson | null;
+}
+
 /** A shopper's account with the shop. */
 export interface AccountJson {
   /** E.164: the number they signed in with, whole, as it is theirs. */
@@ -165,6 +213,8 @@ export interface AccountJson {
     /** Null while none of it expires. */
     expiring: { amount: number; expiresAt: string } | null;
   };
+  /** Their file, and their erasure, as they asked for them (ADR-572). */
+  dataRequests: AccountDataRequestsJson;
 }
 
 /** GET `…/account`: the account, or null when the session is none. */
@@ -180,3 +230,18 @@ export interface AccountOrderLinkResponse {
   path: string;
   url: string;
 }
+
+/**
+ * POST `…/account/data/export` (ADR-572): the shopper's file, `ready`, with a link that downloads
+ * it for a few minutes, `url`, `made` now or the one kept given again; `none` for a number no
+ * customer has, of whom the shop keeps nothing to give. GET gives the file kept the same way, or
+ * 404 for none.
+ */
+export type AccountDataExportResponse =
+  (AccountDataExportJson & { made: boolean; url: string }) | { state: 'none' };
+
+/**
+ * POST `…/account/data/erase` (ADR-572): the shopper's erasure, asked for now or before, as it
+ * waits; `none` for a number no customer has, of whom the shop keeps nothing to erase.
+ */
+export type AccountDataEraseResponse = AccountErasureJson | { state: 'none' };

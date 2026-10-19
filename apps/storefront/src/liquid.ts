@@ -878,6 +878,9 @@ const FORM_ACTIONS: Record<string, string> = {
   customer: 'root_url:/contact',
   // A shopper's sign-in (ADR-571): the number's step, in the page's language.
   customer_login: 'root_url:/account/login',
+  // A shopper's own data, from their account (ADR-572): their file, and their erasure.
+  customer_data_export: 'root_url:/account/data/export',
+  customer_data_erase: 'root_url:/account/data/erase',
   storefront_password: 'root_url:/password',
   // Hatti's own, for a sold-out variant's page (ADR-431).
   back_in_stock: 'root_url:/back-in-stock',
