@@ -318,7 +318,37 @@ describe('StorefrontApiClient', () => {
     const account: AccountJson = {
       phone: '+923001234567',
       name: 'Ayesha Khan',
-      orders: [],
+      orders: [
+        {
+          id: 'ord_1',
+          name: '#1001',
+          placedAt: '2026-10-01T09:00:00.000Z',
+          status: 'open',
+          financialStatus: 'pending',
+          fulfillmentStatus: 'unfulfilled',
+          total: 600_000,
+          currency: 'PKR',
+          itemCount: 3,
+          hasPage: true,
+          // What it sold, to buy again (ADR-574): as carts name variants, a bundle as itself.
+          lines: [
+            {
+              variantId: '0192f3a4-7c4e-7d21-9a3b-5c6d7e8f9a01',
+              productTitle: 'Lawn 3-piece',
+              variantTitle: 'M',
+              quantity: 2,
+              available: true,
+            },
+            {
+              variantId: null,
+              productTitle: 'Eid 3-piece suit',
+              variantTitle: null,
+              quantity: 1,
+              available: false,
+            },
+          ],
+        },
+      ],
       storeCredit: { balance: 50_000, currency: 'PKR', expiring: null },
       dataRequests: { available: true, erasureWaitDays: 10, export: null, erasure: null },
     };

@@ -1,7 +1,9 @@
 {%- comment -%}
   The shopper's account (CUS-02, ADR-571): their orders with the shop, the newest first, each
   opening its page while it has one, and their store credit. The storefront shows it only to a
-  signed-in shopper, and sends others to sign in; in the theme editor, there is no one. Under
+  signed-in shopper, and sends others to sign in; in the theme editor, there is no one. Each
+  order lists what it sold, and while any of it can be had, "Buy again" puts it in the cart
+  (ADR-574), which says what could not go. Under
   "Your data" (CUS-05, ADR-572), they download the file of their own data, or ask for its
   erasure once told what it means and ticking that they understand.
 {%- endcomment -%}
@@ -74,6 +76,23 @@
                 <dd>{{ order.total_price | money }}</dd>
               </div>
             </dl>
+            {%- if order.line_items.size > 0 -%}
+              <ul class="account__order-items" role="list" aria-label="{{ 'customer.account.order_items' | t: name: order.name }}">
+                {%- for item in order.line_items -%}
+                  <li>
+                    <span dir="auto">{{ item.title | escape }}</span>
+                    {%- if item.variant_title %} <span class="account__muted" dir="auto">{{ item.variant_title | escape }}</span>{% endif %}
+                    <bdi>× {{ item.quantity }}</bdi>
+                    {%- unless item.available %} <span class="account__muted">{{ 'customer.account.unavailable' | t }}</span>{% endunless -%}
+                  </li>
+                {%- endfor -%}
+              </ul>
+            {%- endif -%}
+            {%- if order.reorder_url -%}
+              <form method="post" action="{{ order.reorder_url }}" class="account__reorder">
+                <button type="submit" class="button button--secondary" aria-label="{{ 'customer.account.buy_again_label' | t: name: order.name }}">{{ 'customer.account.buy_again' | t }}</button>
+              </form>
+            {%- endif -%}
           </li>
         {%- endfor -%}
       </ul>
@@ -150,6 +169,8 @@
   .account__order-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 0; }
   .account__order-details dt { color: var(--color-muted); font-size: 0.875rem; }
   .account__order-details dd { margin: 0; }
+  .account__order-items { margin: 0.75rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.25rem; font-size: 0.875rem; }
+  .account__reorder { margin-block-start: 0.75rem; }
   .account__data { margin-block-start: 2.5rem; }
   .account__notice { padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
   .account__data-part { margin-block-end: 1.5rem; }

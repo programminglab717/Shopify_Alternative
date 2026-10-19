@@ -60,12 +60,16 @@ import {
   CODE_TYPED_MAX,
   PHONE_TYPED_MAX,
   accountTokenOf,
+  addAgain,
   dataNoticeMessage,
   dataNoticeOf,
   loginCookie,
   loginCookieCleared,
   loginErrorMessage,
   pendingLoginOf,
+  reorderItems,
+  reorderNoticeMessage,
+  reorderNoticeOf,
   signedInCookie,
   signedInCookieCleared,
   type DataNotice,
@@ -231,6 +235,12 @@ const ACCOUNT_LOGINS = { name: 'account-logins', limit: 20, windowMs: 60_000 };
  * shopper asks once or twice, and the core makes one file a customer a day whatever is asked.
  */
 const ACCOUNT_DATA_REQUESTS = { name: 'account-data-requests', limit: 10, windowMs: 60_000 };
+
+/**
+ * Orders an address may buy again from shoppers' accounts a minute (ADR-574), as many as they
+ * may ask of their own data: a shopper buys one or two again, and each asks the cart a few times.
+ */
+const ACCOUNT_REORDERS = { name: 'account-reorders', limit: 10, windowMs: 60_000 };
 
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
@@ -1459,7 +1469,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         if (core) keep(shown ? token : null, shown);
         if (asksForSections(url)) return await sendSections(reply, found, url, shown);
         if (json) return await reply.send(await ajax(shown, found.store));
-        return await sendPage(reply, { path: '/cart', locale, cart: shown }, found);
+        // What came of buying an order again (ADR-574), as its address says.
+        const reorder = reorderNoticeOf(url.searchParams.get('reorder'));
+        const cartError = reorder && reorderNoticeMessage(reorder, words);
+        return await sendPage(reply, { path: '/cart', locale, cart: shown, cartError }, found);
       }
       if (request.headers['sec-fetch-site'] === 'cross-site') {
         return await refuse(403, 'Carts change from the shop itself.');
@@ -2740,6 +2753,77 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
+   * "Buy again" on one of the shopper's orders (ADR-574), posted from their account: what it sold
+   * that can be had now goes in their cart, as many as it had, through the core's cart as
+   * `/cart/add` puts things there, and on to the cart page, saying what could not. Posted only,
+   * as it changes the cart: from the shop's own pages, as the account's other forms are, at most
+   * {@link ACCOUNT_REORDERS} a minute from an address. Without a session, to sign in first; an
+   * order not among those their account lists is the shop's page not found.
+   */
+  const reorder = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { locale, prefix } = languageOf(request);
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send("Shoppers buy again from the shop's own pages.\n");
+    }
+    const { id } = request.params as { id: string };
+    const cartToken = cookieOf(request.headers.cookie, CART_COOKIE);
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      const token = accountTokenOf(request.headers.cookie);
+      if (!token) return await reply.redirect(`${prefix}/account/login`, 303);
+      if (limiter !== null && !(await limiter.hit(ACCOUNT_REORDERS, request.ip)).allowed) {
+        const shown = cartToken ? await core.read(found.shopId, cartToken) : null;
+        const cartError = reorderNoticeMessage('too_many_requests', (key, values) =>
+          translation(theme, locale, key, values),
+        );
+        return await sendPage(reply, { path: '/cart', locale, cart: shown, cartError }, found, 429);
+      }
+      const account = await core.account(found.shopId, token);
+      if (!account) {
+        signOutCookies(request, reply);
+        return await reply.redirect(`${prefix}/account/login`, 303);
+      }
+      const order = account.orders.find((each) => each.id === id);
+      if (!order) {
+        const path = `/account/orders/${encodeURIComponent(id)}/reorder`;
+        return await sendPage(reply, { path, locale }, found, 404);
+      }
+      const items = reorderItems(order.lines);
+      // What the cart has of a variant, read only once it refuses more of it.
+      let kept: Promise<CartJson | null> | null = null;
+      const { added, short } = await addAgain(
+        items,
+        (left) => core.act(found.shopId, cartToken, 'add', { items: left }),
+        async (variantId) => {
+          kept ??= cartToken ? core.read(found.shopId, cartToken) : Promise.resolve(null);
+          const cart = await kept;
+          return (cart?.items ?? [])
+            .filter((item) => item.variantId === variantId)
+            .reduce((sum, item) => sum + item.quantity, 0);
+        },
+      );
+      if (added) {
+        reply.header('set-cookie', cartCookies(added.token, added.cart.itemCount, { secure }));
+        await counted(request, found, 'added_to_cart');
+      }
+      const left = order.lines.some((line) => !line.available || line.variantId === null);
+      const notice = !added ? 'none' : short || left ? 'partial' : null;
+      const onward = `${prefix}/cart${notice ? `?${new URLSearchParams({ reorder: notice })}` : ''}`;
+      return await reply.redirect(onward, 303);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
    * Signing out (ADR-571): the core ends the session the cookie names, and the cookie goes; then
    * the shop's home page. Shopify's themes link to it, so a GET signs out as a POST does.
    */
@@ -2766,6 +2850,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/login`, handler: login });
     app.post(`${prefix}/account/login/verify`, verify);
     app.get(`${prefix}/account/orders/:id`, accountOrder);
+    app.post(`${prefix}/account/orders/:id/reorder`, reorder);
     app.post(`${prefix}/account/data/export`, dataExport);
     app.get(`${prefix}/account/data/export`, dataDownload);
     app.post(`${prefix}/account/data/erase`, dataErase);

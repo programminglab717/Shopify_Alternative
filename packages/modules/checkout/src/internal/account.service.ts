@@ -1,5 +1,12 @@
 import { InputChecker, PublicSite, shopProfile, type FieldError } from '@hatti/api';
 import {
+  DEFAULT_VARIANT_TITLE,
+  bundlesContainingIn,
+  bundlesOfProductsIn,
+  giftCardProductIdsIn,
+  type BundleRecord,
+} from '@hatti/catalog/public';
+import {
   CustomerDataService,
   ERASURE_WAIT_DAYS,
   customerExistsIn,
@@ -16,7 +23,12 @@ import {
   type MessageLanguage,
   type PhoneChannel,
 } from '@hatti/messaging/public';
-import { ORDER_LINK_PATH, accountOrderLinkIn, accountOrdersIn } from '@hatti/orders/public';
+import {
+  ORDER_LINK_PATH,
+  accountOrderLinkIn,
+  accountOrdersIn,
+  type AccountOrderItemFacts,
+} from '@hatti/orders/public';
 import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type {
@@ -26,11 +38,13 @@ import type {
   AccountDataRequestsJson,
   AccountErasureJson,
   AccountJson,
+  AccountOrderLineJson,
   AccountSessionJson,
 } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { ACCOUNT_DATA, ACCOUNT_DATA_TYPE, accountDataKey } from './account-data.js';
+import { CartService } from './cart.service.js';
 import { checkCodeIn, sendCodeIn } from './number-codes.js';
 
 // Shoppers' accounts on a shop's storefront (CUS-02, ADR-570): a shopper signs in with their
@@ -41,7 +55,9 @@ import { checkCodeIn, sendCodeIn } from './number-codes.js';
 // orders, numbers merged into them too, and their store credit. A number no customer has signs in
 // all the same, to an account with nothing in it, so that signing in says nothing of who shops
 // there. Signed in, a shopper asks for their own data, or its erasure, as the shop's staff would
-// for them (CUS-05, ADR-572), through the customers module's own requests.
+// for them (CUS-05, ADR-572), through the customers module's own requests. Each order lists what
+// it sold, for the storefront to put in their cart again (ADR-574), saying what can be had now as
+// the cart would: its variant still the shop's, its product on sale, and not sold out.
 
 export const ACCOUNT_SESSION = {
   /** Bytes of the token the browser's cookie keeps. */
@@ -54,6 +70,8 @@ export const ACCOUNT_SESSION = {
   touchMinutes: 60,
   /** The orders an account lists, the newest first. */
   orders: 20,
+  /** The lines of each it reads, to buy again: as many as an order takes. */
+  lines: 100,
 } as const;
 
 /** A token as {@link secretToken} makes them: anything else names no session, unlooked for. */
@@ -102,6 +120,7 @@ export class AccountService {
     private readonly site: PublicSite,
     private readonly storage: ObjectStorage,
     private readonly data: CustomerDataService,
+    private readonly carts: CartService,
   ) {}
 
   /**
@@ -218,8 +237,16 @@ export class AccountService {
       if (!session) return null;
       const { currency } = await shopProfile(tx, shopId);
       const orders = session.customerId
-        ? await accountOrdersIn(tx, shopId, session.customerId, ACCOUNT_SESSION.orders)
+        ? await accountOrdersIn(tx, shopId, session.customerId, {
+            orders: ACCOUNT_SESSION.orders,
+            lines: ACCOUNT_SESSION.lines,
+          })
         : [];
+      const lines = await this.#linesIn(
+        tx,
+        shopId,
+        orders.map((order) => order.items),
+      );
       const credit = session.customerId
         ? await storeCreditOfCustomerIn(tx, shopId, session.customerId, currency)
         : { balance: 0n, expiring: null };
@@ -236,7 +263,7 @@ export class AccountService {
       return {
         phone: session.phone,
         name: session.name,
-        orders: orders.map((order) => ({
+        orders: orders.map((order, index) => ({
           id: toPublicId('order', order.id),
           name: `#${order.number}`,
           placedAt: order.placedAt.toISOString(),
@@ -247,6 +274,7 @@ export class AccountService {
           currency: order.currency,
           itemCount: order.itemCount,
           hasPage: order.hasPage,
+          lines: lines[index]!,
         })),
         storeCredit: {
           balance: Number(credit.balance),
@@ -358,6 +386,87 @@ export class AccountService {
   }
 
   /** The file `kept`, with a link that downloads it for {@link ACCOUNT_DATA}'s minutes. */
+  /**
+   * What each order's `items` come to, to buy again (ADR-574), in the caller's transaction: each
+   * as the cart names it, and whether the cart would take it now. Gift cards are left out: a
+   * card is bought for someone, once. A bundle is bought again as itself, though its order keeps
+   * only its parts: the shop's bundle sold as those parts, as many of each for as many of it, the
+   * one of its title and on sale first; none once no bundle of the shop's is.
+   */
+  async #linesIn(
+    tx: Tx,
+    shopId: string,
+    orders: readonly (readonly AccountOrderItemFacts[])[],
+  ): Promise<AccountOrderLineJson[][]> {
+    const items = orders.flat();
+    const lines = items.flatMap((item) => (item.kind === 'line' ? [item] : []));
+    const bundles = items.flatMap((item) => (item.kind === 'bundle' ? [item] : []));
+    const giftCards = await giftCardProductIdsIn(
+      tx,
+      shopId,
+      lines.map((line) => line.productId),
+    );
+    const parts = [
+      ...new Set(bundles.flatMap((bundle) => bundle.parts.map((part) => part.productId))),
+    ];
+    const candidates =
+      parts.length === 0
+        ? []
+        : [
+            ...(
+              await bundlesOfProductsIn(tx, shopId, await bundlesContainingIn(tx, shopId, parts))
+            ).values(),
+          ];
+    const soldAs = new Map(
+      bundles.map((bundle) => [bundle, candidates.filter((each) => sameParts(each, bundle))]),
+    );
+    const facts = await this.carts.factsIn(tx, shopId, [
+      ...lines.map((line) => line.variantId),
+      ...[...soldAs.values()].flat().map((each) => each.variantId),
+    ]);
+    const available = (variantId: string) => {
+      const fact = facts.get(variantId);
+      return !!fact?.forSale && (fact.sellable === null || fact.sellable > 0);
+    };
+    return orders.map((listed) =>
+      listed.flatMap((item): AccountOrderLineJson[] => {
+        if (item.kind === 'line') {
+          if (giftCards.has(item.productId)) return [];
+          return [
+            {
+              variantId: item.variantId,
+              productTitle: item.title,
+              variantTitle:
+                item.variantTitle === DEFAULT_VARIANT_TITLE || item.variantTitle === ''
+                  ? null
+                  : item.variantTitle,
+              quantity: item.quantity,
+              available: available(item.variantId),
+            },
+          ];
+        }
+        const rank = (each: BundleRecord) =>
+          (facts.get(each.variantId)?.title === item.title ? 2 : 0) +
+          (available(each.variantId) ? 1 : 0);
+        const chosen = soldAs
+          .get(item)!
+          .reduce<BundleRecord | null>(
+            (best, each) => (best === null || rank(each) > rank(best) ? each : best),
+            null,
+          );
+        return [
+          {
+            variantId: chosen?.variantId ?? null,
+            productTitle: item.title,
+            variantTitle: null,
+            quantity: item.quantity,
+            available: chosen !== null && available(chosen.variantId),
+          },
+        ];
+      }),
+    );
+  }
+
   #linked(kept: KeptExport): AccountDataExportJson & { url: string } {
     return {
       ...exportJson(kept),
@@ -523,4 +632,22 @@ async function sessionIn(
     signedInAt: toDate(row.created_at),
     expiresAt,
   };
+}
+
+/**
+ * Whether the shop's `bundle` is the one an order sold as `sold`'s parts: those variants, and no
+ * others, as many units of each as its parts hold for as many of it.
+ */
+function sameParts(
+  bundle: BundleRecord,
+  sold: Extract<AccountOrderItemFacts, { kind: 'bundle' }>,
+): boolean {
+  return (
+    bundle.components.length === sold.parts.length &&
+    bundle.components.every(
+      (component) =>
+        sold.parts.find((part) => part.variantId === component.variantId)?.units ===
+        component.quantity * sold.quantity,
+    )
+  );
 }

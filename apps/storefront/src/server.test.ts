@@ -3270,7 +3270,13 @@ describe('Carts', () => {
 /** A session's secret, as the core gives one once a code signs a shopper in (ADR-570). */
 const ACCOUNT_TOKEN = 'sEsSiOn_SeCrEt-0123456789abcdefghijklmnopq';
 
-/** A shopper's account with the sample shop: two orders, one cancelled, and store credit. */
+/** The sample shop's variants a shopper ordered, as carts name them. */
+const ORDERED = sampleStore().products.map((product) => product.variants[0]!.id);
+
+/**
+ * A shopper's account with the sample shop: two orders, one cancelled, and store credit. The
+ * open one's items can be had again, but for one; none of the cancelled one's can.
+ */
 const ACCOUNT: AccountJson = {
   phone: '+923217654321',
   name: 'Ayesha Khan',
@@ -3286,6 +3292,22 @@ const ACCOUNT: AccountJson = {
       currency: 'PKR',
       itemCount: 2,
       hasPage: true,
+      lines: [
+        {
+          variantId: ORDERED[0]!,
+          productTitle: 'Lawn 3-piece',
+          variantTitle: 'M',
+          quantity: 1,
+          available: true,
+        },
+        {
+          variantId: ORDERED[1]!,
+          productTitle: 'Chiffon dupatta',
+          variantTitle: null,
+          quantity: 1,
+          available: false,
+        },
+      ],
     },
     {
       id: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1y',
@@ -3298,6 +3320,15 @@ const ACCOUNT: AccountJson = {
       currency: 'PKR',
       itemCount: 1,
       hasPage: false,
+      lines: [
+        {
+          variantId: null,
+          productTitle: 'Eid 3-piece suit',
+          variantTitle: null,
+          quantity: 1,
+          available: false,
+        },
+      ],
     },
   ],
   storeCredit: {
@@ -3769,6 +3800,248 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(core.signedOut).toEqual([ACCOUNT_TOKEN, ACCOUNT_TOKEN]);
     // Signed out, the account sends them to sign in.
     expect((await go('/account')).headers.location).toBe('/account/login');
+    await app.close();
+  });
+
+  /** A cart the core keeps, of `quantity` of each of `variantIds`, as far as a test needs. */
+  const cartOf = (variantIds: readonly string[], quantity = 1): CartJson => ({
+    note: '',
+    attributes: {},
+    items: variantIds.map((variantId) => ({
+      key: `${variantId}:0123456789abcdef0123456789abcdef`,
+      variantId,
+      productId: 'p-1',
+      quantity,
+      properties: {},
+      price: 100_000,
+      linePrice: 100_000 * quantity,
+      title: 'Lawn 3-piece',
+      variantTitle: 'M',
+      sku: null,
+      grams: 0,
+      taxable: true,
+      taxCode: null,
+      maxQuantity: null,
+    })),
+    itemCount: variantIds.length * quantity,
+    subtotal: 100_000 * quantity * variantIds.length,
+    totalWeightGrams: 0,
+    discount: null,
+    totalDiscount: 0,
+  });
+
+  it("shows each order's items, and buys them again into the cart, saying what could not go (ADR-574)", async () => {
+    const app = server();
+    const cookie = signedIn();
+    const [open, cancelled] = ACCOUNT.orders.map((each) => each.id);
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    // Each order's items, compact; "Buy again" while any of them can be had.
+    expect(page.body).toContain(
+      '<ul class="account__order-items" role="list" aria-label="Items in order #1002">',
+    );
+    expect(page.body).toMatch(
+      /<span dir="auto">Lawn 3-piece<\/span> <span class="account__muted" dir="auto">M<\/span>\s*<bdi>× 1<\/bdi><\/li>/,
+    );
+    expect(page.body).toMatch(
+      /<span dir="auto">Chiffon dupatta<\/span>\s*<bdi>× 1<\/bdi> <span class="account__muted">Not available now<\/span>/,
+    );
+    expect(page.body).toMatch(
+      new RegExp(
+        `<form method="post" action="/account/orders/${open}/reorder" class="account__reorder">\\s*` +
+          '<button type="submit" class="button button--secondary" aria-label="Buy the items of order #1002 again">Buy again</button>',
+      ),
+    );
+    // None of the cancelled one's can be had.
+    expect(page.body).toContain('aria-label="Items in order #1001"');
+    expect(page.body).not.toContain(`/account/orders/${cancelled}/reorder`);
+    const urdu = await app.inject({
+      method: 'GET',
+      url: '/ur/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(urdu.body).toContain(`action="/ur/account/orders/${open}/reorder"`);
+    expect(urdu.body).toContain(
+      'aria-label="آرڈر #1002 کی اشیاء دوبارہ خریدیں">دوبارہ خریدیں</button>',
+    );
+    expect(urdu.body).toContain('<span class="account__muted">ابھی دستیاب نہیں</span>');
+
+    // Bought again: what can be had goes in the shopper's cart, which says the rest could not.
+    const reorder = (url: string, cart = 'cart=cArT-sEcReT-1') =>
+      app.inject({ method: 'POST', url, headers: { ...FORM, cookie: `${cookie}; ${cart}` } });
+    core.answer = () => ({
+      ok: true,
+      cart: cartOf([ORDERED[0]!]),
+      token: 'cArT-sEcReT-1',
+      added: [],
+    });
+    const bought = await reorder(`/account/orders/${open}/reorder`);
+    expect([bought.statusCode, bought.headers.location, bought.headers['cache-control']]).toEqual([
+      303,
+      '/cart?reorder=partial',
+      'private, no-store',
+    ]);
+    expect(core.actions).toEqual([
+      {
+        token: 'cArT-sEcReT-1',
+        action: 'add',
+        body: { items: [{ variantId: ORDERED[0], quantity: 1, properties: {} }] },
+      },
+    ]);
+    expect(bought.headers['set-cookie']).toEqual([
+      'cart=cArT-sEcReT-1; Max-Age=1209600; Path=/; SameSite=Lax; HttpOnly',
+      'cart_count=1; Max-Age=1209600; Path=/; SameSite=Lax',
+    ]);
+    const said = await app.inject({
+      method: 'GET',
+      url: '/cart?reorder=partial',
+      headers: { host: 'localhost', cookie: 'cart=cArT-sEcReT-1' },
+    });
+    expect(said.body).toContain(
+      '<p class="cart__error" role="alert" dir="auto">Not everything from your order could go in ' +
+        'your cart: some of it is sold out, has fewer left, or is no longer for sale.</p>',
+    );
+    // A notice the cart page has no words for is none.
+    const unknown = await app.inject({
+      method: 'GET',
+      url: '/cart?reorder=everything',
+      headers: { host: 'localhost' },
+    });
+    expect(unknown.body).not.toContain('class="cart__error"');
+
+    // All of it can be had: as many as the order had, fewer of one the cart has too few of, and
+    // its notice says so; all of them, and none.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      orders: [
+        {
+          ...ACCOUNT.orders[0]!,
+          lines: [
+            { ...ACCOUNT.orders[0]!.lines[0]!, quantity: 5 },
+            { ...ACCOUNT.orders[0]!.lines[1]!, variantId: ORDERED[2]!, available: true },
+          ],
+        },
+      ],
+    });
+    core.actions.length = 0;
+    core.kept.set('cArT-sEcReT-1', cartOf([ORDERED[0]!]));
+    core.answer = () =>
+      (core.actions.at(-1)!.body as { items: { quantity: number }[] }).items[0]!.quantity > 2
+        ? {
+            ok: false,
+            error: { code: 'MAX_QUANTITY', variantId: ORDERED[0]!, title: 'Lawn 3-piece', max: 3 },
+          }
+        : { ok: true, cart: cartOf([ORDERED[0]!, ORDERED[2]!]), token: 'cArT-sEcReT-1', added: [] };
+    const fewer = await reorder(`/account/orders/${open}/reorder`);
+    expect([fewer.statusCode, fewer.headers.location]).toEqual([303, '/cart?reorder=partial']);
+    expect(core.actions.map((each) => each.body)).toEqual([
+      {
+        items: [
+          { variantId: ORDERED[0], quantity: 5, properties: {} },
+          { variantId: ORDERED[2], quantity: 1, properties: {} },
+        ],
+      },
+      {
+        items: [
+          { variantId: ORDERED[0], quantity: 2, properties: {} },
+          { variantId: ORDERED[2], quantity: 1, properties: {} },
+        ],
+      },
+    ]);
+    core.answer = () => ({
+      ok: true,
+      cart: cartOf([ORDERED[0]!, ORDERED[2]!]),
+      token: 'cArT-sEcReT-2',
+      added: [],
+    });
+    // A shopper without a cart has one begun.
+    const all = await reorder(`/ur/account/orders/${open}/reorder`, 'other=1');
+    expect([all.statusCode, all.headers.location]).toEqual([303, '/ur/cart']);
+    expect(core.actions.at(-1)!.token).toBeNull();
+    expect(all.headers['set-cookie']).toContain(
+      'cart=cArT-sEcReT-2; Max-Age=1209600; Path=/; SameSite=Lax; HttpOnly',
+    );
+    core.answer = () => ({ ok: false, error: { code: 'NOT_FOUND', variantId: ORDERED[0]! } });
+    const none = await reorder(`/ur/account/orders/${open}/reorder`);
+    expect([none.statusCode, none.headers.location, none.headers['set-cookie']]).toEqual([
+      303,
+      '/ur/cart?reorder=none',
+      undefined,
+    ]);
+    // Without the first, the second was asked for alone, and refused too.
+    expect(core.actions.at(-1)!.body).toEqual({
+      items: [{ variantId: ORDERED[2], quantity: 1, properties: {} }],
+    });
+    const saidUrdu = await app.inject({
+      method: 'GET',
+      url: '/ur/cart?reorder=none',
+      headers: { host: 'localhost' },
+    });
+    expect(saidUrdu.body).toContain(
+      '<p class="cart__error" role="alert" dir="auto">آپ کے آرڈر کی اشیاء کارٹ میں نہیں ڈالی جا سکیں: یہ ختم ہو گئی ہیں یا اب فروخت کے لیے نہیں ہیں۔</p>',
+    );
+    await app.close();
+  });
+
+  it('buys again only from the shop, for a shopper signed in, an order of theirs (ADR-574)', async () => {
+    const app = server();
+    const cookie = signedIn();
+    const [open, cancelled] = ACCOUNT.orders.map((each) => each.id);
+    core.answer = () => ({
+      ok: true,
+      cart: cartOf([ORDERED[0]!]),
+      token: 'cArT-sEcReT-1',
+      added: [],
+    });
+    const post = (url: string, headers: Record<string, string> = { cookie }) =>
+      app.inject({ method: 'POST', url, headers: { ...FORM, ...headers } });
+    // From another site, refused; from the shop's own pages, taken.
+    const elsewhere = await post(`/account/orders/${open}/reorder`, {
+      cookie,
+      'sec-fetch-site': 'cross-site',
+    });
+    expect([elsewhere.statusCode, elsewhere.headers['cache-control']]).toEqual([
+      403,
+      'private, no-store',
+    ]);
+    expect(core.actions).toEqual([]);
+    const own = await post(`/account/orders/${open}/reorder`, {
+      cookie,
+      'sec-fetch-site': 'same-origin',
+    });
+    expect(own.statusCode).toBe(303);
+    expect(core.actions).toHaveLength(1);
+
+    // An order none of whose items can be had, or not theirs: nothing goes in the cart.
+    const nothing = await post(`/account/orders/${cancelled}/reorder`);
+    expect([nothing.statusCode, nothing.headers.location]).toEqual([303, '/cart?reorder=none']);
+    const missing = await post('/account/orders/ord_nobody/reorder');
+    expect(missing.statusCode).toBe(404);
+    expect(missing.body).toContain('Page not found');
+    // Looked at, the address changes nothing.
+    const looked = await app.inject({
+      method: 'GET',
+      url: `/account/orders/${open}/reorder`,
+      headers: { host: 'localhost', cookie },
+    });
+    expect(looked.statusCode).toBe(404);
+    expect(core.actions).toHaveLength(1);
+
+    // No one signed in: to sign in first; a session that is over takes its cookies with it.
+    const out = await post(`/ur/account/orders/${open}/reorder`, {});
+    expect([out.statusCode, out.headers.location]).toEqual([303, '/ur/account/login']);
+    const over = await post(`/account/orders/${open}/reorder`, {
+      cookie: 'hatti_account=sEsSiOn_SeCrEt-EnDeD-0123456789abcdef',
+    });
+    expect([over.statusCode, over.headers.location]).toEqual([303, '/account/login']);
+    expect(over.headers['set-cookie']).toEqual([
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    ]);
+    expect(core.actions).toHaveLength(1);
     await app.close();
   });
 
@@ -4579,6 +4852,51 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     }
     expect(answers).toEqual([...Array<number>(10).fill(303), 429]);
     expect(core.dataAsked).toHaveLength(10);
+    await app.close();
+  });
+
+  it("limits how often an address can buy shoppers' orders again (ADR-574)", async () => {
+    const core = new FakeCore();
+    core.accounts.set(ACCOUNT_TOKEN, ACCOUNT);
+    core.answer = () => ({
+      ok: true,
+      cart: {
+        note: '',
+        attributes: {},
+        items: [],
+        itemCount: 1,
+        subtotal: 0,
+        totalWeightGrams: 0,
+        discount: null,
+        totalDiscount: 0,
+      },
+      token: 'cArT-sEcReT-1',
+      added: [],
+    });
+    const app = server(core);
+    const answers = [];
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      const answer = await app.inject({
+        method: 'POST',
+        url: `/ur/account/orders/${ACCOUNT.orders[0]!.id}/reorder`,
+        headers: {
+          host: 'bazaar.localhost',
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: `hatti_account=${ACCOUNT_TOKEN}`,
+        },
+        remoteAddress: '203.0.113.73',
+      });
+      answers.push(answer.statusCode);
+      if (answer.statusCode === 429) {
+        // The cart page, saying so in the page's language.
+        expect(answer.body).toContain(
+          '<p class="cart__error" role="alert" dir="auto">بہت زیادہ کوششیں۔ براہ کرم ایک منٹ انتظار کر کے دوبارہ کوشش کریں۔</p>',
+        );
+        expect(answer.headers['cache-control']).toBe('private, no-store');
+      }
+    }
+    expect(answers).toEqual([...Array<number>(10).fill(303), 429]);
+    expect(core.actions).toHaveLength(10);
     await app.close();
   });
 

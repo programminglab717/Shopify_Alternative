@@ -184,10 +184,25 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
           currency: 'PKR',
           itemCount: 3,
           hasPage: true,
+          lines: [
+            {
+              variantId: expect.stringMatching(/^[0-9a-f-]{36}$/) as unknown,
+              productTitle: 'Kurta',
+              variantTitle: null,
+              quantity: 3,
+              available: true,
+            },
+          ],
         },
       ],
       storeCredit: { balance: 0, currency: 'PKR', expiring: null },
     });
+    // Bought again (ADR-574): its variant as the cart names it, which the cart takes.
+    const [line] = account!.orders[0]!.lines;
+    const again = await client.act(shop, null, 'add', {
+      items: [{ variantId: line!.variantId!, quantity: line!.quantity }],
+    });
+    expect(again).toMatchObject({ ok: true, cart: { itemCount: 3, items: [{ title: 'Kurta' }] } });
 
     // Its page, through its link on the core's address, which shows it.
     const link = await client.accountOrderLink(shop, verified.token, order.id);

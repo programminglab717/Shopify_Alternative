@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import type { TenantContext } from '@hatti/api';
+import { BundleService } from '@hatti/catalog/public';
 import { sha256 } from '@hatti/crypto';
 import {
   CustomerDataRegistry,
@@ -369,6 +370,15 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       currency: 'PKR',
       itemCount: 2,
       hasPage: true,
+      lines: [
+        {
+          variantId: kurta,
+          productTitle: 'Kurta',
+          variantTitle: null,
+          quantity: 2,
+          available: true,
+        },
+      ],
     });
     expect(account.storeCredit).toEqual({
       balance: 750_00,
@@ -401,6 +411,108 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       status: 'cancelled',
       hasPage: false,
     });
+  });
+
+  it('offers what each order sold again, saying what the cart would take now (ADR-574)', async () => {
+    const [small, medium] = (await f.variantsOf(f.a, 'Lawn 3-piece', {
+      sizes: ['S', 'M'],
+      price: '3,000',
+    })) as [string, string];
+    const [dupatta] = (await f.variantsOf(f.a, 'Chiffon dupatta')) as [string];
+    const [cap] = (await f.variantsOf(f.a, 'Prayer cap')) as [string];
+    const [suit] = (await f.variantsOf(f.a, 'Eid 3-piece suit', { price: '6,000' })) as [string];
+    const [shirt] = (await f.variantsOf(f.a, 'Lawn shirt', { price: '4,000' })) as [string];
+    const [trouser] = (await f.variantsOf(f.a, 'Cotton trouser')) as [string];
+    for (const variant of [small, medium, dupatta, shirt, trouser]) await f.stock(f.a, variant, 10);
+    // The last one there is.
+    await f.stock(f.a, cap, 1);
+    const productOf = async (variantId: string) =>
+      (
+        await f.db.tenant(f.a.shopId, (tx) => f.variants.snapshotsOf(tx, f.a.shopId, [variantId]))
+      ).get(variantId)!.productId;
+    const bundles = new BundleService(f.db);
+    unwrap(
+      await bundles.set(f.a, await productOf(suit), [
+        { variantId: shirt, quantity: 1 },
+        { variantId: trouser, quantity: 2 },
+      ]),
+    );
+    const card = unwrap(
+      await f.products.create(f.a, {
+        title: 'Gift card',
+        status: 'active',
+        giftCard: true,
+        variants: [{ price: '5,000' }],
+      }),
+    ).variants[0]!.id;
+
+    const items = [
+      { variantId: small, quantity: 1 },
+      { variantId: medium, quantity: 2 },
+      { variantId: kurta, quantity: 1 },
+      { variantId: dupatta, quantity: 1 },
+      { variantId: cap, quantity: 1 },
+      { variantId: suit, quantity: 2 },
+      { variantId: card, quantity: 1 },
+    ];
+    const action = parseAction('add', { items });
+    if ('code' in action) throw new Error(`Refused: ${JSON.stringify(action)}`);
+    const added = await f.carts.act(f.a.shopId, null, action);
+    if (!added.ok) throw new Error(`Refused: ${JSON.stringify(added.error)}`);
+    const secret = (await f.checkouts.start(f.a.shopId, added.token!))!;
+    const view = await f.checkouts.view(secret);
+    if (view.kind !== 'open') throw new Error(`Expected an open checkout, got ${view.kind}`);
+    const placed = await f.checkouts.place(secret, view.shown, FORM);
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+
+    const token = await signIn(JAZZ);
+    const linesOf = async () => (await f.accounts.account(f.a.shopId, token))!.orders[0]!.lines;
+    const line = (variantId: string | null, productTitle: string, quantity: number) => ({
+      variantId,
+      productTitle,
+      variantTitle: null,
+      quantity,
+      available: true,
+    });
+    // As sold: a bundle once, as itself; the gift card left out; the cap sold out by the order.
+    const sold = [
+      { ...line(small, 'Lawn 3-piece', 1), variantTitle: 'S' },
+      { ...line(medium, 'Lawn 3-piece', 2), variantTitle: 'M' },
+      line(kurta, 'Kurta', 1),
+      line(dupatta, 'Chiffon dupatta', 1),
+      { ...line(cap, 'Prayer cap', 1), available: false },
+      line(suit, 'Eid 3-piece suit', 2),
+    ];
+    expect(await linesOf()).toEqual(sold);
+
+    // A variant deleted, a product archived, and a bundle no longer as it was sold: none can be
+    // had, as the cart would say; the titles are as they were sold.
+    unwrap(await f.variants.bulkDelete(f.a, await productOf(small), [small]));
+    unwrap(await f.products.update(f.a, { id: await productOf(dupatta), status: 'archived' }));
+    unwrap(
+      await bundles.set(f.a, await productOf(suit), [
+        { variantId: shirt, quantity: 1 },
+        { variantId: trouser, quantity: 1 },
+      ]),
+    );
+    expect(await linesOf()).toEqual([
+      { ...sold[0]!, available: false },
+      sold[1],
+      sold[2],
+      { ...sold[3]!, available: false },
+      sold[4],
+      { ...sold[5]!, variantId: null, available: false },
+    ]);
+    // Its parts again: the bundle can be had, until a part's stock runs out.
+    unwrap(
+      await bundles.set(f.a, await productOf(suit), [
+        { variantId: shirt, quantity: 1 },
+        { variantId: trouser, quantity: 2 },
+      ]),
+    );
+    expect((await linesOf())[5]).toEqual(sold[5]);
+    await f.stock(f.a, trouser, 1);
+    expect((await linesOf())[5]).toEqual({ ...sold[5]!, available: false });
   });
 
   it("opens an order's page through its link, keeping it while it is the order's", async () => {

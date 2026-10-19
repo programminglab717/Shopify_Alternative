@@ -77,6 +77,8 @@ export {
   accountOrderLinkIn,
   accountOrdersIn,
   type AccountOrderFacts,
+  type AccountOrderItemFacts,
+  type AccountOrderWithItems,
 } from '../internal/account-orders.js';
 export {
   CustomerAnswers,

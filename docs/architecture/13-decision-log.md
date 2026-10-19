@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-573 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-574 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -581,6 +581,7 @@
 | 571 | The storefront signs shoppers in with a code and shows their account, the pages never cached and every other page as it was, Hatti Base's customer templates in both languages | Accepted |
 | 572 | A signed-in shopper downloads their data and asks for its erasure from their account, through the requests staff make, the file kept a day and linked for minutes | Accepted |
 | 573 | The admin says who asked each waiting erasure, and shows a customer who acted in the activity log, linked to their page | Accepted |
+| 574 | A shopper buys an order again from their account: what can still be sold goes into their cart at the order's quantities, and the cart says what could not | Accepted |
 
 ---
 
@@ -21314,3 +21315,24 @@
 * **Consequences:** Staff know an erasure came from the shopper before they cancel it.
 * **Alternatives:** **The customer's name as the actor:** an erased customer's name is gone, and
   their page says who they are.
+
+## ADR-574 · A shopper buys an order again from their account: what can still be sold goes into their cart at the order's quantities, and the cart says what could not
+
+* **Context:** A signed-in shopper sees their orders (ADR-570, ADR-571); Shopify's accounts let
+  them order the same again (CUS-02). Cart permalinks (CH-07) make a cart of their own and go
+  straight to checkout.
+* **Decision:**
+  * **The account's orders give their items** as sold, each with whether it can be bought again:
+    its variant still there, its product active and its stock not out, a bundle's from its parts.
+    Gift cards are left out. A bundle is found again as the shop's bundle of those parts in those
+    quantities, or cannot be bought again.
+  * **Buy again** is a form on each order with something to buy: posted, it adds what can be sold
+    to the shopper's own cart at the order's quantities, as much as the stock allows, and opens
+    the cart, which says if some could not be added, or none. Refused from another site, limited
+    per address, for the order's own shopper alone.
+  * Hatti Base's account lists each order's items, says which are not available now, and offers
+    Buy again. English and Urdu.
+* **Consequences:** A shopper reorders their usual in two taps, and changes the cart before paying.
+* **Alternatives:** **A cart permalink:** it would leave the shopper's cart aside and skip to
+  checkout, where nothing can be changed. **A link that adds to the cart:** a link fetched ahead
+  by a browser or a preview would fill the cart.

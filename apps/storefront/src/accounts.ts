@@ -2,7 +2,8 @@
 // shop's sign-in page asks for a mobile number, the core sends a code to it, and the code typed
 // signs the shopper in, the session's secret kept in a cookie only the server reads (ADR-570).
 // Their account page lists their orders with the shop and their store credit, from `customer`,
-// and from it they ask for the file of their own data, or for its erasure (ADR-572).
+// and from it they ask for the file of their own data, or for its erasure (ADR-572), and buy an
+// order's items again, which go in their cart (ADR-574).
 // Pages are kept at the edge and are the same for every shopper, so only the account's own pages,
 // never kept, read the session; the others learn that a shopper is signed in from a cookie their
 // scripts read, which says nothing more.
@@ -12,6 +13,9 @@ import {
   type AccountJson,
   type AccountLoginVerifyErrorResponse,
   type AccountOrderJson,
+  type AccountOrderLineJson,
+  type CartActionResult,
+  type CartItemInput,
 } from '@hatti/storefront-api';
 import { cookieOf } from './cart.js';
 
@@ -195,6 +199,88 @@ export function dataNoticeMessage(
   }
 }
 
+/**
+ * What the cart page says of an order bought again (ADR-574), named in its address,
+ * `/cart?reorder=partial`: not all of it could go in the cart, or none of it; or, for the page
+ * itself, that the address tried too often.
+ */
+export const REORDER_NOTICES = ['partial', 'none', 'too_many_requests'] as const;
+
+export type ReorderNotice = (typeof REORDER_NOTICES)[number];
+
+/** The notice a cart page's address names; null for none, or one not of {@link REORDER_NOTICES}. */
+export function reorderNoticeOf(value: unknown): ReorderNotice | null {
+  return (REORDER_NOTICES as readonly unknown[]).includes(value) ? (value as ReorderNotice) : null;
+}
+
+/** The theme's words for what came of buying an order again, or the English. */
+export function reorderNoticeMessage(
+  notice: ReorderNotice,
+  translate: (key: string, values: Record<string, unknown>) => string | null,
+): string {
+  const say = (english: string) => translate(`cart.reorder.${notice}`, {}) ?? english;
+  switch (notice) {
+    case 'partial':
+      return say(
+        'Not everything from your order could go in your cart: some of it is sold out, has ' +
+          'fewer left, or is no longer for sale.',
+      );
+    case 'none':
+      return say(
+        "Your order's items couldn't go in your cart: they're sold out or no longer for sale.",
+      );
+    case 'too_many_requests':
+      return say('Too many tries. Please wait a minute and try again.');
+  }
+}
+
+/**
+ * What of an order's `lines` goes in the cart again (ADR-574): those that can be had now, as
+ * many as the order had, a variant once.
+ */
+export function reorderItems(lines: readonly AccountOrderLineJson[]): Required<CartItemInput>[] {
+  const items: Required<CartItemInput>[] = [];
+  for (const line of lines) {
+    if (!line.available || line.variantId === null) continue;
+    const same = items.find((item) => item.variantId === line.variantId);
+    if (same) same.quantity += line.quantity;
+    else items.push({ variantId: line.variantId, quantity: line.quantity, properties: {} });
+  }
+  return items;
+}
+
+/**
+ * Puts `items` in the cart through `add`, as `/cart/add` does: all at once, or, should the cart
+ * refuse them, as many as it takes. A variant it no longer sells is left out; one it has too few
+ * of goes in with as many as it has left, besides what the cart has of it, `inCart`. Asks the
+ * cart once more for each it refuses, and gives up on a refusal of any other kind, as when it is
+ * full. The cart as `add` left it, and whether any were left out or fewer; null when none went
+ * in.
+ */
+export async function addAgain(
+  items: readonly Required<CartItemInput>[],
+  add: (items: Required<CartItemInput>[]) => Promise<CartActionResult>,
+  inCart: (variantId: string) => Promise<number>,
+): Promise<{ added: Extract<CartActionResult, { ok: true }> | null; short: boolean }> {
+  const left = items.map((item) => ({ ...item }));
+  let short = false;
+  for (let tries = 0; left.length > 0 && tries <= items.length; tries += 1) {
+    const result = await add(left.map((item) => ({ ...item })));
+    if (result.ok) return { added: result, short };
+    short = true;
+    const { error } = result;
+    const at =
+      error.code === 'MAX_QUANTITY' || error.code === 'NOT_FOUND'
+        ? left.findIndex((item) => item.variantId === error.variantId)
+        : -1;
+    if (at < 0) break;
+    const room = error.code === 'MAX_QUANTITY' ? error.max - (await inCart(error.variantId)) : 0;
+    if (room > 0 && room < left[at]!.quantity) left[at]!.quantity = room;
+    else left.splice(at, 1);
+  }
+  return { added: null, short: true };
+}
+
 type FinancialStatus = AccountOrderJson['financialStatus'];
 type FulfillmentStatus = AccountOrderJson['fulfillmentStatus'];
 
@@ -250,8 +336,10 @@ const STATUS_LABELS: Readonly<
  * Shopify's `customer`, for the account's pages (ADR-571): the shopper's name and number, their
  * orders with the shop, each linking to its page through the storefront while it has one, and
  * their store credit. Money is in paisa, as everywhere in Liquid here; links are under `prefix`,
- * "/ur" for the Urdu pages. Hatti's `data_requests` say what they asked of their own data
- * (ADR-572), with the notice of what they just asked, in the page's language.
+ * "/ur" for the Urdu pages. Each order has its `line_items`, and Hatti's `reorder_url`, which
+ * the theme's "Buy again" form posts to (ADR-574), while any of them can be had now. Hatti's
+ * `data_requests` say what they asked of their own data (ADR-572), with the notice of what they
+ * just asked, in the page's language.
  */
 export function customerObject(
   account: AccountJson,
@@ -278,6 +366,17 @@ export function customerObject(
     currency: { iso_code: order.currency },
     item_count: order.itemCount,
     url: order.hasPage ? `${options.prefix}/account/orders/${encodeURIComponent(order.id)}` : null,
+    // What it sold, as sold: a bundle as itself, gift cards left out; whether each can be had.
+    line_items: order.lines.map((line) => ({
+      title: line.productTitle,
+      variant_title: line.variantTitle,
+      quantity: line.quantity,
+      available: line.available,
+    })),
+    reorder_url:
+      reorderItems(order.lines).length > 0
+        ? `${options.prefix}/account/orders/${encodeURIComponent(order.id)}/reorder`
+        : null,
   }));
   const credit = account.storeCredit;
   const data = account.dataRequests;

@@ -18,6 +18,7 @@ export {
   type AccountLoginVerifyRequest,
   type AccountLoginVerifyResponse,
   type AccountOrderJson,
+  type AccountOrderLineJson,
   type AccountOrderLinkResponse,
   type AccountResponse,
   type AccountRoute,

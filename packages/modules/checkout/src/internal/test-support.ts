@@ -270,6 +270,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       new PublicSite('https://hatti.test'),
       storage,
       customerData,
+      carts,
     ),
     customerData,
     accountData: new AccountDataExpiry(db, storage),

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### Buying again
+
+* **A shopper buys an order again from their account: what can still be sold goes into their
+  cart at the order's quantities, and the cart says what could not** ([ADR-574](../architecture/13-decision-log.md#adr-574--a-shopper-buys-an-order-again-from-their-account-what-can-still-be-sold-goes-into-their-cart-at-the-orders-quantities-and-the-cart-says-what-could-not), CUS-02).
+* 3535 tests, 6 more: items and what can be bought again, the cart
+  filled as stock allows, refusals and Urdu.
+
 ### d038429 · Who asked, in the admin
 
 * **The admin says who asked each waiting erasure, and shows a customer who acted in the activity

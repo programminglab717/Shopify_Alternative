@@ -149,6 +149,31 @@ export interface AccountOrderJson {
    * 30 days after it closed; never once cancelled.
    */
   hasPage: boolean;
+  /**
+   * What it had, to buy again (ADR-574), in its order: a bundle once, as its own variant, rather
+   * than its parts; gift cards left out. At most 100 of its lines are read.
+   */
+  lines: AccountOrderLineJson[];
+}
+
+/** A line of an order of the shopper's, as their account offers it again (ADR-574). */
+export interface AccountOrderLineJson {
+  /**
+   * The variant to put in the cart, as carts name them (the storefront's documents' UUIDs); a
+   * bundle's own. Null for a bundle the shop no longer has as it was sold.
+   */
+  variantId: string | null;
+  /** As it was sold: the product's title, a bundle's own. */
+  productTitle: string;
+  /** "M / Red", as it was sold; null for a product without options, or a bundle. */
+  variantTitle: string | null;
+  /** As many as the order had. */
+  quantity: number;
+  /**
+   * Whether it can be put in the cart now: its variant is still the shop's, its product on sale
+   * and not sold out (a bundle, by its parts' stock).
+   */
+  available: boolean;
 }
 
 /**
