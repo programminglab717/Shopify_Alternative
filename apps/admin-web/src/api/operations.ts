@@ -5485,6 +5485,25 @@ export const FileQuery = /* GraphQL */ `
   }
 `;
 
+/** The shop's files, the newest first, for a picture setting to choose one of (ADR-631). */
+export const ShopFilesQuery = /* GraphQL */ `
+  query ShopFiles($first: Int!, $after: String) {
+    files(first: $first, after: $after) {
+      nodes {
+        id
+        filename
+        mimeType
+        url
+        alt
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
 /** An article written in a blog, shown now, at a time ahead, or hidden. */
 export const ArticleCreateMutation = /* GraphQL */ `
   mutation ArticleCreate($article: ArticleCreateInput!) {

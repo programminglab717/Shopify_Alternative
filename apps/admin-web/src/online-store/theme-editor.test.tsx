@@ -171,7 +171,7 @@ function core(role: StaffRole, { refuseOnce = false } = {}) {
   let refusals = refuseOnce ? 1 : 0;
   // The preview's link is sealed anew each time the theme is read.
   let reads = 0;
-  return fakeCore(role, (operation) => {
+  return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'ThemeEditor':
         return {
@@ -256,6 +256,44 @@ function core(role: StaffRole, { refuseOnce = false } = {}) {
         return { fileCreate: { files: [{ id: UPLOADED }], userErrors: [] } };
       case 'ShopFile':
         return { file: { id: UPLOADED, url: `${STORAGE}?signed=1`, alt: 'Image' } };
+      case 'ShopFiles':
+        // The shop's files, a page of two and then the last, a PDF among them.
+        return variables.after
+          ? {
+              files: {
+                nodes: [
+                  {
+                    id: 'file_older',
+                    filename: 'Lawn lookbook.webp',
+                    mimeType: 'image/webp',
+                    url: `${STORAGE}?older`,
+                    alt: '',
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            }
+          : {
+              files: {
+                nodes: [
+                  {
+                    id: 'file_menu',
+                    filename: 'Price list.pdf',
+                    mimeType: 'application/pdf',
+                    url: `${STORAGE}?pdf`,
+                    alt: '',
+                  },
+                  {
+                    id: 'file_rooftop',
+                    filename: 'Rooftop Shoot 3.JPG',
+                    mimeType: 'image/jpeg',
+                    url: `${STORAGE}?rooftop`,
+                    alt: 'Lawn suits on a rooftop',
+                  },
+                ],
+                pageInfo: { hasNextPage: true, endCursor: 'c2' },
+              },
+            };
       case 'ThemeFilesUpsert':
         if (refusals > 0) {
           refusals -= 1;
@@ -722,6 +760,34 @@ describe("A theme's editor", () => {
     await waitFor(() => expect(sentOf(fake, 'ThemeFilesUpsert')).toHaveLength(2));
     const without = (savedFiles(fake)[0]!.json as typeof INDEX).sections.banner;
     expect(without.settings).toEqual({});
+  });
+
+  it("chooses a theme's picture from among the shop's files, its pictures alone (ADR-631)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/themes/thm_1');
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Image banner/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from your files' }));
+    // Its pictures, the newest first: no PDF, and more as asked for.
+    await screen.findByRole('button', { name: 'Use Rooftop Shoot 3.JPG' });
+    expect(screen.queryByRole('button', { name: 'Use Price list.pdf' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    await screen.findByRole('button', { name: 'Use Lawn lookbook.webp' });
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+
+    // Chosen: shown from the shop's files, the setting's words kept, the list closed.
+    fireEvent.click(screen.getByRole('button', { name: 'Use Rooftop Shoot 3.JPG' }));
+    expect(screen.queryByRole('button', { name: 'Use Lawn lookbook.webp' })).toBeNull();
+    expect((screen.getByLabelText('Image: what it shows') as HTMLInputElement).value).toBe('Eid');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Saved. Your store shows it in a moment.');
+    const banner = (savedFiles(fake)[0]!.json as typeof INDEX).sections.banner;
+    expect(banner.settings.image).toEqual({
+      src: '/theme-images/file_rooftop/rooftop-shoot-3.jpg',
+      alt: 'Eid',
+    });
+    expect(sentOf(fake, 'FileCreate')).toEqual([]);
   });
 
   it('is not open to those who do not change themes', async () => {

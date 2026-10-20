@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Theme pictures from the shop's files
+
+* **A theme's picture setting chooses from the shop's own pictures** ([ADR-631](../architecture/13-decision-log.md#adr-631--a-themes-picture-setting-chooses-from-the-shops-own-pictures-among-its-files-the-newest-first-sixty-at-a-time-as-well-as-taking-one-uploaded-the-picture-chosen-is-shown-at-its-theme-images-address-as-one-uploaded-is)) as well as
+  taking one uploaded: its files, the newest first, sixty at a time, PDFs and videos left out.
+* Status shortcut 124 now says theme pictures are served at the widths pages ask for
+  ([ADR-538](../architecture/13-decision-log.md#adr-538--a-shops-own-images-are-served-at-the-widths-and-in-the-formats-browsers-take-each-made-once-and-kept-beside-its-file-and-removed-with-it)).
+* 3745 tests, one more: the picture chosen from the files.
+
 ### e23ff33 · Old crops' files removed
 
 * **A crop an image is no longer shown in has its files removed eight days after** ([ADR-630](../architecture/13-decision-log.md#adr-630--a-crop-an-image-is-no-longer-shown-in-has-its-files-removed-from-storage-by-the-worker-eight-days-after-past-the-week-the-edge-may-serve-a-page-cached-before-a-crop-shown-again-meanwhile-stays-and-the-edge-keeps-what-it-has)):

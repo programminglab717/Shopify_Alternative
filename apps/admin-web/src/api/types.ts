@@ -2501,6 +2501,13 @@ export interface ShopFileData {
   file: { id: string; url: string; alt: string } | null;
 }
 
+export interface ShopFilesData {
+  files: {
+    nodes: { id: string; filename: string; mimeType: string; url: string; alt: string }[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
 /** What a blog's, an article's or a comment's mutation answers: what it made, or why not. */
 export interface ContentMutationData {
   [field: string]: {

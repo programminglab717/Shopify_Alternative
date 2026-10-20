@@ -1,7 +1,7 @@
-import { ImageOff, ImageUp, Trash2 } from 'lucide-react';
+import { Images, ImageOff, ImageUp, Trash2 } from 'lucide-react';
 import { useId, useRef, useState, type ChangeEvent } from 'react';
-import { FileQuery } from '../api/operations';
-import type { ShopFileData } from '../api/types';
+import { FileQuery, ShopFilesQuery } from '../api/operations';
+import type { ShopFileData, ShopFilesData } from '../api/types';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { TextArea } from '../products/product-form';
@@ -9,7 +9,7 @@ import { CheckField, SelectField } from '../settings/settings-form';
 import { useAdminQuery } from '../shell/shop-context';
 import { useImageUpload } from '../shell/use-image-upload';
 import { Button } from '../ui/button';
-import { Alert } from '../ui/feedback';
+import { Alert, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { valueOf, type Setting } from './theme-files';
 
@@ -50,11 +50,100 @@ function nameForPath(name: string): string {
   return cut || 'picture';
 }
 
+/** How many of the shop's files a picture setting lists at a time. */
+const FILES_AT_ONCE = 60;
+
+/**
+ * The shop's pictures among its files, the newest first, to choose one for a picture setting
+ * (ADR-631): each shown small and named, with more as asked for. PDFs and videos are not among
+ * them.
+ */
+function FilePicker({
+  onPicked,
+}: {
+  onPicked: (file: { id: string; filename: string; alt: string }) => void;
+}) {
+  // Each page's cursor, the first's none; "Show more" adds the next.
+  const [pages, setPages] = useState<(string | null)[]>([null]);
+  return (
+    <div className="flex flex-col gap-2 rounded-control border border-line p-2">
+      {pages.map((cursor, index) => (
+        <FilePage
+          key={cursor ?? 'first'}
+          after={cursor}
+          onPicked={onPicked}
+          onMore={
+            index === pages.length - 1
+              ? (next) => setPages((before) => [...before, next])
+              : undefined
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+/** A page of the shop's files, its pictures alone; "Show more" on the last while there are more. */
+function FilePage({
+  after,
+  onPicked,
+  onMore,
+}: {
+  after: string | null;
+  onPicked: (file: { id: string; filename: string; alt: string }) => void;
+  onMore?: (cursor: string) => void;
+}) {
+  const { t } = useLocale();
+  const files = useAdminQuery<ShopFilesData>(['files', 'pictures', after], ShopFilesQuery, {
+    first: FILES_AT_ONCE,
+    after,
+  });
+  if (files.isPending) return <Loading label={t('editor.image.filesLoading')} />;
+  if (files.error) return <Alert tone="danger">{errorText(files.error, t)}</Alert>;
+  const pictures = files.data.files.nodes.filter((file) => file.mimeType.startsWith('image/'));
+  const { hasNextPage, endCursor } = files.data.files.pageInfo;
+  return (
+    <>
+      {after === null && pictures.length === 0 && !hasNextPage ? (
+        <p className="text-secondary">{t('editor.image.noFiles')}</p>
+      ) : (
+        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {pictures.map((file) => (
+            <li key={file.id}>
+              <button
+                type="button"
+                className="flex w-full flex-col gap-1 rounded-control p-1 text-start hover:bg-canvas focus-visible:outline focus-visible:outline-2"
+                aria-label={t('editor.image.useFile', { name: file.filename })}
+                onClick={() => onPicked(file)}
+              >
+                <img
+                  src={file.url}
+                  alt=""
+                  loading="lazy"
+                  className="aspect-square w-full rounded-control border border-line object-cover"
+                />
+                <span className="truncate text-sm" dir="auto">
+                  {file.filename}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {onMore && hasNextPage && endCursor && (
+        <Button variant="secondary" onClick={() => onMore(endCursor)}>
+          {t('editor.image.moreFiles')}
+        </Button>
+      )}
+    </>
+  );
+}
+
 /**
  * A picture setting (ADR-326): the picture it shows, a picture of the shop's from its own files
  * or one the theme came with; another uploaded from the phone, kept with the shop's files and
- * shown on its storefront at an address of its own; taken away; and its words for those who
- * cannot see it.
+ * shown on its storefront at an address of its own, or chosen from among them (ADR-631); taken
+ * away; and its words for those who cannot see it.
  */
 function ImageSetting({
   label,
@@ -73,6 +162,7 @@ function ImageSetting({
   const upload = useImageUpload();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   // A picture just uploaded, shown from the phone until its file's address is asked for.
   const [chosen, setChosen] = useState<{ src: string; url: string } | null>(null);
@@ -137,6 +227,15 @@ function ImageSetting({
         >
           {t(src ? 'editor.image.replace' : 'editor.image.choose')}
         </Button>
+        <Button
+          variant="secondary"
+          icon={<Images aria-hidden className="size-5" />}
+          disabled={busy}
+          aria-expanded={picking}
+          onClick={() => setPicking((open) => !open)}
+        >
+          {t('editor.image.fromFiles')}
+        </Button>
         {src && (
           <Button
             variant="danger"
@@ -157,6 +256,16 @@ function ImageSetting({
         aria-label={label}
         onChange={onChosen}
       />
+      {picking && (
+        <FilePicker
+          onPicked={(picked) => {
+            const path = `/theme-images/${picked.id}/${nameForPath(picked.filename)}`;
+            setChosen(null);
+            setPicking(false);
+            onChange({ src: path, alt: alt || picked.alt });
+          }}
+        />
+      )}
       {problem && <Alert tone="danger">{problem}</Alert>}
       {src && (
         <TextField

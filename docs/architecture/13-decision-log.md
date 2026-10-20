@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-630 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-631 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -638,6 +638,7 @@
 | 628 | A delivery address's pin prints on its packing slip and its courier label as a QR code of its place in Google Maps, for the rider to scan with a phone's camera; an invoice, the customer's, carries none | Accepted |
 | 629 | A customer whose order has part of what it waits for before it ships, by transfer or as staff record it, hears what came, what is left to pay and its page, as the new order_part_paid, once for each sum received | Accepted |
 | 630 | A crop an image is no longer shown in has its files removed from storage by the worker eight days after, past the week the edge may serve a page cached before; a crop shown again meanwhile stays, and the edge keeps what it has | Accepted |
+| 631 | A theme's picture setting chooses from the shop's own pictures among its files, the newest first, sixty at a time, as well as taking one uploaded; the picture chosen is shown at its theme-images address, as one uploaded is | Accepted |
 
 ---
 
@@ -22601,3 +22602,20 @@
   **Purging the edge too:** it would take images from pages still cached, for no saving.
   **Keeping a count of pages naming each crop:** the storefront renders pages as asked and keeps
   no list of what they name.
+
+## ADR-631 · A theme's picture setting chooses from the shop's own pictures among its files, the newest first, sixty at a time, as well as taking one uploaded; the picture chosen is shown at its theme-images address, as one uploaded is
+
+* **Context:** A theme's picture is one of the shop's files, served by the storefront at an
+  address of its own (ADR-326), at the sizes pages ask for (ADR-538). The editor only took a
+  picture uploaded from the phone, so a banner the shop already had among its files, from
+  another section or theme, was uploaded again and kept twice (status shortcut 124).
+* **Decision:** Beside "Upload a picture", the editor's picture setting has "Choose from your
+  files": the shop's files the Admin API lists, the newest first, sixty at a time with "Show
+  more", their pictures alone, each shown small and named. Choosing one sets the setting to
+  its `/theme-images/{file}/{name}` address, as an upload does, keeping the setting's words
+  for those who cannot see it, or taking the file's where it has none. Nothing is uploaded.
+* **Consequences:** A picture is kept once and used in as many places as the shop likes; the
+  theme names the file, so the storefront serves it as any theme picture.
+* **Alternatives:** **A section of the admin's own for the shop's files:** a larger screen,
+  for when shops manage many files; the picker is what themes need now. **Searching the files
+  by name:** a shop's pictures are few enough to scroll for now.
