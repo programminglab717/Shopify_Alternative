@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Staff named in comments, picked by name
+### c9dd10d · Staff named in comments, picked by name
 
 * **Staff name someone in an order's comment by picking them from the shop's staff** ([ADR-637](../architecture/13-decision-log.md#adr-637--staff-name-someone-in-an-orders-comment-by-picking-them-from-a-list-of-the-shops-staff-by-name-which-whoever-reads-orders-may-see-with-nothing-of-how-they-sign-in)):
   `staffNames` lists their names alone for whoever reads orders, and the comment box adds @ and
