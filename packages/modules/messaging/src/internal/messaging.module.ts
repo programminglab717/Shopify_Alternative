@@ -7,6 +7,11 @@ import { ConversationResolver } from './graphql/conversation.resolver.js';
 import { CustomersModule } from '@hatti/customers/public';
 import { Module, type DynamicModule } from '@nestjs/common';
 import { AutomationsService } from './automations.service.js';
+import {
+  ContactMessagesService,
+  StorefrontContactMessagesController,
+} from './contact-messages.service.js';
+import { ContactMessageResolver } from './graphql/contact-message.resolver.js';
 import { StockWatchService } from './stock-watches.service.js';
 import { BroadcastsService } from './broadcasts.service.js';
 import { MessagingCustomerData } from './customer-data.js';
@@ -54,7 +59,12 @@ export class MessagingModule {
     return {
       module: MessagingModule,
       imports: [CustomersModule],
-      controllers: [WhatsAppWebhookController, StopLinkController],
+      controllers: [
+        WhatsAppWebhookController,
+        StopLinkController,
+        // Messages through the online store's contact form (ADR-589).
+        StorefrontContactMessagesController,
+      ],
       providers: [
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
         { provide: WHATSAPP_SIGNUP, useValue: options.signup ?? null },
@@ -69,6 +79,8 @@ export class MessagingModule {
         MessagingResolver,
         ConversationsService,
         ConversationResolver,
+        ContactMessagesService,
+        ContactMessageResolver,
         MessagingCustomerData,
         WhatsAppAccountsService,
         WhatsAppAccountResolver,
@@ -87,6 +99,7 @@ export class MessagingModule {
       exports: [
         MessagesService,
         ConversationsService,
+        ContactMessagesService,
         MessagingSettingsService,
         WhatsAppAccountsService,
         WhatsAppTemplatesService,

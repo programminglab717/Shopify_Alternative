@@ -132,6 +132,18 @@ describe('StorefrontApiClient', () => {
     expect(await refusing.watchStock('shop-1', wish)).toEqual({ ok: false, errors });
   });
 
+  it("posts a shopper's message through the contact form, and says what was wrong (ADR-589)", async () => {
+    const message = { phone: '0300 1234567', body: 'Hello', fields: { 'Order number': '#1042' } };
+    const { client, requests } = clientAnswering(() => Response.json({ id: 'cform_1' }));
+    expect(await client.contactMessage('shop-1', message)).toEqual({ ok: true, id: 'cform_1' });
+    expect(requests[0]!.method).toBe('POST');
+    expect(requests[0]!.url).toBe('http://core.test/storefront/shops/shop-1/contact-messages');
+    expect(await requests[0]!.json()).toEqual(message);
+    const errors = [{ field: 'body', message: "Body can't be blank" }];
+    const { client: refusing } = clientAnswering(() => Response.json({ errors }, { status: 422 }));
+    expect(await refusing.contactMessage('shop-1', message)).toEqual({ ok: false, errors });
+  });
+
   it('opens a payment link, with the visits that brought the shopper', async () => {
     const closed = { status: 410, headers: { 'x-a': '1' }, html: '<p>Closed</p>' };
     const { client, requests } = clientAnswering((request) =>

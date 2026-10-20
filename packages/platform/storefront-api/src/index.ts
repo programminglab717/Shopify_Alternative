@@ -85,6 +85,7 @@ export {
   type CommentResult,
   type ReportResult,
   type SignUpResult,
+  type ContactMessageResult,
   type StockWatchResult,
   type StorefrontApiOptions,
 } from './client.js';
@@ -108,6 +109,13 @@ export {
   type SearchOptions,
   type SearchResponse,
 } from './search.js';
+export {
+  CONTACT_MESSAGE_LIMITS,
+  contactMessagesPath,
+  type ContactMessageErrorResponse,
+  type ContactMessageRequest,
+  type ContactMessageResponse,
+} from './contact-messages.js';
 export {
   REPORT_REASON_VALUES,
   RIGHTS_ACTING_AS_VALUES,

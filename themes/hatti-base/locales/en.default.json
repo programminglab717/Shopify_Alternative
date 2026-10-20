@@ -211,6 +211,18 @@
       "comment_moderated": "Thank you: your comment will show once the shop approves it.",
       "comment_error": "Enter your name, your email address and a comment."
     },
+    "contact_form": {
+      "name": "Name",
+      "phone": "Mobile number",
+      "email": "Email",
+      "reach_note": "Give your mobile number or your email, so that we can answer you.",
+      "body": "Message",
+      "submit": "Send",
+      "success": "Thank you for your message. We'll answer you soon.",
+      "error_reach": "Enter your email or mobile number, like 0300 1234567, so that we can answer you.",
+      "error_body": "Write your message.",
+      "error_name": "Your name is too long."
+    },
     "newsletter": {
       "consent": "Send me news and offers from {{ shop }} on WhatsApp",
       "phone": "Mobile number",

@@ -74,6 +74,12 @@ import {
   type RightsComplaintRequest,
 } from './reports.js';
 import {
+  contactMessagesPath,
+  type ContactMessageErrorResponse,
+  type ContactMessageRequest,
+  type ContactMessageResponse,
+} from './contact-messages.js';
+import {
   signUpsPath,
   type SignUpErrorResponse,
   type SignUpRequest,
@@ -108,6 +114,8 @@ export type CartActionResult =
 
 export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
 export type ReportResult = ({ ok: true } & ReportResponse) | ({ ok: false } & ReportErrorResponse);
+export type ContactMessageResult =
+  ({ ok: true } & ContactMessageResponse) | ({ ok: false } & ContactMessageErrorResponse);
 
 export type StockWatchResult =
   ({ ok: true } & StockWatchResponse) | ({ ok: false } & StockWatchErrorResponse);
@@ -328,6 +336,24 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return { ok: true, ...((await response.json()) as SignUpResponse) };
+  }
+
+  /**
+   * A shopper's message through the shop's contact form (ADR-589): its ID, or what was wrong with
+   * it.
+   */
+  async contactMessage(
+    shopId: string,
+    request: ContactMessageRequest,
+  ): Promise<ContactMessageResult> {
+    const response = await this.#request('POST', contactMessagesPath(shopId), null, request);
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as ContactMessageErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as ContactMessageResponse) };
   }
 
   /** A shopper's report of the store (ADR-460): its number, or what was wrong with it. */

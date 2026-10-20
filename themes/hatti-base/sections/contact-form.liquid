@@ -1,0 +1,100 @@
+{%- comment -%}
+  Shopify's contact form (ADR-589): the shopper's name, email or mobile number and what they
+  write, sent on to the core, which keeps them for the shop's staff to read and answer. The form
+  comes back to this section saying how it went: the fields it got wrong, or its thanks.
+{%- endcomment -%}
+<div class="page-width section-spacing contact">
+  {%- if section.settings.heading != blank -%}
+    <h2 dir="auto">{{ section.settings.heading | escape }}</h2>
+  {%- endif -%}
+  {%- form 'contact', id: 'contact_form', class: 'contact__form' -%}
+    {%- if form.posted_successfully? -%}
+      <p class="contact__success" role="status">{{ 'sections.contact_form.success' | t }}</p>
+    {%- else -%}
+      {%- comment -%} Back to this section, on the page in its language. {%- endcomment -%}
+      {%- liquid
+        assign back = request.path
+        if routes.root_url != '/'
+          assign back = routes.root_url | append: request.path
+        endif
+      -%}
+      <input type="hidden" name="return_to" value="{{ back | escape }}#contact_form">
+      {%- if form.errors -%}
+        <ul class="contact__errors" role="alert">
+          {%- if form.errors contains 'email' or form.errors contains 'phone' -%}
+            <li>{{ 'sections.contact_form.error_reach' | t }}</li>
+          {%- endif -%}
+          {%- if form.errors contains 'body' -%}
+            <li>{{ 'sections.contact_form.error_body' | t }}</li>
+          {%- endif -%}
+          {%- if form.errors contains 'name' -%}
+            <li>{{ 'sections.contact_form.error_name' | t }}</li>
+          {%- endif -%}
+        </ul>
+      {%- endif -%}
+      <label class="contact__field">
+        <span>{{ 'sections.contact_form.name' | t }}</span>
+        <input type="text" name="contact[name]" autocomplete="name" dir="auto" maxlength="255">
+      </label>
+      <label class="contact__field">
+        <span>{{ 'sections.contact_form.phone' | t }}</span>
+        <input
+          type="tel"
+          name="contact[phone]"
+          autocomplete="tel"
+          inputmode="tel"
+          dir="ltr"
+          placeholder="0300 1234567"
+          {%- if form.errors contains 'phone' %} aria-invalid="true"{% endif %}
+        >
+      </label>
+      <label class="contact__field">
+        <span>{{ 'sections.contact_form.email' | t }}</span>
+        <input
+          type="email"
+          name="contact[email]"
+          autocomplete="email"
+          dir="ltr"
+          maxlength="254"
+          {%- if form.errors contains 'email' %} aria-invalid="true"{% endif %}
+        >
+      </label>
+      <p class="contact__note">{{ 'sections.contact_form.reach_note' | t }}</p>
+      <label class="contact__field">
+        <span>{{ 'sections.contact_form.body' | t }}</span>
+        <textarea
+          name="contact[body]"
+          rows="5"
+          dir="auto"
+          maxlength="5000"
+          required
+          {%- if form.errors contains 'body' %} aria-invalid="true"{% endif %}
+        ></textarea>
+      </label>
+      <button type="submit" class="button">{{ 'sections.contact_form.submit' | t }}</button>
+    {%- endif -%}
+  {%- endform -%}
+</div>
+
+{% stylesheet %}
+  .contact__form { display: grid; gap: 0.75rem; max-inline-size: 36rem; }
+  .contact__field { display: grid; gap: 0.25rem; }
+  .contact__field input, .contact__field textarea { padding: 0.6rem 0.75rem; font: inherit; }
+  .contact__note { margin: 0; color: var(--color-muted, #555); font-size: 0.875rem; }
+  .contact__errors { color: #b91c1c; margin: 0; padding-inline-start: 1.25rem; }
+  .contact__success { margin: 0; }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:sections.contact-form.name",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:sections.contact-form.settings.heading.label",
+      "default": "Write to us"
+    }
+  ]
+}
+{% endschema %}

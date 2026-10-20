@@ -893,6 +893,8 @@ const FORM_ACTIONS: Record<string, string> = {
 /** The forms that come back to their page saying how they went, by the query's prefix. */
 const POSTED_PREFIXES: Record<string, string> = {
   customer: 'customer',
+  // Shopify's contact form (ADR-589).
+  contact: 'contact',
   new_comment: 'comment',
   back_in_stock: 'back_in_stock',
 };

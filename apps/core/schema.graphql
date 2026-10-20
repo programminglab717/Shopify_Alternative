@@ -2491,6 +2491,57 @@ enum ConsentSource {
 }
 
 """
+What a shopper wrote to the shop through its online store's contact form (OS-08, ADR-589).
+"""
+type ContactMessage {
+  """What they wrote."""
+  body: String!
+
+  """Lower case."""
+  email: String
+
+  """The form's other fields."""
+  fields: [ContactMessageField!]!
+  id: ID!
+
+  """The language of the storefront's page: "en" or "ur"."""
+  language: String!
+  name: String
+
+  """The storefront's path the form was on."""
+  page: String
+
+  """A mobile number in E.164 form; masked like Customer.phone."""
+  phone: String
+
+  """When the shop's staff read it; null while unread."""
+  readAt: DateTime
+  receivedAt: DateTime!
+}
+
+type ContactMessageConnection {
+  nodes: [ContactMessage!]!
+  pageInfo: PageInfo!
+}
+
+type ContactMessageDeletePayload {
+  deletedContactMessageId: ID
+  userErrors: [UserError!]!
+}
+
+"""A field of the contact form's own, by its name (ADR-589)."""
+type ContactMessageField {
+  """As the theme named it under contact[…]: "Order number"."""
+  name: String!
+  value: String!
+}
+
+type ContactMessageUpdatePayload {
+  contactMessage: ContactMessage
+  userErrors: [UserError!]!
+}
+
+"""
 A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to the shop's own number, or to Hatti's shared one in answer to the shop.
 """
 type Conversation {
@@ -7818,6 +7869,14 @@ type Mutation {
   """
   confirmationQueueNext: ConfirmationQueueNextPayload!
 
+  """Deletes the message for good."""
+  contactMessageDelete(id: ID!): ContactMessageDeletePayload!
+
+  """
+  Marks the message read by the shop's staff, or, with `read: false`, unread again.
+  """
+  contactMessageMarkRead(id: ID!, read: Boolean = true): ContactMessageUpdatePayload!
+
   """Marks the conversation's messages read by the shop's staff."""
   conversationMarkRead(id: ID!): ConversationUpdatePayload!
 
@@ -12896,6 +12955,25 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): ConfirmationQueue!
+  contactMessage(id: ID!): ContactMessage
+
+  """
+  What shoppers wrote through the online store's contact form, the latest first.
+  """
+  contactMessages(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Those unread alone."""
+    unread: Boolean
+  ): ContactMessageConnection!
+
+  """
+  How many of the contact form's messages the shop's staff have not read.
+  """
+  contactMessagesUnreadCount: Int!
   conversation(id: ID!): Conversation
 
   """A conversation's messages, the latest first, a page at a time."""

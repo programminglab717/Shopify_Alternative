@@ -48,6 +48,8 @@ import {
   type SearchOptions,
   type CommentRequest,
   type CommentResult,
+  type ContactMessageRequest,
+  type ContactMessageResult,
   type SignUpRequest,
   type SignUpResult,
   type ReportRequest,
@@ -467,6 +469,19 @@ class FakeCore {
     this.signUps.push({ shopId, request });
     if (this.signedUp instanceof Error) throw this.signedUp;
     return this.signedUp;
+  }
+
+  /** The contact form's messages sent on, and how the core answers them (ADR-589). */
+  readonly contactMessages: { shopId: string; request: ContactMessageRequest }[] = [];
+  messaged: ContactMessageResult | Error = { ok: true, id: 'cform_7Kq2xY' };
+
+  async contactMessage(
+    shopId: string,
+    request: ContactMessageRequest,
+  ): Promise<ContactMessageResult> {
+    this.contactMessages.push({ shopId, request });
+    if (this.messaged instanceof Error) throw this.messaged;
+    return this.messaged;
   }
 
   /** The wishes to hear a variant is back sent on, and how the core answers them (ADR-431). */
@@ -3082,12 +3097,93 @@ describe('Carts', () => {
     );
     expect(urdu.headers.location).toBe('/ur?customer_posted=true');
 
-    // Shopify's contact form is not one Hatti takes, nor a sign-up from another site.
-    expect((await post({ form_type: 'contact', 'contact[body]': 'Hi' })).statusCode).toBe(404);
+    // Another form is not one Hatti takes here, nor a sign-up from another site.
+    expect((await post({ form_type: 'other', 'contact[body]': 'Hi' })).statusCode).toBe(404);
     expect((await post(signUp, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
     core.signedUp = new StorefrontApiError(502, 'Bad gateway');
     expect((await post(signUp)).statusCode).toBe(503);
     expect(core.signUps).toHaveLength(4);
+    await app.close();
+  });
+
+  it("sends Shopify's contact form on to the core, then back to its page saying how it went (ADR-589)", async () => {
+    const app = server();
+    const post = (
+      fields: Record<string, string>,
+      headers: Record<string, string> = {},
+      url = '/contact',
+    ) =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { ...FORM, 'user-agent': 'Mozilla/5.0', ...headers },
+        payload: form(fields),
+      });
+    const message = {
+      form_type: 'contact',
+      'contact[name]': 'Ayesha',
+      'contact[phone]': '0300 1234567',
+      'contact[body]': 'Is the lawn suit back in medium?',
+      'contact[Order number]': '#1042',
+      return_to: '/pages/contact#contact_form',
+    };
+    const taken = await post(message);
+    expect([taken.statusCode, taken.headers.location, taken.headers['cache-control']]).toEqual([
+      303,
+      '/pages/contact?contact_posted=true#contact_form',
+      'private, no-store',
+    ]);
+    expect(core.contactMessages.at(-1)).toEqual({
+      shopId: expect.any(String) as unknown,
+      request: {
+        name: 'Ayesha',
+        phone: '0300 1234567',
+        body: 'Is the lawn suit back in medium?',
+        fields: { 'Order number': '#1042' },
+        page: '/pages/contact',
+        language: 'en',
+        ip: '127.0.0.1',
+        userAgent: 'Mozilla/5.0',
+      },
+    });
+
+    // What was wrong goes back to the page the browser came from, by field, in its language.
+    core.messaged = {
+      ok: false,
+      errors: [
+        { field: 'email', message: 'Email or a mobile number is needed' },
+        { field: 'body', message: "Body can't be blank" },
+      ],
+    };
+    const wrong = await post(
+      { form_type: 'contact', 'contact[body]': '' },
+      { referer: 'http://localhost/ur/pages/contact?contact_posted=true' },
+      '/ur/contact',
+    );
+    expect(wrong.headers.location).toBe('/ur/pages/contact?contact_error=email%2Cbody');
+    expect(core.contactMessages.at(-1)?.request).toMatchObject({
+      body: '',
+      fields: {},
+      page: '/ur/pages/contact',
+      language: 'ur',
+    });
+
+    // The page shows how it went: the form's errors, or its thanks.
+    const page = (query: string) =>
+      app.inject({ method: 'GET', url: `/pages/contact?${query}`, headers: { host: 'localhost' } });
+    const shown = await page('contact_error=email,body');
+    expect(shown.body).toContain('id="contact_form"');
+    expect(shown.body).toContain('Enter your email or mobile number');
+    expect(shown.body).toContain('Write your message');
+    const thanked = await page('contact_posted=true');
+    expect(thanked.body).toContain('Thank you for your message.');
+    expect(thanked.body).not.toContain('name="contact[body]"');
+
+    // Not from another site; a core not reached said so.
+    expect((await post(message, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    core.messaged = new StorefrontApiError(502, 'Bad gateway');
+    expect((await post(message)).statusCode).toBe(503);
+    expect(core.contactMessages).toHaveLength(3);
     await app.close();
   });
 

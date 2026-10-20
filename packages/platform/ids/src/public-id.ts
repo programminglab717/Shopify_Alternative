@@ -125,6 +125,8 @@ export const ID_PREFIXES = {
   supportRequestMessage: 'smsg',
   // An address in a shopper's book, kept with their account (ADR-583).
   accountAddress: 'addr',
+  // A message through the online store's contact form (ADR-589).
+  contactMessage: 'cform',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

@@ -29,6 +29,7 @@ export type CoreBackend = Pick<
   | 'themePreview'
   | 'themeImage'
   | 'signUp'
+  | 'contactMessage'
   | 'postComment'
   | 'watchStock'
   | 'report'

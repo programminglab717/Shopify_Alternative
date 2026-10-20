@@ -196,7 +196,8 @@ const SAMPLE_PAGES: PageDoc[] = [
       '<p>Call or WhatsApp <a href="https://wa.me/923001234567">0300 1234567</a>, 10 am to ' +
       '8 pm, or visit us at Liberty Market, Lahore.</p>' +
       '<p dir="rtl" lang="ur">ہم سے رابطہ کریں: 0300 1234567</p>',
-    templateSuffix: null,
+    // Shopify's contact page, with its form (ADR-589).
+    templateSuffix: 'contact',
     publishedAt: PUBLISHED,
   },
 ];

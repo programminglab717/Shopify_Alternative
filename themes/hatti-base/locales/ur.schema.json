@@ -82,6 +82,14 @@
         }
       }
     },
+    "contact-form": {
+      "name": "رابطہ فارم",
+      "settings": {
+        "heading": {
+          "label": "عنوان"
+        }
+      }
+    },
     "main-404": {
       "name": "صفحہ نہیں ملا"
     },

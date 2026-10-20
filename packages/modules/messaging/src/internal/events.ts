@@ -15,6 +15,7 @@ export const MessagingEvents = {
   MarketingAutomationUpdated: 'marketing_automation.updated',
   ConversationMessageReceived: 'conversation.message_received',
   ConversationReplied: 'conversation.replied',
+  ContactMessageReceived: 'contact_message.received',
 } as const;
 
 /**
@@ -34,6 +35,15 @@ export interface ConversationMessageReceivedPayload {
 export interface ConversationRepliedPayload {
   messageId: string;
   at: string;
+}
+
+/**
+ * A shopper wrote to the shop through its online store's contact form (ADR-589). The aggregate is
+ * the message; it says neither who wrote nor what, which the Admin API gives.
+ */
+export interface ContactMessageReceivedPayload {
+  /** The storefront's language the form was in. */
+  language: 'en' | 'ur';
 }
 
 /**

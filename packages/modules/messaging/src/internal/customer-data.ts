@@ -13,7 +13,9 @@ import { queueMessageIn } from './messages.service.js';
  * their numbers' conversations with the shop (ADR-545). A customer's own file has the messages
  * sent them, their opt-outs, those wishes and what they wrote to the shop. A shopper who asked for
  * their erasure from their account is told once it is done (ADR-582), by a message forgotten once
- * sent, so that their number is kept no longer than it takes to tell them.
+ * sent, so that their number is kept no longer than it takes to tell them. What they wrote through
+ * the online store's contact form, from their numbers or email, goes too, and is in their file
+ * (ADR-589).
  */
 export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'messaging',
@@ -42,6 +44,12 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       DELETE FROM messaging.conversations
        WHERE shop_id = ${shopId} AND customer_phone = ANY(${sql.param(customer.phones)}::text[])`);
+    // What they wrote through the contact form (ADR-589).
+    await tx.execute(sql`
+      DELETE FROM messaging.contact_messages
+       WHERE shop_id = ${shopId}
+         AND (phone = ANY(${sql.param(customer.phones)}::text[])
+              OR email = lower(${customer.email}::text))`);
   },
 
   async erased(tx, shopId, notice) {
@@ -106,7 +114,31 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
         JOIN messaging.conversations c ON c.shop_id = m.shop_id AND c.id = m.conversation_id
        WHERE m.shop_id = ${shopId} AND c.customer_phone = ANY(${sql.param(customer.phones)}::text[])
        ORDER BY m.at, m.id`);
+    const { rows: contactMessages } = await tx.execute<{
+      name: string | null;
+      email: string | null;
+      phone: string | null;
+      body: string;
+      fields: Record<string, string>;
+      page: string | null;
+      created_at: string | Date;
+    }>(sql`
+      SELECT name, email, phone, body, fields, page, created_at FROM messaging.contact_messages
+       WHERE shop_id = ${shopId}
+         AND (phone = ANY(${sql.param(customer.phones)}::text[])
+              OR email = lower(${customer.email}::text))
+       ORDER BY id`);
     return {
+      // What they wrote through the online store's contact form (ADR-589).
+      contactMessages: contactMessages.map((row) => ({
+        name: row.name,
+        email: row.email,
+        number: row.phone,
+        said: row.body,
+        fields: row.fields,
+        page: row.page,
+        at: toDate(row.created_at),
+      })),
       // What they wrote to the shop on WhatsApp, and its answers (ADR-545).
       conversationMessages: conversation.map((row) => ({
         number: row.customer_phone,

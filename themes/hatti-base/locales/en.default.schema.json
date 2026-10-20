@@ -82,6 +82,14 @@
         }
       }
     },
+    "contact-form": {
+      "name": "Contact form",
+      "settings": {
+        "heading": {
+          "label": "Heading"
+        }
+      }
+    },
     "main-404": {
       "name": "Page not found"
     },

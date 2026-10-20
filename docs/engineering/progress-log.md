@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The contact form
+
+* **Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept
+  beside the inbox for its staff, with an email or a mobile number to answer on** ([ADR-589](../architecture/13-decision-log.md#adr-589--shopifys-contact-form-is-taken-what-a-shopper-writes-from-the-shops-contact-page-is-kept-beside-the-inbox-for-its-staff-with-an-email-or-a-mobile-number-to-answer-on),
+  OS-08).
+* 3640 tests, 7 more: messages kept, checked, listed, marked, deleted,
+  exported and erased; the storefront's form and Hatti Base's contact page; both APIs.
+
 ### d0c1bdf · The address book for staff
 
 * **The Admin API shows a customer's saved address book, and the admin's customer page lists it,

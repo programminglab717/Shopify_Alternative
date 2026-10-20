@@ -202,6 +202,8 @@ const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
  * so few, but room for many behind one mobile network's address.
  */
 const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
+/** Messages through the contact form from one address (ADR-589). */
+const CONTACT_MESSAGES = { name: 'contact-messages', limit: 5, windowMs: 60_000 };
 
 /**
  * Wishes an address may leave a minute to hear a sold-out variant is back (ADR-431): a shopper
@@ -2038,18 +2040,84 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   }
 
   /**
+   * Shopify's contact form, which themes' contact pages post (ADR-589): the shopper's name, email
+   * or mobile number, what they wrote and the form's other fields, all under `contact[…]`, sent on
+   * to the core, which keeps them for the shop's staff. Then back to the page the form was on:
+   * `contact_posted=true` says it was taken, for `form.posted_successfully?`, or `contact_error`
+   * names the fields that were wrong, for `form.errors`.
+   */
+  const contactMessage = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    found: Found,
+    params: Record<string, unknown>,
+  ) => {
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send('Messages are sent from the shop itself.\n');
+    }
+    if (limiter && !(await limiter.hit(CONTACT_MESSAGES, request.ip)).allowed) {
+      return reply
+        .code(429)
+        .type('text/plain; charset=utf-8')
+        .send('Too many messages. Please wait a minute.\n');
+    }
+    const urdu = request.url.startsWith('/ur/');
+    const from = returnTo(params) ?? refererPath(request) ?? (urdu ? '/ur' : '/');
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no messages');
+      const own = new Set(['name', 'email', 'phone', 'body']);
+      const fields: Record<string, string> = {};
+      const given: Record<string, string> = {};
+      for (const [name, value] of Object.entries(recordOf(params.contact))) {
+        if (typeof value !== 'string') continue;
+        if (own.has(name)) given[name] = value;
+        else fields[name] = value;
+      }
+      const result = await core.contactMessage(found.shopId, {
+        ...given,
+        body: given.body ?? '',
+        fields,
+        page: new URL(from, 'http://storefront.invalid').pathname,
+        language: urdu ? 'ur' : 'en',
+        ip: request.ip,
+        ...(request.headers['user-agent'] && { userAgent: request.headers['user-agent'] }),
+      });
+      const back = new URL(from, 'http://storefront.invalid');
+      back.searchParams.delete('contact_posted');
+      back.searchParams.delete('contact_error');
+      if (result.ok) back.searchParams.set('contact_posted', 'true');
+      else {
+        const wrong = new Set(result.errors.map((error) => error.field));
+        back.searchParams.set('contact_error', [...wrong].join(','));
+      }
+      return await reply.redirect(`${back.pathname}${back.search}${back.hash}`, 303);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('The shop cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+
+  /**
    * Shopify's customer form, which themes' newsletter sections post (ADR-189): the shopper's
    * mobile number, sent on to the core, which keeps it as their consent to the shop's news and
    * offers on WhatsApp. Then back to the page the form was on: `customer_posted=true` says it was
    * taken, for `form.posted_successfully?`, or `customer_error` names the fields that were wrong,
-   * for `form.errors`.
+   * for `form.errors`. Shopify's contact form, which themes' contact pages post, goes to
+   * {@link contactMessage}.
    */
   const contact = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     reply.header('cache-control', 'private, no-store');
     const params = paramsOf(request);
-    // Shopify's contact form, which emails the shop, is not one Hatti takes.
+    if (params.form_type === 'contact') return contactMessage(request, reply, found, params);
     if (params.form_type !== 'customer') {
       return notFound(reply, 'This shop takes no messages here.');
     }

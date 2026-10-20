@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-588 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-589 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -596,6 +596,7 @@
 | 586 | A shopper's session signed in to their account proves its number at checkout, where the shop asks for a code | Accepted |
 | 587 | A signed-in shopper's checkout offers the addresses of their book, each filling in the order's address with a post of its own | Accepted |
 | 588 | The Admin API shows a customer's saved address book, and the admin's customer page lists it, the default first | Accepted |
+| 589 | Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept beside the inbox for its staff, with an email or a mobile number to answer on | Accepted |
 
 ---
 
@@ -21682,3 +21683,33 @@
 * **Alternatives:** **One list of both, orders' and saved:** where orders went is a fact of
   delivery, the book what the shopper keeps; Shopify keeps only the book, but cash on delivery
   makes the orders' addresses worth keeping apart.
+
+## ADR-589 · Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept beside the inbox for its staff, with an email or a mobile number to answer on
+
+* **Context:** Themes' contact pages post Shopify's `{% form 'contact' %}` to `/contact`, which
+  Shopify emails to the shop. The storefront refused it (ADR-189), so a theme brought from
+  Shopify had a contact page that answered 404, and OS-08 asks for contact forms.
+* **Decision:**
+  * **The storefront takes the form:** `form_type=contact` at `/contact` (and `/ur/contact`)
+    sends its `contact[name]`, `contact[email]`, `contact[phone]` and `contact[body]` on to the
+    core, with the form's other `contact[…]` fields by their names, the page it was on, its
+    language and where it came from; then back to that page with `contact_posted=true`, for
+    `form.posted_successfully?`, or `contact_error` naming the fields that were wrong, for
+    `form.errors`. Not from another site, and five a minute from one address.
+  * **The core keeps it** in the messaging module, beside the inbox (migration 0275), since most
+    of Hatti's shops answer on WhatsApp rather than by email: what they wrote, up to 5,000
+    characters, an email or a Pakistani mobile number to answer on (one is needed), at most 20
+    other fields, and whether staff have read it. `contact_message.received` goes to the outbox
+    without who wrote or what.
+  * **The Admin API** lists them the latest first (`contactMessages`, `unread` alone), counts the
+    unread, marks them read or unread and deletes them, under the inbox's scopes, numbers masked
+    as the caller may see them.
+  * **Customers' data:** erased with the customer whose number or email it holds, and in their own
+    file.
+  * **Hatti Base's `page.contact` template:** the page, then a contact form section, in English
+    and Urdu, saying what was wrong or thanking them.
+* **Consequences:** A theme's contact page works, and what shoppers write reaches the shop. Staff
+  read it through the API; the admin's page and telling staff when one comes are a later part.
+* **Alternatives:** **Emailing it to the shop, as Shopify does:** few of Hatti's shops read an
+  inbox, and the message would leave Hatti's erasure and export. **Into the WhatsApp inbox's
+  conversations:** a form opens no WhatsApp window to answer in, and may have only an email.
