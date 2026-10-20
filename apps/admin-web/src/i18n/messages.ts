@@ -1321,6 +1321,11 @@ const en = {
     'Mark it paid in full? This records {amount} received: cash at the door, or a transfer.',
   'money.paid.mark': 'Mark as paid',
   'money.paid.done': 'Marked as paid.',
+  'money.waive.start': 'Go without the advance',
+  'money.waive.confirm':
+    'Let it go without its advance? The courier collects the {amount} still owed with the rest, and it moves on once confirmed.',
+  'money.waive.mark': 'Go without it',
+  'money.waive.done': 'Advance waived: the courier collects it at the door.',
   'money.refund.start': 'Refund',
   'money.refund.forReturn': 'For return {name}: what was paid for its items, at most.',
   'money.refund.save': 'Record the refund',
@@ -6593,6 +6598,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'پوری رقم ادا شدہ درج کریں؟ اس سے {amount} وصول درج ہوں گے: دروازے پر کیش، یا ٹرانسفر۔',
   'money.paid.mark': 'ادا شدہ درج کریں',
   'money.paid.done': 'ادا شدہ درج ہو گیا۔',
+  'money.waive.start': 'ایڈوانس کے بغیر بھیجیں',
+  'money.waive.confirm':
+    'ایڈوانس کے بغیر بھیجیں؟ باقی {amount} کوریئر باقی رقم کے ساتھ وصول کرے گا، اور تصدیق کے بعد آرڈر آگے بڑھے گا۔',
+  'money.waive.mark': 'بغیر ایڈوانس بھیجیں',
+  'money.waive.done': 'ایڈوانس چھوڑ دیا گیا: کوریئر یہ دروازے پر وصول کرے گا۔',
   'money.refund.start': 'رقم واپس کریں',
   'money.refund.forReturn':
     'واپسی {name} کے لیے: زیادہ سے زیادہ اتنی رقم جتنی اس کی اشیاء کے لیے ادا ہوئی۔',

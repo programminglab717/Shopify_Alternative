@@ -1908,6 +1908,15 @@ export class OrderPayWithStoreCreditPayload {
 }
 
 @ObjectType()
+export class OrderWaiveAdvancePayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class OrderMarkAsPaidPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;

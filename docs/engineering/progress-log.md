@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### An advance waived
+
+* **A cash-on-delivery order still waiting for its advance may be let go without it** ([ADR-653](../architecture/13-decision-log.md#adr-653--a-cash-on-delivery-order-still-waiting-for-its-advance-may-be-let-go-without-it-the-courier-collecting-what-it-owed-until-any-of-it-ships)),
+  the courier collecting what it owed, until any of it ships; from the order's page.
+* 3785 tests, two more: the core's waiver and the admin's button.
+
 ### c2ed710 · A draft's amount off within the limit
 
 * **A draft's amount off given by hand keeps to the shop's limit for staff** ([ADR-652](../architecture/13-decision-log.md#adr-652--a-drafts-amount-off-given-by-hand-keeps-to-the-shops-limit-for-staff-as-an-orders-does-a-discount-codes-is-the-shops-own)), as an

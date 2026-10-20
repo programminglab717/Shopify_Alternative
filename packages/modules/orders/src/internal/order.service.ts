@@ -2502,6 +2502,49 @@ export class OrderService {
    * Records that the order is paid in full: cash collected at the door, or a transfer received.
    * An order with refunds already, such as a returned advance, stays partially refunded.
    */
+  /**
+   * Lets a cash-on-delivery order go without the advance it still waits for (ADR-653), as when
+   * its customer can't send one and the shop takes the risk: what came of it stays paid, the rest
+   * is collected at the door, and the order, the advance no longer the customer's say-so, waits
+   * to be confirmed as any order paid on delivery does. Not once anything of it has shipped.
+   */
+  async waiveAdvance(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      if (order.status !== 'open') {
+        return failOne(['id'], 'INVALID', `A ${order.status} order waits for nothing`);
+      }
+      const owed = order.advanceDue - order.amountPaid;
+      if (order.paymentMethod !== 'cash_on_delivery' || owed <= 0n) {
+        return failOne(['id'], 'INVALID', 'It waits for no advance');
+      }
+      if (order.fulfillmentStatus !== 'unfulfilled') {
+        return failOne(['id'], 'INVALID', 'Some of it has shipped: its advance stays');
+      }
+      const updated = await updateOrder(tx, tenant.shopId, order, {
+        advanceDue: order.amountPaid,
+        codAmount: order.codAmount + owed,
+        confirmationStatus:
+          order.confirmationStatus === 'not_required' ? 'pending' : order.confirmationStatus,
+      });
+      const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+      await addTimelineEntry(
+        tx,
+        tenant.shopId,
+        order.id,
+        tenant.actor,
+        'edited',
+        `Advance of ${rupees(owed)} waived: ${rupees(updated.codAmount)} to collect at the door`,
+      );
+      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['advance'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
   async markAsPaid(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
     return this.#change(tenant, id, ['id'], async (tx, order) => {
       if (order.amountPaid === order.total) return { ok: true, value: order };

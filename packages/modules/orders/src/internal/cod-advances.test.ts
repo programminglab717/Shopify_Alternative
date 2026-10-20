@@ -91,6 +91,33 @@ describe.skipIf(!server)('An advance on cash on delivery', () => {
     );
   });
 
+  it('lets an order go without its advance, the rest at the door, to be confirmed (ADR-653)', async () => {
+    const order = await f.order(f.a, [kurta], { shippingPrice: '250', advanceDue: '500' });
+    // Some of it came: that stays paid.
+    unwrap(await f.orders.recordPayment(f.a, order.id, { amount: '200' }));
+    const waived = unwrap(await f.orders.waiveAdvance(f.a, order.id));
+    expect(waived).toMatchObject({
+      stage: 'needs_confirmation',
+      confirmationStatus: 'pending',
+      amountPaid: 200_00n,
+      advanceDue: 200_00n,
+      codAmount: 2_050_00n,
+    });
+    expect(await latest(order.id)).toEqual([
+      'Advance of Rs 300 waived: Rs 2,050 to collect at the door',
+    ]);
+    const updated = (await f.outbox()).filter((event) => event.event_type === 'order.updated');
+    expect(updated.at(-1)?.payload).toMatchObject({ changed: ['advance'] });
+    // Nothing waits for an advance any more; nor on an order without one.
+    expect(refusalOf(await f.orders.waiveAdvance(f.a, order.id))).toBe('It waits for no advance');
+    const plain = await f.order(f.a, [kurta]);
+    expect(refusalOf(await f.orders.waiveAdvance(f.a, plain.id))).toBe('It waits for no advance');
+    unwrap(await f.orders.cancel(f.a, plain.id, { reason: 'customer' }));
+    expect(refusalOf(await f.orders.waiveAdvance(f.a, plain.id))).toBe(
+      'A cancelled order waits for nothing',
+    );
+  });
+
   it('asks for one only on cash on delivery, from a shop with an account, within the law', async () => {
     const place = (extra: Record<string, unknown>, tenant = f.a) =>
       f.orders.create(tenant, {

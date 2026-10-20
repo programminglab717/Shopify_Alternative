@@ -4467,6 +4467,29 @@ export const OrderMarkAsPaidMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A cash-on-delivery order let go without its advance, the courier collecting it (ADR-653). */
+export const OrderWaiveAdvanceMutation = /* GraphQL */ `
+  mutation OrderWaiveAdvance($id: ID!) {
+    orderWaiveAdvance(id: $id) {
+      order {
+        id
+        stage
+        advanceDue {
+          ...Money
+        }
+        codAmount {
+          ...Money
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MONEY}
+  ${USER_ERRORS}
+`;
+
 /** A comment on an order's timeline, for whoever picks it up next (ORD-02). */
 export const OrderCommentCreateMutation = /* GraphQL */ `
   mutation OrderCommentCreate($orderId: ID!, $message: String!) {

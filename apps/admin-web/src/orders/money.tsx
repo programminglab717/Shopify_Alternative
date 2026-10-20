@@ -8,6 +8,7 @@ import {
   OrderMarkAsPaidMutation,
   OrderPayWithStoreCreditMutation,
   OrderRefundMutation,
+  OrderWaiveAdvanceMutation,
   StagedUploadsCreateMutation,
 } from '../api/operations';
 import type {
@@ -16,6 +17,7 @@ import type {
   OrderDetail,
   OrderPayWithStoreCreditData,
   OrderStage,
+  OrderWaiveAdvanceData,
   ParcelUserErrorsData,
   RefundMethod,
   StagedUploadsCreateData,
@@ -427,9 +429,10 @@ function PayWithCredit({
 export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t, locale } = useLocale();
   const shop = useShop();
-  const [open, setOpen] = useState<'refund' | 'paid' | 'credit' | 'record' | null>(null);
+  const [open, setOpen] = useState<'refund' | 'paid' | 'credit' | 'record' | 'waive' | null>(null);
   const [done, setDone] = useState('');
   const markPaid = useAdminMutation<ParcelUserErrorsData, { id: string }>(OrderMarkAsPaidMutation);
+  const waive = useAdminMutation<OrderWaiveAdvanceData, { id: string }>(OrderWaiveAdvanceMutation);
   const { problem, attempt } = useAttempt();
   const handles = permits(shop, HANDLES_MONEY);
   const refunds = permits(shop, REFUNDS);
@@ -615,6 +618,29 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           </Button>
         </div>
       )}
+      {handles && advance && open === 'waive' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex-1">
+            {t('money.waive.confirm', { amount: formatMoney(waiting) })}
+          </span>
+          <Button
+            busy={waive.isPending}
+            onClick={() =>
+              void attempt(
+                async () => (await waive.mutateAsync({ id: order.id })).orderWaiveAdvance!,
+              ).then((ok) => {
+                setOpen(null);
+                if (ok) setDone(t('money.waive.done'));
+              })
+            }
+          >
+            {t('money.waive.mark')}
+          </Button>
+          <Button variant="tertiary" onClick={() => setOpen(null)}>
+            {t('returns.cancel')}
+          </Button>
+        </div>
+      )}
       {open === null && ((handles && unpaid) || hasCredit || (refunds && cents(most) > 0)) && (
         <div className="flex flex-wrap gap-2">
           {hasCredit && (
@@ -649,6 +675,18 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
               }}
             >
               {t('money.paid.start')}
+            </Button>
+          )}
+          {/* A customer the shop trusts: the courier collects the advance with the rest (ADR-653). */}
+          {handles && advance && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDone('');
+                setOpen('waive');
+              }}
+            >
+              {t('money.waive.start')}
             </Button>
           )}
           {refunds && cents(most) > 0 && (

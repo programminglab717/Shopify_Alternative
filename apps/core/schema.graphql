@@ -8732,6 +8732,11 @@ type Mutation {
   orderUpdate(id: ID!, input: OrderUpdateInput!): OrderUpdatePayload!
 
   """
+  Lets a cash-on-delivery order go without the advance it still waits for (ADR-653): what came of it stays paid, the rest is collected at the door, and the order waits to be confirmed as any order paid on delivery does. Not once anything of it has shipped.
+  """
+  orderWaiveAdvance(id: ID!): OrderWaiveAdvancePayload!
+
+  """
   Books up to 250 orders with a courier account, the default unless given, each on its own: each waits to be booked, then ships as a parcel with the courier's tracking number, and is followed until it is delivered or back. The courier collects what the order owes. Orders that cannot ship now, are booked already, or have part shipped are refused, each with why.
   """
   ordersBook(accountId: ID, ids: [ID!]!): OrdersBookPayload!
@@ -10943,6 +10948,11 @@ input OrderUpdateInput {
 }
 
 type OrderUpdatePayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type OrderWaiveAdvancePayload {
   order: Order
   userErrors: [UserError!]!
 }

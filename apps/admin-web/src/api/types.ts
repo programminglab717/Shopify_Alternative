@@ -2867,6 +2867,13 @@ export interface OrderCreateManualPaymentData {
   };
 }
 
+export interface OrderWaiveAdvanceData {
+  orderWaiveAdvance: {
+    order: { id: string; stage: OrderStage; advanceDue: MoneyValue; codAmount: MoneyValue } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface OrderLinkCreateData {
   orderLinkCreate: {
     url: string | null;

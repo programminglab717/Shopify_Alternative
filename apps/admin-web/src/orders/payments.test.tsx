@@ -77,6 +77,26 @@ function core(role: StaffRole, first: ReturnType<typeof order>) {
           },
         };
       }
+      case 'OrderWaiveAdvance': {
+        const owed = Number(current.advanceDue.amount) - Number(current.amountPaid.amount);
+        current = {
+          ...current,
+          advanceDue: current.amountPaid,
+          codAmount: rupees(String(Number(current.codAmount.amount) + owed)),
+          stage: 'NEEDS_CONFIRMATION',
+        };
+        return {
+          orderWaiveAdvance: {
+            order: {
+              id: current.id,
+              stage: current.stage,
+              advanceDue: current.advanceDue,
+              codAmount: current.codAmount,
+            },
+            userErrors: [],
+          },
+        };
+      }
       case 'OrderLinkCreate':
         current = { ...current, customerLink: { expiresAt: null } };
         return {
@@ -135,6 +155,21 @@ describe("An order's payment received by hand, and its customer's link", () => {
     await within(money).findByText('Rs 500 recorded as received.');
     expect(sentOf(fake, 'OrderCreateManualPayment')).toEqual([{ id: 'ord_7', amount: '500' }]);
     expect(within(money).queryByText(/Waiting for its advance/)).toBeNull();
+  });
+
+  it('lets an order go without its advance, after saying what the courier collects (ADR-653)', async () => {
+    const fake = core('owner', order({ amountPaid: rupees('200'), codAmount: rupees('5099') }));
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const money = await screen.findByRole('region', { name: 'Payments and refunds' });
+    fireEvent.click(within(money).getByRole('button', { name: 'Go without the advance' }));
+    expect(within(money).getByText(/collects the Rs 300 still owed with the rest/)).toBeTruthy();
+    await press('Go without it');
+    await within(money).findByText('Advance waived: the courier collects it at the door.');
+    expect(sentOf(fake, 'OrderWaiveAdvance')).toEqual([{ id: 'ord_7' }]);
+    expect(within(money).queryByText(/Waiting for its advance/)).toBeNull();
+    expect(within(money).queryByRole('button', { name: 'Go without the advance' })).toBeNull();
   });
 
   it('records part of a transfer, never more than it owes, and still offers to mark it paid', async () => {

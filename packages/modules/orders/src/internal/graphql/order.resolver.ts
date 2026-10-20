@@ -61,6 +61,7 @@ import {
   OrderInvoice,
   OrderEventsArgs,
   OrderMarkAsPaidPayload,
+  OrderWaiveAdvancePayload,
   OrderLocationChangePayload,
   OrderMarkPackedPayload,
   OrderMarkUnpackedPayload,
@@ -463,6 +464,21 @@ export class OrderResolver {
     @Args('tags', { type: () => [String] }) tags: string[],
   ): Promise<OrderBulkPayload> {
     return bulkPayload(await this.service.bulkRemoveTags(tenant, orderIds(ids), tags), tenant);
+  }
+
+  @Mutation(() => OrderWaiveAdvancePayload, {
+    description:
+      'Lets a cash-on-delivery order go without the advance it still waits for (ADR-653): what ' +
+      'came of it stays paid, the rest is collected at the door, and the order waits to be ' +
+      'confirmed as any order paid on delivery does. Not once anything of it has shipped.',
+  })
+  @RequireScopes('write_orders')
+  async orderWaiveAdvance(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<OrderWaiveAdvancePayload> {
+    const result = await this.service.waiveAdvance(tenant, uuidOf('order', id));
+    return payload(OrderWaiveAdvancePayload, result, tenant);
   }
 
   @Mutation(() => OrderMarkAsPaidPayload, {

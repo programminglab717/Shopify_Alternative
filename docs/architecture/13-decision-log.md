@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-652 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-653 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -660,6 +660,7 @@
 | 650 | The In Urdu tab writes one field of a line or two, a title say, across many of the shop's things at once, each kept for its own words' digest, emptied ones forgotten | Accepted |
 | 651 | A shop limits what its staff take off an order to a share of what its items cost, past which only owners, managers, apps and roles given `give_any_discount` go | Accepted |
 | 652 | A draft's amount off given by hand keeps to the shop's limit for staff, as an order's does; a discount code's is the shop's own | Accepted |
+| 653 | A cash-on-delivery order still waiting for its advance may be let go without it, the courier collecting what it owed, until any of it ships | Accepted |
 
 ---
 
@@ -23029,3 +23030,20 @@
 * **Consequences:** Drafts and orders keep to one limit, whichever an agent works in.
 * **Alternatives:** **Prices agreed on a draft's lines kept to it too:** a line's price is what
   the shop sells at, and remains the target with discounts on lines.
+
+## ADR-653 · A cash-on-delivery order still waiting for its advance may be let go without it, the courier collecting what it owed, until any of it ships
+
+* **Context:** An order asked for an advance on cash on delivery (CHK-10) waited for it by
+  transfer, and was cancelled once its days ran out (ADR-168). A customer the shop knows, or one
+  who called to say the transfer won't come, left the shop cancelling the order and placing it
+  again, or recording money that never came.
+* **Decision:** `orderWaiveAdvance`, for those with `write_orders`, lowers an open order's
+  advance to what it has paid and adds the rest to what the courier collects. It is refused for an
+  order with no advance owed, one not open, and one with any of it shipped. An order that needed
+  no confirmation is then confirmed like any other; the timeline says how much was waived and
+  what the courier collects, and `OrderUpdated` names `advance`. The order's money card on its
+  page offers it beside recording a payment.
+* **Consequences:** The order moves on as cash on delivery; the cancel sweep no longer counts it
+  as unpaid, as it waits for nothing.
+* **Alternatives:** **Changing its payment method:** the order already is cash on delivery; only
+  what it waits for changes.
