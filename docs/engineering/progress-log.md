@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### 61945a2 · The address book at checkout
+
+* **A signed-in shopper's checkout offers the addresses of their book, each filling in the
+  order's address with a post of its own** ([ADR-587](../architecture/13-decision-log.md#adr-587--a-signed-in-shoppers-checkout-offers-the-addresses-of-their-book-each-filling-in-the-orders-address-with-a-post-of-its-own), CUS-02, CHK-03).
+* 3632 tests, 1 more: the book offered and chosen from, and whose it is.
+
 ### 4f23243 · A signed-in session proves its number at checkout
 
 * **A shopper's session signed in to their account proves its number at checkout, where the
