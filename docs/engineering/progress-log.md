@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Listings written on the Search listings tab
+### ceb20ca · Listings written on the Search listings tab
 
 * **A listing is written on the Search listings tab itself** ([ADR-649](../architecture/13-decision-log.md#adr-649--a-listing-is-written-on-the-search-listings-tab-itself-with-the-card-its-own-page-has-and-stays-shown-while-it-is-open-once-it-is-described)), with the card its own
   page has, and stays shown while open once it is described.
