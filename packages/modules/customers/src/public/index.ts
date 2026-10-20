@@ -119,6 +119,7 @@ export {
   issueSoldGiftCardsIn,
   newGiftCardCode,
   normalizeGiftCardCode,
+  giveBackOrderGiftCardsIn,
   revertOrderGiftCardsIn,
   spendGiftCardIn,
   type GiftCardAdjustInput,

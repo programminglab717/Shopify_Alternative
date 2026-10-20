@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-663 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-664 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -671,6 +671,7 @@
 | 661 | A refund given as store credit gives back first what the order's own store credit paid, each part expiring as the credit it came from does | Accepted |
 | 662 | An order lists the orders split from it, the oldest first, as each part names the order it was split from | Accepted |
 | 663 | Cancelling an order whose refunds took part of what its store credit paid gives back as much as they left, to the credits it came from, as a parcel that came back does | Accepted |
+| 664 | Cancelling an order whose refunds took part of what gift cards paid gives back to the cards as much as refunds and store credit left, and the timeline says what the cards got | Accepted |
 
 ---
 
@@ -23259,3 +23260,20 @@
   which credits with a source already are. **A refund made by cancelling:** it would count as a
   refund, in the order's refunded amount and on its credit note, for money the shop never paid
   out.
+
+## ADR-664 · Cancelling an order whose refunds took part of what gift cards paid gives back to the cards as much as refunds and store credit left, and the timeline says what the cards got
+
+* **Context:** A cancelled order gives back what gift cards paid of it, the payment void
+  (ADR-449), but only where what was paid past its refunds and the store credit given back covers
+  all of it; else the cards got nothing and the timeline said nothing of them. ADR-663 gave store
+  credit back in part in the same case.
+* **Decision:** Where it does not cover all of it, cancelling gives that much back to the cards,
+  in the order they paid, each at most what it paid, as a `credit` of the card that names the
+  order; to cards deactivated or past their day too, as a whole one's is. The order's paid amount
+  drops by what came back. Store credit is given back first and the cards from what it leaves, as
+  before. The timeline now says what the cards got back on every cancellation they paid, whole,
+  in part, or, where refunds took all, none.
+* **Consequences:** A part-refunded order paid with gift cards no longer leaves staff to give the
+  cards back by hand. A cancellation is once, so a card is never given back twice.
+* **Alternatives:** **Reverting a debit in part:** a debit's `debit_revert` gives it back whole,
+  once (ADR-449); a credit naming the order says the same without a second kind of revert.

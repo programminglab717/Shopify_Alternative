@@ -624,6 +624,49 @@ export async function revertOrderGiftCardsIn(
   return given;
 }
 
+/**
+ * Gives back up to `amount` of what gift cards paid of order `orderId` and was not given back, in
+ * the caller's transaction, when it is cancelled after refunds took more of what was paid than the
+ * rest left (ADR-664): to the cards in the order they paid, each at most what it paid, as credits
+ * naming the order; to cards deactivated or past their day too, as a whole one's is. What it gave
+ * back.
+ */
+export async function giveBackOrderGiftCardsIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor | 'system',
+  orderId: string,
+  amount: bigint,
+): Promise<bigint> {
+  const { rows: debits } = await tx.execute<{ gift_card_id: string; amount: string }>(sql`
+    SELECT d.gift_card_id, d.amount::text AS amount
+      FROM customers.gift_card_transactions d
+     WHERE d.shop_id = ${shopId} AND d.order_id = ${orderId} AND d.kind = 'debit'
+       AND NOT EXISTS (SELECT 1 FROM customers.gift_card_transactions r
+                        WHERE r.shop_id = d.shop_id AND r.kind = 'debit_revert'
+                          AND r.source_id = d.id)
+     ORDER BY d.created_at, d.id`);
+  let given = 0n;
+  for (const debit of debits) {
+    const rest = amount - given;
+    if (rest <= 0n) break;
+    const card = await lockCard(tx, shopId, debit.gift_card_id);
+    if (!card) continue;
+    const paid = BigInt(debit.amount);
+    const giving = paid < rest ? paid : rest;
+    await changeBalance(tx, shopId, actor, card, {
+      kind: 'credit',
+      amount: giving,
+      balanceAfter: BigInt(card.balance) + giving,
+      orderId,
+      sourceId: null,
+      note: '',
+    });
+    given += giving;
+  }
+  return given;
+}
+
 /** A card issued for a unit of a gift card product sold (CAT-12, ADR-451), its code this once. */
 export interface SoldGiftCard {
   id: string;

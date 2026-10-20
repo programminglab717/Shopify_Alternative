@@ -19,7 +19,6 @@ import {
   debitStoreCreditIn,
   giftCardOfIn,
   giftCardsPaidIn,
-  revertOrderGiftCardsIn,
   spendGiftCardIn,
   withdrawOrderCreditIn,
   storeCreditAccountsIn,
@@ -43,7 +42,7 @@ import { checkAddress, type AddressInput } from './address.js';
 import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { browserIdsOf, type BrowserIdsValue } from './browser-ids.js';
-import { creditBackText, giveCreditBackIn } from './credit-back.js';
+import { cardsBackText, creditBackText, giveCardsBackIn, giveCreditBackIn } from './credit-back.js';
 import { customerFactsQuery } from './customer-facts.js';
 import { endDutyIn, shareOutIn } from './desk-duty.js';
 import {
@@ -1688,12 +1687,12 @@ export class OrderService {
     const credit = await storeCreditPaidIn(tx, shopId, order.id);
     const left = order.amountPaid - order.amountRefunded;
     const creditGiven = await giveCreditBackIn(tx, shopId, by.actor, order.id, credit, left);
-    // Gift cards that paid it get it back likewise (ADR-449), from what refunds left after.
+    // Gift cards that paid it get it back likewise (ADR-449, ADR-664), from what is left after.
     const cards = await giftCardsPaidIn(tx, shopId, order.id);
-    const cardsVoided = cards > 0n && left - creditGiven >= cards;
-    if (cardsVoided) await revertOrderGiftCardsIn(tx, shopId, by.actor, order.id);
-    const voided = creditGiven > 0n || cardsVoided;
-    const paid = order.amountPaid - creditGiven - (cardsVoided ? cards : 0n);
+    const cardsLeft = left - creditGiven;
+    const cardsGiven = await giveCardsBackIn(tx, shopId, by.actor, order.id, cards, cardsLeft);
+    const voided = creditGiven > 0n || cardsGiven > 0n;
+    const paid = order.amountPaid - creditGiven - cardsGiven;
     const updated = await updateOrder(
       tx,
       shopId,
@@ -1714,7 +1713,17 @@ export class OrderService {
         order.id,
         by.actor,
         'refunded',
-        creditBackText(order, credit, creditGiven),
+        creditBackText(order, credit, creditGiven, left),
+      );
+    }
+    if (cards > 0n) {
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        by.actor,
+        'refunded',
+        cardsBackText(order, cards, cardsGiven, cardsLeft),
       );
     }
     // Credit given for paying it online goes with it, but what was spent of it (ADR-432).

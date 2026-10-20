@@ -1467,7 +1467,7 @@ async function creditBackIn(
     order.id,
     actor,
     'refunded',
-    creditBackText(order, credit, given, ', as its parcel came back'),
+    creditBackText(order, credit, given, left, ', as its parcel came back'),
   );
   return updated;
 }

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { GiftCardService } from '@hatti/customers/public';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { RefundService } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
@@ -118,6 +119,37 @@ describe.skipIf(!server)('Gift cards at checkout (PAY-13, ADR-449)', () => {
       ['debit', -150_000n, placed.order.id],
       ['issue', 150_000n, null],
     ]);
+  });
+
+  it('gives back as much as refunds left when cancelled after them (ADR-664)', async () => {
+    const { id, code } = await card('1500');
+    const secret = await checkout();
+    const applied = open(await f.checkouts.applyGiftCard(secret, code));
+    const placed = await f.checkouts.place(secret, applied.shown, FORM);
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    const orderId = placed.order.id;
+    unwrap(await f.orders.recordPayment(f.a, orderId, { amount: '500' }));
+    unwrap(await new RefundService(f.db).refund(f.a, orderId, { amount: '1,000', method: 'cash' }));
+
+    // Rs 1,000 of the Rs 2,000 paid is left unrefunded: that much of the card's comes back.
+    const cancelled = unwrap(await f.orders.cancel(f.a, orderId, { reason: 'customer' }));
+    expect(cancelled).toMatchObject({ amountPaid: 100_000n, amountRefunded: 100_000n });
+    expect(await balanceOf(id)).toBe(100_000n);
+    const ledger = await cards.transactions(f.a, id, { first: 10 });
+    expect(ledger.items.map((item) => [item.kind, item.amount, item.orderId])).toEqual([
+      ['credit', 100_000n, orderId],
+      ['debit', -150_000n, orderId],
+      ['issue', 150_000n, null],
+    ]);
+    const { rows } = await f.admin.query<{ message: string }>(
+      `SELECT message FROM orders.order_events WHERE order_id = $1 AND kind = 'refunded'
+        ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [orderId],
+    );
+    expect(rows[0]!.message).toBe(
+      'Gave Rs 1,000 of the Rs 1,500 gift cards paid back to them, what refunds and store ' +
+        'credit left of what was paid',
+    );
   });
 
   it('pays a whole order it covers, keeping the rest for the next', async () => {
