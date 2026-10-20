@@ -144,6 +144,54 @@ describe.skipIf(!server)('Store credit at checkout (ORD-09, ADR-186)', () => {
     expect(problemOf(spending)).toMatchObject({ kind: 'code', state: 'sent' });
   });
 
+  it('spends the credit of a shopper signed in with the number, without a code (ADR-609)', async () => {
+    const customerId = await give('0300 1234567', '1500');
+    /** Signs `phone` in to the shop's accounts with the code sent to it: the session's token. */
+    const signIn = async (phone: string) => {
+      expect(await f.accounts.startSignIn(f.a.shopId, { phone })).toMatchObject({ kind: 'sent' });
+      const { rows } = await f.admin.query<{ code: string }>(
+        `SELECT variables ->> 'code' AS code FROM messaging.messages
+          WHERE kind = 'account_code' ORDER BY created_at DESC, id DESC LIMIT 1`,
+      );
+      const verified = await f.accounts.verifySignIn(f.a.shopId, { phone, code: rows[0]!.code });
+      if (verified.kind !== 'signed_in')
+        throw new Error(`Expected signed in, got ${verified.kind}`);
+      return verified.token;
+    };
+    const as = (account: string) => ({ client: { ip: null, userAgent: null, account } });
+
+    // A session of another number proves nothing of this one's.
+    const other = await signIn('0321 7654321');
+    const first = await checkout();
+    const refused = await f.checkouts.place(
+      first.secret,
+      first.view.shown,
+      { ...FORM, storeCredit: '1' },
+      as(other),
+    );
+    expect(problemOf(refused)).toMatchObject({ kind: 'code', state: 'sent' });
+    expect(await orderCount()).toBe(0);
+
+    // Signed in with it, the credit is spent at once, no code sent, and the page tells of none.
+    expect(checkoutPage(first.view).html).toContain('We send a code to your number');
+    expect(checkoutPage({ ...first.view, book: [] }).html).not.toContain('We send a code');
+    const codes = (await sent()).length;
+    const own = await signIn('0300 1234567');
+    const { secret, view } = await checkout();
+    const placed = await f.checkouts.place(
+      secret,
+      view.shown,
+      { ...FORM, storeCredit: '1' },
+      as(own),
+    );
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    expect(placed.storeCredit).toBe(1_500_00n);
+    expect(placed.order).toMatchObject({ customerId, amountPaid: 1_500_00n });
+    expect((await sent()).length).toBe(codes);
+    const [account] = await credit.accountsOf(f.a, customerId);
+    expect(account!.balance).toBe(0n);
+  });
+
   it('says so when the number proved has none, and places nothing until it goes without', async () => {
     await give('0333 5551234', '500');
     const { secret, view } = await checkout();

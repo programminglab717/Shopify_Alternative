@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-608 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-609 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -616,6 +616,7 @@
 | 606 | The online store has one Search listings tab: every product's, collection's, page's, blog's and article's search engine listing, those without a description of their own first | Accepted |
 | 607 | A redirect that would send shoppers round a loop is refused, and each redirect says where its redirects in a row end, for the admin to send it straight there | Accepted |
 | 608 | Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap index says when each of its files last changed | Accepted |
+| 609 | A shopper signed in to their account with a number spends its store credit at checkout without a code; a browser's recent proof still asks one | Accepted |
 
 ---
 
@@ -22094,3 +22095,25 @@
   work on Shopify. **A product's trail through its collection:** Hatti's product pages have
   no collection in their address to choose one by, and a product in many collections would
   be given one at random.
+
+## ADR-609 · A shopper signed in to their account with a number spends its store credit at checkout without a code; a browser's recent proof still asks one
+
+* **Context:** Checkout spends a number's store credit only once a code sent to it proves it,
+  each checkout anew (ADR-186, ADR-592), even for a shopper signed in to their account with the
+  number, whose account page and checkout already show the credit (ADR-598). The signed-in
+  shopper proved the number with a code to sign in (ADR-570); asking again is a step where
+  shoppers leave, and Shopify's customers spend their credit signed in without one.
+* **Decision:** Placing an order that spends store credit takes either a code proved for this
+  checkout, as before, or the shopper's account session signed in with the number the order is
+  for (ADR-586). A session of another number proves nothing of this one's, and the code is
+  asked as before. A browser's recent proof (ADR-199) still spares a code only where the shop's
+  risk rules ask one, never for spending credit: it outlives the shopper's choice to stay signed
+  in, and is kept on a device whoever uses it. The order is placed as one whose number was
+  proved, at the time the session signed in. The page's box for paying with credit tells a
+  signed-in shopper of no code.
+* **Consequences:** Signed-in shoppers spend their credit in one step. Signing out, or a
+  session's end, takes the credit's spending back to a code. Credit stays bound to a number,
+  never to whoever holds a browser.
+* **Alternatives:** **The browser's proof too:** fewer codes still, but on a shared phone the
+  next shopper could spend another's credit. **A fresh code for large spends:** a limit no shop
+  has asked for.

@@ -444,6 +444,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
               form.storeCreditAmount ?? '',
               view.creditBalance ?? null,
               problem?.kind === 'store_credit_amount',
+              view.book !== undefined,
             )
           }
           ${asked && codeField()} ${agreement && paragraphs(agreement, 'small muted')}
@@ -562,24 +563,33 @@ function marketingChoices(
  * Paying with the store credit the shopper's number has (ADR-186): theirs once they prove the
  * number with a code, which the page asks for as it places the order; as much as it pays, or as
  * much as they choose (ADR-592). A shopper signed in to their account sees their number's credit,
- * as their account page shows it.
+ * as their account page shows it, and spends it without a code (ADR-609), so is told of none.
  */
 function storeCreditChoice(
   checked: boolean,
   typed: string,
   balance: bigint | null,
   wrong: boolean,
+  signedIn = false,
 ): Html {
   return html`<div class="field">
     <label class="choice">
       <input type="checkbox" name="storeCredit" value="1" ${checked && html`checked`} />
       <span
-        ><span lang="en"
-          >Pay with my store credit. We send a code to your number to check it is yours.</span
-        ><span lang="ur" dir="rtl"
-          >میرے اسٹور کریڈٹ سے ادائیگی کریں۔ نمبر آپ کا ہونے کی تصدیق کے لیے ہم اس پر کوڈ بھیجیں
-          گے۔</span
-        ></span
+        >${
+          signedIn
+            ? say('bilingual', {
+                en: 'Pay with my store credit.',
+                ur: 'میرے اسٹور کریڈٹ سے ادائیگی کریں۔',
+              })
+            : html`<span lang="en"
+                  >Pay with my store credit. We send a code to your number to check it is
+                  yours.</span
+                ><span lang="ur" dir="rtl"
+                  >میرے اسٹور کریڈٹ سے ادائیگی کریں۔ نمبر آپ کا ہونے کی تصدیق کے لیے ہم اس پر کوڈ
+                  بھیجیں گے۔</span
+                >`
+        }</span
       >
     </label>
     ${

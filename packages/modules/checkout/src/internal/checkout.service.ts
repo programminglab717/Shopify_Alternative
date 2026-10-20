@@ -1050,16 +1050,19 @@ export class CheckoutService {
         withCredit || asksCode
           ? await numberVerifiedIn(tx, found.shopId, found.checkoutId, address.phone)
           : null;
-      // Or proved in this browser lately (ADR-199), or by the shopper's session signed in to their
-      // account with it (ADR-586): enough where the shop's risk rules ask, never to spend the
-      // number's credit.
+      // Or by the shopper's session signed in to their account with it (ADR-586), by a code sent
+      // to it: enough to spend its credit too (ADR-609), as the account's page shows it.
+      const sessionAt =
+        !codedAt && (withCredit || asksCode) && client?.account
+          ? await provedBySessionIn(tx, found.shopId, client.account, address.phone)
+          : null;
+      // Or proved in this browser lately (ADR-199): enough where the shop's risk rules ask, never
+      // to spend the number's credit.
       const verifiedAt =
         codedAt ??
+        sessionAt ??
         (asksCode && client?.proof
           ? await provedByBrowserIn(tx, found.shopId, client.proof, address.phone)
-          : null) ??
-        (asksCode && client?.account
-          ? await provedBySessionIn(tx, found.shopId, client.account, address.phone)
           : null);
       // How much of it the shopper chose to spend, rupees to minor units; null for all it pays.
       const creditUpTo = withCredit ? creditAmountOf(form.storeCreditAmount) : null;
@@ -1067,8 +1070,9 @@ export class CheckoutService {
         return { ...view, form, problem: { kind: 'store_credit_amount' } };
       }
       if (withCredit) {
-        // The number's credit is the shopper's to spend once they prove it is theirs.
-        if (!codedAt) throw new NeedsCode();
+        // The number's credit is the shopper's to spend once they prove it is theirs, by a code
+        // here or signed in with it.
+        if (!codedAt && !sessionAt) throw new NeedsCode();
         const credit = await storeCreditOfPhoneIn(
           tx,
           found.shopId,

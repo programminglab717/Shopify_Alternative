@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit spent signed in
+
+* **A shopper signed in to their account with a number spends its store credit at checkout
+  without a code; a browser's recent proof still asks one** ([ADR-609](../architecture/13-decision-log.md#adr-609--a-shopper-signed-in-to-their-account-with-a-number-spends-its-store-credit-at-checkout-without-a-code-a-browsers-recent-proof-still-asks-one), ORD-09, CUS-02).
+* 3697 tests, 1 more: spent at once with the number's session, and a
+  code asked with another's.
+
 ### 7761746 · Breadcrumbs, and the sitemap index's times
 
 * **Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap
