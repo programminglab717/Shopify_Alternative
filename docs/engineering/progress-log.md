@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### What staff take off an order
+### 930fe68 · What staff take off an order
 
 * **A shop limits what its staff take off an order** ([ADR-651](../architecture/13-decision-log.md#adr-651--a-shop-limits-what-its-staff-take-off-an-order-to-a-share-of-what-its-items-cost-past-which-only-owners-managers-apps-and-roles-given-give_any_discount-go)) to a share of what its items
   cost; owners, managers, apps and roles given `give_any_discount` go past it.
