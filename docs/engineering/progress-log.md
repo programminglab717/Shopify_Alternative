@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit given back in part
+### 66c9047 · Store credit given back in part
 
 * **Cancelling an order whose refunds took part of what its store credit paid gives back as much
   as they left** ([ADR-663](../architecture/13-decision-log.md#adr-663--cancelling-an-order-whose-refunds-took-part-of-what-its-store-credit-paid-gives-back-as-much-as-they-left-to-the-credits-it-came-from-as-a-parcel-that-came-back-does)), to the credits it came from with their expiry, as a parcel that came
