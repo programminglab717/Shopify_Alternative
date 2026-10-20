@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Files replaced
+### e702eb6 · Files replaced
 
 * **A shop's file has what it holds replaced by an upload** ([ADR-647](../architecture/13-decision-log.md#adr-647--a-shops-file-has-what-it-holds-replaced-by-an-upload-with-shopifys-fileupdate-and-originalsource-keeping-its-id-so-wherever-it-is-used-shows-the-new-one)), keeping its ID, so its
   logos, sharing image, articles and themes show the new one; Replace on the Files tab.
