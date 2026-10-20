@@ -4682,10 +4682,17 @@ export const CollectionsQuery = /* GraphQL */ `
 /** A collection with its rules and its products, in its order. */
 export const CollectionQuery = /* GraphQL */ `
   query Collection($id: ID!) {
+    shop {
+      url
+    }
     collection(id: $id) {
       id
       title
       handle
+      seo {
+        title
+        description
+      }
       description
       sortOrder
       productsCount
@@ -4811,10 +4818,17 @@ export const PagesQuery = /* GraphQL */ `
 /** A page with its body, to change. */
 export const PageQuery = /* GraphQL */ `
   query Page($id: ID!) {
+    shop {
+      url
+    }
     page(id: $id) {
       id
       title
       handle
+      seo {
+        title
+        description
+      }
       body
       isPublished
       publishedAt
@@ -5313,10 +5327,17 @@ export const BlogsQuery = /* GraphQL */ `
 /** A blog with its articles, the newest last, and each article's comments waiting. */
 export const BlogQuery = /* GraphQL */ `
   query Blog($id: ID!) {
+    shop {
+      url
+    }
     blog(id: $id) {
       id
       title
       handle
+      seo {
+        title
+        description
+      }
       commentPolicy
       articlesCount
       articles(first: 250) {
@@ -5392,10 +5413,17 @@ const COMMENT = /* GraphQL */ `
 /** An article to change, its blog, and its comments, the latest first. */
 export const ArticleQuery = /* GraphQL */ `
   query Article($id: ID!) {
+    shop {
+      url
+    }
     article(id: $id) {
       id
       title
       handle
+      seo {
+        title
+        description
+      }
       body
       summary
       tags

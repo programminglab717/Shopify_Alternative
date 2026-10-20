@@ -39,6 +39,7 @@ import { TextField } from '../ui/field';
 import { BodyArea, normalized, useBody } from './body-field';
 import { usePageState, WRITES_BLOGS } from './pages';
 import { ArticleUrduCard } from '../urdu/urdu-pages';
+import { ArticleSearchListing } from './search-listings';
 
 type When = 'now' | 'later' | 'hidden';
 
@@ -543,6 +544,11 @@ export function ArticleEditorPage() {
         </p>
       </div>
       <ArticleForm key={article.id} blogId={article.blog.id} article={article} />
+      <ArticleSearchListing
+        key={`seo-${article.id}`}
+        article={article}
+        storefront={query.data.shop?.url ?? ''}
+      />
       <ArticleUrduCard articleId={article.id} />
       <Comments article={article} />
       <DeleteArticle article={article} />

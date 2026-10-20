@@ -34,6 +34,7 @@ import { TextField } from '../ui/field';
 import { CollectionUrduCard } from '../urdu/urdu-pages';
 import { BackToProducts } from './collections-page';
 import { RulesEditor, ruleInput, rulesComplete, sortOrders } from './collection-form';
+import { CollectionSearchListing } from '../online-store/search-listings';
 
 type Collection = NonNullable<CollectionData['collection']>;
 
@@ -406,6 +407,13 @@ export function CollectionPage() {
             </p>
           </div>
           <Details key={collection.id} collection={collection} edits={edits} />
+          {edits && (
+            <CollectionSearchListing
+              key={`seo-${collection.id}`}
+              collection={collection}
+              storefront={query.data.shop?.url ?? ''}
+            />
+          )}
           <Products collection={collection} edits={edits} />
           <CollectionUrduCard collectionId={collection.id} />
           {edits && <Delete collection={collection} />}

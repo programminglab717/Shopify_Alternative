@@ -29,6 +29,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { usePageState, WRITES_BLOGS } from './pages';
 import { BlogUrduCard } from '../urdu/urdu-pages';
+import { BlogSearchListing } from './search-listings';
 
 const POLICIES: readonly CommentPolicy[] = ['MODERATED', 'AUTO_PUBLISHED', 'CLOSED'];
 
@@ -356,6 +357,11 @@ export function BlogPage() {
             )}
           </section>
           <BlogForm key={blog.id} blog={blog} />
+          <BlogSearchListing
+            key={`seo-${blog.id}`}
+            blog={blog}
+            storefront={query.data.shop?.url ?? ''}
+          />
           <DeleteBlog blog={blog} />
         </>
       )}

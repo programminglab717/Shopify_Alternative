@@ -22,14 +22,25 @@ export const DESCRIPTION_SHOWN = 160;
 const TITLE_MOST = 70;
 const DESCRIPTION_MOST = 320;
 
+/** What HTML escapes in a page's text, as the storefront reads it back (ADR-231). */
+const ENTITIES: Readonly<Record<string, string>> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  '#39': "'",
+  nbsp: ' ',
+};
+
 /**
  * `text` cut at a word to about `max` characters, with "…" where it was cut, as the storefront
- * cuts a description made from a page's text; its tags gone and its spaces run together. Empty for
- * none.
+ * cuts a description made from a page's text; its tags gone, what HTML escapes read back, and its
+ * spaces run together. Empty for none.
  */
 export function excerpt(text: string, max: number): string {
   const flat = text
     .replace(/<[^>]*>/g, ' ')
+    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, name: string) => ENTITIES[name]!)
     .replace(/\s+/g, ' ')
     .trim();
   const characters = Array.from(flat);

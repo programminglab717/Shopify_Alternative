@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-600 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-601 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -608,6 +608,7 @@
 | 598 | Checkout shows the store credit of the number typed once a code proves it for the checkout, or the browser proved it lately, without signing in | Accepted |
 | 599 | An order's emails say the day checkout said to expect it by, while its delivery is still to come | Accepted |
 | 600 | A product's page in the admin has a search engine listing card: its title and description for search engines, with a preview of how a search engine lists it | Accepted |
+| 601 | Collections, pages, blogs and articles have the same search engine listing card in the admin as products | Accepted |
 
 ---
 
@@ -21926,3 +21927,20 @@
 * **Alternatives:** **A separate SEO page listing every product:** a later toolkit's screen; the
   product's own page is where a merchant looks first. **The preview fetched from a search engine:**
   it shows only what was crawled, not what is being typed.
+
+## ADR-601 · Collections, pages, blogs and articles have the same search engine listing card in the admin as products
+
+* **Context:** A product's page in the admin has a search engine listing card (ADR-600).
+  Collections, pages, blogs and articles take a title and description for search engines too
+  (ADR-231, ADR-244), set only through the API.
+* **Decision:** Each of their pages in the admin has the same card, saved through its own update
+  (`collectionUpdate`, `pageUpdate`, `blogUpdate`, `articleUpdate`) and previewed at its own
+  address: /collections, /pages, /blogs and /blogs/{blog}/{article}. Blank, the preview shows
+  what the storefront gives instead: a collection's description, a page's text, an article's
+  summary or else its text, their tags gone and what HTML escapes read back; a blog's is the
+  shop's own description (ADR-244), which the card leaves unsaid. The card shows on a collection's
+  page to those who change collections, and on the others' to those who write them.
+* **Consequences:** Every page the shop writes is given its listing where it is written. What is
+  wrong with a save is said on the card, and what was typed stays.
+* **Alternatives:** **One SEO screen listing them all:** still a later toolkit's; it would reuse the
+  card.

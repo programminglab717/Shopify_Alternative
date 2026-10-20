@@ -23,6 +23,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { PageUrduCard } from '../urdu/urdu-pages';
 import { BodyArea, normalized, useBody } from './body-field';
+import { PageSearchListing } from './search-listings';
 
 /** Those who write the shop's pages, which are content: marketers too (ADR-176). */
 export const WRITES_PAGES = gate(['owner', 'manager', 'marketer'], 'write_online_store_pages');
@@ -334,6 +335,11 @@ export function PageEditorPage() {
             </p>
           </div>
           <PageForm key={page.id} page={page} />
+          <PageSearchListing
+            key={`seo-${page.id}`}
+            page={page}
+            storefront={query.data.shop?.url ?? ''}
+          />
           <PageUrduCard pageId={page.id} />
           <DeletePage page={page} />
         </>

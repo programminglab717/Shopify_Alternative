@@ -2070,10 +2070,14 @@ export interface CollectionsData {
 }
 
 export interface CollectionData {
+  /** The shop's storefront's address (ADR-601); absent where a fake core leaves it out. */
+  shop?: { url: string };
   collection: {
     id: string;
     title: string;
     handle: string;
+    /** Its own title and description for search engines (ADR-231); absent where a fake core leaves it out. */
+    seo?: { title: string | null; description: string | null };
     description: string;
     sortOrder: CollectionSortOrder;
     productsCount: number;
@@ -2098,6 +2102,8 @@ export interface PageSummary {
   id: string;
   title: string;
   handle: string;
+  /** Its own title and description for search engines (ADR-231); absent where a fake core leaves it out. */
+  seo?: { title: string | null; description: string | null };
   isPublished: boolean;
   publishedAt: string | null;
 }
@@ -2107,6 +2113,8 @@ export interface PagesData {
 }
 
 export interface PageData {
+  /** The shop's storefront's address (ADR-601); absent where a fake core leaves it out. */
+  shop?: { url: string };
   page: (PageSummary & { body: string }) | null;
 }
 
@@ -2430,6 +2438,8 @@ export interface BlogSummary {
   id: string;
   title: string;
   handle: string;
+  /** Its own title and description for search engines (ADR-231); absent where a fake core leaves it out. */
+  seo?: { title: string | null; description: string | null };
   commentPolicy: CommentPolicy;
   articlesCount: number;
 }
@@ -2448,6 +2458,8 @@ export interface ArticleSummary {
 }
 
 export interface BlogData {
+  /** The shop's storefront's address (ADR-601); absent where a fake core leaves it out. */
+  shop?: { url: string };
   blog: (BlogSummary & { articles: { nodes: ArticleSummary[] } }) | null;
 }
 
@@ -2463,6 +2475,8 @@ export interface ArticleDetail {
   id: string;
   title: string;
   handle: string;
+  /** Its own title and description for search engines (ADR-231); absent where a fake core leaves it out. */
+  seo?: { title: string | null; description: string | null };
   body: string;
   summary: string | null;
   tags: string[];
@@ -2475,6 +2489,8 @@ export interface ArticleDetail {
 }
 
 export interface ArticleData {
+  /** The shop's storefront's address (ADR-601); absent where a fake core leaves it out. */
+  shop?: { url: string };
   article: ArticleDetail | null;
 }
 
