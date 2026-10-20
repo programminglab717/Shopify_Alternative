@@ -1204,10 +1204,14 @@ export const ProductTagsQuery = /* GraphQL */ `
   }
 `;
 
-/** Those of a menu link's tags none of the shop's, or its collection's, products has (ADR-665). */
+/**
+ * Those of a menu link's tags none of the shop's, or its collection's, products has (ADR-665),
+ * and whether one has them all together (ADR-669).
+ */
 export const ProductTagsMissingQuery = /* GraphQL */ `
   query ProductTagsMissing($tags: [String!]!, $collectionId: ID) {
     productTagsMissing(tags: $tags, collectionId: $collectionId)
+    productTagsTogether(tags: $tags, collectionId: $collectionId)
   }
 `;
 

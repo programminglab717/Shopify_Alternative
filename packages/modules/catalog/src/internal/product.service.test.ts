@@ -436,6 +436,25 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await f.products.tagsMissing(f.b, ['eid'], { collectionId: null })).toEqual(['eid']);
   });
 
+  it("says whether a product has each of a menu link's tags together (ADR-669)", async () => {
+    const one = await create('One', { tags: ['Eid', 'lawn'] });
+    const two = await create('Two', { tags: ['kids', 'sale'] });
+    const lawn = unwrap(
+      await f.collections.create(f.a, { title: 'Lawn', productIds: [one.id, two.id] }),
+    );
+    const together = (tags: string[], collectionId?: string) =>
+      f.products.tagsTogether(f.a, tags, { collectionId: collectionId ?? null });
+    // Case aside, as the collection's tag page matches them.
+    expect(await together(['eid', 'LAWN', ' lawn '], lawn.id)).toBe(true);
+    // Each some product's, but none's together.
+    expect(await together(['eid', 'kids'], lawn.id)).toBe(false);
+    expect(await together(['kids', 'sale'])).toBe(true);
+    const empty = unwrap(await f.collections.create(f.a, { title: 'Empty' }));
+    expect(await together(['kids', 'sale'], empty.id)).toBe(false);
+    expect(await together([], empty.id)).toBe(true);
+    expect(await f.products.tagsTogether(f.b, ['kids'], { collectionId: null })).toBe(false);
+  });
+
   it('finds products by Roman Urdu spelling variants and Urdu script', async () => {
     const suit = await create('Qameez Shalwar', { tags: ['لان'], vendor: 'Khaadi' });
     await create('Peshawari Chappal');

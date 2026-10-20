@@ -103,16 +103,21 @@ function core(role: StaffRole) {
                 : ['lawn', 'sale', 'Eid', 'new in'],
         };
       case 'ProductTagsMissing': {
-        // As the core says it, of the same tags (ADR-665).
-        const used = (
+        // As the core says it, of the same tags (ADR-665), its products' each (ADR-669).
+        const products = (
           variables.collectionId === 'col_1'
-            ? ['sale', 'Eid', 'new in']
-            : ['lawn', 'sale', 'Eid', 'new in']
-        ).map((tag) => tag.toLowerCase());
+            ? [['sale', 'Eid'], ['new in']]
+            : [
+                ['lawn', 'sale'],
+                ['Eid', 'new in'],
+              ]
+        ).map((tags) => tags.map((tag) => tag.toLowerCase()));
+        const asked = (variables.tags as string[]).map((tag) => tag.toLowerCase());
         return {
           productTagsMissing: (variables.tags as string[]).filter(
-            (tag) => !used.includes(tag.toLowerCase()),
+            (tag) => !products.some((tags) => tags.includes(tag.toLowerCase())),
           ),
+          productTagsTogether: products.some((tags) => asked.every((tag) => tags.includes(tag))),
         };
       }
       case 'CollectionProductSearch':
@@ -345,6 +350,36 @@ describe("The online store's menus", () => {
         { timeout: 2000 },
       ),
     ).toBeTruthy();
+  });
+
+  it("says when no product has all of a link's tags together, though each is some one's (ADR-669)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/menu_1');
+
+    await screen.findByLabelText('Link 2: tags');
+    type('Link 2: tags', 'Sale, new in');
+    expect(
+      await screen.findByText(
+        'None of this collection’s products has all of Sale, new in together: the link would show nothing.',
+        {},
+        { timeout: 2000 },
+      ),
+    ).toBeTruthy();
+    type('Link 2: tags', 'Sale, eid');
+    await waitFor(() => expect(screen.queryByText(/all of .* together/)).toBeNull(), {
+      timeout: 2000,
+    });
+    // A tag none has is said alone.
+    type('Link 2: tags', 'Sale, new in, lawn');
+    expect(
+      await screen.findByText(
+        'None of this collection’s products has lawn: the link would show nothing.',
+        {},
+        { timeout: 2000 },
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/all of .* together/)).toBeNull();
   });
 
   it('makes a menu with a handle from its title and a link to a product found by name', async () => {

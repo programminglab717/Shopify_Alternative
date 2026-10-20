@@ -13943,6 +13943,11 @@ type Query {
   """
   productTagsMissing(collectionId: ID, tags: [String!]!): [String!]!
 
+  """
+  Whether one of the products, or of those in `collectionId` where it is given, has each of `tags` together, case aside: a menu's link narrowed by them shows nothing without (ADR-669).
+  """
+  productTagsTogether(collectionId: ID, tags: [String!]!): Boolean!
+
   """Product types in use."""
   productTypes(
     """1 to 250, most used first."""

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-668 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-669 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -676,6 +676,7 @@
 | 666 | Where the shop shares new orders out, the orders still waiting on an agent whose shift ran out are handed over by the worker to those on duty | Accepted |
 | 667 | A product's photos that say nothing of what they show are described on the search listings tab itself, each beside its picture, and saved together | Accepted |
 | 668 | A shopper's account lists what happened to their store credit, its latest 20 changes the newest first, each with its order, without the shop's notes | Accepted |
+| 669 | The menu editor says when no product has all of a link's tags together, though each is some product's, as it says a tag none has | Accepted |
 
 ---
 
@@ -23352,3 +23353,17 @@
 * **Consequences:** A shopper sees why their credit is what it is without asking the shop.
 * **Alternatives:** **The whole ledger, a page at a time:** twenty is what a shopper reads; more
   can be paged when one asks. **The notes too:** the shop writes them for its staff.
+
+## ADR-669 · The menu editor says when no product has all of a link's tags together, though each is some product's, as it says a tag none has
+
+* **Context:** A menu's link narrowed by tags shows the products with each of them (ADR-644),
+  and the editor says which of its tags none of the products has as typing stops (ADR-665). But
+  tags each some product's may be no one product's together, `sale` on one kurta and `new in` on
+  another, and the link shows nothing all the same, unsaid.
+* **Decision:** The catalog says whether one of the shop's products, or of the collection's,
+  has each of the tags together, case aside as ADR-665 matches them, through
+  `productTagsTogether`, asked in the same request as `productTagsMissing`. Where every tag is
+  some product's but none has them all, the editor says so under the tags, in English and Urdu;
+  a tag none has is still said alone, as it is the one to change.
+* **Consequences:** A link that would show nothing is said, whichever way its tags miss.
+* **Alternatives:** **How many products have them all:** the editor needs only whether any do.

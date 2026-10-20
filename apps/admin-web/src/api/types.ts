@@ -2679,6 +2679,8 @@ export interface ProductTagsData {
 
 export interface ProductTagsMissingData {
   productTagsMissing: string[];
+  /** Whether one product has every tag (ADR-669). */
+  productTagsTogether: boolean;
 }
 
 export interface ProductSuggestionsData {

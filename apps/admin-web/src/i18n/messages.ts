@@ -1670,6 +1670,10 @@ const en = {
   'menus.tagsMissingCollection':
     'None of this collection’s products has {tags}: the link would show nothing.',
   'menus.tagsMissingShop': 'None of your products has {tags}: the link would show nothing.',
+  'menus.tagsApartCollection':
+    'None of this collection’s products has all of {tags} together: the link would show nothing.',
+  'menus.tagsApartShop':
+    'None of your products has all of {tags} together: the link would show nothing.',
   'menus.addTag': 'Add the tag {tag} to link {number}',
   'menus.linkTagsHint': 'Optional, separated by commas: only products with each tag show.',
   'menus.chooseCollection': 'Choose a collection',
@@ -6984,6 +6988,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'menus.tagsMissingCollection':
     'اس کلیکشن کی کسی پروڈکٹ پر {tags} نہیں: یہ لنک کچھ نہیں دکھائے گا۔',
   'menus.tagsMissingShop': 'آپ کی کسی پروڈکٹ پر {tags} نہیں: یہ لنک کچھ نہیں دکھائے گا۔',
+  'menus.tagsApartCollection':
+    'اس کلیکشن کی کسی ایک پروڈکٹ پر {tags} سب اکٹھے نہیں: یہ لنک کچھ نہیں دکھائے گا۔',
+  'menus.tagsApartShop': 'آپ کی کسی ایک پروڈکٹ پر {tags} سب اکٹھے نہیں: یہ لنک کچھ نہیں دکھائے گا۔',
   'menus.addTag': 'لنک {number} میں ٹیگ {tag} شامل کریں',
   'menus.linkTagsHint': 'اختیاری، کوما سے الگ: صرف وہ پروڈکٹس دکھیں گی جن پر ہر ٹیگ ہو۔',
   'menus.chooseCollection': 'کلیکشن چنیں',

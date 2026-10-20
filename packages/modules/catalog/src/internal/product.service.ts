@@ -1102,6 +1102,37 @@ export class ProductService {
   }
 
   /**
+   * Whether one of the shop's products, or of collection `collectionId`'s where it is given, has
+   * each of `tags` together, case aside, as a menu's link narrowed by them needs to show any: each
+   * may be some product's and none have them all (ADR-669). True of no tags.
+   */
+  async tagsTogether(
+    tenant: TenantContext,
+    tags: readonly string[],
+    options: { collectionId?: string | null } = {},
+  ): Promise<boolean> {
+    const lowered = [
+      ...new Set(tags.map((tag) => tag.trim().toLowerCase()).filter((tag) => tag !== '')),
+    ];
+    if (lowered.length === 0) return true;
+    const within = options.collectionId
+      ? sql`AND EXISTS (SELECT 1 FROM catalog.collection_products cp
+                         WHERE cp.shop_id = p.shop_id AND cp.product_id = p.id
+                           AND cp.collection_id = ${options.collectionId})`
+      : sql``;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ together: boolean }>(sql`
+        SELECT EXISTS (
+          SELECT 1 FROM catalog.products p
+           WHERE p.shop_id = ${tenant.shopId} ${within}
+             AND ${sql.param(lowered)}::text[] <@ (SELECT array_agg(lower(t.tag))
+                                                      FROM unnest(p.tags) AS t(tag))
+        ) AS together`);
+      return rows[0]!.together;
+    });
+  }
+
+  /**
    * Products of the shop by ID, with their options, variants and media, in the caller's
    * transaction `tx`: for read models built outside the catalog, such as the storefront's. Those
    * not found are left out.

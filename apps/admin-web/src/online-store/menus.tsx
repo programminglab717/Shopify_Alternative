@@ -299,7 +299,8 @@ function TagsOffered({
 
 /**
  * Those of a link's tags none of its collection's products has, or none of the shop's for all
- * products, said as they stop typing: the link would show nothing (ADR-665).
+ * products, said as they stop typing: the link would show nothing (ADR-665). So would tags each
+ * some product's but none's together (ADR-669).
  */
 function TagsMissing({
   tags,
@@ -317,16 +318,21 @@ function TagsMissing({
     { enabled: asked !== '' },
   );
   const missing = asked === '' ? [] : (its.data?.productTagsMissing ?? []);
-  if (missing.length === 0) return null;
+  const apart = asked !== '' && missing.length === 0 && its.data?.productTagsTogether === false;
+  if (missing.length === 0 && !apart) return null;
   return (
     <p
       role="status"
       className="text-warning text-[length:var(--hatti-type-body-sm-size)]"
       dir="auto"
     >
-      {t(collectionId ? 'menus.tagsMissingCollection' : 'menus.tagsMissingShop', {
-        tags: missing.join(', '),
-      })}
+      {missing.length > 0
+        ? t(collectionId ? 'menus.tagsMissingCollection' : 'menus.tagsMissingShop', {
+            tags: missing.join(', '),
+          })
+        : t(collectionId ? 'menus.tagsApartCollection' : 'menus.tagsApartShop', {
+            tags: tagsOf(asked).join(', '),
+          })}
     </p>
   );
 }

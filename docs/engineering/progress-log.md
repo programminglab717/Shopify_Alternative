@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A menu link's tags no product has together
+
+* **The menu editor says when no product has all of a link's tags together** ([ADR-669](../architecture/13-decision-log.md#adr-669--the-menu-editor-says-when-no-product-has-all-of-a-links-tags-together-though-each-is-some-products-as-it-says-a-tag-none-has)), though
+  each is some product's, as it says a tag none has.
+* 3825 tests, two more: the catalog's and the menu editor's.
+
 ### 2545521 · Store credit's history in the account
 
 * **A shopper's account lists what happened to their store credit** ([ADR-668](../architecture/13-decision-log.md#adr-668--a-shoppers-account-lists-what-happened-to-their-store-credit-its-latest-20-changes-the-newest-first-each-with-its-order-without-the-shops-notes)), its latest 20

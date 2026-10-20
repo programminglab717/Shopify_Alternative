@@ -146,6 +146,25 @@ export class ProductResolver {
     });
   }
 
+  @Query(() => Boolean, {
+    description:
+      'Whether one of the products, or of those in `collectionId` where it is given, has each of ' +
+      "`tags` together, case aside: a menu's link narrowed by them shows nothing without (ADR-669).",
+  })
+  @RequireScopes('read_products')
+  productTagsTogether(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('tags', { type: () => [String] }) tags: string[],
+    @Args('collectionId', { type: () => ID, nullable: true }) collectionId?: string | null,
+  ): Promise<boolean> {
+    if (tags.length > TAGS_CHECKED) {
+      throw badUserInput(`Give at most ${TAGS_CHECKED} tags`);
+    }
+    return this.service.tagsTogether(tenant, tags, {
+      collectionId: collectionId ? uuidOf('collection', collectionId) : null,
+    });
+  }
+
   @Query(() => [String], { description: 'Product types in use.' })
   @RequireScopes('read_products')
   productTypes(
