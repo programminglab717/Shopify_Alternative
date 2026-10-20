@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The desk deals agents their own orders first
+### 865ac4b · The desk deals agents their own orders first
 
 * **The Confirmation Desk deals an agent the orders given to them first** ([ADR-635](../architecture/13-decision-log.md#adr-635--the-confirmation-desk-deals-an-agent-the-orders-given-to-them-first-then-those-given-to-no-one-and-those-given-to-someone-else-last-each-kind-the-most-urgent-first)), then those
   given to no one, and those given to someone else last, each the most urgent first.
