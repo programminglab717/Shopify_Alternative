@@ -121,6 +121,57 @@ describe("Every page's search engine listing, in the admin", () => {
     await screen.findByText('None of these yet.');
   });
 
+  it('writes a listing on the tab itself, kept open once it is described (ADR-649)', async () => {
+    // The core keeps what is saved, and lists it so again.
+    const products = LISTED.SeoProducts!.map((each) => ({ ...each, seo: { ...each.seo } }));
+    const core = fakeCore('owner', (operation, variables) => {
+      if (operation === 'ProductUpdate') {
+        const { id, seo } = variables.input as { id: string; seo: SeoListed['seo'] };
+        products.find((each) => each.id === id)!.seo = seo;
+        return { productUpdate: { product: null, userErrors: [] } };
+      }
+      return {
+        shop: { url: 'https://zari.hatti.pk' },
+        listed: { nodes: operation === 'SeoProducts' ? products : [], pageInfo: {} },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/online-store?tab=seo');
+
+    await screen.findByText('2 of 4 without a description of their own.');
+    fireEvent.click(screen.getByRole('button', { name: "Write Lawn suit's listing here" }));
+    // The card its own page has, its own text standing in for what is left blank.
+    const description = screen.getByLabelText('Meta description') as HTMLTextAreaElement;
+    expect(description.value).toBe('');
+    fireEvent.change(description, {
+      target: {
+        value: 'Three-piece printed lawn suit, stitched or unstitched. Delivery across Pakistan.',
+      },
+    });
+    await press('Save listing');
+    await screen.findByText('1 of 4 without a description of their own.');
+    expect(
+      core.sent.filter((each) => each.operation === 'ProductUpdate').map((each) => each.variables),
+    ).toEqual([
+      {
+        input: {
+          id: 'prd_1',
+          seo: {
+            title: '',
+            description:
+              'Three-piece printed lawn suit, stitched or unstitched. Delivery across Pakistan.',
+          },
+        },
+      },
+    ]);
+    // Described now, it stays while it is open, saying so.
+    expect(within(rowOf('Lawn suit')).queryByText('No description')).toBeNull();
+    expect(screen.getByText('Saved.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: "Done with Lawn suit's listing" }));
+    expect(screen.queryByText('Lawn suit')).toBeNull();
+    expect(rowOf('Shawl')).toBeTruthy();
+  });
+
   it("shows more of a long list, and only the kinds a member's role keeps", async () => {
     const core = seoCore('marketer', true);
     vi.stubGlobal('fetch', core.fetcher);

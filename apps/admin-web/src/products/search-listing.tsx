@@ -14,7 +14,7 @@ export function ProductSearchListing({
   product,
   storefront,
 }: {
-  product: ProductDetail;
+  product: Pick<ProductDetail, 'id' | 'handle' | 'title' | 'description' | 'seo'>;
   storefront: string;
 }) {
   const { t } = useLocale();

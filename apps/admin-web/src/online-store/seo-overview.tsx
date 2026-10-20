@@ -1,6 +1,6 @@
 /** Every page's search engine listing in one place, those without a description first (OS-09). */
 import { Link } from '@tanstack/react-router';
-import { CircleAlert, CircleCheck, FileQuestion, ImageOff, Scissors } from 'lucide-react';
+import { CircleAlert, CircleCheck, FileQuestion, ImageOff, Pencil, Scissors } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -17,6 +17,7 @@ import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { ProductSearchListing } from '../products/search-listing';
 import { EDITS_PRODUCTS } from '../products/status';
 import { CheckField, SelectField } from '../settings/settings-form';
 import { useAdminQuery, useShop } from '../shell/shop-context';
@@ -25,6 +26,12 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, Loading } from '../ui/feedback';
 import { WRITES_BLOGS, WRITES_PAGES } from './pages';
 import { DESCRIPTION_SHOWN, SearchListingPreview, TITLE_SHOWN, excerpt } from './search-listing';
+import {
+  ArticleSearchListing,
+  BlogSearchListing,
+  CollectionSearchListing,
+  PageSearchListing,
+} from './search-listings';
 
 /** Each kind, who keeps it, the query that lists it, and its path at the storefront. */
 const KINDS: Record<SeoKind, { gate: Gate; query: string; path: (listed: SeoListed) => string }> = {
@@ -190,6 +197,55 @@ function ListingLink({ kind, id, children }: { kind: SeoKind; id: string; childr
   }
 }
 
+/**
+ * A listing written on the tab itself (ADR-649), with the card its own page has and the update
+ * that page saves it with.
+ */
+function ListingEditor({
+  kind,
+  listed,
+  storefront,
+}: {
+  kind: SeoKind;
+  listed: SeoListed;
+  storefront: string;
+}) {
+  switch (kind) {
+    case 'PRODUCT':
+      return (
+        <ProductSearchListing
+          product={{ ...listed, description: listed.description ?? '' }}
+          storefront={storefront}
+        />
+      );
+    case 'COLLECTION':
+      return (
+        <CollectionSearchListing
+          collection={{ ...listed, description: listed.description ?? '' }}
+          storefront={storefront}
+        />
+      );
+    case 'PAGE':
+      return (
+        <PageSearchListing page={{ ...listed, body: listed.body ?? '' }} storefront={storefront} />
+      );
+    case 'BLOG':
+      return <BlogSearchListing blog={listed} storefront={storefront} />;
+    case 'ARTICLE':
+      return (
+        <ArticleSearchListing
+          article={{
+            ...listed,
+            body: listed.body ?? '',
+            summary: listed.summary ?? null,
+            blog: listed.blog ?? { handle: '' },
+          }}
+          storefront={storefront}
+        />
+      );
+  }
+}
+
 function nameOf(listed: SeoListed, t: Translate): string {
   return listed.title.trim() || t('seoAll.untitled');
 }
@@ -198,6 +254,14 @@ function nameOf(listed: SeoListed, t: Translate): string {
 function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }) {
   const { t } = useLocale();
   const [first, setFirst] = useState(FIRST);
+  // Those being written here stay shown once they are described.
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((was) => {
+      const now = new Set(was);
+      if (!now.delete(id)) now.add(id);
+      return now;
+    });
   const query = useAdminQuery<SeoListingsData>(
     ['seoListings', kind],
     KINDS[kind].query,
@@ -214,7 +278,9 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
     problems.some((problem) => problem === 'NOTHING' || problem === 'NO_DESCRIPTION'),
   );
   const imageless = listings.filter(({ problems }) => problems.includes('IMAGES'));
-  const shown = missingOnly ? listings.filter(({ problems }) => needsWork(problems)) : listings;
+  const shown = missingOnly
+    ? listings.filter(({ listed, problems }) => needsWork(problems) || open.has(listed.id))
+    : listings;
 
   return (
     <div className="flex flex-col gap-3">
@@ -264,6 +330,23 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
                     description={(listed.seo.description ?? '').trim() || ownTextOf(listed)}
                   />
                 </ListingLink>
+                <div className="flex flex-col gap-3 px-4 pb-3">
+                  <Button
+                    variant="tertiary"
+                    className="self-start"
+                    aria-expanded={open.has(listed.id)}
+                    aria-label={t(open.has(listed.id) ? 'seoAll.writeDone' : 'seoAll.writeOf', {
+                      name: nameOf(listed, t),
+                    })}
+                    icon={<Pencil aria-hidden className="size-5" />}
+                    onClick={() => toggle(listed.id)}
+                  >
+                    {t(open.has(listed.id) ? 'seoAll.done' : 'seoAll.write')}
+                  </Button>
+                  {open.has(listed.id) && (
+                    <ListingEditor kind={kind} listed={listed} storefront={storefront} />
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -290,7 +373,8 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
  * The online store's search listings (OS-09, ADR-606): the shop's products, collections, pages,
  * blogs and articles kind by kind, each as a search engine lists it, with those that have no
  * description of their own, or nothing to make one from, and the words engines cut short; at
- * first only those without a description, each opening the page where its listing is written.
+ * first only those without a description, each opening the page where its listing is written,
+ * or written here (ADR-649).
  */
 export function SeoOverview() {
   const { t } = useLocale();

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-648 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-649 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -656,6 +656,7 @@
 | 646 | The menu editor offers the shop's tags in use to a collection's link, the most used first, each added with a tap | Accepted |
 | 647 | A shop's file has what it holds replaced by an upload, with Shopify's `fileUpdate` and `originalSource`, keeping its ID, so wherever it is used shows the new one | Accepted |
 | 648 | The link page's QR code is drawn in the admin by Hatti's own encoder, of its address marked `utm_source=qr`, and downloaded as a PNG to print | Accepted |
+| 649 | A listing is written on the Search listings tab itself, with the card its own page has, and stays shown while it is open once it is described | Accepted |
 
 ---
 
@@ -22958,3 +22959,18 @@
 * **Consequences:** No service makes the code, and nothing of the shop leaves the browser.
 * **Alternatives:** **A QR code service's image:** another party seeing every shop's address.
   **The code made by the core:** a round trip for what the browser draws at once.
+
+## ADR-649 · A listing is written on the Search listings tab itself, with the card its own page has, and stays shown while it is open once it is described
+
+* **Context:** The Search listings tab (ADR-606) shows what each listing lacks, but each opens
+  the page where it is written, one at a time, and back (status shortcut 110): a shop with
+  fifty products without a description goes there and back fifty times.
+* **Decision:** Each listing on the tab has "Write it here", which opens beneath it the card
+  its own page has (ADR-600, ADR-601), saving through the same update; its name still opens
+  its page. A listing being written stays shown, its "Saved." with it, though the tab shows
+  only those missing a description and it is described now, until "Done" closes it. The words
+  are in English and Urdu.
+* **Consequences:** Listings are written one after another without leaving the tab, each saved
+  alone; what saving refuses is said under it.
+* **Alternatives:** **One form of many listings, saved together:** a bulk update the core does
+  not yet have, which a sitting of many listings may ask for, and remains the target.
