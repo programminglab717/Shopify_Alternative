@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The contact form
+### 0edf6fd · The contact form
 
 * **Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept
   beside the inbox for its staff, with an email or a mobile number to answer on** ([ADR-589](../architecture/13-decision-log.md#adr-589--shopifys-contact-form-is-taken-what-a-shopper-writes-from-the-shops-contact-page-is-kept-beside-the-inbox-for-its-staff-with-an-email-or-a-mobile-number-to-answer-on),
