@@ -139,6 +139,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   freeAbove: bigint('free_above', { mode: 'bigint' }),
   minDays: smallint('min_days'),
   maxDays: smallint('max_days'),
+  /** The hour, in Pakistan's time, from which orders count from the next day (ADR-597). */
+  cutoffHour: smallint('cutoff_hour'),
   zones: jsonb('zones').$type<StoredZone[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

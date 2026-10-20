@@ -58,6 +58,7 @@ function toDeliverySettings(
         days: toDays(zone.days),
       }),
     ),
+    cutoffHour: record.cutoffHour ?? null,
     updatedAt: record.updatedAt,
   });
 }

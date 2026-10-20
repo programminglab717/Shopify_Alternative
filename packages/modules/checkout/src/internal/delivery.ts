@@ -1,6 +1,6 @@
 import type { InputChecker } from '@hatti/api';
 import type { CurrencyCode } from '@hatti/money';
-import { addPkWorkingDays, findCity } from '@hatti/pk';
+import { addPkWorkingDays, findCity, pkDayOf, pkHourOf } from '@hatti/pk';
 
 /** What a shop charges to deliver an order (ADR-043), in minor units. */
 export interface DeliverySettingsRecord {
@@ -11,6 +11,11 @@ export interface DeliverySettingsRecord {
   /** How many working days delivery takes everywhere (CHK-22, ADR-235); null for unsaid. */
   days: DeliveryDays | null;
   zones: DeliveryZoneRecord[];
+  /**
+   * The hour, 1 to 23 in Pakistan's time, from which the day's orders count their delivery days
+   * from the next day (ADR-597); null or left out for none.
+   */
+  cutoffHour?: number | null;
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -37,6 +42,7 @@ export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   freeAbove: null,
   days: null,
   zones: [],
+  cutoffHour: null,
   updatedAt: null,
 };
 
@@ -51,6 +57,8 @@ export interface DeliverySettingsInput {
   /** Null for unsaid. */
   days?: DeliveryDays | null;
   zones?: DeliveryZoneInput[] | null;
+  /** 1 to 23; null for none. */
+  cutoffHour?: number | null;
 }
 
 export interface DeliveryZoneInput {
@@ -91,6 +99,17 @@ export function deliveryDays(
   if (!name) return city ? settings.days : deliveryDaysRange(settings);
   const zone = settings.zones.find((each) => each.cities.includes(name));
   return zone?.days ?? settings.days;
+}
+
+/**
+ * The day delivery's working days count from for an order placed at `at` (ADR-597): the day it
+ * is in Pakistan, or the next once the shop's cut-off hour has come.
+ */
+export function deliveryCountsFrom(settings: DeliverySettingsRecord, at: Date): string {
+  const today = pkDayOf(at);
+  const cutoff = settings.cutoffHour ?? null;
+  if (cutoff === null || pkHourOf(at) < cutoff) return today;
+  return new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 }
 
 /**
@@ -163,7 +182,17 @@ export function checkDeliverySettings(
   if (input.zones !== undefined && input.zones !== null) {
     zones = checkZones(check, input.zones, currency);
   }
-  return check.errors.length > before ? null : { charge, freeAbove, days, zones };
+  let cutoffHour = current.cutoffHour ?? null;
+  if (input.cutoffHour !== undefined) {
+    cutoffHour = input.cutoffHour;
+    if (
+      cutoffHour !== null &&
+      !(Number.isInteger(cutoffHour) && cutoffHour >= 1 && cutoffHour <= 23)
+    ) {
+      check.addMessage(['cutoffHour'], 'INVALID', 'The cut-off is an hour from 1 to 23');
+    }
+  }
+  return check.errors.length > before ? null : { charge, freeAbove, days, zones, cutoffHour };
 }
 
 /** Whole working days, 0 to {@link DELIVERY_LIMITS.days}, the fewest first. */

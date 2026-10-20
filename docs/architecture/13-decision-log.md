@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-596 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-597 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -604,6 +604,7 @@
 | 594 | Checkout says the day to expect delivery by, the shop's working days for the city counted past Sundays and Pakistan's public holidays | Accepted |
 | 595 | An order placed through checkout keeps the day the page said to expect delivery by, which its page shows while it is still to come, and staff see | Accepted |
 | 596 | An order's page says what store credit its customer has with the shop, which pays their next order at checkout | Accepted |
+| 597 | A shop may set the hour from which the day's orders count their delivery days from the next day, as they ship the day after | Accepted |
 
 ---
 
@@ -21853,3 +21854,20 @@
   the order's link sees the amount, as they see the order and its address.
 * **Alternatives:** **Spending it from the order's page:** an order placed is paid as staff take
   it (ADR-185); the next order is where credit is spent.
+
+## ADR-597 · A shop may set the hour from which the day's orders count their delivery days from the next day, as they ship the day after
+
+* **Context:** Checkout's day to expect delivery by counts the shop's working days from the day
+  the order is placed (ADR-594), and the order keeps it (ADR-595). A shop packing the morning's
+  orders for the afternoon pickup sends an evening's order the next day: its promise is a day
+  short.
+* **Decision:**
+  * **A cut-off hour** on the shop's delivery settings (migration 0278), 1 to 23 in Pakistan's
+    time, none unless set: through the Admin API's `deliverySettingsUpdate` and on the admin's
+    delivery page, as a list of hours.
+  * **From that hour the day's orders count from the next day:** checkout's page and the order's
+    promise both count their working days from tomorrow, past Sundays and holidays as before.
+* **Consequences:** A promise made at 9 pm is no tighter than one made at noon. Shops that send
+  orders whenever they come set none, and nothing changes for them.
+* **Alternatives:** **A cut-off for each day of the week:** shops in Pakistan keep one hour, and
+  Sundays and holidays are counted already.

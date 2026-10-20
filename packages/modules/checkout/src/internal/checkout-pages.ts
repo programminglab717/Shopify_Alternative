@@ -372,7 +372,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           giftCard: view.giftCard?.refusal ? null : view.giftCard,
         },
         view.tax,
-        view.today ?? null,
+        view.countsFrom ?? null,
       ),
       discountSection(discount, problem?.kind === 'discount' ? problem : null, discounts),
       orderable && giftCardSection(view.giftCard, problem?.kind === 'gift_card' ? problem : null),

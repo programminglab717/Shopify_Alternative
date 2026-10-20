@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPkWorkingDays, isPkWorkingDay, pkDayOf, pkHolidaysOf } from './index.js';
+import { addPkWorkingDays, isPkWorkingDay, pkDayOf, pkHolidaysOf, pkHourOf } from './index.js';
 
 describe("Pakistan's holidays and working days (ADR-594)", () => {
   it("lists a year's public holidays, the Islamic ones as Pakistan usually sights them", () => {
@@ -41,5 +41,7 @@ describe("Pakistan's holidays and working days (ADR-594)", () => {
   it("says what day it is in Pakistan's time", () => {
     expect(pkDayOf(new Date('2026-10-20T18:59:59Z'))).toBe('2026-10-20');
     expect(pkDayOf(new Date('2026-10-20T19:00:00Z'))).toBe('2026-10-21');
+    expect(pkHourOf(new Date('2026-10-20T10:00:00Z'))).toBe(15);
+    expect(pkHourOf(new Date('2026-10-20T19:00:00Z'))).toBe(0);
   });
 });

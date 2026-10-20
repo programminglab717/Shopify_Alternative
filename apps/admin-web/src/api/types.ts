@@ -1111,6 +1111,8 @@ export interface DeliverySettingsValue {
     charge: MoneyValue;
     days: DeliveryDaysValue | null;
   }[];
+  /** From which hour the day's orders count from the next day (ADR-597); absent in old fakes. */
+  cutoffHour?: number | null;
   updatedAt: string | null;
 }
 

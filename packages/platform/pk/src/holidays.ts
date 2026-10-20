@@ -112,6 +112,11 @@ export function addPkWorkingDays(day: string, days: number): string {
   return at;
 }
 
+/** The hour it is at `at` in Pakistan, 0 to 23. */
+export function pkHourOf(at: Date): number {
+  return new Date(at.getTime() + 5 * 3_600_000).getUTCHours();
+}
+
 /** The day it is at `at` in Pakistan, YYYY-MM-DD. */
 export function pkDayOf(at: Date): string {
   // Pakistan keeps UTC+5 all year.

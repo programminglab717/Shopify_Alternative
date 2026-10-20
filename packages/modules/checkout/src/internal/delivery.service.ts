@@ -47,6 +47,7 @@ export class DeliveryService {
         ...(JSON.stringify(stored(next.zones)) !== JSON.stringify(stored(before.zones))
           ? ['zones']
           : []),
+        ...(next.cutoffHour !== (before.cutoffHour ?? null) ? ['cutoffHour'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       const values = {
@@ -55,6 +56,7 @@ export class DeliveryService {
         minDays: next.days?.min ?? null,
         maxDays: next.days?.max ?? null,
         zones: stored(next.zones),
+        cutoffHour: next.cutoffHour ?? null,
       };
       await tx
         .insert(deliverySettings)
@@ -98,6 +100,7 @@ export class DeliveryService {
         charge: BigInt(zone.charge),
         days: zone.days ?? null,
       })),
+      cutoffHour: row.cutoffHour,
       updatedAt: row.updatedAt,
     };
   }

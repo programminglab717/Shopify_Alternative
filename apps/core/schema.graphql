@@ -4053,6 +4053,11 @@ type DeliverySettings {
   charge: Money!
 
   """
+  The hour, 1 to 23 in Pakistan's time, from which the day's orders count their delivery days from the next day, as they ship the day after (ADR-597); null for none.
+  """
+  cutoffHour: Int
+
+  """
   How many working days delivery takes everywhere no zone says otherwise: the cart and product pages say how long delivery takes, and checkout says it for the city. Null while the shop has not said.
   """
   days: DeliveryDays
@@ -4069,6 +4074,9 @@ type DeliverySettings {
 input DeliverySettingsUpdateInput {
   """Decimal, e.g. "250"; null for nothing."""
   charge: String
+
+  """The day's cut-off hour, 1 to 23 in Pakistan's time; null for none."""
+  cutoffHour: Int
 
   """
   How many working days delivery takes everywhere; null to say nothing of it.

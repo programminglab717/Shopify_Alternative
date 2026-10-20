@@ -6,8 +6,10 @@ import {
   NO_DELIVERY_SETTINGS,
   checkDeliverySettings,
   deliveryCharge,
+  deliveryCountsFrom,
   deliveryDays,
   deliveryDaysRange,
+  expectedDeliveryOn,
   type DeliverySettingsInput,
   type DeliverySettingsRecord,
 } from './delivery.js';
@@ -88,6 +90,7 @@ describe('Delivery charges', () => {
           days: { min: 0, max: 1 },
         },
       ],
+      cutoffHour: null,
     });
     // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
@@ -95,6 +98,7 @@ describe('Delivery charges', () => {
       freeAbove: null,
       days: { min: 2, max: 5 },
       zones: SETTINGS.zones,
+      cutoffHour: null,
     });
     expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
     expect(
@@ -220,5 +224,48 @@ describe.skipIf(!server)('DeliveryService', () => {
         [f.a.shopId],
       ),
     ).rejects.toThrow(/delivery_settings_days_check/);
+  });
+
+  it("keeps the shop's cut-off hour, from which orders count from the next day (ADR-597)", async () => {
+    expect((await f.delivery.get(f.a)).cutoffHour).toBeNull();
+    const saved = unwrap(await f.delivery.update(f.a, { cutoffHour: 15 }));
+    expect(saved.cutoffHour).toBe(15);
+    expect((await f.delivery.get(f.a)).cutoffHour).toBe(15);
+    // Kept when the rest changes; taken off with null.
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    expect((await f.delivery.get(f.a)).cutoffHour).toBe(15);
+    unwrap(await f.delivery.update(f.a, { cutoffHour: null }));
+    expect((await f.delivery.get(f.a)).cutoffHour).toBeNull();
+    expect(
+      (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([['cutoffHour'], ['charge'], ['cutoffHour']]);
+    for (const hour of [0, 24, 1.5]) {
+      const refused = await f.delivery.update(f.a, { cutoffHour: hour });
+      expect(refused.ok ? [] : refused.errors.map((error) => error.field.join('.'))).toEqual([
+        'cutoffHour',
+      ]);
+    }
+    await expect(
+      f.admin.query(`UPDATE checkout.delivery_settings SET cutoff_hour = 0 WHERE shop_id = $1`, [
+        f.a.shopId,
+      ]),
+    ).rejects.toThrow(/cutoff_hour/);
+  });
+});
+
+describe('Where delivery days count from (ADR-597)', () => {
+  it("counts from today in Pakistan, or tomorrow once the shop's cut-off has come", () => {
+    const cutoff = { ...SETTINGS, cutoffHour: 15 };
+    // 2:59 pm and 3 pm in Karachi, Tuesday 20 October 2026.
+    expect(deliveryCountsFrom(cutoff, new Date('2026-10-20T09:59:00Z'))).toBe('2026-10-20');
+    expect(deliveryCountsFrom(cutoff, new Date('2026-10-20T10:00:00Z'))).toBe('2026-10-21');
+    // Without one, the day it is; just after midnight in Karachi is the next day.
+    expect(deliveryCountsFrom(SETTINGS, new Date('2026-10-20T18:00:00Z'))).toBe('2026-10-20');
+    expect(deliveryCountsFrom(SETTINGS, new Date('2026-10-20T19:30:00Z'))).toBe('2026-10-21');
+    // Two working days to Karachi: Thursday before the cut-off, Friday after.
+    const before = deliveryCountsFrom(cutoff, new Date('2026-10-20T09:00:00Z'));
+    const after = deliveryCountsFrom(cutoff, new Date('2026-10-20T11:00:00Z'));
+    expect(expectedDeliveryOn(cutoff, 'Karachi', before, [])).toBe('2026-10-22');
+    expect(expectedDeliveryOn(cutoff, 'Karachi', after, [])).toBe('2026-10-23');
   });
 });

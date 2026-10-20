@@ -2372,6 +2372,7 @@ export const StaffMemberRemoveMutation = /* GraphQL */ `
 
 const DELIVERY_SETTINGS = /* GraphQL */ `
   fragment Delivery on DeliverySettings {
+    cutoffHour
     charge {
       ...Money
     }

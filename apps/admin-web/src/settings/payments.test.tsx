@@ -76,8 +76,33 @@ describe('Delivery and payment settings in the admin', () => {
         freeAbove: '5,000',
         days: { min: 3, max: 5 },
         zones: [{ name: 'Lahore', charge: '150', cities: ['Lahore', 'kasur'], days: null }],
+        cutoffHour: null,
       },
     });
+  });
+
+  it("sets the hour from which the day's orders count from the next day (ADR-597)", async () => {
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'DeliverySettings') {
+        return { deliverySettings: { ...DELIVERY, cutoffHour: 15 } };
+      }
+      if (operation === 'DeliverySettingsUpdate') return { deliverySettingsUpdate: saved };
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/delivery');
+
+    const cutoff = (await screen.findByLabelText(
+      "Cut-off for the day's orders",
+    )) as HTMLSelectElement;
+    expect(cutoff.value).toBe('15');
+    expect(cutoff.selectedOptions[0]?.textContent).toBe('3 pm');
+    fireEvent.change(cutoff, { target: { value: '12' } });
+    await press('Save');
+    await screen.findByText('Saved. Checkout uses it from now on.');
+    expect(
+      core.sent.find((each) => each.operation === 'DeliverySettingsUpdate')?.variables,
+    ).toMatchObject({ input: { cutoffHour: 12 } });
   });
 
   it("names the zone a problem is in, and keeps days that aren't numbers from the core", async () => {

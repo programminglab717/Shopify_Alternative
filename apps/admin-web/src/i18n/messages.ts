@@ -582,6 +582,10 @@ const en = {
   'delivery.daysHint':
     'Your shop and checkout tell shoppers, such as "3 to 5 working days". 0 is the same day. Blank to say nothing.',
   'delivery.badDays': 'type whole days from 0 to 30, or leave both blank',
+  'delivery.cutoff': "Cut-off for the day's orders",
+  'delivery.noCutoff': 'None',
+  'delivery.cutoffHint':
+    'Orders placed from this hour count their delivery days from the next day, as you send them the day after.',
   'delivery.zones': 'Zones',
   'delivery.zonesHint': 'Cities with a charge of their own, such as your own city.',
   'delivery.zoneNumber': 'Zone {n}',
@@ -5682,6 +5686,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'delivery.daysHint':
     'آپ کی دکان اور چیک آؤٹ خریداروں کو بتاتے ہیں، جیسے "3 سے 5 کام کے دن"۔ 0 یعنی اسی دن۔ کچھ نہ بتانے کے لیے خالی۔',
   'delivery.badDays': '0 سے 30 تک پورے دن لکھیں، یا دونوں خالی چھوڑیں',
+  'delivery.cutoff': 'دن کے آرڈرز کا آخری وقت',
+  'delivery.noCutoff': 'کوئی نہیں',
+  'delivery.cutoffHint':
+    'اس وقت سے آنے والے آرڈرز کے ڈیلیوری کے دن اگلے دن سے گنے جاتے ہیں، کیونکہ آپ انہیں اگلے دن بھیجتے ہیں۔',
   'delivery.zones': 'زون',
   'delivery.zonesHint': 'وہ شہر جن کا اپنا چارج ہو، جیسے آپ کا اپنا شہر۔',
   'delivery.zoneNumber': 'زون {n}',

@@ -65,6 +65,14 @@ export class DeliverySettings {
   @Field(() => [DeliveryZone])
   zones!: DeliveryZone[];
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      "The hour, 1 to 23 in Pakistan's time, from which the day's orders count their delivery " +
+      'days from the next day, as they ship the day after (ADR-597); null for none.',
+  })
+  cutoffHour!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
@@ -117,6 +125,12 @@ export class DeliverySettingsUpdateInput {
     description: 'Replaces every zone; an empty list for none. Up to 20.',
   })
   zones?: DeliveryZoneInput[] | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: "The day's cut-off hour, 1 to 23 in Pakistan's time; null for none.",
+  })
+  cutoffHour?: number | null;
 }
 
 @ObjectType()

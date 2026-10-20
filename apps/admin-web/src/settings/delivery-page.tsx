@@ -23,6 +23,7 @@ import {
   parseList,
   parseWhole,
   Problems,
+  SelectField,
   settingProblem,
 } from './settings-form';
 import { BackToSettings } from './settings-page';
@@ -48,6 +49,8 @@ interface DeliveryState {
   freeAbove: string;
   days: DaysState;
   zones: ZoneState[];
+  /** The cut-off hour, "1" to "23", or "" for none (ADR-597). */
+  cutoffHour: string;
 }
 
 function daysState(days: DeliveryDaysValue | null): DaysState {
@@ -66,7 +69,17 @@ function stateOf(settings: DeliverySettingsValue): DeliveryState {
       cities: zone.cities.join(', '),
       days: daysState(zone.days),
     })),
+    cutoffHour:
+      settings.cutoffHour === undefined || settings.cutoffHour === null
+        ? ''
+        : String(settings.cutoffHour),
   };
+}
+
+/** The hours a cut-off may be, as a clock says them: "3 pm". */
+function hourLabel(hour: number): string {
+  const suffix = hour < 12 ? 'am' : 'pm';
+  return `${hour % 12 === 0 ? 12 : hour % 12} ${suffix}`;
 }
 
 /** Days as the API takes them: null when both are blank; a problem when one is not a number. */
@@ -82,6 +95,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   charge: 'delivery.charge',
   freeAbove: 'delivery.freeAbove',
   days: 'delivery.days',
+  cutoffHour: 'delivery.cutoff',
   name: 'delivery.zoneName',
   cities: 'delivery.zoneCities',
 };
@@ -228,6 +242,7 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
             cities: parseList(zone.cities),
             days: zoneDays,
           })),
+          cutoffHour: state.cutoffHour === '' ? null : Number(state.cutoffHour),
         },
       });
       if (deliverySettingsUpdate.userErrors.length > 0) {
@@ -271,6 +286,21 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           hint={t('delivery.daysHint')}
           onChange={(days) => setState({ ...state, days })}
         />
+        <SelectField
+          label={t('delivery.cutoff')}
+          value={state.cutoffHour}
+          options={[
+            { value: '', label: t('delivery.noCutoff') },
+            ...Array.from({ length: 23 }, (_, index) => ({
+              value: String(index + 1),
+              label: hourLabel(index + 1),
+            })),
+          ]}
+          onChange={(cutoffHour) => setState({ ...state, cutoffHour })}
+        />
+        <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('delivery.cutoffHint')}
+        </p>
       </FormSection>
       <FormSection title={t('delivery.zones')} hint={t('delivery.zonesHint')}>
         {state.zones.length > 0 && (

@@ -63,7 +63,7 @@ import {
   type DiscountRefusal,
   type OrderItems,
 } from '@hatti/pricing/public';
-import { maskPkMobile, pkDayOf } from '@hatti/pk';
+import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
@@ -86,6 +86,7 @@ import {
 } from './cod-rules.js';
 import { codRulesIn } from './cod-rules.service.js';
 import {
+  deliveryCountsFrom,
   expectedDeliveryOn,
   highestDeliveryCharge,
   type DeliverySettingsRecord,
@@ -521,10 +522,10 @@ export type CheckoutView =
        */
       creditBalance?: bigint;
       /**
-       * The day it is in Pakistan (ADR-594), YYYY-MM-DD, for the day delivery is expected by;
-       * absent where the page says none.
+       * The day delivery's working days count from (ADR-594, ADR-597), YYYY-MM-DD: the day it is
+       * in Pakistan, or the next past the shop's cut-off; absent where the page says none.
        */
-      today?: string;
+      countsFrom?: string;
     }
   | {
       kind: 'placed';
@@ -1176,7 +1177,12 @@ export class CheckoutService {
           // The day the page said to expect delivery by (ADR-595); none to collect it.
           deliveryExpectedOn: pickupAt
             ? null
-            : expectedDeliveryOn(view.delivery, address.city, pkDayOf(new Date()), view.cart.items),
+            : expectedDeliveryOn(
+                view.delivery,
+                address.city,
+                deliveryCountsFrom(view.delivery, new Date()),
+                view.cart.items,
+              ),
           tags: [],
           agreement: {
             policyVersions: view.shop.policies.map((policy) => policy.versionId),
@@ -1455,7 +1461,7 @@ export class CheckoutService {
       pickup: await this.#pickupPoints(tx, shopId),
       gift: await this.#gift(tx, shopId, cart),
       giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
-      today: pkDayOf(new Date()),
+      countsFrom: deliveryCountsFrom(delivery, new Date()),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null

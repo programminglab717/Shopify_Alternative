@@ -272,7 +272,8 @@ describe('checkoutPage', () => {
       zones: [{ ...DELIVERY.zones[0]!, days: { min: 1, max: 1 } }],
     };
     const page = (city: string, today: string, cart = CART) =>
-      checkoutPage(openView({ delivery, cart, today, form: { ...EMPTY_FORM, city } })).html;
+      checkoutPage(openView({ delivery, cart, countsFrom: today, form: { ...EMPTY_FORM, city } }))
+        .html;
     // Tuesday 20 October 2026: Karachi's one day is Wednesday; elsewhere four, past Sunday.
     expect(page('khi', '2026-10-20')).toContain('Expected by Wednesday 21 October.');
     expect(page('khi', '2026-10-20')).toContain('Wednesday 21 October تک پہنچنے کی توقع۔');
@@ -286,7 +287,7 @@ describe('checkoutPage', () => {
     expect(page('khi', '2026-10-20', preorder)).not.toContain('Expected by');
     // Nor where the shop said nothing of the days.
     const silent = checkoutPage(
-      openView({ today: '2026-10-20', form: { ...EMPTY_FORM, city: 'khi' } }),
+      openView({ countsFrom: '2026-10-20', form: { ...EMPTY_FORM, city: 'khi' } }),
     ).html;
     expect(silent).not.toContain('Expected by');
   });

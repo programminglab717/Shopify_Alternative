@@ -464,7 +464,7 @@ describe.skipIf(!server)('CheckoutService', () => {
     // Karachi's two working days, from the day it is in Pakistan.
     expect(order.deliveryExpectedOn).toBe(addPkWorkingDays(pkDayOf(new Date()), 2));
     expect(order.deliveryExpectedOn).toBe(
-      expectedDeliveryOn(page.delivery, 'Karachi', page.today!, page.cart.items),
+      expectedDeliveryOn(page.delivery, 'Karachi', page.countsFrom!, page.cart.items),
     );
   });
 
