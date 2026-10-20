@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A paused shop's cart kept, its checkout off
+### dbb350d · A paused shop's cart kept, its checkout off
 
 * **While orders are paused, Hatti Base keeps the cart and turns checkout's button off**
   ([ADR-622](../architecture/13-decision-log.md#adr-622--while-orders-are-paused-hatti-base-keeps-the-cart-and-turns-its-checkout-button-off-saying-why-and-its-product-page-says-what-is-added-is-kept-for-when-orders-come-back-the-platforms-script-turns-the-button-on-again-once-their-time-has-come)), saying why on the cart page and in the drawer, and its product page says what is
