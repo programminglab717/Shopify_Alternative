@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Export totals beside the rows
+### faa3c7c · Export totals beside the rows
 
 * **An order export's workbook has its rows' totals on sheets beside them** ([ADR-632](../architecture/13-decision-log.md#adr-632--an-order-exports-workbook-has-its-rows-totals-on-sheets-beside-them-by-the-day-orders-were-placed-and-by-stage-or-a-row-per-line-item-by-variant-each-ending-with-every-rows-a-csv-stays-the-rows-alone)): by the
   day orders were placed and by stage, or by variant for a row per line item, each with an
