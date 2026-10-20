@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Redirect chains followed in one hop
+
+* **The storefront sends shoppers to where a chain of redirects ends** ([ADR-617](../architecture/13-decision-log.md#adr-617--the-storefront-follows-a-chain-of-redirects-to-its-end-and-sends-shoppers-there-in-one-hop-through-addresses-it-has-no-page-at-five-redirects-past-the-first-at-most)), through
+  addresses it has no page at, five redirects past the first at most, the answer purged when any
+  redirect in the chain changes.
+* 3722 tests, as many as before: the storefront's redirect test now follows chains, through an
+  Urdu address and past a query, and stops at a page.
+
 ### e5c954c · robots.txt tested before crawlers meet it
 
 * **A shop tries an address against its robots.txt** ([ADR-616](../architecture/13-decision-log.md#adr-616--a-shop-tries-an-address-against-its-robotstxt-before-crawlers-do-the-rules-as-written-saved-or-not-read-as-rfc-9309-reads-them-and-the-admin-edits-them-beside-the-test)): the file is built in

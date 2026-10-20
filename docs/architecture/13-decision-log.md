@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-616 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-617 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -624,6 +624,7 @@
 | 614 | Hatti Base shows where each page sits above it, the home page to the page as the BreadcrumbList gives it, unless the shop turns it off in the theme's settings | Accepted |
 | 615 | Hatti Base answers shoppers' questions on a page of the shop's choosing, each opened in place, and tells search engines the same as an FAQPage unless the section says not to | Accepted |
 | 616 | A shop tries an address against its robots.txt before crawlers do: the rules as written, saved or not, read as RFC 9309 reads them, and the admin edits them beside the test | Accepted |
+| 617 | The storefront follows a chain of redirects to its end and sends shoppers there in one hop, through addresses it has no page at, five redirects past the first at most | Accepted |
 
 ---
 
@@ -22295,3 +22296,24 @@
 * **Alternatives:** **A tester in the admin alone:** the platform's rules and the matcher written
   twice, apart from the file served. **Fetching the live robots.txt:** tests only saved rules, and
   a closed storefront serves one that disallows everything.
+
+## ADR-617 · The storefront follows a chain of redirects to its end and sends shoppers there in one hop, through addresses it has no page at, five redirects past the first at most
+
+* **Context:** The storefront answered an address it has no page at with the one redirect from
+  it (ADR-052). Where that redirect's target had a redirect of its own, shoppers and crawlers took
+  a hop for each, and search engines give up on long chains. The admin straightens chains
+  (ADR-607, ADR-612), but a chain made again, by an import or a handle changed twice, waits for
+  the shop to notice (status shortcut 42).
+* **Decision:** Answering with a redirect, the storefront looks on from its target: where the
+  target is a path on the shop, the storefront has no page there, and another redirect leaves it,
+  that redirect's target is taken instead, up to five past the first, stopping where a path comes
+  round again. A page at a path stops the chain there, as it would stop the redirect itself. A
+  part of a page named on the way, `#form`, is kept where the next target names none, and the
+  address's query is carried to the end as it was to the first target. The answer is kept at the
+  edge under the tags of every path passed, so changing any redirect in the chain purges it.
+* **Consequences:** One 301 from an old address to the page now there, however many times it
+  moved. Each hop past the first costs the storefront one lookup and one check of the page,
+  which only addresses without a page pay, and the edge keeps the answer.
+* **Alternatives:** **Straightening chains as they are saved:** the admin's choice to make, and
+  saving one redirect would rewrite others silently (ADR-612). **Following without checking for
+  a page:** a redirect left from a path a page took again would hide that page.

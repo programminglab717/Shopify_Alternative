@@ -1228,13 +1228,40 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const notFoundAt =
       ready.status === 404 && status === undefined ? redirectKey(request.path) : null;
     if (notFoundAt !== null && asked && !editor) {
-      const target = await shop.store.redirect(notFoundAt);
-      if (target !== null) {
+      const first = await shop.store.redirect(notFoundAt);
+      if (first !== null) {
+        // On to where the chain ends, in one hop (ADR-617): through paths the shop has no page
+        // at and another redirect leaves, at most a few, a loop stopping where it turns back.
+        let target = first;
+        const passed = [notFoundAt];
+        for (let hop = 0; hop < CHAIN_HOPS; hop += 1) {
+          const through = /^\/(?!\/)[^?#]*/.exec(target)?.[0];
+          const key = through === undefined ? null : redirectKey(through);
+          if (key === null || passed.includes(key)) break;
+          const next = await shop.store.redirect(key);
+          if (next === null) break;
+          const there = await renderer.prepare(
+            { path: through!, locale: request.locale, preview, editor },
+            shop.store,
+            themeFor(shop),
+          );
+          if (there.status !== 404) break;
+          passed.push(key);
+          // A part of the page named on the way is kept where the next target names none.
+          const part = /#.*$/.exec(target)?.[0];
+          target = part && !next.includes('#') ? `${next}${part}` : next;
+        }
         if (preview) previewed(reply);
         else {
           reply
             .header('cache-control', PAGE_CACHE)
-            .header('cache-tag', cacheTags(shop.shopId, ready.named, notFoundAt));
+            .header(
+              'cache-tag',
+              [
+                cacheTags(shop.shopId, ready.named, notFoundAt),
+                ...passed.slice(1).map((key) => pathTag(shop.shopId, key)),
+              ].join(','),
+            );
         }
         return reply.redirect(redirectedTo(target, request.locale === 'ur', asked.url), 301);
       }
@@ -3422,6 +3449,9 @@ function cacheTags(shopId: string, named: readonly NamedDocument[], path: string
     ...(path === null ? [] : [pathTag(shopId, path)]),
   ].join(',');
 }
+
+/** The most redirects followed past the first in one hop (ADR-617). */
+const CHAIN_HOPS = 5;
 
 /** The prefix of the pages in Urdu (04 §5). */
 const URDU_PREFIX = /^\/ur(?=[/?#]|$)/;

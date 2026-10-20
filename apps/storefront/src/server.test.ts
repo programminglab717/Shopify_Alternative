@@ -2740,6 +2740,9 @@ describe('Carts', () => {
           '/blogs/news/eid-edit': 'https://instagram.com/zari',
           '/pages/رابطہ': '/pages/contact',
           '/pages/contact-us': '/pages/رابطہ#form',
+          // A chain, followed to its end in one hop (ADR-617).
+          '/sale-2024': '/sale-2025?ref=old',
+          '/sale-2025': '/collections/sale',
           // A page is there: it is shown, never hidden by a redirect.
           [`/products/${lawn.handle}`]: '/collections/all',
         },
@@ -2770,10 +2773,19 @@ describe('Carts', () => {
     expect(await answer('/ur/collections/sale?page=2')).toEqual([301, '/ur?page=2']);
     expect(await answer('/ur/blogs/news/eid-edit')).toEqual([301, 'https://instagram.com/zari']);
     expect(await answer('/pages/%D8%B1%D8%A7%D8%A8%D8%B7%DB%81')).toEqual([301, '/pages/contact']);
-    expect(await answer('/pages/contact-us')).toEqual([
-      301,
-      '/pages/%D8%B1%D8%A7%D8%A8%D8%B7%DB%81#form',
-    ]);
+    // On through the Urdu address, which has no page, to the page it sends shoppers to, keeping
+    // the part of the page named on the way (ADR-617).
+    expect(await answer('/pages/contact-us')).toEqual([301, '/pages/contact#form']);
+    const chained = await get('/sale-2024?utm_source=sms');
+    expect([chained.statusCode, chained.headers.location]).toEqual([301, '/?utm_source=sms']);
+    expect(String(chained.headers['cache-tag']).split(',')).toEqual(
+      expect.arrayContaining([
+        pathTag('sample', '/sale-2024'),
+        pathTag('sample', '/sale-2025'),
+        pathTag('sample', '/collections/sale'),
+      ]),
+    );
+    expect(await answer('/ur/sale-2024')).toEqual([301, '/ur']);
     expect(await answer(`/products/${lawn.handle}`)).toEqual([200, undefined]);
     expect(await answer('/blogs/news/other')).toEqual([404, undefined]);
 
