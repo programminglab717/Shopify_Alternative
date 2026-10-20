@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit spent signed in
+### 771de87 · Store credit spent signed in
 
 * **A shopper signed in to their account with a number spends its store credit at checkout
   without a code; a browser's recent proof still asks one** ([ADR-609](../architecture/13-decision-log.md#adr-609--a-shopper-signed-in-to-their-account-with-a-number-spends-its-store-credit-at-checkout-without-a-code-a-browsers-recent-proof-still-asks-one), ORD-09, CUS-02).
