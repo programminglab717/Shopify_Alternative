@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A field put in Urdu across many things
+### 36701fa · A field put in Urdu across many things
 
 * **The In Urdu tab writes one field across many things at once** ([ADR-650](../architecture/13-decision-log.md#adr-650--the-in-urdu-tab-writes-one-field-of-a-line-or-two-a-title-say-across-many-of-the-shops-things-at-once-each-kept-for-its-own-words-digest-emptied-ones-forgotten)), a title say,
   each kept for its own words' digest and emptied ones forgotten.
