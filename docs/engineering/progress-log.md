@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Gift cards given back in part
+### 59d5b08 · Gift cards given back in part
 
 * **Cancelling an order whose refunds took part of what gift cards paid gives the cards back what
   refunds and store credit left** ([ADR-664](../architecture/13-decision-log.md#adr-664--cancelling-an-order-whose-refunds-took-part-of-what-gift-cards-paid-gives-back-to-the-cards-as-much-as-refunds-and-store-credit-left-and-the-timeline-says-what-the-cards-got)), and the order's timeline now says what its cards got
