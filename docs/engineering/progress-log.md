@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### An advance waived
+### cea7241 · An advance waived
 
 * **A cash-on-delivery order still waiting for its advance may be let go without it** ([ADR-653](../architecture/13-decision-log.md#adr-653--a-cash-on-delivery-order-still-waiting-for-its-advance-may-be-let-go-without-it-the-courier-collecting-what-it-owed-until-any-of-it-ships)),
   the courier collecting what it owed, until any of it ships; from the order's page.
