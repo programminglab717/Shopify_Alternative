@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Comments' spam kept aside, and those waiting pushed
+
+* **A comment that reads as spam is kept as spam** ([ADR-619](../architecture/13-decision-log.md#adr-619--a-comment-that-reads-as-spam-is-kept-as-spam-neither-shown-nor-held-links-in-its-name-link-markup-more-than-two-links-what-spam-sells-or-a-long-comment-again-within-the-day-and-a-comment-held-for-approval-is-pushed-to-who-writes-the-shops-blogs)), neither shown nor held: a link in
+  its name, link markup, more than two links, spam's words, or a long comment again within the
+  day. A comment held for approval is pushed to the owners, managers and marketers who write
+  the blogs (migration 0283), and the account page offers it among the news to choose.
+* 3729 tests, five more: the signs of spam, comments kept as spam, whom the news is for, its
+  push, and the admin's offer of it.
+
 ### 78b9ad4 · Images without words flagged with the search listings
 
 * **The Search listings tab counts the images that say nothing of what they show** ([ADR-618](../architecture/13-decision-log.md#adr-618--the-search-listings-tab-flags-images-that-say-nothing-of-what-they-show-a-products-photos-an-articles-image-and-the-images-in-pages-and-articles-text-an-articles-image-described-by-its-files-words-where-it-has-none-of-its-own)): a

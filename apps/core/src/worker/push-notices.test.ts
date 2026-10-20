@@ -12,6 +12,7 @@ import {
   type WebPushSender,
 } from '@hatti/messaging/public';
 import { OrderEvents } from '@hatti/orders/public';
+import { OnlineStoreEvents } from '@hatti/online-store/public';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { LowStockAlerts } from './low-stock-alerts.js';
@@ -93,7 +94,7 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
               ($4, $5, 'packer')`,
       [owner, agent, accountant, packer, shopId],
     );
-    const all = '{new_order,needs_review,cash_remitted,low_stock,contact_message}';
+    const all = '{new_order,needs_review,cash_remitted,low_stock,contact_message,comment_pending}';
     await admin.query(
       `INSERT INTO messaging.push_subscriptions (shop_id, user_id, endpoint, p256dh, auth, kinds)
        VALUES ($1, $2, $6, $10, $11, $12), ($1, $3, $7, $10, $11, $12),
@@ -188,6 +189,33 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
     expect(sender.sent.find((each) => each.endpoint === endpoint('owner'))!.message.body).toBe(
       'A shopper wrote to you. Read it in the inbox and answer them.',
     );
+  });
+
+  it('pushes a comment held for approval to who writes the blogs, and nothing else (ADR-619)', async () => {
+    const notices = new PushNotices(database, push);
+    const articleId = newId();
+    const commentId = newId();
+    for (const status of ['published', 'spam']) {
+      await notices.handle(
+        event(OnlineStoreEvents.CommentCreated, newId(), { articleId, status, shown: false }),
+      );
+    }
+    expect(told()).toEqual([]);
+    const held = event(OnlineStoreEvents.CommentCreated, commentId, {
+      articleId,
+      status: 'pending',
+      shown: false,
+    });
+    await notices.handle(held);
+    await notices.handle(held);
+    // The owner alone of these writes the blogs.
+    expect(told()).toEqual([
+      {
+        endpoint: endpoint('owner'),
+        title: 'Zari: a comment to approve',
+        url: `/${shop}/online-store/articles/${toPublicId('article', articleId)}`,
+      },
+    ]);
   });
 
   it('pushes low stock to owners and managers with its spell, without an alerts number', async () => {

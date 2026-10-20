@@ -13,6 +13,7 @@ import {
   type PushService,
 } from '@hatti/messaging/public';
 import { formatMoney, isCurrencyCode, money } from '@hatti/money';
+import { OnlineStoreEvents, type CommentChangedPayload } from '@hatti/online-store/public';
 import { OrderEvents, orderName, type OrderCreatedPayload } from '@hatti/orders/public';
 
 /** What is pushed, to whom, once for its key. */
@@ -50,7 +51,8 @@ async function recipientsIn(tx: Tx, shopId: string): Promise<PushRecipient[]> {
  * a courier's statement of cash remitted, to owners, managers and accountants. Each once, in each
  * member's language, opening its page in the admin; a shopper's message through the contact form
  * (ADR-591), to those who answer customers, saying neither who wrote nor what, which push services
- * would carry. Low stock is pushed with the WhatsApp alert, which keeps its spells
+ * would carry; a comment held for the shop's approval (ADR-619), likewise, to those who write its
+ * blogs, opening the article. Low stock is pushed with the WhatsApp alert, which keeps its spells
  * ({@link lowStockNotice}). Nothing where Hatti has no VAPID keys.
  */
 export class PushNotices {
@@ -59,6 +61,7 @@ export class PushNotices {
     OrderEvents.OrderCreated,
     LogisticsEvents.CodRemittanceImported,
     MessagingEvents.ContactMessageReceived,
+    OnlineStoreEvents.CommentCreated,
   ];
 
   constructor(
@@ -158,6 +161,27 @@ export class PushNotices {
               url: `${base}/inbox?tab=form`,
             },
           } satisfies PushNotice;
+        case OnlineStoreEvents.CommentCreated: {
+          const comment = event.payload as Partial<CommentChangedPayload>;
+          // Shown at once, or kept as spam: nothing waits.
+          if (comment.status !== 'pending' || !comment.articleId) return null;
+          return {
+            kind: 'comment_pending',
+            dedupeKey: `comment_pending:${event.aggregateId}`,
+            recipients,
+            message: {
+              en: {
+                title: `${shop.name}: a comment to approve`,
+                body: 'A shopper commented on one of your articles. Approve it to show it.',
+              },
+              ur: {
+                title: `${shop.name}: منظوری کے لیے تبصرہ`,
+                body: 'ایک خریدار نے آپ کے ایک مضمون پر تبصرہ کیا ہے۔ دکھانے کے لیے منظور کریں۔',
+              },
+              url: `${base}/online-store/articles/${toPublicId('article', comment.articleId)}`,
+            },
+          } satisfies PushNotice;
+        }
         default:
           return null;
       }

@@ -3,8 +3,9 @@ import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, lt, lte, sql } from 'drizzle-orm';
 import { isIP } from 'node:net';
+import { COMMENT_SPAM, spamSignsOf } from './comment-spam.js';
 import { OnlineStoreEvents, type CommentChangedPayload } from './events.js';
 import type { CommentRecord, Page } from './records.js';
 import { articles, blogs, comments, type CommentRow, type CommentStatusValue } from './schema.js';
@@ -54,7 +55,9 @@ export class CommentService {
   /**
    * A shopper's comment from an article's page on the shop's storefront: published, or pending
    * where the blog moderates comments; refused where the blog takes none, the article is not
-   * shown, or a field is wrong, the errors naming `author`, `email` or `body`.
+   * shown, or a field is wrong, the errors naming `author`, `email` or `body`. One that reads as
+   * spam, or repeats word for word one of some length posted on the shop within the day, is kept
+   * as spam (ADR-619), neither shown nor held, and the shopper told no more than of one held.
    */
   async post(
     shopId: string,
@@ -93,7 +96,13 @@ export class CommentService {
       if (found.policy === 'closed') {
         return failOne(['article'], 'INVALID', "This article doesn't take comments");
       }
-      const status: CommentStatusValue = found.policy === 'moderated' ? 'pending' : 'published';
+      const spam =
+        spamSignsOf({ author, body }).length > 0 || (await this.#repeated(tx, shopId, body));
+      const status: CommentStatusValue = spam
+        ? 'spam'
+        : found.policy === 'moderated'
+          ? 'pending'
+          : 'published';
       const [row] = await tx
         .insert(comments)
         .values({
@@ -233,6 +242,23 @@ export class CommentService {
       shown.set(row.article_id, entry);
     }
     return shown;
+  }
+
+  /** Whether the shop took a comment of this very text, not a short one, within the day (ADR-619). */
+  async #repeated(tx: Tx, shopId: string, body: string): Promise<boolean> {
+    if (Array.from(body).length < COMMENT_SPAM.repeated) return false;
+    const [row] = await tx
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.shopId, shopId),
+          eq(comments.body, body),
+          gt(comments.createdAt, sql`now() - interval '1 day'`),
+        ),
+      )
+      .limit(1);
+    return row !== undefined;
   }
 
   async #setStatus(

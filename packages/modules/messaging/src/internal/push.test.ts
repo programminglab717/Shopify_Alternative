@@ -135,6 +135,24 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       told('manager', ['write_conversations']),
     ]).toEqual([false, true]);
   });
+
+  it("tells who writes the shop's blogs of a comment waiting for approval (ADR-619)", () => {
+    const told = (role: StaffRole, scopes?: string[]) =>
+      pushedTo(
+        'comment_pending',
+        recipient('usr', role, 'en', scopes ? { scopes, capabilities: [] } : null),
+      );
+    expect([told('owner'), told('manager'), told('marketer')]).toEqual([true, true, true]);
+    expect([told('confirmation_agent'), told('packer'), told('accountant')]).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect([told('marketer', ['read_content']), told('marketer', ['write_content'])]).toEqual([
+      false,
+      true,
+    ]);
+  });
 });
 
 const message: PushMessage = {

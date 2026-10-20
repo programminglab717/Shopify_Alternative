@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { COMMENT_SPAM, spamSignsOf } from './comment-spam.js';
 import { COMMENT_LIMITS, commentHtml } from './comment.service.js';
 import { comments } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
@@ -17,6 +18,38 @@ describe('Comment HTML', () => {
     expect(commentHtml("It's <script>x()</script>")).toBe(
       '<p>It&#39;s &lt;script&gt;x()&lt;/script&gt;</p>',
     );
+  });
+});
+
+describe('Signs of spam in a comment (ADR-619)', () => {
+  it('reads links in a name, markup for links, more links than a comment needs, and what spam sells', () => {
+    const clean = { author: 'Ayesha Khan', body: 'Lovely lawn. Will order again.' };
+    expect(spamSignsOf(clean)).toEqual([]);
+    expect(spamSignsOf({ author: 'عائشہ', body: 'بہت اچھا لان ہے، دوبارہ منگواؤں گی۔' })).toEqual(
+      [],
+    );
+    // Two links are a comment's own: a size chart and a look.
+    expect(
+      spamSignsOf({ ...clean, body: 'See https://zari.pk/size and www.instagram.com/zari' }),
+    ).toEqual([]);
+    expect(spamSignsOf({ ...clean, author: 'Cheap bags www.bags.example' })).toEqual([
+      'LINK_IN_NAME',
+    ]);
+    expect(spamSignsOf({ ...clean, author: 'bestbags.com' })).toEqual(['LINK_IN_NAME']);
+    expect(spamSignsOf({ ...clean, body: '[url=http://bags.example]bags[/url]' })).toEqual([
+      'LINK_MARKUP',
+    ]);
+    expect(spamSignsOf({ ...clean, body: 'Nice <a href="http://x.example">x</a>' })).toEqual([
+      'LINK_MARKUP',
+    ]);
+    const links = Array.from({ length: COMMENT_SPAM.links + 1 }, (_, i) => `https://x${i}.example`);
+    expect(spamSignsOf({ ...clean, body: links.join(' ') })).toEqual(['LINKS']);
+    expect(spamSignsOf({ ...clean, body: 'Win big at our CASINO tonight' })).toEqual(['WORDS']);
+    expect(spamSignsOf({ ...clean, body: 'We sell backlinks and SEO services' })).toEqual([
+      'WORDS',
+    ]);
+    // Words that only hold one of them are not it.
+    expect(spamSignsOf({ ...clean, body: 'Occasional wear, xxxl please' })).toEqual([]);
   });
 });
 
@@ -173,6 +206,49 @@ describe.skipIf(!server)('Comments on articles (ADR-220)', () => {
       ip: null,
       userAgent: 'x'.repeat(COMMENT_LIMITS.userAgent),
     });
+  });
+
+  it('keeps a comment that reads as spam as spam, neither shown nor held (ADR-619)', async () => {
+    const { blog, eid } = await blogWithArticles();
+    unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'auto_published' }));
+    const status = async (post: Partial<typeof POST>) =>
+      unwrap(await f.comments.post(f.a.shopId, { ...POST, ...post })).status;
+    expect(await status({ author: 'Cheap bags www.bags.example' })).toBe('spam');
+    expect(await status({ body: 'Win big at our casino tonight' })).toBe('spam');
+    // Taken for spam whatever the blog's policy.
+    unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'moderated' }));
+    expect(await status({ body: '[url=http://bags.example]bags[/url]' })).toBe('spam');
+    unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'auto_published' }));
+    // A long comment again, word for word, within the day; short ones shoppers write alike.
+    const long = 'The lawn is lovely and the stitching neat; will order the blue one again.';
+    expect(long.length).toBeGreaterThanOrEqual(COMMENT_SPAM.repeated);
+    expect(await status({ body: long })).toBe('published');
+    expect(await status({ author: 'Zara', email: 'zara@example.pk', body: long })).toBe('spam');
+    expect(await status({ body: 'Thank you!' })).toBe('published');
+    expect(await status({ body: 'Thank you!' })).toBe('published');
+    // A day on, it is a comment of its own again.
+    await f.admin.query(
+      `UPDATE online_store.comments SET created_at = now() - interval '25 hours' WHERE body = $1`,
+      [long],
+    );
+    expect(await status({ body: long })).toBe('published');
+
+    const shown = await f.db.tenant(f.a.shopId, (tx) =>
+      f.comments.shownCommentsOf(tx, f.a.shopId, [eid.id]),
+    );
+    expect(shown.get(eid.id)!.count).toBe(4);
+    expect(
+      (await f.comments.list(f.a, { first: 10, status: 'spam' })).items.map((each) => each.body),
+    ).toEqual([
+      long,
+      '[url=http://bags.example]bags[/url]',
+      'Win big at our casino tonight',
+      POST.body.replace('\r\n', '\n'),
+    ]);
+    expect((await events()).filter(([, payload]) => payload.status === 'spam')).toHaveLength(4);
+    expect(
+      (await events()).filter(([, payload]) => payload.status === 'spam' && payload.shown),
+    ).toEqual([]);
   });
 
   it('lists comments, marks them as spam or not, deletes them, and keeps shops apart', async () => {

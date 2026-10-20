@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-618 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-619 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -626,6 +626,7 @@
 | 616 | A shop tries an address against its robots.txt before crawlers do: the rules as written, saved or not, read as RFC 9309 reads them, and the admin edits them beside the test | Accepted |
 | 617 | The storefront follows a chain of redirects to its end and sends shoppers there in one hop, through addresses it has no page at, five redirects past the first at most | Accepted |
 | 618 | The Search listings tab flags images that say nothing of what they show: a product's photos, an article's image and the images in pages' and articles' text, an article's image described by its file's words where it has none of its own | Accepted |
+| 619 | A comment that reads as spam is kept as spam, neither shown nor held: links in its name, link markup, more than two links, what spam sells, or a long comment again within the day; and a comment held for approval is pushed to who writes the shop's blogs | Accepted |
 
 ---
 
@@ -22341,3 +22342,27 @@
 * **Alternatives:** **Counting in the core:** a field for each kind, for the same answer the
   admin reads from what it has. **Leaving out empty `alt`s:** a shop that typed nothing would
   never be told.
+
+## ADR-619 · A comment that reads as spam is kept as spam, neither shown nor held: links in its name, link markup, more than two links, what spam sells, or a long comment again within the day; and a comment held for approval is pushed to who writes the shop's blogs
+
+* **Context:** Articles take comments as their blog's policy says (ADR-220), five a minute from
+  an address, with nothing to tell spam from a shopper's words: a blog that publishes comments
+  at once shows spam until the shop marks it, and one that moderates them holds spam beside the
+  comments waiting. Nor was the shop told a comment waited, so a moderated blog's comments
+  waited until someone looked (status shortcut 92).
+* **Decision:** A posted comment is read for the signs spam gives itself away by: a link in its
+  name, BBCode's or HTML's markup for links in its text, more than two links, or the words spam
+  is sold with; and one of 40 characters or more that repeats word for word one the shop took
+  within the day. A comment with any is kept with the status `spam`, whatever the blog's policy,
+  neither shown nor waiting; the shopper is told no more than of a comment held, so the filter
+  teaches spammers nothing. The shop finds it among its spam and marks it not spam as before. A
+  comment held for approval is pushed, as a new kind of news, `comment_pending` (migration
+  0283), to owners, managers and marketers who may write content, once a comment, in each
+  member's language, opening the article, saying neither who wrote nor what.
+* **Consequences:** Most spam never shows nor waits, and the shop hears of the comments that
+  do. A shopper who writes like a spammer, or posts the same long comment twice, waits among
+  the spam for the shop to find them. Short comments shoppers write alike, "Thank you!", are
+  never taken as repeats.
+* **Alternatives:** **A service such as Akismet:** sends shoppers' words and addresses to a
+  third party, and a contract Hatti does not have; the signs here can stand in front of one
+  later. **Spam held for approval instead:** a shop would still read it.
