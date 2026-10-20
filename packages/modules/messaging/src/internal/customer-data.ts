@@ -1,7 +1,9 @@
+import { shopProfile } from '@hatti/api';
 import { CustomerDataRegistry, type CustomerDataHandler } from '@hatti/customers/public';
 import { toDate, toDateOrNull } from '@hatti/db';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { queueMessageIn } from './messages.service.js';
 
 /**
  * Messages' part in merging, erasing and exporting customers (ADR-146). A merged duplicate's
@@ -9,7 +11,9 @@ import { sql } from 'drizzle-orm';
  * their email (ADR-181), and name. Their numbers' opt-outs stay, so the shop never writes to them
  * again by mistake. Their wishes to hear when a product is back in stock (ADR-429) go too, and
  * their numbers' conversations with the shop (ADR-545). A customer's own file has the messages
- * sent them, their opt-outs, those wishes and what they wrote to the shop.
+ * sent them, their opt-outs, those wishes and what they wrote to the shop. A shopper who asked for
+ * their erasure from their account is told once it is done (ADR-582), by a message forgotten once
+ * sent, so that their number is kept no longer than it takes to tell them.
  */
 export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'messaging',
@@ -38,6 +42,17 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       DELETE FROM messaging.conversations
        WHERE shop_id = ${shopId} AND customer_phone = ANY(${sql.param(customer.phones)}::text[])`);
+  },
+
+  async erased(tx, shopId, notice) {
+    await queueMessageIn(tx, shopId, {
+      kind: 'erasure_done',
+      recipient: notice.phone,
+      language: notice.language,
+      channel: 'whatsapp',
+      dedupeKey: `erasure_done:${notice.customerId}`,
+      variables: { shop: (await shopProfile(tx, shopId)).name },
+    });
   },
 
   async export(tx, shopId, customer) {

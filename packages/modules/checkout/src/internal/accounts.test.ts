@@ -11,6 +11,7 @@ import {
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
+import { MESSAGING_CUSTOMER_DATA } from '@hatti/messaging/public';
 import { ORDER_CUSTOMER_DATA } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ACCOUNT_DATA } from './account-data.js';
@@ -41,6 +42,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     const registry = new CustomerDataRegistry();
     registry.register(ORDER_CUSTOMER_DATA);
     registry.register(CHECKOUT_CUSTOMER_DATA);
+    registry.register(MESSAGING_CUSTOMER_DATA);
     data = new CustomerDataService(f.db, registry);
   });
 
@@ -778,9 +780,9 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     unwrap(await data.cancelErasure(f.a, ayesha));
     expect((await f.accounts.account(f.a.shopId, token))!.dataRequests.erasure).toBeNull();
 
-    // Asked for again, and carried out by the worker's sweep once due: their file goes with
-    // them, as their session does.
-    const asked = (await f.accounts.dataErase(f.a.shopId, token))!;
+    // Asked for again, from the Urdu storefront, and carried out by the worker's sweep once due:
+    // their file goes with them, as their session does.
+    const asked = (await f.accounts.dataErase(f.a.shopId, token, 'ur-PK'))!;
     if (asked.state === 'none') throw new Error('Expected an erasure');
     expect(asked.state).toBe('waiting');
     await f.accounts.dataExport(f.a.shopId, token);
@@ -793,6 +795,11 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await f.accountData.deleteExpired()).toBe(1);
     expect(await files()).toEqual([]);
     expect((await auditOf(ayesha))[0]).toEqual(['customer.erased', 'customer', ayesha]);
+    // And they are told so, at the number they signed in with, in Urdu (ADR-582).
+    const { rows: told } = await f.admin.query(
+      `SELECT recipient, language FROM messaging.messages WHERE kind = 'erasure_done'`,
+    );
+    expect(told).toEqual([{ recipient: JAZZ, language: 'ur' }]);
   });
 
   /** Products of `tenant`'s shop, by their titles: their IDs, in order. */

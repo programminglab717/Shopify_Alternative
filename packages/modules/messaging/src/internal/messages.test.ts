@@ -761,6 +761,73 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect([...(await messages.optedOut(a.shopId, 'whatsapp', [AYESHA]))]).toEqual([AYESHA]);
   });
 
+  it('tells a shopper their erasure is done, and forgets the message once it settles (ADR-582)', async () => {
+    const ayesha = newId();
+    const identity = { id: ayesha, phones: [AYESHA], email: null };
+    // What went to them before goes with the erasure; word that it is done comes after.
+    await messages.queue(a.shopId, {
+      kind: 'order_shipped',
+      recipient: AYESHA,
+      customerId: ayesha,
+      variables: { shop: 'A', order: '#1001' },
+      dedupeKey: 'order_shipped:1',
+    });
+    // A shop cannot turn it off, which the shopper asked for.
+    const refused = await settings.update(a, { disabled: ['erasure_done'] });
+    expect(refused.ok || refused.errors.map((error) => error.message)).toEqual([
+      `Disabled can't turn off "erasure_done": shoppers ask for it`,
+    ]);
+    await db.tenant(a.shopId, async (tx) => {
+      await MESSAGING_CUSTOMER_DATA.erase(tx, a.shopId, identity, 'system');
+      await MESSAGING_CUSTOMER_DATA.erased!(tx, a.shopId, {
+        customerId: ayesha,
+        phone: AYESHA,
+        language: 'ur',
+      });
+      // Once, however often it is asked.
+      await MESSAGING_CUSTOMER_DATA.erased!(tx, a.shopId, {
+        customerId: ayesha,
+        phone: AYESHA,
+        language: 'ur',
+      });
+    });
+    const { rows: told } = await admin.query<{ id: string }>(
+      `SELECT id, kind, channel, recipient, language, variables FROM messaging.messages
+        WHERE shop_id = $1`,
+      [a.shopId],
+    );
+    expect(told).toEqual([
+      {
+        id: expect.any(String),
+        kind: 'erasure_done',
+        channel: 'whatsapp',
+        recipient: AYESHA,
+        language: 'ur',
+        variables: { shop: 'A' },
+      },
+    ]);
+
+    // WhatsApp refuses it, and an SMS goes in its place; each is forgotten once it settles.
+    const at = soon();
+    await messages.claim(a.shopId, at, 10, 1);
+    await messages.settle(
+      a.shopId,
+      [{ id: told[0]!.id, status: 'failed', error: 'WhatsApp 131026: x', replace: true }],
+      at,
+    );
+    expect((await rows()).map((row) => [row.kind, row.channel, row.status])).toEqual([
+      ['erasure_done', 'sms', 'pending'],
+    ]);
+    const [sms] = await messages.claim(a.shopId, soon(), 10, 1);
+    expect(sms).toMatchObject({ recipient: AYESHA, variables: { shop: 'A' } });
+    await messages.settle(
+      a.shopId,
+      [{ id: sms!.id, status: 'sent', provider: 'sms_gateway', providerMessageId: 'sms.1' }],
+      soon(),
+    );
+    expect(await rows()).toEqual([]);
+  });
+
   it("erases and exports what went to a customer's email, as theirs (ADR-181)", async () => {
     const [ayesha, bilal] = [newId(), newId()];
     await messages.queue(a.shopId, {

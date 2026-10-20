@@ -406,6 +406,71 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
     ]);
   });
 
+  it('tells the shopper who asked from their account once their erasure is done (ADR-582)', async () => {
+    const SIGNED_IN = '+923211234567';
+    const ayesha = unwrap(await f.customers.create(f.a, { phone: JAZZ, name: 'Ayesha' }));
+    // Staff asked first: the shopper asking from their account is told all the same.
+    const asked = unwrap(await f.data.requestErasure(f.staff, ayesha.id));
+    expect(
+      unwrap(
+        await f.data.requestOwnErasure(f.a.shopId, ayesha.id, {
+          phone: SIGNED_IN,
+          language: 'ur',
+        }),
+      ),
+    ).toEqual(asked);
+    const notify = async (customerId: string) =>
+      (
+        await f.admin.query(
+          `SELECT notify_phone, notify_language FROM customers.erasure_requests
+            WHERE customer_id = $1`,
+          [customerId],
+        )
+      ).rows[0];
+    expect(await notify(ayesha.id)).toEqual({ notify_phone: SIGNED_IN, notify_language: 'ur' });
+    // Asked again in English, the first stands.
+    await f.data.requestOwnErasure(f.a.shopId, ayesha.id, { phone: JAZZ, language: 'en' });
+    expect(await notify(ayesha.id)).toEqual({ notify_phone: SIGNED_IN, notify_language: 'ur' });
+
+    // One who asked without a number to tell, and one staff erase at once, having asked.
+    const bilal = unwrap(await f.customers.create(f.a, { phone: '+923331234567', name: 'Bilal' }));
+    unwrap(await f.data.requestOwnErasure(f.a.shopId, bilal.id));
+    const sana = unwrap(await f.customers.create(f.a, { phone: '+923451234567', name: 'Sana' }));
+    unwrap(
+      await f.data.requestOwnErasure(f.a.shopId, sana.id, { phone: SIGNED_IN, language: 'en' }),
+    );
+    f.handler.calls = [];
+
+    // Told once every module has erased them, never before; and not while held.
+    const due = new Date(asked.dueAt.getTime() + 60_000);
+    f.handler.blockers = ['Their orders must be closed or cancelled first; still open: #1001'];
+    expect(await f.data.eraseDue(f.a.shopId, due)).toMatchObject({ erased: 0 });
+    expect(f.handler.calls.filter((call) => call.startsWith('tell'))).toEqual([]);
+    f.handler.blockers = [];
+    unwrap(await f.data.erase(f.staff, sana.id));
+    expect(await f.data.eraseDue(f.a.shopId, due)).toEqual({ erased: 2, waiting: 0 });
+    // Bilal, who gave no number to tell, is not told.
+    expect(f.handler.calls.filter((call) => call.startsWith('tell'))).toEqual([
+      `tell ${sana.id} ${SIGNED_IN} en`,
+      `tell ${ayesha.id} ${SIGNED_IN} ur`,
+    ]);
+    // Each after their own erasure, never before.
+    for (const [customer, language] of [
+      [ayesha, 'ur'],
+      [sana, 'en'],
+    ] as const) {
+      expect(
+        f.handler.calls.indexOf(`tell ${customer.id} ${SIGNED_IN} ${language}`),
+      ).toBeGreaterThan(
+        f.handler.calls.findIndex((call) => call.startsWith(`erase ${customer.id}`)),
+      );
+    }
+    // And nothing kept of whom to tell.
+    expect(
+      (await f.admin.query('SELECT count(*)::int AS n FROM customers.erasure_requests')).rows[0],
+    ).toEqual({ n: 0 });
+  });
+
   it('lists the erasures waiting, the soonest first, a page at a time', async () => {
     const ask = async (phone: string, name: string, dueAt: string) => {
       const customer = unwrap(await f.customers.create(f.a, { phone, name }));

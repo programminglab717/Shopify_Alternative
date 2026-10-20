@@ -9,6 +9,7 @@ import {
   CustomerDataRegistry,
   type CustomerDataHandler,
   type CustomerIdentity,
+  type ErasureNotice,
 } from './customer-data.js';
 import { CustomerDataService } from './customer-data.service.js';
 import { CustomerTransferService } from './customer-transfer.service.js';
@@ -70,6 +71,11 @@ export class TestDataHandler implements CustomerDataHandler {
 
   erase(_tx: unknown, _shopId: string, customer: CustomerIdentity): Promise<void> {
     this.calls.push(`erase ${customer.id} ${customer.phones.join(',')} ${customer.email}`);
+    return Promise.resolve();
+  }
+
+  erased(_tx: unknown, _shopId: string, notice: ErasureNotice): Promise<void> {
+    this.calls.push(`tell ${notice.customerId} ${notice.phone} ${notice.language}`);
     return Promise.resolve();
   }
 

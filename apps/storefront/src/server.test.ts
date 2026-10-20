@@ -581,6 +581,8 @@ class FakeCore {
    * how their erasure waits once asked for.
    */
   readonly dataAsked: ['export' | 'link' | 'erase', string][] = [];
+  /** The languages erasures were asked in, to tell the shopper in once done (ADR-582). */
+  readonly eraseLocales: (string | undefined)[] = [];
   readonly dataFiles = new Map<string, AccountDataExportJson>();
   erasure: AccountDataEraseResponse = {
     state: 'waiting',
@@ -619,10 +621,12 @@ class FakeCore {
   async accountDataErase(
     _shopId: string,
     token: string | null,
+    locale?: string,
   ): Promise<AccountDataEraseResponse | null> {
     const account = token ? this.accounts.get(token) : undefined;
     if (!token || !account) return null;
     this.dataAsked.push(['erase', token]);
+    this.eraseLocales.push(locale);
     return account.dataRequests.available ? this.erasure : { state: 'none' };
   }
 
@@ -4250,6 +4254,8 @@ describe("Shoppers' accounts (ADR-571)", () => {
       '/ur/account?data_request=erase_requested#your-data',
     ]);
     expect(core.dataAsked).toEqual([['erase', ACCOUNT_TOKEN]]);
+    // In the page's language, to be told in once it is done (ADR-582).
+    expect(core.eraseLocales).toEqual(['ur']);
     core.accounts.set(ACCOUNT_TOKEN, {
       ...ACCOUNT,
       dataRequests: {

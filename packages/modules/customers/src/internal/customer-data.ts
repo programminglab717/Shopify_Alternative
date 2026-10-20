@@ -23,11 +23,28 @@ export interface CustomerDataHandler {
    */
   erase(tx: Tx, shopId: string, customer: CustomerIdentity, actor: Actor | 'system'): Promise<void>;
   /**
+   * Once every module has erased the customer, in the same transaction: tells the shopper who
+   * asked for it from their account that it is done (ADR-582), at the number and in the language
+   * of `notice`. Only for an erasure such a shopper asked for; the messaging module's alone.
+   */
+  erased?(tx: Tx, shopId: string, notice: ErasureNotice): Promise<void>;
+  /**
    * What the module keeps of the customer, for the file they are given at their request: sections
    * of the file by name, such as `{ orders: [...] }`, holding plain JSON. Everything erasure would
    * take from them is in it, and the records it would keep while they still name the customer.
    */
   export(tx: Tx, shopId: string, customer: CustomerIdentity): Promise<Record<string, unknown>>;
+}
+
+/**
+ * Whom to tell that a customer's erasure is done (ADR-582): the number the shopper's sign-in to
+ * their account proved, and the language of the page they asked from.
+ */
+export interface ErasureNotice {
+  customerId: string;
+  /** E.164. */
+  phone: string;
+  language: 'en' | 'ur';
 }
 
 /**

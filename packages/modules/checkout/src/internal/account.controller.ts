@@ -171,10 +171,12 @@ export class StorefrontAccountController {
   @Header('cache-control', 'no-store')
   async dataErase(
     @Param('shopId') shopId: string,
+    @Body() body: unknown,
     @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
   ): Promise<AccountDataEraseResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
-    const erasure = token ? await this.accounts.dataErase(shopId, token) : null;
+    const locale = field(body, 'locale').slice(0, 16);
+    const erasure = token ? await this.accounts.dataErase(shopId, token, locale) : null;
     if (!erasure) throw new NotFoundException();
     return erasure;
   }

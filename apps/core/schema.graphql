@@ -7073,6 +7073,11 @@ enum MessageKind {
   DOMAIN_UNPOINTED
 
   """
+  A shopper who asked from their account for their erasure, told once it is done (CUS-05, ADR-582), which the shop cannot turn off; the message is not kept once sent.
+  """
+  ERASURE_DONE
+
+  """
   A gift card they bought, once its order is paid: what it is worth and its code, which is not kept once sent (CAT-12, ADR-451); the shop cannot turn it off.
   """
   GIFT_CARD

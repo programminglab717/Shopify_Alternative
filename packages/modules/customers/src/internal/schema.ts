@@ -106,6 +106,9 @@ export const erasureRequests = customersSchema.table(
     actorKind: text('actor_kind', { enum: ERASURE_REQUESTER_KINDS }).notNull(),
     actorId: uuid('actor_id').notNull(),
     actorRole: text('actor_role'),
+    // Whom to tell once it is done, as a shopper who asked from their account (ADR-582).
+    notifyPhone: text('notify_phone'),
+    notifyLanguage: text('notify_language', { enum: ['en', 'ur'] }),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.customerId] })],
 );

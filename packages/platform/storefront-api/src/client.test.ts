@@ -432,6 +432,10 @@ describe('StorefrontApiClient', () => {
       ['GET', 'http://core.test/storefront/shops/shop-1/account/data/export'],
       ['POST', 'http://core.test/storefront/shops/shop-1/account/data/erase'],
     ]);
+    // With the storefront's language, to tell them in once it is done (ADR-582).
+    expect(await requests[2]!.json()).toEqual({});
+    expect(await client.accountDataErase('shop-1', 'session-secret', 'ur')).toEqual(erasure);
+    expect(await requests.at(-1)!.json()).toEqual({ locale: 'ur' });
     const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
     await expect(down.accountDataExport('shop-1', 'session-secret')).rejects.toThrow(
       StorefrontApiError,

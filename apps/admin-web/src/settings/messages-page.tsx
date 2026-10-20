@@ -73,11 +73,12 @@ const LABELS: Partial<Record<string, MessageKey>> = {
 
 /**
  * What is always sent, which the shop cannot turn off: codes at checkout and to sign in to the
- * storefront, and Hatti's notices.
+ * storefront, word that an erasure a shopper asked for is done (ADR-582), and Hatti's notices.
  */
 const ALWAYS_SENT = [
   'ONE_TIME_CODE',
   'ACCOUNT_CODE',
+  'ERASURE_DONE',
   // Turned on and off with the checkout's own setting (ADR-393, ADR-426).
   'CHECKOUT_REMINDER',
   'CHECKOUT_OFFER',

@@ -36,6 +36,7 @@ export enum MessageKind {
   STORE_OPEN = 'STORE_OPEN',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   ACCOUNT_CODE = 'ACCOUNT_CODE',
+  ERASURE_DONE = 'ERASURE_DONE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
   DAILY_SUMMARY = 'DAILY_SUMMARY',
@@ -186,6 +187,11 @@ registerEnumType(MessageKind, {
       description:
         "A code to sign in to their account on the shop's storefront (CUS-02, ADR-570), which " +
         'the shop cannot turn off; the code is not kept once sent.',
+    },
+    ERASURE_DONE: {
+      description:
+        'A shopper who asked from their account for their erasure, told once it is done ' +
+        '(CUS-05, ADR-582), which the shop cannot turn off; the message is not kept once sent.',
     },
     STOCK_LOW: {
       description:

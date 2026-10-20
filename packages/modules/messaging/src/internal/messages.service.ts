@@ -15,6 +15,7 @@ import type { StopLinkView } from './stop-links.js';
 import {
   ALWAYS_SENT,
   EMAILED_KINDS,
+  FORGOTTEN_KINDS,
   SECRET_KINDS,
   WHATSAPP_ONLY_KINDS,
   type MessageKind,
@@ -164,6 +165,48 @@ type MessageRow = {
   created_at_exactly: string;
 };
 
+/**
+ * {@link MessagesService.queueIn} in the caller's transaction, for a module's part in a
+ * customer's erasure, which no service runs (ADR-582).
+ */
+export async function queueMessageIn(
+  tx: Tx,
+  shopId: string,
+  message: MessageToQueue,
+): Promise<string | null> {
+  const settings = await settingsIn(tx, shopId);
+  if (settings.disabled.includes(message.kind) && !ALWAYS_SENT.includes(message.kind)) {
+    return null;
+  }
+  const language = message.language ?? settings.language;
+  const channel: MessageChannel =
+    message.channel ??
+    (settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp');
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    INSERT INTO messaging.messages
+           (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
+            dedupe_key, broadcast_id)
+    VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
+            ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
+            ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null})
+        ON CONFLICT (shop_id, dedupe_key) DO NOTHING
+    RETURNING id`);
+  const id = rows[0]?.id ?? null;
+  const email = emailOf(message.email);
+  // Its copy goes with it: queued now, or not again.
+  if (id && email && EMAILED_KINDS.includes(message.kind)) {
+    await tx.execute(sql`
+      INSERT INTO messaging.messages
+             (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
+              dedupe_key)
+      VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
+              ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
+              ${message.customerId ?? null}, ${`${message.dedupeKey}:email`})
+          ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
+  }
+  return id;
+}
+
 @Injectable()
 export class MessagesService {
   constructor(
@@ -180,37 +223,7 @@ export class MessagesService {
    * not, or was before.
    */
   async queueIn(tx: Tx, shopId: string, message: MessageToQueue): Promise<string | null> {
-    const settings = await settingsIn(tx, shopId);
-    if (settings.disabled.includes(message.kind) && !ALWAYS_SENT.includes(message.kind)) {
-      return null;
-    }
-    const language = message.language ?? settings.language;
-    const channel: MessageChannel =
-      message.channel ??
-      (settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp');
-    const { rows } = await tx.execute<{ id: string }>(sql`
-      INSERT INTO messaging.messages
-             (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-              dedupe_key, broadcast_id)
-      VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
-              ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
-              ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null})
-          ON CONFLICT (shop_id, dedupe_key) DO NOTHING
-      RETURNING id`);
-    const id = rows[0]?.id ?? null;
-    const email = emailOf(message.email);
-    // Its copy goes with it: queued now, or not again.
-    if (id && email && EMAILED_KINDS.includes(message.kind)) {
-      await tx.execute(sql`
-        INSERT INTO messaging.messages
-               (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-                dedupe_key)
-        VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
-                ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
-                ${message.customerId ?? null}, ${`${message.dedupeKey}:email`})
-            ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
-    }
-    return id;
+    return queueMessageIn(tx, shopId, message);
   }
 
   /** Whether marketing may reach the shop's customers at `at`, and when it may next (ADR-422). */
@@ -381,6 +394,12 @@ export class MessagesService {
           UPDATE messaging.messages SET variables = variables - 'code'
            WHERE shop_id = ${shopId} AND id = ${outcome.id}
              AND (variables ->> 'code') IS NOT NULL`);
+        // And the whole of a message to a customer just erased, whose number nothing else keeps
+        // (ADR-582): its SMS in its place, if any, is forgotten once it settles in turn.
+        if (FORGOTTEN_KINDS.includes(rows[0]!.kind)) {
+          await tx.execute(sql`
+            DELETE FROM messaging.messages WHERE shop_id = ${shopId} AND id = ${outcome.id}`);
+        }
       }
     });
   }

@@ -14,6 +14,7 @@ export {
   CustomerDataRegistry,
   type CustomerDataHandler,
   type CustomerIdentity,
+  type ErasureNotice,
 } from '../internal/customer-data.js';
 export {
   CUSTOMER_DATA_FORMAT,

@@ -2670,14 +2670,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    */
   const dataRequest =
     (
-      ask: (shopId: string, token: string) => Promise<DataNotice | null>,
+      ask: (shopId: string, token: string, locale: string) => Promise<DataNotice | null>,
       options: { confirmed: boolean },
     ) =>
     async (request: FastifyRequest, reply: FastifyReply) => {
       const found = await shopFor(request, reply);
       if (!found) return notFound(reply, 'No shop answers at this address.');
       accountAnswer(reply);
-      const { prefix } = languageOf(request);
+      const { prefix, locale } = languageOf(request);
       if (request.headers['sec-fetch-site'] === 'cross-site') {
         return reply
           .code(403)
@@ -2694,7 +2694,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         if (options.confirmed && recordOf(paramsOf(request).customer).confirm !== '1') {
           return await accountPageOf(request, reply, found, 'erase_unconfirmed', 422);
         }
-        const notice = await ask(found.shopId, token);
+        const notice = await ask(found.shopId, token, locale);
         if (notice === null) {
           signOutCookies(request, reply);
           return await reply.redirect(`${prefix}/account/login`, 303);
@@ -2725,8 +2725,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * their erasure, as the shop's staff would for them.
    */
   const dataErase = dataRequest(
-    async (shopId, token) => {
-      const erasure = await core!.accountDataErase(shopId, token);
+    // Told once it is done in the page's language (ADR-582).
+    async (shopId, token, locale) => {
+      const erasure = await core!.accountDataErase(shopId, token, locale);
       if (!erasure) return null;
       return erasure.state === 'none' ? 'erase_none' : 'erase_requested';
     },

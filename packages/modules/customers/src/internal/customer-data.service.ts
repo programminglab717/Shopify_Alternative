@@ -15,7 +15,7 @@ import { formatMoney, money, toMajorString } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
-import { CustomerDataRegistry } from './customer-data.js';
+import { CustomerDataRegistry, type ErasureNotice } from './customer-data.js';
 import { giftCardsOfCustomerIn, mergeGiftCardsIn } from './gift-cards.service.js';
 import { toCustomerRecord } from './customer.service.js';
 import {
@@ -315,8 +315,13 @@ export class CustomerDataService {
   async requestOwnErasure(
     shopId: string,
     id: string,
+    /**
+     * Whom to tell once it is done (ADR-582): the number they signed in with, and their page's
+     * language.
+     */
+    notify?: Omit<ErasureNotice, 'customerId'>,
   ): Promise<MutationResult<ErasureRequestRecord>> {
-    return this.#requestErasure(shopId, id, customerRequester(id));
+    return this.#requestErasure(shopId, id, customerRequester(id), notify);
   }
 
   /**
@@ -336,6 +341,7 @@ export class CustomerDataService {
     shopId: string,
     id: string,
     by: Requester,
+    notify?: Omit<ErasureNotice, 'customerId'>,
   ): Promise<MutationResult<ErasureRequestRecord>> {
     return this.db.tenant(shopId, async (tx) => {
       const [current] = await tx
@@ -348,7 +354,20 @@ export class CustomerDataService {
         .select()
         .from(erasureRequests)
         .where(and(eq(erasureRequests.shopId, shopId), eq(erasureRequests.customerId, id)));
-      if (existing) return { ok: true, value: toErasureRequest(existing) };
+      const notifyColumns = notify && {
+        notifyPhone: notify.phone,
+        notifyLanguage: notify.language,
+      };
+      if (existing) {
+        // Asked for by staff first: the shopper is told of it all the same (ADR-582).
+        if (notifyColumns && existing.notifyPhone === null) {
+          await tx
+            .update(erasureRequests)
+            .set(notifyColumns)
+            .where(and(eq(erasureRequests.shopId, shopId), eq(erasureRequests.customerId, id)));
+        }
+        return { ok: true, value: toErasureRequest(existing) };
+      }
       const [row] = await tx
         .insert(erasureRequests)
         .values({
@@ -356,6 +375,7 @@ export class CustomerDataService {
           customerId: id,
           dueAt: sql`now() + make_interval(days => ${ERASURE_WAIT_DAYS})`,
           ...by,
+          ...notifyColumns,
         })
         .returning();
       const dueAt = row!.dueAt.toISOString();
@@ -559,6 +579,11 @@ export class CustomerDataService {
         blockers.map((message) => ({ field: ['id'], code: 'IN_USE', message })),
       );
     }
+    // Whom to tell once it is done, as a shopper who asked from their account (ADR-582).
+    const [request] = await tx
+      .select({ phone: erasureRequests.notifyPhone, language: erasureRequests.notifyLanguage })
+      .from(erasureRequests)
+      .where(and(eq(erasureRequests.shopId, shopId), eq(erasureRequests.customerId, id)));
     const erased = { id, phones: numbers.map((row) => row.phone).sort(), email: current.email };
     for (const handler of this.registry.handlers) {
       await handler.erase(tx, shopId, erased, erasure.actor);
@@ -583,6 +608,11 @@ export class CustomerDataService {
       ...erasure.by,
       ...(requestedAt && { details: { requestedAt } }),
     });
+    // Told only now, once every module's records of them are gone.
+    if (request?.phone && request.language) {
+      const notice = { customerId: id, phone: request.phone, language: request.language };
+      for (const handler of this.registry.handlers) await handler.erased?.(tx, shopId, notice);
+    }
   }
 
   /**

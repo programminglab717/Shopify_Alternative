@@ -38,6 +38,7 @@ export const MESSAGE_KINDS = [
   'store_open',
   'one_time_code',
   'account_code',
+  'erasure_done',
   'stock_low',
   'stock_out',
   'daily_summary',
@@ -104,6 +105,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
   // A code to sign in to their account on the shop's storefront, which they asked for (ADR-570).
   'account_code',
+  // Word that the erasure they asked for from their account is done (ADR-582).
+  'erasure_done',
   // Turned on and off with checkout's own setting, which says when (ADR-393, ADR-426).
   'checkout_reminder',
   'checkout_offer',
@@ -614,6 +617,16 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{code} is your code to sign in to your account with {shop}. It works for 10 minutes. Never share it.',
       ur: '{shop} پر اپنے اکاؤنٹ میں سائن ان کرنے کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں۔',
+    },
+  },
+  // A shopper told the erasure they asked for from their account is done (CUS-05, ADR-582).
+  erasure_done: {
+    whatsapp: 'hatti_erasure_done',
+    category: 'utility',
+    parameters: ['shop'],
+    text: {
+      en: '{shop} has erased your details, as you asked from your account: your name, numbers and addresses are gone, and your orders are kept for its accounts without them.',
+      ur: 'آپ کے اکاؤنٹ سے کی گئی درخواست کے مطابق {shop} نے آپ کی تفصیلات مٹا دی ہیں: آپ کا نام، نمبر اور پتے ختم کر دیے گئے ہیں، اور آپ کے آرڈرز ان کے بغیر حساب کے لیے رکھے گئے ہیں۔',
     },
   },
   sign_in_code: {
@@ -1415,6 +1428,12 @@ export function templateButtons(
         },
   );
 }
+
+/**
+ * The kinds whose messages are forgotten once sent, or once they never will be: word to a
+ * customer just erased (ADR-582), whose number nothing else keeps.
+ */
+export const FORGOTTEN_KINDS: readonly MessageKind[] = ['erasure_done'];
 
 /** The kinds whose messages hold a secret, dropped once sent. */
 export const SECRET_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-581 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-582 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -589,6 +589,7 @@
 | 579 | The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations and role changes offer them beside the presets | Accepted |
 | 580 | The admin shows each member what their own scopes and capabilities let them use, a custom role's member no more than it holds | Accepted |
 | 581 | Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email names the shop's own role it gives | Accepted |
+| 582 | A shopper who asked for their erasure from their account is told once it is done, at the number they signed in with, by a message forgotten once sent | Accepted |
 
 ---
 
@@ -21503,3 +21504,29 @@
   to that member.
 * **Alternatives:** **Tell every member of the roles, and let them be refused on opening it:** an
   alert for work they cannot do is noise, and its words may say more than their role lets them see.
+
+## ADR-582 · A shopper who asked for their erasure from their account is told once it is done, at the number they signed in with, by a message forgotten once sent
+
+* **Context:** A shopper asks for their erasure from their account (ADR-572), and it is carried
+  out ten days on, or later while an order is open, but no one told them it was done. Erasure
+  takes every message to their numbers with it (ADR-146), and a message telling them would keep
+  their number after it.
+* **Decision:**
+  * **The request keeps whom to tell** (migration 0273): the number their sign-in proved and the
+    language of the page they asked from, only when they asked from their account; asked for by
+    staff first, the shopper asking still adds them. Both go with the request when it is carried
+    out.
+  * **An `erased` hook** on the modules' customer-data handlers runs once every module has erased
+    the customer, in the same transaction, wherever the erasure happens: at once by staff, or by
+    the worker's sweep. The messaging module's queues `erasure_done` on WhatsApp, once by the
+    customer, in their language: always sent, and paid for from the shop's credit like the
+    sign-in code.
+  * **Forgotten once sent:** a message of a forgotten kind is deleted once it settles, sent or
+    never to be, number and all, its SMS in its place too once that settles. The admin names the
+    kind among what is always sent, in English and Urdu.
+* **Consequences:** A shopper learns their data is gone, and Hatti keeps their number no longer
+  than it takes to tell them. Its delivery is not followed, nor shown in the shop's message list
+  once sent. The template `hatti_erasure_done` must be approved by Meta before it sends.
+* **Alternatives:** **The number in the `customer.erased` event, for the worker to tell them:**
+  the outbox would keep it. **Telling them when staff erase them unasked:** the shop may have its
+  own reasons, and no number was given to tell.

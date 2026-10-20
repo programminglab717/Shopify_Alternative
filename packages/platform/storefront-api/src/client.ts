@@ -573,13 +573,15 @@ export class StorefrontApiClient {
   async accountDataErase(
     shopId: string,
     token: string | null,
+    /** The storefront's language, to tell them in once it is done (ADR-582): "en" or "ur". */
+    locale?: string,
   ): Promise<AccountDataEraseResponse | null> {
     if (!token) return null;
     const response = await this.#request(
       'POST',
       accountPath(shopId, 'data/erase'),
       null,
-      {},
+      locale ? { locale } : {},
       {
         [ACCOUNT_TOKEN_HEADER]: token,
       },

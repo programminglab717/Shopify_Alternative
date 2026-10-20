@@ -376,14 +376,24 @@ export class AccountService {
    * first, the request, its event and the audit log naming the customer as who asked. Asking
    * again, or once the shop has, changes nothing. How it waits: held while an order of theirs is
    * open, or the shop owes them store credit. `none` for a number no customer has, of whom the
-   * shop keeps nothing to erase; null without a session.
+   * shop keeps nothing to erase; null without a session. They are told once it is done (ADR-582),
+   * at the number their sign-in proved, in `locale` where it is one of the platform's languages,
+   * else English.
    */
-  async dataErase(shopId: string, token: string): Promise<AccountDataEraseResponse | null> {
+  async dataErase(
+    shopId: string,
+    token: string,
+    locale?: string | null,
+  ): Promise<AccountDataEraseResponse | null> {
     const session = await this.session(shopId, token);
     if (!session) return null;
     const customerId = session.customerId;
     if (!customerId) return { state: 'none' };
-    const asked = await this.data.requestOwnErasure(shopId, customerId);
+    // "ur", or "ur-PK" as a browser may name it.
+    const asked = await this.data.requestOwnErasure(shopId, customerId, {
+      phone: session.phone,
+      language: (locale ?? '').split('-')[0]!.toLowerCase() === 'ur' ? 'ur' : 'en',
+    });
     // Erased since the session read them.
     if (!asked.ok) return { state: 'none' };
     const erasure = await this.db.tenant(shopId, (tx) =>

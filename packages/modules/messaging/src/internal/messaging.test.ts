@@ -570,6 +570,8 @@ describe("Messages' words", () => {
       'one_time_code',
       // And the code to sign in to their account on the storefront (ADR-570).
       'account_code',
+      // And word that the erasure they asked for from it is done (ADR-582).
+      'erasure_done',
       // Checkout's own setting turns it on and off (ADR-393).
       'checkout_reminder',
       'checkout_offer',
