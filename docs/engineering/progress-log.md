@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### One message for an order placed and paid together
+### b94ee1d · One message for an order placed and paid together
 
 * **An order placed and paid together is told of its payment alone** ([ADR-621](../architecture/13-decision-log.md#adr-621--an-order-placed-and-paid-together-is-told-of-its-payment-alone-the-news-of-it-placed-waits-ten-minutes-for-an-order-to-be-paid-online-at-checkout-and-the-news-of-a-payment-in-full-takes-its-place-while-no-sender-has-taken-it)): the news of an
   order to be paid online at checkout waits ten minutes, and the news of a payment in full
