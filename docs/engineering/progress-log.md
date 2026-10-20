@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The pause of orders in a theme's own words
+### 739aab4 · The pause of orders in a theme's own words
 
 * **Themes are given `shop.checkout_paused`** ([ADR-620](../architecture/13-decision-log.md#adr-620--themes-are-given-a-pause-of-checkout-alone-as-shopcheckout_paused-its-message-and-when-orders-come-back-and-hatti-base-says-so-in-its-own-place-and-words-the-platforms-bar-stands-aside-for-a-themes-notice-marked-data-checkout-paused)): the shop's message and when orders come
   back, while checkout alone is paused. Hatti Base says so above its header in English or
