@@ -912,6 +912,10 @@ const PRODUCT = /* GraphQL */ `
     title
     description
     handle
+    seo {
+      title
+      description
+    }
     status
     productType
     vendor
@@ -1010,6 +1014,9 @@ export const ProductQuery = /* GraphQL */ `
     location {
       id
       name
+    }
+    shop {
+      url
     }
     product(id: $id) {
       ...ProductDetail

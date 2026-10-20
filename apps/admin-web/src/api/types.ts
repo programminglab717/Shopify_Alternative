@@ -519,6 +519,11 @@ export interface ProductDetail {
   complementaryProducts?: { id: string; title: string }[];
   /** When the draft goes on sale by itself (ADR-441); absent where a fake core leaves it out. */
   publishAt?: string | null;
+  /**
+   * Its own title and description for search engines (ADR-231); absent where a fake core leaves
+   * it out.
+   */
+  seo?: { title: string | null; description: string | null };
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   media: ProductMedia[];
   variants: ProductVariantDetail[];
@@ -531,6 +536,8 @@ export interface LocationRef {
 
 export interface ProductData {
   location: LocationRef | null;
+  /** The shop's storefront's address (ADR-600); absent where a fake core leaves it out. */
+  shop?: { url: string };
   product: ProductDetail | null;
 }
 

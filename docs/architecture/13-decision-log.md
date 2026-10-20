@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-599 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-600 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -607,6 +607,7 @@
 | 597 | A shop may set the hour from which the day's orders count their delivery days from the next day, as they ship the day after | Accepted |
 | 598 | Checkout shows the store credit of the number typed once a code proves it for the checkout, or the browser proved it lately, without signing in | Accepted |
 | 599 | An order's emails say the day checkout said to expect it by, while its delivery is still to come | Accepted |
+| 600 | A product's page in the admin has a search engine listing card: its title and description for search engines, with a preview of how a search engine lists it | Accepted |
 
 ---
 
@@ -21906,3 +21907,22 @@
 * **Alternatives:** **WhatsApp too:** its templates are Meta's to approve, on Hatti's number and on
   shops' own (ADR-537); a variable more is a new version of each, waiting on Meta. **SMS alone:** a
   line more costs a segment of every message sent.
+
+## ADR-600 · A product's page in the admin has a search engine listing card: its title and description for search engines, with a preview of how a search engine lists it
+
+* **Context:** Products, collections, pages, blogs and articles take a title and description of
+  their own for search engines (ADR-231, ADR-244), and the home page its own (ADR-243). Only the
+  home page's could be set in the admin; a product's came through Shopify's CSV or the API.
+  Merchants could not see what a search engine would make of a page.
+* **Decision:** A product's page has a "Search engine listing" card, as Shopify's has: a preview
+  of the listing, the storefront's address and the product's path, its title and its
+  description, each cut about where engines cut them (60 and 160 characters, at a word, as the
+  storefront cuts a description made from a page's text); and the two fields, with how many
+  letters each has. Blank, the preview shows what the storefront gives instead: the product's own
+  title and the start of its description. Saving sends `seo` through `productUpdate`; a field
+  emptied clears it. The card is one component, ready for collections, pages, blogs and articles.
+* **Consequences:** A merchant writes for search engines where they edit the product, seeing the
+  listing as they type. The preview is a guide: engines may write their own.
+* **Alternatives:** **A separate SEO page listing every product:** a later toolkit's screen; the
+  product's own page is where a merchant looks first. **The preview fetched from a search engine:**
+  it shows only what was crawled, not what is being typed.

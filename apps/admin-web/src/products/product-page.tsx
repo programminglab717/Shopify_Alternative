@@ -47,6 +47,7 @@ import type { DetailsState } from './product-form';
 import { ProductBundleCard } from './bundle';
 import { ProductPairingsCard } from './pairings';
 import { ProductSchedule } from './schedule';
+import { ProductSearchListing } from './search-listing';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
@@ -567,7 +568,7 @@ function ProductView() {
       />
     );
   }
-  const { product, location } = query.data;
+  const { product, location, shop: storefront } = query.data;
   const edits = permits(shop, EDITS_PRODUCTS);
   if (!product) {
     return (
@@ -625,6 +626,7 @@ function ProductView() {
       {/* Shown afresh when the core's day changes. */}
       {edits && <ProductPreorder product={product} />}
       {edits && <CategoryCard product={product} />}
+      {edits && <ProductSearchListing product={product} storefront={storefront?.url ?? ''} />}
       {edits && <EasternWearCard product={product} />}
       {edits && <ProductMetafieldsCard product={product} />}
       {edits && <GiftCardProduct key={String(product.isGiftCard)} product={product} />}
