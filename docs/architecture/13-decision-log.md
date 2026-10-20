@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-651 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-652 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -659,6 +659,7 @@
 | 649 | A listing is written on the Search listings tab itself, with the card its own page has, and stays shown while it is open once it is described | Accepted |
 | 650 | The In Urdu tab writes one field of a line or two, a title say, across many of the shop's things at once, each kept for its own words' digest, emptied ones forgotten | Accepted |
 | 651 | A shop limits what its staff take off an order to a share of what its items cost, past which only owners, managers, apps and roles given `give_any_discount` go | Accepted |
+| 652 | A draft's amount off given by hand keeps to the shop's limit for staff, as an order's does; a discount code's is the shop's own | Accepted |
 
 ---
 
@@ -23013,3 +23014,18 @@
 * **Alternatives:** **An owner's approval asked for in the order, past the limit:** a request
   waiting on someone, and remains the target. **A limit by role:** one share for the shop
   serves while staff are few; custom roles say who goes past it.
+
+## ADR-652 · A draft's amount off given by hand keeps to the shop's limit for staff, as an order's does; a discount code's is the shop's own
+
+* **Context:** The shop's limit on what staff take off an order (ADR-651) held for orders'
+  charges alone; an agent making a draft for a customer on WhatsApp (ORD-03) gave any amount off
+  it, and the draft's order kept it.
+* **Decision:** Creating or changing a draft, a member of staff without `give_any_discount`
+  raises its amount off no higher than the shop's share of what its items cost, refused with the
+  most they may give, through the check orders' charges use, now kept in the orders module's
+  `staff-discounts`. A discount code's amount is the shop's own, and goes past it; an amount
+  above it already, a manager's say, may be lowered, and one given in place of a code keeps to
+  it.
+* **Consequences:** Drafts and orders keep to one limit, whichever an agent works in.
+* **Alternatives:** **Prices agreed on a draft's lines kept to it too:** a line's price is what
+  the shop sells at, and remains the target with discounts on lines.

@@ -2,7 +2,6 @@ import {
   INPUT_LIMITS,
   InputChecker,
   failOne,
-  hasCapability,
   type FieldError,
   type Actor,
   type MutationResult,
@@ -29,7 +28,7 @@ import {
   type OrderUpdatedPayload,
 } from './events.js';
 import type { OrderLineInput } from './order.service.js';
-import { orderSettingsIn } from './order-settings.service.js';
+import { staffDiscountRefusal } from './staff-discounts.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   addTimelineEntry,
@@ -434,22 +433,18 @@ export class OrderEditService {
         );
       }
       const current = await linesOf(tx, shopId, order.id);
-      if (newDiscount > order.discount && !givesAnyDiscount(tenant.actor)) {
-        const { staffDiscountPercent: percent } = await orderSettingsIn(tx, shopId);
-        const items = current.reduce(
-          (sum, line) => sum + line.unitPrice * BigInt(line.quantity),
-          0n,
-        );
-        const most = percent === null ? null : (items * BigInt(percent)) / 100n;
-        if (most !== null && newDiscount > most) {
-          return failOne(
-            ['input', 'discount'],
-            'INVALID',
-            `Your role takes ${percent}% off at most, ${format(most)}: ask an owner or ` +
-              'a manager to give more',
-          );
-        }
-      }
+      const refused = await staffDiscountRefusal(
+        tx,
+        shopId,
+        tenant.actor,
+        {
+          items: current.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n),
+          before: order.discount,
+          discount: newDiscount,
+        },
+        format,
+      );
+      if (refused) return failOne(['input', 'discount'], 'INVALID', refused);
       const snapshots = await this.variants.snapshotsOf(
         tx,
         shopId,
@@ -1371,12 +1366,4 @@ function itemsWords(what: string, items: readonly EditedLine[], ending: string):
   let shown = parts.length;
   while (shown > 1 && words(shown).length > LIMITS.comment) shown -= 1;
   return words(shown);
-}
-
-/**
- * Whether `actor` takes any discount off an order (ADR-651): apps and Hatti's support as their
- * scopes allow, staff with `give_any_discount`.
- */
-function givesAnyDiscount(actor: Actor): boolean {
-  return actor.kind !== 'staff' || hasCapability(actor, 'give_any_discount');
 }

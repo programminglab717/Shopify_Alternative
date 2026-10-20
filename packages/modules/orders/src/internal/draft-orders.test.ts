@@ -255,6 +255,35 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(await orderCount()).toBe(0);
   });
 
+  it("keeps an amount off a draft within the shop's limit for staff, as an order's (ADR-652)", async () => {
+    unwrap(await f.orderSettings.update(f.a, { staffDiscountPercent: 10 }));
+    const agent = staff('confirmation_agent');
+    // A tenth of Rs 7,099 of items.
+    const given = await draft({ discount: '700' }, agent);
+    expect(given.discount).toBe(700_00n);
+    const tooMuch = await f.drafts.update(agent, given.id, { discount: '800' });
+    expect(!tooMuch.ok && tooMuch.errors[0]).toMatchObject({
+      field: ['input', 'discount'],
+      code: 'INVALID',
+    });
+    expect(!tooMuch.ok && tooMuch.errors[0]!.message).toMatch(/^Your role takes 10% off at most/);
+    expect(
+      errorsOf(
+        await f.drafts.create(agent, {
+          lineItems: [{ variantId: kurta, quantity: 1 }],
+          discount: '500',
+        }),
+      ),
+    ).toEqual([['input.discount', 'INVALID']]);
+    // A manager's draft, or the shop's own code, goes past it.
+    expect((await draft({ discount: '2,000' }, staff('manager'))).discount).toBe(2_000_00n);
+    // Lowered, not raised.
+    const managed = await draft({ discount: '2,000' }, staff('manager'));
+    expect(unwrap(await f.drafts.update(agent, managed.id, { discount: '1,500' })).discount).toBe(
+      1_500_00n,
+    );
+  });
+
   it('lists drafts newest first, by status', async () => {
     const [first, second, third] = [await draft(), await draft(), await draft()];
     unwrap(await f.drafts.complete(f.a, second!.id));

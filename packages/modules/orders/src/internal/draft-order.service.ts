@@ -16,7 +16,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
-import type { CurrencyCode } from '@hatti/money';
+import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { redeemDiscountIn } from '@hatti/pricing/public';
 import { ObjectStorage } from '@hatti/storage';
 import { taxSettingsIn } from '@hatti/tax/public';
@@ -77,6 +77,7 @@ import {
   type PaymentMethodValue,
 } from './schema.js';
 import { shownDigest, shownOfDraft, shownOfOrder, type ShownTerm } from './shown-order.js';
+import { staffDiscountRefusal } from './staff-discounts.js';
 import {
   TransferReceiptService,
   receiptCountIn,
@@ -894,6 +895,23 @@ export class DraftOrderService {
         'INVALID',
         "The discount can't be more than the items cost",
       );
+    }
+    // An amount off given by hand is kept to the shop's limit for staff, as an order's (ADR-652);
+    // a code's is the shop's own.
+    if (next.discountCode === null) {
+      const currency = (current?.currency ?? tenant.currency) as CurrencyCode;
+      const refused = await staffDiscountRefusal(
+        tx,
+        shopId,
+        tenant.actor,
+        {
+          items: subtotal,
+          before: current?.discountCode ? 0n : (current?.discount ?? 0n),
+          discount: next.discount,
+        },
+        (amount) => formatMoney(money(amount, currency)),
+      );
+      if (refused) return failOne(['input', 'discount'], 'INVALID', refused);
     }
     const total = subtotal - next.discount + next.shipping;
     const noAdvance = advanceRefusal(next.paymentMethod);

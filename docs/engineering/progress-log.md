@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A draft's amount off within the limit
+
+* **A draft's amount off given by hand keeps to the shop's limit for staff** ([ADR-652](../architecture/13-decision-log.md#adr-652--a-drafts-amount-off-given-by-hand-keeps-to-the-shops-limit-for-staff-as-an-orders-does-a-discount-codes-is-the-shops-own)), as an
+  order's does; a discount code's is the shop's own.
+* 3783 tests, one more: drafts made and changed by an agent and a manager.
+
 ### 930fe68 · What staff take off an order
 
 * **A shop limits what its staff take off an order** ([ADR-651](../architecture/13-decision-log.md#adr-651--a-shop-limits-what-its-staff-take-off-an-order-to-a-share-of-what-its-items-cost-past-which-only-owners-managers-apps-and-roles-given-give_any_discount-go)) to a share of what its items
