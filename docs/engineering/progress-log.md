@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The link page's QR code
+### 5476eac · The link page's QR code
 
 * **The admin draws the link page's QR code** ([ADR-648](../architecture/13-decision-log.md#adr-648--the-link-pages-qr-code-is-drawn-in-the-admin-by-hattis-own-encoder-of-its-address-marked-utm_sourceqr-and-downloaded-as-a-png-to-print)) with Hatti's own encoder, of its
   address marked `utm_source=qr`, and downloads it as a PNG to print.
