@@ -9,6 +9,7 @@ export {
   type PkProvince,
   type PkProvinceCode,
 } from './cities.js';
+export { addPkWorkingDays, isPkWorkingDay, pkDayOf, pkHolidaysOf } from './holidays.js';
 export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
 export {

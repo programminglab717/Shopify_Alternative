@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-593 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-594 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -601,6 +601,7 @@
 | 591 | Staff who answer customers may be told on their phones when a shopper writes through the contact form, the push saying neither who nor what | Accepted |
 | 592 | A shopper chooses how much of their store credit checkout spends, and a signed-in shopper sees their number's balance there, spending it still asking what proves the number | Accepted |
 | 593 | Hatti Base puts a WhatsApp button on every page, its message naming the product and variant, or the collection, the shopper was looking at, with its link | Accepted |
+| 594 | Checkout says the day to expect delivery by, the shop's working days for the city counted past Sundays and Pakistan's public holidays | Accepted |
 
 ---
 
@@ -21796,3 +21797,23 @@
   colour, a shopper asks about, and can open it from the chat.
 * **Alternatives:** **A chat window on the page:** shoppers already have WhatsApp, where the
   shop answers them and its inbox (ADR-545) keeps the conversation.
+
+## ADR-594 · Checkout says the day to expect delivery by, the shop's working days for the city counted past Sundays and Pakistan's public holidays
+
+* **Context:** CHK-05 asks for delivery dates by city, with couriers' lead times and holidays.
+  A shop says how many working days delivery takes, everywhere and in each zone, and checkout
+  says that for the shopper's city (ADR-235); a shopper still has to count the days, and
+  couriers neither deliver on Sundays nor on Pakistan's public holidays.
+* **Decision:**
+  * **`@hatti/pk` knows Pakistan's public holidays:** those on fixed days (Kashmir Day, Pakistan
+    Day, Labour Day, Independence Day, Iqbal Day, Quaid-e-Azam Day) and the Islamic ones (Eid ul
+    Fitr's and Eid ul Adha's three days, Ashura's two, Eid Milad un Nabi), these from the Umm
+    al-Qura calendar a day later, as Pakistan usually sights the moon, as the marketing calendar
+    does (ADR-484); and counts working days past Sundays and the holidays.
+  * **Checkout's summary says the day:** once the shopper's city is known and the shop has said
+    its days, the most of them counted from the day it is in Pakistan: "Expected by Thursday 22
+    October", in both languages. None while an item waits on its pre-order, whose day says more.
+* **Consequences:** A shopper knows when to expect the parcel before placing the order. An Islamic
+  holiday the committee sights a day off from expected moves a date by a day.
+* **Alternatives:** **The date on product and cart pages:** those pages are cached for every
+  shopper, and the date would go stale; they keep the days.

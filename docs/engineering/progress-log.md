@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The day to expect delivery by
+
+* **Checkout says the day to expect delivery by, the shop's working days for the city counted
+  past Sundays and Pakistan's public holidays** ([ADR-594](../architecture/13-decision-log.md#adr-594--checkout-says-the-day-to-expect-delivery-by-the-shops-working-days-for-the-city-counted-past-sundays-and-pakistans-public-holidays), CHK-05).
+* 3657 tests, 4 more: the holidays, working days, and the date on the
+  page.
+
 ### e438596 · A WhatsApp button on every page
 
 * **Hatti Base puts a WhatsApp button on every page, its message naming the product and variant,

@@ -265,6 +265,32 @@ describe('checkoutPage', () => {
     expect(days('Lahore', within)).toContain('2 کام کے دنوں کے اندر ڈیلیوری۔');
   });
 
+  it("says the day to expect delivery by, past Sundays and Pakistan's holidays (CHK-05, ADR-594)", () => {
+    const delivery: DeliverySettingsRecord = {
+      ...DELIVERY,
+      days: { min: 2, max: 4 },
+      zones: [{ ...DELIVERY.zones[0]!, days: { min: 1, max: 1 } }],
+    };
+    const page = (city: string, today: string, cart = CART) =>
+      checkoutPage(openView({ delivery, cart, today, form: { ...EMPTY_FORM, city } })).html;
+    // Tuesday 20 October 2026: Karachi's one day is Wednesday; elsewhere four, past Sunday.
+    expect(page('khi', '2026-10-20')).toContain('Expected by Wednesday 21 October.');
+    expect(page('khi', '2026-10-20')).toContain('Wednesday 21 October تک پہنچنے کی توقع۔');
+    expect(page('Multan', '2026-10-20')).toContain('Expected by Saturday 24 October.');
+    expect(page('Multan', '2026-10-22')).toContain('Expected by Tuesday 27 October.');
+    // Past Iqbal Day, Monday 9 November.
+    expect(page('khi', '2026-11-07')).toContain('Expected by Tuesday 10 November.');
+    // Not before the city is known, nor while an item waits on its pre-order.
+    expect(page('', '2026-10-20')).not.toContain('Expected by');
+    const preorder = { ...CART, items: [{ ...CART.items[0]!, preorderShipsOn: '2026-11-30' }] };
+    expect(page('khi', '2026-10-20', preorder)).not.toContain('Expected by');
+    // Nor where the shop said nothing of the days.
+    const silent = checkoutPage(
+      openView({ today: '2026-10-20', form: { ...EMPTY_FORM, city: 'khi' } }),
+    ).html;
+    expect(silent).not.toContain('Expected by');
+  });
+
   it('says what is wrong, beside the boxes, keeping what was typed', () => {
     const form = { ...EMPTY_FORM, name: '<b>Ayesha</b>', phone: '12345' };
     const page = checkoutPage(

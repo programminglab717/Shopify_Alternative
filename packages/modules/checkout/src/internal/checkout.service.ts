@@ -63,7 +63,7 @@ import {
   type DiscountRefusal,
   type OrderItems,
 } from '@hatti/pricing/public';
-import { maskPkMobile } from '@hatti/pk';
+import { maskPkMobile, pkDayOf } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
@@ -516,6 +516,11 @@ export type CheckoutView =
        * where the page offers to pay with credit and it has some; spent once a code proves it.
        */
       creditBalance?: bigint;
+      /**
+       * The day it is in Pakistan (ADR-594), YYYY-MM-DD, for the day delivery is expected by;
+       * absent where the page says none.
+       */
+      today?: string;
     }
   | {
       kind: 'placed';
@@ -1442,6 +1447,7 @@ export class CheckoutService {
       pickup: await this.#pickupPoints(tx, shopId),
       gift: await this.#gift(tx, shopId, cart),
       giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
+      today: pkDayOf(new Date()),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null

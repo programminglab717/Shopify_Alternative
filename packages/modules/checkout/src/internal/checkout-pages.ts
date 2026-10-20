@@ -35,6 +35,7 @@ import {
 import {
   PK_CITIES,
   PK_PROVINCES,
+  addPkWorkingDays,
   areaSuggestions,
   findCity,
   maskPkMobile,
@@ -367,6 +368,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           giftCard: view.giftCard?.refusal ? null : view.giftCard,
         },
         view.tax,
+        view.today ?? null,
       ),
       discountSection(discount, problem?.kind === 'discount' ? problem : null, discounts),
       orderable && giftCardSection(view.giftCard, problem?.kind === 'gift_card' ? problem : null),
@@ -1071,7 +1073,8 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
  * with the shop's `fee` for it and less the `advance` it asks for by transfer; or by transfer
  * where that alone is, less what it takes off (`off`). Delivery is exact once the shopper typed a
  * city, or when every city costs the same; until then, the shop's charges. With the total, the
- * sales tax it includes at the shop's `tax` (ADR-096).
+ * sales tax it includes at the shop's `tax` (ADR-096). With the city's days, the day delivery is
+ * expected by, counted from `today` (ADR-594).
  */
 function cartSummary(
   cart: CartJson,
@@ -1089,6 +1092,7 @@ function cartSummary(
     giftCard?: CheckoutGiftCard | null;
   },
   tax: TaxRates,
+  today: string | null,
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, discounts);
   const charge = totals.delivery;
@@ -1199,6 +1203,15 @@ function cartSummary(
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}
     ${days && paragraphs(deliveryDaysWords(days), 'small muted')}
     ${
+      // The day to expect it by, once the city is known: past Sundays and Pakistan's holidays, as
+      // couriers deliver; none while an item waits on its pre-order.
+      days &&
+      today &&
+      city.trim() !== '' &&
+      !cart.items.some((item) => item.preorderShipsOn) &&
+      paragraphs(expectedByWords(addPkWorkingDays(today, days.max)), 'small')
+    }
+    ${
       cart.note !== '' &&
       html`<p class="small muted">
         ${say('bilingual', LABELS.note)}: <span dir="auto">${text(cart.note)}</span>
@@ -1219,6 +1232,17 @@ function deliveryDaysWords(days: DeliveryDays): Sentence {
     en: `Delivered in ${min} to ${en(max)}.`,
     ur: `${min} سے ${ur(max)} میں ڈیلیوری۔`,
   };
+}
+
+/** The day delivery is expected by, YYYY-MM-DD, as the summary says it: "Thursday 22 October". */
+function expectedByWords(day: string): Sentence {
+  const words = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(`${day}T00:00:00Z`));
+  return { en: `Expected by ${words}.`, ur: `${words} تک پہنچنے کی توقع۔` };
 }
 
 /** What delivery costs where, for a shopper who has not typed their city yet. */
