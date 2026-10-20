@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Staff named in comments, picked by name
+
+* **Staff name someone in an order's comment by picking them from the shop's staff** ([ADR-637](../architecture/13-decision-log.md#adr-637--staff-name-someone-in-an-orders-comment-by-picking-them-from-a-list-of-the-shops-staff-by-name-which-whoever-reads-orders-may-see-with-nothing-of-how-they-sign-in)):
+  `staffNames` lists their names alone for whoever reads orders, and the comment box adds @ and
+  the name chosen, so a mention tells the member it names.
+* 3760 tests, two more: the comment box's list, and its query checked against the schema;
+  the staff test now reads the names as an agent.
+
 ### f59c3b8 · The shop's files, found by name
 
 * **The shop's files are searched by name and kept in the online store's Files tab** ([ADR-636](../architecture/13-decision-log.md#adr-636--the-shops-files-are-searched-by-the-words-of-their-names-and-kept-in-a-files-tab-of-the-online-store-found-added-as-pictures-or-pdfs-their-links-copied-and-deleted)):

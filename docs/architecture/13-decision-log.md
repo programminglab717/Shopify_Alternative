@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-636 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-637 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -644,6 +644,7 @@
 | 634 | Owners and managers give up to 250 orders at once to a member of staff, or to no one, among the list's bulk actions; whoever is given them is told once, of them all, on WhatsApp and in their browser | Accepted |
 | 635 | The Confirmation Desk deals an agent the orders given to them first, then those given to no one, and those given to someone else last, each kind the most urgent first | Accepted |
 | 636 | The shop's files are searched by the words of their names, and kept in a Files tab of the online store: found, added as pictures or PDFs, their links copied and deleted | Accepted |
+| 637 | Staff name someone in an order's comment by picking them from a list of the shop's staff by name, which whoever reads orders may see, with nothing of how they sign in | Accepted |
 
 ---
 
@@ -22726,3 +22727,24 @@
 * **Alternatives:** **A search of filenames and descriptions:** descriptions are of images, and
   shops look for a file by what they called it. **A page of its own in Settings:** the files are
   the online store's pictures and documents, beside its pages and themes.
+
+## ADR-637 · Staff name someone in an order's comment by picking them from a list of the shop's staff by name, which whoever reads orders may see, with nothing of how they sign in
+
+* **Context:** A comment that names a member of staff as @ and their name tells them on
+  WhatsApp and in their browser (ADR-191, ADR-633), but the name must be typed as their account
+  has it, and a confirmation agent or packer cannot read the staff list (`read_staff`) to see
+  how. A name typed a little wrong tells no one, and the writer is not told so (status shortcut
+  62).
+* **Decision:** The API's `staffNames` lists the shop's members of staff by name, A to Z, each
+  with its id and name alone, for whoever reads orders (`read_orders`), as the people an order
+  is given to and named in its comments; nothing of how they sign in is shown. The order page's
+  comment box gains **Name someone in it**, a list of the staff but the writer, which adds @ and
+  the name chosen to the comment where the writer is, a space before it where needed and one
+  after, and goes back to its first line for the next.
+* **Consequences:** Staff name one another as their accounts have them, so the mention tells
+  them. Whoever reads orders learns the names of the shop's staff, which the orders they are
+  given and the comments they read already show.
+* **Alternatives:** **Mentions kept by account, not matched by name:** better still, but it
+  changes how comments are kept and read by apps; the names picked here are the ones the match
+  finds. **Suggestions as @ is typed:** a list under the box as one types is harder to use on a
+  phone and by a screen reader than a field of its own.

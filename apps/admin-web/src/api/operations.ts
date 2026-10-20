@@ -2033,6 +2033,16 @@ export const CourierAccountArchiveMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The shop's staff by name, A to Z, to name in a comment (ADR-637). */
+export const StaffNamesQuery = /* GraphQL */ `
+  query StaffNames {
+    staffNames {
+      id
+      name
+    }
+  }
+`;
+
 /** Who works in the shop, and the invitations still open (ADR-101). */
 export const StaffQuery = /* GraphQL */ `
   query Staff {

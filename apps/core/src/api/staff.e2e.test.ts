@@ -1030,6 +1030,16 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       );
       expect(taken.orderAssign.order.assignee).toEqual({ id: toPublicId('user', manager.userId) });
 
+      // Whoever reads orders has the staff by name, to name in a comment (ADR-637).
+      const names = (await as(agent.accessToken, '{ staffNames { id name } }')).data.staffNames;
+      expect(names).toEqual(
+        expect.arrayContaining([
+          { id: agentId, name: 'Sana Iqbal' },
+          { id: toPublicId('user', manager.userId), name: expect.any(String) },
+        ]),
+      );
+      expect(names.map((each: { id: string }) => each.id)).not.toContain(packerId);
+
       // Many at once, as orderAssign does each (ADR-634).
       const third = await orderOfShopA(app, 'CASH_ON_DELIVERY');
       const bulk = (token: string, ids: string[], staffMemberId: string | null) =>

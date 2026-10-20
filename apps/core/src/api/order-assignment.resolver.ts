@@ -19,6 +19,7 @@ import {
   Mutation,
   ObjectType,
   Parent,
+  Query,
   ResolveField,
   Resolver,
 } from '@nestjs/graphql';
@@ -145,6 +146,25 @@ export class OrderAssignmentResolver {
       ? (await this.staff.staffOf(tenant.shopId)).find((each) => each.userId === userId)
       : undefined;
     return member ? { staffMemberId: member.userId, name: member.name } : NOT_STAFF;
+  }
+
+  @Query(() => [OrderAssignee], {
+    description:
+      "The shop's members of staff by name, A to Z, to give an order to or name in its comments " +
+      'as @ and their name (ADR-637): who they are, nothing of how they sign in. For whoever ' +
+      "reads orders, as the shop's staff list is not.",
+  })
+  @RequireScopes('read_orders')
+  async staffNames(@CurrentTenant() tenant: TenantContext): Promise<OrderAssignee[]> {
+    const staff = await this.staff.staffOf(tenant.shopId);
+    return staff
+      .map((member) =>
+        Object.assign(new OrderAssignee(), {
+          id: toPublicId('user', member.userId),
+          name: member.name,
+        }),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   }
 
   @ResolveField(() => OrderAssignee, {

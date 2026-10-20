@@ -1358,6 +1358,8 @@ const en = {
   'details.comment': 'Comment',
   'details.commentHint':
     'For whoever picks the order up next. Name staff with @ to tell them on WhatsApp.',
+  'details.nameSomeone': 'Name someone in it',
+  'details.chooseName': 'Choose a member of staff',
   'details.tooLong': 'A comment can be {most} characters at most.',
   'details.addComment': 'Add the comment',
   'details.edited': 'edited',
@@ -6582,6 +6584,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'details.comment': 'تبصرہ',
   'details.commentHint':
     'جو بھی آرڈر آگے سنبھالے اس کے لیے۔ اسٹاف کو @ سے لکھیں تو انہیں واٹس ایپ پر بتایا جائے گا۔',
+  'details.nameSomeone': 'کسی کا نام شامل کریں',
+  'details.chooseName': 'اسٹاف میں سے کسی کو چنیں',
   'details.tooLong': 'تبصرہ زیادہ سے زیادہ {most} حروف کا ہو سکتا ہے۔',
   'details.addComment': 'تبصرہ شامل کریں',
   'details.edited': 'ترمیم شدہ',

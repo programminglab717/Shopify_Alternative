@@ -123,6 +123,14 @@ function core(role: StaffRole, answer = order()) {
           ],
           staffInvitations: [],
         };
+      case 'StaffNames':
+        return {
+          staffNames: [
+            { id: 'usr_2', name: 'Bilal Ahmed' },
+            { id: 'usr_3', name: 'Hina' },
+            { id: 'usr_1', name: 'Sana' },
+          ],
+        };
       case 'OrderAssign':
         return ok('orderAssign');
       case 'OrderCommentCreate':
@@ -215,6 +223,35 @@ describe("An order's everyday edits, on its page", () => {
       expect(sentOf(fake, 'OrderCommentUpdate')).toEqual({
         id: 'ocm_1',
         message: 'Customer wants it on the 2nd day of Eid',
+      }),
+    );
+  });
+
+  it('names someone in a comment, picked from the staff by name (ADR-637)', async () => {
+    const fake = core('confirmation_agent');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const timeline = await screen.findByRole('region', { name: 'Timeline' });
+    const pick = (await within(timeline).findByLabelText(
+      'Name someone in it',
+    )) as HTMLSelectElement;
+    await within(timeline).findByRole('option', { name: 'Hina' });
+    // Whoever writes is not offered to themselves.
+    expect(within(timeline).queryByRole('option', { name: 'Sana' })).toBeNull();
+    fireEvent.change(pick, { target: { value: 'usr_2' } });
+    const box = within(timeline).getByLabelText('Comment') as HTMLTextAreaElement;
+    expect(box.value).toBe('@Bilal Ahmed ');
+    fireEvent.change(box, { target: { value: `${box.value}and` } });
+    fireEvent.change(pick, { target: { value: 'usr_3' } });
+    expect(box.value).toBe('@Bilal Ahmed and @Hina ');
+    expect(pick.value).toBe('');
+
+    fireEvent.click(within(timeline).getByRole('button', { name: 'Add the comment' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'OrderCommentCreate')).toEqual({
+        orderId: 'ord_7',
+        message: '@Bilal Ahmed and @Hina',
       }),
     );
   });

@@ -7,6 +7,7 @@ import {
   OrderCommentDeleteMutation,
   OrderCommentUpdateMutation,
   OrderUpdateMutation,
+  StaffNamesQuery,
   StaffQuery,
 } from '../api/operations';
 import type { OrderDetail, ParcelUserErrorsData, StaffData } from '../api/types';
@@ -108,6 +109,34 @@ export function Assignment({ order }: { order: OrderDetail }) {
   );
 }
 
+/**
+ * The shop's staff by name, but the writer, to name one in a comment as @ and their name, as
+ * the core finds whom a comment names (ADR-191, ADR-637). Nothing while there is no one else.
+ */
+function NameSomeone({ me, onPicked }: { me?: string; onPicked: (name: string) => void }) {
+  const { t } = useLocale();
+  const names = useAdminQuery<{ staffNames: { id: string; name: string }[] }>(
+    ['staffNames'],
+    StaffNamesQuery,
+  );
+  const others = (names.data?.staffNames ?? []).filter((member) => member.id !== me);
+  if (others.length === 0) return null;
+  return (
+    <SelectField<string>
+      label={t('details.nameSomeone')}
+      value=""
+      options={[
+        { value: '', label: t('details.chooseName') },
+        ...others.map((member) => ({ value: member.id, label: member.name })),
+      ]}
+      onChange={(id) => {
+        const member = others.find((each) => each.id === id);
+        if (member) onPicked(member.name);
+      }}
+    />
+  );
+}
+
 type Event = OrderDetail['events']['nodes'][number];
 
 /** A comment's words changed in place, by its author. */
@@ -181,6 +210,14 @@ export function Timeline({ order, timezone }: { order: OrderDetail; timezone: st
       {writes && (
         <form onSubmit={(form) => void submit(form)} className="flex flex-col gap-2">
           <TextArea label={t('details.comment')} value={message} onChange={setMessage} />
+          <NameSomeone
+            me={me}
+            onPicked={(name) =>
+              setMessage((before) =>
+                before === '' || /\s$/.test(before) ? `${before}@${name} ` : `${before} @${name} `,
+              )
+            }
+          />
           <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
             {message.length > COMMENT_MOST
               ? t('details.tooLong', { most: COMMENT_MOST })

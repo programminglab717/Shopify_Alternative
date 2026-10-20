@@ -13921,6 +13921,11 @@ type Query {
   """
   staffMembers: [StaffMember!]!
 
+  """
+  The shop's members of staff by name, A to Z, to give an order to or name in its comments as @ and their name (ADR-637): who they are, nothing of how they sign in. For whoever reads orders, as the shop's staff list is not.
+  """
+  staffNames: [OrderAssignee!]!
+
   """The starter kits a shop may apply (ONB-13), and what each sets up."""
   starterKits: [StarterKitPreview!]!
 
