@@ -32,6 +32,9 @@
       {{ content_for_layout }}
     </main>
     {% sections 'footer-group' %}
+    {%- if settings.whatsapp_chat and shop.whatsapp %}
+    {% render 'whatsapp-chat' %}
+    {%- endif %}
     {% section 'cart-drawer' %}
   </body>
 </html>

@@ -302,6 +302,10 @@
         },
         "whatsapp_orders": {
           "label": "Offer \"Order on WhatsApp\" on product pages"
+        },
+        "whatsapp_chat": {
+          "label": "Show a WhatsApp button on every page",
+          "info": "Its message says which product or collection the shopper was looking at."
         }
       }
     }

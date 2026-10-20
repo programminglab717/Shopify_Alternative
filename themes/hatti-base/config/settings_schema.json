@@ -67,6 +67,13 @@
         "id": "whatsapp_orders",
         "label": "t:settings_schema.orders.settings.whatsapp_orders.label",
         "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "whatsapp_chat",
+        "label": "t:settings_schema.orders.settings.whatsapp_chat.label",
+        "info": "t:settings_schema.orders.settings.whatsapp_chat.info",
+        "default": true
       }
     ]
   }

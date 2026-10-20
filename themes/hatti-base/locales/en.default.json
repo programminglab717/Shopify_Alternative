@@ -6,7 +6,12 @@
     "whatsapp": {
       "chat": "Chat on WhatsApp",
       "order": "Order on WhatsApp",
-      "order_message": "Hi! I'd like to order {{ product }} ({{ variant }})."
+      "order_message": "Hi! I'd like to order {{ product }} ({{ variant }}): {{ url }}",
+      "order_product_message": "Hi! I'd like to order {{ product }}: {{ url }}",
+      "question": "Hi! I have a question.",
+      "product_message": "Hi! I have a question about {{ product }}: {{ url }}",
+      "variant_message": "Hi! I have a question about {{ product }} ({{ variant }}): {{ url }}",
+      "collection_message": "Hi! I have a question about {{ collection }}: {{ url }}"
     },
     "search": "Search",
     "delivery_days": {

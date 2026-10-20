@@ -196,8 +196,27 @@
           {%- endif -%}
           {% render 'size-chart', chart: product.size_chart, id: product.id %}
           {%- if settings.whatsapp_orders and shop.whatsapp -%}
-            {%- assign message = 'general.whatsapp.order_message' | t: product: product.title, variant: current.title -%}
-            <a class="button button--secondary" href="{{ shop.whatsapp | whatsapp_url: message }}">
+            {%- comment -%}
+              The message names the product, the variant picked and its link (ADR-593), and the
+              script below keeps it to the variant picked.
+            {%- endcomment -%}
+            {%- liquid
+              assign template = ''
+              if product.has_only_default_variant
+                assign message = 'general.whatsapp.order_product_message' | t: product: product.title, url: canonical_url
+              else
+                assign link = canonical_url | append: '?variant=' | append: current.id
+                assign message = 'general.whatsapp.order_message' | t: product: product.title, variant: current.title, url: link
+                assign link = canonical_url | append: '?variant=__ID__'
+                assign words = 'general.whatsapp.order_message' | t: product: product.title, variant: '__VARIANT__', url: link
+                assign template = shop.whatsapp | whatsapp_url: words
+              endif
+            -%}
+            <a
+              class="button button--secondary"
+              href="{{ shop.whatsapp | whatsapp_url: message }}"
+              {%- if template != blank %} data-whatsapp-template="{{ template }}"{% endif %}
+            >
               {{- 'general.whatsapp.order' | t -}}
             </a>
           {%- endif -%}
@@ -372,6 +391,12 @@
     const variant = variants.find((each) => each.options.every((value, index) => value === picked[index]));
     if (!variant) return;
     form.elements.id.value = variant.id;
+    // WhatsApp's messages name the variant picked, and link to it.
+    for (const link of document.querySelectorAll('[data-whatsapp-template]')) {
+      link.href = link.dataset.whatsappTemplate
+        .replace('__VARIANT__', encodeURIComponent(variant.title))
+        .replace('__ID__', variant.id);
+    }
     // Its own stock's words, where few are left.
     const low = document.querySelector('[data-low-stock]');
     if (low) {

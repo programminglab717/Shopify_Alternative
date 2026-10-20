@@ -1,0 +1,37 @@
+{%- comment -%}
+  A WhatsApp button on every page (OS-10, ADR-593), to the shop's number, its message saying what
+  the shopper was looking at: on a product's page the product, the variant picked and its link,
+  which the product page's script keeps to the variant picked; on a collection's, the collection
+  and its link; elsewhere a question. Links that carry `data-whatsapp-template` have
+  `__VARIANT__` and `__ID__` in their address for that script to fill in.
+{%- endcomment -%}
+{%- liquid
+  assign message = 'general.whatsapp.question' | t
+  assign template = ''
+  if product
+    assign current = product.selected_or_first_available_variant
+    if product.has_only_default_variant
+      assign message = 'general.whatsapp.product_message' | t: product: product.title, url: canonical_url
+    else
+      assign link = canonical_url | append: '?variant=' | append: current.id
+      assign message = 'general.whatsapp.variant_message' | t: product: product.title, variant: current.title, url: link
+      assign link = canonical_url | append: '?variant=__ID__'
+      assign words = 'general.whatsapp.variant_message' | t: product: product.title, variant: '__VARIANT__', url: link
+      assign template = shop.whatsapp | whatsapp_url: words
+    endif
+  elsif collection and collection.handle != blank
+    assign message = 'general.whatsapp.collection_message' | t: collection: collection.title, url: canonical_url
+  endif
+-%}
+<a
+  class="whatsapp-chat"
+  href="{{ shop.whatsapp | whatsapp_url: message }}"
+  {%- if template != blank %} data-whatsapp-template="{{ template }}"{% endif %}
+  target="_blank"
+  rel="noopener"
+  aria-label="{{ 'general.whatsapp.chat' | t | escape }}"
+>
+  <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="28" height="28">
+    <path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.2z"/>
+  </svg>
+</a>

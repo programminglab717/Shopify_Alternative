@@ -2823,6 +2823,93 @@ describe('Storefront rendering', () => {
     expect(editing).toMatch(/<hatti-sign-up-popup[^>]*data-design/);
   });
 
+  it('puts a WhatsApp button on every page, its message saying what the shopper was looking at (OS-10, ADR-593)', async () => {
+    const documents = sampleStore();
+    const lawn = documents.products[0]!;
+    const variant = lawn.variants[0]!;
+    const options = { platformUrl: 'https://hatti.pk' };
+    const chat = (html: string) =>
+      html.match(
+        /<a\s+class="whatsapp-chat"\s+href="([^"]+)"(?: data-whatsapp-template="([^"]+)")?/,
+      );
+    const text = (url: string | undefined) => decodeURIComponent(url!.split('?text=')[1]!);
+
+    // A question, from the home page.
+    const home = chat((await render({ path: '/' }, options)).html);
+    expect(home?.[1]).toBe('https://wa.me/923001234567?text=Hi!%20I%20have%20a%20question.');
+    expect(home?.[2]).toBeUndefined();
+
+    // A product's page names it, the variant shown and its link, at the shop's address, and both
+    // links carry the message with the variant left for the page's script to fill in.
+    const page = (await render({ path: `/products/${lawn.handle}` }, options)).html;
+    const link = `https://zari.hatti.pk/products/${lawn.handle}`;
+    const [, href, template] = chat(page)!;
+    expect(text(href)).toBe(
+      `Hi! I have a question about ${lawn.title} (${variant.title}): ${link}?variant=${variant.id}`,
+    );
+    expect(text(template)).toBe(
+      `Hi! I have a question about ${lawn.title} (__VARIANT__): ${link}?variant=__ID__`,
+    );
+    const order = page.match(
+      /<a\s+class="button button--secondary"\s+href="([^"]+)" data-whatsapp-template="([^"]+)"/,
+    );
+    expect(text(order?.[1])).toBe(
+      `Hi! I'd like to order ${lawn.title} (${variant.title}): ${link}?variant=${variant.id}`,
+    );
+    expect(text(order?.[2])).toBe(
+      `Hi! I'd like to order ${lawn.title} (__VARIANT__): ${link}?variant=__ID__`,
+    );
+    // Picking another variant fills both in.
+    expect(page).toContain('link.dataset.whatsappTemplate');
+
+    // A product with no variants to pick names none.
+    const single = {
+      ...lawn,
+      handle: 'plain-dupatta',
+      title: 'Plain Dupatta',
+      variants: [{ ...variant, title: 'Default Title', options: ['Default Title'] }],
+      options: [{ name: 'Title', values: ['Default Title'] }],
+    };
+    const plain = new MemoryStore({
+      ...documents,
+      products: [single, ...documents.products.slice(1)],
+    });
+    const renderer = new PageRenderer(loadTheme(files), { ...options, limits: { timeMs: 10_000 } });
+    const alone = (await renderer.render({ path: '/products/plain-dupatta' }, plain.fresh())).html;
+    expect(text(chat(alone)?.[1])).toBe(
+      'Hi! I have a question about Plain Dupatta: https://zari.hatti.pk/products/plain-dupatta',
+    );
+    expect(chat(alone)?.[2]).toBeUndefined();
+    expect(alone).toContain(
+      `href="https://wa.me/923001234567?text=${encodeURIComponent("Hi! I'd like to order Plain Dupatta: https://zari.hatti.pk/products/plain-dupatta")}"`,
+    );
+
+    // A collection's page names the collection, in Urdu in Urdu.
+    expect(text(chat((await render({ path: '/collections/eid-lawn' }, options)).html)?.[1])).toBe(
+      'Hi! I have a question about Eid Lawn: https://zari.hatti.pk/collections/eid-lawn',
+    );
+    expect(
+      text(
+        chat((await render({ path: '/collections/eid-lawn', locale: 'ur' }, options)).html)?.[1],
+      ),
+    ).toMatch(
+      /^السلام علیکم! مجھے .+ کے بارے میں پوچھنا ہے: https:\/\/zari\.hatti\.pk\/ur\/collections\/eid-lawn$/,
+    );
+
+    // None where the shop turns it off.
+    const off = await render(
+      { path: '/' },
+      {
+        ...options,
+        extra: {
+          'config/settings_data.json': JSON.stringify({ current: { whatsapp_chat: false } }),
+        },
+      },
+    );
+    expect(off.html).not.toContain('class="whatsapp-chat"');
+    expect(off.html).toContain('class="button button--whatsapp"');
+  });
+
   it("links every page's footer to reporting the store to Hatti, in its language (ADR-460)", async () => {
     expect((await render({ path: '/' })).html).toContain(
       '<p class="footer__report"><a href="/report" rel="nofollow">Report this store to Hatti</a></p>',

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-592 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-593 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -600,6 +600,7 @@
 | 590 | The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an email to answer them, marked read and deleted | Accepted |
 | 591 | Staff who answer customers may be told on their phones when a shopper writes through the contact form, the push saying neither who nor what | Accepted |
 | 592 | A shopper chooses how much of their store credit checkout spends, and a signed-in shopper sees their number's balance there, spending it still asking what proves the number | Accepted |
+| 593 | Hatti Base puts a WhatsApp button on every page, its message naming the product and variant, or the collection, the shopper was looking at, with its link | Accepted |
 
 ---
 
@@ -21772,3 +21773,26 @@
   balance before the code.
 * **Alternatives:** **The balance shown to anyone who types a number:** it would tell whoever
   types a number how much credit it has, before anything proves it is theirs.
+
+## ADR-593 · Hatti Base puts a WhatsApp button on every page, its message naming the product and variant, or the collection, the shopper was looking at, with its link
+
+* **Context:** OS-10 asks for a WhatsApp button and chat widget, pre-filled with the product and
+  variant. Hatti Base's product page offers "Order on WhatsApp" (ADR-041), naming the variant
+  the page opened on but not the one picked after, nor the product's link; a "Default Title"
+  stood in for a product without variants. Elsewhere only a home page section links to the chat.
+* **Decision:**
+  * **A button on every page** of the theme's layout, at the end of the line the page reads in,
+    while the shop has a WhatsApp number and the theme setting (on by default) is not turned off.
+  * **Its message says what the shopper was looking at:** on a product's page the product, the
+    variant picked and its link; on a collection's, the collection and its link; elsewhere a
+    question; in the page's language. Links are the page's canonical address, at the shop's
+    own domain.
+  * **"Order on WhatsApp" says the same,** with the link, and names no variant for a product
+    with none to pick.
+  * **Picking another variant changes both:** each carries its message with the variant's name
+    and ID left to fill in, which the product page's script does; without scripts the message
+    names the variant the page opened on.
+* **Consequences:** A shop that sells over WhatsApp knows which product, and which size or
+  colour, a shopper asks about, and can open it from the chat.
+* **Alternatives:** **A chat window on the page:** shoppers already have WhatsApp, where the
+  shop answers them and its inbox (ADR-545) keeps the conversation.

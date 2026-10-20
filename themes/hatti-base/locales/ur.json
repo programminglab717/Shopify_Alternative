@@ -6,7 +6,12 @@
     "whatsapp": {
       "chat": "واٹس ایپ پر بات کریں",
       "order": "واٹس ایپ پر آرڈر کریں",
-      "order_message": "السلام علیکم! مجھے {{ product }} ({{ variant }}) آرڈر کرنا ہے۔"
+      "order_message": "السلام علیکم! مجھے {{ product }} ({{ variant }}) آرڈر کرنا ہے: {{ url }}",
+      "order_product_message": "السلام علیکم! مجھے {{ product }} آرڈر کرنا ہے: {{ url }}",
+      "question": "السلام علیکم! مجھے کچھ پوچھنا ہے۔",
+      "product_message": "السلام علیکم! مجھے {{ product }} کے بارے میں پوچھنا ہے: {{ url }}",
+      "variant_message": "السلام علیکم! مجھے {{ product }} ({{ variant }}) کے بارے میں پوچھنا ہے: {{ url }}",
+      "collection_message": "السلام علیکم! مجھے {{ collection }} کے بارے میں پوچھنا ہے: {{ url }}"
     },
     "search": "تلاش",
     "delivery_days": {

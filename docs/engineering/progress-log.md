@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A WhatsApp button on every page
+
+* **Hatti Base puts a WhatsApp button on every page, its message naming the product and variant,
+  or the collection, the shopper was looking at, with its link** ([ADR-593](../architecture/13-decision-log.md#adr-593--hatti-base-puts-a-whatsapp-button-on-every-page-its-message-naming-the-product-and-variant-or-the-collection-the-shopper-was-looking-at-with-its-link), OS-10).
+* 3653 tests, 1 more: each page's message, the variant left to fill in,
+  and the setting.
+
 ### 37aa7c1 · Store credit chosen at checkout
 
 * **A shopper chooses how much of their store credit checkout spends, and a signed-in shopper
