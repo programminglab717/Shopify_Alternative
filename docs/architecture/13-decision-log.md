@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-622 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-623 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -630,6 +630,7 @@
 | 620 | Themes are given a pause of checkout alone as shop.checkout_paused, its message and when orders come back, and Hatti Base says so in its own place and words; the platform's bar stands aside for a theme's notice marked data-checkout-paused | Accepted |
 | 621 | An order placed and paid together is told of its payment alone: the news of it placed waits ten minutes for an order to be paid online at checkout, and the news of a payment in full takes its place while no sender has taken it | Accepted |
 | 622 | While orders are paused, Hatti Base keeps the cart and turns its checkout button off, saying why, and its product page says what is added is kept for when orders come back; the platform's script turns the button on again once their time has come | Accepted |
+| 623 | A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses with .atom, their articles and products as those pages show them and linking them, under the same IDs as in English; Hatti Base's Urdu pages link them | Accepted |
 
 ---
 
@@ -22429,3 +22430,24 @@
   the same way, or keep checkout's page saying so.
 * **Alternatives:** **Turning the add button off too:** carts kept for later are the point of
   pausing checkout alone. **Hiding checkout's button:** a shopper looks for it and leaves.
+
+## ADR-623 · A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses with .atom, their articles and products as those pages show them and linking them, under the same IDs as in English; Hatti Base's Urdu pages link them
+
+* **Context:** A blog's and a collection's Atom feeds (ADR-209, ADR-216) were in the shop's own
+  words alone, linking its English pages, though the shop may put its articles, blogs,
+  collections and products in Urdu (ADR-238). `/ur/blogs/news.atom` was no address at all, and
+  an Urdu page linked the English feed (status shortcut 93).
+* **Decision:** The feeds are served at their Urdu pages' addresses too, `/ur/blogs/{handle}.atom`
+  and `/ur/collections/{handle}.atom`, read through the store in Urdu as the pages are: each
+  article's title, summary and body, each product's title and description, in the shop's Urdu
+  where it gave one. The feed says `xml:lang`, `ur` or `en`; its links and its entries' are the
+  Urdu pages', and pictures stay at their own addresses. An article or a product is the same
+  entry in both feeds, under its own ID, its translation being it. They are kept at the edge and
+  forgotten as the English feeds are, under the same tags. Hatti Base's layout links the feed in
+  the page's language, by `routes.root_url`.
+* **Consequences:** Readers who follow a shop in Urdu read it in Urdu, and a reader that follows
+  both feeds shows each article once. Themes of shops' own link the Urdu feed the same way, or
+  keep linking the English.
+* **Alternatives:** **IDs of their own for each language:** a reader following both would show
+  each article twice, and Atom's IDs name the thing, not its words. **A `?locale=` parameter:**
+  the pages' own prefix is how the storefront says language everywhere else (04 §5).

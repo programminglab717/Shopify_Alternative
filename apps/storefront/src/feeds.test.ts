@@ -1,5 +1,6 @@
 import {
   MemoryStore,
+  TranslatedStore,
   type ArticleDoc,
   type BlogDoc,
   type CollectionDoc,
@@ -263,7 +264,7 @@ describe("A blog's Atom feed (ADR-209)", () => {
     const feed = await blogFeedOf(store, blogOf([eid, shawls]));
     expect(feed).toBe(
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
-        '<feed xmlns="http://www.w3.org/2005/Atom">\n' +
+        '<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">\n' +
         `<id>urn:uuid:${NEWS}</id>\n` +
         '<link rel="alternate" type="text/html" href="https://www.zari.pk/blogs/news"/>\n' +
         '<link rel="self" type="application/atom+xml" href="https://www.zari.pk/blogs/news.atom"/>\n' +
@@ -331,6 +332,38 @@ describe("A blog's Atom feed (ADR-209)", () => {
     expect(feed.endsWith('</name></author>\n</feed>\n')).toBe(true);
     expect(store.roundTrips).toBe(0);
   });
+
+  it('is in Urdu as its Urdu pages are, linking them, its articles the same entries (ADR-623)', async () => {
+    const eid: ArticleDoc = {
+      ...article(1, 20),
+      handle: 'eid-lawn',
+      translations: {
+        ur: { title: 'عید کی لان آ گئی', bodyHtml: '<p>ملتان میں چھپائی</p>', summaryHtml: '' },
+      },
+    };
+    const store = new MemoryStore({ ...sampleStore(), articles: [eid] });
+    const urdu = new TranslatedStore(store, 'ur');
+    let feed = '';
+    for await (const part of blogFeed(urdu, SHOP, blogOf([eid]), ORIGIN, undefined, {
+      locale: 'ur',
+      prefix: '/ur',
+    })) {
+      feed += part;
+    }
+    expect(feed).toContain('<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ur">\n');
+    expect(feed).toContain(
+      '<link rel="self" type="application/atom+xml" href="https://www.zari.pk/ur/blogs/news.atom"/>',
+    );
+    expect(feed).toContain(
+      `<id>urn:uuid:${eid.id}</id>\n` +
+        '<published>2026-09-20T09:00:00.000Z</published>\n' +
+        '<updated>2026-09-20T09:00:00.000Z</updated>\n' +
+        '<link rel="alternate" type="text/html" href="https://www.zari.pk/ur/blogs/news/eid-lawn"/>\n' +
+        '<title>عید کی لان آ گئی</title>\n' +
+        '<content type="html" xml:base="https://www.zari.pk/ur/blogs/news/eid-lawn">' +
+        '&lt;p&gt;ملتان میں چھپائی&lt;/p&gt;</content>\n',
+    );
+  });
 });
 
 describe("A collection's Atom feed (ADR-216)", () => {
@@ -379,7 +412,7 @@ describe("A collection's Atom feed (ADR-216)", () => {
       .replace(/"/g, '&quot;');
     expect(feed).toBe(
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
-        '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:s="http://jadedpixel.com/-/spec/shopify">\n' +
+        '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:s="http://jadedpixel.com/-/spec/shopify" xml:lang="en">\n' +
         `<id>urn:uuid:${LAWN}</id>\n` +
         '<link rel="alternate" type="text/html" href="https://www.zari.pk/collections/lawn"/>\n' +
         '<link rel="self" type="application/atom+xml" href="https://www.zari.pk/collections/lawn.atom"/>\n' +
@@ -447,6 +480,42 @@ describe("A collection's Atom feed (ADR-216)", () => {
         '&lt;ul&gt;&lt;li&gt;Cotton&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Rs 3,499&lt;/p&gt;</summary>',
     );
     expect(store.roundTrips).toBe(1);
+  });
+
+  it('is in Urdu as its Urdu page is, linking its products there, their pictures where they are (ADR-623)', async () => {
+    const urduKurta: ProductDoc = {
+      ...kurta,
+      translations: { ur: { title: 'کڑھائی والا کرتا', descriptionHtml: '<p>سوتی</p>' } },
+    };
+    const store = new TranslatedStore(
+      new MemoryStore({ ...sampleStore(), products: [urduKurta] }),
+      'ur',
+    );
+    let feed = '';
+    for await (const part of collectionFeed(
+      store,
+      SHOP,
+      collectionOf([kurta.id]),
+      ORIGIN,
+      undefined,
+      {
+        locale: 'ur',
+        prefix: '/ur',
+      },
+    )) {
+      feed += part;
+    }
+    expect(feed).toContain('xmlns:s="http://jadedpixel.com/-/spec/shopify" xml:lang="ur">\n');
+    expect(feed).toContain(
+      `<link rel="self" type="application/atom+xml" href="https://www.zari.pk/ur/collections/${collectionOf([]).handle}.atom"/>`,
+    );
+    expect(feed).toContain(
+      `<link rel="alternate" type="text/html" href="https://www.zari.pk/ur/products/${kurta.handle}"/>\n` +
+        '<title>کڑھائی والا کرتا</title>',
+    );
+    expect(feed).toContain('&lt;p&gt;سوتی&lt;/p&gt;');
+    expect(feed).toContain(`src=&quot;${ORIGIN}/images/`);
+    expect(feed).not.toContain(`${ORIGIN}/ur/images/`);
   });
 
   it('says a collection without products changed now, and asks for none', async () => {

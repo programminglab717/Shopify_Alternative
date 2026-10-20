@@ -10,6 +10,7 @@ import {
   StorefrontActivity,
   StorefrontKeys,
   StorefrontVitals,
+  TranslatedStore,
   handleTag,
   pathTag,
   pausedAt,
@@ -1067,43 +1068,52 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
 
   /**
    * A blog's Atom feed (ADR-209), at its page's address with .atom, as Shopify's: kept at the edge
-   * as its page is, and forgotten with it when an article changes.
+   * as its page is, and forgotten with it when an article changes. At its Urdu page's too, in Urdu
+   * as that page is (ADR-623).
    */
-  app.get('/blogs/:handle.atom', async (request, reply) => {
+  const blogAtom = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const { handle } = request.params as { handle: string };
+    const language = languageOf(request);
     try {
-      const blog = /^[\w-]+$/.test(handle) ? await found.store.blogByHandle(handle) : null;
+      const store = language.prefix
+        ? new TranslatedStore(found.store, language.locale)
+        : found.store;
+      const blog = /^[\w-]+$/.test(handle) ? await store.blogByHandle(handle) : null;
       if (!blog) return await notFound(reply, 'The shop has no such blog.');
-      const shop = await found.store.shop();
+      const shop = await store.shop();
       const origin = await originOf(request, found);
       return await reply
         .header('cache-control', PAGE_CACHE)
         .header('cache-tag', cacheTags(found.shopId, [{ kind: 'blog', handle }], null))
         .type('application/atom+xml; charset=utf-8')
-        .send(Readable.from(blogFeed(found.store, shop, blog, origin)));
+        .send(Readable.from(blogFeed(store, shop, blog, origin, new Date(), language)));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       throw error;
     }
-  });
+  };
+  for (const path of ['/blogs/:handle.atom', '/ur/blogs/:handle.atom']) app.get(path, blogAtom);
 
   /**
    * A collection's Atom feed (ADR-216), at its page's address with .atom, as Shopify's: kept at the
    * edge as its page is, and forgotten when the collection changes, or any product, whose change
-   * purges the listing of them all, as the link page's does.
+   * purges the listing of them all, as the link page's does. In Urdu at its Urdu page's address,
+   * as a blog's is (ADR-623).
    */
-  app.get('/collections/:handle.atom', async (request, reply) => {
+  const collectionAtom = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     const { handle } = request.params as { handle: string };
+    const language = languageOf(request);
     try {
-      const collection = /^[\w-]+$/.test(handle)
-        ? await found.store.collectionByHandle(handle)
-        : null;
+      const store = language.prefix
+        ? new TranslatedStore(found.store, language.locale)
+        : found.store;
+      const collection = /^[\w-]+$/.test(handle) ? await store.collectionByHandle(handle) : null;
       if (!collection) return await notFound(reply, 'The shop has no such collection.');
-      const shop = await found.store.shop();
+      const shop = await store.shop();
       const origin = await originOf(request, found);
       const named: NamedDocument[] = [
         { kind: 'collection', handle },
@@ -1113,12 +1123,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         .header('cache-control', PAGE_CACHE)
         .header('cache-tag', cacheTags(found.shopId, handle === 'all' ? [named[0]!] : named, null))
         .type('application/atom+xml; charset=utf-8')
-        .send(Readable.from(collectionFeed(found.store, shop, collection, origin)));
+        .send(Readable.from(collectionFeed(store, shop, collection, origin, new Date(), language)));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       throw error;
     }
-  });
+  };
+  for (const path of ['/collections/:handle.atom', '/ur/collections/:handle.atom']) {
+    app.get(path, collectionAtom);
+  }
 
   app.get('/assets/:version/:file', async (request, reply) => {
     const { file } = request.params as { file: string };

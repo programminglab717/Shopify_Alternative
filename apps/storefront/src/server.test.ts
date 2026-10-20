@@ -2393,6 +2393,36 @@ describe('Carts', () => {
     }
     // The blog's page is still its page.
     expect((await get('/blogs/news')).headers['content-type']).toBe('text/html; charset=utf-8');
+
+    // In Urdu at its Urdu page's address, linking the Urdu pages, kept and forgotten as it is
+    // (ADR-623); and linked from its Urdu page.
+    const urdu = await get('/ur/blogs/news.atom');
+    expect([urdu.statusCode, urdu.headers['content-type'], urdu.headers['cache-tag']]).toEqual([
+      200,
+      'application/atom+xml; charset=utf-8',
+      'hatti:sample,hatti:sample:blog:news',
+    ]);
+    expect(urdu.body).toContain('<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ur">');
+    expect(urdu.body).toContain(
+      '<link rel="self" type="application/atom+xml" href="http://localhost/ur/blogs/news.atom"/>',
+    );
+    expect(
+      [...urdu.body.matchAll(/<link rel="alternate" type="text\/html" href="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
+    ).toEqual([
+      'http://localhost/ur/blogs/news',
+      'http://localhost/ur/blogs/news/eid-lawn-is-here',
+      'http://localhost/ur/blogs/news/how-to-measure',
+      'http://localhost/ur/blogs/news/winter-shawls',
+    ]);
+    expect((await get('/ur/blogs/journal.atom')).statusCode).toBe(404);
+    expect((await get('/ur/blogs/news')).body).toMatch(
+      /<link rel="alternate" type="application\/atom\+xml" title="[^"]+" href="\/ur\/blogs\/news\.atom">/,
+    );
+    expect((await get('/blogs/news')).body).toMatch(
+      /<link rel="alternate" type="application\/atom\+xml" title="[^"]+" href="\/blogs\/news\.atom">/,
+    );
     await app.close();
   });
 
@@ -2438,6 +2468,23 @@ describe('Carts', () => {
     expect(page.headers['content-type']).toBe('text/html; charset=utf-8');
     expect(page.body).toMatch(
       /<link rel="alternate" type="application\/atom\+xml" title="Zari Fashions - [^"]+" href="\/collections\/eid-lawn\.atom">/,
+    );
+
+    // In Urdu at its Urdu page's address, linked from that page (ADR-623).
+    const urdu = await get('/ur/collections/eid-lawn.atom');
+    expect([urdu.statusCode, urdu.headers['cache-tag']]).toEqual([
+      200,
+      'hatti:sample,hatti:sample:collection:eid-lawn,hatti:sample:collection:all',
+    ]);
+    expect(urdu.body).toContain(
+      '<link rel="self" type="application/atom+xml" href="http://localhost/ur/collections/eid-lawn.atom"/>',
+    );
+    expect(urdu.body).toMatch(
+      /<entry>\n<id>[^<]+<\/id>\n<published>[^<]+<\/published>\n<updated>[^<]+<\/updated>\n<link rel="alternate" type="text\/html" href="http:\/\/localhost\/ur\/products\//,
+    );
+    expect((await get('/ur/collections/silk.atom')).statusCode).toBe(404);
+    expect((await get('/ur/collections/eid-lawn')).body).toMatch(
+      /<link rel="alternate" type="application\/atom\+xml" title="[^"]+" href="\/ur\/collections\/eid-lawn\.atom">/,
     );
     await app.close();
   });

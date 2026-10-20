@@ -30,6 +30,14 @@ export interface FeedShop {
   name: string;
 }
 
+/** The language of an Atom feed (ADR-623): its pages' prefix, `/ur` for Urdu's. */
+export interface FeedLanguage {
+  locale: string;
+  prefix: string;
+}
+
+const ENGLISH: FeedLanguage = { locale: 'en', prefix: '' };
+
 /** The feed, a part at a time: its head, a chunk of products' items each, then its end. */
 export async function* productFeed(
   store: Pick<StoreData, 'productIds' | 'products'>,
@@ -145,7 +153,9 @@ export const BLOG_FEED_ARTICLES = 30;
  * A blog's Atom feed (RFC 4287), as Shopify serves it at /blogs/{handle}.atom (ADR-209): its
  * latest articles, the newest first, each whole, linking to its page at the shop's own address.
  * Its IDs are the blog's and the articles' own, so a new handle or domain shows readers nothing
- * twice. The head, then an article at a time: an article's body may be half a megabyte.
+ * twice. In `language` (ADR-623): its articles as its pages in it show them, linking those pages;
+ * an article is the same entry in each, its translation being it. The head, then an article at a
+ * time: an article's body may be half a megabyte.
  */
 export async function* blogFeed(
   store: Pick<StoreData, 'articles'>,
@@ -153,31 +163,33 @@ export async function* blogFeed(
   blog: BlogDoc,
   origin: string,
   now: Date = new Date(),
+  language: FeedLanguage = ENGLISH,
 ): AsyncGenerator<string> {
   const ids = blog.articles.slice(0, BLOG_FEED_ARTICLES).map((article) => article.id);
   const articles = ids.length === 0 ? [] : await store.articles(ids);
   const shown = articles.filter((doc): doc is ArticleDoc => doc !== null);
-  const address = `${origin}/blogs/${blog.handle}`;
+  const address = `${origin}${language.prefix}/blogs/${blog.handle}`;
   // When it last changed: when its articles did, or now for a blog without any yet.
   const updated = shown.map(updatedOf).reduce((a, b) => (a > b ? a : b), '') || now.toISOString();
   yield '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<feed xmlns="http://www.w3.org/2005/Atom">\n' +
+    `<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="${xml(language.locale)}">\n` +
     `<id>urn:uuid:${xml(blog.id)}</id>\n` +
     `<link rel="alternate" type="text/html" href="${xml(address)}"/>\n` +
     `<link rel="self" type="application/atom+xml" href="${xml(`${address}.atom`)}"/>\n` +
     `<title>${xml(`${shop.name} - ${blog.title}`)}</title>\n` +
     `<updated>${updated}</updated>\n` +
     `<author><name>${xml(shop.name)}</name></author>\n`;
-  for (const article of shown) yield feedEntry(article, origin);
+  for (const article of shown) yield feedEntry(article, origin, language.prefix);
   yield '</feed>\n';
 }
 
 /**
  * An article as its blog's feed has it: its content and summary as HTML, escaped, their relative
- * addresses taken from its page's; signed by its author, else by the shop, as the feed is.
+ * addresses taken from its page's, under `prefix` in a language's feed; signed by its author, else
+ * by the shop, as the feed is.
  */
-export function feedEntry(article: ArticleDoc, origin: string): string {
-  const address = `${origin}/blogs/${article.blogHandle}/${article.handle}`;
+export function feedEntry(article: ArticleDoc, origin: string, prefix = ''): string {
+  const address = `${origin}${prefix}/blogs/${article.blogHandle}/${article.handle}`;
   const base = `xml:base="${xml(address)}"`;
   return (
     '<entry>\n' +
@@ -207,7 +219,7 @@ const SHOPIFY_NS = 'http://jadedpixel.com/-/spec/shopify';
  * (ADR-216): its first products, in its order, each with its type, vendor and variants in
  * Shopify's own namespace, a summary of its picture, description and price, and a link to its
  * page at the shop's own address. Its IDs are the collection's and the products' own, as a blog's
- * feed's are (ADR-209).
+ * feed's are (ADR-209), and it is in `language` as a blog's is (ADR-623).
  */
 export async function* collectionFeed(
   store: Pick<StoreData, 'products'>,
@@ -215,25 +227,26 @@ export async function* collectionFeed(
   collection: CollectionDoc,
   origin: string,
   now: Date = new Date(),
+  language: FeedLanguage = ENGLISH,
 ): AsyncGenerator<string> {
   const ids = collection.productIds.slice(0, COLLECTION_FEED_PRODUCTS);
   const products = (ids.length === 0 ? [] : await store.products(ids)).filter(
     (doc): doc is ProductDoc => doc !== null,
   );
-  const address = `${origin}/collections/${collection.handle}`;
+  const address = `${origin}${language.prefix}/collections/${collection.handle}`;
   // When it last changed: when its products did, or now for one without any, or without dates.
   const updated =
     products.map((product) => product.updatedAt ?? '').reduce((a, b) => (a > b ? a : b), '') ||
     now.toISOString();
   yield '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    `<feed xmlns="http://www.w3.org/2005/Atom" xmlns:s="${SHOPIFY_NS}">\n` +
+    `<feed xmlns="http://www.w3.org/2005/Atom" xmlns:s="${SHOPIFY_NS}" xml:lang="${xml(language.locale)}">\n` +
     `<id>urn:uuid:${xml(collection.id)}</id>\n` +
     `<link rel="alternate" type="text/html" href="${xml(address)}"/>\n` +
     `<link rel="self" type="application/atom+xml" href="${xml(`${address}.atom`)}"/>\n` +
     `<title>${xml(`${shop.name} - ${collection.title}`)}</title>\n` +
     `<updated>${updated}</updated>\n` +
     `<author><name>${xml(shop.name)}</name></author>\n`;
-  for (const product of products) yield productEntry(product, origin, updated);
+  for (const product of products) yield productEntry(product, origin, updated, language.prefix);
   yield '</feed>\n';
 }
 
@@ -241,10 +254,15 @@ export async function* collectionFeed(
  * A product as its collection's feed has it: dated when it was made and last changed, or as the
  * feed is in documents without; its type and vendor, and each variant with its price in rupees,
  * as Shopify's; and a summary of its first picture, its description and its price, as HTML,
- * escaped.
+ * escaped. Its page's address under `prefix` in a language's feed.
  */
-export function productEntry(product: ProductDoc, origin: string, fallback: string): string {
-  const address = `${origin}/products/${encodeURIComponent(product.handle)}`;
+export function productEntry(
+  product: ProductDoc,
+  origin: string,
+  fallback: string,
+  prefix = '',
+): string {
+  const address = `${origin}${prefix}/products/${encodeURIComponent(product.handle)}`;
   const [image] = product.images;
   const prices = product.variants.map((variant) => variant.price);
   const lowest = prices.length > 0 ? Math.min(...prices) : 0;

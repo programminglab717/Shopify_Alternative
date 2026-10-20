@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Atom feeds in Urdu
+
+* **A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses**
+  ([ADR-623](../architecture/13-decision-log.md#adr-623--a-blogs-and-a-collections-atom-feeds-are-in-urdu-at-their-urdu-pages-addresses-with-atom-their-articles-and-products-as-those-pages-show-them-and-linking-them-under-the-same-ids-as-in-english-hatti-bases-urdu-pages-link-them)), `/ur/blogs/{handle}.atom` and `/ur/collections/{handle}.atom`, their articles
+  and products in the shop's Urdu, linking the Urdu pages, under the same IDs as in English;
+  Hatti Base's Urdu pages link them.
+* 3736 tests, two more: each feed in Urdu, and the server's Urdu addresses with the pages
+  linking them.
+
 ### dbb350d · A paused shop's cart kept, its checkout off
 
 * **While orders are paused, Hatti Base keeps the cart and turns checkout's button off**
