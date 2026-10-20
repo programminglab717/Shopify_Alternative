@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The address book for staff
+### d0c1bdf · The address book for staff
 
 * **The Admin API shows a customer's saved address book, and the admin's customer page lists it,
   the default first** ([ADR-588](../architecture/13-decision-log.md#adr-588--the-admin-api-shows-a-customers-saved-address-book-and-the-admins-customer-page-lists-it-the-default-first), CUS-02).
