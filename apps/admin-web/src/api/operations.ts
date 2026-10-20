@@ -322,6 +322,10 @@ export const OrderQuery = /* GraphQL */ `
         id
         name
       }
+      splitParts {
+        id
+        name
+      }
       fulfillments {
         id
         status

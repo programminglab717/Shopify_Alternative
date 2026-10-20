@@ -409,6 +409,23 @@ export function OrderPage() {
               </p>
             ),
         )}
+        {(order.splitParts ?? []).length > 0 && (
+          <p className="text-secondary">
+            {t('order.splitParts')}{' '}
+            {(order.splitParts ?? []).map((part, index) => (
+              <span key={part.id}>
+                {index > 0 && ', '}
+                <Link
+                  to="/$shopId/orders/$orderId"
+                  params={{ shopId: shop.id, orderId: part.id }}
+                  className="num font-medium text-primary hover:underline"
+                >
+                  {part.name}
+                </Link>
+              </span>
+            ))}
+          </p>
+        )}
       </header>
       {order.overPlanLimit && <Alert tone="warning">{t('order.overLimit')}</Alert>}
       <RepeatBanner order={order} />

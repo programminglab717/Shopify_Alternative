@@ -367,6 +367,8 @@ export interface OrderRecord {
   repeatOf: { orderId: string; number: number; pending: boolean } | null;
   /** The order it was split from (ADR-135), the first one, by its ID and number. */
   splitFrom: { orderId: string; number: number } | null;
+  /** The orders split from it (ADR-662), by their IDs and numbers, the oldest first. */
+  splitParts: { orderId: string; number: number }[];
   /** Cash-on-delivery orders only. */
   risk: OrderRiskRecord | null;
   /** The customer's link, if one was made and not taken away. */

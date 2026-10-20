@@ -955,7 +955,8 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const SPLIT = `
       mutation ($id: ID!, $input: OrderSplitInput!) {
         orderSplit(id: $id, input: $input) {
-          order { id lineItems { quantity } totalPrice { formatted } codAmount { formatted } }
+          order { id lineItems { quantity } totalPrice { formatted } codAmount { formatted }
+                  splitParts { name } }
           splitOrder { stage lineItems { quantity } totalShippingPrice { formatted }
                        totalPrice { formatted } codAmount { formatted } splitFrom { id name } }
           userErrors { field code message }
@@ -971,6 +972,8 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
         lineItems: [{ quantity: 2 }],
         totalPrice: { formatted: 'Rs 7,248' },
         codAmount: { formatted: 'Rs 7,248' },
+        // The part it sent apart, listed with it (ADR-662).
+        splitParts: [{ name: `#${Number(created.order.name.slice(1)) + 1}` }],
       },
       splitOrder: {
         stage: 'NEEDS_CONFIRMATION',

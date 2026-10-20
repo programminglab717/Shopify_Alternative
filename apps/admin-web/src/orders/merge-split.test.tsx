@@ -56,6 +56,7 @@ function order(extra: Record<string, unknown> = {}) {
       mergedInto: null,
       repeatOf: null,
       splitFrom: null,
+      splitParts: [],
       amountRefunded: rupees('0'),
       advanceDue: rupees('0'),
       transferReceipts: [],
@@ -228,6 +229,53 @@ describe('Merging and splitting an order, on its page', () => {
     expect(splittable({ ...waiting, paymentMethod: 'BANK_TRANSFER' })).toBe(false);
     expect(splittable({ ...waiting, amountPaid: rupees('500') })).toBe(false);
     expect(splittable({ ...waiting, lineItems: [line('li_1', 'Lawn suit', 'M', 1)] })).toBe(false);
+  });
+});
+
+describe('An order with items sent apart (ADR-662)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('links to each order split from it, and a part to the order it came from', async () => {
+    vi.stubGlobal(
+      'fetch',
+      core(
+        'owner',
+        order({
+          splitParts: [
+            { id: 'ord_8', name: '#1008' },
+            { id: 'ord_9', name: '#1009' },
+          ],
+        }),
+      ).fetcher,
+    );
+    renderAdmin('/shop_1/orders/ord_7');
+
+    expect((await screen.findByRole('link', { name: '#1008' })).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_8',
+    );
+    expect(screen.getByRole('link', { name: '#1009' }).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_9',
+    );
+    expect(screen.getByText(/^Items sent apart as/)).toBeTruthy();
+    cleanup();
+
+    vi.stubGlobal(
+      'fetch',
+      core('owner', order({ splitFrom: { id: 'ord_7', name: '#1007' }, splitParts: [] })).fetcher,
+    );
+    renderAdmin('/shop_1/orders/ord_8');
+    expect((await screen.findByRole('link', { name: '#1007' })).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_7',
+    );
+    expect(screen.queryByText(/^Items sent apart as/)).toBeNull();
   });
 });
 

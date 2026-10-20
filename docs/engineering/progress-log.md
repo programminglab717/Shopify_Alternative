@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### An order's parts
+
+* **An order lists the orders split from it** ([ADR-662](../architecture/13-decision-log.md#adr-662--an-order-lists-the-orders-split-from-it-the-oldest-first-as-each-part-names-the-order-it-was-split-from)), through the Admin API's
+  `Order.splitParts`, and its page in the admin links to each. Shortcut 100's target now says what
+  is left: store credit given back on cancelling where refunds took part of it.
+* 3814 tests, one more: the admin's order page; the orders module's and the API's split tests
+  check the parts too.
+
 ### 42d93f4 · Store credit refunded
 
 * **A refund given as store credit gives back first what the order's store credit paid** ([ADR-661](../architecture/13-decision-log.md#adr-661--a-refund-given-as-store-credit-gives-back-first-what-the-orders-own-store-credit-paid-each-part-expiring-as-the-credit-it-came-from-does)),

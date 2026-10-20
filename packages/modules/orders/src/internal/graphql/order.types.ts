@@ -1415,6 +1415,13 @@ export class Order {
   })
   splitFrom!: OrderSplitFrom | null;
 
+  @Field(() => [OrderSplitFrom], {
+    description:
+      'The orders split from it, their items sent apart, the oldest first (ADR-662): those of a ' +
+      'part split again too, which name this one as the order they were split from.',
+  })
+  splitParts!: OrderSplitFrom[];
+
   @Field(() => OrderRisk, {
     nullable: true,
     description: 'Cash-on-delivery orders only. Held ones wait at stage NEEDS_REVIEW.',

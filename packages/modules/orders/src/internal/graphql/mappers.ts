@@ -296,6 +296,12 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
           name: orderName(record.splitFrom.number),
         })
       : null,
+    splitParts: record.splitParts.map((part) =>
+      Object.assign(new OrderSplitFrom(), {
+        id: toPublicId('order', part.orderId),
+        name: orderName(part.number),
+      }),
+    ),
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
     overPlanLimit: hidden,

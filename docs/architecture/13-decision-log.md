@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-661 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-662 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -669,6 +669,7 @@
 | 659 | A shop gives an address for replies to its customers' emails: they carry it as their Reply-To, and say a reply reaches the shop | Accepted |
 | 660 | A menu's link to a collection is offered the tags of that collection's products alone, a link to all products the shop's | Accepted |
 | 661 | A refund given as store credit gives back first what the order's own store credit paid, each part expiring as the credit it came from does | Accepted |
+| 662 | An order lists the orders split from it, the oldest first, as each part names the order it was split from | Accepted |
 
 ---
 
@@ -23217,3 +23218,17 @@
   as cancellation does (ADR-185), and a part would leave its allocations half restored.
   **Giving back credits already expired, ending again at once:** the customer returned the
   items, and would get nothing for them.
+
+## ADR-662 · An order lists the orders split from it, the oldest first, as each part names the order it was split from
+
+* **Context:** A part sent apart from an order named the order it came from (ADR-135), but the
+  order did not list its parts: only its timeline said which they were, so staff looking for the
+  rest of a customer's order searched by name or number.
+* **Decision:** An order's record has its parts, the orders whose `split_from_id` names it, by ID
+  and number, the oldest first, read with the order in the query that loads it. A part split again
+  names the first order, as before, so the first order lists every part and a part none. The Admin
+  API's `Order.splitParts` gives them, and the admin's order page links to each under its number,
+  as it links a part to the order it came from.
+* **Consequences:** Every part of an order is a tap away from it.
+* **Alternatives:** **A list of parts kept on the order:** two writes for each split, and one more
+  thing to keep right when a part is merged back; `split_from_id` already says it.

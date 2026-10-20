@@ -319,6 +319,11 @@ export interface OrderDetail {
   repeatOf: { id: string; name: string } | null;
   /** The order its items were sent apart from (ADR-135). */
   splitFrom: { id: string; name: string } | null;
+  /**
+   * The orders split from it (ADR-662), the oldest first; absent from an order the admin kept for
+   * offline use before it asked for them (ADR-514).
+   */
+  splitParts?: { id: string; name: string }[];
   fulfillments: ParcelDetail[];
   amountRefunded: MoneyValue;
   refunds: RefundDetail[];

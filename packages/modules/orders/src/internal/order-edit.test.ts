@@ -703,6 +703,9 @@ describe.skipIf(!server)("Editing an order's items", () => {
       stage: 'to_pack',
       splitFrom: null,
     });
+    // It lists the part split from it (ADR-662); the part, none.
+    expect(kept.splitParts).toEqual([{ orderId: split.id, number: split.number }]);
+    expect(split.splitParts).toEqual([]);
     expect(split.lines.map((line) => [line.title, line.quantity, line.unitPrice])).toEqual([
       ['Kurta', 1, 2_360_00n],
       ['Dupatta', 1, 1_000_00n],
@@ -820,6 +823,12 @@ describe.skipIf(!server)("Editing an order's items", () => {
       }),
     );
     expect(again.splitFrom).toEqual({ orderId: order.id, number: order.number });
+    // The first order lists both parts, a part split again naming it (ADR-662).
+    expect((await f.orders.get(f.a, order.id))!.splitParts).toEqual([
+      { orderId: part.id, number: part.number },
+      { orderId: again.id, number: again.number },
+    ]);
+    expect(rest.splitParts).toEqual([]);
     expect([rest.risk, again.risk]).toMatchObject([{ score: 10 }, { score: 10 }]);
     // Merged back, a part's kurta joins the order's at the price both were sold at.
     const { order: whole, merged } = unwrap(await f.edits.merge(f.a, rest.id, order.id));

@@ -88,6 +88,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   repeat_of_pending: boolean | null;
   split_from_id: string | null;
   split_from_number: number | null;
+  split_parts: { id: string; number: number }[];
   risk_score: number | null;
   risk_level: RiskLevelValue | null;
   risk_reasons: RiskReasonValue[];
@@ -279,6 +280,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     splitFrom: row.split_from_id
       ? { orderId: row.split_from_id, number: row.split_from_number! }
       : null,
+    splitParts: row.split_parts.map((part) => ({ orderId: part.id, number: part.number })),
     risk:
       row.risk_score === null || row.risk_level === null
         ? null
@@ -462,6 +464,10 @@ export async function loadOrders(
            o.split_from_id,
            (SELECT s.number FROM orders.orders s
              WHERE s.shop_id = o.shop_id AND s.id = o.split_from_id) AS split_from_number,
+           (SELECT coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'number', p.number)
+                                      ORDER BY p.number), '[]'::jsonb)
+              FROM orders.orders p
+             WHERE p.shop_id = o.shop_id AND p.split_from_id = o.id) AS split_parts,
            o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at, o.over_limit_at,
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,
            o.agreed_policy_versions::text[] AS agreed_policy_versions, o.agreed_at,

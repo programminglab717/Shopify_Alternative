@@ -9972,6 +9972,11 @@ type Order {
   The order it was split from, its items sent apart: the first one, when a part was split again.
   """
   splitFrom: OrderSplitFrom
+
+  """
+  The orders split from it, their items sent apart, the oldest first (ADR-662): those of a part split again too, which name this one as the order they were split from.
+  """
+  splitParts: [OrderSplitFrom!]!
   stage: OrderStage!
   status: OrderStatus!
   subtotalPrice: Money!
