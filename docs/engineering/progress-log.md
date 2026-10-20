@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Photos described on the Search listings tab
+### 49a16d0 · Photos described on the Search listings tab
 
 * **A product's photos without words for what they show are described on the Search listings
   tab itself** ([ADR-667](../architecture/13-decision-log.md#adr-667--a-products-photos-that-say-nothing-of-what-they-show-are-described-on-the-search-listings-tab-itself-each-beside-its-picture-and-saved-together)), each beside its picture, saved together.
