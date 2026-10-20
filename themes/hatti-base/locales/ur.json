@@ -1,5 +1,6 @@
 {
   "general": {
+    "home": "ہوم",
     "cart": "کارٹ",
     "menu": "مینو",
     "language": "English",
@@ -31,7 +32,8 @@
     "sign_in": "سائن ان"
   },
   "accessibility": {
-    "skip_to_content": "مواد پر جائیں"
+    "skip_to_content": "مواد پر جائیں",
+    "breadcrumbs": "آپ یہاں ہیں"
   },
   "products": {
     "product": {

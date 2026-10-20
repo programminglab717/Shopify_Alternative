@@ -29,6 +29,9 @@
     <a class="skip-link" href="#main">{{ 'accessibility.skip_to_content' | t }}</a>
     {% sections 'header-group' %}
     <main id="main" tabindex="-1">
+      {%- if settings.show_breadcrumbs %}
+      {%- render 'breadcrumbs' %}
+      {%- endif %}
       {{ content_for_layout }}
     </main>
     {% sections 'footer-group' %}

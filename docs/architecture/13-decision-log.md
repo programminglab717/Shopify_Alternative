@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-613 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-614 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -621,6 +621,7 @@
 | 611 | Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to confirm unanswered an hour is called once in Urdu, in calling hours: pressing 1 confirms it and 2 cancels it, the call a message on a voice channel of its own | Accepted |
 | 612 | The shop straightens every chain of redirects at once, each sent straight to where its chain ends, loops left for it to break | Accepted |
 | 613 | A refund may be for a customer return, at most what was paid for its items and is not refunded yet, in money or as store credit; each return says what it is worth and what was refunded for it | Accepted |
+| 614 | Hatti Base shows where each page sits above it, the home page to the page as the BreadcrumbList gives it, unless the shop turns it off in the theme's settings | Accepted |
 
 ---
 
@@ -22225,3 +22226,22 @@
   and the return already says which items came back. **Give credit back to the credits that paid
   the order:** keeps their expiry, but needs a debit given back in part, which the ledger keeps
   whole (ADR-185); a new credit is simpler to read on the customer's account.
+
+## ADR-614 · Hatti Base shows where each page sits above it, the home page to the page as the BreadcrumbList gives it, unless the shop turns it off in the theme's settings
+
+* **Context:** Hatti Base tells search engines where a product, collection, page, blog or
+  article sits (ADR-608), but shows shoppers nothing of it: one who lands on an article from a
+  search has no way back to its blog but the menu.
+* **Decision:** A snippet, `breadcrumbs`, rendered at the top of `<main>` by the layout: an ordered
+  list in a `<nav>` named "Breadcrumbs" ("آپ یہاں ہیں" in Urdu), the home page, the blog before an
+  article, and the page itself as the current one, unlinked. Its links are the page's own in its
+  language, so an Urdu page's trail stays in Urdu, and its arrows turn with the page's direction.
+  It shows on the same pages as the BreadcrumbList and nowhere else. A theme setting,
+  `show_breadcrumbs`, on by default, turns the trail off; the structured data stays either way.
+* **Consequences:** Shoppers see where they are and step back up in a tap, and the trail matches
+  what search results show. Themes copied from Hatti Base carry it, and a shop's own theme can
+  render the snippet where it likes.
+* **Alternatives:** **A section of its own on each template:** placed per page by the theme
+  editor, but six templates to change and a trail easily missed on one; the layout shows it
+  everywhere at once. **A product's collection in its trail:** Shopify's themes show it only for
+  a product reached through a collection's address, which Hatti's storefront does not serve.

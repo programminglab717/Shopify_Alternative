@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A breadcrumb trail shoppers see
+
+* **Hatti Base shows where each page sits above it** ([ADR-614](../architecture/13-decision-log.md#adr-614--hatti-base-shows-where-each-page-sits-above-it-the-home-page-to-the-page-as-the-breadcrumblist-gives-it-unless-the-shop-turns-it-off-in-the-themes-settings)): the home page, a blog before its
+  article, then the page, in the page's language and direction, wherever the BreadcrumbList is
+  given; a theme setting turns it off.
+* 3717 tests, 1 more: the trail on an article, a collection and an Urdu
+  page, none elsewhere, and none when turned off.
+
 ### dd40fdf · A return's refund
 
 * **A refund may be for a customer return** ([ADR-613](../architecture/13-decision-log.md#adr-613--a-refund-may-be-for-a-customer-return-at-most-what-was-paid-for-its-items-and-is-not-refunded-yet-in-money-or-as-store-credit-each-return-says-what-it-is-worth-and-what-was-refunded-for-it)): each return says what was paid for its

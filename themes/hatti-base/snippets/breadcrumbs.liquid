@@ -1,0 +1,31 @@
+{%- comment -%}
+  Where a page sits in the shop, shown above it (OS-09, ADR-614): the home page, then a blog before
+  its article, then the page itself, as the BreadcrumbList tells search engines (ADR-608). For
+  products, collections, pages, blogs and articles; nothing elsewhere.
+{%- endcomment -%}
+{%- liquid
+  assign leaf = null
+  case request.page_type
+    when 'product'
+      assign leaf = product
+    when 'collection'
+      assign leaf = collection
+    when 'page'
+      assign leaf = page
+    when 'blog'
+      assign leaf = blog
+    when 'article'
+      assign leaf = article
+  endcase
+-%}
+{%- if leaf -%}
+<nav class="breadcrumbs page-width" aria-label="{{ 'accessibility.breadcrumbs' | t }}">
+  <ol>
+    <li><a href="{{ routes.root_url }}">{{ 'general.home' | t }}</a></li>
+    {%- if request.page_type == 'article' and blog %}
+    <li><a href="{{ blog.url }}">{{ blog.title | escape }}</a></li>
+    {%- endif %}
+    <li><span aria-current="page">{{ leaf.title | escape }}</span></li>
+  </ol>
+</nav>
+{%- endif -%}

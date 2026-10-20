@@ -40,6 +40,13 @@
         "step": 100,
         "unit": "px",
         "default": 1200
+      },
+      {
+        "type": "checkbox",
+        "id": "show_breadcrumbs",
+        "label": "t:settings_schema.layout.settings.show_breadcrumbs.label",
+        "info": "t:settings_schema.layout.settings.show_breadcrumbs.info",
+        "default": true
       }
     ]
   },

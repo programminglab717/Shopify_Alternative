@@ -1,5 +1,6 @@
 {
   "general": {
+    "home": "Home",
     "cart": "Cart",
     "menu": "Main menu",
     "language": "اردو",
@@ -31,7 +32,8 @@
     "sign_in": "Sign in"
   },
   "accessibility": {
-    "skip_to_content": "Skip to content"
+    "skip_to_content": "Skip to content",
+    "breadcrumbs": "Breadcrumbs"
   },
   "products": {
     "product": {

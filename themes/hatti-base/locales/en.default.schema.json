@@ -285,6 +285,10 @@
       "settings": {
         "page_width": {
           "label": "Page width"
+        },
+        "show_breadcrumbs": {
+          "label": "Show where each page sits above it",
+          "info": "A trail from the home page to the product, collection, page, blog or article."
         }
       }
     },

@@ -474,6 +474,56 @@ describe('Storefront rendering', () => {
     }
   });
 
+  it('shows where each page sits above it, unless the theme turns it off (ADR-614)', async () => {
+    const trailOf = async (request: PageRequest, theme = files) => {
+      const renderer = new PageRenderer(loadTheme(theme), {
+        platformUrl: 'https://hatti.pk',
+        limits: { timeMs: 10_000 },
+      });
+      const { html } = await renderer.render(request, new MemoryStore(sampleStore()).fresh());
+      const nav = /<nav class="breadcrumbs[^"]*" aria-label="([^"]*)">([\s\S]*?)<\/nav>/.exec(html);
+      if (!nav) return null;
+      return {
+        label: nav[1],
+        crumbs: [
+          ...nav[2]!.matchAll(/<li>(?:<a href="([^"]*)">|<span aria-current="page">)([^<]*)/g),
+        ].map(([, href, text]) => [text, href ?? null]),
+      };
+    };
+
+    expect(await trailOf({ path: '/blogs/news/eid-lawn-is-here' })).toEqual({
+      label: 'Breadcrumbs',
+      crumbs: [
+        ['Home', '/'],
+        ['News', '/blogs/news'],
+        ['Eid lawn is here', null],
+      ],
+    });
+    expect((await trailOf({ path: '/collections/eid-lawn' }))?.crumbs).toEqual([
+      ['Home', '/'],
+      ['Eid Lawn', null],
+    ]);
+    // In Urdu, at the Urdu addresses, right to left.
+    expect(await trailOf({ path: '/pages/returns', locale: 'ur' })).toMatchObject({
+      label: 'آپ یہاں ہیں',
+      crumbs: [
+        ['ہوم', '/ur'],
+        [expect.any(String), null],
+      ],
+    });
+    // Not on the home page, the cart or a search.
+    for (const path of ['/', '/cart', '/search']) {
+      expect(await trailOf({ path }), path).toBeNull();
+    }
+    // A shop that turns it off sees none; search engines are still told (ADR-608).
+    const data = JSON.parse(files['config/settings_data.json']!) as {
+      current: Record<string, unknown>;
+    };
+    data.current.show_breadcrumbs = false;
+    const off = { ...files, 'config/settings_data.json': JSON.stringify(data) };
+    expect(await trailOf({ path: '/collections/eid-lawn' }, off)).toBeNull();
+  });
+
   it("shows the shop's own Urdu on its Urdu pages, and its own words where it gave none (ADR-238)", async () => {
     const sample = sampleStore();
     const urdu = <T extends { id: string }>(docs: T[], id: string, translations: unknown) =>
