@@ -2970,6 +2970,9 @@ describe('Carts', () => {
     const home = await get('/');
     expect(home.statusCode).toBe(200);
     expect(home.body).not.toContain('This shop is taking a short break');
+    // Each page says checkout is paused, and why (ADR-604).
+    expect(home.body).toContain('<strong>Orders are paused for a while.</strong>');
+    expect(home.body).toContain('Back after Eid.');
     expect((await get(`/products/${lawn.handle}`)).statusCode).toBe(200);
     expect((await get('/cart.js')).statusCode).toBe(200);
     await app.close();

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-603 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-604 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -611,6 +611,7 @@
 | 601 | Collections, pages, blogs and articles have the same search engine listing card in the admin as products | Accepted |
 | 602 | A customer's store credit news goes by email too, where the shop has their email, saying the shop has it | Accepted |
 | 603 | A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill their carts until it takes orders again | Accepted |
+| 604 | While checkout alone is paused, the storefront's pages carry the platform's bar saying orders are paused, the shop's message and when they come back | Accepted |
 
 ---
 
@@ -21979,3 +21980,20 @@
 * **Alternatives:** **A notice on every page:** themes would need a new object for it, as
   Shopify's have none; a later change. **Turning the storefront's checkout button off:** carts
   would be lost to shoppers who could not see why.
+
+## ADR-604 · While checkout alone is paused, the storefront's pages carry the platform's bar saying orders are paused, the shop's message and when they come back
+
+* **Context:** A shop may pause checkout alone, its storefront open to browse (ADR-603). Shoppers
+  learnt of the pause only at checkout, after filling a cart.
+* **Decision:** While the pause is on, every shopper's page of the storefront carries the
+  platform's bar at its top, whatever the theme: "Orders are paused for a while.", the shop's
+  message on one line, and when they come back in the shop's time zone, or that it is soon; in
+  Urdu on Urdu pages. It is laid over the theme's page by a small script from the page's head, as
+  the preview bar is (ADR-049), and the script leaves it out once the time the shop set has come,
+  so pages kept in a cache stop saying it by themselves. Staff's previews and the theme editor
+  show no bar.
+* **Consequences:** Shoppers know before they fill a cart. Themes need nothing new; the bar is
+  the platform's look, not the shop's.
+* **Alternatives:** **A Liquid object for themes to place it:** Shopify has none; a theme could
+  add one later beside the platform's bar. **Only on the cart page:** shoppers fill their carts
+  on product pages.

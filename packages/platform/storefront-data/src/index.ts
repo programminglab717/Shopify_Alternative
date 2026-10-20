@@ -2,6 +2,7 @@ export {
   DOCUMENTS_VERSION,
   MemoryStore,
   articleHandle,
+  checkoutPausedAt,
   pausedAt,
   policyField,
   sitemapEntryOf,

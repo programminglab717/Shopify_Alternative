@@ -3,6 +3,7 @@ import type { AccountAddress, AccountJson, CartJson } from '@hatti/storefront-ap
 import { customerObject, type AddressForm, type DataNotice, type LoginForm } from './accounts.js';
 import {
   TranslatedStore,
+  checkoutPausedAt,
   type HandledKind,
   type SeoDoc,
   type ShopDoc,
@@ -27,6 +28,7 @@ import {
   type LimitKind,
   type RenderLimits,
 } from './limits.js';
+import { checkoutPausedBar } from './maintenance.js';
 import { ChunkQueue } from './stream.js';
 import {
   RequestData,
@@ -263,6 +265,8 @@ interface PreparedPage {
   alternates: string;
   /** The shop's Meta pixel's script for the page, in its head; empty without one (ADR-144). */
   pixel: string;
+  /** The bar saying checkout alone is paused, in its head; empty while it is not (ADR-604). */
+  pausedBar: string;
   /** The file the page's template is, such as templates/product.json. */
   templateFile: string | null;
   globals: Record<string | symbol, unknown>;
@@ -543,7 +547,7 @@ export class PageRenderer {
           : `<script data-hatti-visits>${VISITS_SCRIPT}</script>` +
             `<script data-hatti-session>${SESSION_SCRIPT}</script>` +
             `<script data-hatti-vitals data-template="${vitalTemplateOf(templateFile)}">` +
-            `${VITALS_SCRIPT}</script>${prepared.pixel}`);
+            `${VITALS_SCRIPT}</script>${prepared.pixel}${prepared.pausedBar}`);
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
@@ -804,6 +808,14 @@ export class PageRenderer {
                 : null,
               { locale, prefix: locale === theme.defaultLocale ? '' : `/${locale}` },
             ),
+      // Checkout alone paused (ADR-604): shoppers' pages say so while it is.
+      pausedBar:
+        shopDoc.maintenance?.checkoutOnly &&
+        checkoutPausedAt(shopDoc.maintenance, new Date()) &&
+        !request.preview &&
+        !request.editor
+          ? checkoutPausedBar(shopDoc, shopDoc.maintenance, locale)
+          : '',
       globals,
       renders,
     };

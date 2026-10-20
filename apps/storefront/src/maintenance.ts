@@ -8,6 +8,7 @@ import {
   type Words,
 } from '@hatti/documents';
 import type { MaintenanceDoc, ShopDoc } from '@hatti/storefront-data';
+import { escapeHtml } from './liquid.js';
 
 /**
  * How long a paused shop asks search engines and shoppers' apps to wait before asking again
@@ -102,6 +103,53 @@ export function developmentPage(shop: ShopDoc): RenderedPage {
       <div class="text center muted">${say('bilingual', WORDS.beingBuilt)}</div>
     `,
   });
+}
+
+/** The bar's words while checkout alone is paused (ADR-604), in each of the platform's languages. */
+const BAR_WORDS: Readonly<Record<'en' | 'ur', { title: string; from: string; soon: string }>> = {
+  en: {
+    title: 'Orders are paused for a while.',
+    from: 'We take orders again from {when}.',
+    soon: 'We take orders again soon.',
+  },
+  ur: {
+    title: 'آرڈر کچھ دیر کے لیے بند ہیں۔',
+    from: 'ہم {when} سے دوبارہ آرڈر لیں گے۔',
+    soon: 'ہم جلد دوبارہ آرڈر لیں گے۔',
+  },
+};
+
+/**
+ * The bar the open storefront's pages show while checkout alone is paused (ADR-604): that orders
+ * are paused, the shop's message on one line, and when they come back, in the page's language. It
+ * is laid over the theme's page at its top by a script, as the preview bar is, and goes away by
+ * itself once the time the shop set has come, for pages kept in a cache.
+ */
+export function checkoutPausedBar(
+  shop: ShopDoc,
+  maintenance: MaintenanceDoc,
+  locale: string,
+): string {
+  const words = BAR_WORDS[locale === 'ur' ? 'ur' : 'en'];
+  const when =
+    maintenance.until && momentOf(new Date(maintenance.until), shop.timezone ?? 'Asia/Karachi');
+  const message = maintenance.message.replace(/\s+/g, ' ').trim();
+  const until = maintenance.until ? Date.parse(maintenance.until) : null;
+  return (
+    '<template id="hatti-paused-bar">' +
+    `<div class="hatti-paused-bar" role="status" dir="${locale === 'ur' ? 'rtl' : 'ltr'}">` +
+    `<strong>${escapeHtml(words.title)}</strong>` +
+    (message ? ` <span dir="auto">${escapeHtml(message)}</span>` : '') +
+    ` <span>${escapeHtml(when ? words.from.replace('{when}', when) : words.soon)}</span>` +
+    '</div></template>' +
+    '<style>.hatti-paused-bar{position:sticky;top:0;z-index:2147483646;padding:.625rem 1rem;' +
+    'background:#fef3c7;color:#78350f;font:14px/1.5 system-ui,sans-serif;text-align:center}' +
+    '</style>' +
+    '<script>addEventListener("DOMContentLoaded",function(){' +
+    (until !== null ? `if(Date.now()>=${until})return;` : '') +
+    'var bar=document.getElementById("hatti-paused-bar");if(bar)document.body.prepend(bar.content)' +
+    '})</script>'
+  );
 }
 
 /** What the shop typed, as it wrote it: its paragraphs apart, its lines broken where it broke them. */

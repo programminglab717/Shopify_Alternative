@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
-import { RETRY_AFTER, maintenancePage, retryAfterOf } from './maintenance.js';
+import { RETRY_AFTER, checkoutPausedBar, maintenancePage, retryAfterOf } from './maintenance.js';
+import { checkoutPausedAt } from '@hatti/storefront-data';
 
 describe('A paused shop (ADR-252)', () => {
   const now = new Date('2026-10-07T10:00:00Z');
@@ -35,5 +36,38 @@ describe('A paused shop (ADR-252)', () => {
     expect(page.html).toContain('Stock-take &lt;today&gt;.<br />Back soon.');
     expect(page.html).toContain('href="/ur/track"');
     expect(page.html).not.toContain('wa.me');
+  });
+});
+
+describe('A shop whose checkout alone is paused (ADR-603, ADR-604)', () => {
+  const shop = { ...sampleStore().shop, timezone: 'Asia/Karachi' };
+  const pause = {
+    message: 'Eid break <3>:\n couriers are off.',
+    until: '2026-10-12T04:00:00.000Z',
+    checkoutOnly: true as const,
+  };
+
+  it("bars its pages with what it typed and when it takes orders, in the page's language", () => {
+    const bar = checkoutPausedBar(shop, pause, 'en');
+    expect(bar).toContain('<strong>Orders are paused for a while.</strong>');
+    expect(bar).toContain('<span dir="auto">Eid break &lt;3&gt;: couriers are off.</span>');
+    expect(bar).toContain('We take orders again from 12 October 2026 at 9:00 am.');
+    // Gone by itself once the time comes, from a page kept in a cache.
+    expect(bar).toContain(`if(Date.now()>=${Date.parse(pause.until)})return;`);
+    const urdu = checkoutPausedBar(shop, { ...pause, message: '', until: null }, 'ur');
+    expect(urdu).toContain('dir="rtl"');
+    expect(urdu).toContain('آرڈر کچھ دیر کے لیے بند ہیں۔');
+    expect(urdu).toContain('ہم جلد دوبارہ آرڈر لیں گے۔');
+    expect(urdu).not.toContain('Date.now()');
+  });
+
+  it("is paused until the time it set, and only where the pause is checkout's alone", () => {
+    const before = new Date('2026-10-12T03:59:00Z');
+    const after = new Date('2026-10-12T04:00:00Z');
+    expect(checkoutPausedAt(pause, before)).toBe(true);
+    expect(checkoutPausedAt(pause, after)).toBe(false);
+    expect(checkoutPausedAt({ ...pause, until: null }, after)).toBe(true);
+    expect(checkoutPausedAt({ message: '', until: null }, before)).toBe(false);
+    expect(checkoutPausedAt(undefined, before)).toBe(false);
   });
 });

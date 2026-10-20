@@ -619,6 +619,17 @@ export interface MaintenanceDoc {
 }
 
 /**
+ * Whether a shop's document's `maintenance` pauses its checkout at `now`, its storefront open to
+ * browse (ADR-603, ADR-604).
+ */
+export function checkoutPausedAt(maintenance: MaintenanceDoc | undefined, now: Date): boolean {
+  return (
+    maintenance?.checkoutOnly === true &&
+    (maintenance.until === null || Date.parse(maintenance.until) > now.getTime())
+  );
+}
+
+/**
  * Whether a shop's document's `maintenance` keeps its storefront paused at `now` (ADR-252): not
  * where the pause is checkout's alone (ADR-603).
  */
