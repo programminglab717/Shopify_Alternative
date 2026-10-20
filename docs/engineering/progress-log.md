@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Checkout paused alone
+### 199e5e6 · Checkout paused alone
 
 * **A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill
   their carts until it takes orders again** ([ADR-603](../architecture/13-decision-log.md#adr-603--a-shop-may-pause-checkout-alone-keeping-its-storefront-open-for-shoppers-to-browse-and-fill-their-carts-until-it-takes-orders-again), OS-15). Migration 0279.
