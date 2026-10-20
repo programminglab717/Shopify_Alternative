@@ -207,7 +207,7 @@ export class StorefrontCheckoutController {
     if (!UUID.test(shopId)) throw new NotFoundException();
     // Filled in for a shopper signed in to their account on the shop (ADR-585).
     const view = await this.checkouts.view(token, shopId, { account: account ?? null });
-    return responseOf(view, false);
+    return responseOf(await withBook(this.checkouts, view, shopId, account), false);
   }
 
   /** The name and number the shopper typed, as on the core's own address (ADR-393). */
@@ -249,8 +249,23 @@ export class StorefrontCheckoutController {
         : null,
     };
     const view = await posted(this.checkouts, token, body, { shopId, client });
-    return responseOf(view, true);
+    return responseOf(await withBook(this.checkouts, view, shopId, client.account), true);
   }
+}
+
+/**
+ * The page with the address book of the shopper signed in to their account (ADR-587), to deliver
+ * to another of its addresses; as it is without a session, or an open checkout.
+ */
+async function withBook(
+  checkouts: CheckoutService,
+  view: CheckoutView | { url: string },
+  shopId: string,
+  account: string | null | undefined,
+): Promise<CheckoutView | { url: string }> {
+  if (!account || 'url' in view || view.kind !== 'open') return view;
+  const book = await checkouts.book(shopId, account);
+  return book ? { ...view, book } : view;
 }
 
 /**
@@ -334,7 +349,8 @@ function contactOf(body: unknown): { name: string; phone: string } {
  * or takes it off (`action=gift_wrap`, `remove_gift_wrap`, ADR-413), sends the shopper to the
  * shop's gateway to pay the order placed online (`action=pay`, ADR-152), fills in a returning
  * shopper's saved address once their number is proved, sending the code (`action=recall`, with
- * `channel=sms` for one by SMS) or checking it (`action=recall_code`, ADR-447), or places the
+ * `channel=sms` for one by SMS) or checking it (`action=recall_code`, ADR-447), fills in
+ * another address of a signed-in shopper's book (`action=use_address`, ADR-587), or places the
  * order.
  */
 async function posted(
@@ -369,6 +385,8 @@ async function posted(
         },
         options,
       );
+    case 'use_address':
+      return checkouts.useAddress(token, field(body, 'address'), options);
     default:
       return checkouts.place(token, field(body, 'shown'), formOf(body), options);
   }

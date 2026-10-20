@@ -60,6 +60,7 @@ import {
   type CheckoutGiftCard,
   type CheckoutPayments,
   type CheckoutProblem,
+  type CheckoutSavedAddress,
   type CheckoutShop,
   type CheckoutView,
   type ClosedLinkReason,
@@ -116,6 +117,9 @@ const LABELS = {
   codeBySms: { en: 'Send the code by SMS instead', ur: 'کوڈ ایس ایم ایس سے بھیجیں' },
   codeOnWhatsapp: { en: 'Send a new code on WhatsApp', ur: 'واٹس ایپ پر نیا کوڈ بھیجیں' },
   orderedBefore: { en: 'Ordered here before?', ur: 'پہلے یہاں سے آرڈر کیا ہے؟' },
+  savedAddresses: { en: 'Your saved addresses', ur: 'آپ کے محفوظ پتے' },
+  deliverHere: { en: 'Deliver here', ur: 'یہاں پہنچائیں' },
+  defaultAddress: { en: 'Default', ur: 'بنیادی' },
   fillAddress: { en: 'Fill in my address', ur: 'میرا پتہ بھر دیں' },
   storeCredit: { en: 'Store credit', ur: 'اسٹور کریڈٹ' },
   backToCart: { en: 'Back to cart', ur: 'واپس کارٹ پر' },
@@ -367,7 +371,11 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       discountSection(discount, problem?.kind === 'discount' ? problem : null, discounts),
       orderable && giftCardSection(view.giftCard, problem?.kind === 'gift_card' ? problem : null),
       orderable && giftWrapSection(view.gift),
-      orderable && recallSection(form.phone, problem?.kind === 'recall' ? problem : null),
+      // A signed-in shopper's own addresses (ADR-587); for others, a code fills in the last.
+      orderable &&
+        (view.book
+          ? bookSection(view.book)
+          : recallSection(form.phone, problem?.kind === 'recall' ? problem : null)),
       orderable &&
         html`<form method="post">
           <input type="hidden" name="shown" value="${view.shown}" />
@@ -1418,6 +1426,30 @@ const RECALL_STATUS: Record<RecallState, number> = {
 
 /** Where the number is proved and the form filled in, or found to have nothing to fill it from. */
 const RECALL_DONE: readonly RecallState[] = ['filled', 'nothing'];
+
+/**
+ * A signed-in shopper's address book (ADR-587): each address, the default first, with a form of
+ * its own that fills the order's address in from it, placing nothing.
+ */
+function bookSection(book: readonly CheckoutSavedAddress[]): Html {
+  return html`<section class="section">
+    <h2 class="label">${say('bilingual', LABELS.savedAddresses)}</h2>
+    ${book.map(
+      (address) =>
+        html`<form method="post" class="saved-address">
+          <input type="hidden" name="action" value="use_address" />
+          <input type="hidden" name="address" value="${address.id}" />
+          <p class="small" dir="auto">
+            ${address.summary}
+            ${address.isDefault && html`<span class="muted">· ${say('bilingual', LABELS.defaultAddress)}</span>`}
+          </p>
+          <button class="button secondary" type="submit">
+            ${say('bilingual', LABELS.deliverHere)}
+          </button>
+        </form>`,
+    )}
+  </section>`;
+}
 
 /**
  * A returning shopper's saved address (CHK-03, ADR-447): their number, for a code to prove it is

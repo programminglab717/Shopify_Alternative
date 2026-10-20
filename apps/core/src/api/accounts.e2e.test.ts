@@ -478,6 +478,36 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
     expect(blank.json()).toMatchObject({
       errors: [{ field: 'name' }, { field: 'phone' }, { field: 'address1' }, { field: 'city' }],
     });
+    // A checkout the signed-in shopper opens is filled in from the default address, offering
+    // the book; posted with the session, another fills it in (ADR-585, ADR-587).
+    const {
+      rows: [variant],
+    } = await admin.query<{ id: string }>(
+      'SELECT id FROM catalog.variants WHERE shop_id = $1 ORDER BY id LIMIT 1',
+      [shop],
+    );
+    const cart = await client.act(shop, null, 'add', {
+      items: [{ variantId: variant!.id, quantity: 1 }],
+    });
+    if (!cart.ok) throw new Error(`Expected a cart, got ${JSON.stringify(cart)}`);
+    const started = await client.startCheckout(shop, cart.token);
+    if (!started.ok) throw new Error(`Expected a checkout, got ${JSON.stringify(started)}`);
+    const secret = started.path.split('/').at(-1)!;
+    const opened = await client.checkoutPage(shop, secret, null, undefined, session);
+    const openedHtml = 'html' in opened ? opened.html : '';
+    expect(openedHtml).toContain('value="Office 3, Shahrah-e-Faisal"');
+    expect(openedHtml.match(/value="use_address"/g)).toHaveLength(2);
+    const chosen = await client.checkoutPage(
+      shop,
+      secret,
+      { action: 'use_address', address: home!.id },
+      { ip: '203.0.113.7', userAgent: null, account: session },
+    );
+    expect('html' in chosen && chosen.html).toContain('value="House 12, Street 4"');
+    // Without the session, neither.
+    const plain = await client.checkoutPage(shop, secret, null);
+    expect('html' in plain && plain.html).not.toContain('use_address');
+
     // Taken out; the other shop has none of them.
     expect(await client.accountAddressDelete(shop, session, home!.id)).toMatchObject([
       { address1: 'Office 3, Shahrah-e-Faisal', default: true },

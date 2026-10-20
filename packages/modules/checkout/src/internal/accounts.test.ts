@@ -19,6 +19,7 @@ import { ACCOUNT_DATA } from './account-data.js';
 import { ACCOUNT_SESSION, type SignInVerify } from './account.service.js';
 import { parseAction } from './cart-lines.js';
 import type { CheckoutForm } from './checkout.service.js';
+import { checkoutPage } from './checkout-pages.js';
 import { CHECKOUT_CUSTOMER_DATA } from './customer-data.js';
 import { NUMBER_CODE } from './number-codes.js';
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
@@ -1290,6 +1291,66 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await asked(JAZZ, 'x'.repeat(43))).toBe('code');
     await f.accounts.signOut(f.a.shopId, token);
     expect(await asked(JAZZ, token)).toBe('code');
+  });
+
+  it("offers a signed-in shopper's saved addresses at checkout, filling in the one chosen (ADR-587)", async () => {
+    const token = await signIn(JAZZ);
+    const by = (account?: string) => ({
+      shopId: f.a.shopId,
+      client: { ip: null, userAgent: null, ...(account && { account }) },
+    });
+    await order(JAZZ);
+    // No book yet: none offered.
+    expect(await f.checkouts.book(f.a.shopId, token)).toBeNull();
+    const [home] = await saved(token, typed('Home'));
+    const office = (await saved(token, typed('Office', { city: 'Karachi' }))).find(
+      (address) => address.name === 'Office',
+    )!;
+    const book = await f.checkouts.book(f.a.shopId, token);
+    expect(book).toEqual([
+      { id: home!.id, summary: "Home, Home's house, Street 4, Lahore", isDefault: true },
+      { id: office.id, summary: "Office, Office's house, Street 4, Karachi", isDefault: false },
+    ]);
+
+    // Chosen, it fills in the form, placing nothing.
+    const { secret } = await checkout();
+    const chosen = await f.checkouts.useAddress(secret, office.id, by(token));
+    expect(chosen).toMatchObject({
+      kind: 'open',
+      form: { name: 'Office', city: 'Karachi', province: 'SD', phone: '0300 1234567' },
+      problem: null,
+    });
+    // The page offers each, with a form of its own, in place of asking for a code.
+    if (chosen.kind !== 'open') throw new Error('Expected an open checkout');
+    const page = checkoutPage({ ...chosen, book: book! });
+    expect(page.html).toContain('Your saved addresses');
+    expect(page.html).toContain(`name="address" value="${office.id}"`);
+    expect(page.html.match(/value="use_address"/g)).toHaveLength(2);
+    expect(page.html).not.toContain('Ordered here before?');
+    expect(checkoutPage(chosen).html).toContain('Ordered here before?');
+
+    // An address not in the book: the default; no session: nothing filled in.
+    const lost = await f.checkouts.useAddress(
+      secret,
+      toPublicId('accountAddress', newId()),
+      by(token),
+    );
+    expect(lost).toMatchObject({ form: { name: 'Home', city: 'Lahore' } });
+    expect(await f.checkouts.useAddress(secret, 'nope', by(token))).toMatchObject({
+      form: { name: 'Home' },
+    });
+    expect(await f.checkouts.useAddress(secret, office.id, by())).toMatchObject({
+      form: { name: '', city: '' },
+    });
+    // Another customer's session reads no one else's book, nor another shop's.
+    const zong = await signIn(ZONG);
+    await order(ZONG);
+    expect(await f.checkouts.book(f.a.shopId, zong)).toBeNull();
+    expect(await f.checkouts.useAddress(secret, office.id, by(zong))).toMatchObject({
+      form: { name: '', phone: '0311 1234567' },
+    });
+    expect(await f.checkouts.book(f.b.shopId, token)).toBeNull();
+    expect(await f.checkouts.book(f.a.shopId, 'y'.repeat(500))).toBeNull();
   });
 
   it('sweeps codes to sign in with once their day is up', async () => {

@@ -16,7 +16,7 @@ import {
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { LOGO_URL_SECONDS, shopLogoOf } from '@hatti/files/public';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { pickupLocationsIn, type LocationRecord } from '@hatti/inventory/public';
 import { MessagesService, type PhoneChannel } from '@hatti/messaging/public';
 import type { CurrencyCode } from '@hatti/money';
@@ -412,6 +412,15 @@ export type CheckoutDiscount =
   | { code: string; record: DiscountCodeRecord; refusal: null }
   | { code: string; record: null; refusal: DiscountRefusal };
 
+/** An address of a signed-in shopper's book, as the checkout's page offers it (ADR-587). */
+export interface CheckoutSavedAddress {
+  /** Its ID as the storefront's account knows it: "addr_…". */
+  id: string;
+  /** Who, where and which city, on one line. */
+  summary: string;
+  isDefault: boolean;
+}
+
 /** Where the shopper placed the order from, as their browser told the storefront. */
 export interface CheckoutClient {
   ip: string | null;
@@ -489,6 +498,11 @@ export type CheckoutView =
       gift: CheckoutGift | null;
       /** The gift card applied (ADR-449); null for none. */
       giftCard: CheckoutGiftCard | null;
+      /**
+       * The address book of the shopper signed in to their account (ADR-587), to deliver to
+       * another of its addresses; absent without a session, or a book.
+       */
+      book?: readonly CheckoutSavedAddress[];
     }
   | {
       kind: 'placed';
@@ -591,6 +605,49 @@ export class CheckoutService {
       const form = options.account
         ? await accountFormIn(tx, found.shopId, options.account)
         : EMPTY_FORM;
+      return this.#view(tx, found, false, form);
+    });
+  }
+
+  /**
+   * The address book of the shopper the account session `secret` names (ADR-587), the default
+   * first, as the checkout's page offers it; null for no session of the shop's, or no book.
+   */
+  async book(shopId: string, secret: string): Promise<CheckoutSavedAddress[] | null> {
+    if (secret.length > 128) return null;
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, secret);
+      if (!session?.customerId) return null;
+      const book = await addressesIn(tx, shopId, session.customerId);
+      if (book.length === 0) return null;
+      return book.map((record) => {
+        const { address } = record;
+        const street = [address.address1, address.address2].filter(Boolean).join(', ');
+        return {
+          id: toPublicId('accountAddress', record.id),
+          summary: [address.name, street, address.city].join(', '),
+          isDefault: record.isDefault,
+        };
+      });
+    });
+  }
+
+  /**
+   * The checkout's page with its form filled in from the address `addressId` of the signed-in
+   * shopper's book (ADR-587), as the client's account session names it; with the book's default,
+   * or blank, for an address not in it. Nothing is placed.
+   */
+  async useAddress(
+    token: string,
+    addressId: string,
+    options: { shopId?: string; client?: CheckoutClient } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    const account = options.client?.account ?? null;
+    const id = tryFromPublicId(addressId.slice(0, 64), 'accountAddress');
+    return this.db.tenant(found.shopId, async (tx) => {
+      const form = account ? await accountFormIn(tx, found.shopId, account, id) : EMPTY_FORM;
       return this.#view(tx, found, false, form);
     });
   }
@@ -1867,16 +1924,23 @@ export function orderNoteOf(cart: CartJson): string {
 
 /**
  * The form a checkout's page opens with for the shopper the account session `secret` names
- * (ADR-585): their book's default address, as the account keeps it, else only the number they
+ * (ADR-585): their book's default address, or the one `addressId` names (ADR-587), as the account keeps it, else only the number they
  * signed in with; blank for no session of the shop's. The session proved the number it signed in
  * with, as a code at checkout does (ADR-447), and the book is the shopper's own.
  */
-async function accountFormIn(tx: Tx, shopId: string, secret: string): Promise<CheckoutForm> {
+async function accountFormIn(
+  tx: Tx,
+  shopId: string,
+  secret: string,
+  addressId: string | null = null,
+): Promise<CheckoutForm> {
   if (secret.length > 128) return EMPTY_FORM;
   const session = await sessionIn(tx, shopId, secret);
   if (!session) return EMPTY_FORM;
   const book = session.customerId ? await addressesIn(tx, shopId, session.customerId) : [];
-  const chosen = book.find((record) => record.isDefault);
+  // The one asked for (ADR-587), else the default.
+  const chosen =
+    book.find((record) => record.id === addressId) ?? book.find((record) => record.isDefault);
   if (!chosen) return { ...EMPTY_FORM, phone: typedPhone(session.phone) };
   const { address } = chosen;
   return {

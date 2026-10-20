@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-586 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-587 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -594,6 +594,7 @@
 | 584 | The address book has its own page on the storefront, as Shopify's /account/addresses, its forms posting as Shopify's do | Accepted |
 | 585 | A signed-in shopper's checkout opens filled in from their default address, or with the number they signed in with | Accepted |
 | 586 | A shopper's session signed in to their account proves its number at checkout, where the shop asks for a code | Accepted |
+| 587 | A signed-in shopper's checkout offers the addresses of their book, each filling in the order's address with a post of its own | Accepted |
 
 ---
 
@@ -21639,3 +21640,23 @@
   cannot change the number, and signing out ends it.
 * **Alternatives:** **Letting the session spend store credit:** the account page shows the credit,
   but spending it is kept to a code at checkout, as for any other proof kept in a cookie.
+
+## ADR-587 · A signed-in shopper's checkout offers the addresses of their book, each filling in the order's address with a post of its own
+
+* **Context:** A signed-in shopper's checkout opens filled in from their default address
+  (ADR-585), but an order to another address of their book had to be typed again, and the page
+  still offered to fill in their last order's address by a code (ADR-447).
+* **Decision:**
+  * **The page offers the book:** with the account session (ADR-585, ADR-586), each page the
+    storefront asks for or posts carries the shopper's addresses, the default first, each on one
+    line (who, street and city) with its own small form, `action=use_address` and the address's
+    `addr_…` ID: "Deliver here", in English and Urdu. It takes the place of the code that fills
+    in an address, which a signed-in shopper needs no more.
+  * **Choosing fills in the order's address** from that address, as opening the page filled in
+    the default, and places nothing. One not in the session's book fills in the default; without
+    a session, nothing.
+  * The core's own address, having no account cookie, offers none.
+* **Consequences:** A signed-in shopper orders to any address of theirs without typing it. The
+  book is read once more for each page with a session.
+* **Alternatives:** **A select list in the order's form, filled by a script:** the page works
+  without scripts, as the rest of checkout does.
