@@ -283,7 +283,9 @@ export class RefundService {
             (receipt ? ', with its receipt' : ''),
         });
         if (creditId) {
-          const credited = await storeCredit!.creditIn(
+          // What the order's own store credit paid comes back as it was, expiring as it would
+          // have (ADR-661).
+          const credited = await storeCredit!.refundIn(
             tx,
             tenant,
             {

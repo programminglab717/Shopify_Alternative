@@ -314,6 +314,37 @@ export class StoreCreditService {
   }
 
   /**
+   * Credits a customer in the caller's transaction for a refund of order `grant.orderId` given as
+   * store credit (ADR-661): what the order's own store credit paid and no refund gave back yet
+   * comes back first, each part expiring as the credit it came from does, the latest to expire
+   * first; the rest as `grant.expiresAt` says. One credit's ID, `grant.id`, names them all to the
+   * refund and the customer, who hears of them once.
+   */
+  async refundIn(
+    tx: Tx,
+    tenant: { shopId: string; actor: Actor },
+    grant: StoreCreditGrant & { orderId: string },
+    field: string[],
+    at: Date = new Date(),
+  ): Promise<MutationResult<string>> {
+    const account = await openAccount(tx, tenant.shopId, grant.customerId, grant.currency);
+    if (!account) return failOne(field, 'NOT_FOUND', 'The customer has no account to credit');
+    const parts = await restorableIn(tx, tenant.shopId, account.id, grant.orderId, at);
+    return creditIn(tx, tenant.shopId, tenant.actor, account, {
+      id: grant.id,
+      amount: grant.amount,
+      event: 'order_refund',
+      expiresAt: grant.expiresAt ?? null,
+      orderId: grant.orderId,
+      refundId: grant.refundId ?? null,
+      note: grant.note ?? '',
+      field,
+      at,
+      restoring: parts,
+    });
+  }
+
+  /**
    * Records the expiry of every credit that has expired by `at` with something left, across
    * shops, up to {@link STORE_CREDIT_LIMITS.sweep} accounts at a time: the worker's sweep. Found
    * with the system role; each account's in its shop's own transaction. How many it expired.
@@ -740,6 +771,51 @@ export async function storeCreditPaidIn(tx: Tx, shopId: string, orderId: string)
 }
 
 /**
+ * The credits of account `accountId` that order `orderId`'s store credit came from, with what of
+ * each its payments took that neither a cancellation nor a refund gave back yet, the latest to
+ * expire first, those that never do before them (ADR-661). Credits expired by `at` are left out:
+ * what came from them comes back as a refund's own credit.
+ */
+async function restorableIn(
+  tx: Tx,
+  shopId: string,
+  accountId: string,
+  orderId: string,
+  at: Date,
+): Promise<{ creditId: string; left: bigint; expiresAt: Date | null }[]> {
+  const { rows } = await tx.execute<{
+    id: string;
+    left: string;
+    expires_at: string | Date | null;
+  }>(sql`
+    SELECT c.id, c.expires_at,
+           (sum(a.amount) - coalesce((SELECT sum(r.amount) FROM customers.store_credit_transactions r
+                                       WHERE r.shop_id = c.shop_id AND r.kind = 'credit'
+                                         AND r.source_id = c.id AND r.order_id = ${orderId}), 0)
+           )::text AS left
+      FROM customers.store_credit_transactions d
+      JOIN customers.store_credit_allocations a
+        ON a.shop_id = d.shop_id AND a.debit_id = d.id
+      JOIN customers.store_credit_transactions c
+        ON c.shop_id = a.shop_id AND c.id = a.credit_id
+     WHERE d.shop_id = ${shopId} AND d.account_id = ${accountId} AND d.order_id = ${orderId}
+       AND d.kind = 'debit' AND d.event = 'order_payment'
+       AND NOT EXISTS (SELECT 1 FROM customers.store_credit_transactions v
+                        WHERE v.shop_id = d.shop_id AND v.kind = 'debit_revert'
+                          AND v.source_id = d.id)
+       AND (c.expires_at IS NULL OR c.expires_at > ${at.toISOString()})
+     GROUP BY c.shop_id, c.id, c.expires_at
+     ORDER BY c.expires_at DESC NULLS FIRST, c.id`);
+  return rows
+    .map((row) => ({
+      creditId: row.id,
+      left: BigInt(row.left),
+      expiresAt: row.expires_at === null ? null : toDate(row.expires_at),
+    }))
+    .filter((row) => row.left > 0n);
+}
+
+/**
  * Gives back every debit that paid order `orderId` and was not given back yet, in the caller's
  * transaction, as when the order is cancelled (ADR-185): each to the credits it came from, which
  * expire as they would have, one already expired ending again at once. What it gave back.
@@ -922,6 +998,11 @@ async function creditIn(
     note: string;
     field: string[];
     at: Date;
+    /**
+     * Credits of the account this gives back to, in turn, each at most `left`: as a refund gives
+     * back what an order's store credit paid (ADR-661). The rest expires as `expiresAt` says.
+     */
+    restoring?: readonly { creditId: string; left: bigint; expiresAt: Date | null }[];
   },
 ): Promise<MutationResult<string>> {
   await expireIn(tx, shopId, account.id, credit.at);
@@ -938,15 +1019,27 @@ async function creditIn(
   }
   const id = credit.id ?? newId();
   const { actorKind, actorId } = actorOf(actor);
-  await tx.execute(sql`
-    INSERT INTO customers.store_credit_transactions
-           (shop_id, id, account_id, kind, event, amount, expires_at, remaining, order_id,
-            refund_id, note, actor_kind, actor_id)
-    VALUES (${shopId}, ${id}, ${account.id}, 'credit', ${credit.event}, ${credit.amount},
-            ${credit.expiresAt?.toISOString() ?? null}, ${credit.amount},
-            ${credit.orderId ?? null}, ${credit.refundId ?? null}, ${credit.note}, ${actorKind},
-            ${actorId})`);
-  // For the customer to be told of it (ADR-192).
+  // What it gives back to the credits it restores, then the rest; the first part takes its ID.
+  const parts: { amount: bigint; expiresAt: Date | null; sourceId: string | null }[] = [];
+  let rest = credit.amount;
+  for (const restored of credit.restoring ?? []) {
+    const amount = restored.left < rest ? restored.left : rest;
+    if (amount <= 0n) continue;
+    parts.push({ amount, expiresAt: restored.expiresAt, sourceId: restored.creditId });
+    rest -= amount;
+  }
+  if (rest > 0n) parts.push({ amount: rest, expiresAt: credit.expiresAt, sourceId: null });
+  for (const [index, part] of parts.entries()) {
+    await tx.execute(sql`
+      INSERT INTO customers.store_credit_transactions
+             (shop_id, id, account_id, kind, event, amount, expires_at, remaining, order_id,
+              refund_id, source_id, note, actor_kind, actor_id)
+      VALUES (${shopId}, ${index === 0 ? id : newId()}, ${account.id}, 'credit', ${credit.event},
+              ${part.amount}, ${part.expiresAt?.toISOString() ?? null}, ${part.amount},
+              ${credit.orderId ?? null}, ${credit.refundId ?? null}, ${part.sourceId},
+              ${credit.note}, ${actorKind}, ${actorId})`);
+  }
+  // For the customer to be told of it, once, all of it (ADR-192).
   await appendEvent<StoreCreditCreditedPayload>(tx, shopId, {
     type: CustomerEvents.StoreCreditCredited,
     aggregateType: 'store_credit_account',
@@ -957,7 +1050,7 @@ async function creditIn(
       amount: String(credit.amount),
       currency: account.currency,
       event: credit.event,
-      expiresAt: credit.expiresAt?.toISOString() ?? null,
+      expiresAt: parts[0]!.expiresAt?.toISOString() ?? null,
     },
   });
   return { ok: true, value: id };

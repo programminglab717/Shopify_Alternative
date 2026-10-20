@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -162,6 +163,93 @@ describe.skipIf(!server)('Orders paid with store credit (ORD-09, ADR-185)', () =
     // Cancelled again, nothing more is given back.
     unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
     expect((await ledger(order.customerId)).entries).toHaveLength(5);
+  });
+
+  it('refunds as store credit what the credit paid first, each part expiring as its credit did (ADR-661)', async () => {
+    const order = await f.order(f.a, [kurta], { shippingPrice: '250' });
+    const owner = { customerId: order.customerId };
+    const soon = new Date(Date.now() + 2 * HOUR);
+    const later = new Date(Date.now() + 90 * 24 * HOUR);
+    // One that expires soon, which pays first; one that never does.
+    unwrap(await f.storeCredit.credit(f.a, owner, rupees('1500', soon)));
+    unwrap(await f.storeCredit.credit(f.a, owner, rupees('300')));
+    unwrap(await f.orders.payWithStoreCredit(f.a, order.id, { amount: '1,800' }));
+    const [account] = await f.storeCredit.accountsOf(f.a, order.customerId);
+    /** The refunds' credits, the oldest first: amount, expiry, and which credit it restores. */
+    const refunded = async () =>
+      (
+        await f.admin.query<{ amount: string; expires_at: Date | null; restores: string | null }>(
+          `SELECT r.amount::text, r.expires_at, s.amount::text AS restores
+             FROM customers.store_credit_transactions r
+             LEFT JOIN customers.store_credit_transactions s ON s.id = r.source_id
+            WHERE r.account_id = $1 AND r.event = 'order_refund'
+            ORDER BY r.created_at, r.id`,
+          [account!.id],
+        )
+      ).rows.map((row) => [row.amount, row.expires_at?.getTime() ?? null, row.restores]);
+
+    // The one that never expires was spent last: it comes back first.
+    const first = unwrap(
+      await f.refunds.refund(f.a, order.id, {
+        amount: '500',
+        method: 'store_credit',
+        storeCreditExpiresAt: later,
+      }),
+    );
+    expect(await refunded()).toEqual([
+      ['30000', null, '30000'],
+      ['20000', soon.getTime(), '150000'],
+    ]);
+    // Named to the refund by the first of them.
+    const page = await f.storeCredit.transactions(f.a, account!.id, { first: 10 });
+    const named = page.items.find(
+      (item) => toPublicId('storeCreditTransaction', item.id) === first.refund.reference,
+    );
+    expect(named).toMatchObject({ kind: 'credit', amount: 30_000n, refundId: first.refund.id });
+    // Then what is left of the one expiring soon, and past what the credit paid, the refund's own.
+    unwrap(
+      await f.refunds.refund(f.a, order.id, {
+        amount: '1,300',
+        method: 'store_credit',
+        storeCreditExpiresAt: later,
+      }),
+    );
+    expect((await refunded()).slice(2)).toEqual([['130000', soon.getTime(), '150000']]);
+    expect((await ledger(order.customerId)).balance).toBe(1_800_00n);
+    // Told once a refund, of all of it.
+    const { rows: told } = await f.admin.query<{ amount: string }>(
+      `SELECT payload ->> 'amount' AS amount FROM platform.outbox_events
+        WHERE event_type = 'store_credit.credited' AND payload ->> 'event' = 'order_refund'
+        ORDER BY id`,
+    );
+    expect(told.map((row) => row.amount)).toEqual(['50000', '130000']);
+  });
+
+  it("refunds the rest as the shop says once the credit's part is given back, and none from an expired credit (ADR-661)", async () => {
+    const order = await f.order(f.a, [kurta]);
+    const owner = { customerId: order.customerId };
+    const paidAt = new Date(Date.now() - 2 * HOUR);
+    const later = new Date(Date.now() + 90 * 24 * HOUR);
+    // Expired since it paid: what came from it comes back as the refund's own.
+    unwrap(
+      await f.storeCredit.credit(f.a, owner, rupees('400', new Date(Date.now() - HOUR)), paidAt),
+    );
+    unwrap(await f.orders.payWithStoreCredit(f.a, order.id, { amount: '400' }, paidAt));
+    unwrap(await f.orders.recordPayment(f.a, order.id, { amount: '1,600' }));
+    unwrap(
+      await f.refunds.refund(f.a, order.id, {
+        amount: '700',
+        method: 'store_credit',
+        storeCreditExpiresAt: later,
+      }),
+    );
+    const [account] = await f.storeCredit.accountsOf(f.a, order.customerId);
+    const { rows } = await f.admin.query<{ amount: string; expires_at: Date; source_id: null }>(
+      `SELECT amount::text, expires_at, source_id FROM customers.store_credit_transactions
+        WHERE account_id = $1 AND event = 'order_refund'`,
+      [account!.id],
+    );
+    expect(rows).toEqual([{ amount: '70000', expires_at: later, source_id: null }]);
   });
 
   it('gives the credit back with a parcel that came back, where the shop says so (ADR-610)', async () => {

@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit refunded
+
+* **A refund given as store credit gives back first what the order's store credit paid** ([ADR-661](../architecture/13-decision-log.md#adr-661--a-refund-given-as-store-credit-gives-back-first-what-the-orders-own-store-credit-paid-each-part-expiring-as-the-credit-it-came-from-does)),
+  each part expiring as the credit it came from does; the rest as the shop says.
+* 3813 tests, two more: the orders module's store credit payments.
+
 ### 5846c1f · A collection's tags
 
 * **A menu's link to a collection is offered its products' tags alone** ([ADR-660](../architecture/13-decision-log.md#adr-660--a-menus-link-to-a-collection-is-offered-the-tags-of-that-collections-products-alone-a-link-to-all-products-the-shops)), through the

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-660 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-661 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -668,6 +668,7 @@
 | 658 | A product's photo is turned by quarter turns, after its crop is cut, as part of the crop: a photo taken on its side is turned without being cropped | Accepted |
 | 659 | A shop gives an address for replies to its customers' emails: they carry it as their Reply-To, and say a reply reaches the shop | Accepted |
 | 660 | A menu's link to a collection is offered the tags of that collection's products alone, a link to all products the shop's | Accepted |
+| 661 | A refund given as store credit gives back first what the order's own store credit paid, each part expiring as the credit it came from does | Accepted |
 
 ---
 
@@ -23195,3 +23196,24 @@
 * **Alternatives:** **Filtering the shop's tags in the admin:** it would need every product's
   tags and membership in the browser. **Refusing a link's tags none of its products has:** a
   shop may tag products after it builds its menu; left until shops ask.
+
+## ADR-661 · A refund given as store credit gives back first what the order's own store credit paid, each part expiring as the credit it came from does
+
+* **Context:** A cancelled order gives its store credit back to the credits it came from, which
+  expire as they would have (ADR-185); but a refund of some of an order's items given as store
+  credit was a new credit, expiring as the shop chose or never (ADR-184, ADR-613). Credit that
+  was to expire next week came back for a year, or never, so a customer could keep credit alive
+  by buying and returning.
+* **Decision:** A refund given as store credit gives back first what the order's own store
+  credit paid and nothing gave back yet, as credits of their own, each expiring as the credit it
+  came from does and naming it (`source_id`); the latest to expire first, those that never do
+  before them, as the debit took the soonest first. What came from a credit that has expired
+  since is not given back that way, and the rest of the refund is a credit expiring as the shop
+  says, as before. The first of them is the refund's reference, and the customer hears of them
+  once, all of it. Migration 0295 lets a refund's credit name the credit it restores.
+* **Consequences:** Store credit refunded lasts as long as the credit that paid would have; a
+  refund past it is the shop's to set.
+* **Alternatives:** **Reverting the order's debit in part:** a debit is given back once whole,
+  as cancellation does (ADR-185), and a part would leave its allocations half restored.
+  **Giving back credits already expired, ending again at once:** the customer returned the
+  items, and would get nothing for them.
