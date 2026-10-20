@@ -102,6 +102,35 @@ describe.skipIf(!server)('ConfirmationDeskService', () => {
     expect(await desk.next({ ...f.b, actor: ali.actor })).toBeNull();
   });
 
+  it("deals agents the orders given to them first, and others' orders last (ADR-635)", async () => {
+    const big = await waiting(3, 1);
+    const hers = await waiting(1, 2);
+    const his = await waiting(1, 3);
+    const hersToo = await waiting(1, 4);
+    const free = await waiting(1, 5);
+    const [ali, sana] = [agent(), agent()];
+    const give = async (order: OrderRecord, to: TenantContext) =>
+      unwrap(
+        await f.orders.assign(
+          f.a,
+          order.id,
+          { staffMemberId: (to.actor as { userId: string }).userId, name: 'Agent' },
+          { fromOthers: true },
+        ),
+      );
+    await give(hers, sana);
+    await give(his, ali);
+    await give(hersToo, sana);
+
+    // Each their own first, though an order of high value no one has waits longer.
+    expect((await desk.next(ali))?.order.id).toBe(his.id);
+    expect((await desk.next(sana))?.order.id).toBe(hers.id);
+    // One with none of their own: those no one has, the most urgent first, before Sana's.
+    expect((await desk.next(agent()))?.order.id).toBe(big.id);
+    expect((await desk.next(agent()))?.order.id).toBe(free.id);
+    expect((await desk.next(agent()))?.order.id).toBe(hersToo.id);
+  });
+
   it('records calls: unanswered, due again; asked to call back, due then; a wrong number, held', async () => {
     const order = await waiting(1, 1);
     const ali = agent();

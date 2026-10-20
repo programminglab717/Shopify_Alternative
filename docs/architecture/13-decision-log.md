@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-634 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-635 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -642,6 +642,7 @@
 | 632 | An order export's workbook has its rows' totals on sheets beside them: by the day orders were placed and by stage, or, a row per line item, by variant, each ending with every row's; a CSV stays the rows alone | Accepted |
 | 633 | A member of staff is pushed in their browser of an order given to them and of a comment naming them, whatever their role, if they may see orders, number or none, once each, in their language, opening the order and saying neither its customer nor the comment | Accepted |
 | 634 | Owners and managers give up to 250 orders at once to a member of staff, or to no one, among the list's bulk actions; whoever is given them is told once, of them all, on WhatsApp and in their browser | Accepted |
+| 635 | The Confirmation Desk deals an agent the orders given to them first, then those given to no one, and those given to someone else last, each kind the most urgent first | Accepted |
 
 ---
 
@@ -22688,3 +22689,19 @@
   a transaction of its own, and lost if that failed; each order's event stays with its change.
   **Each order told as before:** forty messages for forty orders, paid for each. **Telling the
   exact number given:** the worker would wait for every order's event, which arrive apart.
+
+## ADR-635 · The Confirmation Desk deals an agent the orders given to them first, then those given to no one, and those given to someone else last, each kind the most urgent first
+
+* **Context:** The desk deals each agent the most urgent order due that no one has taken
+  (ADR-073), whoever it is given to (ADR-127). Shops that share out the day's orders among their
+  agents, now many at once (ADR-634), find an agent dealt someone else's while their own wait
+  (status shortcut 61).
+* **Decision:** After the order an agent has taken already, the desk deals them the orders given
+  to them, then those given to no one, and those given to someone else last, each kind the most
+  urgent first, as before: high value, then due longest, then the riskier. An app is given no
+  orders, so it is dealt those no one has before others'. The queue's list is the same for all.
+* **Consequences:** An agent works through their own first, and an order given to an agent who is
+  away is still called, by whoever has nothing else, rather than left waiting.
+* **Alternatives:** **Others' orders never dealt:** one given to an agent off sick would wait
+  until someone took it back. **Own orders only above the urgent:** a high-value order no one
+  has would come before the agent's own, which shops sharing them out do not want.

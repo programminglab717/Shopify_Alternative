@@ -221,8 +221,9 @@ export class ConfirmationDeskService {
   /**
    * Deals the caller the most urgent order due that no one else has taken, theirs for
    * {@link CONFIRMATION_DESK.claimMinutes} minutes, so that no two agents call the same customer:
-   * the one they took already, while they have it and it still waits. Null when none is due, or
-   * outside the shop's calling hours.
+   * the one they took already, while they have it and it still waits; else those given to them
+   * (ADR-635), then those given to no one, and those given to someone else last. Null when none is
+   * due, or outside the shop's calling hours.
    */
   async next(tenant: TenantContext, at: Date = new Date()): Promise<ConfirmationQueueItem | null> {
     const { kind, id: me } = whoIs(tenant.actor);
@@ -232,6 +233,11 @@ export class ConfirmationDeskService {
       if (!callingOf(policy, at).callingNow) return null;
       const due = dueAtOf(policy.waits);
       const mine = sql`o.claimed_by_kind = ${kind} AND o.claimed_by = ${me}::uuid`;
+      // An app is no member of staff: no order is given to it.
+      const given =
+        kind === 'staff'
+          ? sql`CASE WHEN o.assignee_id = ${me}::uuid THEN 0 WHEN o.assignee_id IS NULL THEN 1 ELSE 2 END`
+          : sql`CASE WHEN o.assignee_id IS NULL THEN 1 ELSE 2 END`;
       // Locked as orders are for any change, those another agent is taking passed over.
       const { rows } = await tx.execute<QueueRow>(sql`
         SELECT ${queueColumns(due)}
@@ -239,7 +245,7 @@ export class ConfirmationDeskService {
          WHERE o.shop_id = ${tenant.shopId} AND ${IN_QUEUE} AND ${due} <= ${now}::timestamptz
            AND (o.claimed_until IS NULL OR o.claimed_until <= ${now}::timestamptz OR ${mine})
          ORDER BY (${mine} AND o.claimed_until > ${now}::timestamptz) DESC NULLS LAST,
-                  ${priorityOf(due)}
+                  ${given}, ${priorityOf(due)}
          LIMIT 1
          FOR UPDATE OF o SKIP LOCKED`);
       const row = rows[0];

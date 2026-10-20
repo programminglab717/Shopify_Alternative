@@ -45,6 +45,8 @@ export class ConfirmationDeskResolver {
     description:
       'Deals you the most urgent order due that no one else has taken, yours for 15 minutes, so ' +
       'that no two agents call the same customer; the one you took already while you have it. ' +
+      'Orders given to you come first, then those given to no one, and those given to someone ' +
+      'else last (ADR-635). ' +
       "Confirm or cancel it, or record the call, and ask for the next. Outside the shop's " +
       'calling hours, none.',
   })
