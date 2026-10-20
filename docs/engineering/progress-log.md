@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The shop's files, found by name
+### f59c3b8 · The shop's files, found by name
 
 * **The shop's files are searched by name and kept in the online store's Files tab** ([ADR-636](../architecture/13-decision-log.md#adr-636--the-shops-files-are-searched-by-the-words-of-their-names-and-kept-in-a-files-tab-of-the-online-store-found-added-as-pictures-or-pdfs-their-links-copied-and-deleted)):
   found by the words of their names, their links copied, deleted after asking, and pictures and
