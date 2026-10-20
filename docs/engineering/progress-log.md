@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit refunded
+### 42d93f4 · Store credit refunded
 
 * **A refund given as store credit gives back first what the order's store credit paid** ([ADR-661](../architecture/13-decision-log.md#adr-661--a-refund-given-as-store-credit-gives-back-first-what-the-orders-own-store-credit-paid-each-part-expiring-as-the-credit-it-came-from-does)),
   each part expiring as the credit it came from does; the rest as the shop says.
