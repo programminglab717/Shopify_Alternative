@@ -13,7 +13,7 @@ import {
 } from '@hatti/documents';
 import type { LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
-import type { ParcelShipmentFacts } from '@hatti/orders/public';
+import { pinCode, type ParcelShipmentFacts } from '@hatti/orders/public';
 import { parsePkMobile } from '@hatti/pk';
 
 // Couriers' labels and load sheets (SHP-02, ADR-150): what packers print for the parcels the
@@ -97,6 +97,7 @@ export function shippingLabel(label: ParcelLabel, context: CourierDocumentContex
     )}
     <p class="huge">${text(address.city)}</p>
     ${label.phone && html`<p class="strong">${ltr(label.phone)}</p>`}
+    ${pinCode(address.location, context.language)}
     <hr class="rule" />
     ${
       label.codAmount > 0n

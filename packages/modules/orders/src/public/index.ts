@@ -5,6 +5,7 @@ export {
   locationField,
   locationFormOf,
   mapUrlOf,
+  pinCode,
   pinLine,
   type LocationForm,
 } from '../internal/location.js';

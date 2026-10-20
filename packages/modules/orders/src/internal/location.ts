@@ -1,5 +1,15 @@
 import type { FieldError } from '@hatti/api';
-import { html, ltr, say, text, type Html, type HtmlValue, type Words } from '@hatti/documents';
+import {
+  html,
+  ltr,
+  qrCode,
+  say,
+  text,
+  type Html,
+  type HtmlValue,
+  type Language,
+  type Words,
+} from '@hatti/documents';
 import {
   CITY_REACH_KM,
   distanceKm,
@@ -80,6 +90,11 @@ const WORDS = {
   add: { en: 'Add my location', ur: 'میری لوکیشن شامل کریں' },
   remove: { en: 'Remove the pin', ur: 'پن ہٹائیں' },
   onTheMap: { en: 'See it on the map', ur: 'نقشے پر دیکھیں' },
+  pin: { en: 'Location pin', ur: 'لوکیشن پن' },
+  scan: {
+    en: "Scan it for the way to the customer's door",
+    ur: 'گاہک کے دروازے تک راستے کے لیے اسکین کریں',
+  },
 } satisfies Record<string, Words>;
 
 interface Sentence {
@@ -192,6 +207,23 @@ export function pinLine(point: MapPoint | null | undefined): Html | false {
     html`<a href="${mapUrlOf(point)}" target="_blank" rel="noreferrer"
       >${say('bilingual', { en: 'Location pin on the map', ur: 'نقشے پر لوکیشن پن' })}</a
     >`
+  );
+}
+
+/**
+ * The pin on a printed packing slip or label (ADR-628): a QR code of its address on the map, for
+ * the rider to scan with a phone's camera and be shown the way. Nothing for an address without one.
+ */
+export function pinCode(point: MapPoint | null | undefined, language: Language): Html | false {
+  return (
+    !!point &&
+    html`<section class="pin">
+      ${qrCode(mapUrlOf(point), 'Location pin on the map')}
+      <div>
+        <p class="label">${say(language, WORDS.pin)}</p>
+        <p class="small">${say(language, WORDS.scan)}</p>
+      </div>
+    </section>`
   );
 }
 

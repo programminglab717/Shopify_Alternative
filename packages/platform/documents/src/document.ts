@@ -131,6 +131,7 @@ table { width: 100%; border-collapse: collapse; }
 .footer { margin-top: 1.2em; text-align: center; }
 .barcode { display: block; width: 100%; height: 15mm; fill: #000; }
 .fbr { display: flex; gap: 1em; align-items: center; margin-top: 1em; break-inside: avoid; }
+.pin { display: flex; gap: 0.75em; align-items: center; margin-top: 0.5em; break-inside: avoid; }
 .qr { display: block; flex: none; width: 26mm; height: 26mm; fill: #000; }
 .huge { font-size: 1.8em; font-weight: 800; letter-spacing: 0.02em; }
 .rule { margin: 0.5em 0; border: 0; border-top: 1.5px solid #111827; }
@@ -141,6 +142,8 @@ table { width: 100%; border-collapse: collapse; }
   gap: 4mm;
 }
 .labels > .shipping-label { padding: 3mm; border: 1px dashed #6b7280; overflow: hidden; }
+.shipping-label .pin { margin-top: 0.3em; }
+.shipping-label .qr { width: 18mm; height: 18mm; }
 .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5em; margin-top: 2em; }
 .signatures .box { min-height: 7em; }
 @media screen {

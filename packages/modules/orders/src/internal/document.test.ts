@@ -1,10 +1,11 @@
 import 'reflect-metadata';
 import type { TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
-import { formatDay } from '@hatti/documents';
+import { formatDay, qrCode, toMarkup } from '@hatti/documents';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { creditNoteName, invoiceName, taxYearOf } from './invoice-series.js';
+import { mapUrlOf } from './location.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -121,6 +122,44 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(owner.html).toContain('0300 1234567');
     expect(owner.title).toBe(`Packing slip #${cod.number}`);
     expect(owner.fileName).toBe(`packing-slip-${cod.number}.html`);
+  });
+
+  it("prints the customer's pin as a QR code the rider scans for the way (ADR-628)", async () => {
+    const order = await f.order(f.a, [kurta]);
+    const slip = async (language: 'english' | 'urdu') =>
+      unwrap(
+        await f.documents.render(f.a, [order.id], {
+          kind: 'packing_slip',
+          paper: 'thermal_4x6',
+          language,
+        }),
+      ).html;
+    // Without a pin, nothing of one.
+    expect(await slip('english')).not.toContain('class="pin"');
+
+    const pin = { latitude: 24.921, longitude: 67.0925 };
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET shipping_address = jsonb_set(shipping_address, '{location}', $2::jsonb)
+        WHERE id = $1`,
+      [order.id, JSON.stringify(pin)],
+    );
+    const english = await slip('english');
+    expect(english).toContain(toMarkup(qrCode(mapUrlOf(pin), 'Location pin on the map')));
+    expect(mapUrlOf(pin)).toBe('https://www.google.com/maps/search/?api=1&query=24.921,67.0925');
+    expect(pagesOf(english)[0]).toContain(
+      '0300 1234567 Location pin Scan it for the way to the customer&#39;s door Payment',
+    );
+    expect(await slip('urdu')).toContain('گاہک کے دروازے تک راستے کے لیے اسکین کریں');
+    // An invoice is the customer's: no pin on it.
+    const invoice = unwrap(
+      await f.documents.render(f.a, [order.id], {
+        kind: 'invoice',
+        paper: 'a4',
+        language: 'english',
+      }),
+    );
+    expect(invoice.html).not.toContain('class="pin"');
   });
 
   it('warns on slips of orders not to pack yet, and lists what is left to ship', async () => {

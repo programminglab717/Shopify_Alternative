@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-627 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-628 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -635,6 +635,7 @@
 | 625 | The Ajax cart's answers at the Urdu addresses, `/ur/cart.js` and the rest, give its lines' titles in the shop's Urdu and their addresses under `/ur`, as the Urdu pages show them | Accepted |
 | 626 | The Search listings tab counts the images without words for what they show in a product's or a collection's description too, as it does those in pages' and articles' text | Accepted |
 | 627 | Orders waiting for their first call longer than the shop's target are pushed to its owners, managers and confirmation agents, as the new kind orders_overdue, at most once an hour, within its calling hours alone, opening the Confirmation Desk | Accepted |
+| 628 | A delivery address's pin prints on its packing slip and its courier label as a QR code of its place in Google Maps, for the rider to scan with a phone's camera; an invoice, the customer's, carries none | Accepted |
 
 ---
 
@@ -22530,3 +22531,25 @@
 * **Alternatives:** **A push for each order as it falls overdue:** a busy afternoon would be a
   push a minute. **WhatsApp to the alerts number:** it costs a message each time; the push is
   free and goes to those who call.
+
+## ADR-628 · A delivery address's pin prints on its packing slip and its courier label as a QR code of its place in Google Maps, for the rider to scan with a phone's camera; an invoice, the customer's, carries none
+
+* **Context:** A customer may pin their address where their phone finds them (ADR-259), and
+  the admin and the customer's pages link the pin on the map; but the rider at the door has
+  only the paper on the parcel, and couriers' bookings have no field for a pin (status
+  shortcut 122). Riders in Pakistan find doors by landmarks and calls, each call minutes lost
+  on a parcel that may yet go back. Printed documents already draw QR codes, for FBR's numbers
+  (ADR-556), with a QR encoder of Hatti's own.
+* **Decision:** Where an order's address has a pin, its packing slip, under who it goes to, and
+  its courier's label, under the customer's number, print a QR code of the pin's address in
+  Google Maps, the one the admin links, with "Location pin: scan it for the way to the
+  customer's door" in the document's language. On a label the code is 18 mm a side, so four
+  still fit an A4 sheet; on a slip it is the 26 mm of FBR's. An invoice is the customer's
+  record of what they bought, and carries none. An erased customer's address keeps no pin, so
+  prints none.
+* **Consequences:** A rider with a phone scans the parcel and is shown the way, whatever the
+  courier's systems take. The code says only where the phone was when the customer said they
+  were at the address (ADR-259).
+* **Alternatives:** **A plus code in words:** riders would type it; a scan opens the map.
+  **A `geo:` link:** shorter, but iPhones' cameras don't open it. **The pin in the courier's
+  booking:** their address fields are for the address (ADR-259).

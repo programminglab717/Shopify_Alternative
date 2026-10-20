@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Pins on packing slips and labels
+
+* **A delivery address's pin prints on its packing slip and courier label** ([ADR-628](../architecture/13-decision-log.md#adr-628--a-delivery-addresss-pin-prints-on-its-packing-slip-and-its-courier-label-as-a-qr-code-of-its-place-in-google-maps-for-the-rider-to-scan-with-a-phones-camera-an-invoice-the-customers-carries-none)) as a
+  QR code of its place in Google Maps, for the rider to scan for the way to the door; the
+  invoice carries none.
+* Status shortcut 125 now names the In Urdu tab ([ADR-340](../architecture/13-decision-log.md#adr-340--the-online-stores-in-urdu-tab-lists-the-shops-products-collections-pages-blogs-articles-menus-and-home-page-kind-by-kind-the-newest-first-each-with-how-much-of-its-own-words-is-in-urdu-and-how-much-is-out-of-date-at-first-only-what-is-left-each-opens-its-own-urdu-page)), which already lists what is left
+  to put in Urdu.
+* 3743 tests, one more: the pin's code on slips, and on labels in their test.
+
 ### 2a1c117 · Overdue first calls pushed
 
 * **Orders waiting for their first call longer than the shop's target are pushed** ([ADR-627](../architecture/13-decision-log.md#adr-627--orders-waiting-for-their-first-call-longer-than-the-shops-target-are-pushed-to-its-owners-managers-and-confirmation-agents-as-the-new-kind-orders_overdue-at-most-once-an-hour-within-its-calling-hours-alone-opening-the-confirmation-desk))

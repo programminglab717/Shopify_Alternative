@@ -83,6 +83,18 @@ describe.skipIf(!server)("Couriers' labels and load sheets", () => {
     ]) {
       expect(html).toContain(line);
     }
+    // No pin, no code for it; with one, its QR code for the rider (ADR-628).
+    expect(html).not.toContain('class="pin"');
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET shipping_address = jsonb_set(shipping_address, '{location}', $2::jsonb)
+        WHERE id = $1`,
+      [parcel.orderId, JSON.stringify({ latitude: 31.5104, longitude: 74.3416 })],
+    );
+    const pinned = unwrap(await f.documents.labels(f.a, [parcel.bookingId], english)).html;
+    expect(pinned).toContain('class="pin"');
+    expect(pinned).toContain('<svg class="qr"');
+    expect(pinned).toContain('Scan it for the way to the customer&#39;s door');
     // Packers see the customer's number masked, as on packing slips.
     const packer = unwrap(await f.documents.labels(staff('packer'), [parcel.bookingId], english));
     expect(packer.html).toContain('0300 ••••567');

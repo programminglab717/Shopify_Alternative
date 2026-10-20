@@ -20,6 +20,7 @@ import {
   type TaxSettingsRecord,
 } from '@hatti/tax/public';
 import type { OrderInvoiceRecord } from './invoice-series.js';
+import { pinCode } from './location.js';
 import { taxByRate } from './order-tax.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
@@ -126,7 +127,7 @@ export function packingSlip(order: OrderRecord, context: DocumentContext): Html 
     <section class="columns">
       <div>
         <p class="label">${t(WORDS.shipTo)}</p>
-        ${recipient(order, context)}
+        ${recipient(order, context)} ${pinCode(order.shippingAddress.location, context.language)}
       </div>
       <div class="box">
         <p class="label">${t(WORDS.payment)}</p>
