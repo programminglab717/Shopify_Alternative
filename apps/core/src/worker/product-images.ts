@@ -3,6 +3,7 @@ import {
   cropNameOf,
   hostPreviewsOf,
   imagesPrefixOf,
+  shownImagesPrefixOf,
   videoKeyOf,
   vimeoOembedUrl,
   type ClaimedMedia,
@@ -27,6 +28,11 @@ import { repeat } from './repeat.js';
 /** Images a round takes from a shop, and media gone whose images it removes. */
 const BATCH = 10;
 const REMOVALS = 100;
+/**
+ * How long a crop replaced is kept (ADR-630): past the week the edge may serve a page cached
+ * before, which still names it, while the storefront is down (`stale-if-error`).
+ */
+export const REPLACED_CROP_KEPT_MS = 8 * 24 * 60 * 60_000;
 /** How long a taken image is the taker's: longer than the slowest fetch and check. */
 const LEASE_MS = 5 * 60_000;
 /** Tries at a source that does not answer, over about half an hour, before the image fails. */
@@ -74,7 +80,9 @@ export class ProductImages {
         logger?.warn({ err: error, shopId }, 'product images not made ready');
       }
     }
-    return { ready, removed: await this.remove() };
+    const removed = await this.remove();
+    await this.removeCrops(at);
+    return { ready, removed };
   }
 
   /** Makes a batch of the shop's images due at `at` ready. How many were. */
@@ -101,6 +109,28 @@ export class ProductImages {
     }
     for (const [shopId, mediaIds] of byShop) await processing.removed(shopId, mediaIds);
     return gone.length;
+  }
+
+  /**
+   * Removes from storage the files of crops replaced over {@link REPLACED_CROP_KEPT_MS} before
+   * `at`, a batch of them (ADR-630): what was made of a crop the image is no longer shown in. A
+   * crop shown again meanwhile stays. The edge keeps what it has, as images do a year. How many
+   * crops' files went.
+   */
+  async removeCrops(at: Date = new Date()): Promise<number> {
+    const { processing, storage } = this.options;
+    const replaced = await processing.cropRemovals(
+      new Date(at.getTime() - REPLACED_CROP_KEPT_MS),
+      REMOVALS,
+    );
+    let removed = 0;
+    for (const { shopId, mediaId, crop } of replaced) {
+      const gone = await processing.removeCrop(shopId, mediaId, crop, () =>
+        storage.deletePrefix(shownImagesPrefixOf(shopId, mediaId, crop)),
+      );
+      if (gone) removed += 1;
+    }
+    return removed;
   }
 
   /** Makes now, every `intervalMs`, a round never overlapping the last. */

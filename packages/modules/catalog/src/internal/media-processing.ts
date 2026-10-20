@@ -228,6 +228,52 @@ export class MediaProcessing {
     return rows.map((row) => ({ shopId: row.shop_id, mediaId: row.media_id }));
   }
 
+  /**
+   * Crops an image was shown in before it was cropped again, or shown whole, until `before`
+   * (ADR-630): a batch, the longest replaced first, for the worker to remove their files.
+   */
+  async cropRemovals(
+    before: Date,
+    limit: number,
+  ): Promise<{ shopId: string; mediaId: string; crop: string }[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string; media_id: string; crop: string }>(sql`
+        SELECT shop_id, media_id, crop FROM catalog.media_crop_removals
+         WHERE created_at < ${before}
+         ORDER BY created_at, media_id, crop
+         LIMIT ${limit}`),
+    );
+    return rows.map((row) => ({ shopId: row.shop_id, mediaId: row.media_id, crop: row.crop }));
+  }
+
+  /**
+   * Removes a crop replaced (ADR-630) through `remove`, which deletes its files, while its
+   * product is locked, so that it is not cropped so again meanwhile; then forgets it. Nothing for
+   * one shown again since, whose files stay. Whether its files were removed.
+   */
+  async removeCrop(
+    shopId: string,
+    mediaId: string,
+    crop: string,
+    remove: () => Promise<void>,
+  ): Promise<boolean> {
+    return this.db.tenant(shopId, async (tx) => {
+      // Cropping an image locks its product first (ADR-257), as this does.
+      await tx.execute(sql`
+        SELECT 1 FROM catalog.products p
+          JOIN catalog.product_media m ON m.shop_id = p.shop_id AND m.product_id = p.id
+         WHERE m.shop_id = ${shopId} AND m.id = ${mediaId}
+           FOR UPDATE OF p`);
+      const { rows } = await tx.execute<{ crop: string }>(sql`
+        DELETE FROM catalog.media_crop_removals
+         WHERE shop_id = ${shopId} AND media_id = ${mediaId} AND crop = ${crop}
+        RETURNING crop`);
+      if (rows.length === 0) return false;
+      await remove();
+      return true;
+    });
+  }
+
   /** Records that the images of media gone were removed. */
   async removed(shopId: string, mediaIds: readonly string[]): Promise<void> {
     if (mediaIds.length === 0) return;

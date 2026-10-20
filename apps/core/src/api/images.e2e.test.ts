@@ -343,6 +343,61 @@ describe.skipIf(!server)("Products' images: uploaded or fetched, checked, served
     expect((await get(image.url)).statusCode).toBe(404);
   });
 
+  it("removes a crop's files a week after the image is cropped otherwise, unless shown so again (ADR-630)", async () => {
+    const product = (
+      await gql('mutation { productCreate(input: { title: "Ajrak Shawl" }) { product { id } } }')
+    ).product;
+    const whole = await sharp({
+      create: { width: 800, height: 600, channels: 3, background: '#7a3d1f' },
+    })
+      .jpeg()
+      .toBuffer();
+    const created = await gql(
+      `mutation ($id: ID!, $media: [CreateMediaInput!]!) {
+        productCreateMedia(productId: $id, media: $media) { media { id } userErrors { field } } }`,
+      { id: product.id, media: [{ originalSource: 'https://cdn.example.pk/ajrak.jpg' }] },
+    );
+    const mediaId = created.media[0].id as string;
+    const uuid = fromPublicId(mediaId, 'media');
+    const worker = images({ 'https://cdn.example.pk/ajrak.jpg': whole });
+    await worker.process(shop, new Date(Date.now() + 60_000));
+    const crop = (left: number, top: number) =>
+      gql(
+        `mutation ($id: ID!, $media: [UpdateMediaInput!]!) {
+          productUpdateMedia(productId: $id, media: $media) { userErrors { field } } }`,
+        {
+          id: product.id,
+          media: [{ id: mediaId, crop: left < 0 ? null : { left, top, width: 400, height: 300 } }],
+        },
+      );
+    const kept = async (name: string) =>
+      (await api.storage.head(`shops/${shop}/images/${uuid}/${name}/clean.jpg`)) !== null;
+    const later = (days: number) => new Date(Date.now() + days * 24 * 60 * 60_000);
+
+    // Cropped, then cropped otherwise: the crop before stays for a week and a day.
+    expect((await crop(0, 0)).userErrors).toEqual([]);
+    expect((await crop(400, 300)).userErrors).toEqual([]);
+    expect(await worker.removeCrops(later(7))).toBe(0);
+    expect(await kept('crop-0-0-400-300')).toBe(true);
+    expect(await worker.removeCrops(later(9))).toBe(1);
+    expect(await kept('crop-0-0-400-300')).toBe(false);
+    expect(await kept('crop-400-300-400-300')).toBe(true);
+    expect(await worker.removeCrops(later(9))).toBe(0);
+
+    // Shown so again before it went, a crop stays, and the one shown between goes.
+    expect((await crop(0, 0)).userErrors).toEqual([]);
+    expect((await crop(400, 300)).userErrors).toEqual([]);
+    expect(await worker.removeCrops(later(9))).toBe(1);
+    expect(await kept('crop-400-300-400-300')).toBe(true);
+    expect(await kept('crop-0-0-400-300')).toBe(false);
+
+    // Shown whole again, its crop goes, and the whole stays.
+    expect((await crop(-1, 0)).userErrors).toEqual([]);
+    expect(await worker.removeCrops(later(9))).toBe(1);
+    expect(await kept('crop-400-300-400-300')).toBe(false);
+    expect(await api.storage.head(`shops/${shop}/images/${uuid}/clean.jpg`)).not.toBeNull();
+  });
+
   it("crops a product's photos to the product in a square through the Admin API (CAT-21, ADR-503)", async () => {
     const product = (
       await gql(

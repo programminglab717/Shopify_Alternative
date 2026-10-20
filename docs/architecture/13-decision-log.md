@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-629 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-630 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -637,6 +637,7 @@
 | 627 | Orders waiting for their first call longer than the shop's target are pushed to its owners, managers and confirmation agents, as the new kind orders_overdue, at most once an hour, within its calling hours alone, opening the Confirmation Desk | Accepted |
 | 628 | A delivery address's pin prints on its packing slip and its courier label as a QR code of its place in Google Maps, for the rider to scan with a phone's camera; an invoice, the customer's, carries none | Accepted |
 | 629 | A customer whose order has part of what it waits for before it ships, by transfer or as staff record it, hears what came, what is left to pay and its page, as the new order_part_paid, once for each sum received | Accepted |
+| 630 | A crop an image is no longer shown in has its files removed from storage by the worker eight days after, past the week the edge may serve a page cached before; a crop shown again meanwhile stays, and the edge keeps what it has | Accepted |
 
 ---
 
@@ -22577,3 +22578,26 @@
   (ADR-171), and "Rs 2,000 received, Rs 3,250 left" reads as plainly. **Waiting for the
   reminder before the order is cancelled (ADR-174):** it comes a day before, too late for a
   customer who thought they had paid.
+
+## ADR-630 · A crop an image is no longer shown in has its files removed from storage by the worker eight days after, past the week the edge may serve a page cached before; a crop shown again meanwhile stays, and the edge keeps what it has
+
+* **Context:** A crop's clean copy, and every size and format made of it, live in a folder of
+  their own beside the image's (ADR-257); cropping the image again, or showing it whole, left
+  the folder until the media itself went (status shortcut 120). A shop that tries a few crops
+  of every photo keeps paying for each. A page cached before the change still names the old
+  crop: the storefront's pages are purged when the product changes, but the edge may serve a
+  stale one for a week while the storefront is down (`stale-if-error`), and the images route
+  serves only crops whose clean copy is kept.
+* **Decision:** When an image's crop changes, a trigger on its media (migration 0285) records
+  the crop it was shown in before, by its folder's name; showing that crop again before it goes
+  forgets it. The worker's image round removes, a hundred at a time, the folders of crops
+  recorded more than eight days before, each with its product locked as cropping locks it, so
+  that the image cannot be cropped so again meanwhile. The edge keeps the copies it has, a year
+  as every image's, so a page it still holds naming the crop shows it.
+* **Consequences:** Storage keeps an image's current crop and its whole, and old crops for a
+  week and a day. A page naming a crop past then that the edge does not hold shows no image
+  there.
+* **Alternatives:** **Removing at once:** pages the edge serves stale would lose their images.
+  **Purging the edge too:** it would take images from pages still cached, for no saving.
+  **Keeping a count of pages naming each crop:** the storefront renders pages as asked and keeps
+  no list of what they name.
