@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Overdue first calls pushed
+### 2a1c117 · Overdue first calls pushed
 
 * **Orders waiting for their first call longer than the shop's target are pushed** ([ADR-627](../architecture/13-decision-log.md#adr-627--orders-waiting-for-their-first-call-longer-than-the-shops-target-are-pushed-to-its-owners-managers-and-confirmation-agents-as-the-new-kind-orders_overdue-at-most-once-an-hour-within-its-calling-hours-alone-opening-the-confirmation-desk))
   to its owners, managers and confirmation agents, at most once an hour and within its calling
