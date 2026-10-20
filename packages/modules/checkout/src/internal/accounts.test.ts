@@ -1264,6 +1264,34 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await formOf(token)).toMatchObject({ name: '', phone: '' });
   });
 
+  it('takes a session signed in to the account as proof of its number when placing (ADR-586)', async () => {
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }));
+    const token = await signIn(JAZZ);
+    const by = (account: string) => ({ client: { ip: null, userAgent: null, account } });
+    // Its own number: placed without a code, proved when the session signed in with it.
+    const own = await checkout();
+    const placed = await f.checkouts.place(own.secret, own.shown, FORM, by(token));
+    expect(placed.kind).toBe('placed');
+    const { rows } = await f.admin.query<{ phone_verified_at: Date | null }>(
+      'SELECT phone_verified_at FROM orders.orders',
+    );
+    expect(rows).toEqual([{ phone_verified_at: expect.any(Date) as unknown }]);
+    expect(await sent('one_time_code')).toEqual([]);
+
+    // Another number, another shop's session, one that is none or over: a code asked for.
+    const inB = await signIn(JAZZ, f.b);
+    const asked = async (phone: string, account: string) => {
+      const { secret, shown } = await checkout();
+      const view = await f.checkouts.place(secret, shown, { ...FORM, phone }, by(account));
+      return view.kind === 'open' ? view.problem?.kind : view.kind;
+    };
+    expect(await asked(ZONG, token)).toBe('code');
+    expect(await asked(JAZZ, inB)).toBe('code');
+    expect(await asked(JAZZ, 'x'.repeat(43))).toBe('code');
+    await f.accounts.signOut(f.a.shopId, token);
+    expect(await asked(JAZZ, token)).toBe('code');
+  });
+
   it('sweeps codes to sign in with once their day is up', async () => {
     await f.accounts.startSignIn(f.a.shopId, { phone: JAZZ });
     await f.accounts.startSignIn(f.a.shopId, { phone: ZONG });

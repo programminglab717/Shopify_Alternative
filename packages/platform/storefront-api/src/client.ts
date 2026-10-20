@@ -244,6 +244,7 @@ export class StorefrontApiClient {
     const ids = Object.entries(client?.browserIds ?? {}).filter(([, value]) => value);
     if (ids.length > 0) from[CLIENT_BROWSER_IDS_HEADER] = new URLSearchParams(ids).toString();
     if (client?.proof) from[CLIENT_PROOF_HEADER] = client.proof;
+    if (client?.account) from[ACCOUNT_TOKEN_HEADER] = client.account;
     // Opened by a shopper signed in to their account: filled in from it (ADR-585).
     const response = form
       ? await this.#request('POST', path, null, form, from)

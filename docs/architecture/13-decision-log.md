@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-585 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-586 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -593,6 +593,7 @@
 | 583 | A customer's address book is kept with their account, each address checked as checkout's are, one the default while there are any | Accepted |
 | 584 | The address book has its own page on the storefront, as Shopify's /account/addresses, its forms posting as Shopify's do | Accepted |
 | 585 | A signed-in shopper's checkout opens filled in from their default address, or with the number they signed in with | Accepted |
+| 586 | A shopper's session signed in to their account proves its number at checkout, where the shop asks for a code | Accepted |
 
 ---
 
@@ -21617,3 +21618,24 @@
   page to carry; the default, changed by hand, does for most orders, and the book's page sets
   it. **Taking the session as proof of the number for placing:** left for its own decision, as it
   touches who checkout trusts.
+
+## ADR-586 · A shopper's session signed in to their account proves its number at checkout, where the shop asks for a code
+
+* **Context:** A shopper signed in to their account (ADR-570) proved their number by a code to
+  do it, and their checkout opens filled in with it (ADR-585), yet placing an order the shop's
+  risk rules ask a code of (ADR-148) sends them another.
+* **Decision:**
+  * **The session goes with what is posted too,** as where the shopper placed the order from
+    (`x-hatti-account` with a checkout's POST), only as proof: this amends ADR-585, under which it
+    went with the page asked for alone. What is typed is still checked as typed.
+  * **It proves the number it signed in with,** where the shop asks for a code, as a browser's
+    proof does (ADR-199): an order to that number is placed without a code, and keeps when the
+    session signed in as when its number was proved. Another number, another shop's session,
+    one that is over or none: the code is asked for as before.
+  * **Never to spend store credit:** as with a browser's proof, the number's credit is spent only
+    once a code proves it in this checkout (ADR-186).
+* **Consequences:** A signed-in shopper orders again without a code. A session stolen with its
+  cookie could place an order to its own number without one, as a browser's proof could; it
+  cannot change the number, and signing out ends it.
+* **Alternatives:** **Letting the session spend store credit:** the account page shows the credit,
+  but spending it is kept to a code at checkout, as for any other proof kept in a cookie.

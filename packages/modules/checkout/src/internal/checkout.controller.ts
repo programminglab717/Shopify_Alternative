@@ -234,12 +234,15 @@ export class StorefrontCheckoutController {
     @Headers(CLIENT_USER_AGENT_HEADER) userAgent: string | undefined,
     @Headers(CLIENT_BROWSER_IDS_HEADER) browserIds: string | undefined,
     @Headers(CLIENT_PROOF_HEADER) proof: string | undefined,
+    @Headers(ACCOUNT_TOKEN_HEADER) account: string | undefined,
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
     const client = {
       ip: ip ?? null,
       userAgent: userAgent ?? null,
       proof: proof?.slice(0, 100) ?? null,
+      // The shopper's session, proving the number it signed in with (ADR-586).
+      account: account?.slice(0, 128) ?? null,
       // As a query string: `fbp=…&fbc=…`. The order keeps those in Meta's format.
       browserIds: browserIds
         ? browserIdsOf(Object.fromEntries(new URLSearchParams(browserIds.slice(0, 2048))))

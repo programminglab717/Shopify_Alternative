@@ -171,13 +171,20 @@ describe('StorefrontApiClient', () => {
       { ip: '203.0.113.7', userAgent: null },
       'session-secret',
     );
-    // The session's secret goes with the page asked for alone.
+    // Posted, with where the shopper placed the order from, proving their number (ADR-586).
+    await client.checkoutPage(
+      'shop-1',
+      'c-secret',
+      { name: 'Ayesha' },
+      { ip: '203.0.113.7', userAgent: null, account: 'session-secret' },
+    );
     expect(
       requests.map((request) => [request.method, request.headers.get('x-hatti-account')]),
     ).toEqual([
       ['GET', 'session-secret'],
       ['GET', null],
       ['POST', null],
+      ['POST', 'session-secret'],
     ]);
   });
 

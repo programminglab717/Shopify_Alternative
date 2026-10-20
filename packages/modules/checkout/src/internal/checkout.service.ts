@@ -423,6 +423,11 @@ export interface CheckoutClient {
    * lately (ADR-199).
    */
   proof?: string | null;
+  /**
+   * The secret of the shopper's session signed in to their account on the shop (ADR-586), which
+   * proves the number it signed in with.
+   */
+  account?: string | null;
 }
 
 export type CheckoutView =
@@ -930,12 +935,16 @@ export class CheckoutService {
         withCredit || asksCode
           ? await numberVerifiedIn(tx, found.shopId, found.checkoutId, address.phone)
           : null;
-      // Or proved in this browser lately (ADR-199): enough where the shop's risk rules ask, never
-      // to spend the number's credit.
+      // Or proved in this browser lately (ADR-199), or by the shopper's session signed in to their
+      // account with it (ADR-586): enough where the shop's risk rules ask, never to spend the
+      // number's credit.
       const verifiedAt =
         codedAt ??
         (asksCode && client?.proof
           ? await provedByBrowserIn(tx, found.shopId, client.proof, address.phone)
+          : null) ??
+        (asksCode && client?.account
+          ? await provedBySessionIn(tx, found.shopId, client.account, address.phone)
           : null);
       if (withCredit) {
         // The number's credit is the shopper's to spend once they prove it is theirs.
@@ -1880,6 +1889,21 @@ async function accountFormIn(tx: Tx, shopId: string, secret: string): Promise<Ch
     landmark: address.landmark ?? '',
     province: address.provinceCode ?? '',
   };
+}
+
+/**
+ * When the account session `secret` proved `phone` (ADR-586): when it signed in with it, by a
+ * code sent to it; null for a session of another number, one over, or none of the shop's.
+ */
+async function provedBySessionIn(
+  tx: Tx,
+  shopId: string,
+  secret: string,
+  phone: string,
+): Promise<Date | null> {
+  if (secret.length > 128) return null;
+  const session = await sessionIn(tx, shopId, secret);
+  return session?.phone === phone ? session.signedInAt : null;
 }
 
 /** A number in E.164, as a shopper types it in Pakistan: "+923001234567" as "0300 1234567". */

@@ -1638,6 +1638,20 @@ describe('Carts', () => {
       headers: { host: 'localhost', cookie: `hatti_account=${ACCOUNT_TOKEN}; hatti_signed_in=1` },
     });
     expect(core.pages.pop()).toEqual({ token: 'c-secret', form: null, account: ACCOUNT_TOKEN });
+    // Posted, where the shopper placed it from, proving the number it signed in with (ADR-586).
+    await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret',
+      headers: {
+        ...FORM,
+        cookie: `hatti_account=${ACCOUNT_TOKEN}; hatti_signed_in=1`,
+        'sec-fetch-site': 'same-origin',
+      },
+      payload: form({ shown: 'digest' }),
+    });
+    const posted = core.pages.pop()!;
+    expect(posted).toMatchObject({ form: { shown: 'digest' }, client: { account: ACCOUNT_TOKEN } });
+    expect(posted).not.toHaveProperty('account');
 
     core.page = { placed: true };
     const placed = await app.inject({

@@ -103,6 +103,11 @@ export interface CheckoutClient {
   browserIds?: { fbp?: string; fbc?: string; ttp?: string; ga?: string; consent?: 'denied' };
   /** The token of a number the browser proved lately, from its cookie (ADR-199). */
   proof?: string;
+  /**
+   * The secret of the shopper's session signed in to their account, from its cookie (ADR-586),
+   * which proves the number it signed in with.
+   */
+  account?: string;
 }
 
 /** Where a checkout's page is, on a shop's storefront and on the core's own address alike. */

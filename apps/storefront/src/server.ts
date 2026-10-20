@@ -1642,16 +1642,19 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
           () => false,
         ));
       const browserIds = browserIdsOf(request.headers.cookie, asks);
-      // And the number this browser proved lately at the shop's checkout (ADR-199).
+      // And the number this browser proved lately at the shop's checkout (ADR-199), and the
+      // shopper's session signed in to their account, which proved its own (ADR-586).
       const proof = cookieOf(request.headers.cookie, NUMBER_PROOF_COOKIE);
+      const signedIn = accountTokenOf(request.headers.cookie);
       const client = {
         ip: request.ip,
         userAgent: request.headers['user-agent'] ?? null,
         ...(browserIds && { browserIds }),
         ...(proof && { proof }),
+        ...(signedIn && { account: signedIn }),
       };
       // Opened by a shopper signed in to their account, filled in from it (ADR-585).
-      const account = posted ? null : accountTokenOf(request.headers.cookie);
+      const account = posted ? null : signedIn;
       const page = await core.checkoutPage(
         found.shopId,
         token,
