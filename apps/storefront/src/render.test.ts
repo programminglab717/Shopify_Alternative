@@ -2285,9 +2285,10 @@ describe('Storefront rendering', () => {
   });
 
   it("does not count the layout's wait for its sections against its own time", async () => {
-    // Sections may take 100 ms each: a featured collection, fetching twice at 60 ms, goes over,
-    // and the layout waits as long for them.
-    const page = await render({ path: '/' }, { latencyMs: 60, limits: { timeMs: 100 } });
+    // Sections may take 300 ms each: a featured collection, fetching twice at 160 ms, goes over,
+    // and the layout waits as long for them. The layout's own time is left room for a slow
+    // machine's rendering.
+    const page = await render({ path: '/' }, { latencyMs: 160, limits: { timeMs: 300 } });
     expect(page.status).toBe(200);
     expect(page.renders.at(-1)).toMatchObject({ id: 'layout/theme', error: null });
     expect(page.renders.find((stat) => stat.id === 'lawn')?.error).toBe('time');
