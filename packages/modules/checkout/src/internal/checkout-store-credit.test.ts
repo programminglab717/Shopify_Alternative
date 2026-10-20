@@ -5,7 +5,7 @@ import { formatMoney, money } from '@hatti/money';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
-import type { CheckoutForm, CheckoutView } from './checkout.service.js';
+import { creditAmountOf, type CheckoutForm, type CheckoutView } from './checkout.service.js';
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -162,5 +162,62 @@ describe.skipIf(!server)('Store credit at checkout (ORD-09, ADR-186)', () => {
     const placed = await f.checkouts.place(secret, view.shown, FORM);
     expect(placed.kind === 'placed' && placed.storeCredit).toBe(0n);
     expect(await orderCount()).toBe(1);
+  });
+
+  it('spends as much of the credit as the shopper chooses, and says what is not an amount (ADR-592)', async () => {
+    const customerId = await give('0300 1234567', '1500');
+    const { secret, view } = await checkout();
+    // Not an amount: said so, and nothing sent or placed.
+    const wrong = await f.checkouts.place(secret, view.shown, {
+      ...FORM,
+      storeCredit: '1',
+      storeCreditAmount: 'some',
+    });
+    expect(problemOf(wrong)).toEqual({ kind: 'store_credit_amount' });
+    const page = checkoutPage(wrong).html;
+    expect(page).toContain('Give how much of your store credit to spend in rupees');
+    expect(page).toMatch(/name="storeCreditAmount"[^>]*value="some"[^>]*aria-invalid="true"/);
+    expect(await sent()).toEqual([]);
+    expect(await orderCount()).toBe(0);
+
+    // Rs 600 of it, typed as shoppers type it.
+    const chosen = { ...FORM, storeCredit: '1', storeCreditAmount: 'Rs 600' };
+    await f.checkouts.place(secret, view.shown, chosen);
+    const [code] = await sent();
+    const placed = await f.checkouts.place(secret, view.shown, { ...chosen, code: code!.code });
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    expect(placed.storeCredit).toBe(600_00n);
+    const [account] = await credit.accountsOf(f.a, customerId);
+    expect(account!.balance).toBe(900_00n);
+
+    // More than it has: as much as it has.
+    const next = await checkout();
+    const more = { ...FORM, storeCredit: '1', storeCreditAmount: '5,000' };
+    await f.checkouts.place(next.secret, next.view.shown, more);
+    const again = (await sent()).at(-1)!;
+    const all = await f.checkouts.place(next.secret, next.view.shown, {
+      ...more,
+      code: again.code,
+    });
+    expect(all.kind === 'placed' && all.storeCredit).toBe(900_00n);
+  });
+
+  it('reads how much a shopper chose to spend, in rupees as typed', () => {
+    expect(
+      ['', ' ', '1500', '1,500', 'Rs 1,500.5', 'rs. 20.25', '0', '1.234', '-5', 'ten'].map(
+        creditAmountOf,
+      ),
+    ).toEqual([
+      null,
+      null,
+      1_500_00n,
+      1_500_00n,
+      1_500_50n,
+      20_25n,
+      'invalid',
+      'invalid',
+      'invalid',
+      'invalid',
+    ]);
   });
 });

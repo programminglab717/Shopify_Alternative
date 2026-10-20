@@ -1315,6 +1315,30 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await asked(JAZZ, token)).toBe('code');
   });
 
+  it("shows a signed-in shopper their number's store credit at checkout, not another's (ADR-592)", async () => {
+    const token = await signIn(JAZZ);
+    // No customer, or no credit: none.
+    expect(await f.checkouts.creditOf(f.a.shopId, token)).toBeNull();
+    const ayesha = (await order(JAZZ)).customerId;
+    expect(await f.checkouts.creditOf(f.a.shopId, token)).toBeNull();
+    unwrap(
+      await credit.credit(f.a, { customerId: ayesha }, { amount: '750', currencyCode: 'PKR' }),
+    );
+    expect(await f.checkouts.creditOf(f.a.shopId, token)).toBe(750_00n);
+    // Another shop's session, or none, reads none.
+    expect(await f.checkouts.creditOf(f.b.shopId, token)).toBeNull();
+    expect(await f.checkouts.creditOf(f.a.shopId, 'x'.repeat(43))).toBeNull();
+
+    const { secret } = await checkout();
+    const view = await f.checkouts.view(secret);
+    if (view.kind !== 'open') throw new Error('Expected an open checkout');
+    expect(view.storeCredit).toBe(true);
+    expect(checkoutPage({ ...view, creditBalance: 750_00n }).html).toContain(
+      'Your store credit: Rs 750',
+    );
+    expect(checkoutPage(view).html).not.toContain('Your store credit');
+  });
+
   it("offers a signed-in shopper's saved addresses at checkout, filling in the one chosen (ADR-587)", async () => {
     const token = await signIn(JAZZ);
     const by = (account?: string) => ({

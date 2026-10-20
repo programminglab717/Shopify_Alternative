@@ -173,6 +173,11 @@ export interface CheckoutForm {
    */
   storeCredit?: string;
   /**
+   * How much of the credit to spend, in rupees as typed: "1500" or "1,500.50" (ADR-592); blank,
+   * or absent, for as much as it pays.
+   */
+  storeCreditAmount?: string;
+  /**
    * The channels whose box for the shop's news and offers the shopper ticked, space-separated:
    * "whatsapp email" (ADR-187); blank, or absent, for none.
    */
@@ -255,6 +260,7 @@ export const EMPTY_FORM: CheckoutForm = {
   code: '',
   resend: '',
   storeCredit: '',
+  storeCreditAmount: '',
   marketing: '',
   latitude: '',
   longitude: '',
@@ -335,6 +341,8 @@ export type CheckoutProblem =
   | { kind: 'refused' }
   /** The shopper asked to pay with store credit, and the number they proved has none (ADR-186). */
   | { kind: 'no_store_credit' }
+  /** How much of the store credit to spend was not an amount of rupees (ADR-592). */
+  | { kind: 'store_credit_amount' }
   /**
    * Checkout took as many orders as it takes lately from the shopper's number, or from their
    * internet address (CHK-18).
@@ -503,6 +511,11 @@ export type CheckoutView =
        * another of its addresses; absent without a session, or a book.
        */
       book?: readonly CheckoutSavedAddress[];
+      /**
+       * The store credit of the number the shopper is signed in to their account with (ADR-592),
+       * where the page offers to pay with credit and it has some; spent once a code proves it.
+       */
+      creditBalance?: bigint;
     }
   | {
       kind: 'placed';
@@ -629,6 +642,21 @@ export class CheckoutService {
           isDefault: record.isDefault,
         };
       });
+    });
+  }
+
+  /**
+   * The store credit of the number the account session `secret` is signed in with (ADR-592), in
+   * the shop's currency: null without a session, or credit.
+   */
+  async creditOf(shopId: string, secret: string): Promise<bigint | null> {
+    if (secret.length > 128) return null;
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, secret);
+      if (!session) return null;
+      const { currency } = await shopProfile(tx, shopId);
+      const credit = await storeCreditOfPhoneIn(tx, shopId, session.phone, currency);
+      return credit > 0n ? credit : null;
     });
   }
 
@@ -1003,6 +1031,11 @@ export class CheckoutService {
         (asksCode && client?.account
           ? await provedBySessionIn(tx, found.shopId, client.account, address.phone)
           : null);
+      // How much of it the shopper chose to spend, rupees to minor units; null for all it pays.
+      const creditUpTo = withCredit ? creditAmountOf(form.storeCreditAmount) : null;
+      if (creditUpTo === 'invalid') {
+        return { ...view, form, problem: { kind: 'store_credit_amount' } };
+      }
       if (withCredit) {
         // The number's credit is the shopper's to spend once they prove it is theirs.
         if (!codedAt) throw new NeedsCode();
@@ -1183,7 +1216,13 @@ export class CheckoutService {
       }
       // The shopper's store credit pays what it can of it (ADR-186).
       const storeCredit = withCredit
-        ? await this.orders.payPlacedWithStoreCreditIn(tx, found.shopId, placed.value.id)
+        ? await this.orders.payPlacedWithStoreCreditIn(
+            tx,
+            found.shopId,
+            placed.value.id,
+            undefined,
+            creditUpTo,
+          )
         : 0n;
       // The gift card applied pays what it can of the rest (ADR-449); one that can't since the
       // page was shown undoes the order.
@@ -1974,4 +2013,21 @@ async function provedBySessionIn(
 function typedPhone(phone: string): string {
   const pk = /^\+92(\d{3})(\d{7})$/.exec(phone);
   return pk ? `0${pk[1]} ${pk[2]}` : phone;
+}
+
+/**
+ * How much of the store credit the shopper chose to spend (ADR-592): rupees as typed, with commas,
+ * "Rs" or paisa, in minor units; null for blank, as much as it pays; "invalid" for anything else,
+ * or nothing.
+ */
+export function creditAmountOf(typed: string | undefined): bigint | null | 'invalid' {
+  const text = (typed ?? '')
+    .replace(/^\s*rs\.?\s*/i, '')
+    .replace(/,/g, '')
+    .trim();
+  if (text === '') return null;
+  const match = /^(\d{1,9})(?:\.(\d{1,2}))?$/.exec(text);
+  if (!match) return 'invalid';
+  const minor = BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'));
+  return minor > 0n ? minor : 'invalid';
 }

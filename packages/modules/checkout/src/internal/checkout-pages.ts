@@ -431,8 +431,16 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
           )}
           ${giftMessageField(view.gift, form)}
           ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
-          ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
-          ${agreement && paragraphs(agreement, 'small muted')}
+          ${
+            view.storeCredit &&
+            storeCreditChoice(
+              form.storeCredit === '1',
+              form.storeCreditAmount ?? '',
+              view.creditBalance ?? null,
+              problem?.kind === 'store_credit_amount',
+            )
+          }
+          ${asked && codeField()} ${agreement && paragraphs(agreement, 'small muted')}
           <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
           ${asked && codeAgain(asked.channel)}
         </form>`,
@@ -546,20 +554,54 @@ function marketingChoices(
 
 /**
  * Paying with the store credit the shopper's number has (ADR-186): theirs once they prove the
- * number with a code, which the page asks for as it places the order.
+ * number with a code, which the page asks for as it places the order; as much as it pays, or as
+ * much as they choose (ADR-592). A shopper signed in to their account sees their number's credit,
+ * as their account page shows it.
  */
-function storeCreditChoice(checked: boolean): Html {
-  return html`<label class="choice">
-    <input type="checkbox" name="storeCredit" value="1" ${checked && html`checked`} />
-    <span
-      ><span lang="en"
-        >Pay with my store credit. We send a code to your number to check it is yours.</span
-      ><span lang="ur" dir="rtl"
-        >میرے اسٹور کریڈٹ سے ادائیگی کریں۔ نمبر آپ کا ہونے کی تصدیق کے لیے ہم اس پر کوڈ بھیجیں
-        گے۔</span
-      ></span
+function storeCreditChoice(
+  checked: boolean,
+  typed: string,
+  balance: bigint | null,
+  wrong: boolean,
+): Html {
+  return html`<div class="field">
+    <label class="choice">
+      <input type="checkbox" name="storeCredit" value="1" ${checked && html`checked`} />
+      <span
+        ><span lang="en"
+          >Pay with my store credit. We send a code to your number to check it is yours.</span
+        ><span lang="ur" dir="rtl"
+          >میرے اسٹور کریڈٹ سے ادائیگی کریں۔ نمبر آپ کا ہونے کی تصدیق کے لیے ہم اس پر کوڈ بھیجیں
+          گے۔</span
+        ></span
+      >
+    </label>
+    ${
+      balance !== null &&
+      html`<p class="small muted">
+        ${say('bilingual', {
+          en: `Your store credit: ${amount(balance)}`,
+          ur: `آپ کا اسٹور کریڈٹ: ${amount(balance)}`,
+        })}
+      </p>`
+    }
+    <label class="label" for="storeCreditAmount"
+      >${say('bilingual', {
+        en: 'How much of it to spend, in rupees (leave blank for as much as it pays)',
+        ur: 'کتنا خرچ کرنا ہے، روپوں میں (جتنا ادا ہو سکے اس کے لیے خالی چھوڑیں)',
+      })}</label
     >
-  </label>`;
+    <input
+      id="storeCreditAmount"
+      name="storeCreditAmount"
+      type="text"
+      inputmode="decimal"
+      maxlength="20"
+      dir="ltr"
+      value="${typed}"
+      ${wrong && html`aria-invalid="true"`}
+    />
+  </div>`;
 }
 
 /**
@@ -1590,6 +1632,11 @@ function problemWords(
       return {
         en: "Sorry, the shop can't take orders right now. Please try again later.",
         ur: 'معذرت، دکان ابھی آرڈر نہیں لے سکتی۔ براہ کرم بعد میں دوبارہ کوشش کریں۔',
+      };
+    case 'store_credit_amount':
+      return {
+        en: 'Give how much of your store credit to spend in rupees, like 1500, or leave it blank.',
+        ur: 'اسٹور کریڈٹ میں سے کتنا خرچ کرنا ہے روپوں میں لکھیں، جیسے 1500، یا خالی چھوڑ دیں۔',
       };
     case 'no_store_credit':
       return {

@@ -2550,17 +2550,29 @@ export class OrderService {
 
   /**
    * Pays order `orderId`, just placed through checkout in the caller's transaction, with its
-   * customer's store credit, as far as it covers (ADR-186): what the credit paid, 0 for nothing.
+   * customer's store credit, as far as it covers (ADR-186), and no more than `upTo` where the
+   * shopper chose how much (ADR-592): what the credit paid, 0 for nothing.
    */
   async payPlacedWithStoreCreditIn(
     tx: Tx,
     shopId: string,
     orderId: string,
     at: Date = new Date(),
+    upTo: bigint | null = null,
   ): Promise<bigint> {
     const order = await lockOrder(tx, shopId, orderId);
     if (!order) return 0n;
-    const paid = await this.payWithStoreCreditIn(tx, { shopId, actor: 'system' }, order, null, at);
+    // At most what the shopper chose to spend (ADR-592), and what the credit and the order allow.
+    let given: bigint | null = null;
+    if (upTo !== null) {
+      const accounts = await storeCreditAccountsIn(tx, shopId, order.customerId, at);
+      const balance = accounts.find((account) => account.currency === order.currency)?.balance;
+      given = [upTo, balance ?? 0n, order.total - order.amountPaid].reduce((least, each) =>
+        each < least ? each : least,
+      );
+      if (given <= 0n) return 0n;
+    }
+    const paid = await this.payWithStoreCreditIn(tx, { shopId, actor: 'system' }, order, given, at);
     return paid.ok ? paid.value.amountPaid - order.amountPaid : 0n;
   }
 

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit chosen at checkout
+
+* **A shopper chooses how much of their store credit checkout spends, and a signed-in shopper
+  sees their number's balance there, spending it still asking what proves the number** ([ADR-592](../architecture/13-decision-log.md#adr-592--a-shopper-chooses-how-much-of-their-store-credit-checkout-spends-and-a-signed-in-shopper-sees-their-numbers-balance-there-spending-it-still-asking-what-proves-the-number),
+  ORD-09, CUS-02).
+* 3652 tests, 3 more: the amount spent and capped, amounts read, and the
+  balance shown to its own session alone.
+
 ### 80ca811 · Contact form messages pushed to staff
 
 * **Staff who answer customers may be told on their phones when a shopper writes through the

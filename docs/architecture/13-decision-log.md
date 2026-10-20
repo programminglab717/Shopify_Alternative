@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-591 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-592 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -599,6 +599,7 @@
 | 589 | Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept beside the inbox for its staff, with an email or a mobile number to answer on | Accepted |
 | 590 | The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an email to answer them, marked read and deleted | Accepted |
 | 591 | Staff who answer customers may be told on their phones when a shopper writes through the contact form, the push saying neither who nor what | Accepted |
+| 592 | A shopper chooses how much of their store credit checkout spends, and a signed-in shopper sees their number's balance there, spending it still asking what proves the number | Accepted |
 
 ---
 
@@ -21750,3 +21751,24 @@
   on a phone is told of each message.
 * **Alternatives:** **The message's first words in the push:** a shopper's words would pass
   through Google's or Apple's push service.
+
+## ADR-592 · A shopper chooses how much of their store credit checkout spends, and a signed-in shopper sees their number's balance there, spending it still asking what proves the number
+
+* **Context:** Checkout spends all the store credit a number has that the order takes, once the
+  number is proved (ADR-186): the shopper chooses whether, not how much, and sees no balance
+  before the code. A shopper signed in to their account already sees their balance on its page
+  (ADR-570), and their session proves their number at placing (ADR-586).
+* **Decision:**
+  * **How much:** beside the box, an amount in rupees ("1500", "Rs 1,500" or "1500.50"),
+    blank for all of it. The order is paid the least of that, the balance and what is left to
+    pay, the credits that expire soonest first, as before. An amount that is not one is put to
+    the shopper before any code is sent.
+  * **The balance:** a signed-in shopper's checkout says how much credit their number has, read
+    for the session's own number as the account's page reads it, and only where the page
+    offers credit at all. Spending it still asks the code, or the session, that proves the
+    number as the order is placed.
+* **Consequences:** A shopper keeps credit for a later order, or spends some of it on this one,
+  and one signed in knows what they have before choosing. A shopper not signed in still sees no
+  balance before the code.
+* **Alternatives:** **The balance shown to anyone who types a number:** it would tell whoever
+  types a number how much credit it has, before anything proves it is theirs.

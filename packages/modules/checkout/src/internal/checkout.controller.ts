@@ -255,7 +255,8 @@ export class StorefrontCheckoutController {
 
 /**
  * The page with the address book of the shopper signed in to their account (ADR-587), to deliver
- * to another of its addresses; as it is without a session, or an open checkout.
+ * to another of its addresses, and their number's store credit where the page offers to pay with
+ * it (ADR-592); as it is without a session, or an open checkout.
  */
 async function withBook(
   checkouts: CheckoutService,
@@ -265,7 +266,12 @@ async function withBook(
 ): Promise<CheckoutView | { url: string }> {
   if (!account || 'url' in view || view.kind !== 'open') return view;
   const book = await checkouts.book(shopId, account);
-  return book ? { ...view, book } : view;
+  const credit = view.storeCredit ? await checkouts.creditOf(shopId, account) : null;
+  return {
+    ...view,
+    ...(book && { book }),
+    ...(credit !== null && { creditBalance: credit }),
+  };
 }
 
 /**
@@ -446,6 +452,7 @@ function formOf(body: unknown): CheckoutForm {
     code: field(body, 'code').slice(0, 20),
     resend: field(body, 'resend'),
     storeCredit: field(body, 'storeCredit') === '1' ? '1' : '',
+    storeCreditAmount: field(body, 'storeCreditAmount').slice(0, 20),
     // Each box for the shop's news and offers ticked (ADR-187).
     marketing: MARKETING_CHANNELS.filter(
       (channel) => field(body, MARKETING_FIELDS[channel]) === '1',
