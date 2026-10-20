@@ -526,11 +526,12 @@ describe('Storefront rendering', () => {
 
   it("answers shoppers' questions on a page, and tells search engines as an FAQPage (ADR-615)", async () => {
     const sample = sampleStore();
+    const pages = sample.pages ?? [];
     const store = new MemoryStore({
       ...sample,
       pages: [
-        ...sample.pages,
-        { ...sample.pages[0]!, id: 'pg-faq', handle: 'faq', title: 'FAQs', templateSuffix: 'faq' },
+        ...pages,
+        { ...pages[0]!, id: 'pg-faq', handle: 'faq', title: 'FAQs', templateSuffix: 'faq' },
       ],
     });
     const render = async (theme = files) => {
