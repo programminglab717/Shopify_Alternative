@@ -2114,6 +2114,10 @@ const en = {
   'linkPage.addressHint':
     'Put it in your Instagram and TikTok bios, and send it in chats: it shows your links, and products to buy at once.',
   'linkPage.open': 'Open it',
+  'linkPage.qr': "The link page's QR code",
+  'linkPage.qrHint':
+    'Print it for your counter, bags and cards: a phone\'s camera opens the page, and orders from it say they came from "qr".',
+  'linkPage.qrDownload': 'Download the QR code',
   'linkPage.whatsapp': 'It links a chat on WhatsApp with {number} too.',
   'linkPage.noWhatsapp': "Add the shop's WhatsApp number and it links a chat there too:",
   'linkPage.about': 'About the shop',
@@ -7374,6 +7378,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'linkPage.addressHint':
     'اسے اپنے انسٹاگرام اور ٹک ٹاک بائیو میں لگائیں اور چیٹ میں بھیجیں: اس پر آپ کے لنک ہیں، اور فوراً خریدنے کو پروڈکٹس۔',
   'linkPage.open': 'کھولیں',
+  'linkPage.qr': 'لنک پیج کا QR کوڈ',
+  'linkPage.qrHint':
+    'اسے کاؤنٹر، شاپنگ بیگ اور کارڈ کے لیے پرنٹ کریں: فون کا کیمرا پیج کھول دیتا ہے، اور اس سے آنے والے آرڈرز بتاتے ہیں کہ وہ "qr" سے آئے۔',
+  'linkPage.qrDownload': 'QR کوڈ ڈاؤن لوڈ کریں',
   'linkPage.whatsapp': 'اس پر {number} سے واٹس ایپ چیٹ کا لنک بھی ہے۔',
   'linkPage.noWhatsapp': 'دکان کا واٹس ایپ نمبر ڈالیں تو اس پر چیٹ کا لنک بھی آ جائے گا:',
   'linkPage.about': 'دکان کے بارے میں',

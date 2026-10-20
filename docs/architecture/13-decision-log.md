@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-647 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-648 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -655,6 +655,7 @@
 | 645 | A payment link lists the orders placed through it, the latest first: its checkouts that became orders, read with the orders module's own Order | Accepted |
 | 646 | The menu editor offers the shop's tags in use to a collection's link, the most used first, each added with a tap | Accepted |
 | 647 | A shop's file has what it holds replaced by an upload, with Shopify's `fileUpdate` and `originalSource`, keeping its ID, so wherever it is used shows the new one | Accepted |
+| 648 | The link page's QR code is drawn in the admin by Hatti's own encoder, of its address marked `utm_source=qr`, and downloaded as a PNG to print | Accepted |
 
 ---
 
@@ -22941,3 +22942,19 @@
 * **Alternatives:** **A theme's picture's address changing with its file:** the theme's
   settings name the file's public ID; a version in the address needs the renderer to look the
   file up per picture, and remains the target.
+
+## ADR-648 · The link page's QR code is drawn in the admin by Hatti's own encoder, of its address marked `utm_source=qr`, and downloaded as a PNG to print
+
+* **Context:** A shop puts its link page (CH-07) in its bios and chats, but shops in Pakistan
+  also sell across a counter, at stalls and exhibitions, and hand out bags and cards; the
+  page's share kit's QR code was left for the admin (status, next steps). Printed documents
+  already draw QR codes with an encoder of Hatti's own (ADR-556, ADR-628).
+* **Decision:** The link page's card in the admin shows its address's QR code in black on
+  white, whatever the admin's theme, drawn as SVG from the same encoder, which
+  `@hatti/documents/qr` now exports alone so the browser loads none of the documents' server
+  code; a button downloads it as a PNG of about 1,000 pixels a side, its quiet zone kept. The
+  code's address carries `utm_source=qr`, so an order placed after a scan keeps "qr" as its
+  source (ORD-13). The words are in English and Urdu.
+* **Consequences:** No service makes the code, and nothing of the shop leaves the browser.
+* **Alternatives:** **A QR code service's image:** another party seeing every shop's address.
+  **The code made by the core:** a round trip for what the browser draws at once.

@@ -14,6 +14,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource/noto-nastaliq-urdu": "5.3.0",
+    "@hatti/documents": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@tanstack/react-query": "5.104.1",
     "@tanstack/react-router": "1.170.41",

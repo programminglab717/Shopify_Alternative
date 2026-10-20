@@ -1,3 +1,4 @@
+import { qrMatrix } from '@hatti/documents/qr';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
@@ -119,6 +120,13 @@ describe("The shop's link page", () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Link page' }));
     expect(await screen.findByText('https://zari.hatti.pk/links')).toBeTruthy();
     expect(screen.getByText('It links a chat on WhatsApp with +923001234567 too.')).toBeTruthy();
+    // Its QR code, of the address marked as scanned (ADR-648), drawn as the encoder makes it.
+    const qr = screen.getByRole('img', { name: "The link page's QR code" });
+    const matrix = qrMatrix('https://zari.hatti.pk/links?utm_source=qr')!;
+    expect(qr.getAttribute('viewBox')).toBe(`0 0 ${matrix.size + 8} ${matrix.size + 8}`);
+    const dark = matrix.modules.flat().filter(Boolean).length;
+    expect(qr.querySelector('path')?.getAttribute('d')?.split('z').length).toBe(dark + 1);
+    expect(screen.getByRole('button', { name: 'Download the QR code' })).toBeTruthy();
     expect((screen.getByLabelText('Bio') as HTMLTextAreaElement).value).toBe(PAGE.bio);
     expect(await screen.findByText('Lawn suit')).toBeTruthy();
     const save = screen.getByRole('button', { name: 'Save the link page' }) as HTMLButtonElement;

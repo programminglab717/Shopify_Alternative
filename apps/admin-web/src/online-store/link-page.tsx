@@ -1,15 +1,17 @@
+import { qrMatrix, type QrMatrix } from '@hatti/documents/qr';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowDown,
   ArrowUp,
   Copy,
+  Download,
   ExternalLink,
   ImageOff,
   Plus,
   Search,
   Trash2,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   CollectionProductSearchQuery,
@@ -92,7 +94,76 @@ function problemOf(error: UserError, t: Translate): string {
   return error.message;
 }
 
-/** Where the page is, to put in the shop's bios and send in chats. */
+/** The quiet zone around a QR code, in modules, as scanners want it. */
+const QUIET = 4;
+
+/** How many pixels a module is in the picture downloaded: about 1,000 a side, to print. */
+const PIXELS = 24;
+
+/** `matrix` as a PNG, its quiet zone around it, for the shop to print or share (ADR-648). */
+function downloadQr(matrix: QrMatrix, filename: string) {
+  const side = (matrix.size + QUIET * 2) * PIXELS;
+  const canvas = document.createElement('canvas');
+  canvas.width = side;
+  canvas.height = side;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, side, side);
+  context.fillStyle = '#000000';
+  matrix.modules.forEach((row, y) => {
+    row.forEach((dark, x) => {
+      if (dark) context.fillRect((x + QUIET) * PIXELS, (y + QUIET) * PIXELS, PIXELS, PIXELS);
+    });
+  });
+  const link = document.createElement('a');
+  link.href = canvas.toDataURL('image/png');
+  link.download = filename;
+  link.click();
+}
+
+/**
+ * The page's QR code (CH-07, ADR-648), drawn by Hatti's own encoder in black on white whatever
+ * the admin's theme, for the shop's counter, bags and cards; it carries `utm_source=qr`, so
+ * orders that came by it say so (ORD-13).
+ */
+function PageQr({ url }: { url: string }) {
+  const { t } = useLocale();
+  const address = `${url}?utm_source=qr`;
+  const matrix = useMemo(() => qrMatrix(address), [address]);
+  if (!matrix) return null;
+  const side = matrix.size + QUIET * 2;
+  const path = matrix.modules
+    .flatMap((row, y) =>
+      row.flatMap((dark, x) => (dark ? [`M${x + QUIET} ${y + QUIET}h1v1h-1z`] : [])),
+    )
+    .join('');
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <svg
+        viewBox={`0 0 ${side} ${side}`}
+        shapeRendering="crispEdges"
+        role="img"
+        aria-label={t('linkPage.qr')}
+        className="size-40 rounded-control border border-line bg-white"
+      >
+        <path d={path} fill="#000000" />
+      </svg>
+      <div className="flex flex-col gap-2">
+        <p className="max-w-xs text-secondary">{t('linkPage.qrHint')}</p>
+        <Button
+          variant="secondary"
+          icon={<Download aria-hidden className="size-5" />}
+          onClick={() => downloadQr(matrix, 'link-page-qr.png')}
+        >
+          {t('linkPage.qrDownload')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Where the page is, to put in the shop's bios and send in chats, and its QR code. */
 function PageAddress({ url, whatsapp }: { url: string; whatsapp: string | null }) {
   const { t } = useLocale();
   const shopId = useShop().id;
@@ -120,6 +191,7 @@ function PageAddress({ url, whatsapp }: { url: string; whatsapp: string | null }
           {t('linkPage.open')}
         </a>
       </div>
+      <PageQr url={url} />
       <p className="text-secondary">
         {whatsapp ? (
           t('linkPage.whatsapp', { number: whatsapp })
