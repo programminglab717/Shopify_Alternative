@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Collections by tag
+### da5764a · Collections by tag
 
 * **A collection's page narrows to its products by tag** ([ADR-643](../architecture/13-decision-log.md#adr-643--a-collections-page-narrows-to-its-products-with-each-of-some-tags-at-collectionshandletagtag-as-shopifys-the-tags-given-to-themes-as-current_tags)):
   `/collections/{handle}/{tag+tag}` as Shopify's, with `current_tags` for themes.
