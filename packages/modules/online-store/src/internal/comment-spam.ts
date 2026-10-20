@@ -13,6 +13,11 @@ export const COMMENT_SPAM = {
    * ones, "Thank you!", shoppers write alike.
    */
   repeated: 40,
+  /**
+   * How long an email address the shop's spam holds keeps its next comments among the spam
+   * (ADR-671), in days: until the shop marks it not spam.
+   */
+  rememberedDays: 90,
 } as const;
 
 const LINK = /\b(?:https?:\/\/|www\.)\S+/giu;

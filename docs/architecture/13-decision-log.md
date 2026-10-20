@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-670 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-671 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -678,6 +678,7 @@
 | 668 | A shopper's account lists what happened to their store credit, its latest 20 changes the newest first, each with its order, without the shop's notes | Accepted |
 | 669 | The menu editor says when no product has all of a link's tags together, though each is some product's, as it says a tag none has | Accepted |
 | 670 | A theme's picture's address carries what its file holds, from the shop's document, so a file replaced is fetched afresh | Accepted |
+| 671 | A comment from an email address the shop's spam holds a comment of, from the last 90 days, is kept as spam too, until the shop marks that one not spam | Accepted |
 
 ---
 
@@ -23386,3 +23387,19 @@
 * **Consequences:** A theme's picture replaced shows at once, as the shop's other images do.
 * **Alternatives:** **The theme's version in the address:** it changes with every save, not with
   the file. **Looking each file up as a page is rendered:** the document has them already.
+
+## ADR-671 · A comment from an email address the shop's spam holds a comment of, from the last 90 days, is kept as spam too, until the shop marks that one not spam
+
+* **Context:** Comments that read as spam are kept as spam (ADR-619), and the shop marks the
+  rest it finds, but what it marked taught the filter nothing: a spammer whose comment the shop
+  marked wrote again from the same address and was shown, or waited, as anyone (status shortcut
+  92).
+* **Decision:** A comment posted from an email address, case aside, of which the shop's spam
+  holds a comment from the last 90 days is kept as spam, whichever marked that one, the shop or
+  the filter. Marking it not spam takes it out of the spam, so the address writes as anyone does
+  again; so does its spam growing old. The shopper is told no more than of a comment held, as
+  for any spam.
+* **Consequences:** What a shop marks as spam keeps that sender's next comments out of sight.
+* **Alternatives:** **The internet address too:** shoppers on Pakistan's mobile networks share
+  addresses, so one spammer's would hide many shoppers' comments. **Words and links learnt from
+  what is marked:** a few marks teach too little; the address is what a spammer keeps.

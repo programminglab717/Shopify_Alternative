@@ -57,7 +57,8 @@ export class CommentService {
    * where the blog moderates comments; refused where the blog takes none, the article is not
    * shown, or a field is wrong, the errors naming `author`, `email` or `body`. One that reads as
    * spam, or repeats word for word one of some length posted on the shop within the day, is kept
-   * as spam (ADR-619), neither shown nor held, and the shopper told no more than of one held.
+   * as spam (ADR-619), neither shown nor held, and the shopper told no more than of one held; so
+   * is one from an email address the shop's spam holds a comment of, lately (ADR-671).
    */
   async post(
     shopId: string,
@@ -97,7 +98,9 @@ export class CommentService {
         return failOne(['article'], 'INVALID', "This article doesn't take comments");
       }
       const spam =
-        spamSignsOf({ author, body }).length > 0 || (await this.#repeated(tx, shopId, body));
+        spamSignsOf({ author, body }).length > 0 ||
+        (await this.#repeated(tx, shopId, body)) ||
+        (await this.#spammer(tx, shopId, email));
       const status: CommentStatusValue = spam
         ? 'spam'
         : found.policy === 'moderated'
@@ -255,6 +258,30 @@ export class CommentService {
           eq(comments.shopId, shopId),
           eq(comments.body, body),
           gt(comments.createdAt, sql`now() - interval '1 day'`),
+        ),
+      )
+      .limit(1);
+    return row !== undefined;
+  }
+
+  /**
+   * Whether the shop's spam holds a comment from `email`, case aside, of the last
+   * {@link COMMENT_SPAM.rememberedDays}: the filter's, or one the shop marked, which it learns
+   * from (ADR-671). One the shop marked not spam is no longer among it.
+   */
+  async #spammer(tx: Tx, shopId: string, email: string): Promise<boolean> {
+    const [row] = await tx
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.shopId, shopId),
+          eq(comments.status, 'spam'),
+          sql`lower(${comments.email}) = lower(${email})`,
+          gt(
+            comments.createdAt,
+            sql`now() - make_interval(days => ${COMMENT_SPAM.rememberedDays})`,
+          ),
         ),
       )
       .limit(1);

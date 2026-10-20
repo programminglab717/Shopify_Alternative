@@ -213,11 +213,18 @@ describe.skipIf(!server)('Comments on articles (ADR-220)', () => {
     unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'auto_published' }));
     const status = async (post: Partial<typeof POST>) =>
       unwrap(await f.comments.post(f.a.shopId, { ...POST, ...post })).status;
-    expect(await status({ author: 'Cheap bags www.bags.example' })).toBe('spam');
-    expect(await status({ body: 'Win big at our casino tonight' })).toBe('spam');
+    // From addresses of their own, as each keeps its next among the spam (ADR-671).
+    expect(await status({ author: 'Cheap bags www.bags.example', email: 'a@bags.example' })).toBe(
+      'spam',
+    );
+    expect(await status({ body: 'Win big at our casino tonight', email: 'b@bags.example' })).toBe(
+      'spam',
+    );
     // Taken for spam whatever the blog's policy.
     unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'moderated' }));
-    expect(await status({ body: '[url=http://bags.example]bags[/url]' })).toBe('spam');
+    expect(
+      await status({ body: '[url=http://bags.example]bags[/url]', email: 'c@bags.example' }),
+    ).toBe('spam');
     unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'auto_published' }));
     // A long comment again, word for word, within the day; short ones shoppers write alike.
     const long = 'The lawn is lovely and the stitching neat; will order the blue one again.';
@@ -249,6 +256,45 @@ describe.skipIf(!server)('Comments on articles (ADR-220)', () => {
     expect(
       (await events()).filter(([, payload]) => payload.status === 'spam' && payload.shown),
     ).toEqual([]);
+  });
+
+  it('keeps among the spam what an address whose comment is spam writes next, until the shop says not (ADR-671)', async () => {
+    const { blog } = await blogWithArticles();
+    unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'auto_published' }));
+    const post = async (more: Partial<typeof POST>) =>
+      unwrap(await f.comments.post(f.a.shopId, { ...POST, ...more }));
+    // The shop marks one spam: what that address writes next is spam too, its case aside.
+    const first = await post({ email: 'bilal@example.pk', body: 'Nice.' });
+    expect(first.status).toBe('published');
+    unwrap(await f.comments.markSpam(f.a, first.id));
+    expect((await post({ email: 'Bilal@Example.pk', body: 'Hello again.' })).status).toBe('spam');
+    // Others' are not, nor another shop's.
+    expect((await post({ email: 'sana@example.pk', body: 'Nice.' })).status).toBe('published');
+    const other = unwrap(await f.blogs.create(f.b, { title: 'News' }));
+    unwrap(await f.articles.create(f.b, { blogId: other.id, title: 'Eid' }));
+    unwrap(await f.blogs.update(f.b, other.id, { commentPolicy: 'auto_published' }));
+    expect(
+      unwrap(await f.comments.post(f.b.shopId, { ...POST, email: 'bilal@example.pk' })).status,
+    ).toBe('published');
+    // The filter's own spam counts as the shop's.
+    expect((await post({ email: 'deals@example.pk', body: 'Our casino pays' })).status).toBe(
+      'spam',
+    );
+    expect((await post({ email: 'deals@example.pk', body: 'Hello.' })).status).toBe('spam');
+
+    // Marked not spam, every one, the address writes as anyone does.
+    for (const comment of (await f.comments.list(f.a, { first: 10, status: 'spam' })).items) {
+      if (comment.email.toLowerCase() === 'bilal@example.pk') {
+        unwrap(await f.comments.markNotSpam(f.a, comment.id));
+      }
+    }
+    expect((await post({ email: 'bilal@example.pk', body: 'Third.' })).status).toBe('published');
+    // And after 90 days the spam no longer counts.
+    await f.admin.query(
+      `UPDATE online_store.comments SET created_at = now() - interval '91 days'
+        WHERE email = 'deals@example.pk'`,
+    );
+    expect((await post({ email: 'deals@example.pk', body: 'Hello.' })).status).toBe('published');
   });
 
   it('lists comments, marks them as spam or not, deletes them, and keeps shops apart', async () => {
