@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-598 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-599 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -606,6 +606,7 @@
 | 596 | An order's page says what store credit its customer has with the shop, which pays their next order at checkout | Accepted |
 | 597 | A shop may set the hour from which the day's orders count their delivery days from the next day, as they ship the day after | Accepted |
 | 598 | Checkout shows the store credit of the number typed once a code proves it for the checkout, or the browser proved it lately, without signing in | Accepted |
+| 599 | An order's emails say the day checkout said to expect it by, while its delivery is still to come | Accepted |
 
 ---
 
@@ -21889,3 +21890,19 @@
 * **Alternatives:** **Showing it on the number typed alone:** anyone typing another's number would
   learn their balance. **Spending it on the browser's proof:** a shared phone's browser would
   spend the credit of whoever proved it last.
+
+## ADR-599 · An order's emails say the day checkout said to expect it by, while its delivery is still to come
+
+* **Context:** Checkout says the day to expect an order by, and the order keeps it for its page
+  and staff (ADR-594, ADR-595). Its customer is told of it by WhatsApp, SMS where WhatsApp cannot
+  deliver, and email where they gave one (ADR-181); none of them said the day.
+* **Decision:** An email of an order's news says the day to expect it by under its words, "Expected
+  by Thursday 22 October.", in the customer's language, while the order's delivery is still to
+  come: placed, asked to confirm, confirmed and shipped, not delivered or cancelled. The worker
+  passes the day with the email's other facts of the order (ADR-198); Hatti's own notices never
+  carry one.
+* **Consequences:** A customer with an email has the promise in writing from the start. WhatsApp
+  and SMS say nothing of it yet.
+* **Alternatives:** **WhatsApp too:** its templates are Meta's to approve, on Hatti's number and on
+  shops' own (ADR-537); a variable more is a new version of each, waiting on Meta. **SMS alone:** a
+  line more costs a segment of every message sent.

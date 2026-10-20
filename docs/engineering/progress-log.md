@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The expected day in the order's emails
+
+* **An order's emails say the day checkout said to expect it by, while its delivery is still to
+  come** ([ADR-599](../architecture/13-decision-log.md#adr-599--an-orders-emails-say-the-day-checkout-said-to-expect-it-by-while-its-delivery-is-still-to-come), CHK-05, MSG-01); WhatsApp's templates wait on Meta.
+* 3667 tests, 1 more: the day said in both languages, or none; the worker
+  passing it.
+
 ### 17b7c0d · Store credit shown once the number is proved
 
 * **Checkout shows the store credit of the number typed once a code proves it, or the browser

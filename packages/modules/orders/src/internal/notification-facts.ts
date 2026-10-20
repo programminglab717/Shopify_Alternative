@@ -1,6 +1,7 @@
 import type { Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
 import { awaitsCustomer, transferOwed } from './rules.js';
+import { AWAITED_STAGES } from './shown-order.js';
 import type {
   CancelReasonValue,
   ConfirmationStatusValue,
@@ -69,6 +70,11 @@ export interface OrderNotificationFacts {
    */
   lines: { title: string; variantTitle: string; quantity: number; total: bigint }[];
   lineCount: number;
+  /**
+   * The day checkout said to expect it by, YYYY-MM-DD, while its delivery is still to come
+   * (ADR-595, ADR-599); null after, or for one that said none.
+   */
+  deliveryExpectedOn: string | null;
 }
 
 /** The lines of an order an email of its news lists, at most (ADR-198). */
@@ -110,12 +116,14 @@ export async function orderNotificationFactsIn(
     parcel_status: ParcelStatusValue | null;
     lines: { title: string; variantTitle: string; quantity: number; total: string }[];
     line_count: number;
+    delivery_expected_on: string | null;
   }>(sql`
     SELECT o.id, o.number, o.source, o.currency, o.total, o.amount_paid, o.advance_due,
            o.customer_id,
            o.customer_erased_at IS NOT NULL AS erased, o.phone, o.email,
            o.shipping_address ->> 'name' AS name, o.cancel_reason, o.status, o.payment_method,
            o.confirmation_status, o.fulfillment_status, o.stage, o.delivery_method,
+           o.delivery_expected_on::text AS delivery_expected_on,
            loc.name AS location_name,
            concat_ws(', ', loc.address1, loc.address2, loc.city) AS location_address,
            loc.pickup_instructions,
@@ -185,5 +193,6 @@ export async function orderNotificationFactsIn(
       : null,
     lines: row.lines.map((line) => ({ ...line, total: BigInt(line.total) })),
     lineCount: row.line_count,
+    deliveryExpectedOn: AWAITED_STAGES.has(row.stage) ? row.delivery_expected_on : null,
   };
 }

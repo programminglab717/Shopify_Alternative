@@ -108,7 +108,7 @@ export function shownOfDraft(
 }
 
 /** The stages of an order whose delivery is still to come. */
-const AWAITED_STAGES: ReadonlySet<OrderStageValue> = new Set([
+export const AWAITED_STAGES: ReadonlySet<OrderStageValue> = new Set([
   'needs_confirmation',
   'needs_review',
   'awaiting_payment',

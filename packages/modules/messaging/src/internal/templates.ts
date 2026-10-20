@@ -326,6 +326,11 @@ export interface MessageVariables {
   items?: string;
   more?: string;
   /**
+   * For an email of an order's news (ADR-599): the day checkout said to expect it by,
+   * "2026-10-22", while its delivery is still to come.
+   */
+  expected?: string;
+  /**
    * For a broadcast (ADR-422): the name of the shop's own template it sends, approved by Meta on
    * the shop's account; and, in `name`, the customer's first name where its body has {{1}}.
    */
@@ -1260,6 +1265,8 @@ const EMAIL_WORDS = {
   /** Under an order's lines (ADR-198). */
   total: { en: 'Total', ur: 'کل' },
   more: { en: '{more} more in the order', ur: 'آرڈر میں مزید {more}' },
+  /** The day checkout said to expect the order by (ADR-599). */
+  expected: { en: 'Expected by {expected}.', ur: '{expected} تک پہنچنے کی توقع۔' },
   why: {
     en: "{shop} sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
     ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
@@ -1299,6 +1306,7 @@ export function messageEmail(
   const lines = shop ? linesOf(variables.items) : [];
   const more = lines.length > 0 && Number(variables.more) > 0 ? variables.more! : null;
   const total = lines.length > 0 && variables.total ? variables.total : null;
+  const expected = shop ? expectedByOf(variables.expected, language) : null;
   const listed = [
     ...lines.map((line) => `${line.name}: ${line.total}`),
     more ? fill(EMAIL_WORDS.more[language], { ...variables, more }) : null,
@@ -1308,7 +1316,7 @@ export function messageEmail(
   return {
     from: hattiPays ? 'hatti' : 'shop',
     subject: fill(subject[language], variables).replace(/\s+/g, ' ').trim(),
-    text: [words, listed.join('\n'), url, why].filter(Boolean).join('\n\n'),
+    text: [words, expected, listed.join('\n'), url, why].filter(Boolean).join('\n\n'),
     html:
       `<!doctype html><html lang="${language}"${rtl ? ' dir="rtl"' : ''}>` +
       '<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1f2933">' +
@@ -1320,6 +1328,7 @@ export function messageEmail(
             `${escapeHtml(variables.shop)}</p>`
           : '') +
       `<p>${escapeHtml(words)}</p>` +
+      (expected ? `<p style="font-weight:600">${escapeHtml(expected)}</p>` : '') +
       (lines.length > 0
         ? '<table role="presentation" style="border-collapse:collapse;margin:8px 0 16px">' +
           lines
@@ -1350,6 +1359,23 @@ export function messageEmail(
         : '') +
       `<p style="font-size:13px;color:#52606d">${escapeHtml(why)}</p></body></html>`,
   };
+}
+
+/**
+ * What an email of an order's news says of the day to expect it by (ADR-599): "Expected by
+ * Thursday 22 October."; null without a day, or for one that is not a day.
+ */
+function expectedByOf(day: string | undefined, language: MessageLanguage): string | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const at = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(at.getTime())) return null;
+  const words = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(at);
+  return EMAIL_WORDS.expected[language].replace('{expected}', words);
 }
 
 /** Whether `value` is a colour an email may be styled with: "#B45309" or "#B53". */

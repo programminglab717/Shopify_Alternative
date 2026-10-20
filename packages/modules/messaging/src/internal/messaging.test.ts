@@ -24,6 +24,7 @@ import {
   templateButtons,
   templateName,
   templateParameters,
+  type MessageVariables,
 } from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
 
@@ -856,8 +857,30 @@ describe("Messages' words", () => {
       ...placed,
       invoice: 'HB-1',
       plan: 'Starter',
+      expected: '2026-10-22',
     })!;
-    expect(bill.html).not.toMatch(/<img|<table|#B45309|Zari &lt;Lawn&gt;<\/p>/);
+    expect(bill.html).not.toMatch(/<img|<table|#B45309|Zari &lt;Lawn&gt;<\/p>|Expected by/);
+  });
+
+  it("says in an order's email the day to expect it by, where its news has one (ADR-599)", () => {
+    const placed: MessageVariables = {
+      shop: 'Zari',
+      order: '#1044',
+      total: 'Rs 5,250',
+      items: 'Kurta, M × 2\tRs 5,000',
+    };
+    const expected = messageEmail('order_placed', 'en', { ...placed, expected: '2026-10-22' })!;
+    expect(expected.html).toContain(
+      '<p style="font-weight:600">Expected by Thursday 22 October.</p>',
+    );
+    expect(expected.text.split('\n\n')[1]).toBe('Expected by Thursday 22 October.');
+    expect(
+      messageEmail('order_placed', 'ur', { ...placed, expected: '2026-10-22' })!.text,
+    ).toContain('Thursday 22 October تک پہنچنے کی توقع۔');
+    expect(
+      messageEmail('order_placed', 'en', { ...placed, expected: '22 Oct' })!.text,
+    ).not.toContain('Expected by');
+    expect(messageEmail('order_placed', 'en', placed)!.text).not.toContain('Expected by');
   });
 
   it("emails Hatti's notices of a shop's bills to its owner from Hatti, saying why (ADR-195)", () => {

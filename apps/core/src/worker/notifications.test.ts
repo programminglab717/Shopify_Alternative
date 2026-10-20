@@ -1369,6 +1369,11 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       shopId,
       logo,
     ]);
+    // The day checkout said to expect it by goes with its news while it is to come (ADR-599).
+    await admin.query(
+      `UPDATE orders.orders SET delivery_expected_on = '2026-10-22' WHERE id = $1`,
+      [order.id],
+    );
     // Confirmed and shipped: each by email too, the shipping with the same link.
     unwrap(await orders().confirm(tenant, order.id));
     unwrap(
@@ -1391,6 +1396,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect(shipped!.variables).toMatchObject({
       logo: `https://hatti.pk/logos/${shopId}`,
       items: 'Kurta × 2\tRs 5,000',
+      expected: '2026-10-22',
     });
     // No email service set up: they fail, saying so.
     await sender().sweep(new Date(Date.now() + 2_000));

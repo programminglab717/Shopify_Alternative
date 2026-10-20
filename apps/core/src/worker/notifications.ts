@@ -482,13 +482,14 @@ export class OrderNotifications {
   /**
    * What an email of the order's news shows of its shop and of it (ADR-198): the shop's accent
    * colour and its logo, as its customers' pages show them, the logo at the API's own address for
-   * it, which lasts as an email does; and the order's first lines, with how many more it has.
+   * it, which lasts as an email does; the order's first lines, with how many more it has; and the
+   * day checkout said to expect it by, while it is still to come (ADR-599).
    */
   async #look(
     tx: Tx,
     shopId: string,
     order: OrderNotificationFacts,
-  ): Promise<Pick<MessageVariables, 'accent' | 'logo' | 'items' | 'more'>> {
+  ): Promise<Pick<MessageVariables, 'accent' | 'logo' | 'items' | 'more' | 'expected'>> {
     const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
     const items = order.lines
       .map((line) => `${lineName(line)} × ${line.quantity}\t${rupees(line.total)}`)
@@ -499,6 +500,7 @@ export class OrderNotifications {
       logo: (await shopLogoOf(tx, shopId)) ? this.site.url(`/${LOGOS_PATH}/${shopId}`) : undefined,
       items: items || undefined,
       more: more > 0 ? String(more) : undefined,
+      expected: order.deliveryExpectedOn ?? undefined,
     };
   }
 }
