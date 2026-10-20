@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Urdu pages link Urdu pages
+### 5449cdd · Urdu pages link Urdu pages
 
 * **On an Urdu page, objects' addresses carry `/ur`** ([ADR-624](../architecture/13-decision-log.md#adr-624--on-an-urdu-page-the-addresses-of-products-variants-collections-pages-blogs-articles-their-comments-cart-lines-and-the-shops-own-menu-links-carry-ur-as-shopifys-objects-url-carry-their-locales-predictive-searchs-json-at-its-urdu-address-likewise-in-the-shops-urdu)): products, variants,
   collections, pages, blogs, articles, comments, cart lines and the shop's own menu links, as
