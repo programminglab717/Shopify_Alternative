@@ -798,11 +798,31 @@ export class CheckoutService {
           return said(checked === 'none' ? 'expired' : checked, rows[0]?.channel);
         }
       }
+      // Proved, the number's store credit, which the page offers to spend (ADR-598).
+      const credit = view.storeCredit
+        ? await storeCreditOfPhoneIn(
+            tx,
+            found.shopId,
+            phone,
+            (await shopProfile(tx, found.shopId)).currency,
+          )
+        : 0n;
+      const withCredit = credit > 0n ? { ...view, creditBalance: credit } : view;
       const saved = await savedAddressIn(tx, found.shopId, phone);
-      if (!saved) return said('nothing');
+      if (!saved) {
+        return {
+          ...withCredit,
+          problem: {
+            kind: 'recall',
+            phone: maskPkMobile(phone),
+            channel: asked.channel,
+            state: 'nothing',
+          },
+        };
+      }
       const { address } = saved;
       return {
-        ...view,
+        ...withCredit,
         form: {
           ...typed,
           name: address.name,
@@ -1442,6 +1462,11 @@ export class CheckoutService {
     };
     const { codRefusal } = payments;
     const tax = await taxSettingsIn(tx, shopId);
+    const storeCredit = await shopGivesStoreCreditIn(tx, shopId);
+    // The credit of the number typed, once a code proved it for this checkout (ADR-598).
+    const provedCredit = storeCredit
+      ? await provedCreditIn(tx, found, form.phone, profile.currency)
+      : null;
     return {
       kind: 'open',
       shop,
@@ -1455,7 +1480,8 @@ export class CheckoutService {
       shown: shownOf(priced, delivery, shop.policies, discount, payments, tax, discounts),
       form,
       attribution: checkout.attribution,
-      storeCredit: await shopGivesStoreCreditIn(tx, shopId),
+      storeCredit,
+      ...(provedCredit !== null && { creditBalance: provedCredit }),
       marketing: await checkoutMarketingIn(tx, shopId),
       paymentLink: link && { id: link.id, title: link.title },
       pickup: await this.#pickupPoints(tx, shopId),
@@ -2027,6 +2053,23 @@ async function provedBySessionIn(
   if (secret.length > 128) return null;
   const session = await sessionIn(tx, shopId, secret);
   return session?.phone === phone ? session.signedInAt : null;
+}
+
+/**
+ * The store credit of the number `typed` on the checkout's form, once a code sent to it proved it
+ * for this checkout (ADR-598); null for a number not proved, not a mobile's, or without credit.
+ */
+async function provedCreditIn(
+  tx: Tx,
+  found: { shopId: string; checkoutId: string },
+  typed: string,
+  currency: string,
+): Promise<bigint | null> {
+  const phone = new InputChecker().mobile(['phone'], typed.slice(0, 40), {});
+  if (!phone) return null;
+  if (!(await numberVerifiedIn(tx, found.shopId, found.checkoutId, phone))) return null;
+  const credit = await storeCreditOfPhoneIn(tx, found.shopId, phone, currency);
+  return credit > 0n ? credit : null;
 }
 
 /** A number in E.164, as a shopper types it in Pakistan: "+923001234567" as "0300 1234567". */

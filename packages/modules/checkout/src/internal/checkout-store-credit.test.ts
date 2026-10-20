@@ -202,6 +202,51 @@ describe.skipIf(!server)('Store credit at checkout (ORD-09, ADR-186)', () => {
     expect(all.kind === 'placed' && all.storeCredit).toBe(900_00n);
   });
 
+  it('shows the credit of a number once a code proves it, without signing in (ADR-598)', async () => {
+    await give('0300 1234567', '1500');
+    const { secret, view } = await checkout();
+    expect(view.kind === 'open' && view.creditBalance).toBeUndefined();
+
+    // Asked to fill in the address, the number is proved by a code first; its credit with it.
+    const ask = (code: string | null) =>
+      f.checkouts.recall(secret, { phone: '0300 1234567', code, channel: 'whatsapp' });
+    const asked = await ask(null);
+    expect(asked.kind === 'open' && asked.creditBalance).toBeUndefined();
+    const [code] = await sent();
+    const proved = await ask(code!.code);
+    expect(proved.kind === 'open' && proved.creditBalance).toBe(1_500_00n);
+    expect(checkoutPage(proved).html).toContain('Your store credit: Rs 1,500');
+
+    // The page keeps saying it while the number is the one proved, and not for another.
+    const shown = await f.checkouts.place(secret, view.shown, {
+      ...FORM,
+      storeCredit: '1',
+      storeCreditAmount: 'some',
+    });
+    expect(problemOf(shown)).toEqual({ kind: 'store_credit_amount' });
+    expect(shown.kind === 'open' && shown.creditBalance).toBe(1_500_00n);
+    const other = await f.checkouts.place(secret, view.shown, {
+      ...FORM,
+      phone: '0301 7654321',
+      storeCredit: '1',
+      storeCreditAmount: 'some',
+    });
+    expect(other.kind === 'open' && other.creditBalance).toBeUndefined();
+    expect(checkoutPage(other).html).not.toContain('Your store credit');
+  });
+
+  it('shows none for a proved number without credit (ADR-598)', async () => {
+    await give('0333 5551234', '500');
+    const { secret } = await checkout();
+    const ask = (code: string | null) =>
+      f.checkouts.recall(secret, { phone: '0300 1234567', code, channel: 'whatsapp' });
+    await ask(null);
+    const [code] = await sent();
+    const proved = await ask(code!.code);
+    expect(proved.kind).toBe('open');
+    expect(proved.kind === 'open' && proved.creditBalance).toBeUndefined();
+  });
+
   it('reads how much a shopper chose to spend, in rupees as typed', () => {
     expect(
       ['', ' ', '1500', '1,500', 'Rs 1,500.5', 'rs. 20.25', '0', '1.234', '-5', 'ten'].map(

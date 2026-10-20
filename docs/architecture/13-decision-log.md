@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-597 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-598 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -605,6 +605,7 @@
 | 595 | An order placed through checkout keeps the day the page said to expect delivery by, which its page shows while it is still to come, and staff see | Accepted |
 | 596 | An order's page says what store credit its customer has with the shop, which pays their next order at checkout | Accepted |
 | 597 | A shop may set the hour from which the day's orders count their delivery days from the next day, as they ship the day after | Accepted |
+| 598 | Checkout shows the store credit of the number typed once a code proves it for the checkout, or the browser proved it lately, without signing in | Accepted |
 
 ---
 
@@ -21871,3 +21872,20 @@
   orders whenever they come set none, and nothing changes for them.
 * **Alternatives:** **A cut-off for each day of the week:** shops in Pakistan keep one hour, and
   Sundays and holidays are counted already.
+
+## ADR-598 · Checkout shows the store credit of the number typed once a code proves it for the checkout, or the browser proved it lately, without signing in
+
+* **Context:** Checkout offers to pay with store credit once the shop has given any, and spends
+  it once a code proves the number (ADR-186, ADR-592). Only a shopper signed in to their account
+  saw how much they had before choosing (ADR-592); everyone else chose blind, and saw the amount
+  only on the order placed.
+* **Decision:** Once a number is proved, checkout's page says what store credit it has where the
+  shop gives credit: when the shopper fills in their address from it, by a code or the browser's
+  recent proof (ADR-199), and on every page after while the number typed is one a code proved for
+  this checkout. A number not proved, or without credit, is shown none, as before.
+* **Consequences:** A shopper sees their balance before choosing how much to spend, without an
+  account. Spending it still asks a code for the checkout (ADR-186): the browser's proof shows
+  the balance but does not spend it.
+* **Alternatives:** **Showing it on the number typed alone:** anyone typing another's number would
+  learn their balance. **Spending it on the browser's proof:** a shared phone's browser would
+  spend the credit of whoever proved it last.
