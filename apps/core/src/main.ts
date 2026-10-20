@@ -108,6 +108,7 @@ const app = await createApi({
   billingTax: hattiTaxOf(config),
   support: supportContactOf(config),
   supportLine: supportLineOf(config),
+  voice: config.VOICE_WEBHOOK_SECRET ? { secret: config.VOICE_WEBHOOK_SECRET } : null,
   ai:
     config.AI_API_KEY && config.AI_MODEL
       ? new AiGateway({

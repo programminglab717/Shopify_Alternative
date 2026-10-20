@@ -8,6 +8,7 @@ import type { Logger } from '@hatti/logger';
 import {
   LogProvider,
   SmsGatewayProvider,
+  VoiceGatewayProvider,
   WhatsAppCloudProvider,
   type MessageChannel,
   type MessageProvider,
@@ -20,13 +21,15 @@ import type { MessageSendingConfig } from './config.js';
 import { SesMessageEmails } from './emails.js';
 
 /**
- * How each channel sends (ADR-146): Hatti's WhatsApp number, the SMS gateway and Amazon SES, for
- * orders' emails (ADR-181), where they are set up; elsewhere the log, in development, and nothing
- * in production, where messages fail as unsent.
+ * How each channel sends (ADR-146): Hatti's WhatsApp number, the SMS gateway, Amazon SES, for
+ * orders' emails (ADR-181), and the voice gateway, for calls to confirm orders (ADR-611), which
+ * tells of each call at `publicUrl`'s webhook, where they are set up; elsewhere the log, in
+ * development, and nothing in production, where messages fail as unsent.
  */
 export function messageProvidersOf(
   config: MessageSendingConfig,
   logger: Logger,
+  publicUrl = 'http://localhost:4000',
 ): Partial<Record<MessageChannel, MessageProvider>> {
   const log = (channel: MessageChannel) =>
     new LogProvider(channel, (message, text) =>
@@ -51,6 +54,15 @@ export function messageProvidersOf(
     });
   } else if (config.NODE_ENV !== 'production') {
     providers.sms = log('sms');
+  }
+  if (config.VOICE_GATEWAY_URL && config.VOICE_GATEWAY_KEY) {
+    providers.voice = new VoiceGatewayProvider({
+      url: config.VOICE_GATEWAY_URL,
+      apiKey: config.VOICE_GATEWAY_KEY,
+      callbackUrl: new URL('/webhooks/voice', publicUrl).href,
+    });
+  } else if (config.NODE_ENV !== 'production') {
+    providers.voice = log('voice');
   }
   if (config.SES_REGION && config.SES_ACCESS_KEY_ID && config.SES_SECRET_ACCESS_KEY) {
     providers.email = new SesMessageEmails({

@@ -188,6 +188,14 @@ describe.skipIf(!server)("WhatsApp's webhook and the shop's messages", () => {
     expect([ok.statusCode, ok.body]).toEqual([200, '1158201444']);
     expect((await check('verify-token-0000')).statusCode).toBe(403);
     expect((await check(WHATSAPP.verifyToken, 'unsubscribe')).statusCode).toBe(403);
+    // The voice gateway's webhook, without its secret, is not there (ADR-611).
+    const voice = await app.inject({
+      method: 'POST',
+      url: '/webhooks/voice',
+      headers: { 'content-type': 'application/json' },
+      payload: JSON.stringify({ id: 'call-1', result: 'answered', key: '1' }),
+    });
+    expect(voice.statusCode).toBe(404);
   });
 
   it('takes only what Meta signed, and follows each message to delivery', async () => {

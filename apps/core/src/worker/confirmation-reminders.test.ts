@@ -141,4 +141,49 @@ describe.skipIf(!server)('Asking again to confirm (ADR-175)', () => {
     expect(await sweeps.sweep(new Date('2026-10-05T05:30:00Z'))).toBe(1);
     expect(await asked()).toEqual([waiting, elsewhere]);
   });
+
+  it('calls a customer who left the reminder unanswered an hour, where the shop says to (ADR-611)', async () => {
+    const settings = new OrderSettingsService(database);
+    const called = async () =>
+      (
+        await admin.query<{ aggregate_id: string }>(
+          `SELECT aggregate_id FROM platform.outbox_events
+            WHERE event_type = 'order.confirmation_called' ORDER BY occurred_at, id`,
+        )
+      ).rows.map((row) => row.aggregate_id);
+    // 1 pm in Karachi, days after the orders above, too long ago to call.
+    const at = new Date('2026-10-09T08:00:00Z');
+    const reminded = async (owner: TenantContext, minutes: number) => {
+      const id = await placed(owner, 5, at);
+      await admin.query('UPDATE orders.orders SET confirmation_reminded_at = $2 WHERE id = $1', [
+        id,
+        new Date(at.getTime() - minutes * 60_000),
+      ]);
+      return id;
+    };
+    const long = await reminded(a, 90);
+    // Reminded half an hour ago: not yet.
+    await reminded(a, 30);
+    // A shop that calls none calls none.
+    expect(await sweeps.sweepCalls(at)).toBe(0);
+
+    unwrap(await settings.update(a, { confirmationCalls: 'high_value' }));
+    // None of high value.
+    expect(await sweeps.sweepCalls(at)).toBe(0);
+    await admin.query(
+      `UPDATE orders.orders SET risk_reasons = '[{"code": "high_value", "points": 20}]'::jsonb
+        WHERE id = $1`,
+      [long],
+    );
+    expect(await sweeps.sweepCalls(at)).toBe(1);
+    expect(await called()).toEqual([long]);
+
+    unwrap(await settings.update(a, { confirmationCalls: 'all' }));
+    const ordinary = await reminded(a, 61);
+    // Once each; at night, none.
+    expect(await sweeps.sweepCalls(new Date('2026-10-09T18:00:00Z'))).toBe(0);
+    expect(await sweeps.sweepCalls(at)).toBe(1);
+    expect(await called()).toEqual([long, ordinary]);
+    expect(await sweeps.sweepCalls(at)).toBe(0);
+  });
 });

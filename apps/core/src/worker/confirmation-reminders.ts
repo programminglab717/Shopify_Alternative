@@ -1,13 +1,14 @@
 import { Database } from '@hatti/db';
 import type { Logger } from '@hatti/logger';
-import { CONFIRMATION_REMINDER, OrderService } from '@hatti/orders/public';
+import { CONFIRMATION_CALL, CONFIRMATION_REMINDER, OrderService } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { repeat } from './repeat.js';
 
 /**
  * Asks customers once more to confirm their cash-on-delivery orders (COD-01, ADR-175): for each
  * shop with orders still waiting for their answer three hours after they were placed, in its
- * calling hours. The shops are found with the system role, which sees every shop, through the
+ * calling hours; and calls those who left that unanswered an hour, where the shop says to
+ * (COD-03, ADR-611). The shops are found with the system role, which sees every shop, through the
  * confirmation queue's index; each order is asked again in its shop's own transaction, and the
  * worker's notifications send it.
  */
@@ -41,10 +42,35 @@ export class ConfirmationReminders {
     return reminded;
   }
 
+  /**
+   * One sweep of every shop with orders reminded and still unanswered an hour on, whose customers
+   * the shop has called (ADR-611): how many were called. A shop that calls none calls none here.
+   */
+  async sweepCalls(at: Date = new Date()): Promise<number> {
+    const { rows: shops } = await this.database.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM orders.orders
+         WHERE stage = 'needs_confirmation' AND confirmation_called_at IS NULL
+           AND confirmation_reminded_at < ${new Date(at.getTime() - CONFIRMATION_CALL.afterReminderMs)}
+           AND created_at >= ${new Date(at.getTime() - CONFIRMATION_REMINDER.withinMs)}`),
+    );
+    let called = 0;
+    for (const shop of shops) {
+      try {
+        const count = await this.orders.callToConfirm(shop.shop_id, at);
+        if (count > 0) this.logger?.info({ shopId: shop.shop_id, count }, 'called to confirm');
+        called += count;
+      } catch (error) {
+        this.logger?.warn({ err: error, shopId: shop.shop_id }, 'not called to confirm');
+      }
+    }
+    return called;
+  }
+
   /** Sweeps now, then every `intervalMs`, a sweep never overlapping the last. */
   start(intervalMs: number): { stop(): Promise<void> } {
     return repeat(
-      () => this.sweep(),
+      async () => (await this.sweep()) + (await this.sweepCalls()),
       intervalMs,
       (error) => this.logger?.warn({ err: error }, 'confirmation reminders sweep failed'),
     );

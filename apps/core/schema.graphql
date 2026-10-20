@@ -2367,6 +2367,20 @@ enum ConfirmationCallOutcome {
 }
 
 """
+Which cash-on-delivery orders get an automated call in Urdu, once, in calling hours, when their customer left the reminder to confirm unanswered for an hour: pressing 1 confirms the order, and 2 cancels it (COD-03, ADR-611). Each call is paid from the message credit.
+"""
+enum ConfirmationCalls {
+  """All of them."""
+  ALL
+
+  """Those of high value, as the shop's risk settings count them."""
+  HIGH_VALUE
+
+  """None: the default."""
+  OFF
+}
+
+"""
 The Confirmation Desk's queue: orders waiting for their customers to confirm them, due for a call now, the most urgent first.
 """
 type ConfirmationQueue {
@@ -7072,6 +7086,11 @@ enum MessageChannel {
   """SMS, from Hatti's shared sender."""
   SMS
 
+  """
+  An automated call through Hatti's voice gateway, read out in Urdu, the keys pressed its answer (ADR-611).
+  """
+  VOICE
+
   """WhatsApp, from Hatti's shared notifications number."""
   WHATSAPP
 }
@@ -7201,6 +7220,11 @@ enum MessageKind {
   Their cash-on-delivery order waits for them: Confirm, Cancel and Change address buttons on WhatsApp, its link by SMS (COD-01). In place of ORDER_PLACED.
   """
   ORDER_CONFIRMATION
+
+  """
+  An automated call in Urdu about their cash-on-delivery order, the reminder to confirm it unanswered for an hour, in the shop's calling hours: pressing 1 confirms it, and 2 cancels it, where the shop's order settings call (COD-03, ADR-611).
+  """
+  ORDER_CONFIRMATION_CALL
 
   """
   Their cash-on-delivery order asked again to be confirmed, three hours on without an answer, in the shop's calling hours, with the same buttons and link (ADR-175).
@@ -10617,6 +10641,7 @@ type OrderSettings {
   Days after an order was placed when, its customer unreachable (three calls unanswered), it is cancelled and its stock let go, by a sweep every few minutes; null for never.
   """
   cancelUnreachableAfterDays: Int
+  confirmationCalls: ConfirmationCalls!
 
   """
   Whether the store credit that paid an order goes back to its customer once its every parcel came back unaccepted (ORD-09, ADR-610), as it does when the order is cancelled.
@@ -10653,6 +10678,7 @@ input OrderSettingsInput {
 
   """1 to 30; null for never."""
   cancelUnreachableAfterDays: Int
+  confirmationCalls: ConfirmationCalls
   creditBackOnReturn: Boolean
   customerCancellation: CustomerCancellation
   deskWaitsForReminder: Boolean

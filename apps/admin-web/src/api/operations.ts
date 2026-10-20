@@ -6713,6 +6713,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     customerCancellation
     upsellPercentOff
     creditBackOnReturn
+    confirmationCalls
     updatedAt
   }
 `;

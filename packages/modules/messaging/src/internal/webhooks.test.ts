@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import type { ConversationsService } from './conversations.service.js';
 import type { MessagesService, StatusUpdate } from './messages.service.js';
 import type { SupportInbox } from './support-inbox.js';
-import { WhatsAppWebhookController } from './webhooks.controller.js';
+import type { CallResult } from './voice-webhook.js';
+import { VoiceWebhookController, WhatsAppWebhookController } from './webhooks.controller.js';
 import type { InboundMessage } from './whatsapp-webhook.js';
 import type { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 
@@ -124,5 +125,65 @@ describe("WhatsApp's webhook and Hatti's support number (ADR-560)", () => {
       controller.receive(...delivered({ statuses: [status('wamid.X1')] })),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(seen.supportStatuses).toEqual(['wamid.A1', 'wamid.X1']);
+  });
+});
+
+describe("The voice gateway's webhook (ADR-611)", () => {
+  const SECRET = 'voice-gateway-secret';
+  /** A call's end, signed as the gateway signs it. */
+  function told(body: object, secret = SECRET) {
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const signature = `sha256=${createHmac('sha256', secret).update(rawBody).digest('hex')}`;
+    return [
+      { body, rawBody } as unknown as FastifyRequest & { rawBody: Buffer },
+      signature,
+    ] as const;
+  }
+
+  function controller(known: boolean, settings: { secret: string } | null = { secret: SECRET }) {
+    const heard: CallResult[] = [];
+    const messages = {
+      recordCall: async (call: CallResult) => {
+        heard.push(call);
+        return known;
+      },
+    };
+    return {
+      heard,
+      webhook: new VoiceWebhookController(settings, messages as unknown as MessagesService),
+    };
+  }
+
+  it("hands each call's end to the messages, signed with the shared secret alone", async () => {
+    const { webhook, heard } = controller(true);
+    const at = new Date().toISOString();
+    expect(
+      await webhook.receive(...told({ id: 'call-77', result: 'answered', key: '1', at })),
+    ).toEqual({ received: 1 });
+    expect(heard).toEqual([{ callId: 'call-77', result: 'answered', key: '1', at: new Date(at) }]);
+    await expect(
+      webhook.receive(...told({ id: 'call-77', result: 'answered' }, 'another-secret')),
+    ).rejects.toMatchObject({ status: 401 });
+    // What says no call's end is taken, and changes nothing.
+    expect(await webhook.receive(...told({ id: 'call-77', result: 'ringing' }))).toEqual({
+      received: 0,
+    });
+    expect(heard).toHaveLength(1);
+  });
+
+  it('asks again for a call not known yet, and answers 404 without the gateway', async () => {
+    const early = controller(false);
+    await expect(
+      early.webhook.receive(...told({ id: 'call-9', result: 'no_answer' })),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    // Long ago: given up on.
+    expect(
+      await early.webhook.receive(
+        ...told({ id: 'call-9', result: 'no_answer', at: '2026-01-01T00:00:00Z' }),
+      ),
+    ).toEqual({ received: 1 });
+    await expect(
+      controller(true, null).webhook.receive(...told({ id: 'call-9', result: 'busy' })),
+    ).rejects.toMatchObject({ status: 404 });
   });
 });

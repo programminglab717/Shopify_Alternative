@@ -25,6 +25,12 @@ import {
 } from './support-inbox.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 import { asksToStop } from './templates.js';
+import {
+  parseCallResult,
+  VOICE_WEBHOOK,
+  voiceSignatureValid,
+  type VoiceWebhookSettings,
+} from './voice-webhook.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
 
 /** What the webhook of Hatti's WhatsApp app checks requests with; null without WhatsApp. */
@@ -125,6 +131,44 @@ export class WhatsAppWebhookController {
       throw new ServiceUnavailableException('A message is not known yet: send it again');
     }
     return { received: statuses.length + inbound.length + templates.length };
+  }
+}
+
+/**
+ * The voice gateway's webhook (COD-03, ADR-611): what became of each automated call it placed,
+ * signed with the secret the two share, which a call's message records, and the key pressed on
+ * it, which the worker acts on as a button's answer. Heard twice, a call's end changes nothing
+ * more. Without the gateway's settings, it answers 404.
+ */
+@Controller('webhooks/voice')
+export class VoiceWebhookController {
+  constructor(
+    @Optional()
+    @Inject(VOICE_WEBHOOK)
+    private readonly settings: VoiceWebhookSettings | null = null,
+    private readonly messages: MessagesService,
+  ) {}
+
+  @Post()
+  @HttpCode(200)
+  async receive(
+    @Req() request: FastifyRequest & { rawBody?: Buffer },
+    @Headers('x-voice-signature') signature: string | undefined,
+  ): Promise<{ received: number }> {
+    if (!this.settings) throw new NotFoundException();
+    if (
+      !request.rawBody ||
+      !voiceSignatureValid(request.rawBody, signature, this.settings.secret)
+    ) {
+      throw new UnauthorizedException('The request is not signed with the shared secret');
+    }
+    const call = parseCallResult(request.body);
+    if (!call) return { received: 0 };
+    if (!(await this.messages.recordCall(call)) && Date.now() - call.at.getTime() < EARLY_MS) {
+      // Told of before its sender recorded the ID it was placed with.
+      throw new ServiceUnavailableException('The call is not known yet: send it again');
+    }
+    return { received: 1 };
   }
 }
 

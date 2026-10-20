@@ -29,6 +29,8 @@ export const OrderEvents = {
   OrderPaymentReminded: 'order.payment_reminded',
   /** Its customer, who has not answered, is asked once more to confirm it (ADR-175). */
   OrderConfirmationReminded: 'order.confirmation_reminded',
+  /** Its customer, who left the reminder unanswered, is called to confirm it (ADR-611). */
+  OrderConfirmationCalled: 'order.confirmation_called',
   /**
    * Given to a member of staff to see through (ADR-191): whom, and who gave it; besides the
    * `order.updated` that says its assignee changed.
@@ -113,6 +115,8 @@ export interface OrderUpdatedPayload extends OrderState {
 export type OrderConfirmedPayload = OrderState;
 
 export type OrderConfirmationRemindedPayload = OrderState;
+
+export type OrderConfirmationCalledPayload = OrderState;
 
 export interface OrderCancelledPayload extends OrderState {
   reason: CancelReasonValue;
@@ -285,6 +289,8 @@ export interface OrderSettingsUpdatedPayload {
   /** The post-purchase offer's percentage off (ADR-438); null for no offer. */
   upsellPercentOff: number | null;
   creditBackOnReturn: boolean;
+  /** Which orders' customers are called to confirm them (ADR-611). */
+  confirmationCalls: 'off' | 'high_value' | 'all';
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

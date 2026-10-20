@@ -826,10 +826,15 @@ describe.skipIf(!server)('Billing', () => {
       ['sms', 'utility', 1_73n],
       ['sms', 'authentication', 1_73n],
       ['sms', 'marketing', 1_73n],
+      // An automated call (ADR-611).
+      ['voice', 'utility', 4_60n],
+      ['voice', 'authentication', 4_60n],
+      ['voice', 'marketing', 4_60n],
     ]);
     const whatsapp = { channel: 'whatsapp', category: 'utility', parts: 1 } as const;
     const sms = { channel: 'sms', category: 'utility', parts: 2 } as const;
     expect(f.wallet.priceOf(sms)).toBe(3_46n);
+    expect(f.wallet.priceOf({ channel: 'voice', category: 'utility', parts: 1 })).toBe(4_60n);
 
     expect(await f.billing.grantCredits(f.a.shopId, 10_00n, 'To try messages with')).toBe(10_00n);
     const [first, second, third] = [newId(), newId(), newId()];

@@ -7,6 +7,7 @@ import {
   OrderSettingsUpdateMutation,
 } from '../api/operations';
 import type {
+  ConfirmationCalls,
   CustomerCancellation,
   OrderPoliciesData,
   OrderRiskSettings,
@@ -32,11 +33,14 @@ import {
   parseWhole,
   percentText,
   Problems,
+  SelectField,
   settingProblem,
 } from './settings-form';
 import { BackToSettings } from './settings-page';
 
 const CANCELLATIONS: readonly CustomerCancellation[] = ['UNTIL_PACKED', 'UNTIL_CONFIRMED'];
+
+const CALLS: readonly ConfirmationCalls[] = ['OFF', 'HIGH_VALUE', 'ALL'];
 
 const LABELS: Partial<Record<string, MessageKey>> = {
   callingHours: 'orderPolicies.callingHours',
@@ -66,6 +70,7 @@ function orderInputOf(state: {
   upsell: boolean;
   upsellPercent: string;
   creditBack: boolean;
+  calls: ConfirmationCalls;
 }) {
   return {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
@@ -77,6 +82,7 @@ function orderInputOf(state: {
     // Offered at no percentage given is offered at its price (ADR-438).
     upsellPercentOff: state.upsell ? (wholeOrNone(state.upsellPercent) ?? 0) : null,
     creditBackOnReturn: state.creditBack,
+    confirmationCalls: state.calls,
   };
 }
 
@@ -97,6 +103,7 @@ function stateOf(settings: OrderSettings) {
     upsell: upsell !== null,
     upsellPercent: upsell === null ? '' : String(upsell),
     creditBack: settings.creditBackOnReturn ?? false,
+    calls: settings.confirmationCalls ?? 'OFF',
   };
 }
 
@@ -223,6 +230,18 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
           checked={state.waits}
           onChange={(waits) => set({ waits })}
         />
+        <SelectField<ConfirmationCalls>
+          label={t('orderPolicies.calls')}
+          value={state.calls}
+          options={CALLS.map((each) => ({
+            value: each,
+            label: t(`orderPolicies.calls.${each}` as MessageKey),
+          }))}
+          onChange={(calls) => set({ calls })}
+        />
+        <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('orderPolicies.callsHint')}
+        </p>
       </FormSection>
 
       <FormSection title={t('orderPolicies.cancelling')} hint={t('orderPolicies.cancellingHint')}>

@@ -168,6 +168,24 @@ describe('Order policies', () => {
     ).toBe(true);
   });
 
+  it('calls in Urdu the customers of high-value orders who leave the reminder unanswered (ADR-611)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    const calls = (await screen.findByLabelText('Automated call in Urdu')) as HTMLSelectElement;
+    expect(calls.value).toBe('OFF');
+    fireEvent.change(calls, { target: { value: 'HIGH_VALUE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([
+      { input: { confirmationCalls: 'HIGH_VALUE' } },
+    ]);
+    expect((screen.getByLabelText('Automated call in Urdu') as HTMLSelectElement).value).toBe(
+      'HIGH_VALUE',
+    );
+  });
+
   it('changes high value and the score that holds an order, and refuses what is not a number', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);

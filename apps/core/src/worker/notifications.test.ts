@@ -840,6 +840,71 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ]);
   });
 
+  it('calls in Urdu one who left the reminder unanswered, a key pressed confirming it (ADR-611)', async () => {
+    const order = await placeOnline();
+    await dispatch();
+    await admin.query(
+      `INSERT INTO orders.order_settings (shop_id, confirmation_calls) VALUES ($1, 'all')
+         ON CONFLICT (shop_id) DO UPDATE SET confirmation_calls = 'all'`,
+      [shopId],
+    );
+    // At noon in Karachi, days ahead as above: reminded two hours before, and still waiting.
+    const day = new Date(Date.now() + 5 * 86_400_000);
+    const noon = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), 7));
+    await admin.query(
+      `UPDATE orders.orders SET created_at = $2, confirmation_reminded_at = $3 WHERE id = $1`,
+      [
+        order.id,
+        new Date(noon.getTime() - 7 * 3_600_000),
+        new Date(noon.getTime() - 2 * 3_600_000),
+      ],
+    );
+    expect(await orders().callToConfirm(shopId, noon)).toBe(1);
+    await dispatch(2);
+    const call = (await queued()).find((message) => message.kind === 'order_confirmation_call');
+    expect(call).toMatchObject({
+      channel: 'voice',
+      recipient: AYESHA,
+      order_id: order.id,
+      variables: { shop: expect.any(String), order: `#${order.number}`, total: 'Rs 5,250' },
+    });
+    const { rows: language } = await admin.query<{ language: string }>(
+      'SELECT language FROM messaging.messages WHERE id = $1',
+      [call!.id],
+    );
+    expect(language).toEqual([{ language: 'ur' }]);
+
+    // Placed through the voice gateway, then pressed 1 on.
+    const placed: string[] = [];
+    const voice: MessageProvider = {
+      name: 'voice_gateway',
+      channel: 'voice',
+      send: async (message) => {
+        placed.push(message.kind);
+        return { ok: true, providerMessageId: 'call-ADR-611' };
+      },
+    };
+    await sender({ whatsapp: whatsapp(), sms: sms(), voice }).sweep(soon());
+    expect(placed).toEqual(['order_confirmation_call']);
+    expect(
+      await messages().recordCall({
+        callId: 'call-ADR-611',
+        result: 'answered',
+        key: '1',
+        at: new Date(),
+      }),
+    ).toBe(true);
+    await dispatch(2);
+    expect((await timeline(order.id)).slice(-2)).toEqual([
+      ['confirmation_call', 'Calling the customer to confirm it, by an automated call in Urdu'],
+      ['confirmed', 'Confirmed by the customer on an automated call'],
+    ]);
+    await admin.query(
+      `UPDATE orders.order_settings SET confirmation_calls = 'off' WHERE shop_id = $1`,
+      [shopId],
+    );
+  });
+
   it('asks by SMS, with the link, when WhatsApp cannot deliver the question', async () => {
     const order = await placeOnline();
     await dispatch();

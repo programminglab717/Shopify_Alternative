@@ -343,6 +343,8 @@ export const orders = ordersSchema.table(
     paymentRemindedAt: timestamp('payment_reminded_at', { withTimezone: true }),
     /** When its customer was asked once more to confirm it (ADR-175). */
     confirmationRemindedAt: timestamp('confirmation_reminded_at', { withTimezone: true }),
+    /** When its customer was called to confirm it, by an automated call (ADR-611). */
+    confirmationCalledAt: timestamp('confirmation_called_at', { withTimezone: true }),
     /** When its customer was asked to review what it brought, or rated it unasked (ADR-400). */
     reviewRequestedAt: timestamp('review_requested_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),

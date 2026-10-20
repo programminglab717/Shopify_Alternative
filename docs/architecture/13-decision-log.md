@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-610 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-611 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -618,6 +618,7 @@
 | 608 | Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap index says when each of its files last changed | Accepted |
 | 609 | A shopper signed in to their account with a number spends its store credit at checkout without a code; a browser's recent proof still asks one | Accepted |
 | 610 | Where the shop says so, the store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled | Accepted |
+| 611 | Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to confirm unanswered an hour is called once in Urdu, in calling hours: pressing 1 confirms it and 2 cancels it, the call a message on a voice channel of its own | Accepted |
 
 ---
 
@@ -22141,3 +22142,34 @@
   whether or not it chose to bear it. **Give back what is left after the return's cost:** a
   partial credit is harder for customers to understand, and the cost of a return is known only
   once the courier's statement comes.
+
+## ADR-611 · Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to confirm unanswered an hour is called once in Urdu, in calling hours: pressing 1 confirms it and 2 cancels it, the call a message on a voice channel of its own
+
+* **Context:** A cash-on-delivery order asks its customer on WhatsApp to confirm it (ADR-147),
+  and asks once more three hours on (ADR-175); the rest is left to the Confirmation Desk's
+  agents. Many customers read no English, use WhatsApp little, or never open the message, and a
+  shop's agents cannot call every order in a sale. 06 §3's sequence puts an automated call in
+  Urdu, "press 1 to confirm, 2 to cancel", after the reminder, for orders of high value first
+  (COD-03).
+* **Decision:** The shop's order settings gain `confirmationCalls`: `off`, the default, as each
+  call costs; `high_value`, the orders its risk settings count as of high value; or `all`. A
+  sweep in the worker, beside the reminders', finds the orders still waiting for their customer
+  an hour after the reminder, placed within the reminders' three days, in the shop's calling
+  hours, and marks each called once, with a note on its timeline; the worker then queues the
+  call. A call is a message on a channel of its own, `voice`, so that it is queued once, tried
+  again, paid from the shop's message credit at the voice gateway's rate and Hatti's fee, and
+  listed with the shop's messages. It is always in Urdu, whatever the shop's language: it is for
+  those who do not read. A voice gateway, set by `VOICE_GATEWAY_URL` and its key, reads the
+  message's words by text-to-speech and listens for the keys it is given; it posts how the call
+  ended, and the key pressed, to `/webhooks/voice`, signed with a secret it shares with Hatti.
+  Answered, the call is delivered; not, it failed and its charge is given back, and no SMS goes in
+  its place. A key that answers, heard once, is a reply, as a WhatsApp button's is: 1 confirms
+  the order and 2 cancels it, as its link would, the timeline saying "on an automated call".
+* **Consequences:** Customers who do not answer on WhatsApp are reached without an agent, the
+  desk keeps those who do not answer the call either, and the shop chooses what it spends. No
+  gateway is tied to: any that takes the request and posts the result signed will do, and until
+  one is chosen calls go to the log in development and fail as unsent in production.
+* **Alternatives:** **A table of calls of its own:** cleaner for calls alone, but every part of
+  messages (queueing, charges, statuses, the admin's list) built again. **Recorded prompts
+  with the variables spoken apart:** truer Urdu, for the gateway chosen to do, once one is.
+  **Calls in the shop's language:** an English call reaches no one an Urdu one does not.

@@ -1,6 +1,7 @@
 import { createLogger } from '@hatti/logger';
 import {
   LogProvider,
+  VoiceGatewayProvider,
   type MessageChannel,
   type MessageProvider,
   type OutgoingMessage,
@@ -166,7 +167,7 @@ describe('How each channel sends (ADR-146)', () => {
 
   it("sends orders' emails through SES where it is set up, to the log in development (ADR-181)", () => {
     const development = messageProvidersOf(local, logger);
-    expect(Object.keys(development).sort()).toEqual(['email', 'sms', 'whatsapp']);
+    expect(Object.keys(development).sort()).toEqual(['email', 'sms', 'voice', 'whatsapp']);
     expect(development.email).toBeInstanceOf(LogProvider);
     expect(development.email?.channel).toBe('email');
     // Nothing set up in production: each fails as unsent.
@@ -184,5 +185,23 @@ describe('How each channel sends (ADR-146)', () => {
     expect(Object.keys(production)).toEqual(['email']);
     expect(production.email).toBeInstanceOf(SesMessageEmails);
     expect(production.email?.name).toBe('ses');
+  });
+
+  it('places calls through the voice gateway where it is set up, told of them at the API (ADR-611)', () => {
+    expect(messageProvidersOf(local, logger).voice).toBeInstanceOf(LogProvider);
+    const voice = messageProvidersOf(
+      {
+        ...local,
+        NODE_ENV: 'production',
+        VOICE_GATEWAY_URL: 'https://voice.example.pk/calls',
+        VOICE_GATEWAY_KEY: 'v'.repeat(32),
+        VOICE_WEBHOOK_SECRET: 'w'.repeat(32),
+      },
+      logger,
+      'https://api.hatti.pk',
+    );
+    expect(Object.keys(voice)).toEqual(['voice']);
+    expect(voice.voice).toBeInstanceOf(VoiceGatewayProvider);
+    expect(voice.voice?.name).toBe('voice_gateway');
   });
 });

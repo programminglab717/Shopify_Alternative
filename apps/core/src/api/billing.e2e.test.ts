@@ -329,6 +329,10 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
       { channel: 'SMS', category: 'UTILITY', price: { amount: '1.73' } },
       { channel: 'SMS', category: 'AUTHENTICATION', price: { amount: '1.73' } },
       { channel: 'SMS', category: 'MARKETING', price: { amount: '1.73' } },
+      // An automated call to confirm an order (ADR-611).
+      { channel: 'VOICE', category: 'UTILITY', price: { amount: '4.60' } },
+      { channel: 'VOICE', category: 'AUTHENTICATION', price: { amount: '4.60' } },
+      { channel: 'VOICE', category: 'MARKETING', price: { amount: '4.60' } },
     ]);
     expect(
       (await gql(manager, BUY, { input: { amount: '1000' } })).errors?.[0].extensions.code,

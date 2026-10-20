@@ -635,6 +635,75 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect(charges.refunded).toEqual([{ shopId: a.shopId, id: whatsapp }]);
   });
 
+  it('follows an automated call to its end, a key pressed its answer, once (ADR-611)', async () => {
+    const charges = new RecordedCharges();
+    const paying = new MessagesService(db, charges);
+    const call = (order: string, recipient: string): MessageToQueue => ({
+      kind: 'order_confirmation_call',
+      channel: 'voice',
+      language: 'ur',
+      recipient,
+      orderId: order,
+      variables: { shop: 'Zari', order: '#1001', total: 'Rs 2,500' },
+      dedupeKey: `order_confirmation_call:${order}`,
+    });
+    const [answered, unanswered] = [newId(), newId()];
+    await paying.queue(a.shopId, call(answered, AYESHA));
+    await paying.queue(a.shopId, call(unanswered, BILAL));
+    const [first, second] = (await rows()).map((row) => row.id);
+    const at = soon();
+    await paying.claim(a.shopId, at, 10, 1);
+    await paying.settle(
+      a.shopId,
+      [
+        { id: first!, status: 'sent', provider: 'voice_gateway', providerMessageId: 'call-1' },
+        { id: second!, status: 'sent', provider: 'voice_gateway', providerMessageId: 'call-2' },
+      ],
+      at,
+    );
+    expect(charges.charged.map((charge) => charge.cost)).toEqual([
+      { channel: 'voice', category: 'utility', parts: 1 },
+      { channel: 'voice', category: 'utility', parts: 1 },
+    ]);
+
+    const heard = new Date(at.getTime() + 40_000);
+    const pressed = { callId: 'call-1', result: 'answered', key: '1', at: heard } as const;
+    expect(await paying.recordCall(pressed)).toBe(true);
+    // Told twice, or a key that answers nothing: no more answers.
+    expect(await paying.recordCall(pressed)).toBe(true);
+    expect(await paying.recordCall({ ...pressed, key: '9' })).toBe(true);
+    // Not answered: failed, its charge given back, and nothing in its place.
+    expect(
+      await paying.recordCall({ callId: 'call-2', result: 'no_answer', key: null, at: heard }),
+    ).toBe(true);
+    // A call not known.
+    expect(
+      await paying.recordCall({ callId: 'call-0', result: 'answered', key: '1', at: heard }),
+    ).toBe(false);
+
+    expect((await rows()).map((row) => [row.channel, row.status, row.error])).toEqual([
+      ['voice', 'delivered', null],
+      ['voice', 'failed', 'The call was not answered'],
+    ]);
+    expect(charges.refunded).toEqual([{ shopId: a.shopId, id: second }]);
+    const { rows: events } = await admin.query(
+      `SELECT aggregate_id, payload FROM platform.outbox_events
+        WHERE event_type = 'message.replied' ORDER BY id`,
+    );
+    expect(events).toEqual([
+      {
+        aggregate_id: first,
+        payload: {
+          kind: 'order_confirmation_call',
+          orderId: answered,
+          answer: 'confirm',
+          channel: 'voice',
+          at: heard.toISOString(),
+        },
+      },
+    ]);
+  });
+
   it('hears "stop" for the shop it answered, or else the one that last wrote, there alone', async () => {
     expect(await messages.optOut('whatsapp', AYESHA, 'STOP')).toBeNull();
     const [first, second, third] = [newId(), newId(), newId()];

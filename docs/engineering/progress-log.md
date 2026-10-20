@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Calls to confirm in Urdu
+
+* **Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to
+  confirm unanswered an hour is called once in Urdu: pressing 1 confirms it and 2 cancels it**
+  ([ADR-611](../architecture/13-decision-log.md#adr-611--where-the-shop-says-so-a-cash-on-delivery-order-whose-customer-leaves-the-reminder-to-confirm-unanswered-an-hour-is-called-once-in-urdu-in-calling-hours-pressing-1-confirms-it-and-2-cancels-it-the-call-a-message-on-a-voice-channel-of-its-own), COD-03).
+* 3709 tests, 10 more: the sweep, the call queued and placed, the
+  gateway's word on it and its signed webhook, the key heard, and the admin's choice.
+
 ### 76464a1 · Store credit back on return
 
 * **Where the shop says so, the store credit that paid an order goes back to its customer once

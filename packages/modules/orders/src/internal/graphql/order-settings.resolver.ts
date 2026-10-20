@@ -1,10 +1,15 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { clockOf } from '../calling-hours.js';
-import { OrderSettingsService, type OrderSettingsRecord } from '../order-settings.service.js';
+import {
+  OrderSettingsService,
+  type ConfirmationCallsValue,
+  type OrderSettingsRecord,
+} from '../order-settings.service.js';
 import type { CustomerCancellationValue } from '../schema.js';
 import {
   CallingHours,
+  ConfirmationCalls,
   CustomerCancellation,
   OrderSettings,
   OrderSettingsInput,
@@ -52,6 +57,9 @@ export class OrderSettingsResolver {
       ...(input.upsellPercentOff !== undefined && { upsellPercentOff: input.upsellPercentOff }),
       ...(input.creditBackOnReturn !== undefined &&
         input.creditBackOnReturn !== null && { creditBackOnReturn: input.creditBackOnReturn }),
+      ...(input.confirmationCalls && {
+        confirmationCalls: input.confirmationCalls.toLowerCase() as ConfirmationCallsValue,
+      }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -75,6 +83,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     cancelUnpaidAfterDays: record.cancelUnpaidAfterDays,
     upsellPercentOff: record.upsellPercentOff,
     creditBackOnReturn: record.creditBackOnReturn,
+    confirmationCalls: record.confirmationCalls.toUpperCase() as ConfirmationCalls,
     updatedAt: record.updatedAt,
   });
 }

@@ -176,7 +176,10 @@ order is overdue
 An order whose customer could not be reached is cancelled as many days after it was placed as
 the shop says, its stock let go, by a sweep in the worker
 ([ADR-092](./13-decision-log.md#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)).
-Not yet: alerts for overdue orders, and WhatsApp and IVR attempts.
+Where the shop says so, a customer who leaves the WhatsApp reminder unanswered an hour is called
+once in Urdu, pressing 1 to confirm and 2 to cancel
+([ADR-611](./13-decision-log.md#adr-611--where-the-shop-says-so-a-cash-on-delivery-order-whose-customer-leaves-the-reminder-to-confirm-unanswered-an-hour-is-called-once-in-urdu-in-calling-hours-pressing-1-confirms-it-and-2-cancels-it-the-call-a-message-on-a-voice-channel-of-its-own)).
+Not yet: alerts for overdue orders.
 
 Beside the desk, an owner or manager gives an order to one member of staff to see through, from
 confirming it to its delivery, and other staff take an order no one has for themselves; each

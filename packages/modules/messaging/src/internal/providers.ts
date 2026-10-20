@@ -1,4 +1,5 @@
 import {
+  callKeysOf,
   messageEmail,
   messageText,
   templateButtons,
@@ -13,15 +14,19 @@ import { LIBRARY_KINDS, libraryParameters } from './template-library.js';
 
 // The channels messages go by (ADR-146): WhatsApp's Cloud API from Hatti's shared notifications
 // number (MSG-03), an SMS gateway, email for the news of orders (ADR-181), which the host
-// application sends, and a log in place of any where none is set up, as in development. Each says
+// application sends, a voice gateway for automated calls (ADR-611), and a log in place of any
+// where none is set up, as in development. Each says
 // what became of a message: sent, with the provider's ID for it; to be tried again; better sent
 // another way; or never to be sent.
 
-export const MESSAGE_CHANNELS = ['whatsapp', 'sms', 'email'] as const;
+export const MESSAGE_CHANNELS = ['whatsapp', 'sms', 'email', 'voice'] as const;
 export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
 
-/** The channels that reach a number: what a code, or a reply, goes by. */
-export type PhoneChannel = Exclude<MessageChannel, 'email'>;
+/** The channels a code, or a reply, goes by. */
+export type PhoneChannel = 'whatsapp' | 'sms';
+
+/** The channels the shop's credit pays for (ADR-155): all but email, which Hatti pays for. */
+export type PricedChannel = Exclude<MessageChannel, 'email'>;
 
 /** A message as a provider sends it. */
 export interface OutgoingMessage {
@@ -219,6 +224,68 @@ export class SmsGatewayProvider implements MessageProvider {
       ok: false,
       outcome: retry ? 'retry' : 'fail',
       error: clip(`SMS gateway ${response.status}: ${String(body.error ?? 'no reason given')}`),
+    };
+  }
+}
+
+/** The provider the voice gateway calls as (ADR-611): its webhook names calls by their IDs there. */
+export const VOICE_GATEWAY = 'voice_gateway';
+
+export interface VoiceGatewayOptions {
+  /** Where calls are asked for: the gateway's API, which takes JSON. */
+  url: string;
+  apiKey: string;
+  /** Where the gateway posts what became of each call, and what was pressed. */
+  callbackUrl: string;
+  timeoutMs?: number;
+}
+
+/**
+ * Places automated calls through a voice gateway (COD-03, ADR-611): it reads the message's words
+ * to the number by text-to-speech, in its language, and listens for the keys `keys` maps to
+ * answers; what became of the call, and what was pressed, comes to {@link VoiceGatewayOptions.callbackUrl}.
+ */
+export class VoiceGatewayProvider implements MessageProvider {
+  readonly name = VOICE_GATEWAY;
+  readonly channel = 'voice' as const;
+
+  constructor(private readonly options: VoiceGatewayOptions) {}
+
+  async send(message: OutgoingMessage): Promise<SendResult> {
+    const { url, apiKey, callbackUrl, timeoutMs } = this.options;
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          to: message.recipient,
+          text: messageText(message.kind, message.language, message.variables),
+          language: message.language,
+          keys: callKeysOf(message.kind),
+          reference: message.id,
+          callbackUrl,
+        }),
+        signal: AbortSignal.timeout(timeoutMs ?? 10_000),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        outcome: 'retry',
+        error: `Voice gateway not reached: ${errorText(error)}`,
+      };
+    }
+    const body = (await response.json().catch(() => ({}))) as { id?: unknown; error?: unknown };
+    if (response.ok) {
+      // Taken: asking again would call twice. Without an ID of its own, it names the call by ours.
+      const id = typeof body.id === 'string' || typeof body.id === 'number' ? body.id : null;
+      return { ok: true, providerMessageId: id === null ? message.id : String(id) };
+    }
+    const retry = response.status >= 500 || response.status === 429;
+    return {
+      ok: false,
+      outcome: retry ? 'retry' : 'fail',
+      error: clip(`Voice gateway ${response.status}: ${String(body.error ?? 'no reason given')}`),
     };
   }
 }

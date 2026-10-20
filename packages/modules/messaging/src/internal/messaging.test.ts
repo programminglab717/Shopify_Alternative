@@ -8,6 +8,7 @@ import { MessageKind } from './graphql/messaging.types.js';
 import {
   LogProvider,
   SmsGatewayProvider,
+  VoiceGatewayProvider,
   WhatsAppCloudProvider,
   type OutgoingMessage,
 } from './providers.js';
@@ -26,6 +27,7 @@ import {
   templateParameters,
   type MessageVariables,
 } from './templates.js';
+import { parseCallResult, voiceSignatureValid } from './voice-webhook.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
 
 const SHIPPED: OutgoingMessage = {
@@ -583,6 +585,7 @@ describe("Messages' words", () => {
       'cod_prepaid',
       // Asked for by the shopper, on the closed shop's page (ADR-446).
       'store_open',
+      'order_confirmation_call',
       // What the customer bought: the card's code (ADR-451).
       'gift_card',
       'invoice_due',
@@ -1365,5 +1368,87 @@ describe('Providers', () => {
       error: 'SMS gateway 400: invalid number',
     });
     requests.splice(0);
+  });
+
+  it('asks the voice gateway to call in Urdu, listening for 1 and 2 (ADR-611)', async () => {
+    const voice = new VoiceGatewayProvider({
+      url: `${baseUrl}/calls`,
+      apiKey: 'voice-key',
+      callbackUrl: 'https://api.hatti.pk/webhooks/voice',
+    });
+    const variables = { shop: 'Zari', order: '#1043', total: 'Rs 5,250' };
+    const call: OutgoingMessage = {
+      ...SHIPPED,
+      kind: 'order_confirmation_call',
+      channel: 'voice',
+      language: 'ur',
+      variables,
+    };
+    answer = { status: 201, body: { id: 'call-77' } };
+    expect(await voice.send(call)).toEqual({ ok: true, providerMessageId: 'call-77' });
+    const [sent] = requests.splice(0);
+    expect(sent!.url).toBe('/calls');
+    expect(sent!.headers.authorization).toBe('Bearer voice-key');
+    expect(sent!.body).toEqual({
+      to: '+923001234567',
+      text:
+        'السلام علیکم! یہ Zari کی طرف سے آپ کے آرڈر #1043 کے بارے میں کال ہے، جس کی رقم ' +
+        'Rs 5,250 ڈیلیوری پر ادا ہو گی۔ آرڈر کنفرم کرنے کے لیے 1 دبائیں۔ منسوخ کرنے کے لیے 2 دبائیں۔',
+      language: 'ur',
+      keys: { '1': 'confirm', '2': 'cancel' },
+      reference: SHIPPED.id,
+      callbackUrl: 'https://api.hatti.pk/webhooks/voice',
+    });
+    expect(messageText('order_confirmation_call', 'en', variables)).toBe(
+      'Assalam-o-Alaikum! This is a call from Zari about your order #1043 for Rs 5,250, paid in ' +
+        'cash on delivery. To confirm it, press 1. To cancel it, press 2.',
+    );
+    // Taken without an ID: placed all the same, never twice, and named by Hatti's.
+    answer = { status: 202, body: {} };
+    expect(await voice.send(call)).toEqual({ ok: true, providerMessageId: SHIPPED.id });
+    answer = { status: 503, body: { error: 'busy' } };
+    expect(await voice.send(call)).toMatchObject({ ok: false, outcome: 'retry' });
+    answer = { status: 422, body: { error: 'not a mobile number' } };
+    expect(await voice.send(call)).toEqual({
+      ok: false,
+      outcome: 'fail',
+      error: 'Voice gateway 422: not a mobile number',
+    });
+    requests.splice(0);
+  });
+});
+
+describe("The voice gateway's word on its calls (ADR-611)", () => {
+  const now = new Date('2026-10-06T08:00:00.000Z');
+
+  it('reads how a call ended and the key pressed, by its ID or else by ours', () => {
+    expect(
+      parseCallResult(
+        { id: 'call-77', result: 'answered', key: '1', at: '2026-10-06T08:01:00Z' },
+        now,
+      ),
+    ).toEqual({
+      callId: 'call-77',
+      result: 'answered',
+      key: '1',
+      at: new Date('2026-10-06T08:01:00Z'),
+    });
+    expect(parseCallResult({ reference: 'msg-1', result: 'no_answer', key: '12' }, now)).toEqual({
+      callId: 'msg-1',
+      result: 'no_answer',
+      key: null,
+      at: now,
+    });
+    expect(parseCallResult({ id: 'call-1', result: 'ringing' }, now)).toBeNull();
+    expect(parseCallResult({ result: 'answered' }, now)).toBeNull();
+    expect(parseCallResult('answered', now)).toBeNull();
+  });
+
+  it('takes only bodies signed with the secret it shares with Hatti', () => {
+    const raw = Buffer.from(JSON.stringify({ id: 'call-77', result: 'answered' }));
+    const signed = `sha256=${createHmac('sha256', 'voice-secret').update(raw).digest('hex')}`;
+    expect(voiceSignatureValid(raw, signed, 'voice-secret')).toBe(true);
+    expect(voiceSignatureValid(raw, signed, 'another-secret')).toBe(false);
+    expect(voiceSignatureValid(raw, undefined, 'voice-secret')).toBe(false);
   });
 });

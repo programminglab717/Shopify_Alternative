@@ -3156,7 +3156,7 @@ export interface ConversionEventsData {
 
 export type MessageRouting = 'RICH' | 'ECONOMY';
 export type MessageLanguage = 'EN' | 'UR';
-export type MessageChannel = 'WHATSAPP' | 'SMS' | 'EMAIL';
+export type MessageChannel = 'WHATSAPP' | 'SMS' | 'EMAIL' | 'VOICE';
 export type MessageStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'SKIPPED';
 
 /** How the shop's customers are told of their orders (MSG-01, ADR-146). */
@@ -3199,6 +3199,9 @@ export interface MessagesData {
 
 export type CustomerCancellation = 'UNTIL_CONFIRMED' | 'UNTIL_PACKED';
 
+/** Which orders' customers get an automated call to confirm them (ADR-611). */
+export type ConfirmationCalls = 'OFF' | 'HIGH_VALUE' | 'ALL';
+
 /** The shop's policies for its orders, but for risk (COD-05, ADR-168). */
 export interface OrderSettings {
   callingHours: { opens: string; closes: string } | null;
@@ -3217,6 +3220,8 @@ export interface OrderSettings {
    * absent where a fake core leaves it out.
    */
   creditBackOnReturn?: boolean;
+  /** Absent where a fake core leaves it out (ADR-611). */
+  confirmationCalls?: ConfirmationCalls;
   updatedAt: string | null;
 }
 

@@ -31,7 +31,9 @@ import { WhatsAppTemplateResolver } from './graphql/whatsapp-template.resolver.j
 import { WHATSAPP_SIGNUP, WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import type { WhatsAppSignupSettings } from './whatsapp-business.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
+import { VOICE_WEBHOOK, type VoiceWebhookSettings } from './voice-webhook.js';
 import {
+  VoiceWebhookController,
   WHATSAPP_WEBHOOK,
   WhatsAppWebhookController,
   type WhatsAppWebhookSettings,
@@ -45,7 +47,8 @@ import { WebPushSender, type VapidKeys } from './web-push.js';
  * VAPID keys, nothing is pushed to staff's browsers (ADR-506); without Meta's Graph API for
  * replies, the inbox cannot answer customers (ADR-546); without Hatti's support number, nothing
  * written to WhatsApp is taken for Hatti's people, and with it, what is written to it goes to the
- * SUPPORT_INBOX the host binds, if any (ADR-560).
+ * SUPPORT_INBOX the host binds, if any (ADR-560). Without the voice gateway's secret, its webhook
+ * answers 404, and no call's end is heard (ADR-611).
  */
 @Module({})
 export class MessagingModule {
@@ -55,12 +58,14 @@ export class MessagingModule {
     push?: VapidKeys | null;
     replies?: WhatsAppReplySettings | null;
     supportLine?: SupportLineSettings | null;
+    voice?: VoiceWebhookSettings | null;
   }): DynamicModule {
     return {
       module: MessagingModule,
       imports: [CustomersModule],
       controllers: [
         WhatsAppWebhookController,
+        VoiceWebhookController,
         StopLinkController,
         // Messages through the online store's contact form (ADR-589).
         StorefrontContactMessagesController,
@@ -70,6 +75,7 @@ export class MessagingModule {
         { provide: WHATSAPP_SIGNUP, useValue: options.signup ?? null },
         { provide: WHATSAPP_REPLIES, useValue: options.replies ?? null },
         { provide: SUPPORT_LINE, useValue: options.supportLine ?? null },
+        { provide: VOICE_WEBHOOK, useValue: options.voice ?? null },
         {
           provide: PUSH_SENDER,
           useValue: options.push ? new WebPushSender(options.push) : null,

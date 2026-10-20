@@ -254,6 +254,7 @@ export {
   type OrderPaidPayload,
   type OrderPaymentRemindedPayload,
   type OrderConfirmationRemindedPayload,
+  type OrderConfirmationCalledPayload,
   type OrderReceiptsErasedPayload,
   type OrderRefundedPayload,
   type OrderUpdatedPayload,
@@ -386,6 +387,7 @@ export {
 } from '../internal/records.js';
 export { RiskSettingsService, type RiskSettingsInput } from '../internal/risk-settings.service.js';
 export {
+  CONFIRMATION_CALL,
   CONFIRMATION_REMINDER,
   DEFAULT_ORDER_SETTINGS,
   OrderSettingsService,

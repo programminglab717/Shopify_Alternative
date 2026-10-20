@@ -48,6 +48,7 @@ import { repeat } from './repeat.js';
 
 /** How the timeline names what customers do through Hatti's messages. */
 const ON_WHATSAPP = 'on WhatsApp';
+const ON_A_CALL = 'on an automated call';
 
 /**
  * Queues what a shop's customers are told about their orders (MSG-01, ADR-146), once each: their
@@ -63,7 +64,8 @@ const ON_WHATSAPP = 'on WhatsApp';
  * was placed (COD-01, ADR-147), its link with it; their answer confirms or cancels it, or brings
  * them its page to change its address, and an order confirmed, by them or the shop, says so. A
  * delivery that failed asks whether to deliver it again or call them first (COD-08, ADR-388), and
- * their answer is kept for the shop. An order its customer collects says where once it is ready
+ * their answer is kept for the shop. One whose customer left the reminder unanswered is called,
+ * where the shop says to, the key they press its answer (COD-03, ADR-611). An order its customer collects says where once it is ready
  * (ADR-389).
  */
 export class OrderNotifications {
@@ -76,6 +78,7 @@ export class OrderNotifications {
     OrderEvents.OrderPaid,
     OrderEvents.OrderPaymentReminded,
     OrderEvents.OrderConfirmationReminded,
+    OrderEvents.OrderConfirmationCalled,
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
     OrderEvents.FulfillmentEventCreated,
@@ -122,6 +125,9 @@ export class OrderNotifications {
       }
       case OrderEvents.OrderConfirmationReminded:
         await this.#askAgain(event.shopId, event.aggregateId);
+        return;
+      case OrderEvents.OrderConfirmationCalled:
+        await this.#call(event.shopId, event.aggregateId);
         return;
       case OrderEvents.OrderPaymentReminded: {
         const { cancelAt } = event.payload as Partial<OrderPaymentRemindedPayload>;
@@ -219,6 +225,33 @@ export class OrderNotifications {
         variables: await this.#variables(tx, shopId, order),
       });
       if (id) await this.#carryPage(tx, shopId, orderId, id, 'asking them again to confirm it');
+    });
+  }
+
+  /**
+   * A cash-on-delivery order whose customer left the reminder unanswered is called (ADR-611): an
+   * automated call in Urdu, whatever the shop's language, which customers who read no English, or
+   * no WhatsApp, understand. Nothing for one answered meanwhile.
+   */
+  async #call(shopId: string, orderId: string): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!order || order.erased || !order.phone || !order.awaitsCustomer) return;
+      const shop = await shopProfile(tx, shopId);
+      await this.messages.queueIn(tx, shopId, {
+        kind: 'order_confirmation_call',
+        channel: 'voice',
+        language: 'ur',
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_confirmation_call:${orderId}`,
+        variables: {
+          shop: shop.name,
+          order: `#${order.number}`,
+          total: formatMoney(money(order.total, order.currency as CurrencyCode)),
+        },
+      });
     });
   }
 
@@ -397,6 +430,13 @@ export class OrderNotifications {
     if (kind === 'order_delivery_failed' && orderId) {
       if (answer === 'retry' || answer === 'call') {
         await this.answers.rescue(event.shopId, orderId, answer, ON_WHATSAPP, answeredAt(at));
+      }
+      return;
+    }
+    // Pressed on a call (ADR-611): 1 confirms it, 2 cancels it.
+    if (kind === 'order_confirmation_call' && orderId) {
+      if (answer === 'confirm' || answer === 'cancel') {
+        await this.answers.answer(event.shopId, orderId, answer, ON_A_CALL);
       }
       return;
     }
@@ -614,6 +654,7 @@ const NOT_SET_UP: Record<MessageChannel, string> = {
   whatsapp: 'No WhatsApp number is set up',
   sms: 'No SMS gateway is set up',
   email: 'No email service is set up',
+  voice: 'No voice gateway is set up',
 };
 
 /** Why a message waits, or a code was not sent: the shop's credit cannot pay for it. */

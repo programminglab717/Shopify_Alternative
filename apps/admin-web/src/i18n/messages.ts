@@ -2576,6 +2576,7 @@ const en = {
   'messages.channel.WHATSAPP': 'WhatsApp',
   'messages.channel.SMS': 'SMS',
   'messages.channel.EMAIL': 'Email',
+  'messages.channel.VOICE': 'Call',
   'messages.attempts': 'Tried {count} times',
   'messages.order': 'Its order',
   'messages.none': 'No messages yet.',
@@ -2598,6 +2599,12 @@ const en = {
   'orderPolicies.waits': 'Wait for WhatsApp first',
   'orderPolicies.waitsHint':
     'An order paid on delivery, not of high value, is called an hour after its customer is asked again on WhatsApp, so agents call only those who did not answer.',
+  'orderPolicies.calls': 'Automated call in Urdu',
+  'orderPolicies.calls.OFF': 'No calls',
+  'orderPolicies.calls.HIGH_VALUE': 'High-value orders',
+  'orderPolicies.calls.ALL': 'Every order paid on delivery',
+  'orderPolicies.callsHint':
+    'Called once in calling hours, an hour after the WhatsApp reminder goes unanswered: pressing 1 confirms the order, 2 cancels it. Each call is paid from your message credit.',
   'orderPolicies.cancelling': 'Cancelling',
   'orderPolicies.cancellingHint':
     'Orders cancelled for you, their stock let go. Leave a field blank to never cancel them.',
@@ -4766,6 +4773,7 @@ const en = {
   'messages.kind.AUTOMATION': 'Automation',
   'messages.kind.BACK_IN_STOCK': 'Back in stock',
   'messages.kind.COD_PREPAID': 'COD to prepaid',
+  'messages.kind.ORDER_CONFIRMATION_CALL': 'Call to confirm',
   'activity.subject.product_review': 'Review',
   'activity.subject.review_settings': 'Review settings',
   'activity.verb.written': 'written',
@@ -7727,6 +7735,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.channel.WHATSAPP': 'واٹس ایپ',
   'messages.channel.SMS': 'SMS',
   'messages.channel.EMAIL': 'ای میل',
+  'messages.channel.VOICE': 'کال',
   'messages.attempts': '{count} بار کوشش ہوئی',
   'messages.order': 'اس کا آرڈر',
   'messages.none': 'ابھی کوئی میسج نہیں۔',
@@ -7749,6 +7758,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.waits': 'پہلے واٹس ایپ کا انتظار کریں',
   'orderPolicies.waitsHint':
     'کیش آن ڈیلیوری کا آرڈر، جو زیادہ مالیت کا نہ ہو، کسٹمر سے واٹس ایپ پر دوبارہ پوچھنے کے ایک گھنٹے بعد کال ہوتا ہے، تاکہ ایجنٹ صرف انہیں کال کریں جنہوں نے جواب نہیں دیا۔',
+  'orderPolicies.calls': 'اردو میں خودکار کال',
+  'orderPolicies.calls.OFF': 'کوئی کال نہیں',
+  'orderPolicies.calls.HIGH_VALUE': 'زیادہ مالیت کے آرڈر',
+  'orderPolicies.calls.ALL': 'ڈیلیوری پر ادائیگی والا ہر آرڈر',
+  'orderPolicies.callsHint':
+    'واٹس ایپ کی یاد دہانی کا جواب نہ ملنے کے ایک گھنٹے بعد، کال کے اوقات میں ایک بار کال ہوتی ہے: 1 دبانے سے آرڈر کنفرم ہوتا ہے، 2 دبانے سے منسوخ۔ ہر کال کی ادائیگی آپ کے میسج کریڈٹ سے ہوتی ہے۔',
   'orderPolicies.cancelling': 'منسوخی',
   'orderPolicies.cancellingHint':
     'آپ کی طرف سے منسوخ ہونے والے آرڈرز، ان کا اسٹاک چھوڑ دیا جاتا ہے۔ کبھی منسوخ نہ کرنے کے لیے خانہ خالی چھوڑ دیں۔',
@@ -9911,6 +9926,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.AUTOMATION': 'خودکار پیغام',
   'messages.kind.BACK_IN_STOCK': 'دوبارہ اسٹاک میں',
   'messages.kind.COD_PREPAID': 'کیش آن ڈیلیوری سے پیشگی ادائیگی',
+  'messages.kind.ORDER_CONFIRMATION_CALL': 'کنفرم کرنے کی کال',
   'activity.subject.product_review': 'ریویو',
   'activity.subject.review_settings': 'ریویو کی ترتیبات',
   'activity.verb.written': 'لکھا گیا',

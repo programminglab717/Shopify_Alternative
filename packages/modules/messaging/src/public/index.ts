@@ -46,14 +46,18 @@ export {
   MESSAGE_CHANNELS,
   SmsGatewayProvider,
   SES_EMAIL,
+  VOICE_GATEWAY,
+  VoiceGatewayProvider,
   WHATSAPP_CLOUD,
   WhatsAppCloudProvider,
   type MessageChannel,
   type MessageProvider,
   type OutgoingMessage,
   type PhoneChannel,
+  type PricedChannel,
   type SendResult,
   type SmsGatewayOptions,
+  type VoiceGatewayOptions,
   type WhatsAppCloudOptions,
 } from '../internal/providers.js';
 export {
@@ -78,6 +82,7 @@ export {
   MARKETING_KINDS,
   TO_THE_SHOP_KINDS,
   WHATSAPP_ONLY_KINDS,
+  CALL_KINDS,
   asksToStop,
   messageEmail,
   messageText,
@@ -102,10 +107,18 @@ export {
   type SupportLineSettings,
 } from '../internal/support-inbox.js';
 export {
+  VoiceWebhookController,
   WHATSAPP_WEBHOOK,
   WhatsAppWebhookController,
   type WhatsAppWebhookSettings,
 } from '../internal/webhooks.controller.js';
+export {
+  VOICE_WEBHOOK,
+  parseCallResult,
+  voiceSignatureValid,
+  type CallResult,
+  type VoiceWebhookSettings,
+} from '../internal/voice-webhook.js';
 export {
   parseWhatsAppWebhook,
   signatureValid,

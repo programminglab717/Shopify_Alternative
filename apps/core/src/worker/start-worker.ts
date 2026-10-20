@@ -755,7 +755,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.ENCRYPTION_KEYS && new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null);
     const messages = new MessagesSender({
       messages: new MessagesService(database, wallet),
-      providers: messageProvidersOf(config, logger),
+      providers: messageProvidersOf(config, logger, config.PUBLIC_URL),
       charges: wallet,
       // Customers' SMS go from each shop's own sender name, once approved (ADR-469).
       smsSenders: (shopId) => smsSenders.senderOf(shopId),

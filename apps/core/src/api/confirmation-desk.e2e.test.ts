@@ -213,7 +213,7 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
         orderSettingsUpdate(input: $input) {
           orderSettings {
             callingHours { opens closes } firstCallMinutes cancelUnreachableAfterDays
-            cancelUnpaidAfterDays deskWaitsForReminder creditBackOnReturn
+            cancelUnpaidAfterDays deskWaitsForReminder creditBackOnReturn confirmationCalls
           }
           userErrors { field code message }
         }
@@ -225,6 +225,7 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
           cancelUnreachableAfterDays: 3,
           cancelUnpaidAfterDays: 2,
           creditBackOnReturn: true,
+          confirmationCalls: 'HIGH_VALUE',
         },
       },
     );
@@ -237,6 +238,8 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
         // The desk deals orders as they are placed unless the shop asks it to wait (ADR-203).
         deskWaitsForReminder: false,
         creditBackOnReturn: true,
+        // An automated call in Urdu for high-value orders left unanswered (ADR-611).
+        confirmationCalls: 'HIGH_VALUE',
       },
       userErrors: [],
     });

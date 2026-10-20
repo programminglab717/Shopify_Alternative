@@ -98,6 +98,8 @@ const ALWAYS_SENT = [
   // Turned on and off on Marketing's automations page (ADR-430, ADR-433).
   'BACK_IN_STOCK',
   'COD_PREPAID',
+  // Placed as the order policies say (ADR-611).
+  'ORDER_CONFIRMATION_CALL',
 ] as const;
 
 const KNOWN: ReadonlySet<string> = new Set([...TO_CUSTOMERS, ...TO_THE_SHOP, ...ALWAYS_SENT]);

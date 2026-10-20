@@ -34,6 +34,7 @@ import {
 import {
   MessagingModule,
   type SupportLineSettings,
+  type VoiceWebhookSettings,
   type VapidKeys,
   type WhatsAppReplySettings,
   type WhatsAppSignupSettings,
@@ -170,6 +171,8 @@ export interface ApiModuleOptions {
    * a support request.
    */
   supportLine?: SupportLineSettings | null;
+  /** The voice gateway's webhook (ADR-611); without it, /webhooks/voice answers 404. */
+  voice?: VoiceWebhookSettings | null;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -307,6 +310,7 @@ export class ApiModule {
           push: options.push ?? null,
           replies: options.whatsAppReplies ?? null,
           supportLine: options.supportLine ?? null,
+          voice: options.voice ?? null,
         }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
         BillingModule.forRoot({

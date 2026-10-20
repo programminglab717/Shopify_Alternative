@@ -124,6 +124,15 @@ const messageSending = {
   SMS_GATEWAY_KEY: env.secret(16).optional(),
   SMS_SENDER: z.string().min(1).max(11).default('Hatti'),
   /**
+   * The voice gateway (07 §3, ADR-611), which places automated calls in Urdu to confirm orders:
+   * where it takes a POST of `{ to, text, language, keys, reference, callbackUrl }`, its key, and
+   * the secret it signs what it posts to /webhooks/voice with. All three or none; without them, no
+   * call is placed, in production, and calls go to the log in development.
+   */
+  VOICE_GATEWAY_URL: env.httpUrl().optional(),
+  VOICE_GATEWAY_KEY: env.secret(16).optional(),
+  VOICE_WEBHOOK_SECRET: env.secret(16).optional(),
+  /**
    * Amazon SES, which sends Hatti's own emails about accounts (ADR-165), from the API, and shops'
    * emails to their customers about their orders (ADR-181), from the worker: its region and the
    * key of an IAM user allowed ses:SendEmail, and ses:GetSuppressedDestination and
@@ -197,6 +206,16 @@ const smsPaired = (config: MessageSendingConfig) =>
 const SMS_PAIRED = {
   path: ['SMS_GATEWAY_KEY'],
   message: 'Set both SMS_GATEWAY_URL and SMS_GATEWAY_KEY, or neither',
+};
+const voiceComplete = (config: MessageSendingConfig) =>
+  new Set([
+    config.VOICE_GATEWAY_URL === undefined,
+    config.VOICE_GATEWAY_KEY === undefined,
+    config.VOICE_WEBHOOK_SECRET === undefined,
+  ]).size === 1;
+const VOICE_COMPLETE = {
+  path: ['VOICE_WEBHOOK_SECRET'],
+  message: 'Set VOICE_GATEWAY_URL, VOICE_GATEWAY_KEY and VOICE_WEBHOOK_SECRET, or none',
 };
 const sesComplete = (
   config: Pick<MessageSendingConfig, 'SES_REGION' | 'SES_ACCESS_KEY_ID' | 'SES_SECRET_ACCESS_KEY'>,
@@ -526,6 +545,7 @@ const apiSchema = z
   .refine(storageShared, STORAGE_SHARED)
   .refine(whatsAppPaired, WHATSAPP_PAIRED)
   .refine(smsPaired, SMS_PAIRED)
+  .refine(voiceComplete, VOICE_COMPLETE)
   .refine((config) => config.NODE_ENV !== 'production' || config.PUBLIC_URL !== undefined, {
     path: ['PUBLIC_URL'],
     message: 'Required in production: links sent to customers point there',
@@ -760,6 +780,7 @@ const workerSchema = z
   .refine(webPushComplete, WEB_PUSH_COMPLETE)
   .refine(whatsAppPaired, WHATSAPP_PAIRED)
   .refine(smsPaired, SMS_PAIRED)
+  .refine(voiceComplete, VOICE_COMPLETE)
   .refine(sesComplete, SES_COMPLETE)
   .refine(
     (config) =>

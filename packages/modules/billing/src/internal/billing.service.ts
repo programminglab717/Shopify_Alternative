@@ -22,7 +22,7 @@ import type {
   GatewayWebhook,
   PaymentGateway,
 } from '@hatti/payments/public';
-import type { MessageCategory, PhoneChannel } from '@hatti/messaging/public';
+import type { MessageCategory, PricedChannel } from '@hatti/messaging/public';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
@@ -201,9 +201,9 @@ export interface WalletRecord {
 
 /** What a message costs the shop (ADR-155), by its channel and its template's category. */
 export interface MessagePriceRecord {
-  channel: PhoneChannel;
+  channel: PricedChannel;
   category: MessageCategory;
-  /** Paisa: a WhatsApp message's, or an SMS part's. */
+  /** Paisa: a WhatsApp message's, an SMS part's, or a call's. */
   price: bigint;
 }
 
@@ -606,7 +606,7 @@ export class BillingService extends PlanAllowance {
 
   /** What each message costs the shop, by channel and category (ADR-155). */
   messagePrices(): MessagePriceRecord[] {
-    return (Object.keys(MESSAGE_RATES) as PhoneChannel[]).flatMap((channel) =>
+    return (Object.keys(MESSAGE_RATES) as PricedChannel[]).flatMap((channel) =>
       (Object.keys(MESSAGE_RATES[channel]) as MessageCategory[]).map((category) => ({
         channel,
         category,

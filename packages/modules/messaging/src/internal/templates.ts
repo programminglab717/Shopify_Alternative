@@ -27,6 +27,7 @@ export const MESSAGE_KINDS = [
   'order_advance_paid',
   'order_payment_reminder',
   'order_confirmation_reminder',
+  'order_confirmation_call',
   'store_credit_given',
   'store_credit_expiring',
   'gift_card',
@@ -118,6 +119,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'cod_prepaid',
   // Asked for by the shopper, on the closed shop's page (ADR-446).
   'store_open',
+  // Placed while the shop's order settings call customers (ADR-611).
+  'order_confirmation_call',
   // What the customer bought: the gift card's code, which no one else has (ADR-451).
   'gift_card',
   'invoice_due',
@@ -211,6 +214,22 @@ export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
 export type ConfirmationAnswer = (typeof CONFIRMATION_ANSWERS)[number];
 
 /**
+ * Automated calls (COD-03, ADR-611): read out by the voice gateway, never sent as a template, the
+ * keys pressed answering as a confirmation's buttons do.
+ */
+export const CALL_KINDS: readonly MessageKind[] = ['order_confirmation_call'];
+
+/** What the keys pressed on a call to confirm an order answer: 1 confirms it, 2 cancels it. */
+const CALL_KEYS: Readonly<Partial<Record<MessageKind, Readonly<Record<string, string>>>>> = {
+  order_confirmation_call: { '1': 'confirm', '2': 'cancel' },
+};
+
+/** The keys a call listens for, and what each answers; none for a message that is no call. */
+export function callKeysOf(kind: AnyMessageKind): Readonly<Record<string, string>> {
+  return CALL_KEYS[kind as MessageKind] ?? {};
+}
+
+/**
  * What the buttons of a message telling a customer their delivery failed answer (COD-08,
  * ADR-388): to have it brought again, or to be called first.
  */
@@ -244,6 +263,8 @@ export interface MessageVariables {
   url?: string;
   /** A one-time code (CHK-09): dropped from the message once it is sent. */
   code?: string;
+  /** For a call (ADR-611): the key its customer pressed, once heard. */
+  key?: string;
   /** For the shop's own alerts: a product, with its variant, and the units left for sale. */
   product?: string;
   stock?: string;
@@ -449,6 +470,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: 'Your order {order} is still waiting for you to confirm it',
       ur: 'آپ کا آرڈر {order} ابھی آپ کی کنفرمیشن کا منتظر ہے',
+    },
+  },
+  order_confirmation_call: {
+    // Read out by the voice gateway: no template of WhatsApp's carries it.
+    whatsapp: 'hatti_order_confirmation_call',
+    category: 'utility',
+    parameters: ['shop', 'order', 'total'],
+    text: {
+      en:
+        'Assalam-o-Alaikum! This is a call from {shop} about your order {order} for {total}, ' +
+        'paid in cash on delivery. To confirm it, press 1. To cancel it, press 2.',
+      ur:
+        'السلام علیکم! یہ {shop} کی طرف سے آپ کے آرڈر {order} کے بارے میں کال ہے، جس کی رقم ' +
+        '{total} ڈیلیوری پر ادا ہو گی۔ آرڈر کنفرم کرنے کے لیے 1 دبائیں۔ منسوخ کرنے کے لیے 2 دبائیں۔',
     },
   },
   order_confirmed: {

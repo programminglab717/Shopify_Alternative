@@ -54,6 +54,7 @@ import {
   type OrderPaidPayload,
   type OrderPaymentRemindedPayload,
   type OrderConfirmationRemindedPayload,
+  type OrderConfirmationCalledPayload,
   type OrderUpdatedPayload,
   type PlanOrdersCountedPayload,
 } from './events.js';
@@ -62,6 +63,7 @@ import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
 import { callingWindowsIn, isCallingTime } from './calling-hours.js';
 import {
+  CONFIRMATION_CALL,
   CONFIRMATION_REMINDER,
   UNPAID_LIMITS,
   UNREACHABLE_LIMITS,
@@ -1852,6 +1854,80 @@ export class OrderService {
       if (done) reminded += 1;
     }
     return reminded;
+  }
+
+  /**
+   * Calls the customers of the shop's cash-on-delivery orders still waiting for their answer
+   * {@link CONFIRMATION_CALL.afterReminderMs} after they were asked again to confirm them (COD-03,
+   * ADR-611), where the shop's order settings say to: all of them, or those of high value by its
+   * risk settings. Once each, the oldest first and {@link CONFIRMATION_CALL.batch} at most; only
+   * in the shop's calling hours, as reminders go, and not for orders placed longer ago than
+   * reminders are sent. An event asks the worker to place the call. How many it called.
+   */
+  async callToConfirm(shopId: string, at: Date = new Date()): Promise<number> {
+    const calls = await this.db.tenant(shopId, async (tx) => {
+      const { callingHours, confirmationCalls } = await orderSettingsIn(tx, shopId);
+      if (confirmationCalls === 'off') return null;
+      const { timezone } = await shopProfile(tx, shopId);
+      const hours = callingHours ?? CONFIRMATION_REMINDER.hours;
+      const windows = await callingWindowsIn(tx, hours, timezone, at, { back: 1, ahead: 0 });
+      return isCallingTime(windows, at) ? confirmationCalls : null;
+    });
+    if (!calls) return 0;
+    const due = and(
+      eq(orders.shopId, shopId),
+      eq(orders.status, 'open'),
+      eq(orders.stage, 'needs_confirmation'),
+      eq(orders.paymentMethod, 'cash_on_delivery'),
+      eq(orders.fulfillmentStatus, 'unfulfilled'),
+      inArray(orders.confirmationStatus, ['pending', 'no_response']),
+      isNull(orders.confirmationCalledAt),
+      lt(orders.confirmationRemindedAt, new Date(at.getTime() - CONFIRMATION_CALL.afterReminderMs)),
+      gte(orders.createdAt, new Date(at.getTime() - CONFIRMATION_REMINDER.withinMs)),
+      calls === 'high_value'
+        ? sql`${orders.riskReasons} @> '[{"code": "high_value"}]'::jsonb`
+        : undefined,
+    );
+    const found = await this.db.tenant(shopId, (tx) =>
+      tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(due)
+        .orderBy(asc(orders.createdAt))
+        .limit(CONFIRMATION_CALL.batch),
+    );
+    let called = 0;
+    for (const { id } of found) {
+      const done = await this.db.tenant(shopId, async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(and(due, eq(orders.id, id)))
+          .for('update');
+        if (!order) return false;
+        await tx
+          .update(orders)
+          .set({ confirmationCalledAt: at })
+          .where(and(eq(orders.shopId, shopId), eq(orders.id, id)));
+        await addTimelineEntry(
+          tx,
+          shopId,
+          id,
+          'system',
+          'confirmation_call',
+          'Calling the customer to confirm it, by an automated call in Urdu',
+        );
+        await appendEvent<OrderConfirmationCalledPayload>(tx, shopId, {
+          type: OrderEvents.OrderConfirmationCalled,
+          aggregateType: 'order',
+          aggregateId: id,
+          payload: { stage: order.stage, version: order.version },
+        });
+        return true;
+      });
+      if (done) called += 1;
+    }
+    return called;
   }
 
   /**

@@ -25,6 +25,7 @@ export enum MessageKind {
   ORDER_ADVANCE_PAID = 'ORDER_ADVANCE_PAID',
   ORDER_PAYMENT_REMINDER = 'ORDER_PAYMENT_REMINDER',
   ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
+  ORDER_CONFIRMATION_CALL = 'ORDER_CONFIRMATION_CALL',
   STORE_CREDIT_GIVEN = 'STORE_CREDIT_GIVEN',
   STORE_CREDIT_EXPIRING = 'STORE_CREDIT_EXPIRING',
   GIFT_CARD = 'GIFT_CARD',
@@ -122,6 +123,12 @@ registerEnumType(MessageKind, {
       description:
         'Their cash-on-delivery order asked again to be confirmed, three hours on without an ' +
         "answer, in the shop's calling hours, with the same buttons and link (ADR-175).",
+    },
+    ORDER_CONFIRMATION_CALL: {
+      description:
+        'An automated call in Urdu about their cash-on-delivery order, the reminder to confirm ' +
+        "it unanswered for an hour, in the shop's calling hours: pressing 1 confirms it, and 2 " +
+        "cancels it, where the shop's order settings call (COD-03, ADR-611).",
     },
     ORDER_PAYMENT_REMINDER: {
       description:
@@ -362,6 +369,7 @@ export enum MessageChannel {
   WHATSAPP = 'WHATSAPP',
   SMS = 'SMS',
   EMAIL = 'EMAIL',
+  VOICE = 'VOICE',
 }
 
 registerEnumType(MessageChannel, {
@@ -374,6 +382,11 @@ registerEnumType(MessageChannel, {
         "Email, from Hatti's address under the shop's name, to the address the customer gave " +
         "with their order: the order's news, beside its WhatsApp message or SMS, at no cost to " +
         'the shop (ADR-181).',
+    },
+    VOICE: {
+      description:
+        "An automated call through Hatti's voice gateway, read out in Urdu, the keys pressed " +
+        'its answer (ADR-611).',
     },
   },
 });

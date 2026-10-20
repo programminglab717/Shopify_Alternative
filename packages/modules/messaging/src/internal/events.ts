@@ -55,10 +55,10 @@ export interface MessageRepliedPayload {
   /** The message's kind: "order_confirmation". */
   kind: string;
   orderId: string | null;
-  /** The button's payload: "confirm". */
+  /** The button's payload, or what the key pressed on a call answers (ADR-611): "confirm". */
   answer: string;
-  channel: 'whatsapp';
-  /** When they answered, as WhatsApp says. */
+  channel: 'whatsapp' | 'voice';
+  /** When they answered, as WhatsApp or the voice gateway says. */
   at: string;
 }
 

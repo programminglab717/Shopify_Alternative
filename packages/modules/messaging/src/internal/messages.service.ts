@@ -9,8 +9,9 @@ import { MessageCharges, chargedFor, messageCostOf } from './charges.js';
 import { emailStatusOf } from './email-events.js';
 import { marketingHours } from './marketing-hours.js';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
-import { SES_EMAIL, WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
+import { SES_EMAIL, VOICE_GATEWAY, WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
+import type { CallResult } from './voice-webhook.js';
 import type { StopLinkView } from './stop-links.js';
 import {
   ALWAYS_SENT,
@@ -18,6 +19,7 @@ import {
   FORGOTTEN_KINDS,
   SECRET_KINDS,
   WHATSAPP_ONLY_KINDS,
+  callKeysOf,
   type MessageKind,
   type MessageLanguage,
   type MessageVariables,
@@ -607,6 +609,58 @@ export class MessagesService {
     });
   }
 
+  /**
+   * What became of an automated call (ADR-611), as the voice gateway tells it: answered, it is
+   * delivered; not, it failed, and what it was charged is given back. A key pressed that answers
+   * the call, as 1 confirms an order, is a reply for the worker, as a WhatsApp button's is.
+   * Whether the call was known.
+   */
+  async recordCall(call: CallResult): Promise<boolean> {
+    const status = call.result === 'answered' ? 'delivered' : 'failed';
+    const { unmatched } = await this.recordStatuses(
+      [
+        {
+          providerMessageId: call.callId,
+          status,
+          at: call.at,
+          error: call.result === 'answered' ? null : CALL_FAILURES[call.result],
+        },
+      ],
+      VOICE_GATEWAY,
+    );
+    if (unmatched.length > 0) return false;
+    if (call.key === null || call.result !== 'answered') return true;
+    const [found] = (await this.#resolve([call.callId], VOICE_GATEWAY)).get(call.callId) ?? [];
+    if (!found) return true;
+    await this.db.tenant(found.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ kind: MessageKind; order_id: string | null }>(sql`
+        SELECT kind, order_id FROM messaging.messages
+         WHERE shop_id = ${found.shopId} AND id = ${found.id} AND channel = 'voice'`);
+      const message = rows[0];
+      const answer = message && callKeysOf(message.kind)[call.key!];
+      if (!message || !answer) return;
+      // Once a call: the gateway may tell of it twice.
+      const { rows: heard } = await tx.execute(sql`
+        UPDATE messaging.messages SET variables = variables || jsonb_build_object('key', ${call.key}::text)
+         WHERE shop_id = ${found.shopId} AND id = ${found.id} AND NOT (variables ? 'key')
+        RETURNING id`);
+      if (heard.length === 0) return;
+      await appendEvent<MessageRepliedPayload>(tx, found.shopId, {
+        type: MessagingEvents.MessageReplied,
+        aggregateType: 'message',
+        aggregateId: found.id,
+        payload: {
+          kind: message.kind,
+          orderId: message.order_id,
+          answer,
+          channel: 'voice',
+          at: call.at.toISOString(),
+        },
+      });
+    });
+    return true;
+  }
+
   /** The messages WhatsApp knows by `ids`, by ID: found in any shop, by the function made for it. */
   async #resolve(
     ids: readonly string[],
@@ -689,6 +743,13 @@ async function replaceWithSms(tx: Tx, shopId: string, id: string): Promise<void>
             OR (variables ->> 'code') IS NOT NULL)
         ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
 }
+
+/** Why a call failed, as the message's error says. */
+const CALL_FAILURES: Record<Exclude<CallResult['result'], 'answered'>, string> = {
+  no_answer: 'The call was not answered',
+  busy: 'The line was busy',
+  failed: 'The call did not go through',
+};
 
 function toRecord(row: MessageRow): MessageRecord {
   return {

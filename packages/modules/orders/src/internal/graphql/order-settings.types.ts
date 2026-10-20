@@ -28,6 +28,27 @@ registerEnumType(CustomerCancellation, {
   },
 });
 
+export enum ConfirmationCalls {
+  OFF = 'OFF',
+  HIGH_VALUE = 'HIGH_VALUE',
+  ALL = 'ALL',
+}
+
+registerEnumType(ConfirmationCalls, {
+  name: 'ConfirmationCalls',
+  description:
+    'Which cash-on-delivery orders get an automated call in Urdu, once, in calling hours, when ' +
+    'their customer left the reminder to confirm unanswered for an hour: pressing 1 confirms the ' +
+    'order, and 2 cancels it (COD-03, ADR-611). Each call is paid from the message credit.',
+  valuesMap: {
+    OFF: { description: 'None: the default.' },
+    HIGH_VALUE: {
+      description: "Those of high value, as the shop's risk settings count them.",
+    },
+    ALL: { description: 'All of them.' },
+  },
+});
+
 @ObjectType({
   description:
     "The hours in which the Confirmation Desk calls customers, in the shop's time zone, as " +
@@ -104,6 +125,9 @@ export class OrderSettings {
   })
   creditBackOnReturn!: boolean;
 
+  @Field(() => ConfirmationCalls)
+  confirmationCalls!: ConfirmationCalls;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -145,6 +169,9 @@ export class OrderSettingsInput {
 
   @Field(() => Boolean, { nullable: true })
   creditBackOnReturn?: boolean | null;
+
+  @Field(() => ConfirmationCalls, { nullable: true })
+  confirmationCalls?: ConfirmationCalls | null;
 }
 
 @ObjectType()

@@ -1,4 +1,5 @@
 import {
+  CALL_KINDS,
   MESSAGE_KINDS,
   TEMPLATES,
   TO_THE_SHOP_KINDS,
@@ -26,7 +27,9 @@ export const LIBRARY_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(
     !TEMPLATES[kind].secret &&
     !TEMPLATES[kind].hattiPays &&
     !TO_THE_SHOP_KINDS.includes(kind) &&
-    !WHATSAPP_ONLY_KINDS.includes(kind),
+    !WHATSAPP_ONLY_KINDS.includes(kind) &&
+    // A call is read out by the voice gateway, never sent as a template (ADR-611).
+    !CALL_KINDS.includes(kind),
 );
 
 export const LIBRARY_LANGUAGES: readonly MessageLanguage[] = ['en', 'ur'];

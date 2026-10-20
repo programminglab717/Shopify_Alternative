@@ -101,6 +101,7 @@ describe.skipIf(!server)('Order links', () => {
       cancelUnpaidAfterDays: null,
       upsellPercentOff: null,
       creditBackOnReturn: false,
+      confirmationCalls: 'off',
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -128,6 +129,7 @@ describe.skipIf(!server)('Order links', () => {
           cancelUnpaidAfterDays: null,
           upsellPercentOff: null,
           creditBackOnReturn: false,
+          confirmationCalls: 'off',
           actorKind: 'app',
           actorId: appId,
         },
@@ -148,6 +150,7 @@ describe.skipIf(!server)('Order links', () => {
           cancelUnpaidAfterDays: null,
           upsellPercentOff: null,
           creditBackOnReturn: false,
+          confirmationCalls: 'off',
         },
       },
     ]);

@@ -55,6 +55,12 @@ export interface OrderSettingsRecord {
    * came back unaccepted (ORD-09, ADR-610), as it does when the order is cancelled.
    */
   creditBackOnReturn: boolean;
+  /**
+   * Which cash-on-delivery orders whose customers left the reminder to confirm unanswered get an
+   * automated call in Urdu, pressing 1 to confirm and 2 to cancel (COD-03, ADR-611): none, those
+   * of high value by the shop's risk settings, or all.
+   */
+  confirmationCalls: ConfirmationCallsValue;
   /** Null while the shop has the defaults. */
   updatedAt: Date | null;
 }
@@ -70,7 +76,12 @@ export interface OrderSettingsInput {
   cancelUnpaidAfterDays?: number | null;
   upsellPercentOff?: number | null;
   creditBackOnReturn?: boolean;
+  confirmationCalls?: ConfirmationCallsValue;
 }
+
+/** Which orders' customers are called to confirm them (ADR-611). */
+export const CONFIRMATION_CALLS = ['off', 'high_value', 'all'] as const;
+export type ConfirmationCallsValue = (typeof CONFIRMATION_CALLS)[number];
 
 export const UNPAID_LIMITS = {
   /** Days after an order was placed when, still unpaid, it may be cancelled. */
@@ -102,6 +113,14 @@ export const CONFIRMATION_REMINDER = {
   batch: 100,
 } as const;
 
+/** Calling a customer to confirm their order, by an automated call in Urdu (COD-03, ADR-611). */
+export const CONFIRMATION_CALL = {
+  /** How long after its customer was asked again an order unanswered is called. */
+  afterReminderMs: 60 * 60_000,
+  /** Orders a sweep calls for a shop at most, each in its own transaction. */
+  batch: 100,
+} as const;
+
 export const UNREACHABLE_LIMITS = {
   /** Days after an order was placed when, its customer unreachable, it may be cancelled. */
   days: { min: 1, max: 30 },
@@ -122,6 +141,7 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   cancelUnpaidAfterDays: null,
   upsellPercentOff: null,
   creditBackOnReturn: false,
+  confirmationCalls: 'off',
 };
 
 /** The most a post-purchase offer takes off (ADR-438). */
@@ -139,11 +159,12 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     cancel_unpaid_after_days: number | null;
     upsell_percent_off: number | null;
     credit_back_on_return: boolean;
+    confirmation_calls: ConfirmationCallsValue;
     updated_at: string;
   }>(sql`
     SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
            desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
-           upsell_percent_off, credit_back_on_return, updated_at
+           upsell_percent_off, credit_back_on_return, confirmation_calls, updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -159,6 +180,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     cancelUnpaidAfterDays: row.cancel_unpaid_after_days,
     upsellPercentOff: row.upsell_percent_off,
     creditBackOnReturn: row.credit_back_on_return,
+    confirmationCalls: row.confirmation_calls,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
@@ -240,6 +262,7 @@ function checkOrderSettings(
     cancelUnpaidAfterDays,
     upsellPercentOff,
     creditBackOnReturn: input.creditBackOnReturn ?? current.creditBackOnReturn,
+    confirmationCalls: input.confirmationCalls ?? current.confirmationCalls,
   };
 }
 
@@ -257,6 +280,7 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
     cancelUnpaidAfterDays: settings.cancelUnpaidAfterDays,
     upsellPercentOff: settings.upsellPercentOff,
     creditBackOnReturn: settings.creditBackOnReturn,
+    confirmationCalls: settings.confirmationCalls,
   };
 }
 
@@ -288,12 +312,12 @@ export class OrderSettingsService {
         INSERT INTO orders.order_settings
                (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes,
                 desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
-                upsell_percent_off, credit_back_on_return)
+                upsell_percent_off, credit_back_on_return, confirmation_calls)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
                 ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
                 ${next.deskWaitsForReminder}, ${next.cancelUnreachableAfterDays},
                 ${next.cancelUnpaidAfterDays}, ${next.upsellPercentOff},
-                ${next.creditBackOnReturn})
+                ${next.creditBackOnReturn}, ${next.confirmationCalls})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
                        calling_opens = excluded.calling_opens,
@@ -304,6 +328,7 @@ export class OrderSettingsService {
                        cancel_unpaid_after_days = excluded.cancel_unpaid_after_days,
                        upsell_percent_off = excluded.upsell_percent_off,
                        credit_back_on_return = excluded.credit_back_on_return,
+                       confirmation_calls = excluded.confirmation_calls,
                        version = orders.order_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<OrderSettingsUpdatedPayload>(tx, tenant.shopId, {

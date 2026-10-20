@@ -874,6 +874,13 @@ test number from Meta's app dashboard answers on WhatsApp) and `SMS_GATEWAY_URL`
 `WHATSAPP_APP_SECRET` and `WHATSAPP_VERIFY_TOKEN` set on the API; replying "band karo" from the
 phone then stops the shop's messages to it.
 
+Calls to confirm (ADR-611): set `orderSettingsUpdate(input: { confirmationCalls: ALL })` and the
+worker calls, in Urdu, each cash-on-delivery order's customer who left the reminder unanswered an
+hour, in calling hours; locally the call's words go to the log. With `VOICE_GATEWAY_URL`,
+`VOICE_GATEWAY_KEY` and `VOICE_WEBHOOK_SECRET` set on both processes, the gateway places it and
+posts `{ id, result, key }` to `{PUBLIC_URL}/webhooks/voice`, signed with the secret: key 1
+confirms the order, and 2 cancels it.
+
 A shop's own WhatsApp number (ADR-419): with `WHATSAPP_APP_ID` and `WHATSAPP_SIGNUP_CONFIG_ID` set
 on the API, beside `WHATSAPP_APP_SECRET`, `whatsAppSignup` gives what the admin starts Meta's
 Embedded Signup with, and `whatsAppAccountConnect(input: { code, businessAccountId, phoneNumberId })`
