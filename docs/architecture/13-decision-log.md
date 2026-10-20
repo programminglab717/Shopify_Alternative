@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-659 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-660 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -667,6 +667,7 @@
 | 657 | A shop selling online alone cancels orders never paid after hours rather than days, reminding their customers halfway | Accepted |
 | 658 | A product's photo is turned by quarter turns, after its crop is cut, as part of the crop: a photo taken on its side is turned without being cropped | Accepted |
 | 659 | A shop gives an address for replies to its customers' emails: they carry it as their Reply-To, and say a reply reaches the shop | Accepted |
+| 660 | A menu's link to a collection is offered the tags of that collection's products alone, a link to all products the shop's | Accepted |
 
 ---
 
@@ -23178,3 +23179,19 @@
   keep its customers' mail, with an inbound mail pipeline to run, for what the shop's own mailbox
   does already. **Sending from the shop's own domain:** it needs the shop's DNS to vouch for SES,
   and stays on the shortcut's target.
+
+## ADR-660 · A menu's link to a collection is offered the tags of that collection's products alone, a link to all products the shop's
+
+* **Context:** The menu editor offered every link narrowed by tags the shop's tags in use
+  (ADR-646). A link to a collection narrowed by a tag none of its products has leads to an empty
+  page, and in a shop of many collections the tags of the one linked to were lost among the rest.
+* **Decision:** The Admin API's `productTags` takes an optional `collectionId`, and then counts
+  the tags of that collection's products alone, the most used first, as its membership has them
+  (smart collections' kept as their rules last matched). The menu editor asks for those of the
+  collection a link goes to, under "Its products' tags", and the shop's for a link to all
+  products, as before. A link to a collection not yet chosen, or gone, is offered none.
+* **Consequences:** The tags offered are those that find something; a shop's other tags no longer
+  crowd them out.
+* **Alternatives:** **Filtering the shop's tags in the admin:** it would need every product's
+  tags and membership in the browser. **Refusing a link's tags none of its products has:** a
+  shop may tag products after it builds its menu; left until shops ask.

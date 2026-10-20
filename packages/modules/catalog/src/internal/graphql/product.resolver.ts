@@ -108,13 +108,20 @@ export class ProductResolver {
     );
   }
 
-  @Query(() => [String], { description: 'Tags in use, for pickers and filters.' })
+  @Query(() => [String], {
+    description:
+      'Tags in use, the most used first, for pickers and filters: of the products in ' +
+      '`collectionId` alone, where it is given (ADR-660).',
+  })
   @RequireScopes('read_products')
   productTags(
     @CurrentTenant() tenant: TenantContext,
     @Args('first', { type: () => Int, ...FACET_LIMIT }) first: number,
+    @Args('collectionId', { type: () => ID, nullable: true }) collectionId?: string | null,
   ): Promise<string[]> {
-    return this.service.facetValues(tenant, 'tags', pageSize(first));
+    return this.service.facetValues(tenant, 'tags', pageSize(first), {
+      collectionId: collectionId ? uuidOf('collection', collectionId) : null,
+    });
   }
 
   @Query(() => [String], { description: 'Product types in use.' })

@@ -13923,8 +13923,12 @@ type Query {
     first: Int
   ): SavedSearchConnection!
 
-  """Tags in use, for pickers and filters."""
+  """
+  Tags in use, the most used first, for pickers and filters: of the products in `collectionId` alone, where it is given (ADR-660).
+  """
   productTags(
+    collectionId: ID
+
     """1 to 250, most used first."""
     first: Int! = 100
   ): [String!]!

@@ -243,26 +243,40 @@ interface Choices {
 /** How many of the shop's tags a link's tags field offers. */
 const TAGS_OFFERED = 12;
 
-/** The shop's tags in use that a link does not have yet, each added with a tap (ADR-646). */
+/**
+ * The shop's tags in use that a link does not have yet, each added with a tap (ADR-646): for a
+ * link to a collection, those of its products alone, as narrowing it by others finds none
+ * (ADR-660).
+ */
 function TagsOffered({
   number,
   chosen,
   tags,
+  collectionId,
   add,
 }: {
   number: string;
   chosen: readonly string[];
   tags: readonly string[];
+  collectionId: string | null;
   add: (tag: string) => void;
 }) {
   const { t } = useLocale();
+  const its = useAdminQuery<ProductTagsData>(
+    ['productTags'],
+    ProductTagsQuery,
+    { collectionId },
+    { enabled: collectionId !== null },
+  );
   const has = new Set(chosen.map((tag) => tag.toLowerCase()));
-  const offered = tags.filter((tag) => !has.has(tag.toLowerCase())).slice(0, TAGS_OFFERED);
+  const offered = (collectionId ? (its.data?.productTags ?? []) : tags)
+    .filter((tag) => !has.has(tag.toLowerCase()))
+    .slice(0, TAGS_OFFERED);
   if (offered.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1">
       <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-        {t('menus.tagsInUse')}
+        {t(collectionId ? 'menus.collectionTags' : 'menus.tagsInUse')}
       </span>
       {offered.map((tag) => (
         <button
@@ -378,6 +392,7 @@ function LinkEditor({
             number={number}
             chosen={tagsOf(draft.tags)}
             tags={choices.tags}
+            collectionId={draft.type === 'COLLECTION' ? draft.resourceId || null : null}
             add={(tag) => set({ tags: [...tagsOf(draft.tags), tag].join(', ') })}
           />
         )}
@@ -522,7 +537,9 @@ function MenuForm({ menu }: { menu: Menu | null }) {
   });
   const pages = useAdminQuery<PagesData>(['pages'], PagesQuery);
   const policies = useAdminQuery<PoliciesData>(['policies'], PoliciesQuery);
-  const tags = useAdminQuery<ProductTagsData>(['productTags'], ProductTagsQuery);
+  const tags = useAdminQuery<ProductTagsData>(['productTags'], ProductTagsQuery, {
+    collectionId: null,
+  });
   const create = useAdminMutation<MenuMutationData, Record<string, unknown>>(MenuCreateMutation);
   const update = useAdminMutation<MenuMutationData, Record<string, unknown>>(MenuUpdateMutation);
   const remove = useAdminMutation<MenuMutationData, { id: string }>(MenuDeleteMutation);

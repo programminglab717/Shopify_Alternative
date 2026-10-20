@@ -406,6 +406,22 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await f.products.facetValues(f.b, 'tags', 10)).toEqual([]);
   });
 
+  it("lists the tags of one collection's products alone, for a menu's link to it (ADR-660)", async () => {
+    const one = await create('One', { tags: ['eid', 'lawn'] });
+    const two = await create('Two', { tags: ['lawn', 'sale'] });
+    await create('Three', { tags: ['eid', 'eid-sale', 'kids'] });
+    const lawn = unwrap(
+      await f.collections.create(f.a, { title: 'Lawn', productIds: [one.id, two.id] }),
+    );
+    const tags = (collectionId: string) =>
+      f.products.facetValues(f.a, 'tags', 10, { collectionId });
+    expect(await tags(lawn.id)).toEqual(['lawn', 'eid', 'sale']);
+    // Another shop's collection, or none: none of its tags.
+    expect(await f.products.facetValues(f.b, 'tags', 10, { collectionId: lawn.id })).toEqual([]);
+    const empty = unwrap(await f.collections.create(f.a, { title: 'Empty' }));
+    expect(await tags(empty.id)).toEqual([]);
+  });
+
   it('finds products by Roman Urdu spelling variants and Urdu script', async () => {
     const suit = await create('Qameez Shalwar', { tags: ['لان'], vendor: 'Khaadi' });
     await create('Peshawari Chappal');

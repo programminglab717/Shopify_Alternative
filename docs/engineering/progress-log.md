@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A collection's tags
+
+* **A menu's link to a collection is offered its products' tags alone** ([ADR-660](../architecture/13-decision-log.md#adr-660--a-menus-link-to-a-collection-is-offered-the-tags-of-that-collections-products-alone-a-link-to-all-products-the-shops)), through the
+  Admin API's `productTags(collectionId:)`; a link to all products is offered the shop's.
+* 3811 tests, two more: the catalog's tags of a collection and the admin's menu editor; the API
+  test asks for them too.
+
 ### e10f3d2 · Replies to emails
 
 * **A shop gives an address for replies to its customers' emails** ([ADR-659](../architecture/13-decision-log.md#adr-659--a-shop-gives-an-address-for-replies-to-its-customers-emails-they-carry-it-as-their-reply-to-and-say-a-reply-reaches-the-shop)): the emails carry it

@@ -93,7 +93,15 @@ function core(role: StaffRole) {
           },
         };
       case 'ProductTags':
-        return { productTags: ['sale', 'Eid', 'new in'] };
+        // The shop's, or one collection's products' alone (ADR-660).
+        return {
+          productTags:
+            variables.collectionId === 'col_1'
+              ? ['sale', 'Eid', 'new in']
+              : variables.collectionId
+                ? []
+                : ['lawn', 'sale', 'Eid', 'new in'],
+        };
       case 'CollectionProductSearch':
         return { products: { nodes: [{ id: 'prod_9', title: 'Chappal', status: 'ACTIVE' }] } };
       case 'MenuCreate':
@@ -265,6 +273,27 @@ describe("The online store's menus", () => {
         items: [{ id: 'mi_1' }, { id: 'mi_2', tags: ['sale', 'Eid', 'NEW IN'] }],
       }),
     );
+  });
+
+  it("offers a collection's link its own products' tags, and all products' link the shop's (ADR-660)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/menu_1');
+
+    expect(await screen.findByRole('button', { name: 'Add the tag sale to link 2' })).toBeTruthy();
+    expect(screen.getByText('Its products’ tags:')).toBeTruthy();
+    // The shop's lawn is none of the collection's products'.
+    expect(screen.queryByRole('button', { name: 'Add the tag lawn to link 2' })).toBeNull();
+    expect(sentOf(fake, 'ProductTags')).toBeDefined();
+    expect(
+      fake.sent.filter((each) => each.operation === 'ProductTags').map((each) => each.variables),
+    ).toEqual(expect.arrayContaining([{ collectionId: null }, { collectionId: 'col_1' }]));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    type('Link 3: title', 'Everything');
+    fireEvent.change(screen.getByLabelText('Link 3: goes to'), { target: { value: 'CATALOG' } });
+    expect(await screen.findByRole('button', { name: 'Add the tag lawn to link 3' })).toBeTruthy();
+    expect(screen.getByText('Tags in use:')).toBeTruthy();
   });
 
   it('makes a menu with a handle from its title and a link to a product found by name', async () => {

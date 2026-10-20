@@ -1042,17 +1042,28 @@ export class ProductService {
   }
 
   /** Distinct tags, types or vendors in use, most used first, for pickers and filters. */
-  async facetValues(tenant: TenantContext, facet: ProductFacet, first: number): Promise<string[]> {
+  async facetValues(
+    tenant: TenantContext,
+    facet: ProductFacet,
+    first: number,
+    options: { collectionId?: string | null } = {},
+  ): Promise<string[]> {
     const column =
       facet === 'tags'
         ? sql`unnest(p.tags)`
         : facet === 'productType'
           ? sql`p.product_type`
           : sql`p.vendor`;
+    // Of one collection's products alone, as a menu's link to it narrows them (ADR-660).
+    const within = options.collectionId
+      ? sql`AND EXISTS (SELECT 1 FROM catalog.collection_products cp
+                         WHERE cp.shop_id = p.shop_id AND cp.product_id = p.id
+                           AND cp.collection_id = ${options.collectionId})`
+      : sql``;
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{ value: string }>(sql`
         SELECT value FROM (SELECT ${column} AS value FROM catalog.products p
-                            WHERE p.shop_id = ${tenant.shopId}) AS v
+                            WHERE p.shop_id = ${tenant.shopId} ${within}) AS v
          WHERE value IS NOT NULL AND value <> ''
          GROUP BY value
          ORDER BY count(*) DESC, value

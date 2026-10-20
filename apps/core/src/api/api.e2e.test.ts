@@ -625,6 +625,21 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
 
       const tags = await gql(tokens.a, '{ productTags(first: 5) }');
       expect(tags.body.data?.productTags).toContain('wedding');
+      // Its products' alone, for a menu's link to it (ADR-660).
+      const wedding = (await gql(tokens.a, '{ collectionByHandle(handle: "wedding") { id } }')).body
+        .data?.collectionByHandle.id;
+      const its = await gql(
+        tokens.a,
+        'query ($id: ID) { productTags(first: 30, collectionId: $id) }',
+        {
+          id: wedding,
+        },
+      );
+      const all = await gql(tokens.a, '{ productTags(first: 30) }');
+      expect(its.body.data?.productTags).toContain('wedding');
+      expect(all.body.data?.productTags).toEqual(
+        expect.arrayContaining(its.body.data?.productTags as string[]),
+      );
     });
 
     it('lists the collections a product is in', async () => {

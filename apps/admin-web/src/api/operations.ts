@@ -1190,10 +1190,13 @@ export const ProductSuggestionsQuery = /* GraphQL */ `
   }
 `;
 
-/** The tags the shop's products use, the most used first, to offer a menu link (ADR-646). */
+/**
+ * The tags the shop's products use, the most used first, to offer a menu link (ADR-646): of one
+ * collection's products alone, for a link to it (ADR-660).
+ */
 export const ProductTagsQuery = /* GraphQL */ `
-  query ProductTags {
-    productTags(first: 30)
+  query ProductTags($collectionId: ID) {
+    productTags(first: 30, collectionId: $collectionId)
   }
 `;
 
