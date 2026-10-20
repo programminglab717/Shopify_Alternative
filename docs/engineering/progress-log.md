@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Staff pushed of their own work
+### 3a29178 · Staff pushed of their own work
 
 * **A member of staff is pushed of an order given to them and of a comment naming them**
   ([ADR-633](../architecture/13-decision-log.md#adr-633--a-member-of-staff-is-pushed-in-their-browser-of-an-order-given-to-them-and-of-a-comment-naming-them-whatever-their-role-if-they-may-see-orders-number-or-none-once-each-in-their-language-opening-the-order-and-saying-neither-its-customer-nor-the-comment)): two kinds of push for every role that may see orders, sent with the WhatsApp alert
