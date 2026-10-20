@@ -215,9 +215,11 @@ export {
 export {
   PUSH_KINDS,
   PUSH_LIMITS,
+  PUSH_NEEDS,
   PUSH_ROLES,
   PUSH_SENDER,
   PushService,
+  pushedTo,
   type PushKind,
   type PushMessage,
   type PushRecipient,

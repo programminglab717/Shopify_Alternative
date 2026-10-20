@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-580 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-581 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -588,6 +588,7 @@
 | 578 | A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's name is checked by capabilities each preset holds as before | Accepted |
 | 579 | The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations and role changes offer them beside the presets | Accepted |
 | 580 | The admin shows each member what their own scopes and capabilities let them use, a custom role's member no more than it holds | Accepted |
+| 581 | Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email names the shop's own role it gives | Accepted |
 
 ---
 
@@ -21477,3 +21478,28 @@
 * **Alternatives:** **Scopes and capabilities alone, without the roles:** a preset's member would
   see pages their role was never meant to, where a scope is shared across roles' work, such as a
   packer's `write_orders` opening the Confirmation Desk.
+
+## ADR-581 · Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email names the shop's own role it gives
+
+* **Context:** The admin shows a custom role's member only what they hold (ADR-580), but the worker
+  still chose whom to tell by preset alone: a push of a new order went to every manager and
+  confirmation agent, a transfer's receipt to every owner and manager, whatever their custom role
+  held. And the invitation's email named only the preset, not the role the shop chose.
+* **Decision:**
+  * **`identity.staff_phones` gives each member's custom role's scopes and capabilities** (migration
+    0272), null for a preset's, and `staffPhonesIn` resolves them as each request does, with the
+    one `memberAccess`.
+  * **Each kind of push names the work it calls for** beside the roles it is for (`PUSH_NEEDS`): a
+    new order and one to review `write_orders`, cash remitted `reconcile_payments`, low stock
+    `write_inventory`. `pushedTo` asks both, so every preset's member is told as before, which a
+    table test proves, and a custom role's member only of the work they may do. The admin's push
+    settings offer the same kinds alike.
+  * **A transfer's receipt**, where no one has its order, goes to the owners and managers who hold
+    `write_orders`, who can mark it paid.
+  * **The invitation's email** names a custom role by its name, with its preset in brackets, in
+    English and Urdu.
+* **Consequences:** A custom role narrows what its member is told as it narrows what they can do.
+  Alerts to one named member, such as an order given to them or a comment naming them, still go
+  to that member.
+* **Alternatives:** **Tell every member of the roles, and let them be refused on opening it:** an
+  alert for work they cannot do is noise, and its words may say more than their role lets them see.

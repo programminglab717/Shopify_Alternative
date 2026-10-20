@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notificationOf, pageFor } from '../offline/push';
+import type { ShopAccess } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn } from '../test-support';
 import type { BrowserSubscription } from './push';
 
@@ -35,7 +36,11 @@ const KEY = `B${'k'.repeat(86)}`;
 const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/Bkkk';
 
 /** The core, keeping each browser's kinds as the Admin API does. */
-function core(role: 'owner' | 'packer' | 'accountant', publicKey: string | null = KEY) {
+function core(
+  role: 'owner' | 'manager' | 'packer' | 'accountant',
+  publicKey: string | null = KEY,
+  shop?: Partial<ShopAccess>,
+) {
   const kept = new Map<string, string[]>();
   return fakeCore(
     role,
@@ -72,6 +77,7 @@ function core(role: 'owner' | 'packer' | 'accountant', publicKey: string | null 
         : path === '/auth/sessions'
           ? { sessions: [] }
           : {},
+    { shop },
   );
 }
 
@@ -134,6 +140,25 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     const boxes = await within(card).findAllByRole('checkbox');
     expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
       'Cash remittedA courier’s statement of the cash they sent.',
+    ]);
+  });
+
+  it("offers a custom role's member only the news of work they may do (ADR-581)", async () => {
+    vi.stubGlobal(
+      'fetch',
+      core('manager', KEY, {
+        mfaRequired: true,
+        scopes: ['write_orders', 'read_inventory'],
+        capabilities: ['assign_orders'],
+        customRole: { id: 'role_1', name: 'Lead' },
+      }).fetcher,
+    );
+    renderAdmin('/shop_1/account');
+    const card = await screen.findByRole('region', { name: 'Notifications on this device' });
+    const boxes = await within(card).findAllByRole('checkbox');
+    expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
+      expect.stringMatching(/^New orders/),
+      expect.stringMatching(/^Orders to review/),
     ]);
   });
 

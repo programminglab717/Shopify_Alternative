@@ -1,4 +1,12 @@
-import { failOne, type MutationResult, type StaffRole, type TenantContext } from '@hatti/api';
+import {
+  failOne,
+  scopeWithin,
+  type AccessScope,
+  type MutationResult,
+  type StaffCapability,
+  type StaffRole,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, toDate } from '@hatti/db';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -6,7 +14,8 @@ import { WebPushSender, type PushOutcome } from './web-push.js';
 
 // Push notifications for staff (APP-03, ADR-506): each browser a member of staff turns them on in
 // subscribes with its push service, for the kinds of news they chose; the worker pushes each to
-// the staff whose role does the work it is about, in their own language, once.
+// the staff whose role does the work it is about, and who may do it (ADR-581), in their own
+// language, once.
 
 export const PUSH_KINDS = ['new_order', 'needs_review', 'cash_remitted', 'low_stock'] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
@@ -18,6 +27,26 @@ export const PUSH_ROLES: Record<PushKind, readonly StaffRole[]> = {
   cash_remitted: ['owner', 'manager', 'accountant'],
   low_stock: ['owner', 'manager'],
 };
+
+/**
+ * What each kind of news needs of those its roles are told of (ADR-581): the work it calls them
+ * to, which every member of those roles' presets may do, and a custom role's only if it holds it.
+ */
+export const PUSH_NEEDS: Record<PushKind, AccessScope | StaffCapability> = {
+  new_order: 'write_orders',
+  needs_review: 'write_orders',
+  cash_remitted: 'reconcile_payments',
+  low_stock: 'write_inventory',
+};
+
+/** Whether `recipient` is told of news of `kind`: their role's work, which they may do. */
+export function pushedTo(kind: PushKind, recipient: PushRecipient): boolean {
+  if (!PUSH_ROLES[kind].includes(recipient.role)) return false;
+  const needs = PUSH_NEEDS[kind];
+  return needs.startsWith('read_') || needs.startsWith('write_')
+    ? scopeWithin(needs as AccessScope, recipient.scopes)
+    : recipient.capabilities.has(needs as StaffCapability);
+}
 
 export const PUSH_LIMITS = {
   /** Pushes in a row that may fail before a subscription is given up. */
@@ -43,11 +72,13 @@ export interface PushMessage {
   url: string;
 }
 
-/** A member of staff to tell, in their language. */
+/** A member of staff to tell, in their language, with what they may do in the shop (ADR-581). */
 export interface PushRecipient {
   userId: string;
   role: StaffRole;
   language: 'en' | 'ur';
+  scopes: readonly AccessScope[];
+  capabilities: ReadonlySet<StaffCapability>;
 }
 
 const ENDPOINT = /^https:\/\/[^\s]{1,990}$/;
@@ -155,7 +186,7 @@ export class PushService {
 
   /**
    * Pushes `message`, of `kind`, to the browsers of those of `recipients` whose role does that
-   * work and who chose it, each in their language; once for `dedupeKey`, however often asked.
+   * work, who may do it ({@link pushedTo}) and who chose it, each in their language; once for `dedupeKey`, however often asked.
    * Forgets subscriptions their push service says are gone, and those that failed too often.
    * How many browsers it went to.
    */
@@ -168,7 +199,7 @@ export class PushService {
   ): Promise<number> {
     if (!this.sender) return 0;
     const sender = this.sender;
-    const told = recipients.filter((each) => PUSH_ROLES[kind].includes(each.role));
+    const told = recipients.filter((each) => pushedTo(kind, each));
     if (told.length === 0) return 0;
     const language = new Map(told.map((each) => [each.userId, each.language]));
     const subscriptions = await this.db.tenant(shopId, async (tx) => {

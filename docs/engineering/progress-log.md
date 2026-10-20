@@ -14,6 +14,16 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-20
+
+### Alerts by what staff may do
+
+* **Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email
+  names the shop's own role it gives** ([ADR-581](../architecture/13-decision-log.md#adr-581--staffs-push-and-whatsapp-alerts-go-by-what-each-member-may-do-and-an-invitations-email-names-the-shops-own-role-it-gives), ADM-01).
+* 3619 tests, 3 more: each kind of push to every preset as before and to
+  a custom role's member by their work, the admin's push choices narrowed, and `staff_phones`
+  and the invitation's email with a custom role.
+
 ## 2026-10-19
 
 ### ba30f87 · The admin by a member's own permissions

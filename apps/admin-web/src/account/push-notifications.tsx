@@ -8,7 +8,7 @@ import {
   PushUnsubscribeMutation,
 } from '../api/operations';
 import type { UserError } from '../api/types';
-import type { StaffRole } from '../auth/session';
+import { gate, permits, type Gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -27,34 +27,37 @@ import {
 
 type PushKind = 'NEW_ORDER' | 'NEEDS_REVIEW' | 'CASH_REMITTED' | 'LOW_STOCK';
 
-/** Whose work each kind of news is, as the core pushes it (ADR-506). */
+/**
+ * Whose work each kind of news is, and what it needs of them, as the core pushes it (ADR-506,
+ * ADR-581): a custom role's member is offered only the news of work they may do.
+ */
 const KINDS: {
   kind: PushKind;
-  roles: readonly StaffRole[];
+  gate: Gate;
   label: MessageKey;
   hint: MessageKey;
 }[] = [
   {
     kind: 'NEW_ORDER',
-    roles: ['owner', 'manager', 'confirmation_agent'],
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
     label: 'push.newOrder',
     hint: 'push.newOrderHint',
   },
   {
     kind: 'NEEDS_REVIEW',
-    roles: ['owner', 'manager', 'confirmation_agent'],
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
     label: 'push.needsReview',
     hint: 'push.needsReviewHint',
   },
   {
     kind: 'CASH_REMITTED',
-    roles: ['owner', 'manager', 'accountant'],
+    gate: gate(['owner', 'manager', 'accountant'], 'reconcile_payments'),
     label: 'push.cashRemitted',
     hint: 'push.cashRemittedHint',
   },
   {
     kind: 'LOW_STOCK',
-    roles: ['owner', 'manager'],
+    gate: gate(['owner', 'manager'], 'write_inventory'),
     label: 'push.lowStock',
     hint: 'push.lowStockHint',
   },
@@ -99,7 +102,7 @@ export function PushNotifications() {
     PushSubscribeMutation,
   );
   const unsubscribe = useAdminMutation<unknown, { endpoint: string }>(PushUnsubscribeMutation);
-  const offered = KINDS.filter((each) => each.roles.includes(shop.role));
+  const offered = KINDS.filter((each) => permits(shop, each.gate));
   const [chosen, setChosen] = useState<PushKind[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);

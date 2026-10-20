@@ -207,19 +207,22 @@ const ROLE_NAMES: Record<StaffRole, Record<AccountEmailLanguage, string>> = {
 
 /**
  * The email inviting someone at `to` to work in `shop` in `role`, from `inviter`, carrying the
- * invitation's `link` (ADR-167).
+ * invitation's `link` (ADR-167); in the shop's own role `customRole`, made from `role`, where it
+ * gives one (ADR-581), named as the shop named it, with its preset.
  */
 export function invitationEmail(input: {
   to: string;
   inviter: string;
   shop: string;
   role: StaffRole;
+  customRole?: string | null;
   link: string;
   language: AccountEmailLanguage;
 }): AccountEmail {
   const inviter = oneLine(input.inviter);
   const shop = oneLine(input.shop);
-  const role = ROLE_NAMES[input.role][input.language];
+  const preset = ROLE_NAMES[input.role][input.language];
+  const role = input.customRole ? `${oneLine(input.customRole)} (${preset})` : preset;
   const words: Omit<Words, 'greeting'> & { greeting: string } =
     input.language === 'ur'
       ? {

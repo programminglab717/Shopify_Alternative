@@ -1,11 +1,25 @@
 import 'reflect-metadata';
-import type { StaffRole, TenantContext } from '@hatti/api';
+import {
+  STAFF_ROLES,
+  staffCapabilities,
+  staffScopes,
+  type StaffRole,
+  type TenantContext,
+} from '@hatti/api';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PUSH_LIMITS, PushService, type PushMessage } from './push.service.js';
+import {
+  PUSH_KINDS,
+  PUSH_LIMITS,
+  PUSH_ROLES,
+  PushService,
+  pushedTo,
+  type PushMessage,
+  type PushRecipient,
+} from './push.service.js';
 import { generateVapidKeys, type PushOutcome, type WebPushSender } from './web-push.js';
 
 const server = testDatabaseServer();
@@ -48,6 +62,61 @@ function staff(shopId: string, userId: string, role: StaffRole = 'owner'): Tenan
     scopes: new Set(),
   };
 }
+
+/** A member of staff to tell: a preset's, or a custom role's holding `custom` (ADR-578). */
+function recipient(
+  userId: string,
+  role: StaffRole,
+  language: 'en' | 'ur' = 'en',
+  custom: { scopes: string[]; capabilities: string[] } | null = null,
+): PushRecipient {
+  return {
+    userId,
+    role,
+    language,
+    scopes: staffScopes(role, custom?.scopes ?? null),
+    capabilities: staffCapabilities(role, custom?.capabilities ?? null),
+  };
+}
+
+describe('Whom each kind of news is pushed to (ADR-581)', () => {
+  it("tells every preset's member whose role it is for, as before", () => {
+    for (const kind of PUSH_KINDS) {
+      for (const role of STAFF_ROLES) {
+        expect([kind, role, pushedTo(kind, recipient('usr', role))]).toEqual([
+          kind,
+          role,
+          PUSH_ROLES[kind].includes(role),
+        ]);
+      }
+    }
+  });
+
+  it("tells a custom role's member only of the work they may do", () => {
+    const lead = recipient('usr', 'manager', 'en', {
+      scopes: ['write_orders', 'read_inventory'],
+      capabilities: ['assign_orders'],
+    });
+    expect(PUSH_KINDS.filter((kind) => pushedTo(kind, lead))).toEqual([
+      'new_order',
+      'needs_review',
+    ]);
+    const books = recipient('usr', 'accountant', 'en', {
+      scopes: ['read_orders'],
+      capabilities: ['reconcile_payments'],
+    });
+    expect(PUSH_KINDS.filter((kind) => pushedTo(kind, books))).toEqual(['cash_remitted']);
+    // Never beyond their preset's roles, whatever they hold.
+    const caller = recipient('usr', 'confirmation_agent', 'en', {
+      scopes: ['write_orders'],
+      capabilities: [],
+    });
+    expect(PUSH_KINDS.filter((kind) => pushedTo(kind, caller))).toEqual([
+      'new_order',
+      'needs_review',
+    ]);
+  });
+});
 
 const message: PushMessage = {
   en: { title: 'New order #1001', body: 'Rs 4,500 from Lahore' },
@@ -163,9 +232,9 @@ describe.skipIf(!server)("Push notifications to staff's browsers (APP-03, ADR-50
     await subscribe(agent, 'agent-phone', ['new_order']);
     await subscribe(packer, 'packer-phone', ['new_order']);
     const recipients = [
-      { userId: owner, role: 'owner' as const, language: 'en' as const },
-      { userId: agent, role: 'confirmation_agent' as const, language: 'ur' as const },
-      { userId: packer, role: 'packer' as const, language: 'en' as const },
+      recipient(owner, 'owner'),
+      recipient(agent, 'confirmation_agent', 'ur'),
+      recipient(packer, 'packer'),
     ];
 
     expect(await push.push(shopId, 'new_order', 'order:1', recipients, message)).toBe(2);
@@ -186,6 +255,16 @@ describe.skipIf(!server)("Push notifications to staff's browsers (APP-03, ADR-50
     expect(sender.sent).toHaveLength(2);
 
     expect(await push.push(shopId, 'low_stock', 'low:1', recipients, message)).toBe(2);
+    // A custom role's member without the stock's work is not told of it (ADR-581).
+    expect(
+      await push.push(
+        shopId,
+        'low_stock',
+        'low:2',
+        [recipient(owner, 'manager', 'en', { scopes: ['write_orders'], capabilities: [] })],
+        message,
+      ),
+    ).toBe(0);
     expect(sender.sent.slice(2).every((each) => each.urgency === 'normal')).toBe(true);
     const { rows } = await admin.query<{ last_sent_at: Date | null }>(
       `SELECT last_sent_at FROM messaging.push_subscriptions WHERE endpoint = $1`,
@@ -200,7 +279,7 @@ describe.skipIf(!server)("Push notifications to staff's browsers (APP-03, ADR-50
     await subscribe(owner, 'fine', ['cash_remitted']);
     sender.answers.set(endpoint('gone'), 'gone');
     sender.answers.set(endpoint('flaky'), 'failed');
-    const recipients = [{ userId: owner, role: 'owner' as const, language: 'en' as const }];
+    const recipients = [recipient(owner, 'owner')];
 
     expect(await push.push(shopId, 'cash_remitted', 'cash:1', recipients, message)).toBe(1);
     const left = async () =>

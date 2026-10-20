@@ -162,6 +162,21 @@ describe('account emails (ADR-165)', () => {
       'Sana Iqbal invited you to work in Zari <Lawn> on Hatti, as an accountant.',
     );
     expect(invitation.html).toContain('Zari &lt;Lawn&gt;');
+    // A shop's own role by its name, with its preset (ADR-581).
+    const custom = (language: 'en' | 'ur') =>
+      invitationEmail({
+        to: 'bilal@example.pk',
+        inviter: 'Sana',
+        shop: 'Zari',
+        role: 'packer',
+        customRole: 'Packer,\nno labels',
+        link: 'https://admin.hatti.pk/invitation#token=hsi_x',
+        language,
+      }).text;
+    expect(custom('en')).toContain(
+      'Sana invited you to work in Zari on Hatti, as Packer, no labels (a packer).',
+    );
+    expect(custom('ur')).toContain('بطور Packer, no labels (پیکر)');
   });
 });
 
@@ -1066,15 +1081,26 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       // As the worker reads them: in a transaction of the shop's, through identity's function.
       const phonesFrom = (transactionShop: string) =>
         appDb.tenant(transactionShop, (tx) => staffPhonesIn(tx, shopId));
-      // Each with their role, which says what of the shop's work is theirs (ADR-247).
+      // Each with their role, which says what of the shop's work is theirs (ADR-247), and what
+      // they may do, their preset's (ADR-581).
       expect(await phonesFrom(shopId)).toEqual([
-        { userId: owner.userId, name: 'Ayesha Khan', phone: null, language: 'ur', role: 'owner' },
+        {
+          userId: owner.userId,
+          name: 'Ayesha Khan',
+          phone: null,
+          language: 'ur',
+          role: 'owner',
+          scopes: ROLE_SCOPES.owner,
+          capabilities: new Set(PRESET_CAPABILITIES.owner),
+        },
         {
           userId: packer.userId,
           name: 'Ayesha Khan',
           phone: '+923001112223',
           language: 'en',
           role: 'packer',
+          scopes: ROLE_SCOPES.packer,
+          capabilities: new Set(),
         },
       ]);
       // A disabled account is told nothing; another shop's transaction learns nothing of them.
@@ -2012,6 +2038,16 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
             customRole: { id: toPublicId('customRole', customRoleId), name: 'Caller, masked' },
           },
         ]);
+        // And the worker, which tells them only of the work they may do (ADR-581).
+        const phoneOf = async (userId: string) =>
+          (await appDb.tenant(shopId, (tx) => staffPhonesIn(tx, shopId))).find(
+            (each) => each.userId === userId,
+          );
+        expect(await phoneOf(agent.userId)).toMatchObject({
+          role: 'confirmation_agent',
+          scopes: ['read_products', 'write_orders'],
+          capabilities: new Set(),
+        });
         // Changed, from their next request.
         await s.updateCustomRole(owner, shopId, customRoleId, {
           scopes: ['read_orders', 'read_customers'],

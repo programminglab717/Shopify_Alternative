@@ -6,8 +6,10 @@ import {
   isStaffRole,
   planLimitMessage,
   rollbackResult,
+  type AccessScope,
   type MutationResult,
   type PlanLimit,
+  type StaffCapability,
   type StaffRole,
 } from '@hatti/api';
 import { secretToken, sha256 } from '@hatti/crypto';
@@ -39,6 +41,7 @@ import {
   checkedName,
   checkedScopes,
   customRoleIn,
+  memberAccess,
   toCustomRole,
   type CustomRoleCreateInput,
   type CustomRoleRecord,
@@ -142,6 +145,12 @@ export interface StaffPhoneRecord {
   language: 'en' | 'ur';
   /** Their role in the shop, which says what of its work is theirs (ADR-247). */
   role: StaffRole;
+  /**
+   * What they may do there, their custom role's or else their preset's, as each of their
+   * requests resolves it (ADR-578): whom of them each alert's work is for (ADR-581).
+   */
+  scopes: AccessScope[];
+  capabilities: ReadonlySet<StaffCapability>;
 }
 
 /**
@@ -195,7 +204,11 @@ export async function staffPhonesIn(tx: ShopTx, shopId: string): Promise<StaffPh
     role: string;
     phone: string | null;
     language: 'en' | 'ur';
-  }>(sql`SELECT user_id, name, role, phone, language FROM identity.staff_phones(${shopId})`);
+    custom_scopes: string[] | null;
+    custom_capabilities: string[] | null;
+  }>(sql`
+    SELECT user_id, name, role, phone, language, custom_scopes, custom_capabilities
+      FROM identity.staff_phones(${shopId})`);
   return rows.flatMap((row) =>
     isStaffRole(row.role)
       ? [
@@ -205,6 +218,12 @@ export async function staffPhonesIn(tx: ShopTx, shopId: string): Promise<StaffPh
             phone: row.phone,
             language: row.language,
             role: row.role,
+            ...memberAccess(
+              row.role,
+              row.custom_scopes === null
+                ? null
+                : { scopes: row.custom_scopes, capabilities: row.custom_capabilities },
+            ),
           },
         ]
       : [],
@@ -514,6 +533,7 @@ export class StaffService {
             inviter: value.invitation.invitedBy.name,
             shop,
             role: value.invitation.role,
+            customRole: value.invitation.customRole?.name ?? null,
             link: `${this.emails.adminUrl.replace(/\/+$/, '')}/invitation#token=${value.token}`,
             // The invitee's own is not known yet: the inviter's (ADR-194).
             language: language ?? (await this.languageOf(actor.userId)),

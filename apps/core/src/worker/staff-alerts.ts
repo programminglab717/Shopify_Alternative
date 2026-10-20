@@ -1,4 +1,4 @@
-import { shopProfile } from '@hatti/api';
+import { scopeWithin, shopProfile } from '@hatti/api';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import { staffPhonesIn } from '@hatti/identity/public';
@@ -23,7 +23,11 @@ type Alert =
   | { kind: 'order_mentioned'; orderId: string; commentId: string }
   | { kind: 'order_receipt_sent'; orderId: string };
 
-/** Who looks for a transfer's money in the shop's bank when no one has its order (ADR-247). */
+/**
+ * Who looks for a transfer's money in the shop's bank when no one has its order (ADR-247): owners
+ * and managers who may mark the order paid, a custom role's member only if it holds `write_orders`
+ * (ADR-581).
+ */
 const PAYMENT_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 /**
@@ -33,9 +37,9 @@ const PAYMENT_ROLES: readonly StaffRole[] = ['owner', 'manager'];
  * unless it was given to another since; and a comment that names them as `@` and their name, but
  * not its author, once a comment however often it is changed. And a receipt a customer sent for
  * an order that still waits for its transfer (ADR-247): told to whom the order is given, else to
- * the owners and managers, once a receipt. Nothing for those who left the shop or proved no
- * number, nor what the shop turned off; each is the shop's message, paid from its credit as its
- * other alerts are.
+ * the owners and managers who may mark it paid (ADR-581), once a receipt. Nothing for those who
+ * left the shop or proved no number, nor what the shop turned off; each is the shop's message,
+ * paid from its credit as its other alerts are.
  */
 export class StaffAlerts {
   /** The events {@link handle} reads. */
@@ -77,7 +81,10 @@ export class StaffAlerts {
         told = assignee
           ? [assignee.userId]
           : staff
-              .filter((member) => PAYMENT_ROLES.includes(member.role))
+              .filter(
+                (member) =>
+                  PAYMENT_ROLES.includes(member.role) && scopeWithin('write_orders', member.scopes),
+              )
               .map((member) => member.userId);
       } else {
         const comment = facts.comment;

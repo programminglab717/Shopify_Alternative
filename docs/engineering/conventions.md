@@ -2422,8 +2422,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   and the member, and its words name the shop and the order but nothing of the customer. A
   customer's receipt for a transfer is `order.updated` naming `transferReceipt`
   ([ADR-247](../architecture/13-decision-log.md#adr-247--staff-hear-on-whatsapp-the-moment-a-customer-sends-the-receipt-of-their-transfer-for-an-order-still-waiting-for-it-whoever-has-the-order-else-the-shops-owners-and-managers-once-a-receipt)):
-  it tells whoever has the order, else the members whose role is in `PAYMENT_ROLES`, from the role
-  `staffPhonesIn` gives, and no one once `staffAlertFactsIn` says the order no longer waits for its
+  it tells whoever has the order, else the members whose role is in `PAYMENT_ROLES` and who hold
+  `write_orders` (ADR-581), from the role and access `staffPhonesIn` gives, and no one once `staffAlertFactsIn` says the order no longer waits for its
   transfer.
 * **A provider's `send` says what to do with a refusal:** `retry` for what may pass (a 5xx, a 429,
   a provider not reached), `replace` for what WhatsApp will never deliver, which an SMS replaces
