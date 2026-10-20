@@ -4548,6 +4548,9 @@ const en = {
   'push.lowStockHint': 'A product running low, and when it runs out.',
   'push.contactMessage': 'Contact form messages',
   'push.contactMessageHint': 'A shopper writing to you from your online store’s contact page.',
+  'push.ordersOverdue': 'Orders not called in time',
+  'push.ordersOverdueHint':
+    'Orders waiting for their first call longer than your target, at most once an hour.',
   'push.commentPending': 'Comments to approve',
   'push.commentPendingHint': 'A shopper’s comment on an article, waiting for you to approve it.',
   'push.turnOn': 'Turn on notifications',
@@ -9729,6 +9732,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'push.lowStockHint': 'کوئی پروڈکٹ کم ہو رہی ہو، اور جب ختم ہو جائے۔',
   'push.contactMessage': 'رابطہ فارم کے پیغامات',
   'push.contactMessageHint': 'جب کوئی خریدار آپ کے آن لائن اسٹور کے رابطہ صفحے سے لکھے۔',
+  'push.ordersOverdue': 'وقت پر کال نہ ہونے والے آرڈرز',
+  'push.ordersOverdueHint':
+    'آپ کے ہدف سے زیادہ دیر سے پہلی کال کے منتظر آرڈرز، گھنٹے میں زیادہ سے زیادہ ایک بار۔',
   'push.commentPending': 'منظوری کے لیے تبصرے',
   'push.commentPendingHint': 'کسی مضمون پر خریدار کا تبصرہ، جو آپ کی منظوری کا منتظر ہے۔',
   'push.turnOn': 'نوٹیفکیشنز آن کریں',

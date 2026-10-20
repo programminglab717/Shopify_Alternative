@@ -423,6 +423,34 @@ function overdueBeforeOf(policy: DeskPolicy, at: Date): Date | null {
     : new Date(at.getTime() - policy.firstCallMinutes * 60_000);
 }
 
+/** Orders waiting longer than the shop's first-call target, and whether its desk calls now. */
+export interface OverdueFirstCalls {
+  count: number;
+  callingNow: boolean;
+}
+
+/**
+ * How many of the shop's orders, at `at`, have waited for their first call longer than its
+ * first-call target (ADR-091), as the desk's queue counts them; none without a target. In the
+ * caller's transaction, for the worker's alert of them (ADR-627).
+ */
+export async function overdueFirstCallsIn(
+  tx: Tx,
+  shopId: string,
+  at: Date = new Date(),
+): Promise<OverdueFirstCalls> {
+  const policy = await deskPolicyIn(tx, shopId, at);
+  const { callingNow } = callingOf(policy, at);
+  const overdueBefore = overdueBeforeOf(policy, at);
+  if (!overdueBefore) return { count: 0, callingNow };
+  const due = dueAtOf(policy.waits);
+  const { rows } = await tx.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count FROM orders.orders o
+     WHERE o.shop_id = ${shopId} AND ${IN_QUEUE} AND o.confirmation_due_at IS NULL
+       AND ${due} < ${overdueBefore.toISOString()}::timestamptz`);
+  return { count: rows[0]?.count ?? 0, callingNow };
+}
+
 /** Who an actor is, as a claim names them. */
 function whoIs(actor: Actor): { kind: 'app' | 'staff'; id: string } {
   return actor.kind === 'app'

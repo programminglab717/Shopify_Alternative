@@ -100,6 +100,7 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
     expect(PUSH_KINDS.filter((kind) => pushedTo(kind, lead))).toEqual([
       'new_order',
       'needs_review',
+      'orders_overdue',
     ]);
     const books = recipient('usr', 'accountant', 'en', {
       scopes: ['read_orders'],
@@ -114,6 +115,7 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
     expect(PUSH_KINDS.filter((kind) => pushedTo(kind, caller))).toEqual([
       'new_order',
       'needs_review',
+      'orders_overdue',
     ]);
   });
 
@@ -152,6 +154,24 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       false,
       true,
     ]);
+  });
+
+  it('tells who confirms orders of orders waiting too long for their first call (ADR-627)', () => {
+    const told = (role: StaffRole, scopes?: string[]) =>
+      pushedTo(
+        'orders_overdue',
+        recipient('usr', role, 'en', scopes ? { scopes, capabilities: [] } : null),
+      );
+    expect([told('owner'), told('manager'), told('confirmation_agent')]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect([told('marketer'), told('packer'), told('accountant')]).toEqual([false, false, false]);
+    expect([
+      told('confirmation_agent', ['read_orders']),
+      told('confirmation_agent', ['write_orders']),
+    ]).toEqual([false, true]);
   });
 });
 

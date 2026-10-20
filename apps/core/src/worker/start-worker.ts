@@ -96,7 +96,7 @@ import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { PartnerEarnings } from './partner-earnings.js';
-import { PushNotices } from './push-notices.js';
+import { OverdueOrderPushes, PushNotices } from './push-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { AutomationTriggers, WinBacks } from './automations.js';
 import { BroadcastQueue } from './broadcasts.js';
@@ -477,6 +477,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => summaries.stop());
+    // Staff pushed of orders waiting past the first-call target, at most hourly (ADR-627).
+    const vapid = vapidKeysOf(config);
+    const overdue = new OverdueOrderPushes(
+      database,
+      new PushService(database, vapid && new WebPushSender(vapid)),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => overdue.stop());
     // Carts, checkouts and browsers' proofs of a number past their time deleted (ADR-230).
     const expired = new ExpiredCheckouts(new CheckoutExpiry(database), logger).start(
       config.SWEEP_INTERVAL_MS,

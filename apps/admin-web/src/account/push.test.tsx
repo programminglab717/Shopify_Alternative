@@ -103,7 +103,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
 
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const lowStock = await within(card).findByRole('checkbox', { name: /Low stock/ });
-    expect(within(card).getAllByRole('checkbox')).toHaveLength(6);
+    expect(within(card).getAllByRole('checkbox')).toHaveLength(7);
     fireEvent.click(lowStock);
     fireEvent.click(within(card).getByRole('button', { name: 'Turn on notifications' }));
     await waitFor(() =>
@@ -115,6 +115,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
           kinds: [
             'NEW_ORDER',
             'NEEDS_REVIEW',
+            'ORDERS_OVERDUE',
             'CASH_REMITTED',
             'CONTACT_MESSAGE',
             'COMMENT_PENDING',
@@ -129,7 +130,15 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(sent(fake, 'PushSubscribe')).toMatchObject({
-        input: { kinds: ['NEW_ORDER', 'NEEDS_REVIEW', 'CONTACT_MESSAGE', 'COMMENT_PENDING'] },
+        input: {
+          kinds: [
+            'NEW_ORDER',
+            'NEEDS_REVIEW',
+            'ORDERS_OVERDUE',
+            'CONTACT_MESSAGE',
+            'COMMENT_PENDING',
+          ],
+        },
       }),
     );
 
@@ -157,6 +166,9 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
       expect.stringMatching(/^New orders/),
       expect.stringMatching(/^Orders to review/),
+      // Those waiting too long for their first call (ADR-627).
+      'Orders not called in timeOrders waiting for their first call longer than your target, ' +
+        'at most once an hour.',
       'Contact form messagesA shopper writing to you from your online store’s contact page.',
     ]);
   });
@@ -187,6 +199,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
       expect.stringMatching(/^New orders/),
       expect.stringMatching(/^Orders to review/),
+      expect.stringMatching(/^Orders not called in time/),
     ]);
   });
 

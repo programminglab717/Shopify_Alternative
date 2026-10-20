@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-626 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-627 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -634,6 +634,7 @@
 | 624 | On an Urdu page, the addresses of products, variants, collections, pages, blogs, articles, their comments, cart lines and the shop's own menu links carry `/ur`, as Shopify's objects' `url` carry their locale's; predictive search's JSON at its Urdu address likewise, in the shop's Urdu | Accepted |
 | 625 | The Ajax cart's answers at the Urdu addresses, `/ur/cart.js` and the rest, give its lines' titles in the shop's Urdu and their addresses under `/ur`, as the Urdu pages show them | Accepted |
 | 626 | The Search listings tab counts the images without words for what they show in a product's or a collection's description too, as it does those in pages' and articles' text | Accepted |
+| 627 | Orders waiting for their first call longer than the shop's target are pushed to its owners, managers and confirmation agents, as the new kind orders_overdue, at most once an hour, within its calling hours alone, opening the Confirmation Desk | Accepted |
 
 ---
 
@@ -22510,3 +22511,22 @@
   them: the admin does not set it yet, and the tab would name a fix the shop cannot make there.
 * **Alternatives:** **Counting in the core:** the tab already parses the text it shows, and a
   field for it would be another query per listing.
+
+## ADR-627 · Orders waiting for their first call longer than the shop's target are pushed to its owners, managers and confirmation agents, as the new kind orders_overdue, at most once an hour, within its calling hours alone, opening the Confirmation Desk
+
+* **Context:** A shop sets a first-call target, and the Confirmation Desk counts and marks the
+  orders that waited longer (ADR-091); nobody was told unless they looked at the desk (status
+  shortcut 54). An order not called soon is a parcel that ships late or not at all, and the
+  desk is where an owner's money leaks first.
+* **Decision:** The worker sweeps the shops with a first-call target and counts, as the desk
+  does, the orders overdue now, through the orders module's `overdueFirstCallsIn`. While any
+  are, within the shop's calling hours, it pushes those who confirm orders, owners, managers and
+  confirmation agents who may write orders (ADR-581), "3 orders not called in time", in each
+  member's language, opening the desk. One push a shop an hour at most, its key the hour, so a
+  backlog nags hourly and a sweep every minute does not. A new kind, `orders_overdue`
+  (migration 0284), each member chooses on their account page as the others.
+* **Consequences:** An owner hears of a desk falling behind while there is time to call, and
+  hears nothing at night, when no one could. Shops without a target are never pushed.
+* **Alternatives:** **A push for each order as it falls overdue:** a busy afternoon would be a
+  push a minute. **WhatsApp to the alerts number:** it costs a message each time; the push is
+  free and goes to those who call.

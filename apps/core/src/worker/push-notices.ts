@@ -1,5 +1,6 @@
 import { shopProfile } from '@hatti/api';
 import type { Database, Tx } from '@hatti/db';
+import type { Logger } from '@hatti/logger';
 import type { DomainEvent } from '@hatti/events';
 import { staffPhonesIn } from '@hatti/identity/public';
 import { toPublicId } from '@hatti/ids';
@@ -14,7 +15,14 @@ import {
 } from '@hatti/messaging/public';
 import { formatMoney, isCurrencyCode, money } from '@hatti/money';
 import { OnlineStoreEvents, type CommentChangedPayload } from '@hatti/online-store/public';
-import { OrderEvents, orderName, type OrderCreatedPayload } from '@hatti/orders/public';
+import {
+  OrderEvents,
+  orderName,
+  overdueFirstCallsIn,
+  type OrderCreatedPayload,
+} from '@hatti/orders/public';
+import { sql } from 'drizzle-orm';
+import { repeat } from './repeat.js';
 
 /** What is pushed, to whom, once for its key. */
 export interface PushNotice {
@@ -229,6 +237,94 @@ export async function lowStockNotice(
           : `آن لائن فروخت کے لیے ${alert.available} باقی ہیں۔ اسٹاک بڑھائیں۔`,
       },
       url: `/${toPublicId('shop', shopId)}/products/${toPublicId('product', alert.productId)}`,
+    },
+  };
+}
+
+/** How often the same shop is pushed of its overdue orders at most: an hour. */
+export const OVERDUE_PUSH_EVERY_MS = 60 * 60_000;
+
+/**
+ * Pushes the shop's owners, managers and confirmation agents when orders have waited for their
+ * first call longer than the shop's first-call target (COD-05, ADR-627), as the Confirmation
+ * Desk counts them: at most once an hour while any wait, within its calling hours alone, opening
+ * the desk. Nothing for a shop without a target, and nothing where Hatti has no VAPID keys. The
+ * shops are found with the system role; each is read in its own transaction.
+ */
+export class OverdueOrderPushes {
+  constructor(
+    private readonly database: Database,
+    private readonly push: PushService,
+    private readonly logger?: Logger,
+  ) {}
+
+  /** One sweep at `at`: how many shops were pushed. */
+  async sweep(at: Date = new Date()): Promise<number> {
+    if (this.push.publicKey === null) return 0;
+    const { rows: shops } = await this.database.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT shop_id FROM orders.order_settings WHERE first_call_minutes IS NOT NULL`),
+    );
+    let pushed = 0;
+    for (const { shop_id: shopId } of shops) {
+      try {
+        const notice = await this.database.tenant(shopId, (tx) =>
+          overdueOrdersNotice(tx, shopId, at),
+        );
+        if (!notice) continue;
+        await this.push.push(
+          shopId,
+          notice.kind,
+          notice.dedupeKey,
+          notice.recipients,
+          notice.message,
+        );
+        pushed += 1;
+      } catch (error) {
+        // One shop's failure is not the others': it is pushed on the next sweep.
+        this.logger?.warn({ err: error, shopId }, 'overdue orders not pushed');
+      }
+    }
+    return pushed;
+  }
+
+  /** Sweeps now, then every `intervalMs`, a sweep never overlapping the last. */
+  start(intervalMs: number): { stop(): Promise<void> } {
+    return repeat(
+      () => this.sweep(),
+      intervalMs,
+      (error) => this.logger?.warn({ err: error }, 'overdue orders sweep failed'),
+    );
+  }
+}
+
+/**
+ * The push of a shop's orders overdue for their first call at `at` (ADR-627), once in each hour:
+ * null while none are, or outside its calling hours, when no one could call them.
+ */
+export async function overdueOrdersNotice(
+  tx: Tx,
+  shopId: string,
+  at: Date,
+): Promise<PushNotice | null> {
+  const { count, callingNow } = await overdueFirstCallsIn(tx, shopId, at);
+  if (count === 0 || !callingNow) return null;
+  const shop = await shopProfile(tx, shopId);
+  const hour = Math.floor(at.getTime() / OVERDUE_PUSH_EVERY_MS);
+  return {
+    kind: 'orders_overdue',
+    dedupeKey: `orders_overdue:${hour}`,
+    recipients: await recipientsIn(tx, shopId),
+    message: {
+      en: {
+        title: `${shop.name}: ${count} ${count === 1 ? 'order' : 'orders'} not called in time`,
+        body: 'Waiting for their first call longer than your target. Call them from the desk.',
+      },
+      ur: {
+        title: `${shop.name}: ${count} ${count === 1 ? 'آرڈر' : 'آرڈرز'} کو وقت پر کال نہیں ہوئی`,
+        body: 'آپ کے ہدف سے زیادہ دیر سے پہلی کال کے منتظر ہیں۔ ڈیسک سے کال کریں۔',
+      },
+      url: `/${toPublicId('shop', shopId)}/desk`,
     },
   };
 }

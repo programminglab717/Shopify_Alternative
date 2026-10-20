@@ -67,6 +67,8 @@ export {
 export {
   CONFIRMATION_DESK,
   ConfirmationDeskService,
+  overdueFirstCallsIn,
+  type OverdueFirstCalls,
   type ConfirmationCallInput,
   type ConfirmationCallRecord,
   type ConfirmationQueue,

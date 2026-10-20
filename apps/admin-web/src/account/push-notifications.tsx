@@ -31,7 +31,8 @@ type PushKind =
   | 'CASH_REMITTED'
   | 'LOW_STOCK'
   | 'CONTACT_MESSAGE'
-  | 'COMMENT_PENDING';
+  | 'COMMENT_PENDING'
+  | 'ORDERS_OVERDUE';
 
 /**
  * Whose work each kind of news is, and what it needs of them, as the core pushes it (ADR-506,
@@ -54,6 +55,12 @@ const KINDS: {
     gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
     label: 'push.needsReview',
     hint: 'push.needsReviewHint',
+  },
+  {
+    kind: 'ORDERS_OVERDUE',
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
+    label: 'push.ordersOverdue',
+    hint: 'push.ordersOverdueHint',
   },
   {
     kind: 'CASH_REMITTED',

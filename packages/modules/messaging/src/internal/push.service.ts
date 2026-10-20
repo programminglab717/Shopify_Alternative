@@ -26,6 +26,8 @@ export const PUSH_KINDS = [
   'contact_message',
   // A shopper's comment waits for the shop's approval (ADR-619).
   'comment_pending',
+  // Orders wait for their first call longer than the shop's target (ADR-627).
+  'orders_overdue',
 ] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
@@ -37,6 +39,7 @@ export const PUSH_ROLES: Record<PushKind, readonly StaffRole[]> = {
   low_stock: ['owner', 'manager'],
   contact_message: ['owner', 'manager', 'confirmation_agent'],
   comment_pending: ['owner', 'manager', 'marketer'],
+  orders_overdue: ['owner', 'manager', 'confirmation_agent'],
 };
 
 /**
@@ -50,6 +53,7 @@ export const PUSH_NEEDS: Record<PushKind, AccessScope | StaffCapability> = {
   low_stock: 'write_inventory',
   contact_message: 'write_conversations',
   comment_pending: 'write_content',
+  orders_overdue: 'write_orders',
 };
 
 /** Whether `recipient` is told of news of `kind`: their role's work, which they may do. */
