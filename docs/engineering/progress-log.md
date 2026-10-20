@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Erasures done told to the shopper
+### e21595b · Erasures done told to the shopper
 
 * **A shopper who asked for their erasure from their account is told once it is done, at the
   number they signed in with, by a message forgotten once sent** ([ADR-582](../architecture/13-decision-log.md#adr-582--a-shopper-who-asked-for-their-erasure-from-their-account-is-told-once-it-is-done-at-the-number-they-signed-in-with-by-a-message-forgotten-once-sent), CUS-05).
