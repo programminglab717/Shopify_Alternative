@@ -372,6 +372,7 @@ describe.skipIf(!server)('Store credit (ORD-09, ADR-184)', () => {
     expect(await factsAt(T0)).toEqual({
       customerId: ayesha,
       phone: '+923001234567',
+      email: null,
       currency: 'PKR',
       balance: 170_000n,
       remaining: 100_000n,

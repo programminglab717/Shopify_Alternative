@@ -401,6 +401,8 @@ export interface StoreCreditNoticeFacts {
   customerId: string;
   /** Their main number, in E.164. */
   phone: string;
+  /** Their email, where the shop has one, which the news goes to too (ADR-602). */
+  email: string | null;
   currency: CurrencyCode;
   /** Minor units: what the account's credits have left that has not expired. */
   balance: bigint;
@@ -419,11 +421,13 @@ export async function storeCreditNoticeFactsIn(
   const { rows } = await tx.execute<{
     customer_id: string;
     phone: string;
+    email: string | null;
     currency: CurrencyCode;
     remaining: string;
     expires_at: string | Date | null;
   }>(sql`
-    SELECT a.customer_id, c.phone, a.currency, t.remaining::text AS remaining, t.expires_at
+    SELECT a.customer_id, c.phone, c.email, a.currency, t.remaining::text AS remaining,
+           t.expires_at
       FROM customers.store_credit_accounts a
       JOIN customers.customers c ON c.shop_id = a.shop_id AND c.id = a.customer_id
       JOIN customers.store_credit_transactions t
@@ -437,6 +441,7 @@ export async function storeCreditNoticeFactsIn(
   return {
     customerId: row.customer_id,
     phone: row.phone,
+    email: row.email,
     currency: row.currency,
     balance: await balanceIn(tx, shopId, accountId, at),
     remaining: expired ? 0n : BigInt(row.remaining),

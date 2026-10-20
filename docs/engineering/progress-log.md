@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit news by email
+
+* **A customer's store credit news goes by email too, where the shop has their email** ([ADR-602](../architecture/13-decision-log.md#adr-602--a-customers-store-credit-news-goes-by-email-too-where-the-shop-has-their-email-saying-the-shop-has-it),
+  ORD-09, MSG-01).
+* 3676 tests, 2 more: the emails' words, and the worker queuing them.
+
 ### 7c50b5b · Search engine listings of collections, pages, blogs and articles
 
 * **Collections, pages, blogs and articles have the same search engine listing card in the admin as

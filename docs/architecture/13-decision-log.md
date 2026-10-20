@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-601 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-602 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -609,6 +609,7 @@
 | 599 | An order's emails say the day checkout said to expect it by, while its delivery is still to come | Accepted |
 | 600 | A product's page in the admin has a search engine listing card: its title and description for search engines, with a preview of how a search engine lists it | Accepted |
 | 601 | Collections, pages, blogs and articles have the same search engine listing card in the admin as products | Accepted |
+| 602 | A customer's store credit news goes by email too, where the shop has their email, saying the shop has it | Accepted |
 
 ---
 
@@ -21944,3 +21945,18 @@
   wrong with a save is said on the card, and what was typed stays.
 * **Alternatives:** **One SEO screen listing them all:** still a later toolkit's; it would reuse the
   card.
+
+## ADR-602 · A customer's store credit news goes by email too, where the shop has their email, saying the shop has it
+
+* **Context:** A customer hears of store credit given them, and a week before a credit of theirs
+  expires (ADR-192), at their number alone. The news of their orders goes to the email they gave
+  with the order too (ADR-181).
+* **Decision:** Both messages have an email's subject, "Rs 1,000 of store credit from Zari" and
+  "Your store credit with Zari expires on …", and go to the email the shop has for the customer
+  as well, queued with the message once by its key, laid out as the shop's own (ADR-198) and never
+  charged. An email of news that is no order's says the shop sent it because the customer gave it
+  the address, not with an order.
+* **Consequences:** Credit given by a refund or by hand reaches customers who read email more than
+  WhatsApp. A suppressed or erased address gets nothing, as order news.
+* **Alternatives:** **Only the email of their last order:** the customer's own record is the
+  address the shop keeps up to date.

@@ -745,6 +745,8 @@ describe("Messages' words", () => {
       'order_advance_paid',
       'order_payment_reminder',
       'order_confirmation_reminder',
+      'store_credit_given',
+      'store_credit_expiring',
       'invoice_due',
       'payment_overdue',
       'plan_ended',
@@ -860,6 +862,29 @@ describe("Messages' words", () => {
       expected: '2026-10-22',
     })!;
     expect(bill.html).not.toMatch(/<img|<table|#B45309|Zari &lt;Lawn&gt;<\/p>|Expected by/);
+  });
+
+  it("emails a customer's store credit, saying the shop has their email (ADR-602)", () => {
+    const given = messageEmail('store_credit_given', 'en', {
+      shop: 'Zari',
+      amount: 'Rs 1,000',
+      balance: 'Rs 1,500',
+    })!;
+    expect(given.from).toBe('shop');
+    expect(given.subject).toBe('Rs 1,000 of store credit from Zari');
+    expect(given.text.split('\n\n')).toEqual([
+      'Zari: Rs 1,000 of store credit was added for you, Rs 1,500 in all. Spend it on your next order, ordering with this number.',
+      "Zari sent this through Hatti because you gave it this email. Replies to it aren't read.",
+    ]);
+    const expiring = messageEmail('store_credit_expiring', 'ur', {
+      shop: 'Zari',
+      amount: 'Rs 1,000',
+      date: '27 Oct, 3:00 pm',
+    })!;
+    expect(expiring.subject).toBe(
+      'Zari کے ساتھ آپ کے اسٹور کریڈٹ کی میعاد 27 Oct, 3:00 pm کو ختم ہو رہی ہے',
+    );
+    expect(expiring.text).toContain('کیونکہ آپ نے انہیں یہ ای میل دی تھی');
   });
 
   it("says in an order's email the day to expect it by, where its news has one (ADR-599)", () => {

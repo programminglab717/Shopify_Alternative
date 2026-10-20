@@ -15,8 +15,8 @@ import { shopTime } from './notifications.js';
  * Tells customers of their store credit (ORD-09, ADR-192), as its events are heard: credit given
  * them, by hand or as a refund, with what they have in all; and a credit of theirs with something
  * left, a week before it expires, with when. At their main number, on the shop's channel and in
- * its language, once each. Nothing for a customer gone, a credit spent or expired since, or what
- * the shop turned off.
+ * its language, once each, and at their email too where the shop has one (ADR-602). Nothing for a
+ * customer gone, a credit spent or expired since, or what the shop turned off.
  */
 export class StoreCreditNotices {
   /** The events {@link handle} reads. */
@@ -43,7 +43,7 @@ export class StoreCreditNotices {
       if (!credit || credit.remaining <= 0n) return;
       const rupees = (paisa: bigint) => formatMoney(money(paisa, credit.currency));
       const { name: shop, timezone } = await shopProfile(tx, shopId);
-      const to = { recipient: credit.phone, customerId: credit.customerId };
+      const to = { recipient: credit.phone, email: credit.email, customerId: credit.customerId };
       if (event.type === CustomerEvents.StoreCreditCredited) {
         await this.messages.queueIn(tx, shopId, {
           kind: 'store_credit_given',

@@ -1930,6 +1930,33 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ]);
   });
 
+  it("emails a customer's store credit news too, where the shop has their email (ADR-602)", async () => {
+    const { customerId } = await placeOnline();
+    await admin.query(`UPDATE customers.customers SET email = 'Ayesha@Example.pk' WHERE id = $1`, [
+      customerId,
+    ]);
+    unwrap(
+      await new StoreCreditService(database).credit(
+        tenant,
+        { customerId },
+        { amount: '750', currencyCode: 'PKR' },
+      ),
+    );
+    await dispatch(2);
+    expect(
+      (await queued())
+        .filter(
+          (message) =>
+            message.kind === 'store_credit_given' && message.variables.amount === 'Rs 750',
+        )
+        .map((message) => [message.channel, message.recipient])
+        .sort(),
+    ).toEqual([
+      ['email', 'ayesha@example.pk'],
+      ['whatsapp', AYESHA],
+    ]);
+  });
+
   it('tells staff at their own numbers of an order given to them, and of a comment naming them (ADR-191)', async () => {
     const [ayeshaId, bilalId, sanaId] = [newId(), newId(), newId()];
     const [AYESHA_MALIK, BILAL] = ['+923211234567', '+923331234567'];

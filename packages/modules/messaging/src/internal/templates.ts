@@ -680,6 +680,11 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       en: '{shop}: {amount} of store credit was added for you, {balance} in all. Spend it on your next order, ordering with this number.',
       ur: '{shop}: آپ کے لیے {amount} کا اسٹور کریڈٹ شامل کیا گیا ہے، کل {balance}۔ اسے اپنے اگلے آرڈر پر استعمال کریں، اسی نمبر سے آرڈر کر کے۔',
     },
+    // By email too, where the shop has the customer's (ADR-602).
+    subject: {
+      en: '{amount} of store credit from {shop}',
+      ur: '{shop} کی طرف سے {amount} کا اسٹور کریڈٹ',
+    },
   },
   store_credit_expiring: {
     whatsapp: 'hatti_store_credit_expiring',
@@ -688,6 +693,10 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: {amount} of your store credit expires on {date}. Spend it on an order before then, ordering with this number.',
       ur: '{shop}: آپ کے اسٹور کریڈٹ میں سے {amount} کی میعاد {date} کو ختم ہو جائے گی۔ اس سے پہلے اسے کسی آرڈر پر استعمال کریں، اسی نمبر سے آرڈر کر کے۔',
+    },
+    subject: {
+      en: 'Your store credit with {shop} expires on {date}',
+      ur: '{shop} کے ساتھ آپ کے اسٹور کریڈٹ کی میعاد {date} کو ختم ہو رہی ہے',
     },
   },
   gift_card: {
@@ -1240,8 +1249,9 @@ export function messageText(
 
 /**
  * The notifications that go by email too: the news of an order, to the address its customer gave
- * with it (ADR-181), and Hatti's notices of the shop's bills, to its owner's (ADR-195). Not the
- * answers WhatsApp's buttons bring, nor codes, nor the shop's own alerts.
+ * with it (ADR-181), a customer's store credit, to the one the shop has for them (ADR-602), and
+ * Hatti's notices of the shop's bills, to its owner's (ADR-195). Not the answers WhatsApp's
+ * buttons bring, nor codes, nor the shop's own alerts.
  */
 export const EMAILED_KINDS: readonly MessageKind[] = MESSAGE_KINDS.filter(
   (kind) => TEMPLATES[kind].subject,
@@ -1271,6 +1281,11 @@ const EMAIL_WORDS = {
     en: "{shop} sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
     ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
   },
+  /** Why news that is no order's came: the customer's store credit (ADR-602). */
+  customer: {
+    en: "{shop} sent this through Hatti because you gave it this email. Replies to it aren't read.",
+    ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے انہیں یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
+  },
   /** Why Hatti's notice of the shop's bills came, to its owner (ADR-195). */
   owner: {
     en: "Hatti sent this to you as the owner of {shop}, about its bills with Hatti. Replies to it aren't read.",
@@ -1296,7 +1311,12 @@ export function messageEmail(
   const { subject, text, hattiPays } = TEMPLATES[kind];
   if (!subject) return null;
   const words = fill(text[language], variables);
-  const why = fill((hattiPays ? EMAIL_WORDS.owner : EMAIL_WORDS.why)[language], variables);
+  const why = fill(
+    (hattiPays ? EMAIL_WORDS.owner : variables.order ? EMAIL_WORDS.why : EMAIL_WORDS.customer)[
+      language
+    ],
+    variables,
+  );
   const { url } = variables;
   const rtl = language === 'ur';
   // Hatti's own notices are Hatti's, not the shop's: none of its look.
