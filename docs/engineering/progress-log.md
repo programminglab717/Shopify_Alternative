@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### 4f23243 · A signed-in session proves its number at checkout
+
+* **A shopper's session signed in to their account proves its number at checkout, where the
+  shop asks for a code** ([ADR-586](../architecture/13-decision-log.md#adr-586--a-shoppers-session-signed-in-to-their-account-proves-its-number-at-checkout-where-the-shop-asks-for-a-code), CUS-02, CHK-09).
+* 3631 tests, 1 more: the code spared its own number alone, for the
+  shop's live sessions.
+
 ### 52b8166 · Checkout filled in from the address book
 
 * **A signed-in shopper's checkout opens filled in from their default address, or with the
