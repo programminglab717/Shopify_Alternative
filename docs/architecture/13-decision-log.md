@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-664 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-665 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -672,6 +672,7 @@
 | 662 | An order lists the orders split from it, the oldest first, as each part names the order it was split from | Accepted |
 | 663 | Cancelling an order whose refunds took part of what its store credit paid gives back as much as they left, to the credits it came from, as a parcel that came back does | Accepted |
 | 664 | Cancelling an order whose refunds took part of what gift cards paid gives back to the cards as much as refunds and store credit left, and the timeline says what the cards got | Accepted |
+| 665 | The menu editor says which of a link's tags none of its collection's products has, or none of the shop's for all products, as typing stops | Accepted |
 
 ---
 
@@ -23277,3 +23278,20 @@
   cards back by hand. A cancellation is once, so a card is never given back twice.
 * **Alternatives:** **Reverting a debit in part:** a debit's `debit_revert` gives it back whole,
   once (ADR-449); a credit naming the order says the same without a second kind of revert.
+
+## ADR-665 · The menu editor says which of a link's tags none of its collection's products has, or none of the shop's for all products, as typing stops
+
+* **Context:** A menu's link to a collection or to all products may narrow it to products with
+  each of some tags (ADR-644), and the editor offers the tags in use (ADR-646, ADR-660). A tag typed
+  by hand that no product there has made a link to an empty page, and nothing said so until a
+  shopper found it.
+* **Decision:** The Admin API's `productTagsMissing(tags, collectionId)` gives those of up to ten
+  tags, a link's most, that none of the collection's products has, or none of the shop's where no
+  collection is given, case aside as the collection's tag page matches them, as they were given.
+  The menu editor asks it for a link's tags half a second after typing stops and says under them
+  which none has: the link would show nothing. It warns and does not refuse: products tagged later
+  make the link right, and a shop may make the menu first.
+* **Consequences:** A typo in a link's tag is seen as it is typed, not by a shopper.
+* **Alternatives:** **Refusing the menu:** a link made ahead of its products, for a sale coming,
+  is a fair one. **Checking against the tags offered:** they are the thirty most used, so a tag
+  past them would be flagged wrongly.

@@ -422,6 +422,20 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await tags(empty.id)).toEqual([]);
   });
 
+  it("says which of a menu link's tags none of its collection's products has (ADR-665)", async () => {
+    const one = await create('One', { tags: ['Eid', 'lawn'] });
+    await create('Two', { tags: ['kids'] });
+    const lawn = unwrap(await f.collections.create(f.a, { title: 'Lawn', productIds: [one.id] }));
+    const missing = (tags: string[], collectionId?: string) =>
+      f.products.tagsMissing(f.a, tags, { collectionId: collectionId ?? null });
+    // Case aside, as the collection's tag page matches them; given back as typed.
+    expect(await missing(['eid', 'LAWN', 'Kids', ' sale '], lawn.id)).toEqual(['Kids', 'sale']);
+    // Of the whole shop where no collection is given.
+    expect(await missing(['kids', 'sale', 'kids'])).toEqual(['sale']);
+    expect(await missing([], lawn.id)).toEqual([]);
+    expect(await f.products.tagsMissing(f.b, ['eid'], { collectionId: null })).toEqual(['eid']);
+  });
+
   it('finds products by Roman Urdu spelling variants and Urdu script', async () => {
     const suit = await create('Qameez Shalwar', { tags: ['لان'], vendor: 'Khaadi' });
     await create('Peshawari Chappal');

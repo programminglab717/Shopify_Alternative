@@ -1204,6 +1204,13 @@ export const ProductTagsQuery = /* GraphQL */ `
   }
 `;
 
+/** Those of a menu link's tags none of the shop's, or its collection's, products has (ADR-665). */
+export const ProductTagsMissingQuery = /* GraphQL */ `
+  query ProductTagsMissing($tags: [String!]!, $collectionId: ID) {
+    productTagsMissing(tags: $tags, collectionId: $collectionId)
+  }
+`;
+
 /** Its variants' prices and SKUs changed, together. */
 export const ProductVariantsBulkUpdateMutation = /* GraphQL */ `
   mutation ProductVariantsBulkUpdate(

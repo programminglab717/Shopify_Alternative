@@ -1667,6 +1667,9 @@ const en = {
   'menus.linkTags': 'Link {number}: tags',
   'menus.tagsInUse': 'Tags in use:',
   'menus.collectionTags': 'Its products’ tags:',
+  'menus.tagsMissingCollection':
+    'None of this collection’s products has {tags}: the link would show nothing.',
+  'menus.tagsMissingShop': 'None of your products has {tags}: the link would show nothing.',
   'menus.addTag': 'Add the tag {tag} to link {number}',
   'menus.linkTagsHint': 'Optional, separated by commas: only products with each tag show.',
   'menus.chooseCollection': 'Choose a collection',
@@ -6974,6 +6977,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'menus.linkTags': 'لنک {number}: ٹیگز',
   'menus.tagsInUse': 'استعمال میں ٹیگز:',
   'menus.collectionTags': 'اس کی پروڈکٹس کے ٹیگز:',
+  'menus.tagsMissingCollection':
+    'اس کلیکشن کی کسی پروڈکٹ پر {tags} نہیں: یہ لنک کچھ نہیں دکھائے گا۔',
+  'menus.tagsMissingShop': 'آپ کی کسی پروڈکٹ پر {tags} نہیں: یہ لنک کچھ نہیں دکھائے گا۔',
   'menus.addTag': 'لنک {number} میں ٹیگ {tag} شامل کریں',
   'menus.linkTagsHint': 'اختیاری، کوما سے الگ: صرف وہ پروڈکٹس دکھیں گی جن پر ہر ٹیگ ہو۔',
   'menus.chooseCollection': 'کلیکشن چنیں',

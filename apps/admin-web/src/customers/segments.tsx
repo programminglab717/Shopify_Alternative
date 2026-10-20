@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Plus, Trash2, UsersRound, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError } from '../api/client';
 import {
@@ -30,6 +30,7 @@ import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
+import { useDebounced } from '../shell/use-debounced';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -81,15 +82,6 @@ const shown = (condition: Condition, filters: readonly SegmentFilterValue[]) => 
   const filter = filters.find((each) => each.name === condition.field);
   return Boolean(filter && OPS_BY_TYPE[filter.type].includes(condition.op));
 };
-
-function useDebounced<T>(value: T, ms = 500): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), ms);
-    return () => window.clearTimeout(timer);
-  }, [value, ms]);
-  return debounced;
-}
 
 /** A condition: the field, how it compares, and the answer, in the merchant's words. */
 function ConditionRow({

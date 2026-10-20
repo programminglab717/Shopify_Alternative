@@ -2677,6 +2677,10 @@ export interface ProductTagsData {
   productTags: string[];
 }
 
+export interface ProductTagsMissingData {
+  productTagsMissing: string[];
+}
+
 export interface ProductSuggestionsData {
   productTypes: string[];
   productVendors: string[];

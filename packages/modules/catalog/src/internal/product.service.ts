@@ -1073,6 +1073,35 @@ export class ProductService {
   }
 
   /**
+   * Those of `tags` none of the shop's products has, or none of collection `collectionId`'s where
+   * it is given, as they were given, case aside: a menu's link narrowed by them shows nothing
+   * (ADR-665).
+   */
+  async tagsMissing(
+    tenant: TenantContext,
+    tags: readonly string[],
+    options: { collectionId?: string | null } = {},
+  ): Promise<string[]> {
+    const wanted = [...new Set(tags.map((tag) => tag.trim()).filter((tag) => tag !== ''))];
+    if (wanted.length === 0) return [];
+    const within = options.collectionId
+      ? sql`AND EXISTS (SELECT 1 FROM catalog.collection_products cp
+                         WHERE cp.shop_id = p.shop_id AND cp.product_id = p.id
+                           AND cp.collection_id = ${options.collectionId})`
+      : sql``;
+    const lowered = wanted.map((tag) => tag.toLowerCase());
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ tag: string }>(sql`
+        SELECT DISTINCT lower(t.tag) AS tag
+          FROM catalog.products p, unnest(p.tags) AS t(tag)
+         WHERE p.shop_id = ${tenant.shopId} ${within}
+           AND lower(t.tag) = ANY(${sql.param(lowered)}::text[])`);
+      const used = new Set(rows.map((row) => row.tag));
+      return wanted.filter((tag) => !used.has(tag.toLowerCase()));
+    });
+  }
+
+  /**
    * Products of the shop by ID, with their options, variants and media, in the caller's
    * transaction `tx`: for read models built outside the catalog, such as the storefront's. Those
    * not found are left out.

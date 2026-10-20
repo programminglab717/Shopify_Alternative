@@ -13938,6 +13938,11 @@ type Query {
     first: Int! = 100
   ): [String!]!
 
+  """
+  Those of `tags` none of the products has, or none of those in `collectionId` where it is given, case aside: a menu's link narrowed by them would show nothing (ADR-665).
+  """
+  productTagsMissing(collectionId: ID, tags: [String!]!): [String!]!
+
   """Product types in use."""
   productTypes(
     """1 to 250, most used first."""

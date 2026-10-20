@@ -1,6 +1,7 @@
 import {
   CurrentTenant,
   Loaders,
+  badUserInput,
   RequestLoaders,
   RequireScopes,
   decodeCursor,
@@ -59,6 +60,8 @@ function productIds(ids: readonly string[]): string[] {
 }
 
 const FACET_LIMIT = { defaultValue: 100, description: '1 to 250, most used first.' };
+/** As many tags as a menu's link takes. */
+const TAGS_CHECKED = 10;
 
 @Resolver(() => Product)
 export class ProductResolver {
@@ -120,6 +123,25 @@ export class ProductResolver {
     @Args('collectionId', { type: () => ID, nullable: true }) collectionId?: string | null,
   ): Promise<string[]> {
     return this.service.facetValues(tenant, 'tags', pageSize(first), {
+      collectionId: collectionId ? uuidOf('collection', collectionId) : null,
+    });
+  }
+
+  @Query(() => [String], {
+    description:
+      'Those of `tags` none of the products has, or none of those in `collectionId` where it is ' +
+      "given, case aside: a menu's link narrowed by them would show nothing (ADR-665).",
+  })
+  @RequireScopes('read_products')
+  productTagsMissing(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('tags', { type: () => [String] }) tags: string[],
+    @Args('collectionId', { type: () => ID, nullable: true }) collectionId?: string | null,
+  ): Promise<string[]> {
+    if (tags.length > TAGS_CHECKED) {
+      throw badUserInput(`Give at most ${TAGS_CHECKED} tags`);
+    }
+    return this.service.tagsMissing(tenant, tags, {
       collectionId: collectionId ? uuidOf('collection', collectionId) : null,
     });
   }

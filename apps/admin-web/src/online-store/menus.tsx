@@ -11,6 +11,7 @@ import {
   MenuUpdateMutation,
   PagesQuery,
   PoliciesQuery,
+  ProductTagsMissingQuery,
   ProductTagsQuery,
 } from '../api/operations';
 import type {
@@ -24,6 +25,7 @@ import type {
   PagesData,
   PoliciesData,
   ProductTagsData,
+  ProductTagsMissingData,
 } from '../api/types';
 import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -34,6 +36,7 @@ import { FormSection } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
+import { useDebounced } from '../shell/use-debounced';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -294,6 +297,40 @@ function TagsOffered({
   );
 }
 
+/**
+ * Those of a link's tags none of its collection's products has, or none of the shop's for all
+ * products, said as they stop typing: the link would show nothing (ADR-665).
+ */
+function TagsMissing({
+  tags,
+  collectionId,
+}: {
+  tags: readonly string[];
+  collectionId: string | null;
+}) {
+  const { t } = useLocale();
+  const asked = useDebounced(tags.join(','));
+  const its = useAdminQuery<ProductTagsMissingData>(
+    ['productTagsMissing', asked, collectionId],
+    ProductTagsMissingQuery,
+    { tags: tagsOf(asked), collectionId },
+    { enabled: asked !== '' },
+  );
+  const missing = asked === '' ? [] : (its.data?.productTagsMissing ?? []);
+  if (missing.length === 0) return null;
+  return (
+    <p
+      role="status"
+      className="text-warning text-[length:var(--hatti-type-body-sm-size)]"
+      dir="auto"
+    >
+      {t(collectionId ? 'menus.tagsMissingCollection' : 'menus.tagsMissingShop', {
+        tags: missing.join(', '),
+      })}
+    </p>
+  );
+}
+
 /** One link: its title, what it leads to, moved, taken out, and the links under it. */
 function LinkEditor({
   draft,
@@ -394,6 +431,12 @@ function LinkEditor({
             tags={choices.tags}
             collectionId={draft.type === 'COLLECTION' ? draft.resourceId || null : null}
             add={(tag) => set({ tags: [...tagsOf(draft.tags), tag].join(', ') })}
+          />
+        )}
+        {TAGGED.includes(draft.type) && (draft.type === 'CATALOG' || draft.resourceId) && (
+          <TagsMissing
+            tags={tagsOf(draft.tags)}
+            collectionId={draft.type === 'COLLECTION' ? draft.resourceId || null : null}
           />
         )}
         {draft.type === 'PRODUCT' && (

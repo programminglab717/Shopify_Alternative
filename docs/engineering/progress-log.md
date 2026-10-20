@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A menu link's missing tags
+
+* **The menu editor says which of a link's tags none of its products has** ([ADR-665](../architecture/13-decision-log.md#adr-665--the-menu-editor-says-which-of-a-links-tags-none-of-its-collections-products-has-or-none-of-the-shops-for-all-products-as-typing-stops)), through the
+  Admin API's `productTagsMissing`, as typing stops; the segment editor's wait for typing to stop
+  is now a hook the two share.
+* 3820 tests, two more: the catalog's and the admin's menu editor; the admin's count had
+  missed one before.
+
 ### 59d5b08 · Gift cards given back in part
 
 * **Cancelling an order whose refunds took part of what gift cards paid gives the cards back what

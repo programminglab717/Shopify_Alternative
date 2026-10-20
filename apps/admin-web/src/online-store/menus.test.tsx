@@ -102,6 +102,19 @@ function core(role: StaffRole) {
                 ? []
                 : ['lawn', 'sale', 'Eid', 'new in'],
         };
+      case 'ProductTagsMissing': {
+        // As the core says it, of the same tags (ADR-665).
+        const used = (
+          variables.collectionId === 'col_1'
+            ? ['sale', 'Eid', 'new in']
+            : ['lawn', 'sale', 'Eid', 'new in']
+        ).map((tag) => tag.toLowerCase());
+        return {
+          productTagsMissing: (variables.tags as string[]).filter(
+            (tag) => !used.includes(tag.toLowerCase()),
+          ),
+        };
+      }
       case 'CollectionProductSearch':
         return { products: { nodes: [{ id: 'prod_9', title: 'Chappal', status: 'ACTIVE' }] } };
       case 'MenuCreate':
@@ -294,6 +307,44 @@ describe("The online store's menus", () => {
     fireEvent.change(screen.getByLabelText('Link 3: goes to'), { target: { value: 'CATALOG' } });
     expect(await screen.findByRole('button', { name: 'Add the tag lawn to link 3' })).toBeTruthy();
     expect(screen.getByText('Tags in use:')).toBeTruthy();
+  });
+
+  it("says which of a link's tags none of its products has, as typing stops (ADR-665)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/menu_1');
+
+    await screen.findByLabelText('Link 2: tags');
+    type('Link 2: tags', 'Sale, lawn');
+    expect(
+      await screen.findByText(
+        'None of this collection’s products has lawn: the link would show nothing.',
+        {},
+        { timeout: 2000 },
+      ),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'ProductTagsMissing')).toEqual({
+      tags: ['Sale', 'lawn'],
+      collectionId: 'col_1',
+    });
+    type('Link 2: tags', 'Sale');
+    await waitFor(
+      () => expect(screen.queryByText(/None of this collection’s products has/)).toBeNull(),
+      { timeout: 2000 },
+    );
+
+    // All products' link: none of the shop's.
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    type('Link 3: title', 'Everything');
+    fireEvent.change(screen.getByLabelText('Link 3: goes to'), { target: { value: 'CATALOG' } });
+    type('Link 3: tags', 'kurta');
+    expect(
+      await screen.findByText(
+        'None of your products has kurta: the link would show nothing.',
+        {},
+        { timeout: 2000 },
+      ),
+    ).toBeTruthy();
   });
 
   it('makes a menu with a handle from its title and a link to a product found by name', async () => {
