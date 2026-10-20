@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Every search engine listing on one tab
+### ec2a180 · Every search engine listing on one tab
 
 * **The online store has one Search listings tab: every product's, collection's, page's, blog's and
   article's search engine listing, those without a description of their own first** ([ADR-606](../architecture/13-decision-log.md#adr-606--the-online-store-has-one-search-listings-tab-every-products-collections-pages-blogs-and-articles-search-engine-listing-those-without-a-description-of-their-own-first),
