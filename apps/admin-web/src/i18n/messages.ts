@@ -2692,6 +2692,9 @@ const en = {
   'orderPolicies.creditBack': 'Give store credit back when a parcel comes back',
   'orderPolicies.creditBackHint':
     'Store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled. Off, it stays spent, as an advance does.',
+  'orderPolicies.staffDiscount': 'Most staff take off an order, in %',
+  'orderPolicies.staffDiscountHint':
+    'Of what its items cost; blank for any. Owners, managers and roles that give any discount take off more.',
   'orderPolicies.risk': 'Risky orders',
   'orderPolicies.riskHint':
     "Each cash-on-delivery order gets a risk score from its customer's history, its number and its value. For orders placed from now on.",
@@ -5287,6 +5290,7 @@ const en = {
   'roles.capability.SEE_BILLING': 'See what the shop pays Hatti',
   'roles.capability.SEE_VERIFICATION': "See the shop's verification",
   'roles.capability.MANAGE_SUPPORT_ACCESS': "See and end Hatti support's access",
+  'roles.capability.GIVE_ANY_DISCOUNT': "Take any discount off an order, past the shop's limit",
   'apps.resource.gift_cards': 'Gift cards',
   'apps.resource.conversations': 'Inbox conversations',
 } as const;
@@ -7966,6 +7970,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.creditBack': 'پارسل واپس آنے پر اسٹور کریڈٹ واپس کریں',
   'orderPolicies.creditBackHint':
     'جس اسٹور کریڈٹ سے آرڈر کی ادائیگی ہوئی، وہ اس کے سارے پارسل قبول کیے بغیر واپس آنے پر گاہک کو واپس مل جاتا ہے، جیسے آرڈر منسوخ ہونے پر ملتا ہے۔ بند ہو تو ایڈوانس کی طرح خرچ شدہ رہتا ہے۔',
+  'orderPolicies.staffDiscount': 'عملہ آرڈر پر زیادہ سے زیادہ کتنی رعایت دے (%)',
+  'orderPolicies.staffDiscountHint':
+    'آئٹمز کی قیمت کا فیصد، بغیر حد کے لیے خالی چھوڑیں۔ مالک، مینیجر اور وہ رول جو کوئی بھی رعایت دے سکتے ہیں، زیادہ دے سکتے ہیں۔',
   'orderPolicies.risk': 'خطرناک آرڈرز',
   'orderPolicies.riskHint':
     'ہر کیش آن ڈیلیوری آرڈر کو کسٹمر کی تاریخ، نمبر اور مالیت سے رسک اسکور ملتا ہے۔ اب سے آنے والے آرڈرز کے لیے۔',
@@ -10556,6 +10563,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'roles.capability.SEE_BILLING': 'دیکھیں دکان ہٹی کو کیا ادا کرتی ہے',
   'roles.capability.SEE_VERIFICATION': 'دکان کی تصدیق دیکھیں',
   'roles.capability.MANAGE_SUPPORT_ACCESS': 'ہٹی سپورٹ کی رسائی دیکھیں اور ختم کریں',
+  'roles.capability.GIVE_ANY_DISCOUNT': 'دکان کی حد سے آگے، آرڈر پر کوئی بھی رعایت دیں',
   'apps.resource.gift_cards': 'گفٹ کارڈز',
   'apps.resource.conversations': 'ان باکس کی گفتگو',
 };

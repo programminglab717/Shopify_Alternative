@@ -296,6 +296,8 @@ export interface OrderSettingsUpdatedPayload {
   creditBackOnReturn: boolean;
   /** Which orders' customers are called to confirm them (ADR-611). */
   confirmationCalls: 'off' | 'high_value' | 'all';
+  /** The most staff without `give_any_discount` take off an order (ADR-651); null for any. */
+  staffDiscountPercent: number | null;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

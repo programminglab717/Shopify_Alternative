@@ -106,6 +106,7 @@ const CAPABILITY_GROUPS: readonly {
       'REFUND_ORDERS',
       'ASSIGN_ORDERS',
       'MODERATE_COMMENTS',
+      'GIVE_ANY_DISCOUNT',
     ],
   },
   { label: 'roles.group.money', capabilities: ['RECONCILE_PAYMENTS', 'CLAIM_FROM_COURIERS'] },

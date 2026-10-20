@@ -186,6 +186,27 @@ describe('Order policies', () => {
     );
   });
 
+  it('limits what staff take off an order, and takes the limit away (ADR-651)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    const most = (await screen.findByLabelText(
+      'Most staff take off an order, in %',
+    )) as HTMLInputElement;
+    expect(most.value).toBe('');
+    type('Most staff take off an order, in %', '10');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    type('Most staff take off an order, in %', '');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    await waitFor(() => expect(sentOf(fake, 'OrderSettingsUpdate')).toHaveLength(2));
+    expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([
+      { input: { staffDiscountPercent: 10 } },
+      { input: { staffDiscountPercent: null } },
+    ]);
+  });
+
   it('changes high value and the score that holds an order, and refuses what is not a number', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);

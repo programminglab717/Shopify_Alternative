@@ -128,6 +128,15 @@ export class OrderSettings {
   @Field(() => ConfirmationCalls)
   confirmationCalls!: ConfirmationCalls;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      "The most, as a percentage of what an order's items cost, a member of staff without the " +
+      'GIVE_ANY_DISCOUNT capability takes off it with orderEditCharges (ORD-04, ADR-651); null ' +
+      'for no limit. Owners, managers and apps take off any.',
+  })
+  staffDiscountPercent!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -172,6 +181,9 @@ export class OrderSettingsInput {
 
   @Field(() => ConfirmationCalls, { nullable: true })
   confirmationCalls?: ConfirmationCalls | null;
+
+  @Field(() => Int, { nullable: true, description: '0 to 100; null for no limit.' })
+  staffDiscountPercent?: number | null;
 }
 
 @ObjectType()

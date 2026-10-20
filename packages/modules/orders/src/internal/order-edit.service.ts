@@ -2,6 +2,7 @@ import {
   INPUT_LIMITS,
   InputChecker,
   failOne,
+  hasCapability,
   type FieldError,
   type Actor,
   type MutationResult,
@@ -28,6 +29,7 @@ import {
   type OrderUpdatedPayload,
 } from './events.js';
 import type { OrderLineInput } from './order.service.js';
+import { orderSettingsIn } from './order-settings.service.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   addTimelineEntry,
@@ -392,7 +394,8 @@ export class OrderEditService {
    * packed (ORD-04, ADR-134), as an agent waives the one or gives the other on the call: its
    * totals, tax, cash at the door and risk follow, as an edit's do. What was taken off for paying
    * by transfer, or online, stays part of the discount. One that changes nothing leaves the order
-   * as it is.
+   * as it is. Staff without `give_any_discount` raise the discount no higher than the shop's
+   * share of what its items cost (ADR-651); they may lower one above it.
    */
   async editCharges(
     tenant: TenantContext,
@@ -431,6 +434,22 @@ export class OrderEditService {
         );
       }
       const current = await linesOf(tx, shopId, order.id);
+      if (newDiscount > order.discount && !givesAnyDiscount(tenant.actor)) {
+        const { staffDiscountPercent: percent } = await orderSettingsIn(tx, shopId);
+        const items = current.reduce(
+          (sum, line) => sum + line.unitPrice * BigInt(line.quantity),
+          0n,
+        );
+        const most = percent === null ? null : (items * BigInt(percent)) / 100n;
+        if (most !== null && newDiscount > most) {
+          return failOne(
+            ['input', 'discount'],
+            'INVALID',
+            `Your role takes ${percent}% off at most, ${format(most)}: ask an owner or ` +
+              'a manager to give more',
+          );
+        }
+      }
       const snapshots = await this.variants.snapshotsOf(
         tx,
         shopId,
@@ -1352,4 +1371,12 @@ function itemsWords(what: string, items: readonly EditedLine[], ending: string):
   let shown = parts.length;
   while (shown > 1 && words(shown).length > LIMITS.comment) shown -= 1;
   return words(shown);
+}
+
+/**
+ * Whether `actor` takes any discount off an order (ADR-651): apps and Hatti's support as their
+ * scopes allow, staff with `give_any_discount`.
+ */
+function givesAnyDiscount(actor: Actor): boolean {
+  return actor.kind !== 'staff' || hasCapability(actor, 'give_any_discount');
 }

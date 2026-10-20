@@ -276,6 +276,8 @@ describe('scopes', () => {
       see_billing: OWNERS_AND_MANAGERS,
       see_verification: OWNERS_AND_MANAGERS,
       manage_support_access: OWNERS_AND_MANAGERS,
+      // New with the shop's limit on what staff take off an order (ADR-651).
+      give_any_discount: OWNERS_AND_MANAGERS,
     };
     expect(Object.keys(before)).toEqual([...STAFF_CAPABILITIES]);
     for (const capability of STAFF_CAPABILITIES) {

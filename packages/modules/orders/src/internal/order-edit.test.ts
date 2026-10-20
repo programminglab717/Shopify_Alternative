@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { InputChecker, type StaffRole, type TenantContext } from '@hatti/api';
+import { InputChecker, type Actor, type StaffRole, type TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
 import { TaxSettingsService } from '@hatti/tax/public';
@@ -460,6 +460,49 @@ describe.skipIf(!server)("Editing an order's items", () => {
     const packed = await f.edits.editCharges(f.a, order.id, { shippingPrice: '250' });
     expect(!packed.ok && packed.errors[0]!.message).toBe(
       'It is packed: mark it unpacked first, then change its charges',
+    );
+  });
+
+  it("keeps what staff take off an order within the shop's limit, but for those who give any (ADR-651)", async () => {
+    const order = await f.order(f.a, [kurta, dupatta], { shippingPrice: '250' });
+    const agent = staff('confirmation_agent');
+    expect(errorsOf(await f.orderSettings.update(f.a, { staffDiscountPercent: 101 }))).toEqual([
+      ['input.staffDiscountPercent', 'INVALID'],
+    ]);
+    expect(unwrap(await f.orderSettings.update(f.a, { staffDiscountPercent: 10 }))).toMatchObject({
+      staffDiscountPercent: 10,
+    });
+
+    // A tenth of Rs 3,360 of items.
+    expect(unwrap(await f.edits.editCharges(agent, order.id, { discount: '300' }))).toMatchObject({
+      discount: 300_00n,
+    });
+    const tooMuch = await f.edits.editCharges(agent, order.id, { discount: '400' });
+    expect(!tooMuch.ok && tooMuch.errors[0]).toEqual({
+      field: ['input', 'discount'],
+      code: 'INVALID',
+      message: 'Your role takes 10% off at most, Rs 336: ask an owner or a manager to give more',
+    });
+    // A manager gives any, and an agent may then lower it, not raise it.
+    unwrap(await f.edits.editCharges(staff('manager'), order.id, { discount: '1,000' }));
+    expect(errorsOf(await f.edits.editCharges(agent, order.id, { discount: '1,100' }))).toEqual([
+      ['input.discount', 'INVALID'],
+    ]);
+    expect(unwrap(await f.edits.editCharges(agent, order.id, { discount: '500' }))).toMatchObject({
+      discount: 500_00n,
+    });
+    // A custom role given the capability, as its preset's are.
+    const trusted: TenantContext = {
+      ...agent,
+      actor: { ...agent.actor, capabilities: new Set(['give_any_discount']) } as Actor,
+    };
+    expect(
+      unwrap(await f.edits.editCharges(trusted, order.id, { discount: '2,000' })),
+    ).toMatchObject({ discount: 2_000_00n });
+    // No limit, none kept.
+    unwrap(await f.orderSettings.update(f.a, { staffDiscountPercent: null }));
+    expect(unwrap(await f.edits.editCharges(agent, order.id, { discount: '3,000' }))).toMatchObject(
+      { discount: 3_000_00n },
     );
   });
 

@@ -57,6 +57,7 @@ export enum StaffCapabilityEnum {
   SEE_BILLING = 'SEE_BILLING',
   SEE_VERIFICATION = 'SEE_VERIFICATION',
   MANAGE_SUPPORT_ACCESS = 'MANAGE_SUPPORT_ACCESS',
+  GIVE_ANY_DISCOUNT = 'GIVE_ANY_DISCOUNT',
 }
 
 const CAPABILITIES = {
@@ -75,6 +76,7 @@ const CAPABILITIES = {
   see_billing: StaffCapabilityEnum.SEE_BILLING,
   see_verification: StaffCapabilityEnum.SEE_VERIFICATION,
   manage_support_access: StaffCapabilityEnum.MANAGE_SUPPORT_ACCESS,
+  give_any_discount: StaffCapabilityEnum.GIVE_ANY_DISCOUNT,
 } satisfies Record<StaffCapability, StaffCapabilityEnum>;
 
 registerEnumType(StaffCapabilityEnum, {
@@ -116,6 +118,11 @@ registerEnumType(StaffCapabilityEnum, {
     SEE_VERIFICATION: { description: "The shop's verification by Hatti (ADR-465)." },
     MANAGE_SUPPORT_ACCESS: {
       description: "Seeing Hatti's support's access to the shop, and ending it (ADR-156).",
+    },
+    GIVE_ANY_DISCOUNT: {
+      description:
+        "Taking any discount off an order, past the shop's limit on what staff take off one " +
+        '(ADR-651).',
     },
   },
 });

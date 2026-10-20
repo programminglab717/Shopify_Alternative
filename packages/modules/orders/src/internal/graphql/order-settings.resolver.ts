@@ -60,6 +60,9 @@ export class OrderSettingsResolver {
       ...(input.confirmationCalls && {
         confirmationCalls: input.confirmationCalls.toLowerCase() as ConfirmationCallsValue,
       }),
+      ...(input.staffDiscountPercent !== undefined && {
+        staffDiscountPercent: input.staffDiscountPercent,
+      }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -84,6 +87,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     upsellPercentOff: record.upsellPercentOff,
     creditBackOnReturn: record.creditBackOnReturn,
     confirmationCalls: record.confirmationCalls.toUpperCase() as ConfirmationCalls,
+    staffDiscountPercent: record.staffDiscountPercent,
     updatedAt: record.updatedAt,
   });
 }

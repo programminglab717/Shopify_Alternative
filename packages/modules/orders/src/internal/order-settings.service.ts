@@ -61,6 +61,11 @@ export interface OrderSettingsRecord {
    * of high value by the shop's risk settings, or all.
    */
   confirmationCalls: ConfirmationCallsValue;
+  /**
+   * The most, as a percentage of what an order's items cost, a member of staff without
+   * `give_any_discount` takes off it (ORD-04, ADR-651); null for no limit.
+   */
+  staffDiscountPercent: number | null;
   /** Null while the shop has the defaults. */
   updatedAt: Date | null;
 }
@@ -77,6 +82,7 @@ export interface OrderSettingsInput {
   upsellPercentOff?: number | null;
   creditBackOnReturn?: boolean;
   confirmationCalls?: ConfirmationCallsValue;
+  staffDiscountPercent?: number | null;
 }
 
 /** Which orders' customers are called to confirm them (ADR-611). */
@@ -142,7 +148,11 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   upsellPercentOff: null,
   creditBackOnReturn: false,
   confirmationCalls: 'off',
+  staffDiscountPercent: null,
 };
+
+/** What a shop may let staff take off an order, as a percentage of its items (ADR-651). */
+export const STAFF_DISCOUNT_PERCENT = { min: 0, max: 100 } as const;
 
 /** The most a post-purchase offer takes off (ADR-438). */
 export const UPSELL_PERCENT = { min: 0, max: 50 } as const;
@@ -160,11 +170,13 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     upsell_percent_off: number | null;
     credit_back_on_return: boolean;
     confirmation_calls: ConfirmationCallsValue;
+    staff_discount_percent: number | null;
     updated_at: string;
   }>(sql`
     SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
            desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
-           upsell_percent_off, credit_back_on_return, confirmation_calls, updated_at
+           upsell_percent_off, credit_back_on_return, confirmation_calls,
+           staff_discount_percent, updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -181,6 +193,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     upsellPercentOff: row.upsell_percent_off,
     creditBackOnReturn: row.credit_back_on_return,
     confirmationCalls: row.confirmation_calls,
+    staffDiscountPercent: row.staff_discount_percent,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
@@ -198,6 +211,7 @@ function checkOrderSettings(
     cancelUnreachableAfterDays,
     cancelUnpaidAfterDays,
     upsellPercentOff,
+    staffDiscountPercent,
   } = current;
   if (input.callingHours !== undefined) {
     callingHours = null;
@@ -252,6 +266,13 @@ function checkOrderSettings(
       UPSELL_PERCENT,
     );
   }
+  if (input.staffDiscountPercent !== undefined) {
+    staffDiscountPercent = check.integer(
+      ['input', 'staffDiscountPercent'],
+      input.staffDiscountPercent,
+      STAFF_DISCOUNT_PERCENT,
+    );
+  }
   if (check.errors.length > before) return null;
   return {
     customerCancellation: input.customerCancellation ?? current.customerCancellation,
@@ -263,6 +284,7 @@ function checkOrderSettings(
     upsellPercentOff,
     creditBackOnReturn: input.creditBackOnReturn ?? current.creditBackOnReturn,
     confirmationCalls: input.confirmationCalls ?? current.confirmationCalls,
+    staffDiscountPercent,
   };
 }
 
@@ -281,6 +303,7 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
     upsellPercentOff: settings.upsellPercentOff,
     creditBackOnReturn: settings.creditBackOnReturn,
     confirmationCalls: settings.confirmationCalls,
+    staffDiscountPercent: settings.staffDiscountPercent,
   };
 }
 
@@ -312,12 +335,14 @@ export class OrderSettingsService {
         INSERT INTO orders.order_settings
                (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes,
                 desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
-                upsell_percent_off, credit_back_on_return, confirmation_calls)
+                upsell_percent_off, credit_back_on_return, confirmation_calls,
+                staff_discount_percent)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
                 ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
                 ${next.deskWaitsForReminder}, ${next.cancelUnreachableAfterDays},
                 ${next.cancelUnpaidAfterDays}, ${next.upsellPercentOff},
-                ${next.creditBackOnReturn}, ${next.confirmationCalls})
+                ${next.creditBackOnReturn}, ${next.confirmationCalls},
+                ${next.staffDiscountPercent})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
                        calling_opens = excluded.calling_opens,
@@ -329,6 +354,7 @@ export class OrderSettingsService {
                        upsell_percent_off = excluded.upsell_percent_off,
                        credit_back_on_return = excluded.credit_back_on_return,
                        confirmation_calls = excluded.confirmation_calls,
+                       staff_discount_percent = excluded.staff_discount_percent,
                        version = orders.order_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<OrderSettingsUpdatedPayload>(tx, tenant.shopId, {

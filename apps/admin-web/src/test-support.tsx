@@ -97,6 +97,7 @@ export const CAPABILITIES: readonly StaffCapability[] = [
   'see_billing',
   'see_verification',
   'manage_support_access',
+  'give_any_discount',
 ];
 
 /** Each preset's capabilities, as the core's (`PRESET_CAPABILITIES`) are. */

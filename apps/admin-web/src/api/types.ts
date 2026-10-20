@@ -962,7 +962,8 @@ export type StaffCapability =
   | 'MANAGE_APPS'
   | 'SEE_BILLING'
   | 'SEE_VERIFICATION'
-  | 'MANAGE_SUPPORT_ACCESS';
+  | 'MANAGE_SUPPORT_ACCESS'
+  | 'GIVE_ANY_DISCOUNT';
 
 /** A shop's own staff role (ADR-578): some of a preset's scopes and capabilities, never more. */
 export interface CustomRole {
@@ -3257,6 +3258,11 @@ export interface OrderSettings {
   creditBackOnReturn?: boolean;
   /** Absent where a fake core leaves it out (ADR-611). */
   confirmationCalls?: ConfirmationCalls;
+  /**
+   * The most staff without GIVE_ANY_DISCOUNT take off an order, in percent (ADR-651); null for
+   * any, absent where a fake core leaves it out.
+   */
+  staffDiscountPercent?: number | null;
   updatedAt: string | null;
 }
 

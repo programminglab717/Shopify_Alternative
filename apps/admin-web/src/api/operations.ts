@@ -6859,6 +6859,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     upsellPercentOff
     creditBackOnReturn
     confirmationCalls
+    staffDiscountPercent
     updatedAt
   }
 `;

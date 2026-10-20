@@ -31,6 +31,7 @@ const ALL = [
   'SEE_BILLING',
   'SEE_VERIFICATION',
   'MANAGE_SUPPORT_ACCESS',
+  'GIVE_ANY_DISCOUNT',
 ];
 const MANAGING = [
   'write_products',

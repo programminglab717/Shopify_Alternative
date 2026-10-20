@@ -52,6 +52,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   highValue: 'orderPolicies.highValue',
   holdAt: 'orderPolicies.holdAt',
   upsellPercentOff: 'orderPolicies.upsellPercent',
+  staffDiscountPercent: 'orderPolicies.staffDiscount',
 };
 
 /** A number of whole units as typed, or blank for none; what is not one stays NaN. */
@@ -71,6 +72,7 @@ function orderInputOf(state: {
   upsellPercent: string;
   creditBack: boolean;
   calls: ConfirmationCalls;
+  staffDiscount: string;
 }) {
   return {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
@@ -83,6 +85,7 @@ function orderInputOf(state: {
     upsellPercentOff: state.upsell ? (wholeOrNone(state.upsellPercent) ?? 0) : null,
     creditBackOnReturn: state.creditBack,
     confirmationCalls: state.calls,
+    staffDiscountPercent: wholeOrNone(state.staffDiscount),
   };
 }
 
@@ -104,6 +107,10 @@ function stateOf(settings: OrderSettings) {
     upsellPercent: upsell === null ? '' : String(upsell),
     creditBack: settings.creditBackOnReturn ?? false,
     calls: settings.confirmationCalls ?? 'OFF',
+    staffDiscount:
+      settings.staffDiscountPercent === null || settings.staffDiscountPercent === undefined
+        ? ''
+        : String(settings.staffDiscountPercent),
   };
 }
 
@@ -296,6 +303,14 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
           hint={t('orderPolicies.creditBackHint')}
           checked={state.creditBack}
           onChange={(creditBack) => set({ creditBack })}
+        />
+        <TextField
+          label={t('orderPolicies.staffDiscount')}
+          hint={t('orderPolicies.staffDiscountHint')}
+          inputMode="numeric"
+          ltr
+          value={state.staffDiscount}
+          onChange={(event) => set({ staffDiscount: event.target.value })}
         />
       </FormSection>
 

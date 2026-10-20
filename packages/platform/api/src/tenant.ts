@@ -216,6 +216,7 @@ export const STAFF_CAPABILITIES = [
   'see_billing',
   'see_verification',
   'manage_support_access',
+  'give_any_discount',
 ] as const;
 export type StaffCapability = (typeof STAFF_CAPABILITIES)[number];
 

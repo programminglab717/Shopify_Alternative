@@ -69,7 +69,8 @@ export type StaffCapability =
   | 'manage_apps'
   | 'see_billing'
   | 'see_verification'
-  | 'manage_support_access';
+  | 'manage_support_access'
+  | 'give_any_discount';
 
 /** What the admin knows of a member's access to a shop: their role, and what they hold there. */
 export type Access = Pick<ShopAccess, 'role' | 'scopes' | 'capabilities'>;

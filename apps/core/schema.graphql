@@ -10761,6 +10761,11 @@ type OrderSettings {
   """
   firstCallMinutes: Int
 
+  """
+  The most, as a percentage of what an order's items cost, a member of staff without the GIVE_ANY_DISCOUNT capability takes off it with orderEditCharges (ORD-04, ADR-651); null for no limit. Owners, managers and apps take off any.
+  """
+  staffDiscountPercent: Int
+
   """When the shop last changed them; none while it has the defaults."""
   updatedAt: DateTime
 
@@ -10787,6 +10792,9 @@ input OrderSettingsInput {
 
   """5 to 1440; null for no target."""
   firstCallMinutes: Int
+
+  """0 to 100; null for no limit."""
+  staffDiscountPercent: Int
 
   """0 to 50; null for no offer."""
   upsellPercentOff: Int
@@ -15423,6 +15431,11 @@ enum StaffCapability {
 
   """Orders as a file, now or scheduled to their email."""
   EXPORT_ORDERS
+
+  """
+  Taking any discount off an order, past the shop's limit on what staff take off one (ADR-651).
+  """
+  GIVE_ANY_DISCOUNT
 
   """The shop's custom apps and apps' webhooks."""
   MANAGE_APPS

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-650 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-651 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -658,6 +658,7 @@
 | 648 | The link page's QR code is drawn in the admin by Hatti's own encoder, of its address marked `utm_source=qr`, and downloaded as a PNG to print | Accepted |
 | 649 | A listing is written on the Search listings tab itself, with the card its own page has, and stays shown while it is open once it is described | Accepted |
 | 650 | The In Urdu tab writes one field of a line or two, a title say, across many of the shop's things at once, each kept for its own words' digest, emptied ones forgotten | Accepted |
+| 651 | A shop limits what its staff take off an order to a share of what its items cost, past which only owners, managers, apps and roles given `give_any_discount` go | Accepted |
 
 ---
 
@@ -22993,3 +22994,22 @@
 * **Alternatives:** **Descriptions and text too:** paragraphs want the room their own pages
   give them, and remain the target. **One mutation for many things:** Shopify's
   `translationsRegister` is a thing at a time, as the core's is.
+
+## ADR-651 · A shop limits what its staff take off an order to a share of what its items cost, past which only owners, managers, apps and roles given `give_any_discount` go
+
+* **Context:** An order's discount is changed on its page or at the desk by anyone who may change
+  orders, as much as they like, the timeline saying who did (ADR-134; status shortcut 66). A
+  confirmation agent talking a wavering customer round may give away a shop's margin, and
+  custom roles (ADR-578) had no capability to say otherwise.
+* **Decision:** The order settings take `staffDiscountPercent`, 0 to 100 or none, kept in
+  migration 0289. A member of staff without the new capability `give_any_discount`, which
+  owners' and managers' presets hold and a custom role made from them may keep, raises an
+  order's discount through `orderEditCharges` no higher than that share of what its items cost,
+  refused with the most they may give; a discount above it already, given at checkout or by a
+  manager, they may lower but not raise. Apps and Hatti's support go by their scopes. The admin's
+  order policies take the percentage, blank for none, and the roles page the capability; the
+  words are in English and Urdu.
+* **Consequences:** An agent offers what the shop allows and sends the rest to a manager.
+* **Alternatives:** **An owner's approval asked for in the order, past the limit:** a request
+  waiting on someone, and remains the target. **A limit by role:** one share for the shop
+  serves while staff are few; custom roles say who goes past it.
