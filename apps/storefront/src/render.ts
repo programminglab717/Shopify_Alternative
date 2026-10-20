@@ -582,6 +582,8 @@ export class PageRenderer {
       data,
       query,
       chunkSize: this.options.chunkSize ?? 12,
+      // Its links in its language (ADR-624).
+      prefix: request.locale === 'ur' ? '/ur' : '',
       filters: {
         params,
         path: request.locale === 'ur' ? `/ur${request.path}` : request.path,
@@ -1213,7 +1215,7 @@ async function resourceOf(
   }
   if (found.name === 'page' && found.handle) {
     const doc = await ctx.data.page(found.handle);
-    return doc ? { page: pageObject(doc), [SEO]: seoOf(doc.seo, doc.bodyHtml) } : null;
+    return doc ? { page: pageObject(doc, ctx.prefix), [SEO]: seoOf(doc.seo, doc.bodyHtml) } : null;
   }
   if (found.name === 'blog' && found.handle) {
     const doc = await ctx.data.blog(found.handle);
@@ -1235,7 +1237,7 @@ async function resourceOf(
     ]);
     return doc
       ? {
-          article: articleObject(doc),
+          article: articleObject(doc, ctx.prefix),
           blog: blog && blogObject(blog, ctx, null, doc.id),
           [SEO]: seoOf(doc.seo, doc.summaryHtml || doc.bodyHtml),
         }

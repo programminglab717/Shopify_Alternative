@@ -54,4 +54,22 @@ describe('Predictive search', () => {
       ],
     });
   });
+
+  it('gives addresses in Urdu at the Urdu address (ADR-624)', () => {
+    const store = sampleStore();
+    const product = store.products[0]!;
+    const page = store.pages![0]!;
+    const { resources } = suggestJson(
+      params('q=x&resources[type]=product,page'),
+      [product],
+      { pages: [page], articles: [] },
+      '/ur',
+    );
+    const [found] = resources.results.products as { url: string; variants: { url: string }[] }[];
+    expect(found!.url).toBe(`/ur/products/${product.handle}`);
+    expect(found!.variants[0]!.url).toBe(
+      `/ur/products/${product.handle}?variant=${product.variants[0]!.id}`,
+    );
+    expect((resources.results.pages as { url: string }[])[0]!.url).toBe(`/ur/pages/${page.handle}`);
+  });
 });

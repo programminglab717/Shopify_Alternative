@@ -5,16 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title | escape }}{% unless page_title contains shop.name %} · {{ shop.name | escape }}{% endunless %}</title>
     <link rel="canonical" href="{{ canonical_url }}">
-    {%- liquid
-      assign feed_prefix = ''
-      if routes.root_url != '/'
-        assign feed_prefix = routes.root_url
-      endif
-    -%}
     {%- if blog %}
-    <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ blog.title | escape }}" href="{{ feed_prefix }}{{ blog.url }}.atom">
+    <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ blog.title | escape }}" href="{{ blog.url }}.atom">
     {%- elsif collection %}
-    <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ collection.title | escape }}" href="{{ feed_prefix }}{{ collection.url }}.atom">
+    <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ collection.title | escape }}" href="{{ collection.url }}.atom">
     {%- endif %}
     {%- render 'meta-tags' %}
     {%- if request.page_type == 'index' %}

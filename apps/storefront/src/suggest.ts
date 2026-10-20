@@ -77,7 +77,8 @@ export function suggestedProducts(
 
 /**
  * /search/suggest.json's answer: the products, pages and articles found, as asked, and nothing
- * yet of the other kinds asked.
+ * yet of the other kinds asked. Their addresses under `prefix` at /ur/search/suggest.json
+ * (ADR-624), as its pages' links are.
  */
 export function suggestJson(
   params: SuggestParams,
@@ -86,40 +87,41 @@ export function suggestJson(
     pages: [],
     articles: [],
   },
+  prefix = '',
 ): { resources: { results: Record<string, unknown[]> } } {
   const results: Record<string, unknown[]> = {};
   for (const type of params.types) {
     results[RESULTS[type]] =
       type === 'product'
-        ? products.map(productJson)
+        ? products.map((doc) => productJson(doc, prefix))
         : type === 'page'
-          ? content.pages.slice(0, params.limit).map(pageJson)
+          ? content.pages.slice(0, params.limit).map((doc) => pageJson(doc, prefix))
           : type === 'article'
-            ? content.articles.slice(0, params.limit).map(articleJson)
+            ? content.articles.slice(0, params.limit).map((doc) => articleJson(doc, prefix))
             : [];
   }
   return { resources: { results } };
 }
 
 /** A page as Shopify's predictive search gives it (ADR-212). */
-function pageJson(doc: PageDoc): Record<string, unknown> {
+function pageJson(doc: PageDoc, prefix: string): Record<string, unknown> {
   return {
     id: doc.id,
     title: doc.title,
     handle: doc.handle,
-    url: `/pages/${doc.handle}`,
+    url: `${prefix}/pages/${doc.handle}`,
     body: doc.bodyHtml,
     published_at: doc.publishedAt,
   };
 }
 
 /** An article as Shopify's predictive search gives it (ADR-212). */
-function articleJson(doc: ArticleDoc): Record<string, unknown> {
+function articleJson(doc: ArticleDoc, prefix: string): Record<string, unknown> {
   return {
     id: doc.id,
     title: doc.title,
     handle: doc.handle,
-    url: `/blogs/${doc.blogHandle}/${doc.handle}`,
+    url: `${prefix}/blogs/${doc.blogHandle}/${doc.handle}`,
     body: doc.bodyHtml,
     summary_html: doc.summaryHtml,
     author: doc.author,
@@ -134,8 +136,8 @@ function isAvailable(doc: ProductDoc): boolean {
 }
 
 /** A product as Shopify's predictive search gives it: amounts in rupees, as "2500.00". */
-function productJson(doc: ProductDoc): Record<string, unknown> {
-  const url = `/products/${doc.handle}`;
+function productJson(doc: ProductDoc, prefix: string): Record<string, unknown> {
+  const url = `${prefix}/products/${doc.handle}`;
   const prices = doc.variants.map((variant) => variant.price);
   const compared = doc.variants.map((variant) => variant.compareAtPrice ?? 0);
   const image = doc.images[0] ?? null;

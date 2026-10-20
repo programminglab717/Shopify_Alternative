@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-623 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-624 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -631,6 +631,7 @@
 | 621 | An order placed and paid together is told of its payment alone: the news of it placed waits ten minutes for an order to be paid online at checkout, and the news of a payment in full takes its place while no sender has taken it | Accepted |
 | 622 | While orders are paused, Hatti Base keeps the cart and turns its checkout button off, saying why, and its product page says what is added is kept for when orders come back; the platform's script turns the button on again once their time has come | Accepted |
 | 623 | A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses with .atom, their articles and products as those pages show them and linking them, under the same IDs as in English; Hatti Base's Urdu pages link them | Accepted |
+| 624 | On an Urdu page, the addresses of products, variants, collections, pages, blogs, articles, their comments, cart lines and the shop's own menu links carry `/ur`, as Shopify's objects' `url` carry their locale's; predictive search's JSON at its Urdu address likewise, in the shop's Urdu | Accepted |
 
 ---
 
@@ -22451,3 +22452,27 @@
 * **Alternatives:** **IDs of their own for each language:** a reader following both would show
   each article twice, and Atom's IDs name the thing, not its words. **A `?locale=` parameter:**
   the pages' own prefix is how the storefront says language everywhere else (04 §5).
+
+## ADR-624 · On an Urdu page, the addresses of products, variants, collections, pages, blogs, articles, their comments, cart lines and the shop's own menu links carry `/ur`, as Shopify's objects' `url` carry their locale's; predictive search's JSON at its Urdu address likewise, in the shop's Urdu
+
+* **Context:** The storefront's Urdu pages (ADR-238) gave themes `product.url`, `collection.url`,
+  `article.url` and the rest without their language, and menu links as the shop saved them. A
+  shopper who chose Urdu was taken back to English by the next product, collection, article or
+  menu link they followed; only the forms, routes and filters' links kept the page's language.
+  The comment form put the prefix before its article's address itself (ADR-220), and the theme
+  before a feed's (ADR-623). `/ur/search/suggest.json` answered in English with English
+  addresses.
+* **Decision:** Objects are built with the page's language's prefix, `/ur` on Urdu pages and none
+  in the shop's own language: products, their variants and bundle parts, collections, pages,
+  blogs, articles and the articles beside one, comments and the comment form's address, cart
+  lines, and menu links to the shop's own paths. A menu link elsewhere, protocol-relative, a
+  fragment, or already in a language is left as it is. The comment form and Hatti Base's feed
+  link take the address as it now is. Predictive search's JSON at its Urdu address reads the
+  store in Urdu and gives Urdu addresses. The language switcher still links the page in the
+  other language, and structured data names the page's own address, Urdu on Urdu pages.
+* **Consequences:** A shopper stays in the language they chose from page to page, and search
+  engines follow Urdu pages to Urdu pages. Themes that put `routes.root_url` before an object's
+  `url` themselves now double it; Shopify's themes do not, as Shopify's `url` carries the locale.
+* **Alternatives:** **Rewriting links in the rendered page:** fragile, and themes' scripts would
+  still read English addresses from objects. **A Liquid filter for themes to call:** Shopify's
+  themes rely on `url` carrying the locale and would not call it.

@@ -1938,16 +1938,24 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       if (found.preview) previewed(reply);
       else reply.header('cache-control', SEARCH_CACHE).header('cache-tag', shopTag(found.shopId));
       if (json) {
+        // In Urdu at its Urdu address, as its pages are (ADR-624).
+        const urdu = url.pathname.startsWith('/ur/');
+        const store = urdu ? new TranslatedStore(found.store, 'ur') : found.store;
         const [docs, pages, articles] = await Promise.all([
-          found.store.products(productIds),
-          found.store.pages(more.pageIds),
-          found.store.articles(more.articleIds),
+          store.products(productIds),
+          store.pages(more.pageIds),
+          store.articles(more.articleIds),
         ]);
         return await reply.send(
-          suggestJson(params, suggestedProducts(docs, params), {
-            pages: pages.filter((doc) => doc !== null),
-            articles: articles.filter((doc) => doc !== null),
-          }),
+          suggestJson(
+            params,
+            suggestedProducts(docs, params),
+            {
+              pages: pages.filter((doc) => doc !== null),
+              articles: articles.filter((doc) => doc !== null),
+            },
+            urdu ? '/ur' : '',
+          ),
         );
       }
       const page: PageRequest = {

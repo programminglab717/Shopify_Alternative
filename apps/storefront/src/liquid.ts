@@ -944,7 +944,7 @@ class FormTag extends Tag {
     const type = String(yield evalToken(this.type, ctx));
     const options = (yield this.hash.render(ctx)) as Record<string, unknown>;
     const routes = (ctx.globals as { routes?: Record<string, string> }).routes ?? {};
-    // A comment posts to its article's address, in the page's language (ADR-220).
+    // A comment posts to its article's address, in the page's language (ADR-220, ADR-624).
     const subject = this.subject ? ((yield evalToken(this.subject, ctx)) as unknown) : null;
     const commentUrl =
       type === 'new_comment' && typeof subject === 'object' && subject !== null
@@ -959,7 +959,8 @@ class FormTag extends Tag {
       type === 'customer_address' ? addressOfSubject(subject, state.addressForm) : null;
     const action =
       typeof commentUrl === 'string'
-        ? `${root}${commentUrl}`
+        ? // In the page's language already, as its article's address is (ADR-624).
+          commentUrl
         : login?.step === 'code'
           ? `${root}/account/login/verify`
           : (address?.url ?? formAction(type, routes));

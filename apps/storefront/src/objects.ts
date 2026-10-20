@@ -130,6 +130,25 @@ export interface ObjectContext {
   chunkSize: number;
   /** What a collection's page filters it by (SRC-03, ADR-478); none where absent. */
   filters?: FilterRequest;
+  /**
+   * What the page's language puts before its pages' addresses, `/ur` on Urdu pages, as Shopify's
+   * objects' `url` carry their locale's (ADR-624); none in the shop's own language.
+   */
+  prefix?: string;
+}
+
+/**
+ * A path on the shop in the page's language (ADR-624): under `prefix` where the path is the
+ * shop's own and not in a language already.
+ */
+export function localizedPath(path: string, prefix = ''): string {
+  if (!prefix || !path.startsWith('/') || path.startsWith('//')) return path;
+  if (/^\/[a-z]{2}(?:-[a-z]{2})?(?=[/?#]|$)/i.test(path)) return path;
+  return path === '/'
+    ? prefix
+    : /^\/[?#]/.test(path)
+      ? `${prefix}${path.slice(1)}`
+      : `${prefix}${path}`;
 }
 
 /** An image: prints as its address; `image_url` and `image_tag` size it. */
@@ -288,7 +307,8 @@ export class FocalPointDrop extends Drop {
 export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<string, unknown> {
   const images = doc.images.map((image) => new ImageDrop(image));
   const media = mediaOf(doc, images);
-  const variants = doc.variants.map((variant) => variantObject(variant, doc, images));
+  const prefix = ctx.prefix ?? '';
+  const variants = doc.variants.map((variant) => variantObject(variant, doc, images, prefix));
   const available = variants.filter((variant) => variant.available);
   const selected = variants.find((variant) => variant.id === ctx.query.variant) ?? null;
   const current = selected ?? available[0] ?? variants[0] ?? null;
@@ -303,7 +323,7 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     object_type: 'product',
     handle: doc.handle,
     title: doc.title,
-    url: `/products/${doc.handle}`,
+    url: `${prefix}/products/${doc.handle}`,
     description: doc.descriptionHtml,
     content: doc.descriptionHtml,
     vendor: doc.vendor,
@@ -368,7 +388,7 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
             title: part.title,
             variant_title: part.variantTitle,
             quantity: part.quantity,
-            url: part.handle === null ? null : `/products/${part.handle}`,
+            url: part.handle === null ? null : `${prefix}/products/${part.handle}`,
           })),
         }
       : null,
@@ -481,7 +501,12 @@ function easternWearMetafields(doc: ProductDoc): Record<string, Record<string, u
   };
 }
 
-function variantObject(variant: VariantDoc, product: ProductDoc, images: readonly ImageDrop[]) {
+function variantObject(
+  variant: VariantDoc,
+  product: ProductDoc,
+  images: readonly ImageDrop[],
+  prefix: string,
+) {
   const image = variant.image === null ? null : (images[variant.image] ?? null);
   return {
     id: variant.id,
@@ -498,7 +523,7 @@ function variantObject(variant: VariantDoc, product: ProductDoc, images: readonl
     option1: variant.options[0] ?? null,
     option2: variant.options[1] ?? null,
     option3: variant.options[2] ?? null,
-    url: `/products/${product.handle}?variant=${variant.id}`,
+    url: `${prefix}/products/${product.handle}?variant=${variant.id}`,
     image,
     featured_image: image,
     metafields: metafieldsObject(variant.metafields),
@@ -587,7 +612,7 @@ export function collectionObject(
     id: doc.id,
     handle: doc.handle,
     title: doc.title,
-    url: `/collections/${doc.handle}`,
+    url: `${ctx.prefix ?? ''}/collections/${doc.handle}`,
     description: doc.descriptionHtml,
     image: doc.image ? new ImageDrop(doc.image) : null,
     products_count: productIds.length,
@@ -718,14 +743,14 @@ export function recommendationsObject(
  * A shop's page (ADR-045), as Shopify's `page`: its content was cleaned when it was saved, so
  * themes print it as it is, as they do Shopify's.
  */
-export function pageObject(doc: PageDoc): Record<string, unknown> {
+export function pageObject(doc: PageDoc, prefix = ''): Record<string, unknown> {
   return {
     id: doc.id,
     // As search results say what each of them is.
     object_type: 'page',
     handle: doc.handle,
     title: doc.title,
-    url: `/pages/${doc.handle}`,
+    url: `${prefix}/pages/${doc.handle}`,
     content: doc.bodyHtml,
     published_at: doc.publishedAt,
     template_suffix: doc.templateSuffix,
@@ -761,13 +786,13 @@ export function blogObject(
       ? null
       : ctx.data.articles(beside).then((docs) => {
           const found = docs[beside.indexOf(id)];
-          return found ? besideObject(found) : null;
+          return found ? besideObject(found, ctx.prefix) : null;
         });
   return {
     id: doc.id,
     handle: doc.handle,
     title: doc.title,
-    url: `/blogs/${doc.handle}`,
+    url: `${ctx.prefix ?? ''}/blogs/${doc.handle}`,
     template_suffix: doc.templateSuffix,
     // Whether its articles take comments, and whether the shop approves each first (ADR-220).
     'comments_enabled?': (doc.commentPolicy ?? 'closed') !== 'closed',
@@ -800,8 +825,8 @@ export function blogObject(
  * An article beside the one shown, as Shopify's `article`. Printed, it is its address: Shopify
  * gave the address alone before it gave the article, and themes written then print it.
  */
-function besideObject(doc: ArticleDoc): Record<string, unknown> {
-  const article = articleObject(doc);
+function besideObject(doc: ArticleDoc, prefix?: string): Record<string, unknown> {
+  const article = articleObject(doc, prefix);
   return { ...article, toString: () => String(article.url) };
 }
 
@@ -821,8 +846,8 @@ function tagsOf(articles: readonly { tags: readonly string[] }[]): string[] {
  * (ADR-213); and its comments the storefront shows, a page of them at a time, with where its
  * form posts a new one (ADR-220).
  */
-export function articleObject(doc: ArticleDoc): Record<string, unknown> & Paginable {
-  const url = `/blogs/${doc.blogHandle}/${doc.handle}`;
+export function articleObject(doc: ArticleDoc, prefix = ''): Record<string, unknown> & Paginable {
+  const url = `${prefix}/blogs/${doc.blogHandle}/${doc.handle}`;
   const comments = (doc.comments ?? []).map((comment) => ({
     id: comment.id,
     author: comment.author,
@@ -865,8 +890,8 @@ export function articleObject(doc: ArticleDoc): Record<string, unknown> & Pagina
 }
 
 /** A menu, as Liquid's `linklist`: its links, with the links under each, three levels at most. */
-export function menuObject(doc: MenuDoc): Record<string, unknown> {
-  const links = linkObjects(doc.links, 1);
+export function menuObject(doc: MenuDoc, prefix = ''): Record<string, unknown> {
+  const links = linkObjects(doc.links, 1, prefix);
   return { handle: doc.handle, title: doc.title, links, levels: levelsOf(links) };
 }
 
@@ -874,15 +899,17 @@ export function menuObject(doc: MenuDoc): Record<string, unknown> {
 function linkObjects(
   links: readonly MenuLinkDoc[] | undefined,
   level: number,
+  prefix: string,
 ): Record<string, unknown>[] {
   if (!links || level > 3) return [];
   return links
     .filter((link) => typeof link.url === 'string' && isSafeLink(link.url))
     .map((link) => {
-      const children = linkObjects(link.links, level + 1);
+      const children = linkObjects(link.links, level + 1, prefix);
       return {
         title: link.title,
-        url: link.url,
+        // The shop's own pages in the page's language (ADR-624); others as they are.
+        url: localizedPath(link.url, prefix),
         type: link.type ?? 'http_link',
         links: children,
         levels: children.length > 0 ? levelsOf(children) : 0,
@@ -1083,14 +1110,14 @@ function lazyProducts(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
 /** Articles in a list, likewise (ADR-177). */
 function lazyArticles(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
   return new LazyList(ids, ctx.chunkSize, async (chunk) =>
-    (await ctx.data.articles(chunk)).map((doc) => doc && articleObject(doc)),
+    (await ctx.data.articles(chunk)).map((doc) => doc && articleObject(doc, ctx.prefix)),
   ).refs();
 }
 
 /** Pages in a list, likewise (ADR-212). */
 function lazyPages(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
   return new LazyList(ids, ctx.chunkSize, async (chunk) =>
-    (await ctx.data.pages(chunk)).map((doc) => doc && pageObject(doc)),
+    (await ctx.data.pages(chunk)).map((doc) => doc && pageObject(doc, ctx.prefix)),
   ).refs();
 }
 
@@ -1116,11 +1143,11 @@ function lazyResults(entries: readonly string[], ctx: ObjectContext): ItemRef[] 
       }),
       ...of('page').map((id, index) => {
         const doc = pages[index];
-        return [`page:${id}`, doc ? pageObject(doc) : null] as const;
+        return [`page:${id}`, doc ? pageObject(doc, ctx.prefix) : null] as const;
       }),
       ...of('article').map((id, index) => {
         const doc = articles[index];
-        return [`article:${id}`, doc ? articleObject(doc) : null] as const;
+        return [`article:${id}`, doc ? articleObject(doc, ctx.prefix) : null] as const;
       }),
     ]);
     return chunk.map((entry) => found.get(entry) ?? null);
@@ -1169,7 +1196,7 @@ export function lookups(ctx: ObjectContext): Record<string, Lookup> {
     all_products: new Lookup((handle) => productPromise(handle, ctx)),
     linklists: new Lookup(async (handle) => {
       const doc = await ctx.data.menu(handle);
-      return doc ? menuObject(doc) : null;
+      return doc ? menuObject(doc, ctx.prefix) : null;
     }),
     pages: new Lookup((handle) => pagePromise(handle, ctx)),
     blogs: new Lookup((handle) => blogPromise(handle, ctx)),
@@ -1206,7 +1233,8 @@ export function resolveSettings(
         settings[id] = named && productPromise(named, ctx);
         break;
       case 'link_list':
-        settings[id] = named && ctx.data.menu(named).then((doc) => doc && menuObject(doc));
+        settings[id] =
+          named && ctx.data.menu(named).then((doc) => doc && menuObject(doc, ctx.prefix));
         break;
       case 'page':
         settings[id] = named && pagePromise(named, ctx);
@@ -1232,7 +1260,7 @@ function collectionPromise(handle: string, ctx: ObjectContext) {
 }
 
 function pagePromise(handle: string, ctx: ObjectContext) {
-  return ctx.data.page(handle).then((doc) => doc && pageObject(doc));
+  return ctx.data.page(handle).then((doc) => doc && pageObject(doc, ctx.prefix));
 }
 
 function productPromise(handle: string, ctx: ObjectContext) {
@@ -1244,7 +1272,7 @@ function blogPromise(handle: string, ctx: ObjectContext) {
 }
 
 function articlePromise(handle: string, ctx: ObjectContext) {
-  return ctx.data.article(handle).then((doc) => doc && articleObject(doc));
+  return ctx.data.article(handle).then((doc) => doc && articleObject(doc, ctx.prefix));
 }
 
 /** Text as a handle, as Shopify's `handleize` makes one: "Eid Edit" gives eid-edit. */
@@ -1421,7 +1449,7 @@ function lineItemObject(
     discounts: [],
     line_level_discount_allocations: [],
     properties: item.properties,
-    url: doc ? `/products/${doc.handle}?variant=${item.variantId}` : null,
+    url: doc ? `${ctx.prefix ?? ''}/products/${doc.handle}?variant=${item.variantId}` : null,
     url_to_remove: `${changeUrl}?id=${encodeURIComponent(item.key)}&quantity=0`,
     image: variant?.image ?? product?.featured_image ?? null,
     options_with_values: (doc?.options ?? []).map((option, index) => ({

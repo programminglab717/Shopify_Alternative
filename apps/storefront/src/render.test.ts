@@ -10,6 +10,7 @@ import {
 } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest, type RenderStat, type RendererOptions } from './render.js';
+import { localizedPath } from './objects.js';
 import { suggestParams } from './suggest.js';
 import {
   loadTheme,
@@ -1067,7 +1068,8 @@ describe('Storefront rendering', () => {
     expect(article.html).toContain('<p>Order by the 20th to have it stitched in time.</p>');
     expect(article.html).toContain('<a href="/blogs/news/tagged/lawn">Lawn</a>');
     const urdu = await render({ path: '/blogs/news/eid-lawn-is-here', locale: 'ur' });
-    expect(urdu.html).toContain('<a href="/blogs/news">News پر واپس</a>');
+    // Its links in Urdu, as the page is (ADR-624).
+    expect(urdu.html).toContain('<a href="/ur/blogs/news">News پر واپس</a>');
     for (const path of [
       '/blogs/news/nothing',
       '/blogs/nothing',
@@ -1124,7 +1126,7 @@ describe('Storefront rendering', () => {
       'older /blogs/news/how-to-measure',
     ]);
     const first = await render({ path: '/blogs/news/winter-shawls', locale: 'ur' });
-    expect(beside(first.html)).toEqual(['newer /blogs/news/how-to-measure']);
+    expect(beside(first.html)).toEqual(['newer /ur/blogs/news/how-to-measure']);
     expect(first.html).toContain('<span>نئی تحریر</span>');
 
     // Its blog's feed, on its page and its articles', and nowhere else.
@@ -3231,14 +3233,17 @@ describe('Storefront rendering', () => {
         )
       ).get(section)!;
     const links = (html: string) =>
-      [...html.matchAll(/href="\/products\/([\w-]+)" class="card__link"/g)].map(
+      [...html.matchAll(/href="(?:\/ur)?\/products\/([\w-]+)" class="card__link"/g)].map(
         (match) => match[1],
       );
     const shown = await asked(4);
     expect(shown).toContain('<h2 dir="auto">You may also like</h2>');
     expect(links(shown)).toEqual([second.handle, fourth.handle]);
     expect(links(await asked(1))).toEqual([second.handle]);
-    expect(links(await asked(4, 'ur'))).toEqual([second.handle, fourth.handle]);
+    const urdu = await asked(4, 'ur');
+    expect(links(urdu)).toEqual([second.handle, fourth.handle]);
+    // Linking their Urdu pages (ADR-624).
+    expect(urdu).toContain(`href="/ur/products/${second.handle}" class="card__link"`);
     // Those the shop pairs with it, in its order, those gone left out (ADR-435).
     const paired = await asked(4, undefined, 'complementary');
     expect(paired).toContain('<h2 dir="auto">Pairs well with</h2>');
@@ -3442,5 +3447,41 @@ describe('Storefront rendering', () => {
         '<p class="cart__delivery">Your order is delivered free.</p>',
     );
     expect(page.html).not.toContain('with the code');
+  });
+
+  it("links an Urdu page's products, collections, pages, articles and menus in Urdu (ADR-624)", async () => {
+    // Bar the language switcher's, which links the page in the other language.
+    const hrefs = (html: string) =>
+      [...html.replace(/<(a|link) [^>]*hreflang=[^>]*>/g, '').matchAll(/href="(\/[^"]*)"/g)].map(
+        (m) => m[1]!,
+      );
+    /** The shop's own pages it links, not its assets or images. */
+    const pages = (html: string) =>
+      hrefs(html).filter((href) => /^\/(ur\/)?(products|collections|pages|blogs)\//.test(href));
+    for (const path of ['/collections/eid-lawn', '/blogs/news', '/blogs/news/how-to-measure']) {
+      const urdu = await render({ path, locale: 'ur' });
+      expect(urdu.errors).toEqual([]);
+      const linked = pages(urdu.html);
+      expect(linked.length, path).toBeGreaterThan(0);
+      expect(
+        linked.filter((href) => !href.startsWith('/ur/')),
+        path,
+      ).toEqual([]);
+      // The shop's own language as it was.
+      const english = await render({ path });
+      expect(
+        pages(english.html).filter((href) => href.startsWith('/ur/')),
+        path,
+      ).toEqual([]);
+    }
+    // A menu's links to the shop's own pages, not elsewhere, nor those in a language already.
+    expect(localizedPath('/collections/eid', '/ur')).toBe('/ur/collections/eid');
+    expect(localizedPath('/', '/ur')).toBe('/ur');
+    expect(localizedPath('/?ref=menu', '/ur')).toBe('/ur?ref=menu');
+    expect(localizedPath('/ur/pages/faq', '/ur')).toBe('/ur/pages/faq');
+    expect(localizedPath('https://instagram.com/zari', '/ur')).toBe('https://instagram.com/zari');
+    expect(localizedPath('//cdn.example.com/x', '/ur')).toBe('//cdn.example.com/x');
+    expect(localizedPath('#size-chart', '/ur')).toBe('#size-chart');
+    expect(localizedPath('/pages/faq', '')).toBe('/pages/faq');
   });
 });

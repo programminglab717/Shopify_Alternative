@@ -3309,7 +3309,7 @@ describe('Carts', () => {
     const urdu = await get(
       `/ur/recommendations/products?section_id=related&product_id=${first!.id}`,
     );
-    expect([urdu.statusCode, urdu.body.includes(`href="/products/${second!.handle}"`)]).toEqual([
+    expect([urdu.statusCode, urdu.body.includes(`href="/ur/products/${second!.handle}"`)]).toEqual([
       200,
       true,
     ]);
