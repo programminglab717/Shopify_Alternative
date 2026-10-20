@@ -41,8 +41,10 @@ import {
 } from '@hatti/messaging/public';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
+import { tryFromPublicId } from '@hatti/ids';
 import {
   FileEvents,
+  fileVersionOf,
   readyImagesIn,
   type FileUpdatedPayload,
   shopLogoOf,
@@ -113,6 +115,7 @@ import {
   type BlogDoc,
   type HandledKind,
   type ShopDoc,
+  type ThemeDoc,
 } from '@hatti/storefront-data';
 import { TrustEvents, verifiedLevelIn } from '@hatti/trust/public';
 import type { Redis } from 'ioredis';
@@ -132,6 +135,7 @@ import {
   productDoc,
   shopDoc,
   themeDoc,
+  themePictureIds,
   withMetafields,
 } from './documents.js';
 import { NO_EDGE_CACHE, type EdgeCache } from './edge-cache.js';
@@ -930,6 +934,7 @@ export class StorefrontPublisher {
       tiktokPixelCode,
       googleMeasurementId,
       await this.services.filters.shownStorefrontFiltersOf(tx, shopId),
+      theme ? await this.#pictures(tx, shopId, theme) : {},
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
@@ -944,6 +949,28 @@ export class StorefrontPublisher {
     }
     // Its theme's version is in it: a new theme changes it too.
     return stored !== JSON.stringify(doc);
+  }
+
+  /**
+   * What each of the shop's pictures its theme names holds (ADR-670), by its public ID: those it
+   * can show, as the storefront serves them (ADR-326).
+   */
+  async #pictures(tx: Tx, shopId: string, theme: ThemeDoc): Promise<Record<string, string>> {
+    const named = themePictureIds(theme).flatMap((id) => {
+      const fileId = tryFromPublicId(id, 'file');
+      return fileId ? [[id, fileId] as const] : [];
+    });
+    const ready = await this.services.files.readyImagesIn(
+      tx,
+      shopId,
+      named.map(([, fileId]) => fileId),
+    );
+    return Object.fromEntries(
+      named.flatMap(([id, fileId]) => {
+        const image = ready.get(fileId);
+        return image ? [[id, fileVersionOf(image.key)]] : [];
+      }),
+    );
   }
 
   /** The items that those standing for many stand for. */

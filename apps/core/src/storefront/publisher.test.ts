@@ -29,7 +29,7 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
 import { BrandService, FileService, readyImagesIn, shopLogoOf } from '@hatti/files/public';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import {
   InventoryService,
   LocationService,
@@ -787,6 +787,61 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       files: { 'config/settings_data.json': settings, 'templates/index.json': home },
     });
     expect((await store().shop()).theme).toEqual({ id: winter.id, version: published.version });
+  });
+
+  it('names what each picture its theme shows holds, so a file replaced is fetched afresh (ADR-670)', async () => {
+    const insert = (id: string, folder: string, type = 'image/jpeg') =>
+      admin.query(
+        `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+         VALUES ($1, $2, $3, 'banner.jpg', $4, 100, 'ready')`,
+        [shopId, id, `shops/${shopId}/files/${folder}/banner.jpg`, type],
+      );
+    const banner = newId();
+    const lookbook = newId();
+    await insert(banner, banner);
+    await insert(lookbook, lookbook, 'application/pdf');
+    const [shown, pdf, gone] = [banner, lookbook, newId()].map((id) => toPublicId('file', id));
+    const home = JSON.stringify({
+      sections: {
+        banner: {
+          type: 'image-banner',
+          settings: { image: { src: `/theme-images/${shown}/Eid-banner.jpg` } },
+        },
+        other: { type: 'image-banner', settings: { image: `/theme-images/${pdf}` } },
+        again: { type: 'image-banner', settings: { image: `/theme-images/${gone}/x.jpg` } },
+      },
+      order: ['banner', 'other', 'again'],
+    });
+    const main = await themes.main(tenant);
+    unwrap(
+      await themes.upsertFiles(tenant, main.id, [{ filename: 'templates/index.json', body: home }]),
+    );
+    await deliver();
+    // Those it can show alone: no PDF, nothing of no file's.
+    expect((await store().shop()).theme).toEqual({
+      id: main.id,
+      version: expect.any(Number) as unknown,
+      pictures: { [shown!]: banner.slice(-8) },
+    });
+
+    // What it holds replaced, its address changes with it.
+    const replaced = newId();
+    await admin.query('UPDATE files.files SET key = $3 WHERE shop_id = $1 AND id = $2', [
+      shopId,
+      banner,
+      `shops/${shopId}/files/${replaced}/banner.jpg`,
+    ]);
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).theme?.pictures).toEqual({ [shown!]: replaced.slice(-8) });
+
+    // A theme naming none keeps its document as it was.
+    unwrap(
+      await themes.upsertFiles(tenant, main.id, [
+        { filename: 'templates/index.json', body: '{"sections":{},"order":[]}' },
+      ]),
+    );
+    await deliver();
+    expect(Object.keys((await store().shop()).theme!)).toEqual(['id', 'version']);
   });
 
   it("keeps a suspended shop's handle for its storefront to say so, takes a closed one's out, and gives it back (ADR-461)", async () => {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-669 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-670 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -677,6 +677,7 @@
 | 667 | A product's photos that say nothing of what they show are described on the search listings tab itself, each beside its picture, and saved together | Accepted |
 | 668 | A shopper's account lists what happened to their store credit, its latest 20 changes the newest first, each with its order, without the shop's notes | Accepted |
 | 669 | The menu editor says when no product has all of a link's tags together, though each is some product's, as it says a tag none has | Accepted |
+| 670 | A theme's picture's address carries what its file holds, from the shop's document, so a file replaced is fetched afresh | Accepted |
 
 ---
 
@@ -23367,3 +23368,21 @@
   a tag none has is still said alone, as it is the one to change.
 * **Consequences:** A link that would show nothing is said, whichever way its tags miss.
 * **Alternatives:** **How many products have them all:** the editor needs only whether any do.
+
+## ADR-670 · A theme's picture's address carries what its file holds, from the shop's document, so a file replaced is fetched afresh
+
+* **Context:** A file replaced keeps its ID (ADR-647), and logos, the sharing image and
+  articles' images carry what it holds in their addresses, but a theme's picture is named in the
+  theme's settings by the file's ID alone (ADR-326, ADR-631): browsers and the edge kept the old
+  one for the hour they keep it (status shortcut 124).
+* **Decision:** The publisher finds the shop's pictures its main theme's files name at their
+  `/theme-images/` addresses and puts, for each it can show, what its file holds
+  (`fileVersionOf`, the last characters of its folder) in the shop's document, under its theme
+  (`theme.pictures`), left out where it names none. A file replaced already rebuilds the shop's
+  document (ADR-647), so it changes then and its pages are purged with it. The storefront adds
+  `?v=` and that mark to an image setting's address naming one of them, before `image_url` adds
+  its width; the picture's route takes no notice of it. Another address, or a picture the
+  document names no mark of, is as it was, as in documents written before.
+* **Consequences:** A theme's picture replaced shows at once, as the shop's other images do.
+* **Alternatives:** **The theme's version in the address:** it changes with every save, not with
+  the file. **Looking each file up as a page is rendered:** the document has them already.

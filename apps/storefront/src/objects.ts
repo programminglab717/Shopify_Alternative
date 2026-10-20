@@ -135,6 +135,11 @@ export interface ObjectContext {
    * objects' `url` carry their locale's (ADR-624); none in the shop's own language.
    */
   prefix?: string;
+  /**
+   * What each of the shop's pictures its theme names holds, by the picture's file ID (ADR-670),
+   * as the shop's document has it: put in the picture's address.
+   */
+  pictures?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -1246,7 +1251,7 @@ export function resolveSettings(
         settings[id] = named && articlePromise(named, ctx);
         break;
       case 'image_picker':
-        settings[id] = imageSetting(value);
+        settings[id] = imageSetting(value, ctx.pictures);
         break;
       default:
         settings[id] = value;
@@ -1284,16 +1289,31 @@ export function handleize(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** An image setting: its address, or the image with its size, as the media library keeps it. */
-function imageSetting(value: unknown): ImageDrop | null {
+/**
+ * An image setting: its address, or the image with its size, as the media library keeps it. One
+ * of the shop's pictures carries what its file holds (ADR-670), so a file replaced is fetched
+ * afresh, by browsers and the edge alike.
+ */
+function imageSetting(
+  value: unknown,
+  pictures: Readonly<Record<string, string>> = {},
+): ImageDrop | null {
   const image = imageValue(value);
-  return image ? new ImageDrop(image) : null;
+  if (!image) return null;
+  const file = THEME_PICTURE.exec(image.src)?.[1];
+  const version = file === undefined ? undefined : pictures[file];
+  return new ImageDrop(
+    version === undefined ? image : { ...image, src: `${image.src}?v=${version}` },
+  );
 }
 
 /** A field of a plain object; nothing it inherits. */
 function field(object: Record<string, unknown> | null, key: string | number): unknown {
   return object && Object.hasOwn(object, key) ? object[key] : undefined;
 }
+
+/** A picture of the shop's at its theme's address (ADR-326), without a query: its file's ID. */
+const THEME_PICTURE = /^\/theme-images\/(file_[0-9a-hjkmnp-tv-z]{26})(?:\/[^?#]*)?$/;
 
 function remember<T>(cache: Map<string, Promise<T>>, key: string, fetch: () => Promise<T>) {
   let promise = cache.get(key);

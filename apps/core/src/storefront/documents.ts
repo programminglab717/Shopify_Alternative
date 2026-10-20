@@ -607,6 +607,8 @@ export function shopDoc(
   googleMeasurementId: string | null = null,
   /** The filters it chose for its pages (ADR-568); null while it chose none. */
   filters: readonly StorefrontFilterRecord[] | null = null,
+  /** What its theme's pictures hold, by their files' IDs (ADR-670). */
+  pictures: Readonly<Record<string, string>> = {},
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -631,7 +633,14 @@ export function shopDoc(
         days: zone.days,
       })),
     },
-    theme: theme ? { id: theme.id, version: theme.version } : null,
+    theme: theme
+      ? {
+          id: theme.id,
+          version: theme.version,
+          // Left out while it names none, so its document stays as it was.
+          ...(Object.keys(pictures).length > 0 && { pictures: { ...pictures } }),
+        }
+      : null,
     // Closed until it opens: what the storefront checks passwords against, never the password.
     password:
       preferences.passwordEnabled && preferences.passwordVerifier
@@ -706,6 +715,17 @@ export function shopDoc(
     ...translationsDoc(translations, (fields) => ({ seo: seoTranslation(fields) })),
   };
 }
+
+/** The IDs of the shop's pictures a theme's files name at their addresses (ADR-326), once each. */
+export function themePictureIds(theme: ThemeDoc): string[] {
+  const ids = new Set<string>();
+  for (const body of Object.values(theme.files)) {
+    for (const [, id] of body.matchAll(THEME_PICTURE)) ids.add(id!);
+  }
+  return [...ids].sort();
+}
+
+const THEME_PICTURE = /\/theme-images\/(file_[0-9a-hjkmnp-tv-z]{26})(?![0-9a-z])/g;
 
 /** A shop's main theme: the shop's own files, which the storefront lays over the platform's. */
 export function themeDoc(main: { theme: ThemeRecord; files: ThemeFileRecord[] }): ThemeDoc {

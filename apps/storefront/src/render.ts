@@ -625,6 +625,8 @@ export class PageRenderer {
               )
           : undefined,
       ]);
+    // Its pictures' addresses name what their files hold (ADR-670).
+    ctx.pictures = shopDoc.theme?.pictures;
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
     const seo = (resource as { [SEO]?: PageSeo })[SEO];

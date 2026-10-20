@@ -2380,6 +2380,49 @@ describe('Storefront rendering', () => {
     expect(await home(undefined)).toContain('<a href="/" class="header__logo">Zari Fashions</a>');
   });
 
+  it("puts what each of the shop's pictures holds in its address, so a file replaced is fetched afresh (ADR-670)", async () => {
+    const SHOWN = 'file_01k7c3d3t0pqrxwzw8x9a2b4c5';
+    const OTHER = 'file_01k7c3d3t0pqrxwzw8x9a2b4c6';
+    const sample = sampleStore();
+    const home = async (pictures?: Record<string, string>) => {
+      const probe = {
+        'sections/probe.liquid':
+          '[{{ section.settings.image }}|{{ section.settings.image | image_url: width: 300 }}]' +
+          '{% schema %}{"name":"Probe","settings":[{"type":"image_picker","id":"image"}]}{% endschema %}',
+        'templates/index.json': JSON.stringify({
+          sections: {
+            a: { type: 'probe', settings: { image: `/theme-images/${SHOWN}/Eid.jpg` } },
+            b: { type: 'probe', settings: { image: `/theme-images/${OTHER}` } },
+            c: { type: 'probe', settings: { image: 'https://cdn.example.pk/eid.jpg' } },
+          },
+          order: ['a', 'b', 'c'],
+          layout: false,
+        }),
+      };
+      const renderer = new PageRenderer(loadTheme({ ...files, ...probe }), {
+        limits: { timeMs: 10_000 },
+      });
+      const theme = { id: 'th1', version: 1, ...(pictures && { pictures }) };
+      const shop = { ...sample.shop, theme };
+      const page = await renderer.render(
+        { path: '/' },
+        new MemoryStore({ ...sample, shop }).fresh(0),
+      );
+      return page.html;
+    };
+    const html = await home({ [SHOWN]: '0a1b2c3d' });
+    expect(html).toContain(
+      `[/theme-images/${SHOWN}/Eid.jpg?v=0a1b2c3d|/theme-images/${SHOWN}/Eid.jpg?v=0a1b2c3d&width=300]`,
+    );
+    // One whose file it names no version of, and another's address, as they are.
+    expect(html).toContain(`[/theme-images/${OTHER}|/theme-images/${OTHER}?width=300]`);
+    expect(html).toContain(
+      '[https://cdn.example.pk/eid.jpg|https://cdn.example.pk/eid.jpg?width=300]',
+    );
+    // A document written before names none.
+    expect(await home()).toContain(`[/theme-images/${SHOWN}/Eid.jpg|`);
+  });
+
   it('lets templates reach only what they are given', async () => {
     const extra = {
       'sections/probe.liquid':

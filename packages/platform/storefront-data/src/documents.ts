@@ -469,7 +469,16 @@ export interface ShopDoc {
    * Its main theme, as last published: the {@link ThemeDoc} to lay over the platform theme. Null
    * for the platform theme as it is.
    */
-  theme: { id: string; version: number } | null;
+  theme: {
+    id: string;
+    version: number;
+    /**
+     * What each of the shop's pictures its files name holds, by the picture's file ID, as
+     * `fileVersionOf` marks it (ADR-670): put in the picture's address, so a file replaced is
+     * fetched afresh. Absent where they name none, as in documents written before.
+     */
+    pictures?: Record<string, string>;
+  } | null;
   /**
    * While its storefront is closed behind a password (ADR-054): a verifier of the password, and
    * what the password page tells shoppers, as HTML. Absent or null while it is open, as in
