@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-662 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-663 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -670,6 +670,7 @@
 | 660 | A menu's link to a collection is offered the tags of that collection's products alone, a link to all products the shop's | Accepted |
 | 661 | A refund given as store credit gives back first what the order's own store credit paid, each part expiring as the credit it came from does | Accepted |
 | 662 | An order lists the orders split from it, the oldest first, as each part names the order it was split from | Accepted |
+| 663 | Cancelling an order whose refunds took part of what its store credit paid gives back as much as they left, to the credits it came from, as a parcel that came back does | Accepted |
 
 ---
 
@@ -23232,3 +23233,29 @@
 * **Consequences:** Every part of an order is a tap away from it.
 * **Alternatives:** **A list of parts kept on the order:** two writes for each split, and one more
   thing to keep right when a part is merged back; `split_from_id` already says it.
+
+## ADR-663 · Cancelling an order whose refunds took part of what its store credit paid gives back as much as they left, to the credits it came from, as a parcel that came back does
+
+* **Context:** Cancelling an order gives back the store credit that paid it, its payment void
+  (ADR-185), and so does a parcel that came back where the shop says so (ADR-610). Where refunds
+  had taken more of what was paid than the rest left, neither gave back anything: the timeline told
+  staff to give back what was owed as a refund, by hand, and a refund made then had none of the
+  credit's expiry.
+* **Decision:** Where what was paid past its refunds is less than the store credit that paid the
+  order, cancelling it, or its parcel coming back, gives back that much of the credit. It comes
+  back as the order's refunds in store credit give it back (ADR-661): as credits of the
+  `order_cancellation` event, each naming the credit it restores and expiring as it does, the
+  latest to expire first, less what refunds in store credit gave back to each already. What came
+  from a credit expired since ends again at once, as it does when a whole payment is voided. The
+  order's paid amount drops by what came back, and gift cards are voided from what is left after.
+  The customer is not told of it, as of a voided payment, and the account's limit does not hold, as
+  it does not for one. The timeline says how much of the credit came back. Migration 0296 lets a
+  cancellation's credit name the credit it restores.
+* **Consequences:** Staff no longer work out by hand what store credit a part-refunded order owes
+  when it is cancelled or comes back. What refunds in store credit took is never given twice, and
+  no more comes back than what was paid and not refunded.
+* **Alternatives:** **Voiding the payment in part:** a debit is given back whole, once, by its
+  `debit_revert` (ADR-185); a part of one would need its own record of which credits it restored,
+  which credits with a source already are. **A refund made by cancelling:** it would count as a
+  refund, in the order's refunded amount and on its credit note, for money the shop never paid
+  out.

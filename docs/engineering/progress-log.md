@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit given back in part
+
+* **Cancelling an order whose refunds took part of what its store credit paid gives back as much
+  as they left** ([ADR-663](../architecture/13-decision-log.md#adr-663--cancelling-an-order-whose-refunds-took-part-of-what-its-store-credit-paid-gives-back-as-much-as-they-left-to-the-credits-it-came-from-as-a-parcel-that-came-back-does)), to the credits it came from with their expiry, as a parcel that came
+  back does where the shop says so. Migration 0296 lets such a credit name the credit it restores.
+* 3816 tests, two more: the orders module's store credit tests.
+
 ### 3580cf4 · An order's parts
 
 * **An order lists the orders split from it** ([ADR-662](../architecture/13-decision-log.md#adr-662--an-order-lists-the-orders-split-from-it-the-oldest-first-as-each-part-names-the-order-it-was-split-from)), through the Admin API's

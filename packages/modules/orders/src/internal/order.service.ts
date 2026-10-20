@@ -20,7 +20,6 @@ import {
   giftCardOfIn,
   giftCardsPaidIn,
   revertOrderGiftCardsIn,
-  revertOrderStoreCreditIn,
   spendGiftCardIn,
   withdrawOrderCreditIn,
   storeCreditAccountsIn,
@@ -44,6 +43,7 @@ import { checkAddress, type AddressInput } from './address.js';
 import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { browserIdsOf, type BrowserIdsValue } from './browser-ids.js';
+import { creditBackText, giveCreditBackIn } from './credit-back.js';
 import { customerFactsQuery } from './customer-facts.js';
 import { endDutyIn, shareOutIn } from './desk-duty.js';
 import {
@@ -1683,18 +1683,17 @@ export class OrderService {
     );
     if (!released.ok) throw new Error('Releasing stock cannot fall short');
 
-    // Store credit that paid it goes back to its customer, the payment void (ADR-185), unless
-    // refunds took more of what was paid than the rest left.
+    // Store credit that paid it goes back to its customer, the payment void (ADR-185); where
+    // refunds took more of what was paid than the rest left, as much as they left (ADR-663).
     const credit = await storeCreditPaidIn(tx, shopId, order.id);
-    const creditVoided = credit > 0n && order.amountPaid - order.amountRefunded >= credit;
-    if (creditVoided) await revertOrderStoreCreditIn(tx, shopId, by.actor, order.id);
+    const left = order.amountPaid - order.amountRefunded;
+    const creditGiven = await giveCreditBackIn(tx, shopId, by.actor, order.id, credit, left);
     // Gift cards that paid it get it back likewise (ADR-449), from what refunds left after.
     const cards = await giftCardsPaidIn(tx, shopId, order.id);
-    const cardsVoided =
-      cards > 0n && order.amountPaid - order.amountRefunded - (creditVoided ? credit : 0n) >= cards;
+    const cardsVoided = cards > 0n && left - creditGiven >= cards;
     if (cardsVoided) await revertOrderGiftCardsIn(tx, shopId, by.actor, order.id);
-    const voided = creditVoided || cardsVoided;
-    const paid = order.amountPaid - (creditVoided ? credit : 0n) - (cardsVoided ? cards : 0n);
+    const voided = creditGiven > 0n || cardsVoided;
+    const paid = order.amountPaid - creditGiven - (cardsVoided ? cards : 0n);
     const updated = await updateOrder(
       tx,
       shopId,
@@ -1709,17 +1708,13 @@ export class OrderService {
     );
     await addTimelineEntry(tx, shopId, order.id, by.actor, 'cancelled', by.message);
     if (credit > 0n) {
-      const rupees = formatMoney(money(credit, order.currency as CurrencyCode));
       await addTimelineEntry(
         tx,
         shopId,
         order.id,
         by.actor,
         'refunded',
-        voided
-          ? `Gave ${rupees} of store credit, which paid it, back to its customer`
-          : `${rupees} of store credit paid it, more than refunds left of what was paid: give ` +
-              'back what is owed as a refund',
+        creditBackText(order, credit, creditGiven),
       );
     }
     // Credit given for paying it online goes with it, but what was spent of it (ADR-432).

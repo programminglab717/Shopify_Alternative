@@ -289,7 +289,7 @@ describe.skipIf(!server)('Orders paid with store credit (ORD-09, ADR-185)', () =
     expect(entries[0]).toEqual(['debit_revert', 'order_cancellation', 1_000_00n, given.order.id]);
   });
 
-  it('leaves to staff credit refunds took the place of, and takes none on a closed order', async () => {
+  it('gives back as much as refunds left of what was paid, and takes none on a closed order (ADR-663)', async () => {
     const order = await f.order(f.a, [kurta]);
     unwrap(await f.storeCredit.credit(f.a, { customerId: order.customerId }, rupees('1000')));
     unwrap(await f.orders.payWithStoreCredit(f.a, order.id, { amount: '1,000' }));
@@ -297,20 +297,74 @@ describe.skipIf(!server)('Orders paid with store credit (ORD-09, ADR-185)', () =
     unwrap(await f.refunds.refund(f.a, order.id, { amount: '1,200', method: 'cash' }));
 
     const cancelled = unwrap(await f.orders.cancel(f.a, order.id, { reason: 'inventory' }));
-    // Only Rs 300 of what was paid is left unrefunded: the credit stays spent.
-    expect(cancelled).toMatchObject({
-      amountPaid: 1_500_00n,
-      amountRefunded: 1_200_00n,
-      financialStatus: 'partially_refunded',
-    });
+    // Only Rs 300 of what was paid is left unrefunded: that much of the credit comes back.
+    expect(cancelled).toMatchObject({ amountPaid: 1_200_00n, amountRefunded: 1_200_00n });
     expect(await latest(order.id)).toEqual([
-      'Rs 1,000 of store credit paid it, more than refunds left of what was paid: give back ' +
-        'what is owed as a refund',
+      'Gave Rs 300 of the Rs 1,000 of store credit that paid it back to its customer, what ' +
+        'refunds left of what was paid',
     ]);
-    expect((await ledger(order.customerId)).balance).toBe(0n);
+    const { balance, entries } = await ledger(order.customerId);
+    expect(balance).toBe(300_00n);
+    expect(entries[0]).toEqual(['credit', 'order_cancellation', 300_00n, order.id]);
+    // Nothing tells the customer of it, as nothing does of a whole one.
+    expect(
+      (await f.outbox()).filter((event) => event.event_type === 'store_credit.credited'),
+    ).toHaveLength(1);
     expect(await f.orders.payWithStoreCredit(f.a, order.id)).toMatchObject({
       ok: false,
       errors: [{ field: ['id'], message: "A cancelled order can't be paid" }],
     });
+  });
+
+  it('gives back to the credits it came from, those expired since ending again (ADR-663)', async () => {
+    const order = await f.order(f.a, [kurta]);
+    const owner = { customerId: order.customerId };
+    const paidAt = new Date(Date.now() - 2 * HOUR);
+    const expired = new Date(Date.now() - HOUR);
+    unwrap(await f.storeCredit.credit(f.a, owner, rupees('600', expired), paidAt));
+    unwrap(await f.storeCredit.credit(f.a, owner, rupees('1000'), paidAt));
+    unwrap(await f.orders.payWithStoreCredit(f.a, order.id, { amount: '1,200' }, paidAt));
+    unwrap(await f.orders.recordPayment(f.a, order.id, { amount: '300' }));
+    unwrap(await f.refunds.refund(f.a, order.id, { amount: '500', method: 'cash' }));
+
+    const cancelled = unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    expect(cancelled).toMatchObject({ amountPaid: 500_00n, amountRefunded: 500_00n });
+    const [account] = await f.storeCredit.accountsOf(f.a, order.customerId);
+    const { rows } = await f.admin.query<{
+      amount: string;
+      remaining: string;
+      expires_at: Date | null;
+    }>(
+      `SELECT amount::text, remaining::text, expires_at FROM customers.store_credit_transactions
+        WHERE account_id = $1 AND kind = 'credit' AND event = 'order_cancellation'
+        ORDER BY amount DESC`,
+      [account!.id],
+    );
+    // Rs 600 to the credit that never expires, the Rs 400 left to the one expired since.
+    expect(rows).toEqual([
+      { amount: '60000', remaining: '60000', expires_at: null },
+      { amount: '40000', remaining: '0', expires_at: expired },
+    ]);
+    expect((await ledger(order.customerId)).balance).toBe(1_000_00n);
+  });
+
+  it('gives back what refunds in store credit did not, with a parcel that came back (ADR-663)', async () => {
+    unwrap(await f.orderSettings.update(f.a, { creditBackOnReturn: true }));
+    const order = await f.order(f.a, [kurta]);
+    unwrap(await f.storeCredit.credit(f.a, { customerId: order.customerId }, rupees('1000')));
+    unwrap(await f.orders.payWithStoreCredit(f.a, order.id, { amount: '1,000' }));
+    unwrap(await f.refunds.refund(f.a, order.id, { amount: '400', method: 'store_credit' }));
+    unwrap(await f.orders.confirm(f.a, order.id));
+    const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));
+    unwrap(await f.fulfillments.markReturning(f.a, fulfillmentId));
+    const back = unwrap(await f.fulfillments.receiveReturn(f.a, fulfillmentId)).order;
+
+    expect(back).toMatchObject({ stage: 'returned', amountPaid: 400_00n, amountRefunded: 400_00n });
+    expect((await latest(order.id, 2))[0]).toBe(
+      'Gave Rs 600 of the Rs 1,000 of store credit that paid it back to its customer, as its ' +
+        'parcel came back, what refunds left of what was paid',
+    );
+    // Rs 400 came back with the refund, Rs 600 with the parcel: all it paid, and no more.
+    expect((await ledger(order.customerId)).balance).toBe(1_000_00n);
   });
 });

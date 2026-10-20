@@ -773,8 +773,8 @@ export async function storeCreditPaidIn(tx: Tx, shopId: string, orderId: string)
 /**
  * The credits of account `accountId` that order `orderId`'s store credit came from, with what of
  * each its payments took that neither a cancellation nor a refund gave back yet, the latest to
- * expire first, those that never do before them (ADR-661). Credits expired by `at` are left out:
- * what came from them comes back as a refund's own credit.
+ * expire first, those that never do before them (ADR-661). Credits expired by `at` are left out,
+ * what came from them coming back as a refund's own credit, unless `expired` keeps them last.
  */
 async function restorableIn(
   tx: Tx,
@@ -782,6 +782,7 @@ async function restorableIn(
   accountId: string,
   orderId: string,
   at: Date,
+  expired = false,
 ): Promise<{ creditId: string; left: bigint; expiresAt: Date | null }[]> {
   const { rows } = await tx.execute<{
     id: string;
@@ -803,7 +804,7 @@ async function restorableIn(
        AND NOT EXISTS (SELECT 1 FROM customers.store_credit_transactions v
                         WHERE v.shop_id = d.shop_id AND v.kind = 'debit_revert'
                           AND v.source_id = d.id)
-       AND (c.expires_at IS NULL OR c.expires_at > ${at.toISOString()})
+       AND (${expired} OR c.expires_at IS NULL OR c.expires_at > ${at.toISOString()})
      GROUP BY c.shop_id, c.id, c.expires_at
      ORDER BY c.expires_at DESC NULLS FIRST, c.id`);
   return rows
@@ -813,6 +814,50 @@ async function restorableIn(
       expiresAt: row.expires_at === null ? null : toDate(row.expires_at),
     }))
     .filter((row) => row.left > 0n);
+}
+
+/**
+ * Gives back up to `amount` of what order `orderId`'s store credit paid and nothing gave back yet,
+ * in the caller's transaction, when the order is cancelled or comes back after refunds took more
+ * of what was paid than the rest left (ADR-663): as credits that expire as those it came from do,
+ * the latest to expire first, what came from one expired since ending again at once, as a whole
+ * one's does (ADR-185). What it gave back.
+ */
+export async function giveBackOrderCreditIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor | 'system',
+  orderId: string,
+  amount: bigint,
+  at: Date = new Date(),
+): Promise<bigint> {
+  const { rows } = await tx.execute<{ account_id: string }>(sql`
+    SELECT DISTINCT account_id FROM customers.store_credit_transactions
+     WHERE shop_id = ${shopId} AND order_id = ${orderId} AND kind = 'debit'
+       AND event = 'order_payment'`);
+  let given = 0n;
+  for (const { account_id: accountId } of rows) {
+    const account = await lockAccount(tx, shopId, accountId);
+    if (!account) continue;
+    const parts = await restorableIn(tx, shopId, account.id, orderId, at, true);
+    const left = parts.reduce((sum, part) => sum + part.left, 0n);
+    const giving = amount - given < left ? amount - given : left;
+    if (giving <= 0n) continue;
+    await creditIn(tx, shopId, actor, account, {
+      amount: giving,
+      event: 'order_cancellation',
+      expiresAt: null,
+      orderId,
+      note: '',
+      field: [],
+      at,
+      restoring: parts,
+      givenBack: true,
+    });
+    await expireIn(tx, shopId, account.id, at);
+    given += giving;
+  }
+  return given;
 }
 
 /**
@@ -1003,12 +1048,17 @@ async function creditIn(
      * back what an order's store credit paid (ADR-661). The rest expires as `expiresAt` says.
      */
     restoring?: readonly { creditId: string; left: bigint; expiresAt: Date | null }[];
+    /**
+     * Whether the customer hears of it, and the account's limit holds: neither for credit given
+     * back as it was, as a cancellation's is (ADR-663).
+     */
+    givenBack?: boolean;
   },
 ): Promise<MutationResult<string>> {
   await expireIn(tx, shopId, account.id, credit.at);
   const balance = await balanceIn(tx, shopId, account.id, credit.at);
   const limit = fromMajor(STORE_CREDIT_LIMITS.balance, account.currency).amount;
-  if (balance + credit.amount > limit) {
+  if (!credit.givenBack && balance + credit.amount > limit) {
     const format = (value: bigint) => formatMoney(money(value, account.currency));
     return failOne(
       credit.field,
@@ -1039,6 +1089,8 @@ async function creditIn(
               ${credit.orderId ?? null}, ${credit.refundId ?? null}, ${part.sourceId},
               ${credit.note}, ${actorKind}, ${actorId})`);
   }
+  // Given back as it was, as a cancellation's: nothing new to tell, as a whole one tells none.
+  if (credit.givenBack) return { ok: true, value: id };
   // For the customer to be told of it, once, all of it (ADR-192).
   await appendEvent<StoreCreditCreditedPayload>(tx, shopId, {
     type: CustomerEvents.StoreCreditCredited,

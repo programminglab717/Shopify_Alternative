@@ -6,7 +6,7 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { revertOrderStoreCreditIn, storeCreditPaidIn } from '@hatti/customers/public';
+import { storeCreditPaidIn } from '@hatti/customers/public';
 import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -28,6 +28,7 @@ import {
   toFulfillmentEvent,
 } from './fulfillment-events.js';
 import { parcelsByTrackingIn, trackingKey } from './cod-cash.js';
+import { creditBackText, giveCreditBackIn } from './credit-back.js';
 import {
   addTimelineEntry,
   loadOrder,
@@ -1438,9 +1439,9 @@ export class FulfillmentService {
 
 /**
  * Gives the store credit that paid an order whose every parcel came back unaccepted back to its
- * customer, where the shop says so (ORD-09, ADR-610), as cancelling the order does (ADR-185):
- * the payment void, unless refunds took more of what was paid than the rest left. The order, as
- * it is after.
+ * customer, where the shop says so (ORD-09, ADR-610), as cancelling the order does (ADR-185,
+ * ADR-663): the payment void, or as much as refunds left of what was paid. The order, as it is
+ * after.
  */
 async function creditBackIn(
   tx: Tx,
@@ -1450,32 +1451,23 @@ async function creditBackIn(
 ): Promise<OrderRow> {
   const credit = await storeCreditPaidIn(tx, shopId, order.id);
   if (credit === 0n || !(await orderSettingsIn(tx, shopId)).creditBackOnReturn) return order;
-  const rupees = formatMoney(money(credit, order.currency as CurrencyCode));
-  if (order.amountPaid - order.amountRefunded < credit) {
-    await addTimelineEntry(
-      tx,
-      shopId,
-      order.id,
-      actor,
-      'refunded',
-      `${rupees} of store credit paid it, more than refunds left of what was paid: give back ` +
-        'what is owed as a refund',
-    );
-    return order;
-  }
-  await revertOrderStoreCreditIn(tx, shopId, actor, order.id);
-  const paid = order.amountPaid - credit;
-  const updated = await updateOrder(tx, shopId, order, {
-    amountPaid: paid,
-    financialStatus: voidedStatusOf(paid, order),
-  });
+  const left = order.amountPaid - order.amountRefunded;
+  const given = await giveCreditBackIn(tx, shopId, actor, order.id, credit, left);
+  const paid = order.amountPaid - given;
+  const updated =
+    given === 0n
+      ? order
+      : await updateOrder(tx, shopId, order, {
+          amountPaid: paid,
+          financialStatus: voidedStatusOf(paid, order),
+        });
   await addTimelineEntry(
     tx,
     shopId,
     order.id,
     actor,
     'refunded',
-    `Gave ${rupees} of store credit, which paid it, back to its customer, as its parcel came back`,
+    creditBackText(order, credit, given, ', as its parcel came back'),
   );
   return updated;
 }
