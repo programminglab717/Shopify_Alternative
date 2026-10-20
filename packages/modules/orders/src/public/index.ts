@@ -279,6 +279,9 @@ export {
   type ParcelResult,
   type RestockInput,
   type TrackingInput,
+  ordersToShipOfCustomerIn,
+  type OrderToShip,
+  type RefusedOrders,
 } from '../internal/fulfillment.service.js';
 export { RECORDED_EVENT_STATUSES, fulfillmentEventsIn } from '../internal/fulfillment-events.js';
 export {

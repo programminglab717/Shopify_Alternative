@@ -5,6 +5,7 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { chargeParcelsIn } from './cod-cash.js';
 import { CodHealthService, type CodHealthInput } from './cod-health.service.js';
+import { ordersToShipOfCustomerIn } from './fulfillment.service.js';
 import type { AddressInput } from './address.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -316,6 +317,41 @@ describe.skipIf(!server)('CodHealthService', () => {
     expect(unwrap(await health.report(f.a, now({ by: 'courier' }))).rows).toEqual([
       { key: 'Leopards', title: 'Leopards', confirmation: null, delivery },
     ]);
+  });
+
+  it("finds a customer's other confirmed orders not yet shipped, their parcel refused (ADR-672)", async () => {
+    const refused = await confirmed(f.a, [kurta], 'Lahore');
+    const parcel = await shipped(refused, 'PostEx');
+    unwrap(await f.fulfillments.markReturning(f.a, parcel));
+    // Theirs: one to pack, one to book, one waiting for its call, one already shipped.
+    const toPack = await confirmed(f.a, [kurta], 'Lahore');
+    const toBook = await confirmed(f.a, [kurta], 'Lahore');
+    unwrap(await f.orders.markPacked(f.a, toBook.id));
+    await place(f.a, [kurta], 'Lahore');
+    await shipped(await confirmed(f.a, [kurta], 'Lahore'));
+    // Another customer's.
+    const other = unwrap(
+      await f.orders.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: { ...at('Lahore'), phone: '0333 7654321' },
+      }),
+    );
+    unwrap(await f.orders.confirm(f.a, other.id));
+    const toShip = (orderId: string, shop = f.a) =>
+      f.db.tenant(shop.shopId, (tx) => ordersToShipOfCustomerIn(tx, shop.shopId, orderId));
+    expect(await toShip(refused.id)).toEqual({
+      refused: { id: refused.id, number: refused.number },
+      toShip: [
+        { id: toPack.id, number: toPack.number },
+        { id: toBook.id, number: toBook.number },
+      ],
+    });
+    // None to call about once they ship; nothing of another shop's.
+    unwrap(await f.orders.markPacked(f.a, toPack.id));
+    await shipped(toPack);
+    await shipped(toBook);
+    expect((await toShip(refused.id))!.toShip).toEqual([]);
+    expect(await toShip(refused.id, f.b)).toBeNull();
   });
 
   it('adds up what returns cost, each parcel once, as statements charged them', async () => {

@@ -1471,3 +1471,48 @@ async function creditBackIn(
   );
   return updated;
 }
+
+/** An order of a customer who refused another's parcel, to call before it ships (ADR-672). */
+export interface OrderToShip {
+  id: string;
+  number: number;
+}
+
+/** The order whose parcel its customer refused, and their others to call about (ADR-672). */
+export interface RefusedOrders {
+  refused: OrderToShip;
+  toShip: OrderToShip[];
+}
+
+/**
+ * Order `orderId`, and its customer's other orders confirmed and waiting to be packed or booked,
+ * not yet handed to a courier, the oldest first, in the caller's transaction: for staff to call
+ * before they ship, its customer having refused its parcel (ADR-672). Null where the order is not
+ * the shop's.
+ */
+export async function ordersToShipOfCustomerIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+): Promise<RefusedOrders | null> {
+  const { rows } = await tx.execute<{
+    refused_number: string | number;
+    id: string | null;
+    number: string | number | null;
+  }>(sql`
+    SELECT refused.number AS refused_number, o.id, o.number
+      FROM orders.orders refused
+      LEFT JOIN orders.orders o
+        ON o.shop_id = refused.shop_id AND o.customer_id = refused.customer_id
+       AND o.id <> refused.id AND o.stage IN ('to_pack', 'to_book')
+     WHERE refused.shop_id = ${shopId} AND refused.id = ${orderId}
+     ORDER BY o.created_at, o.id`);
+  const [first] = rows;
+  if (!first) return null;
+  return {
+    refused: { id: orderId, number: Number(first.refused_number) },
+    toShip: rows.flatMap((row) =>
+      row.id === null ? [] : [{ id: row.id, number: Number(row.number) }],
+    ),
+  };
+}

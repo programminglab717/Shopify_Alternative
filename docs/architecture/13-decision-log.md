@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-671 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-672 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -679,6 +679,7 @@
 | 669 | The menu editor says when no product has all of a link's tags together, though each is some product's, as it says a tag none has | Accepted |
 | 670 | A theme's picture's address carries what its file holds, from the shop's document, so a file replaced is fetched afresh | Accepted |
 | 671 | A comment from an email address the shop's spam holds a comment of, from the last 90 days, is kept as spam too, until the shop marks that one not spam | Accepted |
+| 672 | A parcel its customer refused pushes who confirms orders of each other order of theirs confirmed and not yet shipped, to call them before it ships | Accepted |
 
 ---
 
@@ -23403,3 +23404,21 @@
 * **Alternatives:** **The internet address too:** shoppers on Pakistan's mobile networks share
   addresses, so one spammer's would hide many shoppers' comments. **Words and links learnt from
   what is marked:** a few marks teach too little; the address is what a spammer keeps.
+
+## ADR-672 · A parcel its customer refused pushes who confirms orders of each other order of theirs confirmed and not yet shipped, to call them before it ships
+
+* **Context:** An order waiting to be confirmed is scored again as its customer's history
+  changes (ADR-112), but a confirmed one keeps the score it was confirmed on: a customer who
+  refuses one parcel today has their other order, confirmed yesterday, packed and booked all the
+  same, and it comes back too, at a second return's cost (status shortcut 25).
+* **Decision:** When a parcel turns back, refused or not delivered (`fulfillment.updated` with
+  `returning`), the worker asks the orders module (`ordersToShipOfCustomerIn`) for that order and
+  each of its customer's others confirmed and waiting to be packed or booked, and pushes, as a
+  new kind of news, `customer_refused` (migration 0297), to owners, managers and confirmation
+  agents who may change orders, once for each such order, in each member's language, opening
+  that order: its customer refused the parcel of the first, so call them before it ships. The
+  admin's notification settings offer it beside the orders overdue, in English and Urdu.
+* **Consequences:** A shop hears of a refusal while it can still stop the next parcel.
+* **Alternatives:** **Holding those orders by themselves:** the customer may have refused for
+  the courier's lateness, and a call settles it; holding is the shop's to choose. **WhatsApp
+  too:** pushes come first; the WhatsApp alert can follow as ADR-633's did.

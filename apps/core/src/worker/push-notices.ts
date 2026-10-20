@@ -18,8 +18,11 @@ import { OnlineStoreEvents, type CommentChangedPayload } from '@hatti/online-sto
 import {
   OrderEvents,
   orderName,
+  ordersToShipOfCustomerIn,
   overdueFirstCallsIn,
+  type FulfillmentUpdatedPayload,
   type OrderCreatedPayload,
+  type RefusedOrders,
 } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 import { repeat } from './repeat.js';
@@ -60,7 +63,9 @@ async function recipientsIn(tx: Tx, shopId: string): Promise<PushRecipient[]> {
  * member's language, opening its page in the admin; a shopper's message through the contact form
  * (ADR-591), to those who answer customers, saying neither who wrote nor what, which push services
  * would carry; a comment held for the shop's approval (ADR-619), likewise, to those who write its
- * blogs, opening the article. Low stock is pushed with the WhatsApp alert, which keeps its spells
+ * blogs, opening the article; a parcel its customer refused, of each other order of theirs
+ * confirmed and not yet shipped (ADR-672), to who confirms orders, opening that order, to call
+ * them before it ships. Low stock is pushed with the WhatsApp alert, which keeps its spells
  * ({@link lowStockNotice}). Nothing where Hatti has no VAPID keys.
  */
 export class PushNotices {
@@ -70,17 +75,24 @@ export class PushNotices {
     LogisticsEvents.CodRemittanceImported,
     MessagingEvents.ContactMessageReceived,
     OnlineStoreEvents.CommentCreated,
+    OrderEvents.FulfillmentUpdated,
   ];
 
   constructor(
     private readonly database: Database,
     private readonly push: PushService,
+    /** The orders to call before they ship, their customer having refused `orderId`'s parcel. */
+    private readonly toShip: (
+      tx: Tx,
+      shopId: string,
+      orderId: string,
+    ) => Promise<RefusedOrders | null> = ordersToShipOfCustomerIn,
   ) {}
 
   async handle(event: DomainEvent): Promise<void> {
     if (this.push.publicKey === null) return;
     const { shopId } = event;
-    const notice = await this.database.tenant(shopId, async (tx) => {
+    const found = await this.database.tenant(shopId, async (tx) => {
       const shop = await shopProfile(tx, shopId);
       const recipients = await recipientsIn(tx, shopId);
       const base = `/${toPublicId('shop', shopId)}`;
@@ -190,11 +202,37 @@ export class PushNotices {
             },
           } satisfies PushNotice;
         }
+        case OrderEvents.FulfillmentUpdated: {
+          const parcel = event.payload as Partial<FulfillmentUpdatedPayload>;
+          // Refused, or not delivered, as it turns back alone.
+          if (parcel.status !== 'returning' || !parcel.changed?.includes('status')) return null;
+          if (!parcel.orderId) return null;
+          const orders = await this.toShip(tx, shopId, parcel.orderId);
+          if (!orders || orders.toShip.length === 0) return null;
+          const back = orderName(orders.refused.number);
+          return orders.toShip.map((order): PushNotice => ({
+            kind: 'customer_refused',
+            dedupeKey: `customer_refused:${event.aggregateId}:${order.id}`,
+            recipients,
+            message: {
+              en: {
+                title: `${shop.name}: ${orderName(order.number)}'s customer refused a parcel`,
+                body: `Their parcel for ${back} is coming back. Call them before ${orderName(order.number)} ships.`,
+              },
+              ur: {
+                title: `${shop.name}: ${orderName(order.number)} کے خریدار نے پارسل واپس کر دیا`,
+                body: `ان کا ${back} کا پارسل واپس آ رہا ہے۔ ${orderName(order.number)} بھیجنے سے پہلے انہیں کال کریں۔`,
+              },
+              url: `${base}/orders/${toPublicId('order', order.id)}`,
+            },
+          }));
+        }
         default:
           return null;
       }
     });
-    if (notice) {
+    const notices: PushNotice[] = found === null ? [] : Array.isArray(found) ? found : [found];
+    for (const notice of notices) {
       await this.push.push(
         shopId,
         notice.kind,

@@ -218,6 +218,71 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
     ]);
   });
 
+  it("pushes who confirms orders of a refused parcel's customer's orders yet to ship, each once (ADR-672)", async () => {
+    await admin.query(
+      `UPDATE messaging.push_subscriptions SET kinds = kinds || '{customer_refused}'
+        WHERE shop_id = $1`,
+      [shopId],
+    );
+    const refusedId = newId();
+    const [toPack, toBook] = [newId(), newId()];
+    const asked: string[] = [];
+    const notices = new PushNotices(database, push, (_tx, _shop, orderId) => {
+      asked.push(orderId);
+      return Promise.resolve({
+        refused: { id: refusedId, number: 1001 },
+        toShip: [
+          { id: toPack, number: 1004 },
+          { id: toBook, number: 1005 },
+        ],
+      });
+    });
+    const parcel = newId();
+    const updated = (payload: Record<string, unknown>) =>
+      event(OrderEvents.FulfillmentUpdated, parcel, {
+        orderId: refusedId,
+        version: 2,
+        orderStage: 'returning',
+        orderVersion: 5,
+        ...payload,
+      });
+    // Its tracking changing, or its being delivered, is nothing to tell.
+    await notices.handle(updated({ status: 'returning', changed: ['tracking'] }));
+    await notices.handle(updated({ status: 'delivered', changed: ['status'] }));
+    expect([asked, sender.sent]).toEqual([[], []]);
+    await notices.handle(updated({ status: 'returning', changed: ['status'] }));
+    await notices.handle(updated({ status: 'returning', changed: ['status'] }));
+    const order = (id: string) => `/${shop}/orders/${toPublicId('order', id)}`;
+    expect(told()).toEqual([
+      {
+        endpoint: endpoint('agent'),
+        title: 'Zari: #1004 کے خریدار نے پارسل واپس کر دیا',
+        url: order(toPack),
+      },
+      {
+        endpoint: endpoint('agent'),
+        title: 'Zari: #1005 کے خریدار نے پارسل واپس کر دیا',
+        url: order(toBook),
+      },
+      {
+        endpoint: endpoint('owner'),
+        title: "Zari: #1004's customer refused a parcel",
+        url: order(toPack),
+      },
+      {
+        endpoint: endpoint('owner'),
+        title: "Zari: #1005's customer refused a parcel",
+        url: order(toBook),
+      },
+    ]);
+    expect(
+      sender.sent.find(
+        (each) => each.endpoint === endpoint('owner') && each.message.url === order(toPack),
+      )!.message.body,
+    ).toBe('Their parcel for #1001 is coming back. Call them before #1004 ships.');
+    expect(asked).toEqual([refusedId, refusedId]);
+  });
+
   it('pushes low stock to owners and managers with its spell, without an alerts number', async () => {
     const productId = newId();
     const alert: LowStockAlert = {

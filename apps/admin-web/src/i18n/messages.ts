@@ -4675,6 +4675,9 @@ const en = {
   'push.ordersOverdue': 'Orders not called in time',
   'push.ordersOverdueHint':
     'Orders waiting for their first call longer than your target, at most once an hour.',
+  'push.customerRefused': 'Customers who refused a parcel',
+  'push.customerRefusedHint':
+    'A customer refused a parcel while another of their orders waits to ship: call them first.',
   'push.orderAssigned': 'Orders given to you',
   'push.orderAssignedHint': 'An order given to you to work on.',
   'push.orderMentioned': 'Comments naming you',
@@ -9985,6 +9988,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'push.ordersOverdue': 'وقت پر کال نہ ہونے والے آرڈرز',
   'push.ordersOverdueHint':
     'آپ کے ہدف سے زیادہ دیر سے پہلی کال کے منتظر آرڈرز، گھنٹے میں زیادہ سے زیادہ ایک بار۔',
+  'push.customerRefused': 'پارسل واپس کرنے والے خریدار',
+  'push.customerRefusedHint':
+    'کسی خریدار نے پارسل واپس کر دیا جبکہ ان کا ایک اور آرڈر بھیجا جانا ہے: پہلے انہیں کال کریں۔',
   'push.orderAssigned': 'آپ کو دیے گئے آرڈرز',
   'push.orderAssignedHint': 'جب کوئی آرڈر آپ کو کام کے لیے دیا جائے۔',
   'push.orderMentioned': 'آپ کا ذکر کرنے والے تبصرے',

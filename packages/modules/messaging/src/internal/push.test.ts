@@ -101,6 +101,7 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       'new_order',
       'needs_review',
       'orders_overdue',
+      'customer_refused',
       'order_assigned',
       'order_mentioned',
     ]);
@@ -122,6 +123,7 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       'new_order',
       'needs_review',
       'orders_overdue',
+      'customer_refused',
       'order_assigned',
       'order_mentioned',
     ]);
@@ -179,6 +181,24 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       false,
       true,
     ]);
+  });
+
+  it('tells who confirms orders of a customer who refused a parcel, another of theirs to ship (ADR-672)', () => {
+    const told = (role: StaffRole, scopes?: string[]) =>
+      pushedTo(
+        'customer_refused',
+        recipient('usr', role, 'en', scopes ? { scopes, capabilities: [] } : null),
+      );
+    expect([told('owner'), told('manager'), told('confirmation_agent')]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect([told('marketer'), told('packer'), told('accountant')]).toEqual([false, false, false]);
+    expect([
+      told('confirmation_agent', ['read_orders']),
+      told('confirmation_agent', ['write_orders']),
+    ]).toEqual([false, true]);
   });
 
   it('tells who confirms orders of orders waiting too long for their first call (ADR-627)', () => {

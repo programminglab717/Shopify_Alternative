@@ -103,7 +103,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
 
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const lowStock = await within(card).findByRole('checkbox', { name: /Low stock/ });
-    expect(within(card).getAllByRole('checkbox')).toHaveLength(9);
+    expect(within(card).getAllByRole('checkbox')).toHaveLength(10);
     fireEvent.click(lowStock);
     fireEvent.click(within(card).getByRole('button', { name: 'Turn on notifications' }));
     await waitFor(() =>
@@ -116,6 +116,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'NEW_ORDER',
             'NEEDS_REVIEW',
             'ORDERS_OVERDUE',
+            'CUSTOMER_REFUSED',
             'ORDER_ASSIGNED',
             'ORDER_MENTIONED',
             'CASH_REMITTED',
@@ -137,6 +138,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'NEW_ORDER',
             'NEEDS_REVIEW',
             'ORDERS_OVERDUE',
+            'CUSTOMER_REFUSED',
             'ORDER_ASSIGNED',
             'ORDER_MENTIONED',
             'CONTACT_MESSAGE',
@@ -176,6 +178,9 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
       // Those waiting too long for their first call (ADR-627).
       'Orders not called in timeOrders waiting for their first call longer than your target, ' +
         'at most once an hour.',
+      // A customer who refused a parcel, another of theirs to ship (ADR-672).
+      'Customers who refused a parcelA customer refused a parcel while another of their orders ' +
+        'waits to ship: call them first.',
       expect.stringMatching(/^Orders given to you/),
       expect.stringMatching(/^Comments naming you/),
       'Contact form messagesA shopper writing to you from your online store’s contact page.',
@@ -211,6 +216,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
       expect.stringMatching(/^New orders/),
       expect.stringMatching(/^Orders to review/),
       expect.stringMatching(/^Orders not called in time/),
+      expect.stringMatching(/^Customers who refused a parcel/),
       expect.stringMatching(/^Orders given to you/),
       expect.stringMatching(/^Comments naming you/),
     ]);

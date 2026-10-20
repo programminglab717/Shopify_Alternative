@@ -33,6 +33,7 @@ type PushKind =
   | 'CONTACT_MESSAGE'
   | 'COMMENT_PENDING'
   | 'ORDERS_OVERDUE'
+  | 'CUSTOMER_REFUSED'
   | 'ORDER_ASSIGNED'
   | 'ORDER_MENTIONED';
 
@@ -69,6 +70,12 @@ const KINDS: {
     gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
     label: 'push.ordersOverdue',
     hint: 'push.ordersOverdueHint',
+  },
+  {
+    kind: 'CUSTOMER_REFUSED',
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
+    label: 'push.customerRefused',
+    hint: 'push.customerRefusedHint',
   },
   {
     kind: 'ORDER_ASSIGNED',

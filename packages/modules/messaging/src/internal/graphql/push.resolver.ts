@@ -20,6 +20,7 @@ export enum PushNotificationKind {
   CONTACT_MESSAGE = 'CONTACT_MESSAGE',
   COMMENT_PENDING = 'COMMENT_PENDING',
   ORDERS_OVERDUE = 'ORDERS_OVERDUE',
+  CUSTOMER_REFUSED = 'CUSTOMER_REFUSED',
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
   ORDER_MENTIONED = 'ORDER_MENTIONED',
 }
@@ -30,8 +31,10 @@ registerEnumType(PushNotificationKind, {
     'News pushed to staff: a NEW_ORDER, an order that NEEDS_REVIEW for its risk, CASH_REMITTED ' +
     'by a courier, LOW_STOCK, a CONTACT_MESSAGE through the online store, or a comment on an ' +
     "article that waits for the shop's approval, COMMENT_PENDING, or orders waiting for their " +
-    "first call longer than the shop's target, ORDERS_OVERDUE. Each goes to the roles whose " +
-    'work it is: orders and contact messages to owners, managers and confirmation agents; cash ' +
+    "first call longer than the shop's target, ORDERS_OVERDUE, or a customer who refused a " +
+    'parcel while another of their orders waits to ship, CUSTOMER_REFUSED. Each goes to the ' +
+    'roles whose work it is: orders and contact messages to owners, managers and confirmation ' +
+    'agents; cash ' +
     'to owners, managers and accountants; stock to owners and managers; comments to owners, ' +
     "managers and marketers. And a member's own: an order given to them, ORDER_ASSIGNED, or " +
     'a comment on an order naming them, ORDER_MENTIONED, whatever their role.',
