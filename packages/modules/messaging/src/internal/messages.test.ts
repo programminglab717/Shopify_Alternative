@@ -459,6 +459,33 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     ]);
   });
 
+  it('holds a message till its time, for news after it to take its place before it goes (ADR-621)', async () => {
+    const order = newId();
+    const later = new Date(Date.now() + 10 * 60_000);
+    await messages.queue(a.shopId, {
+      ...placed(order),
+      email: 'ayesha@example.pk',
+      notBefore: later,
+    });
+    // Neither it nor its email's copy is due before then.
+    expect(await messages.dueShops(soon())).toEqual([]);
+    expect(await messages.dueShops(new Date(later.getTime() + 1_000))).toEqual([a.shopId]);
+    const why = 'Not sent: the message of its payment said it was placed';
+    const supersede = (key: string) =>
+      db.tenant(a.shopId, (tx) => messages.supersedeIn(tx, a.shopId, key, why));
+    expect(await supersede(`order_placed:${order}`)).toBe(true);
+    expect((await rows()).map((row) => [row.channel, row.status, row.error]).sort()).toEqual([
+      ['email', 'skipped', why],
+      ['whatsapp', 'skipped', why],
+    ]);
+    // Never one a sender took, nor one gone.
+    const taken = newId();
+    await messages.queue(a.shopId, placed(taken));
+    await messages.claim(a.shopId, soon(), 10, 300_000);
+    expect(await supersede(`order_placed:${taken}`)).toBe(false);
+    expect(await supersede(`order_placed:${order}`)).toBe(false);
+  });
+
   it('sends by SMS what WhatsApp took and did not deliver, once, and within a day', async () => {
     for (let i = 0; i < 5; i++) await messages.queue(a.shopId, placed(newId()));
     const [late, delivered, recent, old, logged] = (await rows()).map((row) => row.id);

@@ -51,6 +51,8 @@ export interface OrderNotificationFacts {
   cancelReason: CancelReasonValue | null;
   /** Whether it is a cash-on-delivery order waiting for its customer to confirm it. */
   awaitsCustomer: boolean;
+  /** How it is paid, for news timed by it (ADR-621). */
+  paymentMethod: PaymentMethodValue;
   stage: OrderStageValue;
   /**
    * Where its customer collects it, for an order they pick up (SHP-15, ADR-389): its location's
@@ -174,6 +176,7 @@ export async function orderNotificationFactsIn(
       confirmationStatus: row.confirmation_status,
       fulfillmentStatus: row.fulfillment_status,
     }),
+    paymentMethod: row.payment_method,
     stage: row.stage,
     pickup:
       row.delivery_method === 'pickup'

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-620 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-621 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -628,6 +628,7 @@
 | 618 | The Search listings tab flags images that say nothing of what they show: a product's photos, an article's image and the images in pages' and articles' text, an article's image described by its file's words where it has none of its own | Accepted |
 | 619 | A comment that reads as spam is kept as spam, neither shown nor held: links in its name, link markup, more than two links, what spam sells, or a long comment again within the day; and a comment held for approval is pushed to who writes the shop's blogs | Accepted |
 | 620 | Themes are given a pause of checkout alone as shop.checkout_paused, its message and when orders come back, and Hatti Base says so in its own place and words; the platform's bar stands aside for a theme's notice marked data-checkout-paused | Accepted |
+| 621 | An order placed and paid together is told of its payment alone: the news of it placed waits ten minutes for an order to be paid online at checkout, and the news of a payment in full takes its place while no sender has taken it | Accepted |
 
 ---
 
@@ -22386,3 +22387,25 @@
   notice, which the bar never did.
 * **Alternatives:** **A setting turning the bar off:** a theme without a notice would leave
   shoppers unknowing. **Shopify's own objects:** Shopify has none for a pause.
+
+## ADR-621 · An order placed and paid together is told of its payment alone: the news of it placed waits ten minutes for an order to be paid online at checkout, and the news of a payment in full takes its place while no sender has taken it
+
+* **Context:** A customer hears that their order was placed (ADR-146) and, once it is paid
+  before it ships, that the shop has their payment (ADR-171). An order paid online at checkout
+  is placed and paid within a minute or two, so its customer got two messages for one act, the
+  second saying all the first did; a transfer recorded before the worker heard of the order did
+  the same (status shortcut 91).
+* **Decision:** A message may be queued to go no sooner than a time of its own, the sender
+  leaving it until then. The news of an order placed to be paid online at checkout, still
+  awaiting its payment, waits ten minutes. When an order is paid in full, the news of it placed,
+  and its email's copy, are kept from going, marked skipped with why, where no sender has taken
+  them yet; the payment's news, which says the shop has the order and its payment, goes in
+  their place. An order left unpaid is told it was placed once the ten minutes are over, and
+  reminded to pay as before (ADR-174).
+* **Consequences:** One message for one act, in most cases; a payment that comes after the news
+  of the order went still has its own. An order paid online and left unpaid hears of itself ten
+  minutes later than before. A message a sender has taken is never skipped, so nothing sent goes
+  unrecorded or unpaid for.
+* **Alternatives:** **A template saying both:** a new WhatsApp template for Meta to approve, for
+  what the payment's already says. **Waiting for every order:** cash on delivery, most orders,
+  would hear of themselves later for nothing.

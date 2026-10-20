@@ -65,6 +65,11 @@ export interface MessageToQueue {
   language?: MessageLanguage | null;
   /** The broadcast it goes in (ADR-422), for the broadcast's counts. */
   broadcastId?: string | null;
+  /**
+   * When it may go, the sender leaving it until then, so news after it can take its place
+   * (ADR-621); at once otherwise.
+   */
+  notBefore?: Date | null;
 }
 
 /** A message the sender took to send. */
@@ -184,13 +189,15 @@ export async function queueMessageIn(
   const channel: MessageChannel =
     message.channel ??
     (settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp');
+  const notBefore = message.notBefore?.toISOString() ?? null;
   const { rows } = await tx.execute<{ id: string }>(sql`
     INSERT INTO messaging.messages
            (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-            dedupe_key, broadcast_id)
+            dedupe_key, broadcast_id, next_attempt_at)
     VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
             ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
-            ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null})
+            ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null},
+            coalesce(${notBefore}::timestamptz, now()))
         ON CONFLICT (shop_id, dedupe_key) DO NOTHING
     RETURNING id`);
   const id = rows[0]?.id ?? null;
@@ -200,10 +207,11 @@ export async function queueMessageIn(
     await tx.execute(sql`
       INSERT INTO messaging.messages
              (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-              dedupe_key)
+              dedupe_key, next_attempt_at)
       VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
               ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
-              ${message.customerId ?? null}, ${`${message.dedupeKey}:email`})
+              ${message.customerId ?? null}, ${`${message.dedupeKey}:email`},
+              coalesce(${notBefore}::timestamptz, now()))
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
   }
   return id;
@@ -232,6 +240,20 @@ export class MessagesService {
   async marketingHoursOf(shopId: string, at: Date): Promise<{ open: boolean; nextOpen: Date }> {
     const { timezone } = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
     return marketingHours(timezone, at);
+  }
+
+  /**
+   * Keeps the message queued by `dedupeKey`, and its email's copy, from going, where no sender
+   * has taken it yet: news that came after says what it would have (ADR-621), `why` saying so.
+   * Whether one was kept back.
+   */
+  async supersedeIn(tx: Tx, shopId: string, dedupeKey: string, why: string): Promise<boolean> {
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      UPDATE messaging.messages SET status = 'skipped', error = ${why}
+       WHERE shop_id = ${shopId} AND dedupe_key IN (${dedupeKey}, ${`${dedupeKey}:email`})
+         AND status = 'pending' AND attempts = 0
+      RETURNING id`);
+    return rows.length > 0;
   }
 
   /** {@link queueIn} in a transaction of its own. */

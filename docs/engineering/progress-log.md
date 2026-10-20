@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### One message for an order placed and paid together
+
+* **An order placed and paid together is told of its payment alone** ([ADR-621](../architecture/13-decision-log.md#adr-621--an-order-placed-and-paid-together-is-told-of-its-payment-alone-the-news-of-it-placed-waits-ten-minutes-for-an-order-to-be-paid-online-at-checkout-and-the-news-of-a-payment-in-full-takes-its-place-while-no-sender-has-taken-it)): the news of an
+  order to be paid online at checkout waits ten minutes, and the news of a payment in full
+  takes the place of the news of it placed while no sender has taken that.
+* 3733 tests, two more: a message held and kept back, and the worker's news of orders placed
+  and paid by transfer and online, and left unpaid.
+
 ### 739aab4 · The pause of orders in a theme's own words
 
 * **Themes are given `shop.checkout_paused`** ([ADR-620](../architecture/13-decision-log.md#adr-620--themes-are-given-a-pause-of-checkout-alone-as-shopcheckout_paused-its-message-and-when-orders-come-back-and-hatti-base-says-so-in-its-own-place-and-words-the-platforms-bar-stands-aside-for-a-themes-notice-marked-data-checkout-paused)): the shop's message and when orders come

@@ -44,6 +44,7 @@ import {
   OrderCommentService,
   OrderEditService,
   OrderService,
+  type OnlinePayments,
   type OrderToPlace,
 } from '@hatti/orders/public';
 import pg from 'pg';
@@ -55,6 +56,7 @@ import { PlanOrders } from './plan-orders.js';
 import {
   MessagesSender,
   OrderNotifications,
+  PLACED_WAITS_MS,
   messageRetryDelayMs,
   shopTime,
 } from './notifications.js';
@@ -1601,6 +1603,75 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         .map((message) => message.kind),
       // Delivered before the worker heard it was shipped: delivered alone.
     ).toEqual(['order_placed', 'order_confirmed', 'order_delivered']);
+  });
+
+  it('tells of an order placed and paid together once, by the news of its payment (ADR-621)', async () => {
+    await withoutConfirmations();
+    unwrap(
+      await new InventoryService(database, new VariantService(database)).setQuantities(tenant, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [
+          {
+            inventoryItemId: variantId,
+            locationId: (await new LocationService(database).primary(tenant)).id,
+            quantity: 100,
+          },
+        ],
+      }),
+    );
+    const told = async (orderId: string) =>
+      (await queued())
+        .filter((message) => message.order_id === orderId && message.channel !== 'email')
+        .map((message) => [message.kind, message.status]);
+    // Paid by transfer before the worker heard it was placed: its payment's news alone.
+    const byTransfer = await placeOnline({ paymentMethod: 'bank_transfer' });
+    unwrap(await orders().markAsPaid(tenant, byTransfer.id));
+    await dispatch(2);
+    expect(await told(byTransfer.id)).toEqual([
+      ['order_placed', 'skipped'],
+      ['order_paid', 'pending'],
+    ]);
+
+    // To be paid online at checkout, through the shop's gateway: the news of it placed waits for
+    // the payment...
+    const gateway = {
+      gatewaysOf: () => Promise.resolve([{ gateway: 'jazzcash', name: 'JazzCash' }]),
+      discountOf: () => Promise.resolve(null),
+    } as unknown as OnlinePayments;
+    const paying = new OrderService(
+      database,
+      new VariantService(database),
+      new LocationService(database),
+      new StockService(),
+      new CustomerService(database),
+      new BlocklistService(database),
+      gateway,
+    );
+    const online = await placeOnline({ paymentMethod: 'online' }, paying);
+    await dispatch(2);
+    const { rows } = await admin.query<{ next_attempt_at: Date }>(
+      'SELECT next_attempt_at FROM messaging.messages WHERE order_id = $1',
+      [online.id],
+    );
+    expect(rows[0]!.next_attempt_at.getTime()).toBeGreaterThan(
+      Date.now() + PLACED_WAITS_MS - 60_000,
+    );
+    // ...whose news takes its place, said once.
+    unwrap(await orders().markAsPaid(tenant, online.id));
+    await dispatch(2);
+    expect(await told(online.id)).toEqual([
+      ['order_placed', 'skipped'],
+      ['order_paid', 'pending'],
+    ]);
+
+    // Left unpaid: told it was placed once the wait is over.
+    const unpaid = await placeOnline({ paymentMethod: 'online' }, paying);
+    await dispatch(2);
+    expect(await told(unpaid.id)).toEqual([['order_placed', 'pending']]);
+    // Left for the tests after it to find nothing waiting to be paid.
+    unwrap(await orders().cancel(tenant, unpaid.id, { reason: 'customer' }));
+    await dispatch(2);
   });
 
   it('reminds the customer to pay a day before an unpaid order is cancelled, with its page (ADR-174)', async () => {

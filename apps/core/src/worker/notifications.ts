@@ -67,6 +67,10 @@ const ON_A_CALL = 'on an automated call';
  * their answer is kept for the shop. One whose customer left the reminder unanswered is called,
  * where the shop says to, the key they press its answer (COD-03, ADR-611). An order its customer collects says where once it is ready
  * (ADR-389).
+ *
+ * An order placed and paid together hears of its payment alone (ADR-621): the news of it paid in
+ * full takes the place of the news of it placed while no sender has taken that yet, and one placed
+ * to be paid online at checkout waits {@link PLACED_WAITS_MS} for it.
  */
 export class OrderNotifications {
   /** The events {@link handle} reads. */
@@ -187,6 +191,13 @@ export class OrderNotifications {
         customerId: order.customerId,
       };
       if (order.amountPaid >= order.total) {
+        // Paid while the news of it placed waits (ADR-621): this says both, in its place.
+        await this.messages.supersedeIn(
+          tx,
+          shopId,
+          `order_placed:${orderId}`,
+          'Not sent: the message of its payment said it was placed',
+        );
         await this.messages.queueIn(tx, shopId, {
           ...base,
           kind: 'order_paid',
@@ -407,6 +418,12 @@ export class OrderNotifications {
         customerId: order.customerId,
         dedupeKey: `${kind}:${orderId}`,
         variables,
+        // Paid online at checkout a moment later, as most are, the payment's news says both
+        // (ADR-621): this waits to be taken over, and goes for an order left unpaid.
+        notBefore:
+          order.paymentMethod === 'online' && order.stage === 'awaiting_payment'
+            ? new Date(Date.now() + PLACED_WAITS_MS)
+            : null,
       });
       // Its link is made once it is queued: an event heard twice makes one, and the link the
       // message carries stays the order's.
@@ -579,6 +596,12 @@ const PAID_AHEAD: readonly string[] = [
   'to_pack',
   'to_book',
 ];
+
+/**
+ * How long the news of an order placed to be paid online at checkout waits for its payment,
+ * whose news says both (ADR-621).
+ */
+export const PLACED_WAITS_MS = 10 * 60_000;
 
 /** How many of a shop's messages go in one round. */
 const BATCH = 50;
