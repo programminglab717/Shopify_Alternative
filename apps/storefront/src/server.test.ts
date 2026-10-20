@@ -2994,6 +2994,11 @@ describe('Carts', () => {
     // Each page says checkout is paused, and why (ADR-604).
     expect(home.body).toContain('<strong>Orders are paused for a while.</strong>');
     expect(home.body).toContain('Back after Eid.');
+    // Hatti Base says so in its own place too, from shop.checkout_paused, the bar standing aside
+    // for it in the browser (ADR-620).
+    expect(home.body).toMatch(
+      /<div class="checkout-paused" role="status" data-checkout-paused>\s*<strong>Orders are paused for a while\.<\/strong>\s*<span dir="auto">Back after Eid\.<\/span>\s*<span>We take orders again soon\.<\/span>/,
+    );
     expect((await get(`/products/${lawn.handle}`)).statusCode).toBe(200);
     expect((await get('/cart.js')).statusCode).toBe(200);
     await app.close();

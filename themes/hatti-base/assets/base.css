@@ -58,6 +58,13 @@ h3 {
 .section-title h2 {
   margin: 0;
 }
+.checkout-paused {
+  padding: 0.625rem 1rem;
+  background: #fef3c7;
+  color: #78350f;
+  text-align: center;
+}
+
 .breadcrumbs ol {
   display: flex;
   flex-wrap: wrap;

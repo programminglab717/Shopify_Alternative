@@ -474,6 +474,35 @@ describe('Storefront rendering', () => {
     }
   });
 
+  it('says orders are paused in its own place and words, while they are (ADR-620)', async () => {
+    const sample = sampleStore();
+    const noticeOf = async (maintenance: ShopDoc['maintenance'], locale?: string) => {
+      const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+      const store = new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, timezone: 'Asia/Karachi', maintenance },
+      });
+      const { html } = await renderer.render({ path: '/', locale }, store.fresh());
+      const notice = /<div class="checkout-paused"[^>]*>([\s\S]*?)<\/div>/.exec(html);
+      return notice && notice[1]!.replace(/\s+/g, ' ').trim();
+    };
+    const pause = {
+      message: 'Eid break <3>',
+      until: '2099-10-12T04:00:00.000Z',
+      checkoutOnly: true as const,
+    };
+    expect(await noticeOf(pause)).toBe(
+      '<strong>Orders are paused for a while.</strong> <span dir="auto">Eid break &lt;3&gt;</span> ' +
+        '<span>We take orders again from 12 October 2099 at 9:00 AM.</span>',
+    );
+    expect(await noticeOf({ ...pause, message: '', until: null }, 'ur')).toBe(
+      '<strong>آرڈر کچھ دیر کے لیے بند ہیں۔</strong> <span>ہم جلد دوبارہ آرڈر لیں گے۔</span>',
+    );
+    // Not once the time has come, nor while the shop takes orders.
+    expect(await noticeOf({ ...pause, until: '2020-01-01T00:00:00.000Z' })).toBeNull();
+    expect(await noticeOf(undefined)).toBeNull();
+  });
+
   it('shows where each page sits above it, unless the theme turns it off (ADR-614)', async () => {
     const trailOf = async (request: PageRequest, theme = files) => {
       const renderer = new PageRenderer(loadTheme(theme), {

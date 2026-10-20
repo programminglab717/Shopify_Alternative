@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-619 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-620 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -627,6 +627,7 @@
 | 617 | The storefront follows a chain of redirects to its end and sends shoppers there in one hop, through addresses it has no page at, five redirects past the first at most | Accepted |
 | 618 | The Search listings tab flags images that say nothing of what they show: a product's photos, an article's image and the images in pages' and articles' text, an article's image described by its file's words where it has none of its own | Accepted |
 | 619 | A comment that reads as spam is kept as spam, neither shown nor held: links in its name, link markup, more than two links, what spam sells, or a long comment again within the day; and a comment held for approval is pushed to who writes the shop's blogs | Accepted |
+| 620 | Themes are given a pause of checkout alone as shop.checkout_paused, its message and when orders come back, and Hatti Base says so in its own place and words; the platform's bar stands aside for a theme's notice marked data-checkout-paused | Accepted |
 
 ---
 
@@ -22366,3 +22367,22 @@
 * **Alternatives:** **A service such as Akismet:** sends shoppers' words and addresses to a
   third party, and a contract Hatti does not have; the signs here can stand in front of one
   later. **Spam held for approval instead:** a shop would still read it.
+
+## ADR-620 · Themes are given a pause of checkout alone as shop.checkout_paused, its message and when orders come back, and Hatti Base says so in its own place and words; the platform's bar stands aside for a theme's notice marked data-checkout-paused
+
+* **Context:** While checkout alone is paused, the storefront lays the platform's bar over every
+  page's top (ADR-604), in the platform's colours and words, the theme knowing nothing of it.
+  A theme could not put the notice where its own announcements go, nor in its own words (status
+  shortcut 115).
+* **Decision:** Liquid's `shop.checkout_paused` is Hatti's own: while checkout alone is paused,
+  the shop's message as typed and `until`, when orders come back, nil for no time set; nil
+  while the shop takes orders, and while the whole storefront is paused, whose page is the
+  platform's. A theme's notice marked `data-checkout-paused` has the platform's bar stand aside
+  for it in the browser, and is taken away with the bar's own time once that has come, for pages
+  kept in a cache. Hatti Base shows the notice above its header, in English or Urdu, the time in
+  the shop's time zone through its own date format, the message escaped as text.
+* **Consequences:** Themes that know of the pause say so as they choose; those that do not keep
+  the platform's bar, so shoppers are never left unknowing. The theme editor's preview shows the
+  notice, which the bar never did.
+* **Alternatives:** **A setting turning the bar off:** a theme without a notice would leave
+  shoppers unknowing. **Shopify's own objects:** Shopify has none for a pause.

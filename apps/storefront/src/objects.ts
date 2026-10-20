@@ -1,4 +1,5 @@
 import { Drop } from 'liquidjs';
+import { checkoutPausedAt } from '@hatti/storefront-data';
 import type {
   AttributeWordDoc,
   ArticleDoc,
@@ -938,6 +939,8 @@ export function shopObject(
   platformUrl?: string,
   /** The page's language, for its policies' addresses and titles. */
   language: { locale: string; prefix: string } = { locale: 'en', prefix: '' },
+  /** When the page is made, for what the shop paused. */
+  now: Date = new Date(),
 ): Record<string, unknown> {
   const platform = platformUrl ? new URL(platformUrl) : null;
   const domain = doc.domain || (platform ? `${doc.handle}.${platform.hostname}` : '');
@@ -963,6 +966,11 @@ export function shopObject(
     back_in_stock: doc.backInStock === true,
     // What Hatti verified of the shop (ADR-465), Hatti's own: "identity", "business", or nil.
     verified: doc.verified ?? null,
+    // Orders paused, its storefront open to browse (ADR-603, ADR-620), Hatti's own: the shop's
+    // message as typed, and when orders come back, nil for no time set; nil while it takes them.
+    checkout_paused: checkoutPausedAt(doc.maintenance, now)
+      ? { message: doc.maintenance!.message, until: doc.maintenance!.until }
+      : null,
     // Its return window (ADR-468), Hatti's own: days, 0 for none, and exchanges alone; or nil.
     returns: doc.returns
       ? { days: doc.returns.days, exchanges_only: doc.returns.exchangesOnly }

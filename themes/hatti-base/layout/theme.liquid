@@ -27,6 +27,7 @@
   </head>
   <body class="template-{{ template.name }}">
     <a class="skip-link" href="#main">{{ 'accessibility.skip_to_content' | t }}</a>
+    {%- render 'checkout-paused' %}
     {% sections 'header-group' %}
     <main id="main" tabindex="-1">
       {%- if settings.show_breadcrumbs %}

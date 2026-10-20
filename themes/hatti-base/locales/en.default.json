@@ -2,6 +2,11 @@
   "general": {
     "home": "Home",
     "cart": "Cart",
+    "checkout_paused": {
+      "title": "Orders are paused for a while.",
+      "until": "We take orders again from {{ when }}.",
+      "soon": "We take orders again soon."
+    },
     "menu": "Main menu",
     "language": "اردو",
     "whatsapp": {
@@ -387,6 +392,7 @@
     }
   },
   "date_formats": {
-    "day_month_year": "%-d %B %Y"
+    "day_month_year": "%-d %B %Y",
+    "day_month_year_time": "%-d %B %Y at %-I:%M %p"
   }
 }

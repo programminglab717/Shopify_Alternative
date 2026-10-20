@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import { RETRY_AFTER, checkoutPausedBar, maintenancePage, retryAfterOf } from './maintenance.js';
 import { checkoutPausedAt } from '@hatti/storefront-data';
+import { shopObject } from './objects.js';
 
 describe('A paused shop (ADR-252)', () => {
   const now = new Date('2026-10-07T10:00:00Z');
@@ -52,13 +53,34 @@ describe('A shop whose checkout alone is paused (ADR-603, ADR-604)', () => {
     expect(bar).toContain('<strong>Orders are paused for a while.</strong>');
     expect(bar).toContain('<span dir="auto">Eid break &lt;3&gt;: couriers are off.</span>');
     expect(bar).toContain('We take orders again from 12 October 2026 at 9:00 am.');
-    // Gone by itself once the time comes, from a page kept in a cache.
-    expect(bar).toContain(`if(Date.now()>=${Date.parse(pause.until)})return;`);
+    // Gone by itself once the time comes, from a page kept in a cache, with the theme's own
+    // notice; standing aside for that notice before (ADR-620).
+    expect(bar).toContain(
+      `if(Date.now()>=${Date.parse(pause.until)}){document.querySelectorAll("[data-checkout-paused]")` +
+        '.forEach(function(own){own.remove()});return}',
+    );
+    expect(bar).toContain('if(document.querySelector("[data-checkout-paused]"))return;');
     const urdu = checkoutPausedBar(shop, { ...pause, message: '', until: null }, 'ur');
     expect(urdu).toContain('dir="rtl"');
     expect(urdu).toContain('آرڈر کچھ دیر کے لیے بند ہیں۔');
     expect(urdu).toContain('ہم جلد دوبارہ آرڈر لیں گے۔');
     expect(urdu).not.toContain('Date.now()');
+  });
+
+  it('gives themes what it paused as shop.checkout_paused, while it is (ADR-620)', () => {
+    const before = new Date('2026-10-12T03:59:00Z');
+    const paused = { ...shop, maintenance: pause };
+    const at = (doc: typeof shop, now: Date) => shopObject(doc, undefined, undefined, now);
+    expect(at(paused, before).checkout_paused).toEqual({
+      message: 'Eid break <3>:\n couriers are off.',
+      until: '2026-10-12T04:00:00.000Z',
+    });
+    expect(at(paused, new Date('2026-10-12T04:00:00Z')).checkout_paused).toBeNull();
+    // Not while the whole storefront is paused, whose page is the platform's; nor while open.
+    expect(
+      at({ ...shop, maintenance: { message: '', until: null } }, before).checkout_paused,
+    ).toBeNull();
+    expect(at(shop, before).checkout_paused).toBeNull();
   });
 
   it("is paused until the time it set, and only where the pause is checkout's alone", () => {

@@ -2,6 +2,11 @@
   "general": {
     "home": "ہوم",
     "cart": "کارٹ",
+    "checkout_paused": {
+      "title": "آرڈر کچھ دیر کے لیے بند ہیں۔",
+      "until": "ہم {{ when }} سے دوبارہ آرڈر لیں گے۔",
+      "soon": "ہم جلد دوبارہ آرڈر لیں گے۔"
+    },
     "menu": "مینو",
     "language": "English",
     "whatsapp": {
@@ -387,6 +392,7 @@
     }
   },
   "date_formats": {
-    "day_month_year": "%-d %B %Y"
+    "day_month_year": "%-d %B %Y",
+    "day_month_year_time": "%-d %B %Y، %-I:%M %p"
   }
 }

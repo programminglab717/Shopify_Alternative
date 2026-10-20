@@ -123,7 +123,9 @@ const BAR_WORDS: Readonly<Record<'en' | 'ur', { title: string; from: string; soo
  * The bar the open storefront's pages show while checkout alone is paused (ADR-604): that orders
  * are paused, the shop's message on one line, and when they come back, in the page's language. It
  * is laid over the theme's page at its top by a script, as the preview bar is, and goes away by
- * itself once the time the shop set has come, for pages kept in a cache.
+ * itself once the time the shop set has come, for pages kept in a cache. A theme that says so
+ * itself, from `shop.checkout_paused`, marks its notice `data-checkout-paused` (ADR-620): the
+ * bar stands aside for it, and takes it away with the bar's own time.
  */
 export function checkoutPausedBar(
   shop: ShopDoc,
@@ -146,7 +148,11 @@ export function checkoutPausedBar(
     'background:#fef3c7;color:#78350f;font:14px/1.5 system-ui,sans-serif;text-align:center}' +
     '</style>' +
     '<script>addEventListener("DOMContentLoaded",function(){' +
-    (until !== null ? `if(Date.now()>=${until})return;` : '') +
+    (until !== null
+      ? `if(Date.now()>=${until}){document.querySelectorAll("[data-checkout-paused]")` +
+        '.forEach(function(own){own.remove()});return}'
+      : '') +
+    'if(document.querySelector("[data-checkout-paused]"))return;' +
     'var bar=document.getElementById("hatti-paused-bar");if(bar)document.body.prepend(bar.content)' +
     '})</script>'
   );

@@ -1,0 +1,20 @@
+{%- comment -%}
+  While the shop takes no orders, its storefront open to browse (ADR-603), this says so where the
+  theme puts it, in its own words (ADR-620): the shop's message and when orders come back. Marked
+  data-checkout-paused, so the platform's own bar stands aside, and takes it away once the time
+  the shop set has come, for pages kept in a cache.
+{%- endcomment -%}
+{%- if shop.checkout_paused -%}
+  <div class="checkout-paused" role="status" data-checkout-paused>
+    <strong>{{ 'general.checkout_paused.title' | t }}</strong>
+    {%- if shop.checkout_paused.message != blank %}
+      <span dir="auto">{{ shop.checkout_paused.message | escape }}</span>
+    {%- endif %}
+    {%- if shop.checkout_paused.until %}
+      {%- assign when = shop.checkout_paused.until | date: format: 'day_month_year_time' %}
+      <span>{{ 'general.checkout_paused.until' | t: when: when }}</span>
+    {%- else %}
+      <span>{{ 'general.checkout_paused.soon' | t }}</span>
+    {%- endif %}
+  </div>
+{%- endif -%}
