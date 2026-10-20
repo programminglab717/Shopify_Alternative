@@ -349,6 +349,20 @@ describe("Messages' words", () => {
       'Rs 4,750',
     ]);
     expect(messageText('order_advance_paid', 'ur', advance)).toContain('Rs 4,750');
+    // Part of what it waits for (ADR-629): what came, what is left, and its page.
+    const part = { ...paid, amount: 'Rs 2,000', left: 'Rs 3,250' };
+    expect(messageText('order_part_paid', 'en', part)).toBe(
+      'Assalam-o-Alaikum Ayesha! Zari Fashions has received Rs 2,000 for your order #1043. ' +
+        'Rs 3,250 is still to pay before it ships. Its page says how:',
+    );
+    expect(templateParameters('order_part_paid', part)).toEqual([
+      'Ayesha',
+      'Zari Fashions',
+      'Rs 2,000',
+      '#1043',
+      'Rs 3,250',
+    ]);
+    expect(messageText('order_part_paid', 'ur', part)).toContain('Rs 3,250');
   });
 
   it('reminds a customer to pay before the order is cancelled, with its page (ADR-174)', () => {
@@ -746,6 +760,7 @@ describe("Messages' words", () => {
       'order_cancelled',
       'order_paid',
       'order_advance_paid',
+      'order_part_paid',
       'order_payment_reminder',
       'order_confirmation_reminder',
       'store_credit_given',

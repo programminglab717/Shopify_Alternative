@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-628 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-629 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -636,6 +636,7 @@
 | 626 | The Search listings tab counts the images without words for what they show in a product's or a collection's description too, as it does those in pages' and articles' text | Accepted |
 | 627 | Orders waiting for their first call longer than the shop's target are pushed to its owners, managers and confirmation agents, as the new kind orders_overdue, at most once an hour, within its calling hours alone, opening the Confirmation Desk | Accepted |
 | 628 | A delivery address's pin prints on its packing slip and its courier label as a QR code of its place in Google Maps, for the rider to scan with a phone's camera; an invoice, the customer's, carries none | Accepted |
+| 629 | A customer whose order has part of what it waits for before it ships, by transfer or as staff record it, hears what came, what is left to pay and its page, as the new order_part_paid, once for each sum received | Accepted |
 
 ---
 
@@ -22553,3 +22554,26 @@
 * **Alternatives:** **A plus code in words:** riders would type it; a scan opens the map.
   **A `geo:` link:** shorter, but iPhones' cameras don't open it. **The pin in the courier's
   booking:** their address fields are for the address (ADR-259).
+
+## ADR-629 · A customer whose order has part of what it waits for before it ships, by transfer or as staff record it, hears what came, what is left to pay and its page, as the new order_part_paid, once for each sum received
+
+* **Context:** A customer hears that the shop has their payment once the order is paid in
+  full, or once its advance is in (ADR-171), but nothing of part of it: a transfer short of the
+  total, as customers send when a bank app caps a day's transfers or they pay in two, or part
+  of an advance. They wrote to the shop to ask whether it came, and what was left (status
+  shortcut 91). The order waits to ship meanwhile, and is cancelled if the rest never comes
+  (ADR-174).
+* **Decision:** Heard from `order.paid` while the order waits to ship, as ADR-171's are: where
+  something is paid but the order still waits for some of what it asks before it ships, the
+  whole of a transfer's or an online payment's total, or a cash-on-delivery order's advance, the
+  customer hears `order_part_paid`: what the shop has received, what is left to pay before it
+  ships, and the order's page, which says how. A template of Hatti's number in English and
+  Urdu, Meta's utility category, with the page as its button ("Pay the rest"), emailed too where
+  the order has an address (ADR-181), and offered to shops' own numbers (ADR-537). Once for each
+  sum received, as the advance's; the shop may turn it off.
+* **Consequences:** A customer who paid part knows it arrived and what to send, without
+  writing to ask. Each part costs the shop a message.
+* **Alternatives:** **Each payment's own amount:** the event carries what is paid in all
+  (ADR-171), and "Rs 2,000 received, Rs 3,250 left" reads as plainly. **Waiting for the
+  reminder before the order is cancelled (ADR-174):** it comes a day before, too late for a
+  customer who thought they had paid.

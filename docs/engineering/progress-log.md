@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Part of a payment told
+
+* **A customer whose order has part of what it waits for before it ships hears so** ([ADR-629](../architecture/13-decision-log.md#adr-629--a-customer-whose-order-has-part-of-what-it-waits-for-before-it-ships-by-transfer-or-as-staff-record-it-hears-what-came-what-is-left-to-pay-and-its-page-as-the-new-order_part_paid-once-for-each-sum-received)):
+  what came, what is left to pay and the order's page, as the new template `order_part_paid`,
+  once for each sum received; the shop may turn it off on its Messages page.
+* 3743 tests, as before: the payment notices' and templates' tests now cover it.
+
 ### 5fcfb46 · Pins on packing slips and labels
 
 * **A delivery address's pin prints on its packing slip and courier label** ([ADR-628](../architecture/13-decision-log.md#adr-628--a-delivery-addresss-pin-prints-on-its-packing-slip-and-its-courier-label-as-a-qr-code-of-its-place-in-google-maps-for-the-rider-to-scan-with-a-phones-camera-an-invoice-the-customers-carries-none)) as a

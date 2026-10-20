@@ -23,6 +23,7 @@ export enum MessageKind {
   ORDER_CANCELLED = 'ORDER_CANCELLED',
   ORDER_PAID = 'ORDER_PAID',
   ORDER_ADVANCE_PAID = 'ORDER_ADVANCE_PAID',
+  ORDER_PART_PAID = 'ORDER_PART_PAID',
   ORDER_PAYMENT_REMINDER = 'ORDER_PAYMENT_REMINDER',
   ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
   ORDER_CONFIRMATION_CALL = 'ORDER_CONFIRMATION_CALL',
@@ -118,6 +119,11 @@ registerEnumType(MessageKind, {
       description:
         "The shop has their cash-on-delivery order's advance, before it ships, and what is left " +
         'to pay the rider (ADR-171).',
+    },
+    ORDER_PART_PAID: {
+      description:
+        'The shop has part of what their order waits for before it ships, by transfer or as ' +
+        'staff recorded it: what came, what is left, and its page (ADR-629).',
     },
     ORDER_CONFIRMATION_REMINDER: {
       description:

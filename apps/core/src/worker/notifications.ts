@@ -173,7 +173,8 @@ export class OrderNotifications {
   /**
    * The shop has the customer's payment before the order ships (ADR-171): told once the order is
    * paid in full, or, paying on delivery, once its advance is in, with what is left for the
-   * rider. Nothing for a part paid otherwise, or a cancelled order.
+   * rider; part of what it waits for, by transfer or as staff recorded it, with what is left to
+   * pay and its page (ADR-629). Nothing for a cancelled order.
    */
   async #paid(shopId: string, orderId: string): Promise<void> {
     await this.database.tenant(shopId, async (tx) => {
@@ -212,6 +213,15 @@ export class OrderNotifications {
           dedupeKey: `order_advance_paid:${orderId}:${order.amountPaid}`,
           variables: { ...variables, due: rupees(order.cashDue) },
         });
+      } else if (order.awaited > 0n && order.amountPaid > 0n) {
+        const id = await this.messages.queueIn(tx, shopId, {
+          ...base,
+          kind: 'order_part_paid',
+          // Once for each sum received, as the advance's.
+          dedupeKey: `order_part_paid:${orderId}:${order.amountPaid}`,
+          variables: { ...variables, left: rupees(order.awaited) },
+        });
+        if (id) await this.#carryPage(tx, shopId, orderId, id, 'that part of its payment came');
       }
     });
   }

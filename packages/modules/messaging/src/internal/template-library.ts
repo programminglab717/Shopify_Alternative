@@ -70,6 +70,7 @@ const LINK_LABELS: Partial<Record<MessageKind, Record<MessageLanguage, string>>>
   order_address: { en: 'Change address', ur: 'پتہ بدلیں' },
   order_shipped: { en: 'Track your order', ur: 'آرڈر ٹریک کریں' },
   order_out_for_delivery: { en: 'Track your order', ur: 'آرڈر ٹریک کریں' },
+  order_part_paid: { en: 'Pay the rest', ur: 'باقی ادائیگی کریں' },
   order_payment_reminder: { en: 'Pay now', ur: 'ابھی ادائیگی کریں' },
   review_request: { en: 'Rate your order', ur: 'رائے دیں' },
 };

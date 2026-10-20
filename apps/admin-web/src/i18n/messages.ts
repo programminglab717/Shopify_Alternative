@@ -2524,6 +2524,7 @@ const en = {
   'messages.kind.ORDER_PAYMENT_REMINDER': 'Payment reminder',
   'messages.kind.ORDER_PAID': 'Payment received',
   'messages.kind.ORDER_ADVANCE_PAID': 'Advance received',
+  'messages.kind.ORDER_PART_PAID': 'Part of a payment received',
   'messages.kind.ORDER_SHIPPED': 'Order shipped',
   'messages.kind.ORDER_OUT_FOR_DELIVERY': 'Out for delivery',
   'messages.kind.ORDER_DELIVERED': 'Order delivered',
@@ -2557,6 +2558,8 @@ const en = {
   'messages.hint.ORDER_PAID': 'When the whole order is paid before it ships.',
   'messages.hint.ORDER_ADVANCE_PAID':
     'When their advance comes in, with what is left for the rider.',
+  'messages.hint.ORDER_PART_PAID':
+    'When part of what is paid before it ships comes in, with what is left and its page.',
   'messages.hint.ORDER_SHIPPED': 'When the courier takes the parcel, with its tracking.',
   'messages.hint.ORDER_OUT_FOR_DELIVERY': 'When the rider sets out, with the cash to keep ready.',
   'messages.hint.ORDER_DELIVERED': 'When the parcel is delivered.',
@@ -7715,6 +7718,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.ORDER_PAYMENT_REMINDER': 'ادائیگی کی یاد دہانی',
   'messages.kind.ORDER_PAID': 'ادائیگی مل گئی',
   'messages.kind.ORDER_ADVANCE_PAID': 'ایڈوانس مل گیا',
+  'messages.kind.ORDER_PART_PAID': 'ادائیگی کا کچھ حصہ مل گیا',
   'messages.kind.ORDER_SHIPPED': 'آرڈر روانہ ہو گیا',
   'messages.kind.ORDER_OUT_FOR_DELIVERY': 'ڈیلیوری کے لیے نکل گیا',
   'messages.kind.ORDER_DELIVERED': 'آرڈر ڈیلیور ہو گیا',
@@ -7747,6 +7751,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.hint.ORDER_PAYMENT_REMINDER': 'بغیر ادائیگی آرڈر منسوخ ہونے سے ایک دن پہلے۔',
   'messages.hint.ORDER_PAID': 'جب روانگی سے پہلے پورا آرڈر ادا ہو جائے۔',
   'messages.hint.ORDER_ADVANCE_PAID': 'جب ان کا ایڈوانس آئے، رائیڈر کو باقی رقم کے ساتھ۔',
+  'messages.hint.ORDER_PART_PAID':
+    'جب روانگی سے پہلے کی رقم کا کچھ حصہ آئے، باقی رقم اور آرڈر کے صفحے کے ساتھ۔',
   'messages.hint.ORDER_SHIPPED': 'جب کوریئر پارسل لے، ٹریکنگ کے ساتھ۔',
   'messages.hint.ORDER_OUT_FOR_DELIVERY': 'جب رائیڈر نکلے، تیار رکھنے والی رقم کے ساتھ۔',
   'messages.hint.ORDER_DELIVERED': 'جب پارسل ڈیلیور ہو۔',

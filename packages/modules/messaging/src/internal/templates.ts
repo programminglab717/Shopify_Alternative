@@ -25,6 +25,7 @@ export const MESSAGE_KINDS = [
   'order_cancelled',
   'order_paid',
   'order_advance_paid',
+  'order_part_paid',
   'order_payment_reminder',
   'order_confirmation_reminder',
   'order_confirmation_call',
@@ -257,6 +258,8 @@ export interface MessageVariables {
   total?: string;
   /** What the customer pays the rider: "Rs 5,250" (ADR-160). */
   due?: string;
+  /** What is left to pay before the order ships, part of it paid: "Rs 3,250" (ADR-629). */
+  left?: string;
   courier?: string;
   tracking?: string;
   /** The order's page for its customer, which follows its parcels too (ADR-160). */
@@ -602,6 +605,25 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: 'We have the advance for order {order}',
       ur: 'آرڈر {order} کی پیشگی رقم موصول ہو گئی ہے',
+    },
+  },
+  order_part_paid: {
+    whatsapp: 'hatti_order_part_paid',
+    category: 'utility',
+    parameters: ['name', 'shop', 'amount', 'order', 'left'],
+    // Its page, which says how to pay the rest.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {shop} has received {amount} for your order {order}. ' +
+        '{left} is still to pay before it ships. Its page says how:',
+      ur:
+        'السلام علیکم {name}! {shop} کو آپ کے آرڈر {order} کے لیے {amount} موصول ہو گئے ہیں۔ ' +
+        'روانگی سے پہلے {left} کی ادائیگی باقی ہے۔ ادائیگی کا طریقہ آرڈر کے صفحے پر ہے:',
+    },
+    subject: {
+      en: 'We have part of the payment for order {order}',
+      ur: 'آرڈر {order} کی ادائیگی کا کچھ حصہ موصول ہو گیا ہے',
     },
   },
   order_payment_reminder: {

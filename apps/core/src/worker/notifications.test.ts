@@ -1539,7 +1539,9 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     );
     const paid = async () =>
       (await queued())
-        .filter((message) => message.kind === 'order_paid' || message.kind === 'order_advance_paid')
+        .filter((message) =>
+          ['order_paid', 'order_advance_paid', 'order_part_paid'].includes(message.kind),
+        )
         .map((message) => [message.kind, message.order_id, message.channel, message.variables]);
     // Paid by transfer in full: told once, however often it is heard.
     const byTransfer = await placeOnline({ paymentMethod: 'bank_transfer' });
@@ -1554,7 +1556,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     };
     expect(await paid()).toEqual([['order_paid', byTransfer.id, 'whatsapp', told]]);
 
-    // Paying on delivery, its advance in: what is left for the rider. Part of it alone: nothing.
+    // Paying on delivery: part of its advance, what is left to send and its page (ADR-629); the
+    // advance in, what is left for the rider.
     unwrap(
       await new BankTransferService(database).update(tenant, {
         enabled: true,
@@ -1568,10 +1571,24 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     const withAdvance = await placeOnline({ advanceDue: 500_00n });
     unwrap(await orders().recordPayment(tenant, withAdvance.id, { amount: '200' }));
     await dispatch(2);
-    expect(await paid()).toHaveLength(1);
+    expect((await paid())[1]).toEqual([
+      'order_part_paid',
+      withAdvance.id,
+      'whatsapp',
+      {
+        name: 'Ayesha',
+        shop: 'Zari Fashions',
+        order: `#${withAdvance.number}`,
+        total: 'Rs 5,250',
+        amount: 'Rs 200',
+        left: 'Rs 300',
+        // Its page, which says how to pay the rest.
+        url: expect.stringContaining('/o/'),
+      },
+    ]);
     unwrap(await orders().recordPayment(tenant, withAdvance.id, { amount: '300' }));
     await dispatch(2);
-    expect((await paid())[1]).toEqual([
+    expect((await paid())[2]).toEqual([
       'order_advance_paid',
       withAdvance.id,
       'whatsapp',
@@ -1596,7 +1613,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     unwrap(await fulfillments().markDelivered(tenant, shipped.fulfillmentId));
     unwrap(await orders().markAsPaid(tenant, atTheDoor.id));
     await dispatch(2);
-    expect(await paid()).toHaveLength(2);
+    expect(await paid()).toHaveLength(3);
     expect(
       (await queued())
         .filter((message) => message.order_id === atTheDoor.id)
