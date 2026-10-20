@@ -1,4 +1,13 @@
-import { ArrowRight, Download, FileUp, PenLine, Plus, Search, Trash2 } from 'lucide-react';
+import {
+  ArrowRight,
+  CornerDownRight,
+  Download,
+  FileUp,
+  PenLine,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import {
@@ -27,7 +36,11 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
-/** A redirect, its old address or where it goes changed in place, or deleted after asking. */
+/**
+ * A redirect, its old address or where it goes changed in place, or deleted after asking; where
+ * another redirect sends shoppers on from its target, where they end up, to send them straight
+ * there (ADR-607), and a loop kept from before said.
+ */
 function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
   const { t } = useLocale();
   const remove = useAdminMutation<ContentMutationData, { id: string }>(UrlRedirectDeleteMutation);
@@ -42,16 +55,11 @@ function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
   const [target, setTarget] = useState(redirect.target);
   const [changed, setChanged] = useState<string | null>(null);
 
-  const onSave = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!path.trim() || !target.trim()) return;
+  const save = async (urlRedirect: { path: string; target: string }) => {
     setChanged(null);
-    let saved = path.trim();
+    let saved = urlRedirect.path;
     const ok = await attempt(async () => {
-      const { urlRedirectUpdate } = await update.mutateAsync({
-        id: redirect.id,
-        urlRedirect: { path: path.trim(), target: target.trim() },
-      });
+      const { urlRedirectUpdate } = await update.mutateAsync({ id: redirect.id, urlRedirect });
       // As the core keeps it: an address pasted whole is kept as its path.
       saved = urlRedirectUpdate.urlRedirect?.path ?? saved;
       return urlRedirectUpdate;
@@ -60,6 +68,12 @@ function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
       setEditing(false);
       setChanged(saved);
     }
+  };
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!path.trim() || !target.trim()) return;
+    await save({ path: path.trim(), target: target.trim() });
   };
 
   return (
@@ -92,6 +106,24 @@ function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
           </span>
         )}
       </div>
+      {redirect.finalTarget && !editing && (
+        <div className="flex flex-wrap items-center gap-2 text-[length:var(--hatti-type-body-sm-size)]">
+          <CornerDownRight aria-hidden className="size-4 shrink-0 text-secondary" />
+          <span className="text-secondary" dir="auto">
+            {t('redirects.chain', { target: redirect.finalTarget })}
+          </span>
+          <Button
+            variant="secondary"
+            busy={update.isPending}
+            onClick={() =>
+              void save({ path: redirect.path, target: redirect.finalTarget ?? redirect.target })
+            }
+          >
+            {t('redirects.straighten', { target: redirect.finalTarget })}
+          </Button>
+        </div>
+      )}
+      {redirect.loops && <Alert tone="danger">{t('redirects.loops')}</Alert>}
       {editing && (
         <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-3">
           <TextField

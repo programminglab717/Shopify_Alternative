@@ -2594,6 +2594,10 @@ export interface UrlRedirectValue {
   id: string;
   path: string;
   target: string;
+  /** Where shoppers end up through the shop's redirects in a row, where not the target (ADR-607). */
+  finalTarget?: string | null;
+  /** Whether its redirects in a row come back round, kept from before loops were refused. */
+  loops?: boolean;
 }
 
 export interface UrlRedirectUpdateData {

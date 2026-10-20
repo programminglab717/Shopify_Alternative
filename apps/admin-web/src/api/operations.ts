@@ -5683,6 +5683,8 @@ export const UrlRedirectsQuery = /* GraphQL */ `
         id
         path
         target
+        finalTarget
+        loops
       }
       pageInfo {
         hasNextPage

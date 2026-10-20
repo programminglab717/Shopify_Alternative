@@ -29,6 +29,23 @@ export class UrlRedirect {
   @Field({ description: 'Where it sends them: a path on the shop, or an http(s) address.' })
   target!: string;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Hatti's own: where shoppers end up where the target is another redirect's path, its " +
+      'redirects in a row followed as the storefront follows them where none of their paths has ' +
+      'a page; null where the target is where they end up. A redirect straight there saves ' +
+      'shoppers and search engines the hops.',
+  })
+  finalTarget!: string | null;
+
+  @Field({
+    description:
+      "Hatti's own: whether its redirects in a row come back round to a path they passed, as " +
+      'none made since loops were refused can.',
+  })
+  loops!: boolean;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 

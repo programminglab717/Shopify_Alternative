@@ -195,6 +195,8 @@ export function toUrlRedirect(record: UrlRedirectRecord): UrlRedirect {
     id: toPublicId('urlRedirect', record.id),
     path: record.path,
     target: record.target,
+    finalTarget: record.finalTarget,
+    loops: record.loops,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });

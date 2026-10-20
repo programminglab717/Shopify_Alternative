@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { REDIRECT_LIMIT, redirectPath, redirectTarget } from './redirect-paths.js';
 import { urlRedirects } from './schema.js';
@@ -154,6 +155,56 @@ describe.skipIf(!server)('UrlRedirectService', () => {
       'url_redirect.updated',
       'url_redirect.deleted',
     ]);
+  });
+
+  it('refuses a loop, and says where redirects in a row end (ADR-607)', async () => {
+    const a = unwrap(await service.create(f.a, { path: '/a', target: '/b?x=1' }));
+    expect(a).toMatchObject({ finalTarget: null, loops: false });
+    unwrap(await service.create(f.a, { path: '/b', target: '/Ur/C/' }));
+    const c = unwrap(await service.create(f.a, { path: '/c', target: 'https://zari.pk/d' }));
+    unwrap(await service.create(f.a, { path: '/d', target: '/a' }));
+
+    // Back to /a, however the target is written.
+    unwrap(await service.create(f.a, { path: '/e', target: '/e2' }));
+    expect(errorsOf(await service.update(f.a, c.id, { target: '/A/' }))).toEqual([
+      ['target', 'INVALID', 'It would send shoppers round in a loop: /c → /a → /b → /c'],
+    ]);
+    unwrap(await service.create(f.a, { path: '/e2', target: '/c' }));
+    const list = await service.list(f.a, { first: 10 });
+    expect(list.items.map((r) => [r.path, r.finalTarget, r.loops])).toEqual([
+      ['/a', 'https://zari.pk/d', false],
+      ['/b', 'https://zari.pk/d', false],
+      ['/c', null, false],
+      ['/d', 'https://zari.pk/d', false],
+      ['/e', 'https://zari.pk/d', false],
+      ['/e2', 'https://zari.pk/d', false],
+    ]);
+    // Another shop's redirects are not followed.
+    expect(unwrap(await service.create(f.b, { path: '/x', target: '/a' })).finalTarget).toBeNull();
+    // Moving the redirect itself is no loop: its old path no longer sends anywhere.
+    expect(unwrap(await service.update(f.a, c.id, { path: '/c-old', target: '/c' }))).toMatchObject(
+      { path: '/c-old', finalTarget: null },
+    );
+
+    // A loop kept from before is said, and ends nowhere.
+    await f.db.tenant(f.a.shopId, async (tx) => {
+      await tx.update(urlRedirects).set({ target: '/a' }).where(eq(urlRedirects.path, '/c-old'));
+      await tx.update(urlRedirects).set({ target: '/c-old' }).where(eq(urlRedirects.path, '/a'));
+    });
+    expect(await service.get(f.a, a.id)).toMatchObject({ finalTarget: null, loops: true });
+
+    // A file's rows are checked against the shop's redirects and the rows before them.
+    const csv = 'Redirect from,Redirect to\n/f,/g\n/g,/h\n/h,/f\n/i,/e\n';
+    expect(unwrap(await service.import(f.a, csv))).toMatchObject({
+      created: 3,
+      rowErrors: [
+        {
+          row: 4,
+          column: 'Redirect to',
+          message: 'It would send shoppers round in a loop: /h → /f → /g → /h',
+        },
+      ],
+    });
   });
 
   it("sends a moved page's old address to its new one, the long way round never", async () => {

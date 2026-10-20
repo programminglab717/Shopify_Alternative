@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-606 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-607 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -614,6 +614,7 @@
 | 604 | While checkout alone is paused, the storefront's pages carry the platform's bar saying orders are paused, the shop's message and when they come back | Accepted |
 | 605 | A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has not had in full, as an Excel workbook to send it | Accepted |
 | 606 | The online store has one Search listings tab: every product's, collection's, page's, blog's and article's search engine listing, those without a description of their own first | Accepted |
+| 607 | A redirect that would send shoppers round a loop is refused, and each redirect says where its redirects in a row end, for the admin to send it straight there | Accepted |
 
 ---
 
@@ -22043,3 +22044,29 @@
   across two modules for what five existing connections give. **Writing listings on the tab
   itself:** quicker for many at once; left until shops ask, since the card where each is written
   previews it with its own text.
+
+## ADR-607 · A redirect that would send shoppers round a loop is refused, and each redirect says where its redirects in a row end, for the admin to send it straight there
+
+* **Context:** A redirect's target may be another redirect's path, so shoppers are sent on a hop
+  at a time, and a chain that came back to where it began was not refused (ADR-052): a browser
+  gives up on it, and search engines follow only a few hops. Shops moving from Shopify import
+  thousands of redirects at once (ONB-05), among them chains built up over years.
+* **Decision:** A redirect made, changed or imported is refused, as `INVALID` on its target, where
+  following the shop's redirects from its target would come back to its path, or pass a path
+  twice, or go past 20 hops, as browsers give up: "It would send shoppers round in a loop: /c →
+  /a → /b → /c". A target counts as a path on the shop as redirects are kept: lowercase, without
+  its query, a trailing slash or /ur. An import checks each row against the shop's redirects and
+  the rows before it; the rows that would loop are said, and the rest go in. `UrlRedirect` gains
+  two fields of Hatti's own: `finalTarget`, where shoppers end up where the target is another
+  redirect's path, followed a level of the chains at a time for a page of redirects; and
+  `loops`, for a loop kept from before. The admin's redirects tab says where a chained redirect
+  ends, with a button sending it straight there, and that a looping one goes round.
+* **Consequences:** No new loop reaches a storefront, and a shop sees and straightens the chains
+  it has. A chain is followed as the storefront would where none of its paths has a page: a
+  redirect from a path that has one waits, and is still counted, since deleting the page wakes
+  it. Moving a page (ADR-053) already sends earlier redirects straight to its new address, so
+  makes no chain.
+* **Alternatives:** **The storefront following chains to their end in one hop:** one answer for
+  shoppers, but a lookup per hop on every 404 the storefront answers; straightening them where
+  they are kept does it once. **Refusing chains too:** an import of a store's history would lose
+  rows that work.

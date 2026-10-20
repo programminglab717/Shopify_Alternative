@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Redirect loops refused, and chains shown
+
+* **A redirect that would send shoppers round a loop is refused, and each redirect says where its
+  redirects in a row end, for the admin to send it straight there** ([ADR-607](../architecture/13-decision-log.md#adr-607--a-redirect-that-would-send-shoppers-round-a-loop-is-refused-and-each-redirect-says-where-its-redirects-in-a-row-end-for-the-admin-to-send-it-straight-there), OS-09).
+* 3695 tests, 3 more: loops refused as redirects are made, changed and
+  imported, chains' ends through the service and the Admin API, and the admin's button.
+
 ### ec2a180 · Every search engine listing on one tab
 
 * **The online store has one Search listings tab: every product's, collection's, page's, blog's and

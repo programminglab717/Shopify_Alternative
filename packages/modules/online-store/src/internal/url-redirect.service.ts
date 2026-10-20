@@ -92,7 +92,7 @@ export class UrlRedirectService {
         .orderBy(asc(urlRedirects.id))
         .limit(options.first + 1);
       return {
-        items: rows.slice(0, options.first).map(toRecord),
+        items: await recordsOf(tx, tenant.shopId, rows.slice(0, options.first)),
         hasNextPage: rows.length > options.first,
       };
     });
@@ -101,7 +101,7 @@ export class UrlRedirectService {
   async get(tenant: TenantContext, id: string): Promise<UrlRedirectRecord | null> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const row = await this.#find(tx, tenant.shopId, id);
-      return row ? toRecord(row) : null;
+      return row ? ((await recordsOf(tx, tenant.shopId, [row]))[0] ?? null) : null;
     });
   }
 
@@ -121,6 +121,8 @@ export class UrlRedirectService {
       if ((counts?.total ?? 0) >= REDIRECT_LIMIT) {
         return failOne([], 'TOO_MANY', `A shop can keep at most ${REDIRECT_LIMIT} redirects`);
       }
+      const loop = await loopIn(tx, tenant.shopId, path, target);
+      if (loop) return failOne(['target'], 'INVALID', loopMessage(loop));
       const [row] = await tx
         .insert(urlRedirects)
         .values({ shopId: tenant.shopId, id: newId(), path, target })
@@ -128,7 +130,7 @@ export class UrlRedirectService {
         .returning();
       if (!row) return failOne(['path'], 'TAKEN', `${path} has a redirect already`);
       await recordEvent(tx, OnlineStoreEvents.UrlRedirectCreated, row);
-      return { ok: true, value: toRecord(row) };
+      return { ok: true, value: (await recordsOf(tx, tenant.shopId, [row]))[0]! };
     });
   }
 
@@ -149,14 +151,18 @@ export class UrlRedirectService {
         if (sendsBack(path, target)) {
           return failOne(['target'], 'INVALID', `${target} would send shoppers back to ${path}`);
         }
-        if (path === row.path && target === row.target) return { ok: true, value: toRecord(row) };
+        if (path === row.path && target === row.target) {
+          return { ok: true, value: (await recordsOf(tx, tenant.shopId, [row]))[0]! };
+        }
+        const loop = await loopIn(tx, tenant.shopId, path, target, row.id);
+        if (loop) return failOne(['target'], 'INVALID', loopMessage(loop));
         const [updated] = await tx
           .update(urlRedirects)
           .set({ path, target, updatedAt: sql`now()` })
           .where(and(eq(urlRedirects.shopId, tenant.shopId), eq(urlRedirects.id, id)))
           .returning();
         await recordEvent(tx, OnlineStoreEvents.UrlRedirectUpdated, updated!);
-        return { ok: true, value: toRecord(updated!) };
+        return { ok: true, value: (await recordsOf(tx, tenant.shopId, [updated!]))[0]! };
       });
     } catch (error) {
       // Another redirect has the path: the transaction is undone whole.
@@ -265,7 +271,22 @@ export class UrlRedirectService {
           .where(and(eq(urlRedirects.shopId, tenant.shopId), inArray(urlRedirects.path, paths)));
         for (const row of rows) taken.add(row.path);
       }
-      const fresh = wanted.filter((each) => !taken.has(each.path));
+      // A row that would send shoppers round a loop, through the shop's redirects and the rows
+      // before it, does not go in.
+      const sends = new Map(
+        (await shopRedirectsOf(tx, tenant.shopId)).map((each) => [each.path, each.target]),
+      );
+      const fresh: typeof wanted = [];
+      for (const each of wanted) {
+        if (taken.has(each.path)) continue;
+        const loop = loopAmong(sends, each.path, each.target);
+        if (loop) {
+          say(each.row, 1, loopMessage(loop));
+          continue;
+        }
+        sends.set(each.path, each.target);
+        fresh.push(each);
+      }
       const [counts] = await tx
         .select({ total: count() })
         .from(urlRedirects)
@@ -310,7 +331,7 @@ export class UrlRedirectService {
         value: {
           rows: records.length,
           created,
-          skipped: wanted.length - fresh.length,
+          skipped: taken.size,
           rowErrors: errors.slice(0, REDIRECT_IMPORT_LIMITS.rowErrors),
           rowErrorCount: errors.length,
           dryRun,
@@ -587,11 +608,123 @@ async function recordEvent(tx: Tx, type: string, row: UrlRedirectRow): Promise<v
   });
 }
 
-function toRecord(row: UrlRedirectRow): UrlRedirectRecord {
+/** The most redirects in a row followed to find where shoppers end up: past it, a chain is a loop. */
+export const MOST_HOPS = 20;
+
+/** The path on the shop a target sends shoppers to, as redirects are kept; null for an address elsewhere. */
+function pathOn(target: string): string | null {
+  return target.startsWith('/') ? redirectPath(target) : null;
+}
+
+/**
+ * The paths a redirect from `path` to `target` would send shoppers round, back to `path`, through
+ * the redirects `sends` keeps by path; null where it ends somewhere.
+ */
+function loopAmong(
+  sends: ReadonlyMap<string, string>,
+  path: string,
+  target: string,
+): string[] | null {
+  const round = [path];
+  for (let at = pathOn(target); at !== null;) {
+    const again = round.includes(at);
+    round.push(at);
+    // Round again, or further than browsers follow.
+    if (again || round.length > MOST_HOPS) return round;
+    const next = sends.get(at);
+    at = next === undefined ? null : pathOn(next);
+  }
+  return null;
+}
+
+/**
+ * The paths a redirect from `path` to `target` would send shoppers round, through the shop's
+ * redirects in `tx`, other than `except`'s, which it replaces; null where it ends somewhere.
+ */
+async function loopIn(
+  tx: Tx,
+  shopId: string,
+  path: string,
+  target: string,
+  except?: string,
+): Promise<string[] | null> {
+  const sends = new Map<string, string>();
+  for (let at = pathOn(target), hops = 0; at !== null && hops <= MOST_HOPS; hops++) {
+    if (at === path || sends.has(at)) break;
+    const [row] = await tx
+      .select({ id: urlRedirects.id, target: urlRedirects.target })
+      .from(urlRedirects)
+      .where(and(eq(urlRedirects.shopId, shopId), eq(urlRedirects.path, at)));
+    if (!row || row.id === except) break;
+    sends.set(at, row.target);
+    at = pathOn(row.target);
+  }
+  return loopAmong(sends, path, target);
+}
+
+function loopMessage(round: readonly string[]): string {
+  return `It would send shoppers round in a loop: ${round.join(' → ')}`;
+}
+
+/**
+ * The rows as records, each with where its chain of the shop's redirects ends: followed a hop at
+ * a time, a level of the chains at once, to an address no redirect is from.
+ */
+async function recordsOf(
+  tx: Tx,
+  shopId: string,
+  rows: UrlRedirectRow[],
+): Promise<UrlRedirectRecord[]> {
+  const ends = new Map<string, { at: string; seen: Set<string> }>();
+  for (const row of rows) {
+    if (pathOn(row.target) !== null)
+      ends.set(row.id, { at: row.target, seen: new Set([row.path]) });
+  }
+  const looping = new Set<string>();
+  let moving = [...ends.keys()];
+  for (let hop = 0; moving.length > 0; hop++) {
+    const paths = [...new Set(moving.map((id) => pathOn(ends.get(id)!.at)!))];
+    const found = await tx
+      .select({ path: urlRedirects.path, target: urlRedirects.target })
+      .from(urlRedirects)
+      .where(and(eq(urlRedirects.shopId, shopId), inArray(urlRedirects.path, paths)));
+    const sends = new Map(found.map((each) => [each.path, each.target]));
+    const next: string[] = [];
+    for (const id of moving) {
+      const end = ends.get(id)!;
+      const at = pathOn(end.at)!;
+      const to = sends.get(at);
+      if (to === undefined) continue;
+      if (end.seen.has(at) || hop >= MOST_HOPS) {
+        looping.add(id);
+        continue;
+      }
+      end.seen.add(at);
+      end.at = to;
+      if (pathOn(to) !== null) next.push(id);
+    }
+    moving = next;
+  }
+  return rows.map((row) => {
+    const end = ends.get(row.id);
+    const loops = looping.has(row.id);
+    return toRecord(row, {
+      finalTarget: loops || !end || end.at === row.target ? null : end.at,
+      loops,
+    });
+  });
+}
+
+function toRecord(
+  row: UrlRedirectRow,
+  chain: { finalTarget: string | null; loops: boolean },
+): UrlRedirectRecord {
   return {
     id: row.id,
     path: row.path,
     target: row.target,
+    finalTarget: chain.finalTarget,
+    loops: chain.loops,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

@@ -27,7 +27,11 @@ const CHECKED = {
   userErrors: [],
 };
 
-function core(role: StaffRole) {
+const REDIRECTS: Record<string, unknown>[] = [
+  { id: 'red_1', path: '/products/old-lawn', target: '/products/lawn' },
+];
+
+function core(role: StaffRole, redirects = REDIRECTS) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'StorefrontPreferences':
@@ -55,7 +59,7 @@ function core(role: StaffRole) {
       case 'UrlRedirects':
         return {
           urlRedirects: {
-            nodes: [{ id: 'red_1', path: '/products/old-lawn', target: '/products/lawn' }],
+            nodes: redirects,
             pageInfo: { hasNextPage: false },
           },
         };
@@ -299,6 +303,47 @@ describe("The storefront's preferences and redirects", () => {
       },
     });
     expect(screen.queryByRole('button', { name: 'Save the redirect' })).toBeNull();
+  });
+
+  it('says where redirects in a row end, sends one straight there, and says a loop (ADR-607)', async () => {
+    const fake = core('manager', [
+      {
+        id: 'red_1',
+        path: '/sale-2025',
+        target: '/sale-2026',
+        finalTarget: '/collections/eid',
+        loops: false,
+      },
+      {
+        id: 'red_2',
+        path: '/sale-2026',
+        target: '/collections/eid',
+        finalTarget: null,
+        loops: false,
+      },
+      { id: 'red_3', path: '/a', target: '/b', finalTarget: null, loops: true },
+    ]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=redirects');
+
+    const chained = (
+      await screen.findByText('Another redirect sends shoppers on from there, to /collections/eid.')
+    ).closest('li')!;
+    expect(within(chained).getByText('/sale-2025')).toBeTruthy();
+    expect(screen.getAllByText(/Another redirect sends shoppers on/)).toHaveLength(1);
+    fireEvent.click(
+      within(chained).getByRole('button', { name: 'Send straight to /collections/eid' }),
+    );
+    await screen.findByText('The redirect from /sale-2025 is changed.');
+    expect(sentOf(fake, 'UrlRedirectUpdate')).toEqual([
+      { id: 'red_1', urlRedirect: { path: '/sale-2025', target: '/collections/eid' } },
+    ]);
+    const looping = screen
+      .getByText(
+        'This goes round in a loop with other redirects: change where it goes, or delete it.',
+      )
+      .closest('li')!;
+    expect(within(looping).getByText('/a')).toBeTruthy();
   });
 
   it('finds, adds, deletes, imports after checking, and exports redirects', async () => {

@@ -249,6 +249,27 @@ describe.skipIf(!server)('Admin GraphQL API: URL redirects', () => {
     expect(await denied(tokens.pages, '{ urlRedirectsExport { count } }')).toBe('ACCESS_DENIED');
   });
 
+  it('says where redirects in a row end, and refuses a loop (ADR-607)', async () => {
+    const first = await create(tokens.a, { path: '/sale-2025', target: '/sale-2026' });
+    await create(tokens.a, { path: '/sale-2026', target: '/collections/eid' });
+    const read = 'query ($id: ID!) { urlRedirect(id: $id) { target finalTarget loops } }';
+    expect(await call(tokens.reader, read, { id: first.urlRedirect.id })).toEqual({
+      target: '/sale-2026',
+      finalTarget: '/collections/eid',
+      loops: false,
+    });
+    expect(
+      (await create(tokens.a, { path: '/collections/eid', target: '/sale-2025' })).userErrors,
+    ).toEqual([
+      {
+        field: ['urlRedirect', 'target'],
+        code: 'INVALID',
+        message:
+          'It would send shoppers round in a loop: /collections/eid → /sale-2025 → /sale-2026 → /collections/eid',
+      },
+    ]);
+  });
+
   it('needs the navigation scopes, as Shopify asks for them', async () => {
     const denied = async (token: string, query: string) =>
       (await gql(token, query)).errors?.[0]?.extensions?.code;

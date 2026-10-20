@@ -3386,6 +3386,10 @@ const en = {
   'redirects.changeOne': 'Change the redirect from {path}',
   'redirects.save': 'Save the redirect',
   'redirects.changed': 'The redirect from {path} is changed.',
+  'redirects.chain': 'Another redirect sends shoppers on from there, to {target}.',
+  'redirects.straighten': 'Send straight to {target}',
+  'redirects.loops':
+    'This goes round in a loop with other redirects: change where it goes, or delete it.',
   'orders.fresh': 'Show {count} new orders',
   'orders.fresh.one': 'Show 1 new order',
   'orders.freshSaid': '{count} new orders',
@@ -8522,6 +8526,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'redirects.changeOne': '{path} سے ری ڈائریکٹ بدلیں',
   'redirects.save': 'ری ڈائریکٹ محفوظ کریں',
   'redirects.changed': '{path} سے ری ڈائریکٹ بدل گیا۔',
+  'redirects.chain': 'وہاں سے ایک اور ری ڈائریکٹ خریداروں کو آگے {target} پر بھیجتا ہے۔',
+  'redirects.straighten': 'سیدھا {target} پر بھیجیں',
+  'redirects.loops':
+    'یہ دوسرے ری ڈائریکٹس کے ساتھ چکر میں گھومتا ہے: اس کی منزل بدلیں یا اسے ڈیلیٹ کریں۔',
   'orders.fresh': '{count} نئے آرڈر دیکھیں',
   'orders.fresh.one': '1 نیا آرڈر دیکھیں',
   'orders.freshSaid': '{count} نئے آرڈر',

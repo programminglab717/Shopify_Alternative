@@ -108,6 +108,13 @@ export interface UrlRedirectRecord {
   path: string;
   /** Where it sends shoppers: a path on the storefront, or an http(s) address elsewhere. */
   target: string;
+  /**
+   * Where shoppers end up where its target is another redirect's path, followed through the
+   * shop's redirects in a row (ADR-607); null where the target is where they end up.
+   */
+  finalTarget: string | null;
+  /** Whether its chain comes back round to a path it passed: kept from before loops were refused. */
+  loops: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
