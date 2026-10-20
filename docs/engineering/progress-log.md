@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The contact form in the admin's inbox
+### 18b199b · The contact form in the admin's inbox
 
 * **The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an
   email to answer them, marked read and deleted** ([ADR-590](../architecture/13-decision-log.md#adr-590--the-admins-inbox-has-a-contact-form-tab-what-shoppers-wrote-with-a-call-whatsapp-or-an-email-to-answer-them-marked-read-and-deleted), OS-08).
