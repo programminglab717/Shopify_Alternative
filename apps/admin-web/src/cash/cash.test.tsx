@@ -156,6 +156,37 @@ describe('The cash couriers hold, in the admin', () => {
     ).toBe(false);
   });
 
+  it("downloads a courier's dispute sheet of the cash it has held a week or more (ADR-605)", async () => {
+    const core = fakeCore('accountant', (operation) => {
+      if (operation === 'Cash') return CASH;
+      if (operation === 'CodDisputeSheet') {
+        return {
+          codDisputeSheet: {
+            filename: 'dispute-leopards-2026-10-20.xlsx',
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            content: btoa('PK'),
+          },
+        };
+      }
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:dispute');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    renderAdmin('/shop_1/cash');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Dispute sheet for Leopards' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(
+      core.sent
+        .filter((each) => each.operation === 'CodDisputeSheet')
+        .map((each) => each.variables),
+    ).toEqual([{ courier: 'Leopards', olderThanDays: 7 }]);
+    expect(screen.getAllByText('Dispute sheet: 7 days or more')).toHaveLength(2);
+    vi.restoreAllMocks();
+  });
+
   it("lists a statement's lines to look into first, each with its order", async () => {
     const line = (row: number, outcome: string, orderName: string | null) => ({
       row,

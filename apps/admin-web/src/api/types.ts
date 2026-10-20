@@ -4661,3 +4661,8 @@ export interface TikTokAdAccountDisconnectData {
 export interface TikTokAdSpendSyncData {
   tiktokAdSpendSync: { tiktokAdAccount: TikTokAdAccount | null; userErrors: UserError[] };
 }
+
+/** A courier's dispute sheet, as the core sends it (ADR-605): its bytes in base64. */
+export interface CodDisputeSheetData {
+  codDisputeSheet: { filename: string; contentType: string; content: string };
+}

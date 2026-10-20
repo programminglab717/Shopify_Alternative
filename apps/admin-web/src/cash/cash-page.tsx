@@ -1,11 +1,12 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { CreditCard, FileUp, Landmark, Wallet } from 'lucide-react';
+import { CreditCard, FileSpreadsheet, FileUp, Landmark, Wallet } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { CashQuery, CashStatementImportMutation } from '../api/operations';
+import { CashQuery, CashStatementImportMutation, CodDisputeSheetQuery } from '../api/operations';
 import type {
   CashData,
   CashStatementImportData,
+  CodDisputeSheetData,
   CodReceivableAgeValue,
   CodRemittanceOutcome,
   CodRemittanceOutcomeCounts,
@@ -16,6 +17,7 @@ import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { save } from '../orders/export-page';
 import { FormSection, problemText } from '../products/product-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
@@ -96,9 +98,29 @@ function Ages({ ages }: { ages: CodReceivableAgeValue[] }) {
   );
 }
 
+/** Days a dispute sheet goes back from: cash a courier has held a week or more (ADR-605). */
+export const DISPUTE_DAYS = 7;
+
 function Couriers({ couriers }: { couriers: CashData['codReceivables']['couriers'] }) {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
+  const sheet = useAdminMutation<
+    CodDisputeSheetData,
+    { courier: string | null; olderThanDays: number }
+  >(CodDisputeSheetQuery);
+  const [problem, setProblem] = useState<string | null>(null);
+  const dispute = async (courier: string | null) => {
+    setProblem(null);
+    try {
+      const { codDisputeSheet } = await sheet.mutateAsync({
+        courier,
+        olderThanDays: DISPUTE_DAYS,
+      });
+      save(codDisputeSheet);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
   return (
     <FormSection title={t('cash.couriers')}>
       {couriers.length === 0 ? (
@@ -123,11 +145,24 @@ function Couriers({ couriers }: { couriers: CashData['codReceivables']['couriers
                     date: formatDate(each.oldestDeliveredAt, timezone, locale),
                   })}
                 </span>
+                <Button
+                  variant="tertiary"
+                  className="basis-full justify-start sm:basis-auto"
+                  disabled={sheet.isPending}
+                  aria-label={t('cash.disputeFor', {
+                    courier: each.courier ?? t('cod.health.noCourier'),
+                  })}
+                  icon={<FileSpreadsheet aria-hidden className="size-5" />}
+                  onClick={() => void dispute(each.courier)}
+                >
+                  {t('cash.dispute', { days: DISPUTE_DAYS })}
+                </Button>
               </li>
             );
           })}
         </ul>
       )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
   );
 }

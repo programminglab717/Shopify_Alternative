@@ -3664,6 +3664,20 @@ const COD_AGE = /* GraphQL */ `
 `;
 
 /** The cash couriers hold for the shop, and their statements (COD-10). */
+/**
+ * A courier's dispute sheet (ADR-605): the parcels whose cash it has held a week or more, as an
+ * Excel workbook to send it.
+ */
+export const CodDisputeSheetQuery = /* GraphQL */ `
+  query CodDisputeSheet($courier: String, $olderThanDays: Int) {
+    codDisputeSheet(courier: $courier, olderThanDays: $olderThanDays) {
+      filename
+      contentType
+      content
+    }
+  }
+`;
+
 export const CashQuery = /* GraphQL */ `
   query Cash {
     codReceivables {

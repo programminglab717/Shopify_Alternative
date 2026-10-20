@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { readXlsx } from '@hatti/xlsx';
 import { CodReceivablesService } from './cod-receivables.service.js';
 import { ADDRESS, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -146,5 +147,59 @@ describe.skipIf(!server)('CodReceivablesService', () => {
     expect(later.couriers[0]!.ages).toEqual(ages([1, 2_000_00n], [1, 2_000_00n], [1, 5_000_00n]));
     // Each shop its own.
     expect((await receivables.report(f.b)).owed).toEqual(none);
+  });
+
+  it("makes a courier's dispute sheet of the cash it has held past the days asked (ADR-605)", async () => {
+    const old = await delivered(shawl, 'TCS', 20);
+    await delivered(kurta, 'tcs', 9);
+    await delivered(kurta, 'TCS', 3);
+    await delivered(kurta, 'Leopards', 30);
+    await delivered(kurta, null, 15);
+    // Paid in part: what came, and what is still owed.
+    await f.admin.query('UPDATE orders.orders SET amount_paid = 1500 * 100 WHERE id = $1', [
+      old.orderId,
+    ]);
+    const { rows: tracked } = await f.admin.query<{ tracking_number: string; number: number }>(
+      `SELECT f.tracking_number, o.number FROM orders.fulfillments f
+         JOIN orders.orders o ON o.id = f.order_id WHERE f.id = $1`,
+      [old.fulfillmentId],
+    );
+
+    const sheet = await receivables.disputeSheet(f.a, 'Tcs');
+    expect(sheet.rows).toBe(2);
+    expect(sheet.filename).toMatch(/^dispute-tcs-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    const read = readXlsx(sheet.content);
+    expect(read.sheet).toBe('Cash owed');
+    expect(read.rows[0]).toEqual([
+      'Tracking number',
+      'Order',
+      'Delivered',
+      'Days since delivery',
+      'City',
+      'Cash to collect',
+      'Received',
+      'Still owed',
+      'Courier',
+    ]);
+    // The oldest first: its tracking number, what it was to collect, what came and what is owed.
+    expect(read.rows[1]).toEqual([
+      tracked[0]!.tracking_number,
+      `#${tracked[0]!.number}`,
+      // A time, which a spreadsheet keeps as a number of days.
+      expect.any(Number),
+      20,
+      'Karachi',
+      5000,
+      1500,
+      3500,
+      'TCS',
+    ]);
+    expect(read.rows[2]?.[3]).toBe(9);
+    // Asked from three days, the one delivered three days ago too; none named, those shipped so.
+    expect((await receivables.disputeSheet(f.a, 'TCS', 3)).rows).toBe(3);
+    const unnamed = await receivables.disputeSheet(f.a, null);
+    expect(unnamed.rows).toBe(1);
+    expect(unnamed.filename).toMatch(/^dispute-no-courier-/);
+    expect((await receivables.disputeSheet(f.a, 'PostEx')).rows).toBe(0);
   });
 });

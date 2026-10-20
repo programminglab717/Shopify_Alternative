@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-604 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-605 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -612,6 +612,7 @@
 | 602 | A customer's store credit news goes by email too, where the shop has their email, saying the shop has it | Accepted |
 | 603 | A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill their carts until it takes orders again | Accepted |
 | 604 | While checkout alone is paused, the storefront's pages carry the platform's bar saying orders are paused, the shop's message and when they come back | Accepted |
+| 605 | A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has not had in full, as an Excel workbook to send it | Accepted |
 
 ---
 
@@ -21997,3 +21998,23 @@
 * **Alternatives:** **A Liquid object for themes to place it:** Shopify has none; a theme could
   add one later beside the platform's bar. **Only on the cart page:** shoppers fill their carts
   on product pages.
+
+## ADR-605 · A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has not had in full, as an Excel workbook to send it
+
+* **Context:** The shop sees what each courier owes and for how long (ADR-066), and statements
+  pay parcels, short or in full (ADR-067, ADR-246). To chase a courier it had to list the parcels
+  by hand; 06 §7 plans a one-click dispute sheet.
+* **Decision:** `codDisputeSheet(courier, olderThanDays)` makes a workbook of the parcels the
+  courier delivered at least that many days ago (a week unless said, up to a year) on
+  cash-on-delivery orders not yet paid in full, the oldest first: tracking number, order, when it
+  was delivered in the shop's time zone, days since, city, the cash it was to collect, what of it
+  came, by a statement or by hand, and what is still owed. The courier is matched as
+  `codReceivables` names it, in any letter case; none for parcels shipped without one. It comes
+  as the order export's file does, its bytes in base64, under `read_orders`. The admin's cash page
+  has a download for each courier.
+* **Consequences:** The shop sends one file the courier can check line by line, partly paid
+  parcels with what is left. Nothing is kept of the sheet: it is made afresh when asked.
+* **Alternatives:** **Each courier's own dispute format:** couriers' formats differ and are not
+  published; the sheet's columns are the ones every courier's statement has.
+  **Unmatched statement lines in it:** those are the courier's own lines, already on its
+  statement; the sheet is what the shop says it is owed.

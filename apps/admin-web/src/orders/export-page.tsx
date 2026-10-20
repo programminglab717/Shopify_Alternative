@@ -49,7 +49,7 @@ function dayAfter(date: string): string {
 }
 
 /** A file the core sent, its bytes in base64, saved by the browser under its own name. */
-function save(file: { content: string; contentType: string; filename: string }) {
+export function save(file: { content: string; contentType: string; filename: string }) {
   const bytes = Uint8Array.from(atob(file.content), (char) => char.charCodeAt(0));
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([bytes], { type: file.contentType }));

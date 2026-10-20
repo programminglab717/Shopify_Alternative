@@ -479,8 +479,10 @@ flowchart TB
   courier lost pays the parcel's claim, and the statement keeps what of its cash did so (ADR-093,
   §6). Statements may come as the Excel workbooks couriers send, read from their first sheet
   shown under the courier's title rows, and other cash on a parcel paid short before pays what
-  its order still owes ([ADR-246](./13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)). Couriers' APIs, the
-  ledger, tax credits and dispute sheets come later.
+  its order still owes ([ADR-246](./13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)). A dispute sheet for each courier lists the
+  parcels whose cash it has held a week or more, with what of it came
+  ([ADR-605](./13-decision-log.md#adr-605--a-couriers-dispute-sheet-the-parcels-it-delivered-a-week-or-more-ago-whose-cash-the-shop-has-not-had-in-full-as-an-excel-workbook-to-send-it)). Couriers' APIs, the ledger, tax credits
+  and dispute sheets in each courier's own format come later.
 * **Deductions** are itemised: shipping fees, fuel surcharges, COD handling fees, RTO charges and
   **tax withheld at source**. Since Finance Act 2025, couriers withhold income tax on COD
   collections and intermediaries on digital payments, both rates doubling for non-filers, plus

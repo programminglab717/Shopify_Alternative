@@ -12895,6 +12895,16 @@ type Query {
   checkoutTrustBadges: [CheckoutTrustBadge!]!
 
   """
+  A courier's dispute sheet (COD-10, ADR-605): the parcels it delivered olderThanDays days ago or more whose cash the shop has not had in full, as an Excel workbook to send it, the oldest first: each by tracking number, with its order, when it was delivered, its city, the cash it was to collect, what came of it and what is still owed. The courier is as codReceivables names it, in any letter case; none for parcels shipped without one.
+  """
+  codDisputeSheet(
+    courier: String
+
+    """Days since delivery, 0 to 365; a week unless said."""
+    olderThanDays: Int! = 7
+  ): OrderExportFile!
+
+  """
   COD health (COD-12): how a period's cash-on-delivery orders turned out, confirmed of those placed, and delivered and returned of their parcels, for the shop and by city, product, source, courier, or where their last visits came from or their campaigns. Worked out from the orders when asked.
   """
   codHealth(

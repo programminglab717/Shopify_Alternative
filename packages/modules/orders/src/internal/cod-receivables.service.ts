@@ -1,7 +1,10 @@
-import type { TenantContext } from '@hatti/api';
-import { Database } from '@hatti/db';
+import { shopProfile, type TenantContext } from '@hatti/api';
+import { Database, type Tx } from '@hatti/db';
+import { money, toMajorString, type CurrencyCode } from '@hatti/money';
+import { XLSX_CONTENT_TYPE, toXlsx, type XlsxColumn } from '@hatti/xlsx';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { orderName } from './rules.js';
 
 /**
  * How long cash has waited since its parcel was delivered, in whole days: a week, a fortnight, a
@@ -137,6 +140,33 @@ export class CodReceivablesService {
       };
     });
   }
+
+  /**
+   * The dispute sheet of the cash `courier` has held `olderThanDays` days or more (ADR-605): a
+   * week unless said, at most a year.
+   */
+  async disputeSheet(
+    tenant: TenantContext,
+    courier: string | null,
+    olderThanDays: number = DISPUTE_DAYS.default,
+    at: Date = new Date(),
+  ): Promise<CodDisputeSheet> {
+    const days = Math.min(Math.max(Math.trunc(olderThanDays), 0), DISPUTE_DAYS.max);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { timezone } = await shopProfile(tx, tenant.shopId);
+      return codDisputeSheetIn(
+        tx,
+        tenant.shopId,
+        {
+          courier: courier?.slice(0, 200) ?? null,
+          olderThanDays: days,
+          timeZone: timezone,
+          currency: tenant.currency,
+        },
+        at,
+      );
+    });
+  }
 }
 
 /** The index in {@link RECEIVABLE_AGES} of `days`, in SQL. */
@@ -162,4 +192,114 @@ function agesOf(rows: readonly AgeRow[]): ReceivableAge[] {
     ...age,
     ...cashOf(rows.filter((row) => row.age === index)),
   }));
+}
+
+/** What a dispute sheet lists at least, by default: cash a courier has held a week or more. */
+export const DISPUTE_DAYS = { default: 7, max: 365 } as const;
+
+/** A dispute sheet: the workbook to send a courier, and how many parcels it lists. */
+export interface CodDisputeSheet {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+  rows: number;
+}
+
+type DisputeRow = {
+  tracking_number: string | null;
+  number: number;
+  delivered_at: Date | string;
+  city: string | null;
+  total: string;
+  amount_paid: string;
+  courier: string | null;
+};
+
+/** A dispute sheet's columns: the parcel, when it was delivered, and its cash, paid and owed. */
+const DISPUTE_COLUMNS: readonly XlsxColumn[] = [
+  { header: 'Tracking number' },
+  { header: 'Order' },
+  { header: 'Delivered', type: 'time' },
+  { header: 'Days since delivery', type: 'number' },
+  { header: 'City' },
+  { header: 'Cash to collect', type: 'amount' },
+  { header: 'Received', type: 'amount' },
+  { header: 'Still owed', type: 'amount' },
+  { header: 'Courier' },
+];
+
+/**
+ * The parcels a courier delivered `olderThanDays` or more days before `at` whose cash the shop has
+ * not had in full (COD-10, ADR-605), as an Excel workbook to send them: by tracking number, the
+ * oldest first, each with what it was to collect, what of it came, by a statement or by hand, and
+ * what is still owed. The courier is as staff named it, in any letter case; null for parcels
+ * shipped without one named. Times are in the shop's time zone.
+ */
+export async function codDisputeSheetIn(
+  tx: Tx,
+  shopId: string,
+  input: { courier: string | null; olderThanDays: number; timeZone: string; currency: string },
+  at: Date = new Date(),
+): Promise<CodDisputeSheet> {
+  const { rows } = await tx.execute<DisputeRow>(sql`
+    SELECT last.tracking_number, o.number, last.delivered_at,
+           o.shipping_address ->> 'city' AS city, o.total::text, o.amount_paid::text,
+           nullif(btrim(last.tracking_company), '') AS courier
+      FROM orders.orders o
+      JOIN LATERAL (
+        SELECT f.delivered_at, f.tracking_company, f.tracking_number
+          FROM orders.fulfillments f
+         WHERE f.shop_id = o.shop_id AND f.order_id = o.id AND f.status = 'delivered'
+         ORDER BY f.delivered_at DESC
+         LIMIT 1
+      ) last ON true
+     WHERE o.shop_id = ${shopId}
+       AND o.stage = 'delivered'
+       AND o.payment_method = 'cash_on_delivery'
+       AND o.amount_paid < o.total
+       AND lower(nullif(btrim(last.tracking_company), ''))
+           IS NOT DISTINCT FROM lower(nullif(btrim(${input.courier}::text), ''))
+       AND last.delivered_at <= ${at.toISOString()}::timestamptz
+                                - make_interval(days => ${input.olderThanDays})
+     ORDER BY last.delivered_at, o.number`);
+  const time = new Intl.DateTimeFormat('en-US', {
+    timeZone: input.timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const when = (value: Date) => {
+    const part = (type: string) => time.formatToParts(value).find((p) => p.type === type)?.value;
+    return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`;
+  };
+  const amount = (minor: bigint) => toMajorString(money(minor, input.currency as CurrencyCode));
+  const sheet = rows.map((row) => {
+    const delivered = new Date(row.delivered_at);
+    const total = BigInt(row.total);
+    const paid = BigInt(row.amount_paid);
+    return [
+      row.tracking_number,
+      orderName(row.number),
+      when(delivered),
+      Math.floor((at.getTime() - delivered.getTime()) / 86_400_000),
+      row.city,
+      amount(total),
+      amount(paid),
+      amount(total - paid),
+      row.courier,
+    ];
+  });
+  const named = (input.courier?.trim() || 'no-courier')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return {
+    filename: `dispute-${named || 'courier'}-${when(at).slice(0, 10)}.xlsx`,
+    contentType: XLSX_CONTENT_TYPE,
+    content: toXlsx({ name: 'Cash owed', columns: DISPUTE_COLUMNS, rows: sheet }),
+    rows: sheet.length,
+  };
 }
