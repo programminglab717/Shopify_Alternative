@@ -4666,3 +4666,23 @@ export interface TikTokAdSpendSyncData {
 export interface CodDisputeSheetData {
   codDisputeSheet: { filename: string; contentType: string; content: string };
 }
+
+/** The kinds the online store's SEO tab lists (OS-09, ADR-606). */
+export type SeoKind = 'PRODUCT' | 'COLLECTION' | 'PAGE' | 'BLOG' | 'ARTICLE';
+
+/** A product, collection, page, blog or article with what search engines are given of it. */
+export interface SeoListed {
+  id: string;
+  title: string;
+  handle: string;
+  seo: { title: string | null; description: string | null };
+  description?: string;
+  body?: string;
+  summary?: string | null;
+  blog?: { handle: string };
+}
+
+export interface SeoListingsData {
+  shop: { url: string } | null;
+  listed: { nodes: SeoListed[]; pageInfo: { hasNextPage: boolean } };
+}

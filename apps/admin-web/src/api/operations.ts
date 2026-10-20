@@ -9656,3 +9656,102 @@ export const TikTokAdSpendSyncMutation = /* GraphQL */ `
   ${TIKTOK_AD_ACCOUNT}
   ${USER_ERRORS}
 `;
+
+/** Each kind's search engine listings for the online store's SEO tab (OS-09, ADR-606). */
+const SEO_LISTED = /* GraphQL */ `
+  id
+  title
+  handle
+  seo {
+    title
+    description
+  }
+`;
+
+export const SeoProductsQuery = /* GraphQL */ `
+  query SeoProducts($first: Int!) {
+    shop {
+      url
+    }
+    listed: products(first: $first) {
+      nodes {
+        ${SEO_LISTED}
+        description
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+export const SeoCollectionsQuery = /* GraphQL */ `
+  query SeoCollections($first: Int!) {
+    shop {
+      url
+    }
+    listed: collections(first: $first) {
+      nodes {
+        ${SEO_LISTED}
+        description
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+export const SeoPagesQuery = /* GraphQL */ `
+  query SeoPages($first: Int!) {
+    shop {
+      url
+    }
+    listed: pages(first: $first) {
+      nodes {
+        ${SEO_LISTED}
+        body
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+export const SeoBlogsQuery = /* GraphQL */ `
+  query SeoBlogs($first: Int!) {
+    shop {
+      url
+    }
+    listed: blogs(first: $first) {
+      nodes {
+        ${SEO_LISTED}
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+export const SeoArticlesQuery = /* GraphQL */ `
+  query SeoArticles($first: Int!) {
+    shop {
+      url
+    }
+    listed: articles(first: $first) {
+      nodes {
+        ${SEO_LISTED}
+        body
+        summary
+        blog {
+          handle
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;

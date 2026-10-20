@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-605 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-606 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -613,6 +613,7 @@
 | 603 | A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill their carts until it takes orders again | Accepted |
 | 604 | While checkout alone is paused, the storefront's pages carry the platform's bar saying orders are paused, the shop's message and when they come back | Accepted |
 | 605 | A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has not had in full, as an Excel workbook to send it | Accepted |
+| 606 | The online store has one Search listings tab: every product's, collection's, page's, blog's and article's search engine listing, those without a description of their own first | Accepted |
 
 ---
 
@@ -22018,3 +22019,27 @@
   published; the sheet's columns are the ones every courier's statement has.
   **Unmatched statement lines in it:** those are the courier's own lines, already on its
   statement; the sheet is what the shop says it is owed.
+
+## ADR-606 · The online store has one Search listings tab: every product's, collection's, page's, blog's and article's search engine listing, those without a description of their own first
+
+* **Context:** Each product, collection, page, blog and article has its search engine listing card
+  where it is written (ADR-600, ADR-601). A shop with many of them could not see which still lack
+  a description of their own without opening each, as Shopify's SEO apps and its own listing
+  checks let a merchant do.
+* **Decision:** The online store has a Search listings tab. It lists one kind at a time, through
+  the kind's own connection (`products`, `collections`, `pages`, `blogs`, `articles`), the first
+  100 and then up to 250, as the Urdu tab does (ADR-238). Each row is the thing's name, how a search
+  engine lists it (the same preview as its card, at its address at the shop's storefront) and
+  what is wrong with it: **No description** where the shop wrote none and the storefront makes one
+  from its text; **Nothing to describe it** where there is no text to make one from either; **Title
+  cut short** past about 60 letters; **Description cut short** where the shop's own runs past about
+  160. At first only those without a description show. Each row opens the page where the listing
+  is written. The kinds shown are those the member's role keeps: products and collections for
+  those who change products, pages for those who write pages, blogs and articles for those who
+  write blogs; the tab is for those who keep any of them.
+* **Consequences:** A shop sees in one place what search engines are told of its pages, and writes
+  the missing descriptions from there. The core is unchanged: the tab reads what the cards read.
+* **Alternatives:** **A listings query of the core's own, across kinds:** one call, but a new API
+  across two modules for what five existing connections give. **Writing listings on the tab
+  itself:** quicker for many at once; left until shops ask, since the card where each is written
+  previews it with its own text.

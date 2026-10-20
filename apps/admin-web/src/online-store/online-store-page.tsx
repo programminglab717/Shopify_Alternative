@@ -16,6 +16,7 @@ import { MetaTab, SETS_META } from './meta';
 import { PagesList, WRITES_BLOGS, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
 import { RedirectsTab } from './redirects';
+import { KEEPS_LISTINGS, SeoOverview } from './seo-overview';
 import { SpeedTab } from './speed';
 import { StoreBuilderTab } from './store-builder';
 import { StorefrontPreferencesTab } from './storefront';
@@ -32,6 +33,7 @@ export const ONLINE_STORE_TABS = [
   'themes',
   'builder',
   'speed',
+  'seo',
   'redirects',
   'links',
   'meta',
@@ -80,6 +82,7 @@ const TABS: Record<OnlineStoreTab, { label: MessageKey; gate: Gate; body: () => 
     gate: gate(EDITS_THEMES.roles, 'read_themes'),
     body: () => <SpeedTab />,
   },
+  seo: { label: 'onlineStore.seo', gate: KEEPS_LISTINGS, body: () => <SeoOverview /> },
   redirects: { label: 'onlineStore.redirects', gate: EDITS_MENUS, body: () => <RedirectsTab /> },
   links: { label: 'onlineStore.linkPage', gate: SETS_STOREFRONT, body: () => <LinkPageTab /> },
   meta: { label: 'onlineStore.meta', gate: SETS_META, body: () => <MetaTab /> },
@@ -96,8 +99,8 @@ export const OPENS_ONLINE_STORE = gate(
 
 /**
  * The online store (OS-02, OS-06, OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies,
- * its storefront's password, pause and home page for search engines, its filters (ADR-568), its themes, its speed (OS-13), its
- * redirects, its
+ * its storefront's password, pause and home page for search engines, its filters (ADR-568), its themes, its speed (OS-13), every page's
+ * search engine listing (ADR-606), its redirects, its
  * link page, Meta and the catalog feed (MKT-10, MKT-11), TikTok (ADR-542), Google (ADR-550), and what is left to put in Urdu; a tab for
  * each part its role works in.
  */

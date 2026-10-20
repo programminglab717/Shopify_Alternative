@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Every search engine listing on one tab
+
+* **The online store has one Search listings tab: every product's, collection's, page's, blog's and
+  article's search engine listing, those without a description of their own first** ([ADR-606](../architecture/13-decision-log.md#adr-606--the-online-store-has-one-search-listings-tab-every-products-collections-pages-blogs-and-articles-search-engine-listing-those-without-a-description-of-their-own-first),
+  OS-09).
+* 3692 tests, 9 more: the tab's lists, flags and roles, and a test for
+  each of its five queries against the schema.
+
 ### 31aa621 · A courier's dispute sheet
 
 * **A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has
