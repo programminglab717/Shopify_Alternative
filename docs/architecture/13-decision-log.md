@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-602 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-603 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -610,6 +610,7 @@
 | 600 | A product's page in the admin has a search engine listing card: its title and description for search engines, with a preview of how a search engine lists it | Accepted |
 | 601 | Collections, pages, blogs and articles have the same search engine listing card in the admin as products | Accepted |
 | 602 | A customer's store credit news goes by email too, where the shop has their email, saying the shop has it | Accepted |
+| 603 | A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill their carts until it takes orders again | Accepted |
 
 ---
 
@@ -21960,3 +21961,21 @@
   WhatsApp. A suppressed or erased address gets nothing, as order news.
 * **Alternatives:** **Only the email of their last order:** the customer's own record is the
   address the shop keeps up to date.
+
+## ADR-603 · A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill their carts until it takes orders again
+
+* **Context:** A shop pausing for a while (ADR-252) closes its whole storefront: every page
+  answers 503 with a page saying when it is back, and checkout takes no orders. Shops off for Eid
+  or a stock-take often want shoppers to keep browsing, and their ads and catalog feeds to keep
+  landing on real pages, while no orders come in.
+* **Decision:** The pause has a setting of its own, `maintenanceCheckoutOnly`, kept between
+  pauses as the shop chose it. Where it is on, the storefront's document carries the pause with
+  `checkoutOnly`, and the storefront serves every page as ever, carts included; checkout alone
+  answers with its paused page, the shop's message and when it is back, as it does for a whole
+  pause. The admin's Pause card offers it as "Keep the storefront open to browse", and says what
+  shoppers will see.
+* **Consequences:** Search engines and ads keep the shop's pages; shoppers can fill a cart for
+  when it opens. The storefront's pages themselves say nothing of the pause until checkout.
+* **Alternatives:** **A notice on every page:** themes would need a new object for it, as
+  Shopify's have none; a later change. **Turning the storefront's checkout button off:** carts
+  would be lost to shoppers who could not see why.

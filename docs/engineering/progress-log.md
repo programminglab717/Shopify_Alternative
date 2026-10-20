@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Checkout paused alone
+
+* **A shop may pause checkout alone, keeping its storefront open for shoppers to browse and fill
+  their carts until it takes orders again** ([ADR-603](../architecture/13-decision-log.md#adr-603--a-shop-may-pause-checkout-alone-keeping-its-storefront-open-for-shoppers-to-browse-and-fill-their-carts-until-it-takes-orders-again), OS-15). Migration 0279.
+* 3679 tests, 3 more: the setting kept between pauses, the storefront
+  serving its pages, and the admin's card.
+
 ### 2590090 · Store credit news by email
 
 * **A customer's store credit news goes by email too, where the shop has their email** ([ADR-602](../architecture/13-decision-log.md#adr-602--a-customers-store-credit-news-goes-by-email-too-where-the-shop-has-their-email-saying-the-shop-has-it),

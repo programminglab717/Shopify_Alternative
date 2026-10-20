@@ -309,6 +309,11 @@ export interface MaintenanceRecord {
   message: string;
   /** When it opens again by itself, while it is paused; null for when its staff open it. */
   until: Date | null;
+  /**
+   * Whether a pause keeps the storefront open for shoppers to browse, checkout alone taking no
+   * orders (ADR-603); kept between pauses, as the shop chose it.
+   */
+  checkoutOnly: boolean;
 }
 
 /** A shop's social sharing image (ADR-243): one of its files, and what it shows. */

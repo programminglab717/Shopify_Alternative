@@ -9312,6 +9312,11 @@ type OnlineStorePreferences {
   linkPage: LinkPage!
 
   """
+  Whether a pause keeps the storefront open for shoppers to browse (ADR-603): checkout alone takes no orders, saying when it is back. False for the whole storefront paused.
+  """
+  maintenanceCheckoutOnly: Boolean!
+
+  """
   Whether the open storefront is paused for a while (ADR-252), as for a stock-take or the days couriers stop for Eid: shoppers see a page saying it is back soon, search engines are told to come back later, and checkout takes no orders. Orders placed before, their links and the tracking page carry on; the shop's staff see the storefront through a preview. False again once maintenanceUntil comes.
   """
   maintenanceEnabled: Boolean!
@@ -9381,6 +9386,11 @@ input OnlineStorePreferencesInput {
 
   """Its link-in-bio page."""
   linkPage: LinkPageInput
+
+  """
+  Whether a pause keeps the storefront browsable, checkout alone taking no orders. Left as it is if not given; kept between pauses.
+  """
+  maintenanceCheckoutOnly: Boolean
 
   """
   Pauses the open storefront for a while, or opens it again. Left as it is if not given.

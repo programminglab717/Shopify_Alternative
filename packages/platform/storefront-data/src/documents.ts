@@ -611,12 +611,21 @@ export interface FilterDoc {
 export interface MaintenanceDoc {
   message: string;
   until: string | null;
+  /**
+   * True where the pause keeps the storefront browsable, checkout alone taking no orders
+   * (ADR-603); absent for the whole storefront paused, as in documents written before.
+   */
+  checkoutOnly?: true;
 }
 
-/** Whether a shop's document's `maintenance` keeps its storefront paused at `now` (ADR-252). */
+/**
+ * Whether a shop's document's `maintenance` keeps its storefront paused at `now` (ADR-252): not
+ * where the pause is checkout's alone (ADR-603).
+ */
 export function pausedAt(maintenance: MaintenanceDoc | undefined, now: Date): boolean {
   return (
     maintenance !== undefined &&
+    !maintenance.checkoutOnly &&
     (maintenance.until === null || Date.parse(maintenance.until) > now.getTime())
   );
 }

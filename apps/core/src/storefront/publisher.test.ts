@@ -1944,7 +1944,20 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     });
     // Every page changes: none may be kept while it is paused.
     expect(forgotten.flat()).toContain(shopTag(shopId));
-    unwrap(await preferences.update(tenant, { maintenanceEnabled: false }));
+    // Checkout's alone (ADR-603): the storefront is told so, and stays open to browse.
+    unwrap(await preferences.update(tenant, { maintenanceCheckoutOnly: true }));
+    await deliver();
+    expect((await store().shop()).maintenance).toEqual({
+      message: 'Back after Eid <soon>.',
+      until: until.toISOString(),
+      checkoutOnly: true,
+    });
+    unwrap(
+      await preferences.update(tenant, {
+        maintenanceEnabled: false,
+        maintenanceCheckoutOnly: false,
+      }),
+    );
     await deliver();
     expect((await store().shop()).maintenance).toBeUndefined();
   });

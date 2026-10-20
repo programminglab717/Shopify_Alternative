@@ -1829,6 +1829,10 @@ const en = {
   'storefront.pauseEnabled': 'Pause the storefront',
   'storefront.pauseOn': 'Shoppers see it is back soon, and cannot order.',
   'storefront.pauseOff': 'The storefront takes orders.',
+  'storefront.pauseCheckoutOn': 'Shoppers can browse, but checkout says it is back soon.',
+  'storefront.pauseBrowsing': 'Keep the storefront open to browse',
+  'storefront.pauseBrowsingHint':
+    'Pause checkout alone: shoppers see your products and add them to their cart, and order once you are back.',
   'storefront.pauseMessage': 'Message while paused',
   'storefront.pauseMessageHint': 'Such as: We are closed for Eid and back on the 15th.',
   'storefront.pauseUntil': 'Open again on',
@@ -6948,6 +6952,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.pauseEnabled': 'اسٹور فرنٹ روکیں',
   'storefront.pauseOn': 'خریدار دیکھیں گے کہ دکان جلد واپس آئے گی، اور آرڈر نہیں دے سکیں گے۔',
   'storefront.pauseOff': 'اسٹور فرنٹ آرڈر لے رہا ہے۔',
+  'storefront.pauseCheckoutOn':
+    'خریدار دکان دیکھ سکتے ہیں، مگر چیک آؤٹ بتائے گا کہ دکان جلد واپس آئے گی۔',
+  'storefront.pauseBrowsing': 'اسٹور فرنٹ دیکھنے کے لیے کھلا رکھیں',
+  'storefront.pauseBrowsingHint':
+    'صرف چیک آؤٹ روکیں: خریدار آپ کی مصنوعات دیکھ کر کارٹ میں ڈال سکتے ہیں، اور آپ کی واپسی پر آرڈر دے سکتے ہیں۔',
   'storefront.pauseMessage': 'وقفے کے دوران پیغام',
   'storefront.pauseMessageHint': 'جیسے: ہم عید پر بند ہیں اور 15 تاریخ کو واپس آئیں گے۔',
   'storefront.pauseUntil': 'دوبارہ کب کھلے',

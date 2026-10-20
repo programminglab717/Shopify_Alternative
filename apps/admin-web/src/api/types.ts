@@ -2515,6 +2515,11 @@ export interface StorefrontPreferences {
   maintenanceEnabled: boolean;
   maintenanceMessage: string;
   maintenanceUntil: string | null;
+  /**
+   * Whether a pause keeps the storefront browsable, checkout alone paused (ADR-603); absent where
+   * a fake core leaves it out.
+   */
+  maintenanceCheckoutOnly?: boolean;
   seo: { title: string | null; description: string | null };
   /** Days a buyer has to return an order, null while the shop says nothing (ADR-468). */
   returnDays: number | null;

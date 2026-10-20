@@ -157,6 +157,13 @@ export class OnlineStorePreferences {
   })
   maintenanceUntil!: Date | null;
 
+  @Field({
+    description:
+      'Whether a pause keeps the storefront open for shoppers to browse (ADR-603): checkout ' +
+      'alone takes no orders, saying when it is back. False for the whole storefront paused.',
+  })
+  maintenanceCheckoutOnly!: boolean;
+
   @Field(() => Int, {
     nullable: true,
     description:
@@ -317,6 +324,14 @@ export class OnlineStorePreferencesInput {
       'staff open it. Left as it is if not given; opening the storefront takes it away.',
   })
   maintenanceUntil?: Date | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Whether a pause keeps the storefront browsable, checkout alone taking no orders. Left as ' +
+      'it is if not given; kept between pauses.',
+  })
+  maintenanceCheckoutOnly?: boolean | null;
 
   @Field(() => Int, {
     nullable: true,

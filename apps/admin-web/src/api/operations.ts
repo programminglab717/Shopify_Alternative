@@ -5572,6 +5572,7 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
     maintenanceEnabled
     maintenanceMessage
     maintenanceUntil
+    maintenanceCheckoutOnly
     seo {
       title
       description

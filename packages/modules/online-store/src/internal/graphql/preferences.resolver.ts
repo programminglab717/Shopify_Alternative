@@ -88,6 +88,7 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
     maintenanceEnabled: view.maintenance.enabled,
     maintenanceMessage: view.maintenance.message,
     maintenanceUntil: view.maintenance.until,
+    maintenanceCheckoutOnly: view.maintenance.checkoutOnly,
     returnDays: view.returns.days,
     returnExchangesOnly: view.returns.exchangesOnly,
     hidePoweredBy: view.hidePoweredBy,

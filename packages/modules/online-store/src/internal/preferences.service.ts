@@ -59,6 +59,11 @@ export interface PreferencesInput {
    */
   maintenanceUntil?: Date | null;
   /**
+   * Whether a pause keeps the storefront browsable, checkout alone taking no orders (ADR-603).
+   * Left as it is if absent.
+   */
+  maintenanceCheckoutOnly?: boolean | null;
+  /**
    * Days after delivery it takes items back, up to 90; 0 for no returns; null to say nothing
    * besides its refund policy. Left as it is if absent.
    */
@@ -315,6 +320,7 @@ export class PreferencesService {
           input.maintenanceEnabled ?? was.maintenance.enabled,
           maintenanceMessage ?? was.maintenance.message,
           until === undefined ? was.maintenance.until : until,
+          input.maintenanceCheckoutOnly ?? was.maintenance.checkoutOnly,
         ),
         returns: {
           days: returnDays === undefined ? was.returns.days : returnDays,
@@ -350,6 +356,9 @@ export class PreferencesService {
           : []),
         ...(next.maintenance.enabled !== was.maintenance.enabled ? ['maintenanceEnabled'] : []),
         ...(next.maintenance.message !== was.maintenance.message ? ['maintenanceMessage'] : []),
+        ...(next.maintenance.checkoutOnly !== was.maintenance.checkoutOnly
+          ? ['maintenanceCheckoutOnly']
+          : []),
         ...(next.maintenance.until?.getTime() !== was.maintenance.until?.getTime()
           ? ['maintenanceUntil']
           : []),
@@ -382,6 +391,7 @@ export class PreferencesService {
         maintenanceEnabled: next.maintenance.enabled,
         maintenanceMessage: next.maintenance.message,
         maintenanceUntil: next.maintenance.until,
+        maintenanceCheckoutOnly: next.maintenance.checkoutOnly,
         returnDays: next.returns.days,
         returnExchangesOnly: next.returns.exchangesOnly,
         hidePoweredBy: next.hidePoweredBy,
@@ -493,8 +503,13 @@ async function rowOf(
  * A paused storefront's settings as kept (ADR-252): opening it takes away the time it would have
  * opened at, so pausing it again starts afresh.
  */
-function pausedUntil(enabled: boolean, message: string, until: Date | null): MaintenanceRecord {
-  return { enabled, message, until: enabled ? until : null };
+function pausedUntil(
+  enabled: boolean,
+  message: string,
+  until: Date | null,
+  checkoutOnly: boolean,
+): MaintenanceRecord {
+  return { enabled, message, until: enabled ? until : null, checkoutOnly };
 }
 
 function toRecord(row: PreferencesRow | undefined, now = new Date()): PreferencesRecord {
@@ -518,7 +533,12 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
     sharingImage: row?.sharingImageId
       ? { fileId: row.sharingImageId, altText: row.sharingImageAlt }
       : null,
-    maintenance: pausedUntil(paused, row?.maintenanceMessage ?? '', until),
+    maintenance: pausedUntil(
+      paused,
+      row?.maintenanceMessage ?? '',
+      until,
+      row?.maintenanceCheckoutOnly ?? false,
+    ),
     returns: {
       days: row?.returnDays ?? null,
       exchangesOnly: row?.returnExchangesOnly ?? false,

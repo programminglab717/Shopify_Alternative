@@ -226,6 +226,8 @@ export const preferences = onlineStoreSchema.table('preferences', {
   maintenanceEnabled: boolean('maintenance_enabled').notNull().default(false),
   maintenanceMessage: text('maintenance_message').notNull().default(''),
   maintenanceUntil: timestamp('maintenance_until', { withTimezone: true }),
+  /** Whether a pause keeps the storefront browsable, checkout alone taking no orders (ADR-603). */
+  maintenanceCheckoutOnly: boolean('maintenance_checkout_only').notNull().default(false),
   /** Its return window (ADR-468): days after delivery, 0 for none, null for nothing said. */
   returnDays: smallint('return_days'),
   returnExchangesOnly: boolean('return_exchanges_only').notNull().default(false),

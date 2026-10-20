@@ -645,6 +645,8 @@ export function shopDoc(
       maintenance: {
         message: preferences.maintenance.message,
         until: preferences.maintenance.until?.toISOString() ?? null,
+        // Checkout's alone (ADR-603): the storefront stays open to browse.
+        ...(preferences.maintenance.checkoutOnly && { checkoutOnly: true as const }),
       },
     }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.

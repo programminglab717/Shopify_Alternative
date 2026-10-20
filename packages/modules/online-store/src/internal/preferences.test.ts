@@ -40,7 +40,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
     seo: { title: null, description: null },
     sharingImage: null,
-    maintenance: { enabled: false, message: '', until: null },
+    maintenance: { enabled: false, message: '', until: null, checkoutOnly: false },
     returns: { days: null, exchangesOnly: false },
     hidePoweredBy: false,
     consentBanner: false,
@@ -86,7 +86,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
       seo: { title: null, description: null },
       sharingImage: null,
-      maintenance: { enabled: false, message: '', until: null },
+      maintenance: { enabled: false, message: '', until: null, checkoutOnly: false },
       returns: { days: null, exchangesOnly: false },
       hidePoweredBy: false,
       consentBanner: false,
@@ -543,6 +543,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       enabled: true,
       message: 'Eid break: couriers are off.\nBack on the 12th.',
       until,
+      checkoutOnly: false,
     });
     // As read models are given it.
     expect(
@@ -578,6 +579,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       enabled: false,
       message: 'Eid break: couriers are off.\nBack on the 12th.',
       until: null,
+      checkoutOnly: false,
     });
     const again = unwrap(await f.preferences.update(f.a, { maintenanceEnabled: true }));
     expect(again.maintenance).toMatchObject({ enabled: true, until: null });
@@ -607,5 +609,21 @@ describe.skipIf(!server)('PreferencesService', () => {
     ]);
     // Another shop's storefront stays open.
     expect((await f.preferences.get(f.b)).maintenance.enabled).toBe(false);
+  });
+
+  it('pauses checkout alone where the shop keeps its storefront open, kept between pauses (ADR-603)', async () => {
+    const paused = unwrap(
+      await f.preferences.update(f.a, { maintenanceEnabled: true, maintenanceCheckoutOnly: true }),
+    );
+    expect(paused.maintenance).toMatchObject({ enabled: true, checkoutOnly: true });
+    expect(
+      (await f.db.tenant(f.a.shopId, (tx) => shopPreferencesOf(tx, f.a.shopId))).maintenance,
+    ).toMatchObject({ enabled: true, checkoutOnly: true });
+    // Opened and paused again: still checkout's alone, as the shop chose.
+    unwrap(await f.preferences.update(f.a, { maintenanceEnabled: false }));
+    const again = unwrap(await f.preferences.update(f.a, { maintenanceEnabled: true }));
+    expect(again.maintenance).toMatchObject({ enabled: true, checkoutOnly: true });
+    const events = (await f.outbox()).map((event) => event.payload);
+    expect(events[0]).toEqual({ changed: ['maintenanceEnabled', 'maintenanceCheckoutOnly'] });
   });
 });

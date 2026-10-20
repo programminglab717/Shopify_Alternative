@@ -2955,6 +2955,26 @@ describe('Carts', () => {
     await over.close();
   });
 
+  it("serves its pages where the pause is checkout's alone, the storefront open to browse (ADR-603)", async () => {
+    const sample = sampleStore();
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: {
+          ...sample.shop,
+          maintenance: { message: 'Back after Eid.', until: null, checkoutOnly: true },
+        },
+      }),
+    });
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    const home = await get('/');
+    expect(home.statusCode).toBe(200);
+    expect(home.body).not.toContain('This shop is taking a short break');
+    expect((await get(`/products/${lawn.handle}`)).statusCode).toBe(200);
+    expect((await get('/cart.js')).statusCode).toBe(200);
+    await app.close();
+  });
+
   it("shows a partner's development store as opening soon, to all but its staff's previews (ADR-504)", async () => {
     const sample = sampleStore();
     const app = server({

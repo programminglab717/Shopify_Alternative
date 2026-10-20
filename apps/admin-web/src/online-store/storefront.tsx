@@ -118,10 +118,15 @@ function PasswordForm({ preferences }: { preferences: StorefrontPreferences }) {
   );
 }
 
-/** The open storefront paused for a while, opening again by itself at a time or when told. */
+/**
+ * The open storefront paused for a while, opening again by itself at a time or when told; or
+ * checkout alone, the storefront left open to browse (ADR-603).
+ */
 function PauseForm({ preferences }: { preferences: StorefrontPreferences }) {
   const { t } = useLocale();
   const [enabled, setEnabled] = useState(preferences.maintenanceEnabled);
+  const keptBrowsing = preferences.maintenanceCheckoutOnly ?? false;
+  const [browsing, setBrowsing] = useState(keptBrowsing);
   const [message, setMessage] = useState(preferences.maintenanceMessage);
   const kept = preferences.maintenanceUntil ? localInput(preferences.maintenanceUntil) : '';
   const [until, setUntil] = useState(kept);
@@ -132,14 +137,27 @@ function PauseForm({ preferences }: { preferences: StorefrontPreferences }) {
     }),
     ...(enabled &&
       until !== kept && { maintenanceUntil: until ? new Date(until).toISOString() : null }),
+    ...(browsing !== keptBrowsing && { maintenanceCheckoutOnly: browsing }),
   };
   return (
     <PreferencesForm title={t('storefront.pause')} hint={t('storefront.pauseHint')} input={input}>
       <CheckField
         label={t('storefront.pauseEnabled')}
-        hint={t(enabled ? 'storefront.pauseOn' : 'storefront.pauseOff')}
+        hint={t(
+          !enabled
+            ? 'storefront.pauseOff'
+            : browsing
+              ? 'storefront.pauseCheckoutOn'
+              : 'storefront.pauseOn',
+        )}
         checked={enabled}
         onChange={setEnabled}
+      />
+      <CheckField
+        label={t('storefront.pauseBrowsing')}
+        hint={t('storefront.pauseBrowsingHint')}
+        checked={browsing}
+        onChange={setBrowsing}
       />
       <TextField
         label={t('storefront.pauseMessage')}

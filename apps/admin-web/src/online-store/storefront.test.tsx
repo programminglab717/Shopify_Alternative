@@ -175,6 +175,26 @@ describe("The storefront's preferences and redirects", () => {
     );
   });
 
+  it('pauses checkout alone, keeping the storefront open to browse (ADR-603)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const pause = await screen.findByRole('region', { name: 'Pause' });
+    fireEvent.click(within(pause).getByLabelText(/Pause the storefront/));
+    expect(within(pause).getByText('Shoppers see it is back soon, and cannot order.')).toBeTruthy();
+    fireEvent.click(within(pause).getByLabelText(/Keep the storefront open to browse/));
+    expect(
+      within(pause).getByText('Shoppers can browse, but checkout says it is back soon.'),
+    ).toBeTruthy();
+    fireEvent.click(within(pause).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { maintenanceEnabled: true, maintenanceCheckoutOnly: true },
+      }),
+    );
+  });
+
   it('sets the return window product pages show, refusing more than 90 days (ADR-468)', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);
