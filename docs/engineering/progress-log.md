@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A menu link's tags no product has together
+### ab376c2 · A menu link's tags no product has together
 
 * **The menu editor says when no product has all of a link's tags together** ([ADR-669](../architecture/13-decision-log.md#adr-669--the-menu-editor-says-when-no-product-has-all-of-a-links-tags-together-though-each-is-some-products-as-it-says-a-tag-none-has)), though
   each is some product's, as it says a tag none has.
