@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Replies to emails
+### e10f3d2 · Replies to emails
 
 * **A shop gives an address for replies to its customers' emails** ([ADR-659](../architecture/13-decision-log.md#adr-659--a-shop-gives-an-address-for-replies-to-its-customers-emails-they-carry-it-as-their-reply-to-and-say-a-reply-reaches-the-shop)): the emails carry it
   as their Reply-To and say a reply reaches the shop, rather than that replies aren't read.
