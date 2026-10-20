@@ -17,7 +17,14 @@ import { WebPushSender, type PushOutcome } from './web-push.js';
 // the staff whose role does the work it is about, and who may do it (ADR-581), in their own
 // language, once.
 
-export const PUSH_KINDS = ['new_order', 'needs_review', 'cash_remitted', 'low_stock'] as const;
+export const PUSH_KINDS = [
+  'new_order',
+  'needs_review',
+  'cash_remitted',
+  'low_stock',
+  // A shopper wrote through the contact form (ADR-591).
+  'contact_message',
+] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 /** Whose work each kind of news is: the roles told of it. */
@@ -26,6 +33,7 @@ export const PUSH_ROLES: Record<PushKind, readonly StaffRole[]> = {
   needs_review: ['owner', 'manager', 'confirmation_agent'],
   cash_remitted: ['owner', 'manager', 'accountant'],
   low_stock: ['owner', 'manager'],
+  contact_message: ['owner', 'manager', 'confirmation_agent'],
 };
 
 /**
@@ -37,6 +45,7 @@ export const PUSH_NEEDS: Record<PushKind, AccessScope | StaffCapability> = {
   needs_review: 'write_orders',
   cash_remitted: 'reconcile_payments',
   low_stock: 'write_inventory',
+  contact_message: 'write_conversations',
 };
 
 /** Whether `recipient` is told of news of `kind`: their role's work, which they may do. */
@@ -232,7 +241,7 @@ export class PushService {
             const outcome = await sender.send(
               { endpoint: each.endpoint, p256dh: each.p256dh, auth: each.auth },
               { ...words, url: message.url, tag: dedupeKey.slice(0, 64) },
-              { urgency: kind === 'low_stock' ? 'normal' : 'high' },
+              { urgency: kind === 'low_stock' || kind === 'contact_message' ? 'normal' : 'high' },
             );
             return { id: each.id, outcome };
           }),

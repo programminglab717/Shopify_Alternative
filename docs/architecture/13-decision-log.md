@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-590 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-591 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -598,6 +598,7 @@
 | 588 | The Admin API shows a customer's saved address book, and the admin's customer page lists it, the default first | Accepted |
 | 589 | Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept beside the inbox for its staff, with an email or a mobile number to answer on | Accepted |
 | 590 | The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an email to answer them, marked read and deleted | Accepted |
+| 591 | Staff who answer customers may be told on their phones when a shopper writes through the contact form, the push saying neither who nor what | Accepted |
 
 ---
 
@@ -21732,3 +21733,20 @@
   WhatsApp conversations. Telling staff when one comes, by push, is a later part.
 * **Alternatives:** **A page of its own under Online store:** staff who answer customers look in
   the inbox, and the forms' messages are customers writing.
+
+## ADR-591 · Staff who answer customers may be told on their phones when a shopper writes through the contact form, the push saying neither who nor what
+
+* **Context:** What shoppers write through the contact form waits in the inbox's tab (ADR-590)
+  until someone looks. Staff are pushed news of new orders and the like (ADR-506) by the roles
+  whose work it is (ADR-581).
+* **Decision:**
+  * **A `contact_message` kind of push** (migration 0276), for owners, managers and
+    confirmation agents, and a custom role's member only if they may answer customers
+    (`write_conversations`): chosen on each device, as the other kinds are, in the account page.
+  * **The worker pushes it** on `contact_message.received`, once a message, in each member's
+    language: the shop's name and that a shopper wrote, opening the inbox's contact form tab.
+    It says neither who wrote nor what, which push services would carry; at normal urgency.
+* **Consequences:** A shop hears of a contact page's message when it comes. Someone who chose it
+  on a phone is told of each message.
+* **Alternatives:** **The message's first words in the push:** a shopper's words would pass
+  through Google's or Apple's push service.

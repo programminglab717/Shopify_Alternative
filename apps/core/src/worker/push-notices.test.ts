@@ -4,6 +4,7 @@ import { newId, toPublicId } from '@hatti/ids';
 import type { LowStockAlert, LowStockService } from '@hatti/inventory/public';
 import { LogisticsEvents } from '@hatti/logistics/public';
 import {
+  MessagingEvents,
   MessagesService,
   PushService,
   generateVapidKeys,
@@ -92,7 +93,7 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
               ($4, $5, 'packer')`,
       [owner, agent, accountant, packer, shopId],
     );
-    const all = '{new_order,needs_review,cash_remitted,low_stock}';
+    const all = '{new_order,needs_review,cash_remitted,low_stock,contact_message}';
     await admin.query(
       `INSERT INTO messaging.push_subscriptions (shop_id, user_id, endpoint, p256dh, auth, kinds)
        VALUES ($1, $2, $6, $10, $11, $12), ($1, $3, $7, $10, $11, $12),
@@ -168,6 +169,25 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
       { endpoint: endpoint('accountant'), title: 'Zari: PostEx remitted Rs 52,000', url },
       { endpoint: endpoint('owner'), title: 'Zari: PostEx remitted Rs 52,000', url },
     ]);
+  });
+
+  it('pushes a message through the contact form to who answers customers, saying not what (ADR-591)', async () => {
+    const notices = new PushNotices(database, push);
+    const messageId = newId();
+    await notices.handle(
+      event(MessagingEvents.ContactMessageReceived, messageId, { language: 'en' }),
+    );
+    await notices.handle(
+      event(MessagingEvents.ContactMessageReceived, messageId, { language: 'en' }),
+    );
+    const url = `/${shop}/inbox?tab=form`;
+    expect(told()).toEqual([
+      { endpoint: endpoint('agent'), title: 'Zari: رابطہ صفحے سے پیغام', url },
+      { endpoint: endpoint('owner'), title: 'Zari: a message from your contact page', url },
+    ]);
+    expect(sender.sent.find((each) => each.endpoint === endpoint('owner'))!.message.body).toBe(
+      'A shopper wrote to you. Read it in the inbox and answer them.',
+    );
   });
 
   it('pushes low stock to owners and managers with its spell, without an alerts number', async () => {

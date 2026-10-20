@@ -25,7 +25,7 @@ import {
   unsubscribeBrowser,
 } from './push';
 
-type PushKind = 'NEW_ORDER' | 'NEEDS_REVIEW' | 'CASH_REMITTED' | 'LOW_STOCK';
+type PushKind = 'NEW_ORDER' | 'NEEDS_REVIEW' | 'CASH_REMITTED' | 'LOW_STOCK' | 'CONTACT_MESSAGE';
 
 /**
  * Whose work each kind of news is, and what it needs of them, as the core pushes it (ADR-506,
@@ -60,6 +60,12 @@ const KINDS: {
     gate: gate(['owner', 'manager'], 'write_inventory'),
     label: 'push.lowStock',
     hint: 'push.lowStockHint',
+  },
+  {
+    kind: 'CONTACT_MESSAGE',
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_conversations'),
+    label: 'push.contactMessage',
+    hint: 'push.contactMessageHint',
   },
 ];
 

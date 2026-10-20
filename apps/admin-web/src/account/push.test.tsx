@@ -37,7 +37,7 @@ const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/Bkkk';
 
 /** The core, keeping each browser's kinds as the Admin API does. */
 function core(
-  role: 'owner' | 'manager' | 'packer' | 'accountant',
+  role: 'owner' | 'manager' | 'confirmation_agent' | 'packer' | 'accountant',
   publicKey: string | null = KEY,
   shop?: Partial<ShopAccess>,
 ) {
@@ -103,7 +103,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
 
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const lowStock = await within(card).findByRole('checkbox', { name: /Low stock/ });
-    expect(within(card).getAllByRole('checkbox')).toHaveLength(4);
+    expect(within(card).getAllByRole('checkbox')).toHaveLength(5);
     fireEvent.click(lowStock);
     fireEvent.click(within(card).getByRole('button', { name: 'Turn on notifications' }));
     await waitFor(() =>
@@ -112,7 +112,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
           endpoint: ENDPOINT,
           p256dh: 'B'.repeat(87),
           auth: 'a'.repeat(22),
-          kinds: ['NEW_ORDER', 'NEEDS_REVIEW', 'CASH_REMITTED'],
+          kinds: ['NEW_ORDER', 'NEEDS_REVIEW', 'CASH_REMITTED', 'CONTACT_MESSAGE'],
         },
       }),
     );
@@ -123,7 +123,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(sent(fake, 'PushSubscribe')).toMatchObject({
-        input: { kinds: ['NEW_ORDER', 'NEEDS_REVIEW'] },
+        input: { kinds: ['NEW_ORDER', 'NEEDS_REVIEW', 'CONTACT_MESSAGE'] },
       }),
     );
 
@@ -140,6 +140,18 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     const boxes = await within(card).findAllByRole('checkbox');
     expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
       'Cash remittedA courier’s statement of the cash they sent.',
+    ]);
+  });
+
+  it('offers who answers customers the contact form’s messages (ADR-591)', async () => {
+    vi.stubGlobal('fetch', core('confirmation_agent').fetcher);
+    renderAdmin('/shop_1/account');
+    const card = await screen.findByRole('region', { name: 'Notifications on this device' });
+    const boxes = await within(card).findAllByRole('checkbox');
+    expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
+      expect.stringMatching(/^New orders/),
+      expect.stringMatching(/^Orders to review/),
+      'Contact form messagesA shopper writing to you from your online store’s contact page.',
     ]);
   });
 

@@ -116,6 +116,25 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       'needs_review',
     ]);
   });
+
+  it('tells who answers customers of a message through the contact form (ADR-591)', () => {
+    const told = (role: StaffRole, scopes?: string[]) =>
+      pushedTo(
+        'contact_message',
+        recipient('usr', role, 'en', scopes ? { scopes, capabilities: [] } : null),
+      );
+    expect([told('owner'), told('manager'), told('confirmation_agent')]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect([told('marketer'), told('packer'), told('accountant')]).toEqual([false, false, false]);
+    // A custom role's member, only where they may answer.
+    expect([
+      told('manager', ['read_conversations']),
+      told('manager', ['write_conversations']),
+    ]).toEqual([false, true]);
+  });
 });
 
 const message: PushMessage = {

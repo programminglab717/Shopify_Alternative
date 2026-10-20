@@ -5,7 +5,13 @@ import { staffPhonesIn } from '@hatti/identity/public';
 import { toPublicId } from '@hatti/ids';
 import type { LowStockAlert } from '@hatti/inventory/public';
 import { LogisticsEvents, type CodRemittanceImportedPayload } from '@hatti/logistics/public';
-import type { PushKind, PushMessage, PushRecipient, PushService } from '@hatti/messaging/public';
+import {
+  MessagingEvents,
+  type PushKind,
+  type PushMessage,
+  type PushRecipient,
+  type PushService,
+} from '@hatti/messaging/public';
 import { formatMoney, isCurrencyCode, money } from '@hatti/money';
 import { OrderEvents, orderName, type OrderCreatedPayload } from '@hatti/orders/public';
 
@@ -42,14 +48,17 @@ async function recipientsIn(tx: Tx, shopId: string): Promise<PushRecipient[]> {
  * Pushes the shop's news to its staff's browsers (APP-03, ADR-506), as the events are heard: a
  * new order, or one held for review for its risk, to owners, managers and confirmation agents;
  * a courier's statement of cash remitted, to owners, managers and accountants. Each once, in each
- * member's language, opening its page in the admin. Low stock is pushed with the WhatsApp alert,
- * which keeps its spells ({@link lowStockNotice}). Nothing where Hatti has no VAPID keys.
+ * member's language, opening its page in the admin; a shopper's message through the contact form
+ * (ADR-591), to those who answer customers, saying neither who wrote nor what, which push services
+ * would carry. Low stock is pushed with the WhatsApp alert, which keeps its spells
+ * ({@link lowStockNotice}). Nothing where Hatti has no VAPID keys.
  */
 export class PushNotices {
   /** The events {@link handle} reads. */
   static readonly EVENTS: readonly string[] = [
     OrderEvents.OrderCreated,
     LogisticsEvents.CodRemittanceImported,
+    MessagingEvents.ContactMessageReceived,
   ];
 
   constructor(
@@ -132,6 +141,23 @@ export class PushNotices {
             },
           } satisfies PushNotice;
         }
+        case MessagingEvents.ContactMessageReceived:
+          return {
+            kind: 'contact_message',
+            dedupeKey: `contact_message:${event.aggregateId}`,
+            recipients,
+            message: {
+              en: {
+                title: `${shop.name}: a message from your contact page`,
+                body: 'A shopper wrote to you. Read it in the inbox and answer them.',
+              },
+              ur: {
+                title: `${shop.name}: رابطہ صفحے سے پیغام`,
+                body: 'ایک خریدار نے آپ کو لکھا ہے۔ ان باکس میں پڑھیں اور جواب دیں۔',
+              },
+              url: `${base}/inbox?tab=form`,
+            },
+          } satisfies PushNotice;
         default:
           return null;
       }

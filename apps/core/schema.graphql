@@ -12659,10 +12659,11 @@ input PurchaseOrderUpdateInput {
 }
 
 """
-News pushed to staff: a NEW_ORDER, an order that NEEDS_REVIEW for its risk, CASH_REMITTED by a courier, or LOW_STOCK. Each goes to the roles whose work it is: orders to owners, managers and confirmation agents; cash to owners, managers and accountants; stock to owners and managers.
+News pushed to staff: a NEW_ORDER, an order that NEEDS_REVIEW for its risk, CASH_REMITTED by a courier, LOW_STOCK, or a CONTACT_MESSAGE through the online store. Each goes to the roles whose work it is: orders and contact messages to owners, managers and confirmation agents; cash to owners, managers and accountants; stock to owners and managers.
 """
 enum PushNotificationKind {
   CASH_REMITTED
+  CONTACT_MESSAGE
   LOW_STOCK
   NEEDS_REVIEW
   NEW_ORDER

@@ -17,15 +17,16 @@ export enum PushNotificationKind {
   NEEDS_REVIEW = 'NEEDS_REVIEW',
   CASH_REMITTED = 'CASH_REMITTED',
   LOW_STOCK = 'LOW_STOCK',
+  CONTACT_MESSAGE = 'CONTACT_MESSAGE',
 }
 
 registerEnumType(PushNotificationKind, {
   name: 'PushNotificationKind',
   description:
     'News pushed to staff: a NEW_ORDER, an order that NEEDS_REVIEW for its risk, CASH_REMITTED ' +
-    'by a courier, or LOW_STOCK. Each goes to the roles whose work it is: orders to owners, ' +
-    'managers and confirmation agents; cash to owners, managers and accountants; stock to ' +
-    'owners and managers.',
+    'by a courier, LOW_STOCK, or a CONTACT_MESSAGE through the online store. Each goes to the ' +
+    'roles whose work it is: orders and contact messages to owners, managers and confirmation ' +
+    'agents; cash to owners, managers and accountants; stock to owners and managers.',
 });
 
 @ObjectType({
