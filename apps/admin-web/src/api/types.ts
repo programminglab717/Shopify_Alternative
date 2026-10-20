@@ -183,6 +183,9 @@ export interface ReturnDetail {
   note: string;
   trackingInfo: { company: string | null; number: string | null };
   exchangeOrder: { id: string; name: string } | null;
+  /** What was paid for its items (ADR-613), and what refunds for it gave back. */
+  worth: MoneyValue;
+  amountRefunded: MoneyValue;
   returnLineItems: {
     quantity: number;
     restockedQuantity: number | null;

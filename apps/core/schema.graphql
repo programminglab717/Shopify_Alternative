@@ -10526,6 +10526,11 @@ input OrderRefundInput {
   """
   reference: String
 
+  """
+  The customer return it gives money back for (ADR-613): at most what was paid for its items and not refunded yet. Not for ONLINE.
+  """
+  returnId: ID
+
   """For STORE_CREDIT: when the credit expires; never, unless given."""
   storeCreditExpiresAt: DateTime
 }
@@ -14067,6 +14072,9 @@ type Refund {
   """
   reference: String
 
+  """The customer return it gives money back for (ADR-613), if any."""
+  returnId: ID
+
   """
   What of it was sales tax: the order's tax in all it has refunded, in proportion to its total, less what the refunds before it gave back. Refunds of a whole order give back all its tax.
   """
@@ -14125,6 +14133,8 @@ type RefundReceipt {
 A customer sending back items of a delivered parcel (ORD-07, ADR-136): recorded by staff, and checked in when it arrives. Money given back is a refund of its own.
 """
 type Return {
+  """What refunds for it gave back, a refund by exchange among them."""
+  amountRefunded: Money!
   cancelledAt: DateTime
 
   """When it was checked in."""
@@ -14148,6 +14158,11 @@ type Return {
 
   """How it comes back, when a courier brings it."""
   trackingInfo: TrackingInfo!
+
+  """
+  What was paid for its items (ADR-613): their prices, less their share of the order's discount. A refund for it gives back at most this, less what refunds for it gave back.
+  """
+  worth: Money!
 }
 
 type ReturnCancelPayload {

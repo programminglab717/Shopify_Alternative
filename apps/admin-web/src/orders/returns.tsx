@@ -19,7 +19,7 @@ import type {
   ReturnReason,
 } from '../api/types';
 import { permits } from '../auth/permissions';
-import { formatCount, formatDate } from '../i18n/format';
+import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { parsePrice } from '../products/product-form';
@@ -30,6 +30,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { REFUNDS, RefundForm, cents, refundable } from './money';
 import { WORKS_PARCELS } from './parcels';
 import { RestockForm } from './restock-form';
 import type { Restock } from './restock-form';
@@ -315,7 +316,13 @@ function ReturnItem({
 }) {
   const { t, locale } = useLocale();
   const shopId = useShop().id;
-  const [open, setOpen] = useState<'checkIn' | null>(null);
+  const [open, setOpen] = useState<'checkIn' | 'refund' | null>(null);
+  const [refunded, setRefunded] = useState('');
+  // What is left to give back for it (ADR-613): its worth less its refunds, at most what the
+  // order has paid and not refunded.
+  const owed = cents(back.worth.amount) - cents(back.amountRefunded.amount);
+  const most = Math.min(owed, cents(refundable(order)));
+  const refunds = permits(useShop(), REFUNDS) && back.status !== 'CANCELLED' && most > 0;
   const receive = useAdminMutation<ParcelUserErrorsData, { id: string; restock: Restock }>(
     ReturnReceiveMutation,
   );
@@ -377,6 +384,31 @@ function ReturnItem({
         <span className="text-secondary" dir="auto">
           {back.note}
         </span>
+      )}
+      {back.status !== 'CANCELLED' && cents(back.worth.amount) > 0 && (
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('orderReturns.worth', {
+            worth: formatMoney(back.worth.amount),
+            refunded: formatMoney(back.amountRefunded.amount),
+          })}
+        </span>
+      )}
+      {refunded && <Alert tone="success">{refunded}</Alert>}
+      {refunds && open === 'refund' && (
+        <RefundForm
+          order={order}
+          most={(most / 100).toFixed(2)}
+          forReturn={back}
+          onDone={(message) => {
+            setOpen(null);
+            setRefunded(message);
+          }}
+        />
+      )}
+      {refunds && open === null && (
+        <Button variant="secondary" className="self-start" onClick={() => setOpen('refund')}>
+          {t('orderReturns.refund', { amount: formatMoney((most / 100).toFixed(2)) })}
+        </Button>
       )}
       {works && back.status === 'OPEN' && open === 'checkIn' && (
         <RestockForm

@@ -269,6 +269,108 @@ describe.skipIf(!server)('ReturnService', () => {
     expect(await f.level(f.a, chappal)).toMatchObject({ onHand: 3 });
   });
 
+  it("refunds what was paid for a return's items, as store credit too, and no more (ADR-613)", async () => {
+    const order = await anOrder();
+    unwrap(await f.orders.markAsPaid(f.a, order.id));
+    const { return: back } = unwrap(
+      await f.returns.create(f.a, {
+        orderId: order.id,
+        returnLineItems: [
+          { lineItemId: lineOf(order, chappal).id, quantity: 1, reason: 'unwanted' },
+          { lineItemId: lineOf(order, khussa).id, quantity: 1, reason: 'defective' },
+        ],
+      }),
+    );
+    // A chappal at Rs 3,499 and a khussa at Rs 2,250 come back.
+    expect(back).toMatchObject({ worth: 5_749_00n, refunded: 0n });
+    const name = `#${order.number}-R1`;
+
+    expect(
+      await f.refunds.refund(f.a, order.id, { amount: '6,000', method: 'cash', returnId: back.id }),
+    ).toMatchObject({
+      ok: false,
+      errors: [
+        {
+          field: ['input', 'amount'],
+          message: `A refund for ${name} can be at most Rs 5,749: what was paid for its items and not refunded yet`,
+        },
+      ],
+    });
+    const cash = unwrap(
+      await f.refunds.refund(f.a, order.id, { amount: '4,000', method: 'cash', returnId: back.id }),
+    );
+    expect(cash.refund).toMatchObject({ amount: 4_000_00n, returnId: back.id });
+    expect(cash.order.returns[0]).toMatchObject({ worth: 5_749_00n, refunded: 4_000_00n });
+    const [said] = (await f.orders.timeline(f.a, order.id, { first: 1 })).items;
+    expect(said!.message).toBe(`Refunded Rs 4,000 in cash for return ${name}`);
+
+    // The rest as store credit, for the customer to spend again.
+    const credit = unwrap(
+      await f.refunds.refund(f.a, order.id, {
+        amount: '1,749',
+        method: 'store_credit',
+        returnId: back.id,
+      }),
+    );
+    expect(credit.order.returns[0]).toMatchObject({ refunded: 5_749_00n });
+    const [account] = await f.storeCredit.accountsOf(f.a, order.customerId);
+    expect(account!.balance).toBe(1_749_00n);
+    expect(
+      await f.refunds.refund(f.a, order.id, { amount: '1', method: 'cash', returnId: back.id }),
+    ).toMatchObject({
+      ok: false,
+      errors: [{ message: `What was paid for the items of ${name} is refunded already` }],
+    });
+    // What is left of the order is refunded as before, for no return.
+    const rest = unwrap(await f.refunds.refund(f.a, order.id, { amount: '100', method: 'cash' }));
+    expect(rest.refund.returnId).toBeNull();
+
+    expect(
+      errorsOf(
+        await f.refunds.refund(f.a, order.id, { amount: '1', method: 'cash', returnId: newId() }),
+      ),
+    ).toEqual([['input.returnId', 'NOT_FOUND']]);
+    expect(
+      errorsOf(
+        await f.refunds.refund(f.a, order.id, {
+          amount: '1',
+          method: 'online',
+          returnId: back.id,
+        }),
+      ),
+    ).toEqual([['input.returnId', 'INVALID']]);
+  });
+
+  it("refuses a refund for a cancelled return, or another order's", async () => {
+    const order = await anOrder();
+    unwrap(await f.orders.markAsPaid(f.a, order.id));
+    const { return: back } = unwrap(
+      await f.returns.create(f.a, {
+        orderId: order.id,
+        returnLineItems: [{ lineItemId: lineOf(order, khussa).id, quantity: 1, reason: 'other' }],
+      }),
+    );
+    const other = await anOrder();
+    unwrap(await f.orders.markAsPaid(f.a, other.id));
+    expect(
+      errorsOf(
+        await f.refunds.refund(f.a, other.id, { amount: '1', method: 'cash', returnId: back.id }),
+      ),
+    ).toEqual([['input.returnId', 'NOT_FOUND']]);
+    unwrap(await f.returns.cancel(f.a, back.id));
+    expect(
+      await f.refunds.refund(f.a, order.id, { amount: '1', method: 'cash', returnId: back.id }),
+    ).toMatchObject({
+      ok: false,
+      errors: [
+        {
+          field: ['input', 'returnId'],
+          message: `#${order.number}-R1 was cancelled: nothing comes back for it`,
+        },
+      ],
+    });
+  });
+
   it('lists the returns on their way, the longest first, and counts them on the home', async () => {
     const back = async (order: OrderRecord, variantId: string, quantity: number) =>
       unwrap(
@@ -374,8 +476,17 @@ describe.skipIf(!server)('ReturnService', () => {
       expect(credited).toMatchObject({
         amountRefunded: 2_300_00n,
         financialStatus: 'partially_refunded',
-        refunds: [{ amount: 2_300_00n, method: 'exchange', reference: `#${order.number + 1}` }],
+        refunds: [
+          {
+            amount: 2_300_00n,
+            method: 'exchange',
+            reference: `#${order.number + 1}`,
+            returnId: back.id,
+          },
+        ],
       });
+      // The exchange took all the return was worth (ADR-613).
+      expect(credited.returns[0]).toMatchObject({ worth: 2_300_00n, refunded: 2_300_00n });
       const exchange = (await f.orders.get(f.a, exchangeId))!;
       expect(exchange).toMatchObject({
         paymentMethod: 'cash_on_delivery',

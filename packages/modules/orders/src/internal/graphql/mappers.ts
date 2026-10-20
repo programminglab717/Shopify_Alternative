@@ -252,7 +252,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     refunds: record.refunds.map((refund, index) =>
       toRefund(refund, currency, record.number, index + 1),
     ),
-    returns: record.returns.map((back) => toReturn(back, record.number, lineItemsById)),
+    returns: record.returns.map((back) => toReturn(back, record.number, lineItemsById, currency)),
     returnStatus: returnStatusOf(record.returns),
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
@@ -485,6 +485,7 @@ export function toReturn(
   record: ReturnRecord,
   orderNumber: number,
   lineItemsById: ReadonlyMap<string, OrderLineItem>,
+  currency: CurrencyCode,
 ): Return {
   return Object.assign(new Return(), {
     id: toPublicId('return', record.id),
@@ -510,6 +511,8 @@ export function toReturn(
           name: orderName(record.exchangeOrder.number),
         })
       : null,
+    worth: Money.from(money(record.worth, currency)),
+    amountRefunded: Money.from(money(record.refunded, currency)),
     createdAt: record.createdAt,
     closedAt: record.closedAt,
     cancelledAt: record.cancelledAt,
@@ -553,6 +556,7 @@ export function toRefund(
         number: record.creditNote.name,
         issuedAt: record.creditNote.issuedAt,
       }),
+    returnId: record.returnId && toPublicId('return', record.returnId),
     createdAt: record.createdAt,
   });
 }

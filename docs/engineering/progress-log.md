@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A return's refund
+
+* **A refund may be for a customer return** ([ADR-613](../architecture/13-decision-log.md#adr-613--a-refund-may-be-for-a-customer-return-at-most-what-was-paid-for-its-items-and-is-not-refunded-yet-in-money-or-as-store-credit-each-return-says-what-it-is-worth-and-what-was-refunded-for-it)): each return says what was paid for its
+  items, discounts shared out, and what refunds for it gave back; a refund for it gives back at
+  most the rest, in money or as store credit, and the order's page offers it on the return.
+  Migration 0282 ties refunds to returns, those by exchange before it among them.
+* 3716 tests, 4 more: refunds for a return in cash and as store credit
+  and what they refuse, end to end through the API, and the admin's offer.
+
 ### 7a146cb · Redirect chains straightened at once
 
 * **Every chain of redirects is sent straight to where it ends in one tap** ([ADR-612](../architecture/13-decision-log.md#adr-612--the-shop-straightens-every-chain-of-redirects-at-once-each-sent-straight-to-where-its-chain-ends-loops-left-for-it-to-break)):

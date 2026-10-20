@@ -385,6 +385,14 @@ export const OrderQuery = /* GraphQL */ `
           id
           name
         }
+        worth {
+          amount
+          currencyCode
+        }
+        amountRefunded {
+          amount
+          currencyCode
+        }
         returnLineItems {
           quantity
           restockedQuantity

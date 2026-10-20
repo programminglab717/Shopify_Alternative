@@ -11,7 +11,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { VariantService } from '@hatti/catalog/public';
 import { LocationService, StockService } from '@hatti/inventory/public';
-import { allocate, divideRounded, formatMoney, money, type CurrencyCode } from '@hatti/money';
+import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { OrderEvents, type ReturnPayload } from './events.js';
@@ -25,6 +25,7 @@ import {
 import { OrderService, type OrderLineInput } from './order.service.js';
 import type { OrderRecord, Page, ReturnRecord } from './records.js';
 import { writeRefund } from './refund.service.js';
+import { paidFor } from './return-worth.js';
 import { LIMITS, itemName, orderName, returnName } from './rules.js';
 import {
   lines,
@@ -251,9 +252,11 @@ export class ReturnService {
       const name = returnName(order.number, next);
       let current = order;
       let swapped: { orderId: string; words: string } | null = null;
+      const id = newId();
       if (exchange.length > 0) {
         const sent = await this.#exchange(tx, tenant, order, {
           name,
+          returnId: id,
           lines: exchange,
           shipping: exchangeShipping,
           back: asked.map((entry) => ({
@@ -266,7 +269,6 @@ export class ReturnService {
         current = sent.value.order;
         swapped = { orderId: sent.value.exchangeOrderId, words: sent.value.words };
       }
-      const id = newId();
       const { actorKind, actorId } = actorColumnsOf(tenant.actor);
       const [created] = await tx
         .insert(returns)
@@ -462,6 +464,8 @@ export class ReturnService {
     order: OrderRow,
     exchange: {
       name: string;
+      /** The return's, written after its refund by exchange. */
+      returnId: string;
       lines: { variantId: string; quantity: number; price: bigint | null }[];
       shipping: bigint;
       back: { line: LineRow; units: number }[];
@@ -543,6 +547,7 @@ export class ReturnService {
           amount: applied,
           method: 'exchange',
           reference: sentName,
+          returnId: exchange.returnId,
           note: '',
           message: `${format(applied)} paid for what ${exchange.name} sends back went to its exchange, ${sentName}`,
         })
@@ -738,31 +743,4 @@ function items(count: number): string {
 /** As much of a timeline entry as it holds. */
 function clipped(message: string): string {
   return message.length <= LIMITS.comment ? message : `${message.slice(0, LIMITS.comment - 1)}…`;
-}
-
-/**
- * What was paid for `back`, units of the order's lines: their prices, less their share of the
- * order's discount, shared by the lines' totals as the tax on them is (ADR-096).
- */
-function paidFor(
-  order: OrderRow,
-  orderLines: readonly LineRow[],
-  back: readonly { line: LineRow; units: number }[],
-): bigint {
-  const shares = new Map<string, bigint>();
-  if (order.discount > 0n) {
-    const parts = allocate(
-      money(order.discount, order.currency as CurrencyCode),
-      orderLines.map((line) => line.total),
-    );
-    orderLines.forEach((line, index) => shares.set(line.id, parts[index]!.amount));
-  }
-  return back.reduce((sum, { line, units }) => {
-    const share = divideRounded(
-      (shares.get(line.id) ?? 0n) * BigInt(units),
-      BigInt(line.quantity),
-      'half-up',
-    );
-    return sum + line.unitPrice * BigInt(units) - share;
-  }, 0n);
 }

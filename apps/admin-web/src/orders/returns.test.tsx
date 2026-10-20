@@ -55,6 +55,8 @@ const back = (status: string, extra: Record<string, unknown> = {}) => ({
       lineItem: { id: 'li_1' },
     },
   ],
+  worth: rupees('5000'),
+  amountRefunded: rupees('0'),
   ...extra,
 });
 
@@ -136,6 +138,8 @@ function core(role: StaffRole, fulfillments: unknown[], returns: unknown[]) {
         return { returnCancel: { userErrors: [] } };
       case 'ParcelClaimCreate':
         return { fulfillmentClaimCreate: { userErrors: [] } };
+      case 'OrderRefund':
+        return { orderRefund: { refund: { id: 'ref_2' }, userErrors: [] } };
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -218,6 +222,57 @@ describe("An order's customer returns, on its page", () => {
         id: 'ret_1',
       }),
     );
+  });
+
+  it("refunds what is left of a return's worth, not online, for those who refund (ADR-613)", async () => {
+    const fake = core(
+      'manager',
+      [parcel('DELIVERED')],
+      [back('CLOSED', { amountRefunded: rupees('1000') })],
+    );
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const section = await screen.findByRole('region', { name: 'Returns' });
+    expect(
+      within(section).getByText('Paid for its items: Rs 5,000 · refunded: Rs 1,000'),
+    ).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Refund Rs 4,000' }));
+    expect(
+      within(section).getByText('For return #1007-R1: what was paid for its items, at most.'),
+    ).toBeTruthy();
+    const how = within(section).getByLabelText('How') as HTMLSelectElement;
+    const offered = [...how.options].map((option) => option.textContent);
+    expect(offered).toContain('Store credit');
+    expect(offered).not.toContain('Back through the payment gateway');
+    fireEvent.change(how, { target: { value: 'STORE_CREDIT' } });
+    fireEvent.click(within(section).getByRole('button', { name: 'Record the refund' }));
+
+    await within(section).findByText('Rs 4,000 refunded.');
+    expect(fake.sent.find((each) => each.operation === 'OrderRefund')?.variables).toEqual({
+      id: 'ord_7',
+      input: { amount: '4000', method: 'STORE_CREDIT', returnId: 'ret_1' },
+    });
+  });
+
+  it('offers no refund for a return refunded in full, or to those who do not refund', async () => {
+    const fake = core('packer', [parcel('DELIVERED')], [back('CLOSED')]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const section = await screen.findByRole('region', { name: 'Returns' });
+    expect(within(section).getByText('Paid for its items: Rs 5,000 · refunded: Rs 0')).toBeTruthy();
+    expect(within(section).queryByRole('button', { name: /^Refund/ })).toBeNull();
+    cleanup();
+
+    const paid = core(
+      'manager',
+      [parcel('DELIVERED')],
+      [back('CLOSED', { amountRefunded: rupees('5000') })],
+    );
+    vi.stubGlobal('fetch', paid.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const again = await screen.findByRole('region', { name: 'Returns' });
+    expect(within(again).queryByRole('button', { name: /^Refund/ })).toBeNull();
   });
 
   it('claims a parcel back damaged from its courier, for those who claim', async () => {

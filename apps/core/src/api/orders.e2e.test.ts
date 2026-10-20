@@ -1099,6 +1099,35 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       closedAt: expect.any(String),
     });
     expect(received.order.returnStatus).toBe('RETURNED');
+    // What was paid for its items is refunded for it, and no more (ADR-613).
+    const REFUND = `mutation ($id: ID!, $input: OrderRefundInput!) {
+      orderRefund(id: $id, input: $input) {
+        refund { returnId }
+        order { returns { worth { formatted } amountRefunded { formatted } } }
+        userErrors { field message }
+      }
+    }`;
+    const over = await mutate(tokens.a, REFUND, {
+      id: orderId,
+      input: { amount: '3500', method: 'CASH', returnId: created1.return.id },
+    });
+    expect(over.userErrors).toEqual([
+      {
+        field: ['input', 'amount'],
+        message: `A refund for ${created.order.name}-R1 can be at most Rs 3,499: what was paid for its items and not refunded yet`,
+      },
+    ]);
+    const refunded = await mutate(tokens.a, REFUND, {
+      id: orderId,
+      input: { amount: '1000', method: 'CASH', returnId: created1.return.id },
+    });
+    expect(refunded).toEqual({
+      refund: { returnId: created1.return.id },
+      order: {
+        returns: [{ worth: { formatted: 'Rs 3,499' }, amountRefunded: { formatted: 'Rs 1,000' } }],
+      },
+      userErrors: [],
+    });
     const cancelled = await mutate(
       tokens.a,
       `mutation ($id: ID!) { returnCancel(id: $id) { ${RETURN} } }`,
@@ -1129,6 +1158,7 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(exchanged.userErrors).toEqual([]);
     expect(exchanged.return.name).toBe(`${created.order.name}-R2`);
     expect(exchanged.order.refunds).toEqual([
+      { amount: { formatted: 'Rs 1,000' }, method: 'CASH', reference: null },
       {
         amount: { formatted: 'Rs 3,499' },
         method: 'EXCHANGE',

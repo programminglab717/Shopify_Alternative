@@ -152,6 +152,8 @@ export interface RefundRecord {
   receipt: RefundReceiptRecord | null;
   /** Its credit note, given back on an invoiced order (ADR-496): "CN/2026-27/00001". */
   creditNote: { name: string; issuedAt: Date } | null;
+  /** The customer return it gives money back for (ADR-613); null for none. */
+  returnId: string | null;
   actorKind: 'app' | 'staff';
   actorId: string;
   createdAt: Date;
@@ -188,6 +190,13 @@ export interface ReturnRecord {
     /** Once checked in: how many went back in stock; the rest were written off. */
     restockedQuantity: number | null;
   }[];
+  /**
+   * What was paid for its items (ADR-613): their prices, less their share of the order's
+   * discount, as an exchange for them is paid.
+   */
+  worth: bigint;
+  /** What refunds for it gave back, a refund by exchange among them. */
+  refunded: bigint;
   actorKind: 'app' | 'staff';
   actorId: string;
   createdAt: Date;

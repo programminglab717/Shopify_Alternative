@@ -686,6 +686,8 @@ export const refunds = ordersSchema.table(
     receiptKey: text('receipt_key'),
     receiptContentType: text('receipt_content_type'),
     receiptSize: integer('receipt_size'),
+    /** The customer return it gives money back for (ADR-613), if any. */
+    returnId: uuid('return_id'),
     actorKind: text('actor_kind', { enum: ['app', 'staff'] }).notNull(),
     actorId: uuid('actor_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

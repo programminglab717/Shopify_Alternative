@@ -21,7 +21,7 @@ import { OnlinePayments } from './online-payments.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
 import { refundTaxOf } from './order-tax.js';
 import type { OrderRecord, RefundRecord } from './records.js';
-import { LIMITS } from './rules.js';
+import { LIMITS, returnName } from './rules.js';
 import { refunds, type OrderRow, type RefundMethodValue } from './schema.js';
 import { issueCreditNoteIn } from './invoice-series.js';
 import { TransferReceiptService, type StoredReceipt } from './transfer-receipt.service.js';
@@ -41,6 +41,11 @@ export interface RefundInput {
    * `stagedUploadsCreate` staged for it (ADR-242).
    */
   receipt?: string | null;
+  /**
+   * The customer return it gives money back for (ADR-613): at most what was paid for its items
+   * and is not refunded yet. Not online, whose refund the gateway records.
+   */
+  returnId?: string | null;
 }
 
 export interface RefundResult {
@@ -136,6 +141,13 @@ export class RefundService {
         'It must expire in the future',
       );
     }
+    if (input.returnId && input.method === 'online') {
+      check.addMessage(
+        ['input', 'returnId'],
+        'INVALID',
+        'A refund online is not given for a return: give it another way, or leave the return out',
+      );
+    }
     const receipt = input.receipt?.trim() || null;
     if (receipt !== null && !BY_HAND.includes(input.method)) {
       check.addMessage(
@@ -215,6 +227,36 @@ export class RefundService {
           );
         }
 
+        // A return's refund gives back what was paid for its items, at most (ADR-613).
+        let forReturn: string | null = null;
+        if (input.returnId) {
+          const record = (await loadOrder(tx, tenant.shopId, orderId))!;
+          const back = record.returns.find((entry) => entry.id === input.returnId);
+          if (!back) {
+            return failOne(['input', 'returnId'], 'NOT_FOUND', 'Return not found on this order');
+          }
+          const name = returnName(order.number, back.number);
+          if (back.status === 'cancelled') {
+            return failOne(
+              ['input', 'returnId'],
+              'INVALID',
+              `${name} was cancelled: nothing comes back for it`,
+            );
+          }
+          const left = back.worth - back.refunded;
+          if (amount > left) {
+            return failOne(
+              ['input', 'amount'],
+              'INVALID',
+              left > 0n
+                ? `A refund for ${name} can be at most ${format(left)}: what was paid for its ` +
+                    'items and not refunded yet'
+                : `What was paid for the items of ${name} is refunded already`,
+            );
+          }
+          forReturn = name;
+        }
+
         // Its receipt's upload is the order's now, no longer one the shop may make a file of.
         if (
           receipt &&
@@ -234,8 +276,10 @@ export class RefundService {
           reference: creditId ? toPublicId('storeCreditTransaction', creditId) : reference,
           note,
           receipt: receipt?.stored ?? null,
+          returnId: forReturn ? input.returnId : null,
           message:
             `Refunded ${format(amount)}${METHOD_TEXT[input.method]}` +
+            (forReturn ? ` for return ${forReturn}` : '') +
             (receipt ? ', with its receipt' : ''),
         });
         if (creditId) {
@@ -360,6 +404,8 @@ export async function writeRefund(
     note: string;
     /** Its receipt, kept among the order's (ADR-242). */
     receipt?: StoredReceipt | null;
+    /** The customer return it gives money back for (ADR-613). */
+    returnId?: string | null;
     message: string;
   },
 ): Promise<{ refundId: string; order: OrderRow }> {
@@ -389,6 +435,7 @@ export async function writeRefund(
     receiptKey: refund.receipt?.key ?? null,
     receiptContentType: refund.receipt?.contentType ?? null,
     receiptSize: refund.receipt?.size ?? null,
+    returnId: refund.returnId ?? null,
     actorKind: actor.actorKind,
     actorId: actor.actorId,
   });

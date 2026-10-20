@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-612 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-613 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -620,6 +620,7 @@
 | 610 | Where the shop says so, the store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled | Accepted |
 | 611 | Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to confirm unanswered an hour is called once in Urdu, in calling hours: pressing 1 confirms it and 2 cancels it, the call a message on a voice channel of its own | Accepted |
 | 612 | The shop straightens every chain of redirects at once, each sent straight to where its chain ends, loops left for it to break | Accepted |
+| 613 | A refund may be for a customer return, at most what was paid for its items and is not refunded yet, in money or as store credit; each return says what it is worth and what was refunded for it | Accepted |
 
 ---
 
@@ -22196,3 +22197,31 @@
   itself redirects would silently go somewhere other than the shop typed, and changing the
   later redirect would leave the earlier pointing at the old end. **Have the storefront follow
   chains:** more lookups on every miss, and search engines still see the hops.
+
+## ADR-613 · A refund may be for a customer return, at most what was paid for its items and is not refunded yet, in money or as store credit; each return says what it is worth and what was refunded for it
+
+* **Context:** A customer return records what comes back and checks it in (ADR-136), and money
+  given back is a refund of its own. Nothing ties the two: staff work out by hand what the items
+  coming back were paid for, discounts shared out, and nothing stops a second refund for the same
+  return. A customer who paid with store credit, and sends back some of the items, has no way to
+  get that part back but a refund staff size by hand (status shortcut 100).
+* **Decision:** Each return says what it is worth: what was paid for its items, their prices
+  less their share of the order's discount, shared by the lines' totals as the tax on them is,
+  as an exchange for them is paid (ADR-137); and what refunds for it gave back. A refund may name
+  the return it is for (`returnId`, a column of its own on refunds): it is then at most the
+  return's worth less what refunds for it gave back, as well as at most what the order has paid
+  and not refunded; a cancelled return takes none. It goes back in cash, by transfer, to a
+  wallet, or as store credit, which credits the customer as any refund as credit does (ADR-184);
+  online refunds are left out, since the gateway records its own. A refund by exchange is its
+  return's too, and those made before are tied to theirs by the migration. The order's timeline
+  says which return a refund was for. In the admin, each return shows its worth and what was
+  refunded for it, and offers the rest as a refund, the order's refund form opening with it.
+* **Consequences:** A return's money is given back once, at the right amount, in the way the
+  customer wants, store credit among them. The credit given is a new credit with an expiry of
+  its own, not the credits that paid the order given back.
+* **Alternatives:** **Refund on checking the return in:** one step fewer, but a shop often gives
+  the money back before the items arrive, or after inspecting them; the refund stays its own.
+  **Refund lines item by item, as Shopify's:** finer, but the shops here refund returns whole,
+  and the return already says which items came back. **Give credit back to the credits that paid
+  the order:** keeps their expiry, but needs a debit given back in part, which the ledger keeps
+  whole (ADR-185); a new credit is simpler to read on the customer's account.

@@ -71,7 +71,7 @@ const UNSHIPPED: readonly OrderStage[] = [
 const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const RECEIPT_BYTES = 10 * 1024 * 1024;
 
-const cents = (amount: string) => Math.round(Number(amount) * 100);
+export const cents = (amount: string) => Math.round(Number(amount) * 100);
 
 /**
  * What the order waits for by transfer before it ships, as the core works it out: the whole of a
@@ -101,20 +101,23 @@ export function refundable(order: Pick<OrderDetail, 'amountPaid' | 'amountRefund
  * transfer's reference and its receipt, uploaded as it is chosen; through the gateway, or as
  * store credit, where the core records its own.
  */
-function RefundForm({
+export function RefundForm({
   order,
   most,
+  forReturn,
   onDone,
 }: {
   order: OrderDetail;
   most: string;
+  /** The customer return it gives money back for (ADR-613): not online, which the core refuses. */
+  forReturn?: { id: string; name: string };
   onDone: (message: string) => void;
 }) {
   const { t } = useLocale();
   const input = useRef<HTMLInputElement>(null);
   const [amount, setAmount] = useState(priceText(most));
   const [method, setMethod] = useState<RefundMethod>(
-    order.paymentMethod === 'ONLINE' ? 'ONLINE' : 'BANK_TRANSFER',
+    order.paymentMethod === 'ONLINE' && !forReturn ? 'ONLINE' : 'BANK_TRANSFER',
   );
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
@@ -189,6 +192,7 @@ function RefundForm({
             ...(byHand && reference.trim() ? { reference: reference.trim() } : {}),
             ...(note.trim() ? { note: note.trim() } : {}),
             ...(receiptUrl ? { receipt: receiptUrl } : {}),
+            ...(forReturn ? { returnId: forReturn.id } : {}),
           },
         })
       ).orderRefund!;
@@ -198,6 +202,7 @@ function RefundForm({
 
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
+      {forReturn && <p className="text-secondary">{t('money.refund.forReturn', forReturn)}</p>}
       <div className="grid gap-3 md:grid-cols-2">
         <TextField
           label={t('money.amount', { most: formatMoney(most) })}
@@ -216,7 +221,7 @@ function RefundForm({
         <SelectField<RefundMethod>
           label={t('money.method')}
           value={method}
-          options={METHODS.map((each) => ({
+          options={METHODS.filter((each) => !forReturn || each !== 'ONLINE').map((each) => ({
             value: each,
             label: t(`money.method.${each}` as MessageKey),
           }))}

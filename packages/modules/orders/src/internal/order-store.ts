@@ -7,6 +7,7 @@ import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { creditNoteName } from './invoice-series.js';
 import { ESTIMATED_CHARGE } from './parcel-estimates.js';
+import { paidFor, type PricedLine } from './return-worth.js';
 import type {
   FulfillmentRecord,
   OrderLineRecord,
@@ -165,6 +166,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     credit_note_year: number | null;
     credit_note_number: number | null;
     credit_note_issued_at: string | null;
+    return_id: string | null;
     actor_kind: RefundRecord['actorKind'];
     actor_id: string;
     created_at: string;
@@ -194,6 +196,28 @@ interface OrderJsonRow extends Record<string, unknown> {
 }
 
 function toOrderRecord(row: OrderJsonRow): OrderRecord {
+  // What each return is worth, and what refunds for it gave back (ADR-613).
+  const priced = new Map(
+    row.lines.map((line): [string, PricedLine] => [
+      line.id,
+      {
+        id: line.id,
+        unitPrice: BigInt(line.unit_price),
+        quantity: line.quantity,
+        total: BigInt(line.total),
+      },
+    ]),
+  );
+  const worthOf = (back: OrderJsonRow['returns'][number]) =>
+    paidFor(
+      { discount: BigInt(row.discount), currency: row.currency },
+      [...priced.values()],
+      back.lines.map((line) => ({ line: priced.get(line.line_id)!, units: line.quantity })),
+    );
+  const refundedFor = (returnId: string) =>
+    row.refunds
+      .filter((refund) => refund.return_id === returnId)
+      .reduce((sum, refund) => sum + BigInt(refund.amount), 0n);
   return {
     id: row.id,
     number: row.number,
@@ -365,6 +389,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
               name: creditNoteName(refund.credit_note_year!, refund.credit_note_number),
               issuedAt: toDate(refund.credit_note_issued_at!),
             },
+      returnId: refund.return_id,
       actorKind: refund.actor_kind,
       actorId: refund.actor_id,
       createdAt: toDate(refund.created_at),
@@ -387,6 +412,8 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
         reason: line.reason,
         restockedQuantity: line.restocked_quantity,
       })),
+      worth: worthOf(back),
+      refunded: refundedFor(back.id),
       actorKind: back.actor_kind,
       actorId: back.actor_id,
       createdAt: toDate(back.created_at),
@@ -484,7 +511,7 @@ export async function loadOrders(
                       'receipt_key', r.receipt_key, 'receipt_content_type', r.receipt_content_type,
                       'receipt_size', r.receipt_size,
                       'credit_note_year', cn.tax_year, 'credit_note_number', cn.number,
-                      'credit_note_issued_at', cn.issued_at,
+                      'credit_note_issued_at', cn.issued_at, 'return_id', r.return_id,
                       'actor_id', r.actor_id, 'created_at', r.created_at) ORDER BY r.id)
                FROM orders.refunds r
                LEFT JOIN orders.refund_credit_notes cn

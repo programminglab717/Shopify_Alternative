@@ -51,6 +51,7 @@ export class RefundResolver {
     const result = await this.refunds.refund(tenant, uuidOf('order', id), {
       ...input,
       method: toRefundMethodValue(input.method),
+      returnId: input.returnId ? uuidOf('return', input.returnId) : null,
     });
     if (!result.ok) {
       return Object.assign(new OrderRefundPayload(), {

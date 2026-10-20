@@ -204,6 +204,12 @@ export class Refund {
   })
   creditNote!: CreditNote | null;
 
+  @Field(() => ID, {
+    nullable: true,
+    description: 'The customer return it gives money back for (ADR-613), if any.',
+  })
+  returnId!: string | null;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 }
@@ -1121,6 +1127,18 @@ export class Return {
   })
   exchangeOrder!: ReturnExchangeOrder | null;
 
+  @Field(() => Money, {
+    description:
+      "What was paid for its items (ADR-613): their prices, less their share of the order's " +
+      'discount. A refund for it gives back at most this, less what refunds for it gave back.',
+  })
+  worth!: Money;
+
+  @Field(() => Money, {
+    description: 'What refunds for it gave back, a refund by exchange among them.',
+  })
+  amountRefunded!: Money;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 
@@ -1935,6 +1953,14 @@ export class OrderRefundInput {
       "not made one of the shop's files.",
   })
   receipt?: string | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'The customer return it gives money back for (ADR-613): at most what was paid for its ' +
+      'items and not refunded yet. Not for ONLINE.',
+  })
+  returnId?: string | null;
 }
 
 @InputType()
