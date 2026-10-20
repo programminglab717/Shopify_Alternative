@@ -1063,6 +1063,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       landmark: 'Near the mosque',
       city: 'Lahore',
       provinceCode: 'PB',
+      province: 'Punjab',
       zip: null,
       default: true,
     });
@@ -1187,6 +1188,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
         landmark: null,
         city: 'Lahore',
         provinceCode: 'PB',
+        province: 'Punjab',
         zip: null,
         default: name === 'Home',
         savedAt: expect.any(Date) as unknown,

@@ -94,6 +94,9 @@
         }
       }
     },
+    "main-addresses": {
+      "name": "پتے"
+    },
     "main-article": {
       "name": "مضمون"
     },

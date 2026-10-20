@@ -333,6 +333,8 @@ export interface AccountAddress {
   landmark: string | null;
   city: string;
   provinceCode: string | null;
+  /** The province's name, in English: "Punjab". */
+  province: string | null;
   zip: string | null;
   /** The one the account delivers to first; one of them while it has any. */
   default: boolean;

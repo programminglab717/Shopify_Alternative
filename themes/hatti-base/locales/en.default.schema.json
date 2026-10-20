@@ -94,6 +94,9 @@
         }
       }
     },
+    "main-addresses": {
+      "name": "Addresses"
+    },
     "main-article": {
       "name": "Article"
     },

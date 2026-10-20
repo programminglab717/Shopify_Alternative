@@ -263,6 +263,8 @@
       "sign_out": "Sign out",
       "wishlist": "Your wishlist",
       "wishlist_note": "Kept with your account, on every phone or computer you sign in on.",
+      "addresses": "Your addresses",
+      "default_address": "Delivered to first: {{ address }}",
       "store_credit": "Store credit",
       "store_credit_expiring": "{{ amount }} of it expires on {{ date }}.",
       "store_credit_note": "It is taken off your next order at checkout.",
@@ -313,6 +315,39 @@
           "erase_unconfirmed": "Tick the box to say you understand what deleting your data means.",
           "too_many_requests": "Too many tries. Please wait a minute and try again."
         }
+      }
+    },
+    "addresses": {
+      "title": "Your addresses",
+      "back": "Back to your account",
+      "none": "You haven't saved an address yet. Add one to fill in checkout faster.",
+      "default": "Default address",
+      "edit": "Edit",
+      "remove": "Remove",
+      "add": "Add a new address",
+      "full": "You can keep {{ count }} addresses. Remove one to add another.",
+      "name": "Full name",
+      "phone": "Mobile number",
+      "address1": "House and street",
+      "address2": "Area or block (optional)",
+      "landmark": "Landmark (optional)",
+      "city": "City",
+      "province": "Province (optional)",
+      "zip": "Postal code (optional)",
+      "set_default": "Make this my default address",
+      "save": "Save address",
+      "errors": {
+        "name": "Enter the name of who receives the order.",
+        "phone": "Enter a Pakistani mobile number, like 0300 1234567.",
+        "address1": "Enter the house and street.",
+        "city": "Enter the city.",
+        "province": "Enter a province of Pakistan, like Punjab or Sindh.",
+        "zip": "Enter a postal code of 5 digits, or leave it empty.",
+        "too_long": "Shorten what you typed.",
+        "not_found": "That address is no longer in your account.",
+        "too_many": "You can keep {{ count }} addresses. Remove one to add another.",
+        "first_order": "Your addresses are kept once you place your first order.",
+        "too_many_requests": "Too many changes. Please wait a minute and try again."
       }
     }
   },

@@ -17,8 +17,11 @@ import {
   type ThemeDoc,
 } from '@hatti/storefront-data';
 import {
+  ACCOUNT_ADDRESSES_MAX,
   PRODUCT_FEED_PATH,
   StorefrontApiError,
+  type AccountAddress,
+  type AccountAddressRequest,
   type AccountClient,
   type AccountDataEraseResponse,
   type AccountDataExportJson,
@@ -668,6 +671,81 @@ class FakeCore {
       (this.wishlists.get(token) ?? []).filter((id) => id !== productId),
     );
     return this.wishlists.get(token)!;
+  }
+
+  /**
+   * Address books kept with accounts (ADR-584), by the session's secret, the default first, as
+   * the core keeps them, checking a city and a number as it does; and what was saved.
+   */
+  readonly addressBooks = new Map<string, AccountAddress[]>();
+  readonly addressesSaved: [string | null, AccountAddressRequest][] = [];
+
+  async accountAddresses(_shopId: string, token: string | null): Promise<AccountAddress[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    return this.addressBooks.get(token) ?? [];
+  }
+
+  async accountAddressSave(
+    _shopId: string,
+    token: string | null,
+    address: AccountAddressRequest,
+    addressId?: string,
+  ): Promise<
+    | { ok: true; addresses: AccountAddress[] }
+    | { ok: false; errors: { field: string; message: string }[] }
+    | null
+  > {
+    if (!token || !this.accounts.has(token)) return null;
+    this.addressesSaved.push([addressId ?? null, address]);
+    const book = this.addressBooks.get(token) ?? [];
+    const errors = [
+      ...(/^0?3\d{2}[\s-]?\d{7}$/.test(address.phone)
+        ? []
+        : [{ field: 'phone', message: 'Phone must be a Pakistani mobile number' }]),
+      ...(address.city.trim() === '' ? [{ field: 'city', message: "City can't be blank" }] : []),
+      ...(addressId !== undefined && !book.some((each) => each.id === addressId)
+        ? [{ field: 'id', message: 'Id is not one of your addresses' }]
+        : []),
+      ...(addressId === undefined && book.length >= ACCOUNT_ADDRESSES_MAX
+        ? [{ field: '', message: 'You can keep 20 addresses' }]
+        : []),
+    ];
+    if (errors.length > 0) return { ok: false, errors };
+    const kept: AccountAddress = {
+      id: addressId ?? `addr_${book.length + 1}`,
+      name: address.name,
+      phone: `+92${address.phone.replace(/\D/g, '').slice(-10)}`,
+      address1: address.address1,
+      address2: address.address2 ?? null,
+      landmark: address.landmark ?? null,
+      city: address.city,
+      provinceCode: 'PB',
+      province: 'Punjab',
+      zip: address.zip ?? null,
+      default: book.length === 0 || address.default === true,
+    };
+    let next = addressId
+      ? book.map((each) =>
+          each.id === addressId ? { ...kept, default: each.default || kept.default } : each,
+        )
+      : [...book, kept];
+    if (kept.default) next = next.map((each) => ({ ...each, default: each.id === kept.id }));
+    next.sort((a, b) => Number(b.default) - Number(a.default));
+    this.addressBooks.set(token, next);
+    return { ok: true, addresses: next };
+  }
+
+  async accountAddressDelete(
+    _shopId: string,
+    token: string | null,
+    addressId: string,
+  ): Promise<AccountAddress[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    const left = (this.addressBooks.get(token) ?? []).filter((each) => each.id !== addressId);
+    if (left.length > 0 && !left.some((each) => each.default))
+      left[0] = { ...left[0]!, default: true };
+    this.addressBooks.set(token, left);
+    return left;
   }
 }
 
@@ -4367,6 +4445,244 @@ describe("Shoppers' accounts (ADR-571)", () => {
       'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
     ]);
     expect(core.dataAsked).toEqual([['export', ACCOUNT_TOKEN]]);
+    await app.close();
+  });
+
+  it("keeps a signed-in shopper's address book on its own page, adding, changing and removing addresses (ADR-584)", async () => {
+    const app = server();
+    // No one signed in: to sign in first, and back.
+    const out = await app.inject({ method: 'GET', url: '/account/addresses', headers: FORM });
+    expect([out.statusCode, out.headers.location]).toEqual([
+      302,
+      '/account/login?return_to=%2Faccount%2Faddresses',
+    ]);
+
+    const cookie = signedIn();
+    const empty = await app.inject({
+      method: 'GET',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie },
+    });
+    expect([empty.statusCode, empty.headers['cache-control']]).toEqual([200, 'private, no-store']);
+    expect(empty.body).toContain('You haven&#39;t saved an address yet.');
+    expect(empty.body).toMatch(
+      /<form method="post" action="\/account\/addresses" accept-charset="UTF-8" id="address_form_new" class="addresses__form addresses__new"><input type="hidden" name="form_type" value="customer_address"><details open>/,
+    );
+
+    // Added as Shopify's forms add them: its first and last names, one name.
+    const added = await app.inject({
+      method: 'POST',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie },
+      payload: form({
+        'address[first_name]': 'Ayesha',
+        'address[last_name]': 'Khan',
+        'address[phone]': '0321 7654321',
+        'address[address1]': 'House 12, Street 4',
+        'address[landmark]': 'Near the mosque',
+        'address[city]': 'Lahore',
+      }),
+    });
+    expect([added.statusCode, added.headers.location]).toEqual([303, '/account/addresses']);
+    expect(core.addressesSaved).toEqual([
+      [
+        null,
+        {
+          name: 'Ayesha Khan',
+          phone: '0321 7654321',
+          address1: 'House 12, Street 4',
+          address2: null,
+          landmark: 'Near the mosque',
+          city: 'Lahore',
+          province: null,
+          zip: null,
+          default: false,
+        },
+      ],
+    ]);
+    const book = await app.inject({
+      method: 'GET',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie },
+    });
+    expect(book.body).toContain('Default address');
+    expect(book.body).toContain('Near the mosque');
+    expect(book.body).toMatch(
+      /action="\/account\/addresses\/addr_1" accept-charset="UTF-8" id="address_form_addr_1"/,
+    );
+    expect(book.body).toContain('value="House 12, Street 4"');
+    expect(book.body).toMatch(
+      /<input type="checkbox" id="address_default_address_addr_1" name="address\[default\]" value="1" checked>/,
+    );
+    expect(book.body).toMatch(
+      /<form method="post" action="\/account\/addresses\/addr_1" class="addresses__remove">\s*<input type="hidden" name="_method" value="delete">/,
+    );
+    // The account page links to it, saying which is the default.
+    const account = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { ...FORM, cookie },
+    });
+    expect(account.body).toContain('<a href="/account/addresses">Your addresses</a>');
+    expect(account.body).toContain('Delivered to first: House 12, Street 4, Lahore, Punjab');
+
+    // Refused, the page again, the form open with what was typed and what was wrong.
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/account/addresses/addr_1',
+      headers: { ...FORM, cookie },
+      payload: form({
+        'address[name]': 'Ayesha Khan',
+        'address[phone]': '0321 7654321',
+        'address[address1]': 'Flat 3, Gulberg',
+        'address[city]': '',
+      }),
+    });
+    expect([refused.statusCode, refused.headers['cache-control']]).toEqual([
+      422,
+      'private, no-store',
+    ]);
+    expect(refused.body).toMatch(
+      /id="address_form_addr_1" class="addresses__form"><input type="hidden" name="form_type" value="customer_address"><details open>/,
+    );
+    expect(refused.body).toContain('value="Flat 3, Gulberg"');
+    expect(refused.body).toContain('<p>Enter the city.</p>');
+    expect(refused.body).not.toMatch(/id="address_form_new"[^>]*><input[^>]*><details open>/);
+    // In Urdu, in the page's words, posting where the page is.
+    const urdu = await app.inject({
+      method: 'POST',
+      url: '/ur/account/addresses',
+      headers: { ...FORM, cookie },
+      payload: form({
+        'address[name]': 'Bilal',
+        'address[phone]': '123',
+        'address[city]': 'Lahore',
+      }),
+    });
+    expect(urdu.statusCode).toBe(422);
+    expect(urdu.body).toContain('<p>پاکستانی موبائل نمبر درج کریں، جیسے 0300 1234567۔</p>');
+    expect(urdu.body).toMatch(
+      /action="\/ur\/account\/addresses" accept-charset="UTF-8" id="address_form_new"/,
+    );
+    expect(urdu.body).toMatch(/action="\/ur\/account\/addresses\/addr_1"/);
+
+    // Changed and made the default, then removed.
+    const second = await app.inject({
+      method: 'POST',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie },
+      payload: form({
+        'address[name]': 'Ayesha Khan',
+        'address[phone]': '03217654321',
+        'address[address1]': 'Office 9, Mall Road',
+        'address[city]': 'Lahore',
+        'address[default]': '1',
+      }),
+    });
+    expect(second.headers.location).toBe('/account/addresses');
+    expect(core.addressBooks.get(ACCOUNT_TOKEN)!.map((each) => [each.id, each.default])).toEqual([
+      ['addr_2', true],
+      ['addr_1', false],
+    ]);
+    const removed = await app.inject({
+      method: 'POST',
+      url: '/account/addresses/addr_2',
+      headers: { ...FORM, cookie },
+      payload: form({ _method: 'delete' }),
+    });
+    expect([removed.statusCode, removed.headers.location]).toEqual([303, '/account/addresses']);
+    expect(core.addressBooks.get(ACCOUNT_TOKEN)!.map((each) => [each.id, each.default])).toEqual([
+      ['addr_1', true],
+    ]);
+    await app.close();
+  });
+
+  it('refuses address changes from other sites and from no one signed in, and says when the book is full (ADR-584)', async () => {
+    const app = server();
+    const cookie = signedIn();
+    const typed = form({
+      'address[name]': 'Ayesha Khan',
+      'address[phone]': '0321 7654321',
+      'address[address1]': 'House 12',
+      'address[city]': 'Lahore',
+    });
+    const elsewhere = await app.inject({
+      method: 'POST',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie, 'sec-fetch-site': 'cross-site' },
+      payload: typed,
+    });
+    expect([elsewhere.statusCode, elsewhere.headers['cache-control']]).toEqual([
+      403,
+      'private, no-store',
+    ]);
+    const nobody = await app.inject({
+      method: 'POST',
+      url: '/ur/account/addresses',
+      headers: FORM,
+      payload: typed,
+    });
+    expect([nobody.statusCode, nobody.headers.location]).toEqual([303, '/ur/account/login']);
+    expect(core.addressesSaved).toEqual([]);
+
+    // An address not theirs.
+    const lost = await app.inject({
+      method: 'POST',
+      url: '/account/addresses/addr_404',
+      headers: { ...FORM, cookie },
+      payload: typed,
+    });
+    expect(lost.statusCode).toBe(422);
+    expect(lost.body).toContain('<p>That address is no longer in your account.</p>');
+
+    // A full book offers no new one, and refuses one posted all the same.
+    core.addressBooks.set(
+      ACCOUNT_TOKEN,
+      Array.from({ length: ACCOUNT_ADDRESSES_MAX }, (_, index) => ({
+        id: `addr_${index + 1}`,
+        name: 'Ayesha Khan',
+        phone: '+923217654321',
+        address1: `House ${index + 1}`,
+        address2: null,
+        landmark: null,
+        city: 'Lahore',
+        provinceCode: 'PB',
+        province: 'Punjab',
+        zip: null,
+        default: index === 0,
+      })),
+    );
+    const full = await app.inject({
+      method: 'GET',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie },
+    });
+    expect(full.body).toContain('You can keep 20 addresses. Remove one to add another.');
+    expect(full.body).not.toContain('id="address_form_new"');
+    const more = await app.inject({
+      method: 'POST',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie },
+      payload: typed,
+    });
+    // Refused, the page says why as it did.
+    expect(more.statusCode).toBe(422);
+    expect(more.body).toContain(
+      '<p class="addresses__full">You can keep 20 addresses. Remove one to add another.</p>',
+    );
+
+    // A session that is over: to sign in, its cookies gone.
+    const over = await app.inject({
+      method: 'POST',
+      url: '/account/addresses',
+      headers: { ...FORM, cookie: 'hatti_account=sEsSiOn_SeCrEt-EnDeD-0123456789abcdef' },
+      payload: typed,
+    });
+    expect([over.statusCode, over.headers.location]).toEqual([303, '/account/login']);
+    expect(over.headers['set-cookie']).toEqual([
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    ]);
     await app.close();
   });
 

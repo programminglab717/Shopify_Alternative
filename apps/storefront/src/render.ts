@@ -1,6 +1,6 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
-import type { AccountJson, CartJson } from '@hatti/storefront-api';
-import { customerObject, type DataNotice, type LoginForm } from './accounts.js';
+import type { AccountAddress, AccountJson, CartJson } from '@hatti/storefront-api';
+import { customerObject, type AddressForm, type DataNotice, type LoginForm } from './accounts.js';
 import {
   TranslatedStore,
   type HandledKind,
@@ -149,6 +149,13 @@ export interface PageRequest {
   dataNotice?: { code: DataNotice; message: string } | null;
   /** The sign-in page's form, as its route leaves it: its step, and what went wrong. */
   login?: LoginForm | null;
+  /**
+   * The signed-in shopper's address book (ADR-584), the default first, as `customer.addresses`,
+   * on the account's own pages.
+   */
+  addresses?: readonly AccountAddress[] | null;
+  /** An address form posted to the address book's page that did not go, shown again. */
+  addressForm?: AddressForm | null;
 }
 
 /**
@@ -233,6 +240,8 @@ interface PreparedPage {
   formErrors: Readonly<Record<string, readonly string[]>>;
   /** The sign-in page's form; null on other pages. */
   login: LoginForm | null;
+  /** An address form that did not go; null on other pages. */
+  addressForm: AddressForm | null;
   /** Content of the platform's own instead of a template's, as a policy's page has (ADR-056). */
   builtIn: string | null;
   theme: Theme;
@@ -281,6 +290,7 @@ function routesFor(prefix: string): Record<string, string> {
     product_recommendations_url: `${prefix}/recommendations/products`,
     account_url: `${prefix}/account`,
     account_login_url: `${prefix}/account/login`,
+    account_addresses_url: `${prefix}/account/addresses`,
     account_logout_url: `${prefix}/account/logout`,
   };
 }
@@ -367,6 +377,7 @@ export class PageRenderer {
       params: page.ctx.filters?.params ?? [],
       formErrors: page.formErrors,
       login: page.login,
+      addressForm: page.addressForm,
       renderSection: () => Promise.resolve(''),
       renderGroup: () => Promise.resolve(''),
     };
@@ -461,6 +472,7 @@ export class PageRenderer {
       params: ctx.filters?.params ?? [],
       formErrors: prepared.formErrors,
       login: prepared.login,
+      addressForm: prepared.addressForm,
       renderSection: (section) =>
         limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
       renderGroup: (group) =>
@@ -695,6 +707,7 @@ export class PageRenderer {
             locale,
             prefix: locale === theme.defaultLocale ? '' : `/${locale}`,
             notice: request.dataNotice ?? null,
+            addresses: request.addresses ?? null,
           })
         : null,
       localization: {
@@ -769,6 +782,7 @@ export class PageRenderer {
       preview: request.preview ?? null,
       formErrors: request.formErrors ?? {},
       login: request.login ?? null,
+      addressForm: request.addressForm ?? null,
       builtIn,
       editor: request.editor ?? null,
       templateFile,
@@ -1082,6 +1096,8 @@ function route(path: string): Route {
   // A shopper's sign-in and account (ADR-571), which the storefront serves only to them.
   if (path === '/account') return { name: 'customers/account', handle: null };
   if (path === '/account/login') return { name: 'customers/login', handle: null };
+  // Their address book (ADR-584).
+  if (path === '/account/addresses') return { name: 'customers/addresses', handle: null };
   const policy = /^\/policies\/([a-z-]+)\/?$/.exec(path);
   if (policy) return { name: 'policy', handle: policy[1]! };
   // The shop's link-in-bio page (ADR-161).
@@ -1263,6 +1279,7 @@ function pageTitle(
   if (name === 'search') return words('sections.search.title') ?? 'Search';
   if (name === 'customers/login') return words('customer.login.title') ?? 'Sign in';
   if (name === 'customers/account') return words('customer.account.title') ?? 'Your account';
+  if (name === 'customers/addresses') return words('customer.addresses.title') ?? 'Your addresses';
   return name === '404' ? 'Page not found' : String(shop.name);
 }
 

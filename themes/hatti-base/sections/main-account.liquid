@@ -7,7 +7,8 @@
   "Your data" (CUS-05, ADR-572), they download the file of their own data, or ask for its
   erasure once told what it means and ticking that they understand. Where the shop has a wishlist
   page, as the header may link to, it links to it too: their wishlist is kept with their account
-  once they are signed in (ADR-575).
+  once they are signed in (ADR-575). It links to their address book (ADR-584), saying which
+  address is their default.
 {%- endcomment -%}
 <div class="page-width section-spacing account">
   <div class="section-title">
@@ -37,6 +38,13 @@
         <span class="account__muted">{{ 'customer.account.wishlist_note' | t }}</span>
       </p>
     {%- endif -%}
+
+    <p class="account__addresses">
+      <a href="{{ routes.account_addresses_url }}">{{ 'customer.account.addresses' | t }}</a>
+      {%- if customer.default_address -%}
+        <span class="account__muted" dir="auto">{{ 'customer.account.default_address' | t: address: customer.default_address.summary }}</span>
+      {%- endif -%}
+    </p>
 
     {%- assign credit = customer.store_credit_account -%}
     {%- if credit.balance > 0 -%}
@@ -173,6 +181,7 @@
   .account { max-inline-size: 48rem; }
   .account__who { margin-block: 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
   .account__wishlist { margin-block: -0.75rem 1.5rem; display: grid; gap: 0.25rem; }
+  .account__addresses { margin-block: -0.75rem 1.5rem; display: grid; gap: 0.25rem; }
   .account__muted { color: var(--color-muted); font-size: 0.875rem; }
   .account__credit { margin-block-end: 2rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
   .account__credit h2 { margin-block-start: 0; font-size: 1rem; }

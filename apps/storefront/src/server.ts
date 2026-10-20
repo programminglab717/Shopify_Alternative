@@ -23,6 +23,7 @@ import {
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
+  ACCOUNT_ADDRESSES_MAX,
   ACCOUNT_WISHLIST_MAX,
   CONTENT_TYPES,
   NUMBER_PROOF_COOKIE,
@@ -62,6 +63,8 @@ import {
   PHONE_TYPED_MAX,
   accountTokenOf,
   addAgain,
+  addressErrorMessages,
+  addressRequestOf,
   dataNoticeMessage,
   dataNoticeOf,
   loginCookie,
@@ -73,6 +76,7 @@ import {
   reorderNoticeOf,
   signedInCookie,
   signedInCookieCleared,
+  type AddressForm,
   type DataNotice,
   type LoginForm,
   type LoginProblem,
@@ -249,6 +253,12 @@ const ACCOUNT_REORDERS = { name: 'account-reorders', limit: 10, windowMs: 60_000
  * for many shoppers behind one mobile network's address, but not for a script.
  */
 const ACCOUNT_WISHLISTS = { name: 'account-wishlists', limit: 60, windowMs: 60_000 };
+
+/**
+ * Changes an address may make to shoppers' address books a minute (ADR-584): a shopper adds an
+ * address or two, and corrects one; room for many behind one mobile network's address.
+ */
+const ACCOUNT_ADDRESS_CHANGES = { name: 'account-address-changes', limit: 30, windowMs: 60_000 };
 
 /** The longest handle a wishlist's script is asked of, as catalog's handles are at most. */
 const HANDLE_MAX = 255;
@@ -2594,7 +2604,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   ) => {
     const { locale, prefix } = languageOf(request);
     const token = accountTokenOf(request.headers.cookie);
-    const account = token ? await core!.account(found.shopId, token) : null;
+    // With their address book, for `customer.default_address` (ADR-584).
+    const [account, addresses] = token
+      ? await Promise.all([
+          core!.account(found.shopId, token),
+          core!.accountAddresses(found.shopId, token),
+        ])
+      : [null, null];
     if (!account) {
       if (token) signOutCookies(request, reply);
       return reply.redirect(`${prefix}/account/login`, request.method === 'POST' ? 303 : 302);
@@ -2603,7 +2619,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       code: notice,
       message: dataNoticeMessage(notice, (key, values) => translation(theme, locale, key, values)),
     };
-    const page = { path: '/account', locale, customer: account, dataNotice };
+    const page = { path: '/account', locale, customer: account, addresses, dataNotice };
     return sendPage(reply, page, found, status, request.method === 'GET' ? request : undefined);
   };
 
@@ -2913,6 +2929,132 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     };
 
   /**
+   * The address book's page (ADR-584), `/account/addresses`, in the theme's `customers/addresses`
+   * template: `customer` with `customer.addresses`, the default first, and `form` showing again
+   * an address that was just posted and refused. Without a session, on to sign in, and back.
+   */
+  const addressesPageOf = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    found: Found,
+    form: AddressForm | null,
+    status?: number,
+  ) => {
+    const { locale, prefix } = languageOf(request);
+    const token = accountTokenOf(request.headers.cookie);
+    const [account, addresses] = token
+      ? await Promise.all([
+          core!.account(found.shopId, token),
+          core!.accountAddresses(found.shopId, token),
+        ])
+      : [null, null];
+    if (!account || !addresses) {
+      if (token) signOutCookies(request, reply);
+      const back = `${prefix}/account/addresses`;
+      const to = `${prefix}/account/login?${new URLSearchParams({ return_to: back })}`;
+      return reply.redirect(to, request.method === 'POST' ? 303 : 302);
+    }
+    // A form for an address no longer in the book comes back as a new one's, to keep what was
+    // typed.
+    const shown =
+      form && form.id !== null && !addresses.some((each) => each.id === form.id)
+        ? { ...form, id: null }
+        : form;
+    const page = {
+      path: '/account/addresses',
+      locale,
+      customer: account,
+      addresses,
+      addressForm: shown,
+    };
+    return sendPage(reply, page, found, status, request.method === 'GET' ? request : undefined);
+  };
+
+  const addressesPage = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      return await addressesPageOf(request, reply, found, null);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
+   * An address of the shopper's book, posted from its page (ADR-584), as Shopify's forms post
+   * them: to `/account/addresses` for a new one, or to the address's own `url` to change it, or,
+   * with `_method=delete`, to take it out. From the shop's own pages alone, at most
+   * {@link ACCOUNT_ADDRESS_CHANGES} a minute from an address. Done, back to the book; refused,
+   * the book's page again, saying what was wrong beside what was typed. Without a session, to
+   * sign in first.
+   */
+  const addressChange = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const { locale, prefix } = languageOf(request);
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send("Shoppers change their addresses from the shop's own pages.\n");
+    }
+    const { id = null } = request.params as { id?: string };
+    const body = paramsOf(request);
+    const words = (key: string, values: Record<string, unknown>) =>
+      translation(theme, locale, key, values);
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      const token = accountTokenOf(request.headers.cookie);
+      if (!token) return await reply.redirect(`${prefix}/account/login`, 303);
+      const { request: address, values } = addressRequestOf(recordOf(body.address));
+      if (limiter !== null && !(await limiter.hit(ACCOUNT_ADDRESS_CHANGES, request.ip)).allowed) {
+        const errors = [
+          translation(theme, locale, 'customer.addresses.errors.too_many_requests', {}) ??
+            'Too many changes. Please wait a minute and try again.',
+        ];
+        return await addressesPageOf(request, reply, found, { id, values, errors }, 429);
+      }
+      const back = `${prefix}/account/addresses`;
+      if (id !== null && body._method === 'delete') {
+        const left = await core.accountAddressDelete(found.shopId, token, id.slice(0, 64));
+        if (!left) {
+          signOutCookies(request, reply);
+          return await reply.redirect(`${prefix}/account/login`, 303);
+        }
+        return await reply.redirect(back, 303);
+      }
+      const saved = await core.accountAddressSave(
+        found.shopId,
+        token,
+        address,
+        id === null ? undefined : id.slice(0, 64),
+      );
+      if (!saved) {
+        signOutCookies(request, reply);
+        return await reply.redirect(`${prefix}/account/login`, 303);
+      }
+      if (saved.ok) return await reply.redirect(back, 303);
+      // Whether the book is full, for an error that names no field to say so.
+      const book = await core.accountAddresses(found.shopId, token);
+      const errors = addressErrorMessages(
+        saved.errors,
+        { full: (book?.length ?? 0) >= ACCOUNT_ADDRESSES_MAX },
+        words,
+      );
+      return await addressesPageOf(request, reply, found, { id, values, errors }, 422);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return accountUnavailable(reply);
+    }
+  };
+
+  /**
    * Signing out (ADR-571): the core ends the session the cookie names, and the cookie goes; then
    * the shop's home page. Shopify's themes link to it, so a GET signs out as a POST does.
    */
@@ -2946,6 +3088,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.get(`${prefix}/account/wishlist.json`, wishlist('read'));
     app.post(`${prefix}/account/wishlist`, wishlist('add'));
     app.post(`${prefix}/account/wishlist/remove`, wishlist('remove'));
+    app.get(`${prefix}/account/addresses`, addressesPage);
+    app.post(`${prefix}/account/addresses`, addressChange);
+    app.post(`${prefix}/account/addresses/:id`, addressChange);
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/logout`, handler: logout });
   }
 

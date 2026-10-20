@@ -504,6 +504,7 @@ describe('StorefrontApiClient', () => {
       landmark: null,
       city: 'Lahore',
       provinceCode: 'PB',
+      province: 'Punjab',
       zip: null,
       default: true,
     };

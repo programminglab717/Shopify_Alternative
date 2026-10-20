@@ -20,7 +20,7 @@ import {
   type TopLevelToken,
   type ValueToken,
 } from 'liquidjs';
-import type { LoginForm } from './accounts.js';
+import type { AddressForm, LoginForm } from './accounts.js';
 import type { WorkLimiter } from './limits.js';
 import {
   ExternalVideoDrop,
@@ -54,6 +54,8 @@ export interface PageState {
   formErrors: Readonly<Record<string, readonly string[]>>;
   /** The sign-in page's form, as its route leaves it (ADR-571); null on other pages. */
   login: LoginForm | null;
+  /** An address form posted to the address book's page that did not go (ADR-584); or null. */
+  addressForm: AddressForm | null;
 }
 
 export const PAGE = Symbol('page');
@@ -881,6 +883,8 @@ const FORM_ACTIONS: Record<string, string> = {
   // A shopper's own data, from their account (ADR-572): their file, and their erasure.
   customer_data_export: 'root_url:/account/data/export',
   customer_data_erase: 'root_url:/account/data/erase',
+  // A new address for the shopper's book (ADR-584); one of theirs posts to its own `url`.
+  customer_address: 'root_url:/account/addresses',
   storefront_password: 'root_url:/password',
   // Hatti's own, for a sold-out variant's page (ADR-431).
   back_in_stock: 'root_url:/back-in-stock',
@@ -948,17 +952,21 @@ class FormTag extends Tag {
     const state = pageState(ctx);
     // The sign-in form posts the number, then the code sent to it (ADR-571).
     const login = type === 'customer_login' ? state.login : null;
+    // An address of the shopper's book posts to its own address (ADR-584).
+    const address =
+      type === 'customer_address' ? addressOfSubject(subject, state.addressForm) : null;
     const action =
       typeof commentUrl === 'string'
         ? `${root}${commentUrl}`
         : login?.step === 'code'
           ? `${root}/account/login/verify`
-          : formAction(type, routes);
+          : (address?.url ?? formAction(type, routes));
     const attributes = Object.entries({
       method: 'post',
       action,
       'accept-charset': 'UTF-8',
       ...(type === 'new_comment' && { id: 'comment_form', class: 'comment-form' }),
+      ...(address && { id: address.id ? `address_form_${address.id}` : 'address_form_new' }),
       ...options,
     })
       .map(([name, value]) => `${escapeHtml(name)}="${attribute(value)}"`)
@@ -973,6 +981,7 @@ class FormTag extends Tag {
     // The sign-in's say what was wrong in the page's language, as Shopify's messages do.
     const errors =
       login?.errors ??
+      address?.errors ??
       state.formErrors[type] ??
       posted[`${prefix}_error`]?.split(',').filter((field) => field !== '') ??
       [];
@@ -995,6 +1004,14 @@ class FormTag extends Tag {
           channel: login.channel,
           return_to: login.returnTo,
         }),
+        // An address's form (ADR-584): what it holds, or what was just typed in it, as
+        // Shopify's `form.address1`; and the box that makes it the default.
+        ...(address && { id: address.id, ...address.values }),
+        ...(address && {
+          set_as_default_checkbox:
+            `<input type="checkbox" id="address_default_address_${address.id ?? 'new'}" ` +
+            `name="address[default]" value="1"${address.values.default === '1' ? ' checked' : ''}>`,
+        }),
       },
     });
     try {
@@ -1004,6 +1021,51 @@ class FormTag extends Tag {
     }
     emitter.write('</form>');
   }
+}
+
+/**
+ * The address a `customer_address` form is for (ADR-584): one of the book's, by its `id` and
+ * `url`, or the new one; with what the page posted to it and was refused, when it was this one.
+ */
+function addressOfSubject(
+  subject: unknown,
+  posted: AddressForm | null,
+): {
+  id: string | null;
+  url: string | null;
+  values: Record<string, string>;
+  errors: string[] | null;
+} {
+  const record = (typeof subject === 'object' && subject !== null ? subject : {}) as Record<
+    string,
+    unknown
+  >;
+  const id = typeof record.id === 'string' ? record.id : null;
+  const text = (name: string) => (typeof record[name] === 'string' ? (record[name] as string) : '');
+  const values: Record<string, string> = {
+    name: text('name'),
+    first_name: text('first_name'),
+    last_name: text('last_name'),
+    phone: text('phone'),
+    address1: text('address1'),
+    address2: text('address2'),
+    landmark: text('landmark'),
+    city: text('city'),
+    province: text('province'),
+    zip: text('zip'),
+    country: 'Pakistan',
+    default: record.default === true ? '1' : '',
+  };
+  if (posted && posted.id === id) {
+    const [first = '', ...rest] = (posted.values.name ?? '').trim().split(/\s+/);
+    return {
+      id,
+      url: id === null ? null : text('url') || null,
+      values: { ...values, ...posted.values, first_name: first, last_name: rest.join(' ') },
+      errors: [...posted.errors],
+    };
+  }
+  return { id, url: id === null ? null : text('url') || null, values, errors: null };
 }
 
 /**

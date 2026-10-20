@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-583 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-584 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -591,6 +591,7 @@
 | 581 | Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email names the shop's own role it gives | Accepted |
 | 582 | A shopper who asked for their erasure from their account is told once it is done, at the number they signed in with, by a message forgotten once sent | Accepted |
 | 583 | A customer's address book is kept with their account, each address checked as checkout's are, one the default while there are any | Accepted |
+| 584 | The address book has its own page on the storefront, as Shopify's /account/addresses, its forms posting as Shopify's do | Accepted |
 
 ---
 
@@ -21560,3 +21561,34 @@
 * **Alternatives:** **The addresses of past orders as the book:** a shopper could not keep one
   they have not ordered to, nor take one away. **A book for a number with no customer:** it
   would need its own sweep, and checkout fills in from a proved number already (ADR-447).
+
+## ADR-584 · The address book has its own page on the storefront, as Shopify's /account/addresses, its forms posting as Shopify's do
+
+* **Context:** The core keeps a customer's address book (ADR-583), but shoppers have no page to
+  keep it from, and themes written for Shopify read `customer.addresses` and post
+  `{% form 'customer_address' %}`.
+* **Decision:**
+  * **`/account/addresses`** (and `/ur/account/addresses`), in the theme's `customers/addresses`
+    template, read for the session's cookie and never kept, as the account's other pages are;
+    without a session, on to sign in and back. `routes.account_addresses_url` names it.
+  * **Liquid as Shopify's:** `customer.addresses`, the default first, `addresses_count`,
+    `default_address` and `new_address`, on the account's pages; each address with its name split
+    into first and last, its street, city, province, postal code, Pakistan, `summary` and `url`,
+    and Hatti's `landmark`. `{% form 'customer_address', address %}` posts to the address's
+    `url`, or to the book for `new_address`, and gives `form.address1` and the rest, and
+    `form.set_as_default_checkbox`.
+  * **Posted as Shopify's forms post:** `address[...]` fields, a name or first and last names;
+    to an address's `url` with `_method=delete` to take it out. From the shop's own pages alone,
+    at most 30 changes a minute from an address. Done, back to the book; refused, the page again
+    with 422, the form posted open with what was typed and what was wrong in the page's
+    language, line by line; a form for an address no longer in the book comes back as the new
+    one's. A full book offers no new form, and says so.
+  * **The province's name** goes with each address from the core, which keeps its code.
+  * **Hatti Base** lists the book with a form to change each address and one to remove it, and
+    one for a new address, in English and Urdu; the account page links to it, saying which
+    address is the default.
+* **Consequences:** Shoppers keep their addresses from their account on any theme written for
+  Shopify's. Checkout does not yet fill in from the default address.
+* **Alternatives:** **An Ajax address book:** the page works without scripts, as the account's
+  other forms do. **Errors as field names for the theme to word:** the storefront words them,
+  as it does the sign-in's, so a theme written for Shopify shows them as they are.

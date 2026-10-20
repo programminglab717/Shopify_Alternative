@@ -440,6 +440,7 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
       landmark: 'Near the mosque',
       city: 'Karachi',
       provinceCode: 'SD',
+      province: 'Sindh',
       zip: null,
       default: true,
     });

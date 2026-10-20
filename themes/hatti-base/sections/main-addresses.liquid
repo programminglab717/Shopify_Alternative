@@ -1,0 +1,82 @@
+{%- comment -%}
+  The shopper's address book (CUS-02, ADR-583, ADR-584): the addresses kept with their account,
+  the default first, each with a form to change it and one to remove it; and a form for a new one
+  while the book has room. A form refused comes back open, with what was typed and what was
+  wrong. The storefront shows it only to a signed-in shopper, and sends others to sign in.
+{%- endcomment -%}
+<div class="page-width section-spacing addresses">
+  <div class="section-title">
+    <h1>{{ 'customer.addresses.title' | t }}</h1>
+    <a href="{{ routes.account_url }}">{{ 'customer.addresses.back' | t }}</a>
+  </div>
+  {%- if customer -%}
+    {%- if customer.addresses_count == 0 -%}
+      <p>{{ 'customer.addresses.none' | t }}</p>
+    {%- else -%}
+      <ul class="addresses__list" role="list">
+        {%- for address in customer.addresses -%}
+          <li class="addresses__item">
+            {%- if address.default -%}
+              <p class="addresses__default">{{ 'customer.addresses.default' | t }}</p>
+            {%- endif -%}
+            <address dir="auto">
+              {{ address.name | escape }}<br>
+              {{ address.street | escape }}<br>
+              {%- if address.landmark != blank -%}{{ address.landmark | escape }}<br>{%- endif -%}
+              {{ address.city | escape }}
+              {%- if address.province != blank %}, {{ address.province | escape }}{% endif -%}
+              {%- if address.zip != blank %} {{ address.zip | escape }}{% endif %}<br>
+              <bdi dir="ltr">{{ address.phone | escape }}</bdi>
+            </address>
+            {%- form 'customer_address', address, class: 'addresses__form' -%}
+              <details{% if form.errors %} open{% endif %}>
+                <summary>{{ 'customer.addresses.edit' | t }}</summary>
+                {%- render 'address-fields', form: form, key: address.id -%}
+              </details>
+            {%- endform -%}
+            <form method="post" action="{{ address.url }}" class="addresses__remove">
+              <input type="hidden" name="_method" value="delete">
+              <button type="submit" class="button button--secondary">{{ 'customer.addresses.remove' | t }}</button>
+            </form>
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+
+    {%- if customer.addresses_full? -%}
+      <p class="addresses__full">{{ 'customer.addresses.full' | t: count: customer.addresses_count }}</p>
+    {%- else -%}
+      {%- form 'customer_address', customer.new_address, class: 'addresses__form addresses__new' -%}
+        <details{% if form.errors or customer.addresses_count == 0 %} open{% endif %}>
+          <summary>{{ 'customer.addresses.add' | t }}</summary>
+          {%- render 'address-fields', form: form, key: 'new' -%}
+        </details>
+      {%- endform -%}
+    {%- endif -%}
+  {%- else -%}
+    <a class="button" href="{{ routes.account_login_url }}">{{ 'customer.login.title' | t }}</a>
+  {%- endif -%}
+</div>
+
+{% stylesheet %}
+  .addresses { max-inline-size: 48rem; }
+  .addresses__list { margin: 0 0 1.5rem; padding: 0; list-style: none; display: grid; gap: 0.75rem; }
+  .addresses__item { padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; display: grid; gap: 0.75rem; }
+  .addresses__item address { font-style: normal; }
+  .addresses__default { margin: 0; font-weight: 600; }
+  .addresses__form summary { cursor: pointer; font-weight: 600; }
+  .addresses__new { margin-block-start: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
+  .addresses__fields { display: grid; gap: 0.25rem 0; margin-block: 0.75rem; }
+  .addresses__fields input[type='text'], .addresses__fields input[type='tel'] { margin-block-end: 0.5rem; }
+  .addresses__check { display: flex; align-items: center; gap: 0.5rem; }
+  .addresses__error { color: var(--color-error, #b42318); margin-block-end: 0.75rem; }
+  .addresses__error p { margin: 0; }
+  .addresses__full { color: var(--color-muted); }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:sections.main-addresses.name",
+  "settings": []
+}
+{% endschema %}

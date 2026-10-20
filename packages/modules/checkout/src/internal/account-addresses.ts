@@ -2,6 +2,7 @@ import type { InputChecker } from '@hatti/api';
 import { toDate, type Tx } from '@hatti/db';
 import { toPublicId } from '@hatti/ids';
 import { checkAddress, type AddressValue } from '@hatti/orders/public';
+import { PK_PROVINCES, type PkProvinceCode } from '@hatti/pk';
 import {
   ACCOUNT_ADDRESSES_MAX,
   type AccountAddress,
@@ -54,6 +55,9 @@ export function toAccountAddress(record: AccountAddressRecord): AccountAddress {
     landmark: address.landmark,
     city: address.city,
     provinceCode: address.provinceCode,
+    province: address.provinceCode
+      ? (PK_PROVINCES[address.provinceCode as PkProvinceCode]?.name ?? null)
+      : null,
     zip: address.zip,
     default: record.isDefault,
   };

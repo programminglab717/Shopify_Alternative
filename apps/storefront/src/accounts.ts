@@ -3,13 +3,18 @@
 // signs the shopper in, the session's secret kept in a cookie only the server reads (ADR-570).
 // Their account page lists their orders with the shop and their store credit, from `customer`,
 // and from it they ask for the file of their own data, or for its erasure (ADR-572), and buy an
-// order's items again, which go in their cart (ADR-574).
+// order's items again, which go in their cart (ADR-574). Their address book (ADR-583) has its
+// own page, `/account/addresses`, whose forms add, change and take out addresses (ADR-584).
 // Pages are kept at the edge and are the same for every shopper, so only the account's own pages,
 // never kept, read the session; the others learn that a shopper is signed in from a cookie their
 // scripts read, which says nothing more.
 
 import {
+  ACCOUNT_ADDRESSES_MAX,
   ACCOUNT_COOKIE,
+  type AccountAddress,
+  type AccountAddressRequest,
+  type AccountErrorResponse,
   type AccountJson,
   type AccountLoginVerifyErrorResponse,
   type AccountOrderJson,
@@ -234,6 +239,140 @@ export function reorderNoticeMessage(
   }
 }
 
+/** The fields of an address form, as `address[city]` names them (ADR-584). */
+export const ADDRESS_FIELDS = [
+  'name',
+  'phone',
+  'address1',
+  'address2',
+  'landmark',
+  'city',
+  'province',
+  'zip',
+] as const;
+
+/** The longest text read of what a shopper typed in an address's field. */
+const ADDRESS_TYPED_MAX = 300;
+
+/**
+ * An address form posted to the address book's page that did not go (ADR-584), for the page to
+ * show again: which address it changed, or null for a new one; what was typed; and what was wrong,
+ * in the page's language.
+ */
+export interface AddressForm {
+  id: string | null;
+  values: Readonly<Record<string, string>>;
+  errors: readonly string[];
+}
+
+/**
+ * The address a posted form sends, from Shopify's `address[...]` fields: its name, or its first
+ * and last names together, as Shopify's forms have them; ticked `address[default]`, the default.
+ */
+export function addressRequestOf(posted: Record<string, unknown>): {
+  request: AccountAddressRequest;
+  values: Record<string, string>;
+} {
+  const text = (name: string) => {
+    const value = posted[name];
+    return typeof value === 'string' ? value.slice(0, ADDRESS_TYPED_MAX) : '';
+  };
+  const name =
+    text('name').trim() || [text('first_name').trim(), text('last_name').trim()].join(' ').trim();
+  const values: Record<string, string> = Object.fromEntries(
+    ADDRESS_FIELDS.map((field) => [field, field === 'name' ? name : text(field)]),
+  );
+  const optional = (field: string) => values[field]!.trim() || null;
+  const ticked = ['1', 'true', 'on'].includes(text('default'));
+  return {
+    request: {
+      name,
+      phone: values.phone!,
+      address1: values.address1!,
+      address2: optional('address2'),
+      landmark: optional('landmark'),
+      city: values.city!,
+      province: optional('province'),
+      zip: optional('zip'),
+      default: ticked,
+    },
+    values: { ...values, default: ticked ? '1' : '' },
+  };
+}
+
+/**
+ * What the core found wrong with an address, in the theme's words or the English (ADR-584): a
+ * line for each field; for the book as a whole, that it is full, else that it comes with the
+ * first order.
+ */
+export function addressErrorMessages(
+  errors: AccountErrorResponse['errors'],
+  book: { full: boolean },
+  translate: (key: string, values: Record<string, unknown>) => string | null,
+): string[] {
+  const say = (key: string, english: string, values: Record<string, unknown> = {}) =>
+    translate(`customer.addresses.errors.${key}`, values) ?? english;
+  const messages = errors.map(({ field }) => {
+    switch (field) {
+      case '':
+        return book.full
+          ? say(
+              'too_many',
+              `You can keep ${ACCOUNT_ADDRESSES_MAX} addresses. Remove one to add another.`,
+              { count: ACCOUNT_ADDRESSES_MAX },
+            )
+          : say('first_order', 'Your addresses are kept once you place your first order.');
+      case 'id':
+        return say('not_found', 'That address is no longer in your account.');
+      case 'name':
+        return say('name', 'Enter the name of who receives the order.');
+      case 'phone':
+        return say('phone', 'Enter a Pakistani mobile number, like 0300 1234567.');
+      case 'address1':
+        return say('address1', 'Enter the house and street.');
+      case 'city':
+        return say('city', 'Enter the city.');
+      case 'province':
+        return say('province', 'Enter a province of Pakistan, like Punjab or Sindh.');
+      case 'zip':
+        return say('zip', 'Enter a postal code of 5 digits, or leave it empty.');
+      default:
+        return say('too_long', 'Shorten what you typed.');
+    }
+  });
+  return [...new Set(messages)];
+}
+
+/**
+ * An address of the book as Shopify's `address` object has it (ADR-584), and Hatti's landmark:
+ * its name split into first and last, Pakistan its country, and `url`, which its form posts to.
+ */
+export function addressObject(address: AccountAddress, prefix: string): Record<string, unknown> {
+  const [first = '', ...rest] = address.name.trim().split(/\s+/);
+  const street = [address.address1, address.address2].filter(Boolean).join(', ');
+  return {
+    id: address.id,
+    name: address.name,
+    first_name: first,
+    last_name: rest.join(' '),
+    company: null,
+    address1: address.address1,
+    address2: address.address2 ?? '',
+    landmark: address.landmark ?? '',
+    street,
+    city: address.city,
+    province: address.province ?? '',
+    province_code: address.provinceCode ?? '',
+    zip: address.zip ?? '',
+    country: 'Pakistan',
+    country_code: 'PK',
+    phone: address.phone,
+    summary: [street, address.city, address.province].filter(Boolean).join(', '),
+    url: `${prefix}/account/addresses/${encodeURIComponent(address.id)}`,
+    default: address.default,
+  };
+}
+
 /**
  * What of an order's `lines` goes in the cart again (ADR-574): those that can be had now, as
  * many as the order had, a variant once.
@@ -347,6 +486,8 @@ export function customerObject(
     locale: string;
     prefix: string;
     notice?: { code: DataNotice; message: string } | null;
+    /** Their address book (ADR-584), the default first. */
+    addresses?: readonly AccountAddress[] | null;
   },
 ): Record<string, unknown> {
   const labels = STATUS_LABELS[options.locale] ?? STATUS_LABELS.en!;
@@ -380,6 +521,7 @@ export function customerObject(
   }));
   const credit = account.storeCredit;
   const data = account.dataRequests;
+  const addresses = (options.addresses ?? []).map((each) => addressObject(each, options.prefix));
   return {
     name,
     first_name: first,
@@ -389,6 +531,14 @@ export function customerObject(
     has_account: true,
     orders,
     orders_count: orders.length,
+    // Their address book (ADR-584), as Shopify's: the default first; and the blank address the
+    // form for a new one fills in.
+    addresses,
+    addresses_count: addresses.length,
+    default_address: addresses.find((address) => address.default) ?? null,
+    new_address: { id: null, country: 'Pakistan', country_code: 'PK' },
+    // Hatti's: whether the book has room for another.
+    'addresses_full?': addresses.length >= ACCOUNT_ADDRESSES_MAX,
     store_credit_account: {
       balance: credit.balance,
       currency: { iso_code: credit.currency },
