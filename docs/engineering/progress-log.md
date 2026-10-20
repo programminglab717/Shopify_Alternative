@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A product's search engine listing
+### b1a69c2 · A product's search engine listing
 
 * **A product's page in the admin has a search engine listing card: its title and description for
   search engines, with a preview of how a search engine lists it** ([ADR-600](../architecture/13-decision-log.md#adr-600--a-products-page-in-the-admin-has-a-search-engine-listing-card-its-title-and-description-for-search-engines-with-a-preview-of-how-a-search-engine-lists-it), OS-09).
