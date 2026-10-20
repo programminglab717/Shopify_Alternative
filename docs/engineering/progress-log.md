@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit back on return
+### 76464a1 · Store credit back on return
 
 * **Where the shop says so, the store credit that paid an order goes back to its customer once
   its every parcel came back unaccepted** ([ADR-610](../architecture/13-decision-log.md#adr-610--where-the-shop-says-so-the-store-credit-that-paid-an-order-goes-back-to-its-customer-once-its-every-parcel-came-back-unaccepted-as-it-does-when-the-order-is-cancelled), ORD-09, COD-09).
