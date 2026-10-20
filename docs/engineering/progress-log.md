@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### 52b8166 · Checkout filled in from the address book
+
+* **A signed-in shopper's checkout opens filled in from their default address, or with the
+  number they signed in with** ([ADR-585](../architecture/13-decision-log.md#adr-585--a-signed-in-shoppers-checkout-opens-filled-in-from-their-default-address-or-with-the-number-they-signed-in-with), CUS-02, CHK-03).
+* 3630 tests, 2 more: what fills the form, and who may have it filled.
+
 ### 2aeb9de · The address book's page
 
 * **The address book has its own page on the storefront, as Shopify's /account/addresses, its
