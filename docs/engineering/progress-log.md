@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Lapsed shifts handed over
+### 1c323b9 · Lapsed shifts handed over
 
 * **What still waits on an agent whose shift at the Confirmation Desk ran out goes by itself to
   those on duty** ([ADR-666](../architecture/13-decision-log.md#adr-666--where-the-shop-shares-new-orders-out-the-orders-still-waiting-on-an-agent-whose-shift-ran-out-are-handed-over-by-the-worker-to-those-on-duty)), where the shop shares new orders out: a sweep of the worker. Shortcut
