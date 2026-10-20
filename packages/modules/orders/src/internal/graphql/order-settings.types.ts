@@ -137,6 +137,14 @@ export class OrderSettings {
   })
   staffDiscountPercent!: number | null;
 
+  @Field({
+    description:
+      'Whether each order placed that needs a call is given to an agent on duty at the ' +
+      'Confirmation Desk (confirmationDeskDutyStart), the one with the fewest waiting, then the ' +
+      'one given one longest ago (ADR-654).',
+  })
+  shareNewOrders!: boolean;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -184,6 +192,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '0 to 100; null for no limit.' })
   staffDiscountPercent?: number | null;
+
+  @Field(() => Boolean, { nullable: true })
+  shareNewOrders?: boolean | null;
 }
 
 @ObjectType()

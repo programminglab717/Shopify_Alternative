@@ -1079,6 +1079,76 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       });
     });
 
+    it('shares new orders among the agents on duty at the desk, where the shop says so (ADR-654)', async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      const agentId = toPublicId('user', agent.userId);
+      const as = (token: string, query: string) =>
+        graphql(token, shopA, query).then((response) => response.json() as Json);
+
+      // An agent goes on duty for some hours, and is listed as such, by name.
+      const started = await as(
+        agent.accessToken,
+        `mutation { confirmationDeskDutyStart(hours: 4) {
+           duty { staffMemberId name endsAt waiting isYou } userErrors { field code } } }`,
+      );
+      expect(started.data.confirmationDeskDutyStart).toEqual({
+        duty: {
+          staffMemberId: agentId,
+          name: 'Sana Iqbal',
+          endsAt: expect.any(String),
+          waiting: 0,
+          isYou: true,
+        },
+        userErrors: [],
+      });
+      expect(
+        (
+          await as(
+            agent.accessToken,
+            `mutation { confirmationDeskDutyStart(hours: 13) { userErrors { field code } } }`,
+          )
+        ).data.confirmationDeskDutyStart.userErrors,
+      ).toEqual([{ field: ['hours'], code: 'INVALID' }]);
+
+      // Until the shop shares new orders out, they stay with no one; then they go to the agent.
+      const before = await orderOfShopA(app, 'CASH_ON_DELIVERY');
+      const shared = await as(
+        manager.accessToken,
+        'mutation { orderSettingsUpdate(input: { shareNewOrders: true }) { orderSettings { shareNewOrders } } }',
+      );
+      expect(shared.data.orderSettingsUpdate.orderSettings).toEqual({ shareNewOrders: true });
+      const after = await orderOfShopA(app, 'CASH_ON_DELIVERY');
+      const assignees = await as(
+        manager.accessToken,
+        `{ before: order(id: "${before}") { assignee { id } }
+           after: order(id: "${after}") { assignee { id name } events(first: 5) { nodes { message } } }
+           confirmationDeskDuty { name waiting isYou } }`,
+      );
+      expect(assignees.data.before.assignee).toBeNull();
+      expect(assignees.data.after.assignee).toEqual({ id: agentId, name: 'Sana Iqbal' });
+      expect(assignees.data.after.events.nodes).toContainEqual({
+        message: 'Assigned to Sana Iqbal, on duty at the Confirmation Desk',
+      });
+      expect(assignees.data.confirmationDeskDuty).toEqual([
+        { name: 'Sana Iqbal', waiting: 1, isYou: false },
+      ]);
+
+      // Off duty, the agent is given no more.
+      await as(agent.accessToken, 'mutation { confirmationDeskDutyEnd { userErrors { code } } }');
+      expect((await as(agent.accessToken, '{ confirmationDeskDuty { name } }')).data).toEqual({
+        confirmationDeskDuty: [],
+      });
+      await as(
+        manager.accessToken,
+        'mutation { orderSettingsUpdate(input: { shareNewOrders: false }) { userErrors { code } } }',
+      );
+    });
+
     it("lets staff and apps comment on an order's timeline, each changing their own (ADR-128)", async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       const orderId = await orderOfShopA(app, 'CASH_ON_DELIVERY');

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-653 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-654 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -661,6 +661,7 @@
 | 651 | A shop limits what its staff take off an order to a share of what its items cost, past which only owners, managers, apps and roles given `give_any_discount` go | Accepted |
 | 652 | A draft's amount off given by hand keeps to the shop's limit for staff, as an order's does; a discount code's is the shop's own | Accepted |
 | 653 | A cash-on-delivery order still waiting for its advance may be let go without it, the courier collecting what it owed, until any of it ships | Accepted |
+| 654 | Agents go on duty at the Confirmation Desk for a shift of hours, and where the shop says so each order placed that needs a call is given to the one on duty with the fewest waiting | Accepted |
 
 ---
 
@@ -23047,3 +23048,26 @@
   as unpaid, as it waits for nothing.
 * **Alternatives:** **Changing its payment method:** the order already is cash on delivery; only
   what it waits for changes.
+
+## ADR-654 · Agents go on duty at the Confirmation Desk for a shift of hours, and where the shop says so each order placed that needs a call is given to the one on duty with the fewest waiting
+
+* **Context:** Orders were given to agents by hand, one at a time or many at once (ADR-127,
+  ADR-634), and the desk dealt an agent theirs first (ADR-635). A shop with several agents still
+  had someone share out each morning's orders, and orders placed during the day waited for them.
+* **Decision:** A member of staff goes on duty at the desk for 1 to 12 hours
+  (`confirmationDeskDutyStart`, 8 unless they say), and off it (`confirmationDeskDutyEnd`); going
+  on duty again while on it moves when the shift ends, and `confirmationDeskDuty` lists who is on,
+  with how many of their orders wait to be confirmed. The orders module keeps the shifts
+  (`orders.desk_duty`), with the agent's name from the shop's staff for the timeline. Where the
+  shop turns on `shareNewOrders`, an order placed that needs a call, given to no one, goes in the
+  transaction that places it to the agent on duty with the fewest orders waiting, then the one
+  given one longest ago; the shift is locked so that orders placed at once are dealt one after
+  another. The timeline says who and why, and `OrderAssigned` is appended with no one as who gave
+  it, so the agent is told as of any order given to them (ADR-191, ADR-633). A member who leaves
+  the shop goes off duty. Apps go on no duty. The desk's page has the shift's card; the order
+  settings, the switch.
+* **Consequences:** Orders reach an agent as they come without anyone sharing them out; the
+  desk's dealing order (ADR-635) then puts each agent's own first.
+* **Alternatives:** **Round robin among all agents:** an agent away from the desk would be given
+  orders no one calls. **Sharing in a sweep:** orders would wait for it; giving in the placing
+  transaction keeps it exact.

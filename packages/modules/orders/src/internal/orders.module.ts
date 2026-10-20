@@ -10,6 +10,7 @@ import { CourierPerformanceService } from './courier-performance.service.js';
 import { DeliveryRescueService } from './delivery-rescue.service.js';
 import { CodReceivablesService } from './cod-receivables.service.js';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
+import { DeskDutyService } from './desk-duty.js';
 import { OrderSettingsService } from './order-settings.service.js';
 import { OrderSegmentFacts } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
@@ -89,6 +90,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     DeliveryRescueService,
     CodReceivablesService,
     ConfirmationDeskService,
+    DeskDutyService,
     AgentPerformanceService,
     PackerPerformanceService,
     OrderSettingsService,
@@ -146,6 +148,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     DeliveryRescueService,
     CodReceivablesService,
     ConfirmationDeskService,
+    DeskDutyService,
     AgentPerformanceService,
     PackerPerformanceService,
     OrderSettingsService,

@@ -76,6 +76,7 @@ export {
   type ConfirmationQueueItem,
 } from '../internal/confirmation-desk.service.js';
 export { orderConversionFactsIn, type OrderConversionFacts } from '../internal/conversion-facts.js';
+export { DESK_DUTY, DeskDutyService, type DeskDutyRecord } from '../internal/desk-duty.js';
 export {
   accountOrderLinkIn,
   accountOrdersIn,

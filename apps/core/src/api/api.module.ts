@@ -74,6 +74,7 @@ import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { FileUsesResolver } from './file-uses.resolver.js';
 import { PaymentLinkOrdersResolver } from './payment-link-orders.resolver.js';
+import { DeskDutyResolver } from './desk-duty.resolver.js';
 import { OrderAssignmentResolver } from './order-assignment.resolver.js';
 import { ParcelHandOverResolver } from './parcel-hand-over.resolver.js';
 import { OrderEventResolver } from './order-event.resolver.js';
@@ -336,6 +337,7 @@ export class ApiModule {
         FileUsesResolver,
         PaymentLinkOrdersResolver,
         OrderAssignmentResolver,
+        DeskDutyResolver,
         ParcelHandOverResolver,
         OrderEventResolver,
         ProductsImportResolver,

@@ -48,6 +48,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { SEES_AGENTS } from './agents-page';
+import { DeskDutyCard } from './desk-duty';
 
 const HOUR = 3_600_000;
 
@@ -460,6 +461,8 @@ export function DeskPage() {
           <EmptyState title={t('desk.empty')} body={t('desk.emptyBody')} />
         </Card>
       )}
+
+      <DeskDutyCard timezone={shop.timezone} />
 
       {desk.nodes.length > 0 && (
         <section aria-labelledby="desk-queue" className="flex flex-col gap-2">

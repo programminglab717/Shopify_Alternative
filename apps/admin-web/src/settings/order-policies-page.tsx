@@ -65,6 +65,7 @@ function orderInputOf(state: {
   closes: string;
   firstCall: string;
   waits: boolean;
+  share: boolean;
   unpaid: string;
   unreachable: string;
   cancellation: CustomerCancellation;
@@ -78,6 +79,7 @@ function orderInputOf(state: {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
     firstCallMinutes: wholeOrNone(state.firstCall),
     deskWaitsForReminder: state.waits,
+    shareNewOrders: state.share,
     cancelUnpaidAfterDays: wholeOrNone(state.unpaid),
     cancelUnreachableAfterDays: wholeOrNone(state.unreachable),
     customerCancellation: state.cancellation,
@@ -97,6 +99,7 @@ function stateOf(settings: OrderSettings) {
     closes: settings.callingHours?.closes ?? '21:00',
     firstCall: settings.firstCallMinutes === null ? '' : String(settings.firstCallMinutes),
     waits: settings.deskWaitsForReminder,
+    share: settings.shareNewOrders ?? false,
     unpaid: settings.cancelUnpaidAfterDays === null ? '' : String(settings.cancelUnpaidAfterDays),
     unreachable:
       settings.cancelUnreachableAfterDays === null
@@ -236,6 +239,12 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
           hint={t('orderPolicies.waitsHint')}
           checked={state.waits}
           onChange={(waits) => set({ waits })}
+        />
+        <CheckField
+          label={t('orderPolicies.share')}
+          hint={t('orderPolicies.shareHint')}
+          checked={state.share}
+          onChange={(share) => set({ share })}
         />
         <SelectField<ConfirmationCalls>
           label={t('orderPolicies.calls')}

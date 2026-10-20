@@ -298,6 +298,8 @@ export interface OrderSettingsUpdatedPayload {
   confirmationCalls: 'off' | 'high_value' | 'all';
   /** The most staff without `give_any_discount` take off an order (ADR-651); null for any. */
   staffDiscountPercent: number | null;
+  /** Whether new orders are shared out among agents on duty (ADR-654). */
+  shareNewOrders: boolean;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

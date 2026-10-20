@@ -45,6 +45,7 @@ import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { browserIdsOf, type BrowserIdsValue } from './browser-ids.js';
 import { customerFactsQuery } from './customer-facts.js';
+import { endDutyIn, shareOutIn } from './desk-duty.js';
 import {
   OrderEvents,
   type OrderAssignedPayload,
@@ -912,6 +913,7 @@ export class OrderService {
         advanceForRiskMessage(risk!, formatMoney(money(askedForRisk, currency))),
       );
     }
+    await shareOutIn(tx, shopId, row!);
     await appendEvent<OrderCreatedPayload>(tx, shopId, {
       type: OrderEvents.OrderCreated,
       aggregateType: 'order',
@@ -2264,6 +2266,8 @@ export class OrderService {
    */
   async release(tenant: TenantContext, staffMemberId: string): Promise<number> {
     return this.db.tenant(tenant.shopId, async (tx) => {
+      // Nor are they on duty at the desk any more (ADR-654).
+      await endDutyIn(tx, tenant.shopId, staffMemberId);
       const released = await tx
         .update(orders)
         .set({

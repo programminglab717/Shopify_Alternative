@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Agents on duty at the desk
+
+* **Agents go on duty at the Confirmation Desk for a shift of hours** ([ADR-654](../architecture/13-decision-log.md#adr-654--agents-go-on-duty-at-the-confirmation-desk-for-a-shift-of-hours-and-where-the-shop-says-so-each-order-placed-that-needs-a-call-is-given-to-the-one-on-duty-with-the-fewest-waiting)), and where the shop
+  says so each order placed that needs a call is given to the one on duty with the fewest waiting.
+* 3791 tests, five more: shifts and sharing in the orders module, the Admin API, and the desk's
+  card.
+
 ### cea7241 · An advance waived
 
 * **A cash-on-delivery order still waiting for its advance may be let go without it** ([ADR-653](../architecture/13-decision-log.md#adr-653--a-cash-on-delivery-order-still-waiting-for-its-advance-may-be-let-go-without-it-the-courier-collecting-what-it-owed-until-any-of-it-ships)),

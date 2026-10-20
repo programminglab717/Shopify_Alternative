@@ -422,6 +422,28 @@ export interface ConfirmationQueueNextData {
   confirmationQueueNext: { callingOpensAt: string | null; item: DeskItem | null };
 }
 
+/** A member of staff on duty at the Confirmation Desk (ADR-654). */
+export interface DeskDuty {
+  staffMemberId: string;
+  name: string;
+  endsAt: string;
+  /** Their orders waiting to be confirmed. */
+  waiting: number;
+  isYou: boolean;
+}
+
+export interface ConfirmationDeskDutyData {
+  confirmationDeskDuty: DeskDuty[];
+}
+
+export interface ConfirmationDeskDutyStartData {
+  confirmationDeskDutyStart: { duty: DeskDuty | null; userErrors: UserError[] };
+}
+
+export interface ConfirmationDeskDutyEndData {
+  confirmationDeskDutyEnd: { userErrors: UserError[] };
+}
+
 export interface OrderPhoneRevealData {
   orderPhoneReveal: { phone: string | null; userErrors: UserError[] };
 }
@@ -3270,6 +3292,11 @@ export interface OrderSettings {
    * any, absent where a fake core leaves it out.
    */
   staffDiscountPercent?: number | null;
+  /**
+   * Whether new orders that need a call go to the agents on duty at the desk (ADR-654); absent
+   * where a fake core leaves it out.
+   */
+  shareNewOrders?: boolean;
   updatedAt: string | null;
 }
 

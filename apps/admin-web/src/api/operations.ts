@@ -853,6 +853,54 @@ export const ConfirmationQueueNextMutation = /* GraphQL */ `
   ${DESK_ITEM}
 `;
 
+const DESK_DUTY = /* GraphQL */ `
+  fragment DeskDutyParts on DeskDuty {
+    staffMemberId
+    name
+    endsAt
+    waiting
+    isYou
+  }
+`;
+
+/** Who is on duty at the desk, to be given new orders where the shop shares them (ADR-654). */
+export const ConfirmationDeskDutyQuery = /* GraphQL */ `
+  query ConfirmationDeskDuty {
+    confirmationDeskDuty {
+      ...DeskDutyParts
+    }
+  }
+  ${DESK_DUTY}
+`;
+
+/** The caller goes on duty at the desk for some hours, or moves when their shift ends. */
+export const ConfirmationDeskDutyStartMutation = /* GraphQL */ `
+  mutation ConfirmationDeskDutyStart($hours: Int) {
+    confirmationDeskDutyStart(hours: $hours) {
+      duty {
+        ...DeskDutyParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DESK_DUTY}
+  ${USER_ERRORS}
+`;
+
+/** The caller goes off duty; the orders given to them stay theirs. */
+export const ConfirmationDeskDutyEndMutation = /* GraphQL */ `
+  mutation ConfirmationDeskDutyEnd {
+    confirmationDeskDutyEnd {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A call that confirmed nothing: not answered, call back later, or someone else's number. */
 export const OrderConfirmationCallMutation = /* GraphQL */ `
   mutation OrderConfirmationCall(
@@ -6883,6 +6931,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     creditBackOnReturn
     confirmationCalls
     staffDiscountPercent
+    shareNewOrders
     updatedAt
   }
 `;

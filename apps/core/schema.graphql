@@ -4179,6 +4179,31 @@ input DeliveryZoneInput {
 }
 
 """
+A member of staff on duty at the Confirmation Desk (ADR-654): until when, and how many of the orders given to them wait to be confirmed.
+"""
+type DeskDuty {
+  endsAt: DateTime!
+
+  """Whether it is the caller."""
+  isYou: Boolean!
+  name: String!
+
+  """Their account: usr_…"""
+  staffMemberId: ID!
+  startedAt: DateTime!
+  waiting: Int!
+}
+
+type DeskDutyEndPayload {
+  userErrors: [UserError!]!
+}
+
+type DeskDutyStartPayload {
+  duty: DeskDuty
+  userErrors: [UserError!]!
+}
+
+"""
 A code shoppers enter for a percentage or an amount off an order's items, or for free delivery, as Shopify's basic and free-shipping discount codes are (CHK-06).
 """
 type DiscountCode {
@@ -7963,6 +7988,14 @@ type Mutation {
   """Marks a comment as spam: the storefront no longer shows it."""
   commentSpam(id: ID!): CommentSpamPayload!
 
+  """Takes you off duty at the desk; the orders given to you stay yours."""
+  confirmationDeskDutyEnd: DeskDutyEndPayload!
+
+  """
+  Puts you on duty at the Confirmation Desk for 1 to 12 hours, 8 unless you say; on duty already, it moves when your shift ends. For members of staff: no order is given to an app.
+  """
+  confirmationDeskDutyStart(hours: Int): DeskDutyStartPayload!
+
   """
   Deals you the most urgent order due that no one else has taken, yours for 15 minutes, so that no two agents call the same customer; the one you took already while you have it. Orders given to you come first, then those given to no one, and those given to someone else last (ADR-635). Confirm or cancel it, or record the call, and ask for the next. Outside the shop's calling hours, none.
   """
@@ -10767,6 +10800,11 @@ type OrderSettings {
   firstCallMinutes: Int
 
   """
+  Whether each order placed that needs a call is given to an agent on duty at the Confirmation Desk (confirmationDeskDutyStart), the one with the fewest waiting, then the one given one longest ago (ADR-654).
+  """
+  shareNewOrders: Boolean!
+
+  """
   The most, as a percentage of what an order's items cost, a member of staff without the GIVE_ANY_DISCOUNT capability takes off it with orderEditCharges (ORD-04, ADR-651); null for no limit. Owners, managers and apps take off any.
   """
   staffDiscountPercent: Int
@@ -10797,6 +10835,7 @@ input OrderSettingsInput {
 
   """5 to 1440; null for no target."""
   firstCallMinutes: Int
+  shareNewOrders: Boolean
 
   """0 to 100; null for no limit."""
   staffDiscountPercent: Int
@@ -13145,6 +13184,11 @@ type Query {
     """Work done at or after this."""
     from: DateTime!
   ): [ConfirmationAgent!]!
+
+  """
+  Who is on duty at the Confirmation Desk now, the soonest to end first. Where the shop shares new orders out (orderSettings.shareNewOrders), each order placed that needs a call is given to one of them (ADR-654).
+  """
+  confirmationDeskDuty: [DeskDuty!]!
 
   """
   The Confirmation Desk's queue (COD-04): orders waiting for their customers to confirm them, due for a call now, the most urgent first, and how many wait for later.

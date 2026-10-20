@@ -63,6 +63,7 @@ export class OrderSettingsResolver {
       ...(input.staffDiscountPercent !== undefined && {
         staffDiscountPercent: input.staffDiscountPercent,
       }),
+      ...(typeof input.shareNewOrders === 'boolean' && { shareNewOrders: input.shareNewOrders }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -88,6 +89,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     creditBackOnReturn: record.creditBackOnReturn,
     confirmationCalls: record.confirmationCalls.toUpperCase() as ConfirmationCalls,
     staffDiscountPercent: record.staffDiscountPercent,
+    shareNewOrders: record.shareNewOrders,
     updatedAt: record.updatedAt,
   });
 }
