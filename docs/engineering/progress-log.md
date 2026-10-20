@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Hatti Base's menus three levels deep
+### 01d5a9f · Hatti Base's menus three levels deep
 
 * **Hatti Base shows a menu three levels deep** ([ADR-641](../architecture/13-decision-log.md#adr-641--hatti-base-shows-a-menu-three-levels-deep-links-under-a-link-open-below-it-across-the-page-and-in-a-drawer-on-phones-with-no-script)): links under a link open below it
   across the page, and in a drawer on phones, all with `<details>` and no script.
