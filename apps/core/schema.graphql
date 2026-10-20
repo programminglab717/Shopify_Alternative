@@ -13313,6 +13313,11 @@ type Query {
 
     """1 to 250; default 50."""
     first: Int
+
+    """
+    Words each file's name holds, in any case: `lawn eid` finds `Eid lawn banner.jpg` (ADR-636).
+    """
+    query: String
   ): FileConnection!
 
   """

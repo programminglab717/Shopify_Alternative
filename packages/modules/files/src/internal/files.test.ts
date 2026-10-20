@@ -383,6 +383,31 @@ describe.skipIf(!server)('FileService', () => {
     ]);
   });
 
+  it('finds files by the words of their names, in any case, newest first (ADR-636)', async () => {
+    const made = async (filename: string, owner = a) => {
+      const [upload] = unwrap(
+        await stage([{ filename, mimeType: 'image/png', fileSize: '16' }], owner),
+      );
+      await storage.put(keyOf(upload!.resourceUrl), png(16), 'image/png');
+      const [file] = unwrap(await service.create(owner, [{ originalSource: upload!.resourceUrl }]));
+      return file!;
+    };
+    const banner = await made('Eid lawn banner.png');
+    const lawn = await made('lawn_2026.png');
+    await made('Kurta.png');
+    await made('Lawn of B.png', b);
+    const names = async (query: string | null, first = 10) =>
+      (await service.list(a, { first, query })).items.map((file) => file.filename);
+
+    expect(await names('LAWN')).toEqual([lawn.filename, banner.filename]);
+    expect(await names('lawn eid')).toEqual([banner.filename]);
+    // A word's % or _ is itself, not a wildcard; spaces and nothing find them all.
+    expect(await names('lawn_')).toEqual([lawn.filename]);
+    expect(await names('%')).toEqual([]);
+    expect(await names('  ')).toHaveLength(3);
+    expect(await names(null, 1)).toEqual(['Kurta.png']);
+  });
+
   it('sweeps uploads staged a day ago and never made files, as the shop stages more', async () => {
     const [old] = unwrap(
       await stage([{ filename: 'old.png', mimeType: 'image/png', fileSize: '16' }]),

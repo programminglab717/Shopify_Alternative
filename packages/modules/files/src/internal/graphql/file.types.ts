@@ -75,6 +75,14 @@ export class FilesArgs {
 
   @Field(() => String, { nullable: true })
   after?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Words each file's name holds, in any case: `lawn eid` finds `Eid lawn banner.jpg` " +
+      '(ADR-636).',
+  })
+  query?: string | null;
 }
 
 @InputType({ description: "A file to upload, as Shopify's stagedUploadsCreate takes it." })

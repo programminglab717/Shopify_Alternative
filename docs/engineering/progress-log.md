@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The shop's files, found by name
+
+* **The shop's files are searched by name and kept in the online store's Files tab** ([ADR-636](../architecture/13-decision-log.md#adr-636--the-shops-files-are-searched-by-the-words-of-their-names-and-kept-in-a-files-tab-of-the-online-store-found-added-as-pictures-or-pdfs-their-links-copied-and-deleted)):
+  found by the words of their names, their links copied, deleted after asking, and pictures and
+  PDFs added from the device.
+* 3758 tests, five more: the files search, the Files tab's three, and its delete mutation
+  checked against the schema.
+
 ### 865ac4b · The desk deals agents their own orders first
 
 * **The Confirmation Desk deals an agent the orders given to them first** ([ADR-635](../architecture/13-decision-log.md#adr-635--the-confirmation-desk-deals-an-agent-the-orders-given-to-them-first-then-those-given-to-no-one-and-those-given-to-someone-else-last-each-kind-the-most-urgent-first)), then those

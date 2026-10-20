@@ -5502,8 +5502,8 @@ export const FileQuery = /* GraphQL */ `
 
 /** The shop's files, the newest first, for a picture setting to choose one of (ADR-631). */
 export const ShopFilesQuery = /* GraphQL */ `
-  query ShopFiles($first: Int!, $after: String) {
-    files(first: $first, after: $after) {
+  query ShopFiles($first: Int!, $after: String, $query: String) {
+    files(first: $first, after: $after, query: $query) {
       nodes {
         id
         filename
@@ -5517,6 +5517,19 @@ export const ShopFilesQuery = /* GraphQL */ `
       }
     }
   }
+`;
+
+/** Files of the shop's deleted, with what storage keeps of them (ADR-636). */
+export const FileDeleteMutation = /* GraphQL */ `
+  mutation FileDelete($fileIds: [ID!]!) {
+    fileDelete(fileIds: $fileIds) {
+      deletedFileIds
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 /** An article written in a blog, shown now, at a time ahead, or hidden. */

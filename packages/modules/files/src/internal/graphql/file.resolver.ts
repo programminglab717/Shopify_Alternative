@@ -40,7 +40,11 @@ export class FileResolver {
   ): Promise<FileConnection> {
     const after = args.after ? uuidOf(decodeCursor(args.after, ['id']).id) : null;
     const first = pageSize(args.first);
-    const { items, hasNextPage } = await this.service.list(tenant, { first, after });
+    const { items, hasNextPage } = await this.service.list(tenant, {
+      first,
+      after,
+      query: args.query,
+    });
     const nodes = items.map((record) => this.#toFile(record));
     const edges = nodes.map((node) =>
       Object.assign(new FileEdge(), { cursor: encodeCursor({ id: node.id }), node }),

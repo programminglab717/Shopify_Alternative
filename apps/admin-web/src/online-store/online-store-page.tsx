@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/feedback';
 import { WRITES_URDU } from '../urdu/in-urdu';
 import { UrduOverview } from '../urdu/urdu-overview';
 import { BlogsList } from './blogs';
+import { FilesTab, KEEPS_FILES } from './files';
 import { FiltersTab } from './filters';
 import { GoogleTab } from './google';
 import { LinkPageTab } from './link-page';
@@ -27,6 +28,7 @@ export const ONLINE_STORE_TABS = [
   'pages',
   'blogs',
   'menus',
+  'files',
   'policies',
   'storefront',
   'filters',
@@ -60,6 +62,7 @@ const TABS: Record<OnlineStoreTab, { label: MessageKey; gate: Gate; body: () => 
   pages: { label: 'onlineStore.pages', gate: WRITES_PAGES, body: () => <PagesList /> },
   blogs: { label: 'onlineStore.blogs', gate: WRITES_BLOGS, body: () => <BlogsList /> },
   menus: { label: 'onlineStore.menus', gate: EDITS_MENUS, body: () => <MenusList /> },
+  files: { label: 'onlineStore.files', gate: KEEPS_FILES, body: () => <FilesTab /> },
   policies: {
     label: 'onlineStore.policies',
     gate: SETS_POLICIES,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-635 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-636 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -643,6 +643,7 @@
 | 633 | A member of staff is pushed in their browser of an order given to them and of a comment naming them, whatever their role, if they may see orders, number or none, once each, in their language, opening the order and saying neither its customer nor the comment | Accepted |
 | 634 | Owners and managers give up to 250 orders at once to a member of staff, or to no one, among the list's bulk actions; whoever is given them is told once, of them all, on WhatsApp and in their browser | Accepted |
 | 635 | The Confirmation Desk deals an agent the orders given to them first, then those given to no one, and those given to someone else last, each kind the most urgent first | Accepted |
+| 636 | The shop's files are searched by the words of their names, and kept in a Files tab of the online store: found, added as pictures or PDFs, their links copied and deleted | Accepted |
 
 ---
 
@@ -22705,3 +22706,23 @@
 * **Alternatives:** **Others' orders never dealt:** one given to an agent off sick would wait
   until someone took it back. **Own orders only above the urgent:** a high-value order no one
   has would come before the agent's own, which shops sharing them out do not want.
+
+## ADR-636 · The shop's files are searched by the words of their names, and kept in a Files tab of the online store: found, added as pictures or PDFs, their links copied and deleted
+
+* **Context:** The shop's files (ADR-079) are made where they are used, a product's photo, an
+  article's image, a theme's picture, and listed only in the theme editor's picker, newest first
+  (ADR-631). A shop that wants the link to its size guide, or to clear out old banners, has no
+  place to find them, and the API's `files` takes no search (status shortcut 124).
+* **Decision:** `files(query:)` finds the files whose names hold each of the query's words, in
+  any case, newest first: "lawn eid" finds "Eid lawn banner.jpg"; a word's `%` and `_` are
+  themselves, and ten words at most count. The online store gains a **Files** tab for those who
+  keep files (`write_files`: owners, managers and marketers): a search by name, sixty at a time
+  with more as asked for, each file small or as a PDF's mark, with its link to copy and a delete
+  that asks first; pictures and PDFs are added from the device, a picture made smaller as photos
+  are (ADR-079), a PDF as it is.
+* **Consequences:** A file's link is a tap away for a WhatsApp message or a page, and files no
+  longer used can be cleared. A file still named by a page or a theme shows nothing there once
+  deleted, as the delete warns.
+* **Alternatives:** **A search of filenames and descriptions:** descriptions are of images, and
+  shops look for a file by what they called it. **A page of its own in Settings:** the files are
+  the online store's pictures and documents, beside its pages and themes.

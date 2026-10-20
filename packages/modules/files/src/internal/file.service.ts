@@ -10,7 +10,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { ObjectStorage, maxUploadBytesOf } from '@hatti/storage';
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, lt, sql } from 'drizzle-orm';
 import { FileEvents, type FileCreatedPayload, type FileDeletedPayload } from './events.js';
 import {
   FILE_TYPES,
@@ -33,6 +33,10 @@ export const UPLOAD_SECONDS = 3600;
 export const FILE_URL_SECONDS = 3600;
 
 /** Staged uploads never made files are deleted after a day, some each time a shop stages more. */
+/** A files search's longest, and how many of its words count (ADR-636). */
+const FILE_SEARCH_MOST = 255;
+const FILE_SEARCH_WORDS = 10;
+
 const STAGED_HOURS = 24;
 const SWEEP = 100;
 
@@ -183,11 +187,21 @@ export class FileService {
     return { ok: true, value: made };
   }
 
-  /** The shop's files, newest first. */
+  /**
+   * The shop's files, newest first; with `query`, those whose names hold each of its words, in
+   * any case (ADR-636): "lawn eid" finds "Eid lawn banner.jpg".
+   */
   async list(
     tenant: TenantContext,
-    options: { first: number; after?: string | null },
+    options: { first: number; after?: string | null; query?: string | null },
   ): Promise<Page<FileRecord>> {
+    // No filename has control characters, and Postgres refuses some.
+    const words = (options.query ?? '')
+      .replace(/\p{Cc}/gu, '')
+      .slice(0, FILE_SEARCH_MOST)
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, FILE_SEARCH_WORDS);
     return this.db.tenant(tenant.shopId, async (tx) => {
       const rows = await tx
         .select()
@@ -197,6 +211,9 @@ export class FileService {
             eq(files.shopId, tenant.shopId),
             eq(files.status, 'ready'),
             options.after ? lt(files.id, options.after) : undefined,
+            ...words.map((word) =>
+              ilike(files.filename, `%${word.replace(/[\\%_]/g, (char) => `\\${char}`)}%`),
+            ),
           ),
         )
         .orderBy(desc(files.id))
