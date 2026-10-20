@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A cut-off hour for the day's orders
+### 96ed92d · A cut-off hour for the day's orders
 
 * **A shop may set the hour from which the day's orders count their delivery days from the next
   day, as they ship the day after** ([ADR-597](../architecture/13-decision-log.md#adr-597--a-shop-may-set-the-hour-from-which-the-days-orders-count-their-delivery-days-from-the-next-day-as-they-ship-the-day-after), CHK-05).
