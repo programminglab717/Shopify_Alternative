@@ -166,7 +166,7 @@ describe.skipIf(!server)(
       expect(shown.data.whatsAppAccount).toMatchObject({ phoneNumberId: NUMBER });
       // Hatti's order templates go to the account from the worker (ADR-537): none yet.
       expect(shown.data.whatsAppOrderTemplates).toEqual({
-        total: 36,
+        total: 38,
         approved: 0,
         pending: 0,
         refused: 0,
