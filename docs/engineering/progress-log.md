@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### 2aeb9de · The address book's page
+
+* **The address book has its own page on the storefront, as Shopify's /account/addresses, its
+  forms posting as Shopify's do** ([ADR-584](../architecture/13-decision-log.md#adr-584--the-address-book-has-its-own-page-on-the-storefront-as-shopifys-accountaddresses-its-forms-posting-as-shopifys-do), CUS-02).
+* 3628 tests, 2 more: the page and its forms, refused and done, and the
+  limits on who may post them.
+
 ### 89ed39e · The account's address book
 
 * **A customer's address book is kept with their account, each address checked as checkout's
