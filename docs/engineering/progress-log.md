@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A payment link's orders
+### 2617cec · A payment link's orders
 
 * **A payment link lists its orders** ([ADR-645](../architecture/13-decision-log.md#adr-645--a-payment-link-lists-the-orders-placed-through-it-the-latest-first-its-checkouts-that-became-orders-read-with-the-orders-modules-own-order)): `PaymentLink.orders`, the latest first, found
   by an index of the link's checkouts (migration 0287) and read as the orders module's orders;
