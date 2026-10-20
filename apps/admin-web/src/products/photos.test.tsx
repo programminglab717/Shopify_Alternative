@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ImageCrop } from '../api/types';
 import { fakeCore, press, renderAdmin, signedIn } from '../test-support';
 import { preparePhoto } from './photos';
 
@@ -13,7 +14,7 @@ const photo = (id: string, position: number) => ({
   mediaErrors: [],
   width: 800,
   height: 600,
-  crop: null,
+  crop: null as ImageCrop | null,
 });
 
 const AJRAK = {
@@ -52,7 +53,7 @@ function photosCore() {
       case 'Product':
         return { location: { id: 'loc_1', name: 'Shop' }, product: { ...AJRAK, media } };
       case 'ProductUpdateMedia': {
-        const [change] = variables.media as { id: string; alt?: string; crop?: unknown }[];
+        const [change] = variables.media as { id: string; alt?: string; crop?: ImageCrop }[];
         if (change!.alt?.startsWith('http')) {
           return {
             productUpdateMedia: {
