@@ -2242,6 +2242,15 @@ describe('Carts', () => {
       `<loc>http://localhost/pages/${published.handle}</loc>` +
         `<lastmod>${published.publishedAt.replace(/\.\d+(?=Z$)/, '')}</lastmod>`,
     );
+    // The index says when the last of each file's addresses changed (ADR-608).
+    const latest = sample
+      .pages!.map((page) => page.publishedAt)
+      .sort()
+      .at(-1)!;
+    expect(index.body).toContain(
+      '<sitemap><loc>http://localhost/sitemaps/pages-1.xml</loc>' +
+        `<lastmod>${latest.replace(/\.\d+(?=Z$)/, '')}</lastmod></sitemap>`,
+    );
     // Blogs, and articles at their blog's address and theirs (ADR-177).
     expect(locs((await get('/sitemaps/blogs-1.xml')).body)).toEqual([
       'http://localhost/blogs/news',

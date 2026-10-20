@@ -366,9 +366,10 @@ describe('Storefront rendering', () => {
     const dataOf = async (request: PageRequest, shopDoc = branded) => {
       const shop = new MemoryStore({ ...sample, shop: shopDoc, articles });
       const { html } = await renderer.render(request, shop.fresh());
-      return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(
-        ([, json]) => JSON.parse(json!) as unknown,
-      );
+      // Where each page sits is its own test's (ADR-608).
+      return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+        .map(([, json]) => JSON.parse(json!) as Record<string, unknown>)
+        .filter((data) => data['@type'] !== 'BreadcrumbList');
     };
     const organization = {
       '@type': 'Organization',
@@ -427,6 +428,49 @@ describe('Storefront rendering', () => {
     // Other pages don't.
     for (const path of ['/blogs/news', '/collections/eid-lawn', '/pages/returns', '/search']) {
       expect(await dataOf({ path }), path).toEqual([]);
+    }
+  });
+
+  it('tells search engines where each page sits in the shop, as a BreadcrumbList (ADR-608)', async () => {
+    const renderer = new PageRenderer(loadTheme(files), {
+      platformUrl: 'https://hatti.pk',
+      limits: { timeMs: 10_000 },
+    });
+    const crumbsOf = async (request: PageRequest) => {
+      const { html } = await renderer.render(request, new MemoryStore(sampleStore()).fresh());
+      return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+        .map(([, json]) => JSON.parse(json!) as Record<string, unknown>)
+        .filter((data) => data['@type'] === 'BreadcrumbList')
+        .map((data) =>
+          (data.itemListElement as { position: number; name: string; item: string }[]).map(
+            (crumb) => [crumb.position, crumb.name, crumb.item],
+          ),
+        );
+    };
+    const home = [1, 'Zari Fashions', 'https://zari.hatti.pk/'];
+
+    expect(await crumbsOf({ path: '/blogs/news/eid-lawn-is-here' })).toEqual([
+      [
+        home,
+        [2, 'News', 'https://zari.hatti.pk/blogs/news'],
+        [3, 'Eid lawn is here', 'https://zari.hatti.pk/blogs/news/eid-lawn-is-here'],
+      ],
+    ]);
+    expect(await crumbsOf({ path: '/collections/eid-lawn' })).toEqual([
+      [home, [2, 'Eid Lawn', 'https://zari.hatti.pk/collections/eid-lawn']],
+    ]);
+    const product = await crumbsOf({ path: '/products/bridal-lehenga-heavy' });
+    expect(product[0]?.[1]?.[2]).toBe('https://zari.hatti.pk/products/bridal-lehenga-heavy');
+    expect(await crumbsOf({ path: '/blogs/news' })).toEqual([
+      [home, [2, 'News', 'https://zari.hatti.pk/blogs/news']],
+    ]);
+    // In Urdu, at its Urdu addresses.
+    const urdu = await crumbsOf({ path: '/pages/returns', locale: 'ur' });
+    expect(urdu[0]?.[0]).toEqual([1, 'Zari Fashions', 'https://zari.hatti.pk/ur']);
+    expect(urdu[0]?.[1]?.[2]).toBe('https://zari.hatti.pk/ur/pages/returns');
+    // Not on the home page, the cart or a search.
+    for (const path of ['/', '/cart', '/search']) {
+      expect(await crumbsOf({ path }), path).toEqual([]);
     }
   });
 

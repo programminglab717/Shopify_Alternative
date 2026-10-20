@@ -45,23 +45,45 @@ export function sitemapPages(count: number): number {
   return Math.ceil(count / SITEMAP_SIZE);
 }
 
-/** The index of a shop's sitemaps: one file per {@link SITEMAP_SIZE} addresses of each kind. */
+/** A kind's entries in the order its files list them, the same each time, so a handle stays in its file. */
+export function inSitemapOrder(entries: readonly SitemapEntry[]): SitemapEntry[] {
+  return [...entries].sort((a, b) => (a.handle < b.handle ? -1 : a.handle > b.handle ? 1 : 0));
+}
+
+/** W3C's date and time, to the second, as sitemaps give when something last changed. */
+function lastmodOf(at: string): string {
+  return `<lastmod>${escapeHtml(at.replace(/\.\d+(?=Z$)/, ''))}</lastmod>`;
+}
+
+/**
+ * The index of a shop's sitemaps: one file per {@link SITEMAP_SIZE} addresses of each kind, each
+ * with when the last of its addresses changed (ADR-608), from `entries` by kind in
+ * {@link inSitemapOrder}.
+ */
 export function sitemapIndex(
   origin: string,
-  counts: Readonly<Record<HandledKind, number>>,
+  entries: Readonly<Record<HandledKind, readonly SitemapEntry[]>>,
 ): string {
-  const entries = SITEMAP_KINDS.flatMap((kind) =>
+  const files = SITEMAP_KINDS.flatMap((kind) =>
     // The pages' sitemap always has the home page.
     Array.from(
-      { length: Math.max(sitemapPages(counts[kind]), kind === 'page' ? 1 : 0) },
-      (_, i) =>
-        `<sitemap><loc>${escapeHtml(`${origin}${sitemapPath(kind, i + 1)}`)}</loc></sitemap>`,
+      { length: Math.max(sitemapPages(entries[kind].length), kind === 'page' ? 1 : 0) },
+      (_, i) => {
+        // ISO times in UTC compare as text.
+        const latest = entries[kind]
+          .slice(i * SITEMAP_SIZE, (i + 1) * SITEMAP_SIZE)
+          .reduce<string | null>((last, { at }) => (at && (!last || at > last) ? at : last), null);
+        return (
+          `<sitemap><loc>${escapeHtml(`${origin}${sitemapPath(kind, i + 1)}`)}</loc>` +
+          `${latest ? lastmodOf(latest) : ''}</sitemap>`
+        );
+      },
     ),
   );
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-    entries.join('\n') +
+    files.join('\n') +
     '\n</sitemapindex>\n'
   );
 }
@@ -97,8 +119,7 @@ export function sitemapPage(
               `href="${escapeHtml(addressIn(code, path))}"/>`,
           )
         : [];
-    // W3C's date and time, to the second.
-    const lastmod = at ? `<lastmod>${escapeHtml(at.replace(/\.\d+(?=Z$)/, ''))}</lastmod>` : '';
+    const lastmod = at ? lastmodOf(at) : '';
     const picture = image
       ? `<image:image><image:loc>${escapeHtml(imageAddress(image, origin, null))}</image:loc>` +
         '</image:image>'

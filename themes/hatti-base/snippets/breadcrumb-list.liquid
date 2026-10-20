@@ -1,0 +1,31 @@
+{%- comment -%}
+  Where a page sits in the shop, for search engines, as schema.org's BreadcrumbList (OS-09,
+  ADR-608): the home page, then a blog before its article, then the page itself, each at its
+  address at the shop's. For products, collections, pages, blogs and articles; nothing elsewhere.
+{%- endcomment -%}
+{%- liquid
+  assign leaf = null
+  case request.page_type
+    when 'product'
+      assign leaf = product
+    when 'collection'
+      assign leaf = collection
+    when 'page'
+      assign leaf = page
+    when 'blog'
+      assign leaf = blog
+    when 'article'
+      assign leaf = article
+  endcase
+  assign home_url = shop.url | append: routes.root_url
+-%}
+{%- if leaf -%}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":{{ shop.name | json }},"item":{{ home_url | json }}}
+{%- if request.page_type == 'article' and blog -%}
+  {%- assign blog_url = shop.url | append: blog.url -%}
+  ,{"@type":"ListItem","position":2,"name":{{ blog.title | json }},"item":{{ blog_url | json }}},{"@type":"ListItem","position":3,"name":{{ leaf.title | json }},"item":{{ canonical_url | json }}}
+{%- else -%}
+  ,{"@type":"ListItem","position":2,"name":{{ leaf.title | json }},"item":{{ canonical_url | json }}}
+{%- endif -%}
+]}</script>
+{%- endif -%}

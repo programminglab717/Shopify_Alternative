@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-607 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-608 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -615,6 +615,7 @@
 | 605 | A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has not had in full, as an Excel workbook to send it | Accepted |
 | 606 | The online store has one Search listings tab: every product's, collection's, page's, blog's and article's search engine listing, those without a description of their own first | Accepted |
 | 607 | A redirect that would send shoppers round a loop is refused, and each redirect says where its redirects in a row end, for the admin to send it straight there | Accepted |
+| 608 | Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap index says when each of its files last changed | Accepted |
 
 ---
 
@@ -22070,3 +22071,26 @@
   shoppers, but a lookup per hop on every 404 the storefront answers; straightening them where
   they are kept does it once. **Refusing chains too:** an import of a store's history would lose
   rows that work.
+
+## ADR-608 · Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap index says when each of its files last changed
+
+* **Context:** Structured data gave products, articles and the shop (ADR-237), but not where a
+  page sits, which Google shows in place of its address in results. The sitemap index named
+  each file without `lastmod` (ADR-236), so crawlers fetched every file to learn which had
+  changed.
+* **Decision:** Hatti Base renders a snippet, `breadcrumb-list`, at the end of every page: on a
+  product's, a collection's, a page's or a blog's page, schema.org's `BreadcrumbList` of the
+  shop's home page and the page itself; on an article's, the home page, its blog and the
+  article. Each item is named by its title and given at its address at the shop's, in the
+  page's language (/ur for Urdu). It is written in Liquid with the `json` filter, so any theme
+  can copy it, and it is data alone: Hatti Base shows no trail on the page. The sitemap index
+  reads each kind's entries, where it read their handles, and gives each file the latest time
+  any of its addresses changed, in the order the files list them.
+* **Consequences:** Search results can show where a page sits in the shop, and crawlers fetch
+  only the files that changed. The index costs the same round trip a kind as before, reading
+  each entry's time with its handle; a file whose addresses say no time gives none.
+* **Alternatives:** **A `structured_data` of Hatti's own for breadcrumbs:** shorter in a
+  theme, but Shopify's filter gives no such thing, and a theme copying Hatti Base's would not
+  work on Shopify. **A product's trail through its collection:** Hatti's product pages have
+  no collection in their address to choose one by, and a product in many collections would
+  be given one at random.

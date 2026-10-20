@@ -472,7 +472,9 @@ Center and Meta's catalogs fetch, at `/feeds/products.xml`
 Each collection has Shopify's Atom feed too, at its address with .atom, its first 50 products
 with their variants in Shopify's own namespace, for feed readers and newsletters
 ([ADR-216](./13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)).
-Breadcrumbs, ratings and FAQs in structured data are to come.
+Hatti Base gives every product, collection, page, blog and article a `BreadcrumbList` of where
+it sits in the shop, and the sitemap index says when each of its files last changed
+([ADR-608](./13-decision-log.md#adr-608--hatti-base-tells-search-engines-where-each-page-sits-as-a-breadcrumblist-and-the-sitemap-index-says-when-each-of-its-files-last-changed)); FAQs in structured data are to come.
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and
   recommend products; see [09](./09-ai-and-intelligence.md).

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Breadcrumbs, and the sitemap index's times
+
+* **Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap
+  index says when each of its files last changed** ([ADR-608](../architecture/13-decision-log.md#adr-608--hatti-base-tells-search-engines-where-each-page-sits-as-a-breadcrumblist-and-the-sitemap-index-says-when-each-of-its-files-last-changed), OS-09).
+* 3696 tests, 1 more: the trail on each kind of page and in Urdu, and
+  the index's time for a file.
+
 ### 7b3b17c · Redirect loops refused, and chains shown
 
 * **A redirect that would send shoppers round a loop is refused, and each redirect says where its

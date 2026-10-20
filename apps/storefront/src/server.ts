@@ -90,6 +90,7 @@ import type { SearchFound } from './objects.js';
 import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
 import {
   SITEMAP_KINDS,
+  inSitemapOrder,
   robotsTxt,
   sitemapIndex,
   sitemapOf,
@@ -1021,14 +1022,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
 
   /**
    * The index of the shop's sitemaps, one for each 5,000 of its products, collections, pages, blogs
-   * or articles.
+   * or articles, with when each last changed (ADR-608).
    */
   app.get('/sitemap.xml', (request, reply) =>
     crawlers(request, reply, 'application/xml; charset=utf-8', async (found, origin) => {
-      const counts = await Promise.all(
-        SITEMAP_KINDS.map(async (kind) => [kind, (await found.store.handles(kind)).length]),
+      const entries = await Promise.all(
+        SITEMAP_KINDS.map(async (kind) => [kind, inSitemapOrder(await found.store.sitemap(kind))]),
       );
-      return sitemapIndex(origin, Object.fromEntries(counts));
+      return sitemapIndex(origin, Object.fromEntries(entries));
     }),
   );
 
@@ -1036,10 +1037,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     crawlers(request, reply, 'application/xml; charset=utf-8', async (found, origin) => {
       const asked = sitemapOf((request.params as { name: string }).name);
       if (!asked) return null;
-      // In the same order each time, so a handle stays in its file.
-      const entries = (await found.store.sitemap(asked.kind)).sort((a, b) =>
-        a.handle < b.handle ? -1 : a.handle > b.handle ? 1 : 0,
-      );
+      const entries = inSitemapOrder(await found.store.sitemap(asked.kind));
       if (asked.page > Math.max(sitemapPages(entries.length), 1)) return null;
       return sitemapPage(origin, asked.kind, entries, asked.page, languages);
     }),
