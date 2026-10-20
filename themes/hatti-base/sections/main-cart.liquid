@@ -29,7 +29,18 @@
           {% render 'cart-totals', cart: cart, delivery: delivery %}
           {%- comment -%} Updating first: Enter in a box updates the cart, as it does without this button. {%- endcomment -%}
           <button type="submit" name="update" class="button button--secondary">{{ 'sections.cart.update' | t }}</button>
-          <button type="submit" name="checkout" class="button">{{ 'sections.cart.checkout' | t }}</button>
+          {%- comment -%}
+            Orders paused (ADR-622): the cart kept, and checkout's button off until they come back,
+            which the platform's script turns on again for a page kept in a cache.
+          {%- endcomment -%}
+          {%- if shop.checkout_paused -%}
+            <p class="cart__paused" role="status" data-checkout-paused>{{ 'general.checkout_paused.cart' | t }}</p>
+            <button type="submit" name="checkout" class="button" disabled data-checkout-paused-disabled>
+              {{- 'sections.cart.checkout' | t -}}
+            </button>
+          {%- else -%}
+            <button type="submit" name="checkout" class="button">{{ 'sections.cart.checkout' | t }}</button>
+          {%- endif -%}
           {%- if settings.whatsapp_orders and shop.whatsapp -%}
             {%- capture items -%}
               {%- for item in cart.items -%}

@@ -125,7 +125,8 @@ const BAR_WORDS: Readonly<Record<'en' | 'ur', { title: string; from: string; soo
  * is laid over the theme's page at its top by a script, as the preview bar is, and goes away by
  * itself once the time the shop set has come, for pages kept in a cache. A theme that says so
  * itself, from `shop.checkout_paused`, marks its notice `data-checkout-paused` (ADR-620): the
- * bar stands aside for it, and takes it away with the bar's own time.
+ * bar stands aside for it, and takes it away with the bar's own time, turning on again what the
+ * theme turned off while it lasted, marked `data-checkout-paused-disabled` (ADR-622).
  */
 export function checkoutPausedBar(
   shop: ShopDoc,
@@ -150,7 +151,9 @@ export function checkoutPausedBar(
     '<script>addEventListener("DOMContentLoaded",function(){' +
     (until !== null
       ? `if(Date.now()>=${until}){document.querySelectorAll("[data-checkout-paused]")` +
-        '.forEach(function(own){own.remove()});return}'
+        '.forEach(function(own){own.remove()});' +
+        'document.querySelectorAll("[data-checkout-paused-disabled]")' +
+        '.forEach(function(off){off.disabled=false});return}'
       : '') +
     'if(document.querySelector("[data-checkout-paused]"))return;' +
     'var bar=document.getElementById("hatti-paused-bar");if(bar)document.body.prepend(bar.content)' +

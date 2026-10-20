@@ -31,7 +31,18 @@
             </ul>
             <div class="cart-drawer__summary">
               {% render 'cart-totals', cart: cart, delivery: delivery %}
-              <button type="submit" name="checkout" class="button">{{ 'sections.cart.checkout' | t }}</button>
+              {%- comment -%}
+                Orders paused (ADR-622): the cart kept, and checkout's button off until they come back,
+                which the platform's script turns on again for a page kept in a cache.
+              {%- endcomment -%}
+              {%- if shop.checkout_paused -%}
+                <p class="cart__paused" role="status" data-checkout-paused>{{ 'general.checkout_paused.cart' | t }}</p>
+                <button type="submit" name="checkout" class="button" disabled data-checkout-paused-disabled>
+                  {{- 'sections.cart.checkout' | t -}}
+                </button>
+              {%- else -%}
+                <button type="submit" name="checkout" class="button">{{ 'sections.cart.checkout' | t }}</button>
+              {%- endif -%}
               <a class="button button--secondary" href="{{ routes.cart_url }}">{{ 'sections.cart_drawer.view' | t }}</a>
             </div>
           {%- endform -%}

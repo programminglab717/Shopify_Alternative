@@ -58,6 +58,11 @@ h3 {
 .section-title h2 {
   margin: 0;
 }
+.cart__paused,
+.product__paused {
+  color: #78350f;
+}
+
 .checkout-paused {
   padding: 0.625rem 1rem;
   background: #fef3c7;

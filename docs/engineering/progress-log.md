@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A paused shop's cart kept, its checkout off
+
+* **While orders are paused, Hatti Base keeps the cart and turns checkout's button off**
+  ([ADR-622](../architecture/13-decision-log.md#adr-622--while-orders-are-paused-hatti-base-keeps-the-cart-and-turns-its-checkout-button-off-saying-why-and-its-product-page-says-what-is-added-is-kept-for-when-orders-come-back-the-platforms-script-turns-the-button-on-again-once-their-time-has-come)), saying why on the cart page and in the drawer, and its product page says what is
+  added is kept for when orders come back; the platform's script turns the button on again
+  once their time has come.
+* 3734 tests, one more: the cart and product page paused and open; the bar's test reads the
+  button turned on again.
+
 ### b94ee1d · One message for an order placed and paid together
 
 * **An order placed and paid together is told of its payment alone** ([ADR-621](../architecture/13-decision-log.md#adr-621--an-order-placed-and-paid-together-is-told-of-its-payment-alone-the-news-of-it-placed-waits-ten-minutes-for-an-order-to-be-paid-online-at-checkout-and-the-news-of-a-payment-in-full-takes-its-place-while-no-sender-has-taken-it)): the news of an

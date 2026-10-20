@@ -125,6 +125,10 @@
                 {{ 'products.product.sold_out' | t }}
               {%- endif -%}
             </button>
+            {%- comment -%} Orders paused (ADR-622): it goes in the cart for when they come back. {%- endcomment -%}
+            {%- if shop.checkout_paused and current.available -%}
+              <p class="product__paused" data-checkout-paused>{{ 'general.checkout_paused.product' | t }}</p>
+            {%- endif -%}
             {%- comment -%}
               How many are left, where few are (ADR-445): the store says it only for 5 or fewer, so
               the words are never a guess. Picking another variant says its own.

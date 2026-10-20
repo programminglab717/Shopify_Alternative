@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-621 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-622 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -629,6 +629,7 @@
 | 619 | A comment that reads as spam is kept as spam, neither shown nor held: links in its name, link markup, more than two links, what spam sells, or a long comment again within the day; and a comment held for approval is pushed to who writes the shop's blogs | Accepted |
 | 620 | Themes are given a pause of checkout alone as shop.checkout_paused, its message and when orders come back, and Hatti Base says so in its own place and words; the platform's bar stands aside for a theme's notice marked data-checkout-paused | Accepted |
 | 621 | An order placed and paid together is told of its payment alone: the news of it placed waits ten minutes for an order to be paid online at checkout, and the news of a payment in full takes its place while no sender has taken it | Accepted |
+| 622 | While orders are paused, Hatti Base keeps the cart and turns its checkout button off, saying why, and its product page says what is added is kept for when orders come back; the platform's script turns the button on again once their time has come | Accepted |
 
 ---
 
@@ -22409,3 +22410,22 @@
 * **Alternatives:** **A template saying both:** a new WhatsApp template for Meta to approve, for
   what the payment's already says. **Waiting for every order:** cash on delivery, most orders,
   would hear of themselves later for nothing.
+
+## ADR-622 · While orders are paused, Hatti Base keeps the cart and turns its checkout button off, saying why, and its product page says what is added is kept for when orders come back; the platform's script turns the button on again once their time has come
+
+* **Context:** While checkout alone is paused, shoppers browse and fill their carts (ADR-603),
+  and the pages say orders are paused (ADR-604, ADR-620). Hatti Base's cart still offered
+  checkout, whose page then said it takes no orders, and its product page said nothing at the
+  button: shoppers filled carts they could not order without being told so where they acted
+  (status shortcut 115).
+* **Decision:** From `shop.checkout_paused`, Hatti Base's cart page and cart drawer say the cart
+  is kept for when orders come back and show checkout's button turned off, marked
+  `data-checkout-paused-disabled`; its product page says, under the button, that what is added
+  is kept for then, while the variant can be bought. The platform's script, which takes a
+  theme's notices away once the time the shop set has come (ADR-620), turns on again what the
+  theme marked so, for pages kept in a cache.
+* **Consequences:** Shoppers learn at the button that they can keep shopping and order later,
+  and none reach a checkout that turns them back. Themes of shops' own mark their own buttons
+  the same way, or keep checkout's page saying so.
+* **Alternatives:** **Turning the add button off too:** carts kept for later are the point of
+  pausing checkout alone. **Hiding checkout's button:** a shopper looks for it and leaves.

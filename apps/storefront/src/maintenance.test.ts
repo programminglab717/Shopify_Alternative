@@ -57,7 +57,9 @@ describe('A shop whose checkout alone is paused (ADR-603, ADR-604)', () => {
     // notice; standing aside for that notice before (ADR-620).
     expect(bar).toContain(
       `if(Date.now()>=${Date.parse(pause.until)}){document.querySelectorAll("[data-checkout-paused]")` +
-        '.forEach(function(own){own.remove()});return}',
+        '.forEach(function(own){own.remove()});' +
+        'document.querySelectorAll("[data-checkout-paused-disabled]")' +
+        '.forEach(function(off){off.disabled=false});return}',
     );
     expect(bar).toContain('if(document.querySelector("[data-checkout-paused]"))return;');
     const urdu = checkoutPausedBar(shop, { ...pause, message: '', until: null }, 'ur');

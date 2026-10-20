@@ -503,6 +503,68 @@ describe('Storefront rendering', () => {
     expect(await noticeOf(undefined)).toBeNull();
   });
 
+  it('keeps the cart and turns checkout off while orders are paused (ADR-622)', async () => {
+    const sample = sampleStore();
+    const lawn = sample.products[0]!;
+    const variant = lawn.variants.find((each) => each.available)!;
+    const cart: CartJson = {
+      note: '',
+      attributes: {},
+      items: [
+        {
+          key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+          variantId: variant.id,
+          productId: lawn.id,
+          quantity: 1,
+          properties: {},
+          price: variant.price,
+          linePrice: variant.price,
+          title: lawn.title,
+          variantTitle: variant.title,
+          sku: null,
+          grams: 0,
+          taxable: true,
+          taxCode: null,
+          maxQuantity: null,
+        },
+      ],
+      itemCount: 1,
+      subtotal: variant.price,
+      totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
+    };
+    const pageOf = async (request: PageRequest, maintenance: ShopDoc['maintenance']) => {
+      const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+      const store = new MemoryStore({ ...sample, shop: { ...sample.shop, maintenance } });
+      return (await renderer.render(request, store.fresh())).html;
+    };
+    const pause = { message: '', until: null, checkoutOnly: true as const };
+    const paused = await pageOf({ path: '/cart', cart }, pause);
+    expect(paused).toContain(
+      '<p class="cart__paused" role="status" data-checkout-paused>' +
+        'Orders are paused for a while: your cart is kept for when we take them again.</p>',
+    );
+    expect(paused).toContain(
+      '<button type="submit" name="checkout" class="button" disabled data-checkout-paused-disabled>Check out</button>',
+    );
+    // The product goes in the cart all the same, for when orders come back.
+    const product = await pageOf({ path: `/products/${lawn.handle}`, locale: 'ur' }, pause);
+    expect(product).toContain(
+      '<p class="product__paused" data-checkout-paused>' +
+        'آرڈر کچھ دیر کے لیے بند ہیں: اسے کارٹ میں ڈال لیں، اور جب ہم دوبارہ آرڈر لیں تب منگوائیں۔</p>',
+    );
+    // Taking orders: neither.
+    const open = await pageOf({ path: '/cart', cart }, undefined);
+    expect(open).toContain(
+      '<button type="submit" name="checkout" class="button">Check out</button>',
+    );
+    expect(open).not.toContain('cart__paused');
+    expect(await pageOf({ path: `/products/${lawn.handle}` }, undefined)).not.toContain(
+      'product__paused',
+    );
+  });
+
   it('shows where each page sits above it, unless the theme turns it off (ADR-614)', async () => {
     const trailOf = async (request: PageRequest, theme = files) => {
       const renderer = new PageRenderer(loadTheme(theme), {

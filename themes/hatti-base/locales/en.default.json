@@ -5,7 +5,9 @@
     "checkout_paused": {
       "title": "Orders are paused for a while.",
       "until": "We take orders again from {{ when }}.",
-      "soon": "We take orders again soon."
+      "soon": "We take orders again soon.",
+      "cart": "Orders are paused for a while: your cart is kept for when we take them again.",
+      "product": "Orders are paused for a while: add it to your cart, and order it when we take them again."
     },
     "menu": "Main menu",
     "language": "اردو",
