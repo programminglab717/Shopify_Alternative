@@ -5647,6 +5647,11 @@ type ImageCrop {
   height: Int!
   left: Int!
   top: Int!
+
+  """
+  Quarter turns clockwise, 0 to 3, once the part is cut (ADR-658): turned on its side, the image shown is `height` wide.
+  """
+  turns: Int!
   width: Int!
 }
 
@@ -5657,6 +5662,11 @@ input ImageCropInput {
   height: Int!
   left: Int!
   top: Int!
+
+  """
+  Quarter turns clockwise, 0 to 3, after the part is cut (ADR-658); 0 unless given. The whole image turned is a crop of all of it with turns.
+  """
+  turns: Int
   width: Int!
 }
 

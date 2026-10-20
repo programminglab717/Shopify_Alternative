@@ -119,6 +119,8 @@ export interface ImageCrop {
   top: number;
   width: number;
   height: number;
+  /** Quarter turns clockwise, once the part is cut from the whole (ADR-658); none if absent. */
+  turns?: number | null;
 }
 
 /**
@@ -131,7 +133,10 @@ export async function cropImage(
   crop: ImageCrop,
   format: CleanFormat,
 ): Promise<Buffer> {
-  const part = sharp(clean, INPUT).extract(crop);
+  const { left, top, width, height, turns } = crop;
+  // Cut first, then turned: the crop is in the whole image's pixels as it was taken.
+  const cut = sharp(clean, INPUT).extract({ left, top, width, height });
+  const part = turns ? cut.rotate(turns * 90) : cut;
   return (format === 'jpeg' ? part.jpeg({ quality: 90 }) : part.png()).toBuffer();
 }
 

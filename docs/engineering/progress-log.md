@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Photos turned
+
+* **A product's photo is turned by quarter turns as part of its crop** ([ADR-658](../architecture/13-decision-log.md#adr-658--a-products-photo-is-turned-by-quarter-turns-after-its-crop-is-cut-as-part-of-the-crop-a-photo-taken-on-its-side-is-turned-without-being-cropped)), cut first and
+  turned after, and the admin's photos turn a quarter clockwise each tap.
+* 3805 tests, two more: the images package and the admin's photos; the catalog's crop test
+  turns one too.
+
 ### 7647c33 · Unpaid orders after hours
 
 * **A shop selling online alone cancels orders never paid after 1 to 72 hours** ([ADR-657](../architecture/13-decision-log.md#adr-657--a-shop-selling-online-alone-cancels-orders-never-paid-after-hours-rather-than-days-reminding-their-customers-halfway)) rather

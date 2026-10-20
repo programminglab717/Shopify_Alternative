@@ -97,6 +97,7 @@ export class MediaProcessing {
           top: number | null;
           width: number | null;
           height: number | null;
+          turns: number;
           video: boolean;
         } | null;
       }>(sql`
@@ -120,6 +121,7 @@ export class MediaProcessing {
                   (SELECT jsonb_build_object(
                             'id', o.id, 'format', o.image_format, 'left', o.crop_left,
                             'top', o.crop_top, 'width', o.crop_width, 'height', o.crop_height,
+                            'turns', o.crop_turns,
                             'video', o.video_size IS NOT NULL)
                      FROM catalog.product_media o
                     WHERE o.shop_id = m.shop_id AND o.id = m.copied_from
@@ -151,6 +153,7 @@ export class MediaProcessing {
                     top: row.copy_of.top!,
                     width: row.copy_of.width!,
                     height: row.copy_of.height!,
+                    ...(row.copy_of.turns > 0 && { turns: row.copy_of.turns }),
                   },
             video: row.copy_of.video,
           },
@@ -181,7 +184,8 @@ export class MediaProcessing {
                video_height = ${video?.height ?? null},
                video_duration_ms = ${video?.durationMs ?? null}, crop_left = ${crop?.left ?? null},
                crop_top = ${crop?.top ?? null}, crop_width = ${crop?.width ?? null},
-               crop_height = ${crop?.height ?? null}, updated_at = now()
+               crop_height = ${crop?.height ?? null}, crop_turns = ${crop?.turns ?? 0},
+               updated_at = now()
          WHERE shop_id = ${shopId} AND id = ${mediaId} AND status = 'processing'
         RETURNING product_id`);
       if (rows[0]) {

@@ -299,6 +299,31 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       expect(unwrap(await crop({ left: 0, top: 0, width: 800, height: 600 })).media[0]!.crop).toBe(
         null,
       );
+      // Turned a quarter clockwise, all of it, for a photo taken on its side (ADR-658): shown
+      // 600 wide, at a path of its own, its clean copy turned.
+      expect(errorsOf(await crop({ left: 0, top: 0, width: 800, height: 600, turns: 4 }))).toEqual([
+        ['media.0.crop', 'INVALID'],
+      ]);
+      const turned = unwrap(await crop({ left: 0, top: 0, width: 800, height: 600, turns: 1 }))
+        .media[0]!;
+      expect(turned.crop).toEqual({ left: 0, top: 0, width: 800, height: 600, turns: 1 });
+      expect(shownSizeOf(turned)).toEqual({ width: 600, height: 800 });
+      const turnedPath = imagePathOf(f.a.shopId, turned, 'lawn-kurta')!;
+      expect(turnedPath).toBe(`/images/${f.a.shopId}/${front}/crop-0-0-800-600-t1/lawn-kurta.jpg`);
+      expect(parseImagePath(turnedPath)?.crop).toBe('crop-0-0-800-600-t1');
+      const onItsSide = await storage.read(
+        cleanImageKey(f.a.shopId, front!, 'jpeg', 'crop-0-0-800-600-t1'),
+      );
+      expect(await sharp(onItsSide!.body).metadata()).toMatchObject({ width: 600, height: 800 });
+      // Unturned again, all of it is the image as it is, and the turned crop's files go as a
+      // replaced crop's do (ADR-630).
+      const straight = unwrap(await crop({ left: 0, top: 0, width: 800, height: 600, turns: 0 }));
+      expect(straight.media[0]!.crop).toBeNull();
+      const { rows: replaced } = await f.admin.query<{ crop: string }>(
+        'SELECT crop FROM catalog.media_crop_removals WHERE media_id = $1 ORDER BY crop',
+        [front],
+      );
+      expect(replaced.map((row) => row.crop)).toContain('crop-0-0-800-600-t1');
       unwrap(await crop({ left: 400, top: 300, width: 400, height: 300 }));
       expect(unwrap(await crop(null)).media[0]!.crop).toBeNull();
       // Another shop crops none of the shop's.

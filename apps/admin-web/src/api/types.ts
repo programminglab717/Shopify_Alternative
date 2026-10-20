@@ -464,6 +464,20 @@ export interface ProductMedia extends ProductThumbnail {
   position: number;
   mediaContentType: 'IMAGE' | 'VIDEO' | 'EXTERNAL_VIDEO';
   mediaErrors: { message: string }[];
+  /** The whole image, before any crop; null until ready. */
+  width?: number | null;
+  height?: number | null;
+  /** The part shown, and how far it is turned (ADR-257, ADR-658); null for all of it. */
+  crop?: ImageCrop | null;
+}
+
+export interface ImageCrop {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  /** Quarter turns clockwise. */
+  turns: number;
 }
 
 export interface ProductListItem {

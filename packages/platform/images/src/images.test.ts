@@ -169,6 +169,23 @@ describe('variants', () => {
 });
 
 describe('crops', () => {
+  it('turn the part asked for by quarter turns clockwise, once cut (ADR-658)', async () => {
+    const clean = await (await photo(800, 600)).jpeg({ quality: 100 }).toBuffer();
+    const crop = { left: 400, top: 300, width: 200, height: 100 };
+    const turned = await cropImage(clean, { ...crop, turns: 1 }, 'jpeg');
+    const { data, info } = await sharp(turned).raw().toBuffer({ resolveWithObject: true });
+    // On its side: 100 wide, 200 high, its top left the cut part's bottom left.
+    expect([info.width, info.height]).toEqual([100, 200]);
+    expect(Math.abs(data[0]! - Math.round((255 * 400) / 800))).toBeLessThan(8);
+    expect(Math.abs(data[2]! - Math.round((255 * 399) / 600))).toBeLessThan(8);
+    // Upside down: its top left the cut part's bottom right.
+    const upsideDown = await sharp(await cropImage(clean, { ...crop, turns: 2 }, 'jpeg'))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect([upsideDown.info.width, upsideDown.info.height]).toEqual([200, 100]);
+    expect(Math.abs(upsideDown.data[0]! - Math.round((255 * 599) / 800))).toBeLessThan(8);
+  });
+
   it("keep the part asked for, in the clean copy's format (ADR-257)", async () => {
     // Red grows across and blue down: a part's first pixel says where it was taken from.
     const clean = await (await photo(800, 600)).jpeg({ quality: 100 }).toBuffer();

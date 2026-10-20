@@ -11,6 +11,9 @@ const photo = (id: string, position: number) => ({
   mediaContentType: 'IMAGE',
   previewImage: { url: `http://localhost:4000/images/${id}` },
   mediaErrors: [],
+  width: 800,
+  height: 600,
+  crop: null,
 });
 
 const AJRAK = {
@@ -49,8 +52,8 @@ function photosCore() {
       case 'Product':
         return { location: { id: 'loc_1', name: 'Shop' }, product: { ...AJRAK, media } };
       case 'ProductUpdateMedia': {
-        const [change] = variables.media as { id: string; alt: string }[];
-        if (change!.alt.startsWith('http')) {
+        const [change] = variables.media as { id: string; alt?: string; crop?: unknown }[];
+        if (change!.alt?.startsWith('http')) {
           return {
             productUpdateMedia: {
               userErrors: [
@@ -63,9 +66,7 @@ function photosCore() {
             },
           };
         }
-        media = media.map((each) =>
-          each.id === change!.id ? { ...each, alt: change!.alt } : each,
-        );
+        media = media.map((each) => (each.id === change!.id ? { ...each, ...change } : each));
         return { productUpdateMedia: { userErrors: [] } };
       }
       case 'StagedUploadsCreate':
@@ -193,6 +194,33 @@ describe("A product's photos", () => {
       productId: 'prod_1',
       media: [{ id: 'media_2', alt: 'Blue and red ajrak, folded' }],
     });
+  });
+
+  it('turns a photo taken on its side a quarter at a time, keeping its crop (ADR-658)', async () => {
+    const core = photosCore();
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+
+    await screen.findByRole('button', { name: 'Turn photo 2 a quarter clockwise' });
+    await press('Turn photo 2 a quarter clockwise');
+    const turns = () =>
+      core.sent
+        .filter((each) => each.operation === 'ProductUpdateMedia')
+        .map((each) => (each.variables.media as { crop: unknown }[])[0]!.crop);
+    await waitFor(() =>
+      expect(turns()).toEqual([{ left: 0, top: 0, width: 800, height: 600, turns: 1 }]),
+    );
+    // Turned again from where it was.
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('button', { name: 'Turn photo 2 a quarter clockwise' })
+          .hasAttribute('disabled'),
+      ).toBe(false),
+    );
+    await press('Turn photo 2 a quarter clockwise');
+    await waitFor(() => expect(turns()).toHaveLength(2));
+    expect(turns()[1]).toEqual({ left: 0, top: 0, width: 800, height: 600, turns: 2 });
   });
 
   it('crops the photos to the product in the shape chosen, saying which it left (CAT-21)', async () => {

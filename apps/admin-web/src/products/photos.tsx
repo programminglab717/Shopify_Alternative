@@ -1,4 +1,4 @@
-import { Camera, ImageOff, LoaderCircle, Pencil, Star, Trash2 } from 'lucide-react';
+import { Camera, ImageOff, LoaderCircle, Pencil, RotateCw, Star, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import {
@@ -10,6 +10,7 @@ import {
 } from '../api/operations';
 import { browserFetch } from '../api/client';
 import type {
+  ImageCrop,
   ProductCreateMediaData,
   ProductDeleteMediaData,
   ProductDetail,
@@ -152,6 +153,29 @@ function MediaTile({
   const first = position === 1;
   const [removing, setRemoving] = useState(false);
   const [describing, setDescribing] = useState(false);
+  const update = useAdminMutation<
+    { productUpdateMedia: { userErrors: UserError[] } },
+    { productId: string; media: { id: string; crop: ImageCrop }[] }
+  >(ProductUpdateMediaMutation);
+  // A photo taken on its side is turned a quarter at a time, keeping its crop (ADR-658).
+  const turnable =
+    media.status === 'READY' &&
+    media.mediaContentType === 'IMAGE' &&
+    !!media.width &&
+    !!media.height;
+  const turn = () => {
+    const crop = media.crop ?? {
+      left: 0,
+      top: 0,
+      width: media.width!,
+      height: media.height!,
+      turns: 0,
+    };
+    void update.mutateAsync({
+      productId,
+      media: [{ id: media.id, crop: { ...crop, turns: (crop.turns + 1) % 4 } }],
+    });
+  };
   const url = media.previewImage?.url;
   const at = (width: number) => `${url}${url?.includes('?') ? '&' : '?'}width=${width}`;
   return (
@@ -216,6 +240,17 @@ function MediaTile({
                 disabled={busy}
                 onClick={() => setDescribing(true)}
               />
+              {turnable && (
+                <Button
+                  variant="tertiary"
+                  className="flex-1 px-2"
+                  aria-label={t('photos.turn', { position })}
+                  icon={<RotateCw aria-hidden className="size-5" />}
+                  busy={update.isPending}
+                  disabled={busy}
+                  onClick={turn}
+                />
+              )}
               {!first && (
                 <Button
                   variant="tertiary"

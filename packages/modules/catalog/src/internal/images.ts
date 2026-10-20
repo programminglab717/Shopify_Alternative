@@ -14,14 +14,18 @@ export const IMAGES_PATH = '/images';
 const EXTENSION: Readonly<Record<ImageFormatValue, string>> = { jpeg: 'jpg', png: 'png' };
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const CROP = 'crop-\\d{1,4}-\\d{1,4}-\\d{1,4}-\\d{1,4}';
+const CROP = 'crop-\\d{1,4}-\\d{1,4}-\\d{1,4}-\\d{1,4}(?:-t[1-3])?';
 const IMAGE_PATH = new RegExp(
   `^${IMAGES_PATH}/(${UUID})/(${UUID})/(?:(${CROP})/)?[a-z0-9-]{1,100}\\.(jpg|png)$`,
 );
 
-/** The name of a crop's folder, and of its part of its image's path: "crop-120-0-800-800". */
+/**
+ * The name of a crop's folder, and of its part of its image's path: "crop-120-0-800-800", and
+ * "crop-120-0-800-800-t1" turned a quarter clockwise (ADR-658).
+ */
 export function cropNameOf(crop: MediaCropRecord): string {
-  return `crop-${crop.left}-${crop.top}-${crop.width}-${crop.height}`;
+  const turned = crop.turns ? `-t${crop.turns}` : '';
+  return `crop-${crop.left}-${crop.top}-${crop.width}-${crop.height}${turned}`;
 }
 
 /**
@@ -44,7 +48,11 @@ export function imagePathOf(
 export function shownSizeOf(
   media: Pick<MediaRecord, 'width' | 'height' | 'crop'>,
 ): { width: number; height: number } | null {
-  if (media.crop) return { width: media.crop.width, height: media.crop.height };
+  if (media.crop) {
+    const { width, height, turns } = media.crop;
+    // Turned on its side, its sides swap (ADR-658).
+    return (turns ?? 0) % 2 === 1 ? { width: height, height: width } : { width, height };
+  }
   return media.width === null || media.height === null
     ? null
     : { width: media.width, height: media.height };

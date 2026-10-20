@@ -206,7 +206,8 @@ export class MediaService {
           }
           changes.push(sql`crop_left = ${crop?.left ?? null}, crop_top = ${crop?.top ?? null},
                            crop_width = ${crop?.width ?? null},
-                           crop_height = ${crop?.height ?? null}`);
+                           crop_height = ${crop?.height ?? null},
+                           crop_turns = ${crop?.turns ?? 0}`);
           // Its focal point was of the image shown before.
           if (focalPoints[index] === undefined) changes.push(sql`focal_x = NULL, focal_y = NULL`);
         }
@@ -512,6 +513,11 @@ function cropOf(
     return null;
   }
   const { left, top } = crop;
+  const turns = crop.turns ?? 0;
+  if (!Number.isInteger(turns) || turns < 0 || turns > 3) {
+    check.addMessage(field, 'INVALID', 'Turn an image by 0 to 3 quarter turns');
+    return null;
+  }
   const sides = [crop.width, crop.height];
   if (![left, top, ...sides].every(Number.isInteger) || left < 0 || top < 0) {
     check.addMessage(field, 'INVALID', 'Give the crop in whole pixels from the top left');
@@ -529,8 +535,10 @@ function cropOf(
     check.addMessage(field, 'INVALID', 'One side of a crop may be at most 20 times the other');
     return null;
   }
-  if (left === 0 && top === 0 && crop.width === width && crop.height === height) return null;
-  return { left, top, width: crop.width, height: crop.height };
+  const whole = left === 0 && top === 0 && crop.width === width && crop.height === height;
+  // All of it unturned is the image as it is; turned, it is the whole image's crop (ADR-658).
+  if (whole && turns === 0) return null;
+  return { left, top, width: crop.width, height: crop.height, ...(turns > 0 && { turns }) };
 }
 
 /** A focal point in percent, across and down, to the hundredth. */
@@ -550,5 +558,9 @@ function focalPointOf(
 function sameCrop(a: MediaCropRecord | null, b: MediaCropRecord | null): boolean {
   return a === null || b === null
     ? a === b
-    : a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+    : a.left === b.left &&
+        a.top === b.top &&
+        a.width === b.width &&
+        a.height === b.height &&
+        (a.turns ?? 0) === (b.turns ?? 0);
 }

@@ -181,9 +181,13 @@ export async function queryProducts(
                                    THEN json_build_object('code', m.error_code,
                                                           'message', m.error_message) END,
                      'crop', CASE WHEN m.crop_left IS NOT NULL
-                                  THEN json_build_object('left', m.crop_left, 'top', m.crop_top,
-                                                         'width', m.crop_width,
-                                                         'height', m.crop_height) END,
+                                  THEN jsonb_build_object('left', m.crop_left, 'top', m.crop_top,
+                                                          'width', m.crop_width,
+                                                          'height', m.crop_height)
+                                       -- Turned, it says how far (ADR-658).
+                                       || CASE WHEN m.crop_turns > 0
+                                               THEN jsonb_build_object('turns', m.crop_turns)
+                                               ELSE '{}'::jsonb END END,
                      'focalPoint', CASE WHEN m.focal_x IS NOT NULL
                                         THEN json_build_object('x', m.focal_x, 'y', m.focal_y)
                                    END,

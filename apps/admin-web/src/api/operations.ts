@@ -1045,6 +1045,15 @@ const PRODUCT = /* GraphQL */ `
       mediaErrors {
         message
       }
+      width
+      height
+      crop {
+        left
+        top
+        width
+        height
+        turns
+      }
     }
     variants {
       id

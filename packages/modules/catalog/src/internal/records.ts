@@ -110,6 +110,8 @@ export interface MediaCropRecord {
   top: number;
   width: number;
   height: number;
+  /** Quarter turns clockwise, 1 to 3, after the part is cut (ADR-658); none if absent or 0. */
+  turns?: number | null;
 }
 
 /** A point of an image, in percent of it across and down from its top left. */

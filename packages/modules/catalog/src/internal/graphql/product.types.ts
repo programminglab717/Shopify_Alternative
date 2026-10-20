@@ -155,6 +155,13 @@ export class ImageCrop {
 
   @Field(() => Int)
   height!: number;
+
+  @Field(() => Int, {
+    description:
+      'Quarter turns clockwise, 0 to 3, once the part is cut (ADR-658): turned on its side, the ' +
+      'image shown is `height` wide.',
+  })
+  turns!: number;
 }
 
 @ObjectType({
@@ -839,6 +846,14 @@ export class ImageCropInput {
 
   @Field(() => Int)
   height!: number;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Quarter turns clockwise, 0 to 3, after the part is cut (ADR-658); 0 unless given. The ' +
+      'whole image turned is a crop of all of it with turns.',
+  })
+  turns?: number | null;
 }
 
 @InputType({

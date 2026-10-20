@@ -152,6 +152,7 @@ export const productMedia = catalogSchema.table(
     cropTop: integer('crop_top'),
     cropWidth: integer('crop_width'),
     cropHeight: integer('crop_height'),
+    cropTurns: smallint('crop_turns').notNull().default(0),
     focalX: numeric('focal_x', { precision: 5, scale: 2 }),
     focalY: numeric('focal_y', { precision: 5, scale: 2 }),
     previewSourceUrl: text('preview_source_url'),

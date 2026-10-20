@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-657 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-658 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -665,6 +665,7 @@
 | 655 | Orders a shop's staff take from chats, at its counter or by hand go to Meta's conversions API too where the shop says so, as chat, physical_store or other events matched by the customer's number | Accepted |
 | 656 | An agent going off duty at the Confirmation Desk may hand over the orders still waiting on them, each to whoever else is on duty with the fewest waiting | Accepted |
 | 657 | A shop selling online alone cancels orders never paid after hours rather than days, reminding their customers halfway | Accepted |
+| 658 | A product's photo is turned by quarter turns, after its crop is cut, as part of the crop: a photo taken on its side is turned without being cropped | Accepted |
 
 ---
 
@@ -23137,3 +23138,22 @@
 * **Alternatives:** **Minutes:** a payment started at a gateway may take longer; an hour is the
   least. **One setting in hours:** a shop counting days would type 72 for three; two fields keep
   each shop's way of saying it, the database holding one.
+
+## ADR-658 · A product's photo is turned by quarter turns, after its crop is cut, as part of the crop: a photo taken on its side is turned without being cropped
+
+* **Context:** A crop was a rectangle of the whole image, neither turned nor straightened
+  (ADR-257). Phones' photos the camera did not mark as turned, and shots taken on their side,
+  came up sideways on the storefront, and the shop had to turn them elsewhere and upload them
+  again.
+* **Decision:** A crop takes `turns`, 0 to 3 quarter turns clockwise, applied after the part is
+  cut from the whole image, so the rectangle stays in the whole image's pixels as it was taken and
+  auto-crop's and older crops' stand as they were. The whole image turned is a crop of all of it
+  with turns; unturned, all of it is still no crop. A turned crop is named with its turns
+  ("crop-0-0-800-600-t1"), so it has an address and a clean copy of its own, and an old one goes
+  as replaced crops do (ADR-630). The size an image is shown at swaps its sides when it is on its
+  side, for the storefront's documents and themes. A copy of a product keeps its photos' turns.
+  The admin's photos have a Turn button, a quarter clockwise each tap, keeping the crop.
+* **Consequences:** A photo taken on its side is put right in a tap, without leaving the admin.
+* **Alternatives:** **Turning the whole image's clean copy:** every crop made of it would move,
+  and auto-crop's frames with it. **Any angle, to straighten a tilted shot:** it leaves corners to
+  fill or crop away; left until merchants ask.

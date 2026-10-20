@@ -97,7 +97,9 @@ export function toMedia(record: MediaRecord, handle: string): ProductMedia {
           }),
         ]
       : [],
-    crop: record.crop && Object.assign(new ImageCrop(), record.crop),
+    crop:
+      record.crop &&
+      Object.assign(new ImageCrop(), { ...record.crop, turns: record.crop.turns ?? 0 }),
     externalVideo:
       record.externalVideo &&
       Object.assign(new ExternalVideo(), {
