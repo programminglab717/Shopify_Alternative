@@ -9287,6 +9287,24 @@ const CONVERSATION = /* GraphQL */ `
  * The shop's WhatsApp conversations (MSG-05, ADR-545), the latest written first, and how many have
  * messages unread.
  */
+const CONTACT_MESSAGE = /* GraphQL */ `
+  fragment ContactMessageFields on ContactMessage {
+    id
+    name
+    email
+    phone
+    body
+    fields {
+      name
+      value
+    }
+    page
+    language
+    receivedAt
+    readAt
+  }
+`;
+
 export const ConversationsQuery = /* GraphQL */ `
   query Conversations($first: Int, $after: String, $unread: Boolean, $status: ConversationStatus) {
     conversations(first: $first, after: $after, unread: $unread, status: $status) {
@@ -9301,6 +9319,50 @@ export const ConversationsQuery = /* GraphQL */ `
     conversationsUnreadCount
   }
   ${CONVERSATION}
+`;
+
+/** What shoppers wrote through the online store's contact form, the latest first (ADR-590). */
+export const ContactMessagesQuery = /* GraphQL */ `
+  query ContactMessages($first: Int, $after: String, $unread: Boolean) {
+    contactMessages(first: $first, after: $after, unread: $unread) {
+      nodes {
+        ...ContactMessageFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+    contactMessagesUnreadCount
+  }
+  ${CONTACT_MESSAGE}
+`;
+
+export const ContactMessageMarkReadMutation = /* GraphQL */ `
+  mutation ContactMessageMarkRead($id: ID!, $read: Boolean) {
+    contactMessageMarkRead(id: $id, read: $read) {
+      contactMessage {
+        ...ContactMessageFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONTACT_MESSAGE}
+  ${USER_ERRORS}
+`;
+
+export const ContactMessageDeleteMutation = /* GraphQL */ `
+  mutation ContactMessageDelete($id: ID!) {
+    contactMessageDelete(id: $id) {
+      deletedContactMessageId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 export const ConversationQuery = /* GraphQL */ `

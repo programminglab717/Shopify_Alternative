@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The contact form in the admin's inbox
+
+* **The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an
+  email to answer them, marked read and deleted** ([ADR-590](../architecture/13-decision-log.md#adr-590--the-admins-inbox-has-a-contact-form-tab-what-shoppers-wrote-with-a-call-whatsapp-or-an-email-to-answer-them-marked-read-and-deleted), OS-08).
+* 3646 tests, 6 more: the tab, its ways to answer, and who may act on
+  it.
+
 ### 0edf6fd · The contact form
 
 * **Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept

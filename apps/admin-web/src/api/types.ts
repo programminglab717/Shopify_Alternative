@@ -4479,6 +4479,37 @@ export interface ConversationsData {
   conversationsUnreadCount: number;
 }
 
+/** What a shopper wrote through the online store's contact form (ADR-589). */
+export interface ContactMessageValue {
+  id: string;
+  name: string | null;
+  email: string | null;
+  /** E.164, or masked as the member may see it. */
+  phone: string | null;
+  body: string;
+  fields: { name: string; value: string }[];
+  page: string | null;
+  language: string;
+  receivedAt: string;
+  readAt: string | null;
+}
+
+export interface ContactMessagesData {
+  contactMessages: {
+    nodes: ContactMessageValue[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+  contactMessagesUnreadCount: number;
+}
+
+export interface ContactMessageMarkReadData {
+  contactMessageMarkRead: { contactMessage: ContactMessageValue | null; userErrors: UserError[] };
+}
+
+export interface ContactMessageDeleteData {
+  contactMessageDelete: { deletedContactMessageId: string | null; userErrors: UserError[] };
+}
+
 export interface ConversationData {
   conversation: ConversationValue | null;
 }

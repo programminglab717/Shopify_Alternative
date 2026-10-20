@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { ChevronRight, MessagesSquare } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { ConversationsQuery } from '../api/operations';
 import type {
   ConversationMessageValue,
@@ -18,6 +19,7 @@ import type { MessageKey } from '../i18n/messages';
 import { useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { ContactMessages } from './contact-messages';
 
 const PAGE = 50;
 
@@ -30,7 +32,8 @@ export const READS_INBOX = gate(
 /** Those who answer customers, mark conversations read and close them; marketers only read. */
 export const WORKS_INBOX = gate(['owner', 'manager', 'confirmation_agent'], 'write_conversations');
 
-type InboxTab = 'open' | 'unread' | 'closed';
+/** The conversations' tabs, and the contact form's messages beside them (ADR-590). */
+type InboxTab = 'open' | 'unread' | 'closed' | 'form';
 
 /** The inbox's search: which tab, the open conversations when none. */
 export interface InboxSearch {
@@ -39,12 +42,12 @@ export interface InboxSearch {
 
 export function validateInboxSearch(search: Record<string, unknown>): InboxSearch {
   const tab = search.tab;
-  return tab === 'unread' || tab === 'closed' ? { tab } : {};
+  return tab === 'unread' || tab === 'closed' || tab === 'form' ? { tab } : {};
 }
 
 /** Each tab: its name, what it asks the API for, and what it says when empty. */
 const TABS: Record<
-  InboxTab,
+  Exclude<InboxTab, 'form'>,
   {
     label: MessageKey;
     status: ConversationStatus | null;
@@ -156,12 +159,84 @@ function ConversationRow({
  * are unread. Marketers read it; the rest who see it also answer.
  */
 export function InboxPage() {
+  const { tab = 'open' } = useSearch({ from: '/$shopId/inbox' });
+  return tab === 'form' ? (
+    <InboxFrame tab="form" unreadCount={null}>
+      <ContactMessages />
+    </InboxFrame>
+  ) : (
+    <Conversations tab={tab} />
+  );
+}
+
+/** The inbox's heading and tabs, around the tab shown. */
+function InboxFrame({
+  tab,
+  unreadCount,
+  children,
+}: {
+  tab: InboxTab;
+  unreadCount: number | null;
+  children: ReactNode;
+}) {
+  const { t } = useLocale();
+  const shop = useShop();
+  const navigate = useNavigate();
+  const tabs: [InboxTab, MessageKey][] = [
+    ...(Object.keys(TABS) as Exclude<InboxTab, 'form'>[]).map((each): [InboxTab, MessageKey] => [
+      each,
+      TABS[each].label,
+    ]),
+    ['form', 'inbox.tab.FORM'],
+  ];
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+          {t('inbox.title')}
+        </h1>
+        <p className="text-secondary">
+          {t(tab === 'form' ? 'contactMessages.intro' : 'inbox.intro')}
+          {unreadCount !== null &&
+            unreadCount > 0 &&
+            ` · ${t('inbox.unreadCount', { count: formatCount(unreadCount) })}`}
+        </p>
+      </header>
+      <div role="tablist" className="flex gap-2 overflow-x-auto pb-1">
+        {tabs.map(([each, label]) => (
+          <button
+            key={each}
+            type="button"
+            role="tab"
+            aria-selected={tab === each}
+            onClick={() =>
+              void navigate({
+                to: '/$shopId/inbox',
+                params: { shopId: shop.id },
+                search: each === 'open' ? {} : { tab: each },
+              })
+            }
+            className={`inline-flex min-h-10 shrink-0 items-center rounded-full border px-3 ${
+              tab === each
+                ? 'border-primary bg-primary text-on-primary'
+                : 'border-line bg-surface text-text'
+            }`}
+          >
+            {t(label)}
+          </button>
+        ))}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** The conversations of one of the inbox's tabs, a page at a time. */
+function Conversations({ tab }: { tab: Exclude<InboxTab, 'form'> }) {
   const { t } = useLocale();
   const store = useSessionStore();
   const shop = useShop();
   const timezone = useShopTimezone();
-  const navigate = useNavigate();
-  const { tab = 'open' } = useSearch({ from: '/$shopId/inbox' });
   const { status, unread, none, noneHint } = TABS[tab];
 
   const conversations = useInfiniteQuery({
@@ -182,40 +257,7 @@ export function InboxPage() {
   const unreadCount = conversations.data?.pages[0]?.conversationsUnreadCount ?? 0;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-          {t('inbox.title')}
-        </h1>
-        <p className="text-secondary">
-          {t('inbox.intro')}
-          {unreadCount > 0 && ` · ${t('inbox.unreadCount', { count: formatCount(unreadCount) })}`}
-        </p>
-      </header>
-      <div role="tablist" className="flex gap-2 overflow-x-auto pb-1">
-        {(Object.keys(TABS) as InboxTab[]).map((each) => (
-          <button
-            key={each}
-            type="button"
-            role="tab"
-            aria-selected={tab === each}
-            onClick={() =>
-              void navigate({
-                to: '/$shopId/inbox',
-                params: { shopId: shop.id },
-                search: each === 'open' ? {} : { tab: each },
-              })
-            }
-            className={`inline-flex min-h-10 shrink-0 items-center rounded-full border px-3 ${
-              tab === each
-                ? 'border-primary bg-primary text-on-primary'
-                : 'border-line bg-surface text-text'
-            }`}
-          >
-            {t(TABS[each].label)}
-          </button>
-        ))}
-      </div>
+    <InboxFrame tab={tab} unreadCount={unreadCount}>
       {conversations.isPending ? (
         <Loading label={t('state.loading')} />
       ) : conversations.isError ? (
@@ -255,6 +297,6 @@ export function InboxPage() {
           )}
         </Card>
       )}
-    </div>
+    </InboxFrame>
   );
 }

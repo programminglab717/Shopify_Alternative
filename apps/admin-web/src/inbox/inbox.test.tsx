@@ -378,3 +378,133 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
     ]);
   });
 });
+
+function contactMessage(id: string, extra: object = {}) {
+  return {
+    id,
+    name: 'Ayesha Khan' as string | null,
+    email: null as string | null,
+    phone: '+923001234567' as string | null,
+    body: 'Is the lawn suit back in medium?',
+    fields: [] as { name: string; value: string }[],
+    page: '/pages/contact' as string | null,
+    language: 'en',
+    receivedAt: ago(30),
+    readAt: null as string | null,
+    ...extra,
+  };
+}
+
+/** A fake core with the contact form's messages: marking and deleting change them as it would. */
+function contactCore(role: StaffRole = 'owner', empty = false) {
+  const messages = empty
+    ? []
+    : [
+        contactMessage('cform_1', { fields: [{ name: 'Order number', value: '#1042' }] }),
+        contactMessage('cform_2', {
+          name: null,
+          phone: role === 'marketer' ? '0321 ••••567' : null,
+          email: 'bilal@example.pk',
+          body: 'Do you deliver to Quetta?',
+          readAt: ago(5),
+        }),
+      ];
+  return fakeCore(role, (operation, variables) => {
+    switch (operation) {
+      case 'ContactMessages':
+        return {
+          contactMessages: {
+            nodes: messages,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+          contactMessagesUnreadCount: messages.filter((each) => each.readAt === null).length,
+        };
+      case 'ContactMessageMarkRead': {
+        const found = messages.find((each) => each.id === variables.id)!;
+        found.readAt = variables.read ? ago(0) : null;
+        return { contactMessageMarkRead: { contactMessage: found, userErrors: [] } };
+      }
+      case 'ContactMessageDelete': {
+        messages.splice(
+          messages.findIndex((each) => each.id === variables.id),
+          1,
+        );
+        return {
+          contactMessageDelete: { deletedContactMessageId: variables.id, userErrors: [] },
+        };
+      }
+      default:
+        throw new Error(`unexpected ${operation}`);
+    }
+  });
+}
+
+describe("The inbox's contact form tab (OS-08, ADR-590)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('lists what shoppers wrote with how to answer them, marked read and deleted by those who work the inbox', async () => {
+    const core = contactCore();
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/inbox?tab=form');
+
+    expect(await screen.findByText('Is the lawn suit back in medium?')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Contact form' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(screen.getByText('Ayesha Khan')).toBeTruthy();
+    expect(screen.getByText('New')).toBeTruthy();
+    expect(screen.getByRole('link', { name: '0300 1234567' }).getAttribute('href')).toBe(
+      'tel:+923001234567',
+    );
+    expect(screen.getByRole('link', { name: 'WhatsApp' }).getAttribute('href')).toBe(
+      'https://wa.me/923001234567',
+    );
+    expect(screen.getByText('Order number')).toBeTruthy();
+    expect(screen.getByText('#1042')).toBeTruthy();
+    expect(screen.getAllByText('Sent from /pages/contact')).toHaveLength(2);
+    // One with an email alone and no name.
+    expect(screen.getByText('No name given')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'bilal@example.pk' }).getAttribute('href')).toBe(
+      'mailto:bilal@example.pk',
+    );
+
+    await press('Mark as read');
+    await waitFor(() =>
+      expect(sentOf(core, 'ContactMessageMarkRead')).toEqual([{ id: 'cform_1', read: true }]),
+    );
+    expect(await screen.findAllByRole('button', { name: 'Mark as unread' })).toHaveLength(2);
+
+    const second = screen.getByText('Do you deliver to Quetta?').closest('li')!;
+    fireEvent.click(within(second).getByRole('button', { name: 'Delete' }));
+    expect(within(second).getByText('Delete this message for good?')).toBeTruthy();
+    fireEvent.click(within(second).getByRole('button', { name: 'Delete it' }));
+    await waitFor(() => expect(sentOf(core, 'ContactMessageDelete')).toEqual([{ id: 'cform_2' }]));
+    await waitFor(() => expect(screen.queryByText('Do you deliver to Quetta?')).toBeNull());
+  });
+
+  it('shows a marketer the messages alone, numbers masked and nothing to dial', async () => {
+    const core = contactCore('marketer');
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/inbox?tab=form');
+
+    expect(await screen.findByText('Do you deliver to Quetta?')).toBeTruthy();
+    expect(screen.getByText('0321 ••••567')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: '0321 ••••567' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mark as read' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+  });
+
+  it('says when no shopper has written', async () => {
+    vi.stubGlobal('fetch', contactCore('owner', true).fetcher);
+    renderAdmin('/shop_1/inbox?tab=form');
+    expect(await screen.findByText('No messages from the contact form')).toBeTruthy();
+  });
+});

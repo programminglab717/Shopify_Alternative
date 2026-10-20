@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-589 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-590 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -597,6 +597,7 @@
 | 587 | A signed-in shopper's checkout offers the addresses of their book, each filling in the order's address with a post of its own | Accepted |
 | 588 | The Admin API shows a customer's saved address book, and the admin's customer page lists it, the default first | Accepted |
 | 589 | Shopify's contact form is taken: what a shopper writes from the shop's contact page is kept beside the inbox for its staff, with an email or a mobile number to answer on | Accepted |
+| 590 | The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an email to answer them, marked read and deleted | Accepted |
 
 ---
 
@@ -21713,3 +21714,21 @@
 * **Alternatives:** **Emailing it to the shop, as Shopify does:** few of Hatti's shops read an
   inbox, and the message would leave Hatti's erasure and export. **Into the WhatsApp inbox's
   conversations:** a form opens no WhatsApp window to answer in, and may have only an email.
+
+## ADR-590 · The admin's inbox has a contact form tab: what shoppers wrote, with a call, WhatsApp or an email to answer them, marked read and deleted
+
+* **Context:** The core keeps what shoppers write through the online store's contact form
+  (ADR-589), readable only through the Admin API.
+* **Decision:**
+  * **A "Contact form" tab in the inbox,** beside its conversations' open, unread and closed tabs,
+    for those who read the inbox: each message the latest first, with who wrote (or that no name
+    was given), when, "New" while unread, what they wrote, the form's other fields and the page it
+    was sent from.
+  * **Ways to answer from it:** the number as a link to call and to open WhatsApp with them, and
+    the email as a link to write to them. A number shown masked is neither.
+  * Those who answer customers mark a message read or unread and delete it, asked once more
+    first; marketers only read, as in the inbox. English and Urdu.
+* **Consequences:** A shop reads and answers its contact page's messages where it reads its
+  WhatsApp conversations. Telling staff when one comes, by push, is a later part.
+* **Alternatives:** **A page of its own under Online store:** staff who answer customers look in
+  the inbox, and the forms' messages are customers writing.
