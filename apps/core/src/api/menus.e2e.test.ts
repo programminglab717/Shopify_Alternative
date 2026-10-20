@@ -134,6 +134,8 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
             resourceId: eid.id,
             items: [{ title: 'Ask us', type: 'HTTP', url: 'https://wa.me/923001234567' }],
           },
+          // Narrowed to its products with each tag (ADR-644).
+          { title: 'Eid sale', type: 'CATALOG', tags: ['Eid', 'On Sale'] },
         ],
       },
     );
@@ -149,6 +151,12 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
           url: '/collections/eid-edit',
           resourceId: eid.id,
           items: [{ title: 'Ask us', type: 'HTTP', url: 'https://wa.me/923001234567' }],
+        },
+        {
+          title: 'Eid sale',
+          type: 'CATALOG',
+          url: '/collections/all/eid+on-sale',
+          tags: ['Eid', 'On Sale'],
         },
       ],
     });

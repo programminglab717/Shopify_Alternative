@@ -20,6 +20,7 @@ import {
   allItems,
   checkMenuItems,
   defaultMenuItems,
+  taggedUrl,
   type MenuItemInput,
 } from './menu-items.js';
 import type { MenuItemRecord, MenuItemValue, MenuRecord, Page } from './records.js';
@@ -343,7 +344,11 @@ export class MenuService {
             return { url: item.url, shown: true };
         }
       };
-      return { ...item, ...where(), items: item.items.map(resolve) };
+      const at = where();
+      // Narrowed to the link's tags (ADR-644).
+      const tags = item.tags ?? [];
+      const url = at.url === null ? null : taggedUrl(at.url, tags);
+      return { ...item, ...at, url, tags, items: item.items.map(resolve) };
     };
     return rows.map((row) => ({
       id: row.id,

@@ -6991,7 +6991,9 @@ type MenuItem {
   """The collection, product, page, blog or article it links to."""
   resourceId: ID
 
-  """Empty: menu items do not take tags yet."""
+  """
+  The tags a COLLECTION or CATALOG link narrows to: its url leads to the collection's products with each.
+  """
   tags: [String!]!
   title: String!
   type: MenuItemType!
@@ -7009,7 +7011,7 @@ input MenuItemCreateInput {
   """The collection, product, page, blog or article it links to."""
   resourceId: ID
 
-  """Not available yet: leave it empty."""
+  """Tags a COLLECTION or CATALOG link narrows to, 10 at most."""
   tags: [String!]
   title: String!
   type: MenuItemType!
@@ -7075,7 +7077,7 @@ input MenuItemUpdateInput {
   """The collection, product, page, blog or article it links to."""
   resourceId: ID
 
-  """Not available yet: leave it empty."""
+  """Tags a COLLECTION or CATALOG link narrows to, 10 at most."""
   tags: [String!]
   title: String!
   type: MenuItemType!

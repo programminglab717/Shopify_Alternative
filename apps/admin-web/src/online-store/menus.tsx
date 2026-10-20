@@ -65,6 +65,18 @@ const RESOURCED: readonly MenuItemType[] = [
   'SHOP_POLICY',
 ];
 
+/** The links that narrow to products with some tags (ADR-644). */
+const TAGGED: readonly MenuItemType[] = ['COLLECTION', 'CATALOG'];
+
+/** Tags as typed, comma-separated: each once whatever its case, without blanks. */
+function tagsOf(text: string): string[] {
+  const tags = new Map<string, string>();
+  for (const tag of text.split(',').map((each) => each.trim())) {
+    if (tag !== '' && !tags.has(tag.toLowerCase())) tags.set(tag.toLowerCase(), tag);
+  }
+  return [...tags.values()];
+}
+
 /** A link as the editor holds it: what the core keeps, and what it last showed as leading to. */
 interface Draft {
   key: string;
@@ -73,6 +85,8 @@ interface Draft {
   type: MenuItemType;
   resourceId: string | null;
   url: string;
+  /** Its tags, comma-separated as typed. */
+  tags: string;
   /** Where it led when read, or what was chosen for it since. */
   shown: string | null;
   items: Draft[];
@@ -89,6 +103,7 @@ function draftsOf(links: readonly MenuLink[]): Draft[] {
     type: link.type,
     resourceId: link.resourceId,
     url: link.type === 'HTTP' ? (link.url ?? '') : '',
+    tags: (link.tags ?? []).join(', '),
     shown: link.url,
     items: draftsOf(link.items ?? []),
   }));
@@ -102,6 +117,8 @@ export function linksInput(drafts: readonly Draft[]): Record<string, unknown>[] 
     type: draft.type,
     ...(RESOURCED.includes(draft.type) && { resourceId: draft.resourceId }),
     ...(draft.type === 'HTTP' && { url: draft.url.trim() }),
+    ...(TAGGED.includes(draft.type) &&
+      tagsOf(draft.tags).length > 0 && { tags: tagsOf(draft.tags) }),
     items: linksInput(draft.items),
   }));
 }
@@ -153,6 +170,7 @@ const blank = (): Draft => ({
   type: 'COLLECTION',
   resourceId: null,
   url: '',
+  tags: '',
   shown: null,
   items: [],
 });
@@ -288,6 +306,16 @@ function LinkEditor({
               value={draft.resourceId ?? ''}
               options={choose(choices.policies, 'menus.choosePolicy')}
               onChange={(resourceId) => set({ resourceId: resourceId || null })}
+            />
+          )}
+          {TAGGED.includes(draft.type) && (
+            <TextField
+              label={t('menus.linkTags', { number })}
+              hint={t('menus.linkTagsHint')}
+              dir="auto"
+              className="w-48"
+              value={draft.tags}
+              onChange={(event) => set({ tags: event.target.value })}
             />
           )}
           {draft.type === 'HTTP' && (

@@ -81,7 +81,10 @@ export class MenuItem {
   })
   url!: string | null;
 
-  @Field(() => [String], { description: 'Empty: menu items do not take tags yet.' })
+  @Field(() => [String], {
+    description:
+      "The tags a COLLECTION or CATALOG link narrows to: its url leads to the collection's products with each.",
+  })
   tags!: string[];
 
   @Field(() => [MenuItem], { description: 'Three levels at most.' })
@@ -167,7 +170,10 @@ export class MenuItemCreateInput {
   @Field(() => String, { nullable: true, description: "An HTTP link's address." })
   url?: string | null;
 
-  @Field(() => [String], { nullable: true, description: 'Not available yet: leave it empty.' })
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Tags a COLLECTION or CATALOG link narrows to, 10 at most.',
+  })
   tags?: string[] | null;
 
   @Field(() => [MenuItemCreateInput], { nullable: true })
@@ -197,7 +203,10 @@ export class MenuItemUpdateInput {
   @Field(() => String, { nullable: true, description: "An HTTP link's address." })
   url?: string | null;
 
-  @Field(() => [String], { nullable: true, description: 'Not available yet: leave it empty.' })
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Tags a COLLECTION or CATALOG link narrows to, 10 at most.',
+  })
   tags?: string[] | null;
 
   @Field(() => [MenuItemUpdateInput], { nullable: true })

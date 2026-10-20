@@ -2150,6 +2150,8 @@ export interface MenuLink {
   type: MenuItemType;
   resourceId: string | null;
   url: string | null;
+  /** The tags a collection's or all products' link narrows to (ADR-644). */
+  tags: string[];
   items?: MenuLink[];
 }
 

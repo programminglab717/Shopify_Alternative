@@ -189,8 +189,8 @@ describe.skipIf(!server)('MenuService', () => {
         ['items.0.url', 'BLANK', 'An http link needs a URL'],
       ],
       [
-        { title: 'Tags', type: 'catalog', tags: ['eid'] },
-        ['items.0.tags', 'INVALID', "Tags on menu items aren't available yet"],
+        { title: 'Tags', type: 'page', resourceId: eid.id, tags: ['eid'] },
+        ['items.0.tags', 'INVALID', 'Only collection and all-products links take tags'],
       ],
       [
         { title: 'Theirs', type: 'collection', resourceId: otherShops.id },
@@ -429,6 +429,44 @@ describe.skipIf(!server)('MenuService', () => {
         }),
       ),
     ).toEqual([['items.0.resourceId', 'NOT_FOUND', 'Blog not found']]);
+  });
+
+  it("narrows a collection's link to its products with each of some tags (ADR-644)", async () => {
+    const footer = await byHandle('footer');
+    const saved = unwrap(
+      await f.menus.update(f.a, footer.id, {
+        title: 'Footer menu',
+        items: [
+          { title: 'Eid sale', type: 'collection', resourceId: eid.id, tags: [' Sale ', 'New In'] },
+          { title: 'Lawn', type: 'catalog', tags: ['لان', 'sale', 'Sale', ''] },
+          { title: 'Home', type: 'frontpage', tags: [] },
+        ],
+      }),
+    );
+    // Kept as given, trimmed, once each; the links lead to the collection's tag pages.
+    expect(saved.items.map((item) => item.tags)).toEqual([['Sale', 'New In'], ['لان', 'sale'], []]);
+    expect(outline(saved.items)).toEqual([
+      'Eid sale collection /collections/eid-edit/sale+new-in',
+      `Lawn catalog /collections/all/${encodeURIComponent('لان')}+sale`,
+      'Home frontpage /',
+    ]);
+    const read = (await f.db.tenant(f.a.shopId, (tx) => f.menus.menusOf(tx, f.a.shopId))).find(
+      (menu) => menu.handle === 'footer',
+    )!;
+    expect(outline(read.items)).toEqual(outline(saved.items));
+    // Ten at most, each a handle the storefront can match.
+    const tagged = (tags: string[]) => [
+      { title: 'Eid', type: 'collection', resourceId: eid.id, tags },
+    ];
+    const update = async (items: MenuItemInput[]) =>
+      errorsOf(await f.menus.update(f.a, footer.id, { title: 'Footer menu', items }));
+    expect(await update(tagged(Array.from({ length: 11 }, (_, i) => `t${i}`)))).toEqual([
+      ['items.0.tags', 'TOO_MANY', 'A link takes 10 tags at most'],
+    ]);
+    expect(await update(tagged(['sale', '!!', 'x'.repeat(256)]))).toEqual([
+      ['items.0.tags.1', 'INVALID', 'A tag needs a letter or a number'],
+      ['items.0.tags.2', 'TOO_LONG', 'A tag is 255 characters at most'],
+    ]);
   });
 
   it('links to the search page and to policies by ID, a policy cleared gone (ADR-640)', async () => {

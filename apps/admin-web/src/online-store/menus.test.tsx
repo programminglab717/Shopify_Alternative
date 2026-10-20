@@ -10,7 +10,7 @@ const link = (
   type: string,
   extra: Record<string, unknown> = {},
   items: unknown[] = [],
-) => ({ id, title, type, resourceId: null, url: null, items, ...extra });
+) => ({ id, title, type, resourceId: null, url: null, tags: [], items, ...extra });
 
 const MAIN = {
   id: 'menu_1',
@@ -217,6 +217,32 @@ describe("The online store's menus", () => {
         'Someone saved this menu after you opened it. Open it again to see their changes, then make yours.',
       ),
     ).toBeTruthy();
+  });
+
+  it('narrows a collection or all products link to some tags, a link of each else without (ADR-644)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/menu_1');
+
+    await screen.findByLabelText('Link 2: title');
+    expect(screen.queryByLabelText('Link 1: tags')).toBeNull();
+    type('Link 2: tags', ' Sale, new in, sale,, ');
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    type('Link 3: title', 'Lawn');
+    fireEvent.change(screen.getByLabelText('Link 3: goes to'), { target: { value: 'CATALOG' } });
+    type('Link 3: tags', 'لان');
+    fireEvent.click(screen.getByRole('button', { name: 'Save the menu' }));
+
+    await waitFor(() =>
+      expect(sentOf(fake, 'MenuUpdate')).toMatchObject({
+        items: [
+          { id: 'mi_1', type: 'FRONTPAGE' },
+          { id: 'mi_2', type: 'COLLECTION', resourceId: 'col_1', tags: ['Sale', 'new in'] },
+          { title: 'Lawn', type: 'CATALOG', tags: ['لان'] },
+        ],
+      }),
+    );
+    expect((sentOf(fake, 'MenuUpdate')!.items as unknown[])[0]).not.toHaveProperty('tags');
   });
 
   it('makes a menu with a handle from its title and a link to a product found by name', async () => {

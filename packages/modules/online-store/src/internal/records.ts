@@ -69,11 +69,14 @@ export interface MenuItemValue {
   resourceId: string | null;
   /** An http link's address. */
   url: string | null;
+  /** Tags a collection's or all products' link narrows to (ADR-644); none on older links. */
+  tags?: string[];
   items: MenuItemValue[];
 }
 
 /** A menu's item, with where it leads now. */
-export interface MenuItemRecord extends Omit<MenuItemValue, 'items'> {
+export interface MenuItemRecord extends Omit<MenuItemValue, 'items' | 'tags'> {
+  tags: string[];
   /** Its address on the storefront, or the http link's; null if what it linked to is gone. */
   url: string | null;
   /**

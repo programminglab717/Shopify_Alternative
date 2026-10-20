@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-643 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-644 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -651,6 +651,7 @@
 | 641 | Hatti Base shows a menu three levels deep: links under a link open below it across the page, and in a drawer on phones, with no script | Accepted |
 | 642 | A menu saved as its editor read it is not saved over: menuUpdate takes ifUnchangedSince, the menu's updatedAt, and a save made since is refused as STALE | Accepted |
 | 643 | A collection's page narrows to its products with each of some tags, at /collections/{handle}/{tag+tag} as Shopify's, the tags given to themes as current_tags | Accepted |
+| 644 | A menu's link to a collection or to all products may narrow it to its products with each of some tags, as Shopify's MenuItem tags, leading to the collection's tag page | Accepted |
 
 ---
 
@@ -22868,3 +22869,20 @@
 * **Alternatives:** **Tags as a filter parameter:** Shopify's themes link the path, not a
   parameter. **Any of the tags rather than each:** Shopify's narrows by each, and a shop
   wanting either makes a collection.
+
+## ADR-644 · A menu's link to a collection or to all products may narrow it to its products with each of some tags, as Shopify's MenuItem tags, leading to the collection's tag page
+
+* **Context:** Shopify's `MenuItem` has `tags`: a `COLLECTION` or `CATALOG` link with tags leads
+  to the collection's products with each of them, so a shop's "Lawn on sale" is one menu link.
+  Hatti's menus refused tags (status shortcut 35), and before ADR-643 the storefront had no
+  page to send them to.
+* **Decision:** A `COLLECTION` or `CATALOG` link takes up to ten tags, each trimmed and kept as
+  typed, once each as the storefront matches it (`Sale` and `sale` alike), each with a letter or
+  a number and 255 characters at most; any other link taking tags is refused. The link leads to
+  `/collections/{handle}/{tag+tag}`, each tag as its handle, Urdu ones escaped, so themes get
+  it as Shopify's `link.url`. Links kept before have none. The admin's menu editor has a tags
+  field, comma-separated, on collection and all-products links, in English and Urdu.
+* **Consequences:** A shop links a collection's sale or its new arrivals from a menu without
+  making a collection of them. A tag no product carries leads to an empty page, as Shopify's.
+* **Alternatives:** **Tags as an http link's address:** they would break with the collection's
+  handle; a tagged link follows it.

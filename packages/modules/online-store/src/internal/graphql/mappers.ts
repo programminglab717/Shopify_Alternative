@@ -142,7 +142,7 @@ function toMenuItem(record: MenuItemRecord): MenuItem {
     type: record.type.toUpperCase() as MenuItemType,
     resourceId: record.resourceId ? toPublicId(kind, record.resourceId) : null,
     url: record.url,
-    tags: [],
+    tags: record.tags,
     items: record.items.map(toMenuItem),
   });
 }

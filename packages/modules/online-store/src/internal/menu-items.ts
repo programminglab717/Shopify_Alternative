@@ -12,6 +12,9 @@ export const MENU_LIMITS = {
   title: 255,
   handle: 100,
   url: 2048,
+  /** Tags on a collection's link (ADR-644), as many as the storefront narrows by. */
+  tags: 10,
+  tag: 255,
   /** The items as JSON, under the 256 KB the database keeps, which it counts with spaces. */
   bytes: 200 * 1024,
 } as const;
@@ -51,6 +54,9 @@ const RESOURCED: ReadonlySet<string> = new Set([
   'article',
   'shop_policy',
 ]);
+
+/** The links that may narrow what they lead to by tags (ADR-644). */
+const TAGGED: ReadonlySet<string> = new Set(['collection', 'catalog']);
 
 /**
  * An http link's address: a path on the storefront, or a web, mail or phone address, with nothing
@@ -130,8 +136,37 @@ export function checkMenuItems(
             'phone address',
         );
       }
-      if (item.tags?.length) {
-        check.add([...at, 'tags'], 'INVALID', "on menu items aren't available yet");
+      // Tags narrow a collection's link to its products with each of them (ADR-644).
+      // Each once, as the storefront matches them: Sale and sale alike.
+      const tags = distinctTags(item.tags ?? []);
+      if (tags.length > 0 && !TAGGED.has(type)) {
+        check.addMessage(
+          [...at, 'tags'],
+          'INVALID',
+          'Only collection and all-products links take tags',
+        );
+      } else if (tags.length > MENU_LIMITS.tags) {
+        check.addMessage(
+          [...at, 'tags'],
+          'TOO_MANY',
+          `A link takes ${MENU_LIMITS.tags} tags at most`,
+        );
+      } else {
+        tags.forEach((tag, index) => {
+          if (tag.length > MENU_LIMITS.tag) {
+            check.addMessage(
+              [...at, 'tags', String(index)],
+              'TOO_LONG',
+              `A tag is ${MENU_LIMITS.tag} characters at most`,
+            );
+          } else if (tagHandle(tag) === '') {
+            check.addMessage(
+              [...at, 'tags', String(index)],
+              'INVALID',
+              'A tag needs a letter or a number',
+            );
+          }
+        });
       }
       let id = newId();
       if (item.id) {
@@ -156,6 +191,7 @@ export function checkMenuItems(
         type: type as MenuItemTypeValue,
         resourceId: resourced ? resourceId : null,
         url: url || null,
+        ...(TAGGED.has(type) && tags.length > 0 && { tags }),
         items: depth < MENU_LIMITS.levels ? walk(children, [...at, 'items'], depth + 1) : [],
       };
     });
@@ -166,6 +202,35 @@ export function checkMenuItems(
     check.addMessage(['items'], 'TOO_LONG', "A menu's items take 200 KB at most");
   }
   return values;
+}
+
+/**
+ * A tag as the storefront matches it, as Shopify's `handleize`: "Eid Sale" gives eid-sale, and
+ * Urdu keeps its letters.
+ */
+export function tagHandle(tag: string): string {
+  return tag
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Where a collection's link with tags leads: its address and its tags, as /collections/eid/sale+new. */
+export function taggedUrl(url: string, tags: readonly string[]): string {
+  return tags.length > 0
+    ? `${url}/${tags.map((tag) => encodeURIComponent(tagHandle(tag))).join('+')}`
+    : url;
+}
+
+/** Tags trimmed, without blanks, each once as the storefront matches them, the first kept. */
+function distinctTags(given: readonly string[]): string[] {
+  const tags = new Map<string, string>();
+  for (const tag of given.map((each) => each.trim())) {
+    const key = tagHandle(tag) || tag;
+    if (tag !== '' && !tags.has(key)) tags.set(key, tag);
+  }
+  return [...tags.values()];
 }
 
 /** Every item of a tree, at every level. */

@@ -4933,6 +4933,7 @@ const MENU_ITEM = /* GraphQL */ `
     type
     resourceId
     url
+    tags
   }
 `;
 
