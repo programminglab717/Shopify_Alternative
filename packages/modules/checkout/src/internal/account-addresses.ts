@@ -80,6 +80,30 @@ export async function addressesIn(
 }
 
 /**
+ * The books of the customers `customerIds`, in the caller's transaction (ADR-588), as
+ * {@link addressesIn} reads each: by customer, none for one who keeps none.
+ */
+export async function addressBooksIn(
+  tx: Tx,
+  shopId: string,
+  customerIds: readonly string[],
+): Promise<Map<string, AccountAddressRecord[]>> {
+  const books = new Map<string, AccountAddressRecord[]>();
+  if (customerIds.length === 0) return books;
+  const { rows } = await tx.execute<AddressRow & { customer_id: string }>(sql`
+    SELECT customer_id, id, address, is_default, created_at, updated_at
+      FROM checkout.account_addresses
+     WHERE shop_id = ${shopId} AND customer_id = ANY(${sql.param([...customerIds])}::uuid[])
+     ORDER BY is_default DESC, updated_at DESC, id DESC`);
+  for (const row of rows) {
+    const book = books.get(row.customer_id) ?? [];
+    book.push(toRecord(row));
+    books.set(row.customer_id, book);
+  }
+  return books;
+}
+
+/**
  * Saves `input` to the customer `customerId`'s book, in the caller's transaction: a new address,
  * or the one `id` names, changed. The first saved, or one asked to be, becomes the default. Null
  * after adding to `check` what was wrong: the address, a book already full, or an address not in

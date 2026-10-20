@@ -454,6 +454,26 @@ export function CustomerPage() {
               </ul>
             </FormSection>
           )}
+          {customer.savedAddresses.length > 0 && (
+            <FormSection title={t('customer.savedAddresses')}>
+              <ul className="flex flex-col gap-2">
+                {customer.savedAddresses.map((address, index) => (
+                  <li key={index}>
+                    <Card className="flex items-start justify-between gap-2 p-3">
+                      <address className="not-italic" dir="auto">
+                        {address.formatted.join(', ')}
+                      </address>
+                      {index === 0 && (
+                        <span className="shrink-0 rounded-full bg-canvas px-2 text-[length:var(--hatti-type-body-sm-size)] font-medium text-primary">
+                          {t('customer.defaultAddress')}
+                        </span>
+                      )}
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+            </FormSection>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           {wide && <Contact customer={customer} />}

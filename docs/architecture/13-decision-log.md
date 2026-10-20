@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-587 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-588 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -595,6 +595,7 @@
 | 585 | A signed-in shopper's checkout opens filled in from their default address, or with the number they signed in with | Accepted |
 | 586 | A shopper's session signed in to their account proves its number at checkout, where the shop asks for a code | Accepted |
 | 587 | A signed-in shopper's checkout offers the addresses of their book, each filling in the order's address with a post of its own | Accepted |
+| 588 | The Admin API shows a customer's saved address book, and the admin's customer page lists it, the default first | Accepted |
 
 ---
 
@@ -21660,3 +21661,24 @@
   book is read once more for each page with a session.
 * **Alternatives:** **A select list in the order's form, filled by a script:** the page works
   without scripts, as the rest of checkout does.
+
+## ADR-588 · The Admin API shows a customer's saved address book, and the admin's customer page lists it, the default first
+
+* **Context:** Shoppers keep an address book with their account (ADR-583), but the shop's staff
+  saw only where their orders went (`Customer.addresses`), not the addresses they saved, as
+  Shopify's admin shows a customer's.
+* **Decision:**
+  * **`Customer.savedAddresses` and `Customer.defaultAddress`** on the Admin API, under
+    `read_customers`: the book as the storefront keeps it, the default first, then the latest
+    changed, each a `MailingAddress` as an order's address is, its phone masked from staff who may
+    not see numbers. The checkout module, which keeps the books, resolves them on the customers
+    module's type, one query per page of customers by a request loader, as the orders module
+    resolves a customer's orders.
+  * **The admin's customer page** lists them under "Saved on the storefront", the default marked,
+    in English and Urdu, after the addresses their orders went to.
+  * Staff read the book and change nothing in it: it is the shopper's.
+* **Consequences:** Staff confirming an order see where a customer said they live, and an app
+  reads it as Shopify's apps read a customer's addresses.
+* **Alternatives:** **One list of both, orders' and saved:** where orders went is a fact of
+  delivery, the book what the shopper keeps; Shopify keeps only the book, but cash on delivery
+  makes the orders' addresses worth keeping apart.

@@ -478,6 +478,45 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
     expect(blank.json()).toMatchObject({
       errors: [{ field: 'name' }, { field: 'phone' }, { field: 'address1' }, { field: 'city' }],
     });
+    // The shop's staff see the book on the customer, the default first (ADR-588).
+    const customers = await graphql(`
+      {
+        customers(first: 10) {
+          nodes {
+            phone
+            savedAddresses {
+              address1
+              city
+              province
+              phone
+            }
+            defaultAddress {
+              address1
+            }
+          }
+        }
+      }
+    `);
+    expect(
+      customers.customers.nodes.find((c: { phone: string }) => c.phone === '+923001234567'),
+    ).toEqual({
+      phone: '+923001234567',
+      savedAddresses: [
+        {
+          address1: 'Office 3, Shahrah-e-Faisal',
+          city: 'Karachi',
+          province: 'Sindh',
+          phone: '+923001234567',
+        },
+        {
+          address1: 'House 12, Street 4',
+          city: 'Karachi',
+          province: 'Sindh',
+          phone: '+923001234567',
+        },
+      ],
+      defaultAddress: { address1: 'Office 3, Shahrah-e-Faisal' },
+    });
     // A checkout the signed-in shopper opens is filled in from the default address, offering
     // the book; posted with the session, another fills it in (ADR-585, ADR-587).
     const {

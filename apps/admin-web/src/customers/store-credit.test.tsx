@@ -26,6 +26,7 @@ const CUSTOMER = {
   emailMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
   erasureScheduledAt: null,
   addresses: [],
+  savedAddresses: [],
   orders: { nodes: [] },
 };
 

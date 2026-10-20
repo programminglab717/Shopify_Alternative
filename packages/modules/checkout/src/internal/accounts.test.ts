@@ -1219,6 +1219,28 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(rows).toEqual([{ name: 'Elsewhere' }]);
   });
 
+  it("reads many customers' books at once for staff, the default first, and no other shop's (ADR-588)", async () => {
+    const jazz = await signIn(JAZZ);
+    const ayesha = (await order(JAZZ)).customerId;
+    await saved(jazz, typed('Home'));
+    await saved(jazz, typed('Office', { default: true }));
+    const zong = await signIn(ZONG);
+    const bilal = (await order(ZONG)).customerId;
+    await saved(zong, typed('Shop'));
+    const nobody = newId();
+
+    const books = await f.accounts.addressBooks(f.a.shopId, [ayesha, bilal, nobody]);
+    const shown = (id: string) =>
+      books.get(id)?.map((record) => (record.isDefault ? '*' : '') + record.address.name);
+    expect([shown(ayesha), shown(bilal), shown(nobody)]).toEqual([
+      ['*Office', 'Home'],
+      ['*Shop'],
+      undefined,
+    ]);
+    expect((await f.accounts.addressBooks(f.b.shopId, [ayesha, bilal])).size).toBe(0);
+    expect((await f.accounts.addressBooks(f.a.shopId, [])).size).toBe(0);
+  });
+
   it("fills a signed-in shopper's checkout from their default address, or their number (ADR-585)", async () => {
     const token = await signIn(JAZZ);
     const formOf = async (account: string | null, tenant: TenantContext = f.a) => {

@@ -1503,6 +1503,9 @@ export const CustomerQuery = /* GraphQL */ `
       addresses {
         formatted
       }
+      savedAddresses {
+        formatted
+      }
       orders(first: 20) {
         nodes {
           id

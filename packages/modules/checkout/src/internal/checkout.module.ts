@@ -21,6 +21,7 @@ import { CheckoutCustomerData } from './customer-data.js';
 import { DeliveryService } from './delivery.service.js';
 import { AbandonedCheckoutResolver } from './graphql/abandoned.resolver.js';
 import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
+import { CustomerAddressesResolver } from './graphql/customer-addresses.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
 import { GiftOptionsResolver } from './graphql/gift-options.resolver.js';
 import { CheckoutMarketingResolver } from './graphql/marketing.resolver.js';
@@ -60,6 +61,8 @@ import { TrustBadgeService } from './trust-badge.service.js';
     AbandonedCheckoutResolver,
     // Shoppers' accounts on the storefront, signed in to by a code (CUS-02, ADR-570).
     AccountService,
+    // The address books they keep, on the Admin API's customers (ADR-588).
+    CustomerAddressesResolver,
     // Sends the codes that prove shoppers' numbers (CHK-09) and sign them in.
     MessagesService,
     // Browsers' proofs of numbers in customers' erasure and exports (ADR-199).

@@ -3590,6 +3590,11 @@ type Customer {
     first: Int
   ): ConsentEventConnection!
   createdAt: DateTime!
+
+  """
+  The address they chose as their default on the storefront, if they saved any.
+  """
+  defaultAddress: MailingAddress
   deliveryHistory: CustomerDeliveryHistory!
 
   """The name, or the number when there is none: "0300 1234567"."""
@@ -3630,6 +3635,11 @@ type Customer {
   Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where marketing goes. Staff other than owners and managers see it masked, "0300 ••••567"; confirmation agents reveal it with customerPhoneReveal, which is logged.
   """
   phone: String!
+
+  """
+  The addresses they saved with their account on the storefront, the default first, then the latest changed.
+  """
+  savedAddresses: [MailingAddress!]!
   smsMarketingConsent: CustomerMarketingConsent!
 
   """

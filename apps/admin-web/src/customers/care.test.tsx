@@ -35,6 +35,7 @@ function customer(id: string, name: string, erasureScheduledAt: string | null = 
     emailMarketingConsent: { marketingState: 'NOT_SUBSCRIBED' },
     erasureScheduledAt,
     addresses: [],
+    savedAddresses: [],
     orders: { nodes: [] },
   };
 }

@@ -27,6 +27,10 @@ function ayesha(phone: string) {
     emailMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
     erasureScheduledAt: null,
     addresses: [{ formatted: ['House 12', 'Karachi'] }],
+    savedAddresses: [
+      { formatted: ['Office 3, Shahrah-e-Faisal', 'Karachi'] },
+      { formatted: ['House 12', 'Karachi'] },
+    ],
     orders: {
       nodes: [
         {
@@ -116,6 +120,11 @@ describe('Customers in the admin', () => {
 
     await screen.findByText('Parcels they took: 2 of 3.');
     expect(screen.getByText('#1001')).toBeTruthy();
+    // The book they keep on the storefront, the default first (ADR-588).
+    expect(screen.getByText('Saved on the storefront')).toBeTruthy();
+    expect(screen.getByText('Office 3, Shahrah-e-Faisal, Karachi').parentElement?.textContent).toBe(
+      'Office 3, Shahrah-e-Faisal, KarachiDefault',
+    );
     expect(screen.queryByRole('link', { name: 'Call' })).toBeNull();
     await press('Show number');
     const call = await screen.findByRole('link', { name: 'Call' });

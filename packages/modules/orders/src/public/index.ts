@@ -355,10 +355,16 @@ export {
   type ParcelChargeEstimate,
 } from '../internal/parcel-estimates.js';
 export { OrdersModule } from '../internal/orders.module.js';
-export { Fulfillment, Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
+export {
+  Fulfillment,
+  MailingAddress,
+  Order,
+  OrderAgreement,
+  OrderEvent,
+} from '../internal/graphql/order.types.js';
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
 export { SalesInterval } from '../internal/graphql/sales-report.types.js';
-export { toOrder } from '../internal/graphql/mappers.js';
+export { hidesPhones, toAddress, toOrder } from '../internal/graphql/mappers.js';
 export {
   NO_ORDERS,
   type CustomerOrderStats,

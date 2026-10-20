@@ -657,6 +657,8 @@ export interface CustomerDetail {
   /** When their data will be erased, as they asked; null while none is waiting. */
   erasureScheduledAt: string | null;
   addresses: { formatted: string[] }[];
+  /** The address book they keep with their account on the storefront, the default first (ADR-588). */
+  savedAddresses: { formatted: string[] }[];
   orders: {
     nodes: {
       id: string;

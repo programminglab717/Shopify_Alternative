@@ -46,10 +46,12 @@ import type {
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
+  addressBooksIn,
   addressesIn,
   deleteAddressIn,
   saveAddressIn,
   toAccountAddress,
+  type AccountAddressRecord,
 } from './account-addresses.js';
 import { ACCOUNT_DATA, ACCOUNT_DATA_TYPE, accountDataKey } from './account-data.js';
 import {
@@ -460,6 +462,18 @@ export class AccountService {
       if (!session.customerId) return [];
       return (await addressesIn(tx, shopId, session.customerId)).map(toAccountAddress);
     });
+  }
+
+  /**
+   * The address books of the customers `customerIds`, for staff (ADR-588): by customer, the
+   * default first, then the latest changed; none for one who keeps none.
+   */
+  async addressBooks(
+    shopId: string,
+    customerIds: readonly string[],
+  ): Promise<Map<string, AccountAddressRecord[]>> {
+    if (customerIds.length === 0) return new Map();
+    return this.db.tenant(shopId, (tx) => addressBooksIn(tx, shopId, customerIds));
   }
 
   /**
