@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Orders keep the promised delivery day
+
+* **An order placed through checkout keeps the day the page said to expect delivery by, which its
+  page shows while it is still to come, and staff see** ([ADR-595](../architecture/13-decision-log.md#adr-595--an-order-placed-through-checkout-keeps-the-day-the-page-said-to-expect-delivery-by-which-its-page-shows-while-it-is-still-to-come-and-staff-see), CHK-05).
+* 3660 tests, 3 more: the day kept on placing, the order's page, and the
+  admin's.
+
 ### d91cf9a · The day to expect delivery by
 
 * **Checkout says the day to expect delivery by, the shop's working days for the city counted

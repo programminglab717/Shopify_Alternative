@@ -9673,6 +9673,11 @@ type Order {
   The customer's link, where they follow the order and act on it while they may; null without one. orderLinkCreate makes one.
   """
   customerLink: OrderCustomerLink
+
+  """
+  The day checkout said to expect its delivery by, YYYY-MM-DD: the shop's working days for the city counted past Sundays and Pakistan's public holidays (CHK-05, ADR-595); null where it said none, as for orders staff take.
+  """
+  deliveryExpectedOn: String
   deliveryMethod: OrderDeliveryMethod!
 
   """The discount codes it was placed with, as the shop wrote them."""

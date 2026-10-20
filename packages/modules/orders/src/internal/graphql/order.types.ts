@@ -1360,6 +1360,15 @@ export class Order {
   })
   giftMessage!: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The day checkout said to expect its delivery by, YYYY-MM-DD: the shop's working days for " +
+      "the city counted past Sundays and Pakistan's public holidays (CHK-05, ADR-595); null " +
+      'where it said none, as for orders staff take.',
+  })
+  deliveryExpectedOn!: string | null;
+
   @Field(() => [String])
   tags!: string[];
 

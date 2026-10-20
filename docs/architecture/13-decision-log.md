@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-594 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-595 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -602,6 +602,7 @@
 | 592 | A shopper chooses how much of their store credit checkout spends, and a signed-in shopper sees their number's balance there, spending it still asking what proves the number | Accepted |
 | 593 | Hatti Base puts a WhatsApp button on every page, its message naming the product and variant, or the collection, the shopper was looking at, with its link | Accepted |
 | 594 | Checkout says the day to expect delivery by, the shop's working days for the city counted past Sundays and Pakistan's public holidays | Accepted |
+| 595 | An order placed through checkout keeps the day the page said to expect delivery by, which its page shows while it is still to come, and staff see | Accepted |
 
 ---
 
@@ -21817,3 +21818,22 @@
   holiday the committee sights a day off from expected moves a date by a day.
 * **Alternatives:** **The date on product and cart pages:** those pages are cached for every
   shopper, and the date would go stale; they keep the days.
+
+## ADR-595 · An order placed through checkout keeps the day the page said to expect delivery by, which its page shows while it is still to come, and staff see
+
+* **Context:** Checkout says the day to expect delivery by (ADR-594), but the order kept none
+  of it: its page could not say it again, and staff answering a customer who asks where it is
+  could not see what they were told.
+* **Decision:**
+  * **The order keeps the day** (migration 0277), worked out as the page works it out, from the
+    day it is placed: none for an order to collect, or one the page said none for, or one staff
+    take.
+  * **Its page says it** while delivery is still to come: from placing until it is delivered,
+    and not once cancelled or coming back.
+  * **The Admin API gives it** on `Order.deliveryExpectedOn`, and the admin's order page says it
+    beside the note.
+* **Consequences:** A customer sees the same day on their order's page as at checkout; staff see
+  what the customer was told. A late parcel stays late on the page: the day is a promise, not
+  re-estimated.
+* **Alternatives:** **Working the day out again whenever the page is read:** it would move with
+  the shop's settings and with the days that pass, and no longer be what the customer was told.

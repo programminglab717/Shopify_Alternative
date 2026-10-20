@@ -274,6 +274,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     bankAccount: record.bankAccount && toBankAccount(record.bankAccount),
     note: record.note,
     giftMessage: record.giftMessage,
+    deliveryExpectedOn: record.deliveryExpectedOn,
     tags: record.tags,
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
     mergedInto: record.mergedInto

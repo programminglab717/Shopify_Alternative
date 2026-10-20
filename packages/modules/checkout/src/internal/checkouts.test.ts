@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import type { TenantContext } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { addPkWorkingDays, pkDayOf } from '@hatti/pk';
 import { checkoutPagePath, type CartActionName, type CartJson } from '@hatti/storefront-api';
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -15,6 +16,7 @@ import {
   type CheckoutForm,
   type CheckoutView,
 } from './checkout.service.js';
+import { expectedDeliveryOn } from './delivery.js';
 import { checkouts } from './schema.js';
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
 
@@ -445,6 +447,25 @@ describe.skipIf(!server)('CheckoutService', () => {
     );
     expect(carts.rows).toEqual([{ discount_codes: [] }]);
     expect((await f.outbox()).map((event) => event.event_type)).toContain('discount_code.redeemed');
+  });
+
+  it('keeps on the order the day the page said to expect delivery by (ADR-595)', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '250',
+        days: { min: 2, max: 4 },
+        zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '150', days: { min: 1, max: 2 } }],
+      }),
+    );
+    const { token } = await lawnCart();
+    const { secret } = await started(token);
+    const page = open(await f.checkouts.view(secret));
+    const order = placedOrder(await f.checkouts.place(secret, page.shown, FORM));
+    // Karachi's two working days, from the day it is in Pakistan.
+    expect(order.deliveryExpectedOn).toBe(addPkWorkingDays(pkDayOf(new Date()), 2));
+    expect(order.deliveryExpectedOn).toBe(
+      expectedDeliveryOn(page.delivery, 'Karachi', page.today!, page.cart.items),
+    );
   });
 
   it("takes the shop's automatic discounts without a code, and keeps their titles on the order (ADR-515)", async () => {

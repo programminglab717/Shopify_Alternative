@@ -1511,6 +1511,17 @@ function preorderWords(shipsOn: string): Words {
   return { en: `Pre-order: ships by ${day}`, ur: `پیشگی آرڈر: ${day} تک روانہ ہوگا` };
 }
 
+/** The day delivery is expected by, YYYY-MM-DD (ADR-595): "Thursday 22 October". */
+function expectedByWords(day: string): Words {
+  const words = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(`${day}T00:00:00Z`));
+  return { en: `Expected by ${words}`, ur: `${words} تک پہنچنے کی توقع` };
+}
+
 /** The items and what they come to, down to what is paid at the door or by transfer. */
 function summary(shown: ShownOrder): Html {
   const row = (label: Words, value: string, className = '') =>
@@ -1555,6 +1566,10 @@ function summary(shown: ShownOrder): Html {
         </tr>`;
       })}
     </table>
+    ${
+      // The day checkout said to expect it by, while it is still to come (ADR-595).
+      shown.deliveryExpectedOn && paragraphs(expectedByWords(shown.deliveryExpectedOn), 'small')
+    }
     ${
       // The words to go with it as a gift (ADR-413), as the customer wrote them.
       shown.giftMessage &&

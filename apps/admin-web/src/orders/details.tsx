@@ -1,4 +1,4 @@
-import { Gift } from 'lucide-react';
+import { CalendarClock, Gift } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -14,6 +14,7 @@ import { useMe } from '../auth/context';
 import { can, gate, hasCapability, permits } from '../auth/permissions';
 import { formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import { shipsOnWords } from '../products/preorder';
 import { parseTags, TextArea } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
@@ -250,7 +251,7 @@ export function Timeline({ order, timezone }: { order: OrderDetail; timezone: st
 
 /** The order's note and tags (ORD-02), changed by those who work orders. */
 export function NoteAndTags({ order }: { order: OrderDetail }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const shop = useShop();
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState(order.note ?? '');
@@ -300,6 +301,14 @@ export function NoteAndTags({ order }: { order: OrderDetail }) {
 
   return (
     <div className="flex flex-col gap-2">
+      {order.deliveryExpectedOn && (
+        <p className="flex items-center gap-2">
+          <CalendarClock aria-hidden className="size-4 text-secondary" />
+          {t('details.deliveryExpected', {
+            date: shipsOnWords(order.deliveryExpectedOn, locale),
+          })}
+        </p>
+      )}
       {order.giftMessage && (
         <div className="rounded-control border border-line px-3 py-2">
           <p className="flex items-center gap-2 font-medium">

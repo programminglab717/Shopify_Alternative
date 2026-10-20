@@ -902,6 +902,23 @@ describe.skipIf(!server)('Order links', () => {
     expect(cancelled.kind === 'order' && cancelled.order.agreement).toBeNull();
   });
 
+  it('says the day checkout said to expect delivery by, while it is still to come (ADR-595)', async () => {
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    expect(orderLinkPage(await shownOn(token)).html).not.toContain('Expected by');
+    await f.admin.query(
+      `UPDATE orders.orders SET delivery_expected_on = '2026-10-22' WHERE id = '${order.id}'`,
+    );
+    const view = await shownOn(token);
+    expect(view.order.deliveryExpectedOn).toBe('2026-10-22');
+    const page = orderLinkPage(view).html;
+    expect(page).toContain('Expected by Thursday 22 October');
+    expect(page).toContain('Thursday 22 October تک پہنچنے کی توقع');
+    // Not once it is no longer coming.
+    unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    expect(orderLinkPage(await shownOn(token)).html).not.toContain('Expected by');
+  });
+
   it('shows the address to correct, as it is or as the customer typed it', async () => {
     const order = await f.order(f.a, [kurta], {
       shippingAddress: { ...ADDRESS, name: 'Ayesha "Ash" <Khan>' },

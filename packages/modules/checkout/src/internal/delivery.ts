@@ -1,6 +1,6 @@
 import type { InputChecker } from '@hatti/api';
 import type { CurrencyCode } from '@hatti/money';
-import { findCity } from '@hatti/pk';
+import { addPkWorkingDays, findCity } from '@hatti/pk';
 
 /** What a shop charges to deliver an order (ADR-043), in minor units. */
 export interface DeliverySettingsRecord {
@@ -91,6 +91,22 @@ export function deliveryDays(
   if (!name) return city ? settings.days : deliveryDaysRange(settings);
   const zone = settings.zones.find((each) => each.cities.includes(name));
   return zone?.days ?? settings.days;
+}
+
+/**
+ * The day to expect delivery to `city` by (ADR-594), YYYY-MM-DD: the most of the city's working
+ * days counted from `today` past Sundays and Pakistan's public holidays. Null without a city, or
+ * days the shop said, or while an item waits on its pre-order, whose day says more.
+ */
+export function expectedDeliveryOn(
+  settings: DeliverySettingsRecord,
+  city: string,
+  today: string,
+  items: readonly { preorderShipsOn?: string | null }[],
+): string | null {
+  if (city.trim() === '' || items.some((item) => item.preorderShipsOn)) return null;
+  const days = deliveryDays(settings, city);
+  return days ? addPkWorkingDays(today, days.max) : null;
 }
 
 /**

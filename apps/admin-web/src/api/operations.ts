@@ -196,6 +196,7 @@ export const OrderQuery = /* GraphQL */ `
       }
       note
       giftMessage
+      deliveryExpectedOn
       tags
       phone
       email

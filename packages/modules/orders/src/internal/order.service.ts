@@ -218,6 +218,8 @@ export interface OrderToPlace {
   note: string;
   /** The message to go with it as a gift, checked (CHK-16, ADR-413); none when left out. */
   giftMessage?: string | null;
+  /** The day checkout said to expect delivery by (ADR-595), YYYY-MM-DD; none when left out. */
+  deliveryExpectedOn?: string | null;
   tags: string[];
   /**
    * What its customer agreed to, when they place it themselves: through checkout (ADR-057), or by
@@ -811,6 +813,7 @@ export class OrderService {
         locationId: location.value.id,
         note: order.note,
         giftMessage: giftMessageOf(order.giftMessage),
+        deliveryExpectedOn: order.deliveryExpectedOn ?? null,
         tags: order.tags,
         searchText: searchTextOf(address, email),
         discountCodes: order.discountCodes ?? [],

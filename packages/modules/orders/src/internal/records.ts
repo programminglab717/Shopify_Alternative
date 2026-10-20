@@ -345,6 +345,8 @@ export interface OrderRecord {
   note: string;
   /** The message to go with it as a gift (CHK-16, ADR-413); null for none. */
   giftMessage: string | null;
+  /** The day checkout said to expect delivery by (ADR-595), YYYY-MM-DD; null where it said none. */
+  deliveryExpectedOn: string | null;
   tags: string[];
   cancelReason: CancelReasonValue | null;
   /** The order it was merged into, cancelled as `merged` (ADR-132), by its ID and number. */

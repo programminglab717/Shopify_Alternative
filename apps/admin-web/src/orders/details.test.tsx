@@ -308,6 +308,21 @@ describe("An order's everyday edits, on its page", () => {
     expect(within(plain).queryByText('Gift message')).toBeNull();
   });
 
+  it('shows the day checkout told the customer to expect delivery by (ADR-595)', async () => {
+    vi.stubGlobal('fetch', core('packer', order({ deliveryExpectedOn: '2026-10-22' })).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const notes = await screen.findByRole('region', { name: 'Note and tags' });
+    expect(
+      within(notes).getByText(/^Checkout told the customer to expect it by .*22.*2026$/),
+    ).toBeTruthy();
+    cleanup();
+
+    vi.stubGlobal('fetch', core('packer').fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const plain = await screen.findByRole('region', { name: 'Note and tags' });
+    expect(within(plain).queryByText(/expect it by/)).toBeNull();
+  });
+
   it('leaves the address as it is once a parcel shipped, and edits to those who work orders', async () => {
     vi.stubGlobal(
       'fetch',

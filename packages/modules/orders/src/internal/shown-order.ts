@@ -5,7 +5,7 @@ import { maskPkMobile } from '@hatti/pk';
 import { taxByRate, type DraftTax } from './order-tax.js';
 import type { DraftOrderRecord, LineBundle, OrderRecord } from './records.js';
 import { itemName, transferOwed } from './rules.js';
-import type { StoredAddressValue } from './schema.js';
+import type { OrderStageValue, StoredAddressValue } from './schema.js';
 
 /**
  * What a customer's page shows of a draft or an order: its items, what they come to, and where
@@ -25,6 +25,11 @@ export interface ShownOrder {
   }[];
   /** The message to go with it as a gift (ADR-413); a draft has none. */
   giftMessage?: string | null;
+  /**
+   * The day checkout said to expect delivery by (ADR-595), while it is still to come: none once
+   * delivered, cancelled or coming back, and a draft has none.
+   */
+  deliveryExpectedOn?: string | null;
   /** Minor units. */
   subtotal: bigint;
   discount: bigint;
@@ -102,6 +107,17 @@ export function shownOfDraft(
   };
 }
 
+/** The stages of an order whose delivery is still to come. */
+const AWAITED_STAGES: ReadonlySet<OrderStageValue> = new Set([
+  'needs_confirmation',
+  'needs_review',
+  'awaiting_payment',
+  'to_pack',
+  'to_book',
+  'partially_fulfilled',
+  'in_transit',
+]);
+
 export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = []): ShownOrder {
   const cashOnDelivery = order.paymentMethod === 'cash_on_delivery';
   // What is still owed: an order marked paid before it arrives has nothing left to pay. Of it,
@@ -115,6 +131,7 @@ export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = [
     currency: order.currency,
     lines: order.lines,
     giftMessage: order.giftMessage,
+    deliveryExpectedOn: AWAITED_STAGES.has(order.stage) ? order.deliveryExpectedOn : null,
     subtotal: order.subtotal,
     discount: order.discount,
     transferDiscount: order.transferDiscount,

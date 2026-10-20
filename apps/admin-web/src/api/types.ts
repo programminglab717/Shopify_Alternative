@@ -253,6 +253,11 @@ export interface OrderDetail {
   note: string;
   /** The words to go with it as a gift (ADR-413); absent where a fake core leaves it out. */
   giftMessage?: string | null;
+  /**
+   * The day checkout told its customer to expect delivery by (ADR-595); absent where a fake core
+   * leaves it out.
+   */
+  deliveryExpectedOn?: string | null;
   tags: string[];
   phone: string | null;
   email: string | null;

@@ -35,7 +35,6 @@ import {
 import {
   PK_CITIES,
   PK_PROVINCES,
-  addPkWorkingDays,
   areaSuggestions,
   findCity,
   maskPkMobile,
@@ -68,7 +67,12 @@ import {
   type PickupPoint,
   type RecallState,
 } from './checkout.service.js';
-import { deliveryDays, type DeliveryDays, type DeliverySettingsRecord } from './delivery.js';
+import {
+  deliveryDays,
+  expectedDeliveryOn,
+  type DeliveryDays,
+  type DeliverySettingsRecord,
+} from './delivery.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
 import { checkoutTotals } from './totals.js';
 
@@ -1098,6 +1102,8 @@ function cartSummary(
   const charge = totals.delivery;
   // How long delivery takes to the city typed, or wherever it goes until one is (ADR-235).
   const days = deliveryDays(delivery, city.trim() === '' ? null : city);
+  // The day to expect it by, once the city is known (ADR-594).
+  const expected = today && expectedDeliveryOn(delivery, city, today, cart.items);
   const { onDelivery, fee, off, advance } = pay;
   // As placing the order works it out: on the items after what is taken off them, and on
   // delivery and the fee where the shop's include it.
@@ -1202,15 +1208,7 @@ function cartSummary(
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}
     ${days && paragraphs(deliveryDaysWords(days), 'small muted')}
-    ${
-      // The day to expect it by, once the city is known: past Sundays and Pakistan's holidays, as
-      // couriers deliver; none while an item waits on its pre-order.
-      days &&
-      today &&
-      city.trim() !== '' &&
-      !cart.items.some((item) => item.preorderShipsOn) &&
-      paragraphs(expectedByWords(addPkWorkingDays(today, days.max)), 'small')
-    }
+    ${expected && paragraphs(expectedByWords(expected), 'small')}
     ${
       cart.note !== '' &&
       html`<p class="small muted">

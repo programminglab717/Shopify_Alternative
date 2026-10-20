@@ -85,7 +85,11 @@ import {
   type CodRulesRecord,
 } from './cod-rules.js';
 import { codRulesIn } from './cod-rules.service.js';
-import { highestDeliveryCharge, type DeliverySettingsRecord } from './delivery.js';
+import {
+  expectedDeliveryOn,
+  highestDeliveryCharge,
+  type DeliverySettingsRecord,
+} from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
 import { giftOptionsIn } from './gift-options.service.js';
 import { marketingTicked, marketingWording } from './marketing.js';
@@ -1169,6 +1173,10 @@ export class CheckoutService {
           note: orderNoteOf(view.cart),
           // A message to go with it as a gift, where the page asked for one (ADR-413).
           giftMessage: view.gift?.messages ? (form.giftMessage ?? null) : null,
+          // The day the page said to expect delivery by (ADR-595); none to collect it.
+          deliveryExpectedOn: pickupAt
+            ? null
+            : expectedDeliveryOn(view.delivery, address.city, pkDayOf(new Date()), view.cart.items),
           tags: [],
           agreement: {
             policyVersions: view.shop.policies.map((policy) => policy.versionId),

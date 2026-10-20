@@ -6,6 +6,7 @@ import { Database } from '@hatti/db';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { MessagesService } from '@hatti/messaging/public';
 import { OrderService } from '@hatti/orders/public';
+import { addPkWorkingDays, pkDayOf } from '@hatti/pk';
 import {
   StorefrontApiClient,
   cartPath,
@@ -517,6 +518,12 @@ describe.skipIf(!server)('Checkouts', () => {
         { policy: { type: 'REFUND_POLICY', body } },
       );
     await refundPolicy('<p>7 days.</p>');
+    // Delivery takes two to three working days, which the order keeps as a day (ADR-595).
+    await admin.query(
+      `INSERT INTO checkout.delivery_settings (shop_id, min_days, max_days) VALUES ($1, 2, 3)
+       ON CONFLICT (shop_id) DO UPDATE SET min_days = 2, max_days = 3`,
+      [shopA],
+    );
 
     const secret = (await checkout()).split('/').at(-1)!;
     const shown = await app.inject({
@@ -560,9 +567,13 @@ describe.skipIf(!server)('Checkouts', () => {
     await refundPolicy('<p>14 days.</p>');
     const { data } = await gql(`{
       orders(first: 1) {
-        nodes { agreement { agreedAt ip userAgent policies { id type title body } } }
+        nodes {
+          deliveryExpectedOn
+          agreement { agreedAt ip userAgent policies { id type title body } }
+        }
       }
     }`);
+    expect(data.orders.nodes[0].deliveryExpectedOn).toBe(addPkWorkingDays(pkDayOf(new Date()), 3));
     expect(data.orders.nodes[0].agreement).toEqual({
       agreedAt: expect.any(String),
       ip: '203.0.113.7',
