@@ -2847,11 +2847,12 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       session = await stale(opened.tokens.accessToken);
       expect((await both.reauthenticationOptions(session)).methods).toEqual(['totp']);
       later();
+      // Each started only once the last is refused, none left to reject unawaited.
       for (const refused of [
-        both.sendReauthenticationCode(session, {}, client()),
-        both.reauthenticate(session, { googleIdToken: own }, client()),
+        () => both.sendReauthenticationCode(session, {}, client()),
+        () => both.reauthenticate(session, { googleIdToken: own }, client()),
       ]) {
-        expect(await authError(refused)).toMatchObject({
+        expect(await authError(refused())).toMatchObject({
           code: 'INVALID_METHOD',
           message: 'Confirm with your passkey or authenticator app: your account has one',
         });
