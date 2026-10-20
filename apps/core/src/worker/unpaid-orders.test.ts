@@ -178,4 +178,18 @@ describe.skipIf(!server)('Orders never paid (ADR-168)', () => {
     await sweeps.start(60_000).stop();
     expect(await statusOf(a, another)).toBe('cancelled');
   });
+
+  it('cancels them after the hours a shop selling online alone says (ADR-657)', async () => {
+    // Shop B, which cancelled none, now cancels them six hours on: its old one goes too.
+    unwrap(await new OrderSettingsService(database).update(b, { cancelUnpaidAfterHours: 6 }));
+    const [yesterday, now] = [await unpaid(b, 1), await unpaid(b, 0)];
+    expect(await sweeps.sweep()).toEqual({ reminded: 0, cancelled: 2 });
+    expect(await statusOf(b, yesterday)).toBe('cancelled');
+    expect(await statusOf(b, now)).toBe('open');
+    // Seven hours on, the one placed now has gone the same way, reminded at none of them.
+    expect(await sweeps.sweep(new Date(Date.now() + 7 * 3_600_000))).toEqual({
+      reminded: 0,
+      cancelled: 1,
+    });
+  });
 });

@@ -42,12 +42,17 @@ const CANCELLATIONS: readonly CustomerCancellation[] = ['UNTIL_PACKED', 'UNTIL_C
 
 const CALLS: readonly ConfirmationCalls[] = ['OFF', 'HIGH_VALUE', 'ALL'];
 
+/** Unpaid orders wait days, or hours for a shop selling online alone (ADR-657). */
+const UNPAID_UNITS = ['days', 'hours'] as const;
+type UnpaidUnit = (typeof UNPAID_UNITS)[number];
+
 const LABELS: Partial<Record<string, MessageKey>> = {
   callingHours: 'orderPolicies.callingHours',
   opens: 'orderPolicies.opens',
   closes: 'orderPolicies.closes',
   firstCallMinutes: 'orderPolicies.firstCall',
   cancelUnpaidAfterDays: 'orderPolicies.unpaidDays',
+  cancelUnpaidAfterHours: 'orderPolicies.unpaidDays',
   cancelUnreachableAfterDays: 'orderPolicies.unreachableDays',
   highValue: 'orderPolicies.highValue',
   holdAt: 'orderPolicies.holdAt',
@@ -67,6 +72,7 @@ function orderInputOf(state: {
   waits: boolean;
   share: boolean;
   unpaid: string;
+  unpaidUnit: UnpaidUnit;
   unreachable: string;
   cancellation: CustomerCancellation;
   upsell: boolean;
@@ -80,7 +86,8 @@ function orderInputOf(state: {
     firstCallMinutes: wholeOrNone(state.firstCall),
     deskWaitsForReminder: state.waits,
     shareNewOrders: state.share,
-    cancelUnpaidAfterDays: wholeOrNone(state.unpaid),
+    cancelUnpaidAfterDays: state.unpaidUnit === 'days' ? wholeOrNone(state.unpaid) : null,
+    cancelUnpaidAfterHours: state.unpaidUnit === 'hours' ? wholeOrNone(state.unpaid) : null,
     cancelUnreachableAfterDays: wholeOrNone(state.unreachable),
     customerCancellation: state.cancellation,
     // Offered at no percentage given is offered at its price (ADR-438).
@@ -100,7 +107,10 @@ function stateOf(settings: OrderSettings) {
     firstCall: settings.firstCallMinutes === null ? '' : String(settings.firstCallMinutes),
     waits: settings.deskWaitsForReminder,
     share: settings.shareNewOrders ?? false,
-    unpaid: settings.cancelUnpaidAfterDays === null ? '' : String(settings.cancelUnpaidAfterDays),
+    unpaid: String(settings.cancelUnpaidAfterHours ?? settings.cancelUnpaidAfterDays ?? ''),
+    unpaidUnit: ((settings.cancelUnpaidAfterHours ?? null) !== null
+      ? 'hours'
+      : 'days') as UnpaidUnit,
     unreachable:
       settings.cancelUnreachableAfterDays === null
         ? ''
@@ -262,14 +272,27 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
 
       <FormSection title={t('orderPolicies.cancelling')} hint={t('orderPolicies.cancellingHint')}>
         <Pair>
-          <TextField
-            label={t('orderPolicies.unpaidDays')}
-            hint={t('orderPolicies.unpaidDaysHint')}
-            inputMode="numeric"
-            ltr
-            value={state.unpaid}
-            onChange={(event) => set({ unpaid: event.target.value })}
-          />
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <TextField
+                label={t('orderPolicies.unpaidDays')}
+                hint={t('orderPolicies.unpaidDaysHint')}
+                inputMode="numeric"
+                ltr
+                value={state.unpaid}
+                onChange={(event) => set({ unpaid: event.target.value })}
+              />
+            </div>
+            <SelectField<UnpaidUnit>
+              label={t('orderPolicies.unpaidUnit')}
+              value={state.unpaidUnit}
+              options={UNPAID_UNITS.map((unit) => ({
+                value: unit,
+                label: t(`orderPolicies.unpaidUnit.${unit}` as MessageKey),
+              }))}
+              onChange={(unpaidUnit) => set({ unpaidUnit })}
+            />
+          </div>
           <TextField
             label={t('orderPolicies.unreachableDays')}
             hint={t('orderPolicies.unreachableDaysHint')}

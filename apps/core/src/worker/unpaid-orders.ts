@@ -1,17 +1,18 @@
 import { Database } from '@hatti/db';
 import type { Logger } from '@hatti/logger';
-import { OrderService, UNPAID_LIMITS } from '@hatti/orders/public';
+import { OrderService, UNPAID_LIMITS, type UnpaidWait } from '@hatti/orders/public';
 import { paymentsUnderwayIn } from '@hatti/payments/public';
 import { sql } from 'drizzle-orm';
 import { repeat } from './repeat.js';
 
 /**
- * Cancels orders never paid (ADR-168): for each shop that says after how many days, the orders
- * still waiting for their payment by transfer or online, or their advance, that long after they
- * were placed, their stock let go; but not one with a receipt waiting to be checked, nor one with
- * a payment started online in the last day, which its gateway may still take. A day before, each
- * order's customer is reminded once (ADR-174). The shops are found with the system role, which
- * sees every shop; each order is reminded or cancelled in its shop's own transaction.
+ * Cancels orders never paid (ADR-168): for each shop that says after how many days, or hours
+ * (ADR-657), the orders still waiting for their payment by transfer or online, or their advance,
+ * that long after they were placed, their stock let go; but not one with a receipt waiting to be
+ * checked, nor one with a payment started online in the last day, which its gateway may still
+ * take. A day before, or halfway through a wait of a day or less, each order's customer is
+ * reminded once (ADR-174). The shops are found with the system role, which sees every shop; each
+ * order is reminded or cancelled in its shop's own transaction.
  */
 export class UnpaidOrders {
   constructor(
@@ -23,22 +24,24 @@ export class UnpaidOrders {
   /** One sweep of every shop that cancels them: how many orders it reminded and cancelled. */
   async sweep(at: Date = new Date()): Promise<{ reminded: number; cancelled: number }> {
     const { rows: shops } = await this.database.system((tx) =>
-      tx.execute<{ shop_id: string; days: number }>(sql`
-        SELECT shop_id, cancel_unpaid_after_days AS days
+      tx.execute<{ shop_id: string; days: number | null; hours: number | null }>(sql`
+        SELECT shop_id, cancel_unpaid_after_days AS days, cancel_unpaid_after_hours AS hours
           FROM orders.order_settings
-         WHERE cancel_unpaid_after_days IS NOT NULL`),
+         WHERE cancel_unpaid_after_days IS NOT NULL OR cancel_unpaid_after_hours IS NOT NULL`),
     );
     const since = new Date(at.getTime() - UNPAID_LIMITS.paymentUnderwayMs);
     let reminded = 0;
     let cancelled = 0;
     for (const shop of shops) {
+      // Days, or hours for a shop selling online alone (ADR-657).
+      const wait: UnpaidWait = shop.hours !== null ? { hours: shop.hours } : shop.days!;
       const underway = (orderIds: string[]) =>
         this.database.tenant(shop.shop_id, (tx) =>
           paymentsUnderwayIn(tx, shop.shop_id, orderIds, since),
         );
       try {
-        const told = await this.orders.remindUnpaid(shop.shop_id, shop.days, at, underway);
-        const count = await this.orders.cancelUnpaid(shop.shop_id, shop.days, at, underway);
+        const told = await this.orders.remindUnpaid(shop.shop_id, wait, at, underway);
+        const count = await this.orders.cancelUnpaid(shop.shop_id, wait, at, underway);
         if (told + count > 0) {
           this.logger?.info(
             { shopId: shop.shop_id, reminded: told, cancelled: count },

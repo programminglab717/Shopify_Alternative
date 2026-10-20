@@ -54,6 +54,9 @@ export class OrderSettingsResolver {
       ...(input.cancelUnpaidAfterDays !== undefined && {
         cancelUnpaidAfterDays: input.cancelUnpaidAfterDays,
       }),
+      ...(input.cancelUnpaidAfterHours !== undefined && {
+        cancelUnpaidAfterHours: input.cancelUnpaidAfterHours,
+      }),
       ...(input.upsellPercentOff !== undefined && { upsellPercentOff: input.upsellPercentOff }),
       ...(input.creditBackOnReturn !== undefined &&
         input.creditBackOnReturn !== null && { creditBackOnReturn: input.creditBackOnReturn }),
@@ -85,6 +88,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     deskWaitsForReminder: record.deskWaitsForReminder,
     cancelUnreachableAfterDays: record.cancelUnreachableAfterDays,
     cancelUnpaidAfterDays: record.cancelUnpaidAfterDays,
+    cancelUnpaidAfterHours: record.cancelUnpaidAfterHours,
     upsellPercentOff: record.upsellPercentOff,
     creditBackOnReturn: record.creditBackOnReturn,
     confirmationCalls: record.confirmationCalls.toUpperCase() as ConfirmationCalls,

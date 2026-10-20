@@ -6927,6 +6927,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     firstCallMinutes
     deskWaitsForReminder
     cancelUnpaidAfterDays
+    cancelUnpaidAfterHours
     cancelUnreachableAfterDays
     customerCancellation
     upsellPercentOff

@@ -291,6 +291,7 @@ export interface OrderSettingsUpdatedPayload {
   deskWaitsForReminder: boolean;
   cancelUnreachableAfterDays: number | null;
   cancelUnpaidAfterDays: number | null;
+  cancelUnpaidAfterHours: number | null;
   /** The post-purchase offer's percentage off (ADR-438); null for no offer. */
   upsellPercentOff: number | null;
   creditBackOnReturn: boolean;

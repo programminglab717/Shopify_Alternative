@@ -112,6 +112,14 @@ export class OrderSettings {
   @Field(() => Int, {
     nullable: true,
     description:
+      'Hours instead of days, for a shop selling online alone (ADR-657): one or the other is ' +
+      'set at most; null for never.',
+  })
+  cancelUnpaidAfterHours!: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
       "The percentage off at which a cash-on-delivery order's page offers its customer a " +
       'product the shop pairs with what they bought, added with a tap and paid at the door, ' +
       'until it is packed (MKT-09, ADR-438); null for no offer, 0 for its price.',
@@ -178,8 +186,11 @@ export class OrderSettingsInput {
   @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
   cancelUnreachableAfterDays?: number | null;
 
-  @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
+  @Field(() => Int, { nullable: true, description: '1 to 30; null for never. Clears the hours.' })
   cancelUnpaidAfterDays?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 72; null for never. Clears the days.' })
+  cancelUnpaidAfterHours?: number | null;
 
   @Field(() => Int, { nullable: true, description: '0 to 50; null for no offer.' })
   upsellPercentOff?: number | null;

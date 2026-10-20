@@ -300,6 +300,7 @@ export {
   type OrderToPlace,
   type OrderUpdateInput,
   type Placement,
+  type UnpaidWait,
 } from '../internal/order.service.js';
 export {
   OrderLinkService,

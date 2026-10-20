@@ -2699,9 +2699,12 @@ const en = {
   'orderPolicies.cancelling': 'Cancelling',
   'orderPolicies.cancellingHint':
     'Orders cancelled for you, their stock let go. Leave a field blank to never cancel them.',
-  'orderPolicies.unpaidDays': 'Unpaid orders after (days)',
+  'orderPolicies.unpaidDays': 'Unpaid orders after',
   'orderPolicies.unpaidDaysHint':
-    'Waiting for a transfer, online payment or advance, with no receipt to check. 1 to 30.',
+    'Waiting for a transfer, online payment or advance, with no receipt to check. 1 to 30 days, or 1 to 72 hours if you sell online alone.',
+  'orderPolicies.unpaidUnit': 'In',
+  'orderPolicies.unpaidUnit.days': 'days',
+  'orderPolicies.unpaidUnit.hours': 'hours',
   'orderPolicies.unreachableDays': 'Unreachable customers after (days)',
   'orderPolicies.unreachableDaysHint': 'Three calls unanswered. 1 to 30.',
   'orderPolicies.customerCancels': "Customers may cancel through their order's page",
@@ -7998,9 +8001,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.cancelling': 'منسوخی',
   'orderPolicies.cancellingHint':
     'آپ کی طرف سے منسوخ ہونے والے آرڈرز، ان کا اسٹاک چھوڑ دیا جاتا ہے۔ کبھی منسوخ نہ کرنے کے لیے خانہ خالی چھوڑ دیں۔',
-  'orderPolicies.unpaidDays': 'بغیر ادائیگی آرڈرز اتنے دن بعد',
+  'orderPolicies.unpaidDays': 'بغیر ادائیگی آرڈرز اتنی دیر بعد',
   'orderPolicies.unpaidDaysHint':
-    'ٹرانسفر، آن لائن ادائیگی یا ایڈوانس کے انتظار میں، جانچنے کو کوئی رسید نہیں۔ 1 سے 30۔',
+    'ٹرانسفر، آن لائن ادائیگی یا ایڈوانس کے انتظار میں، جانچنے کو کوئی رسید نہیں۔ 1 سے 30 دن، یا اگر آپ صرف آن لائن بیچتے ہیں تو 1 سے 72 گھنٹے۔',
+  'orderPolicies.unpaidUnit': 'اکائی',
+  'orderPolicies.unpaidUnit.days': 'دن',
+  'orderPolicies.unpaidUnit.hours': 'گھنٹے',
   'orderPolicies.unreachableDays': 'رابطے میں نہ آنے والے کسٹمرز اتنے دن بعد',
   'orderPolicies.unreachableDaysHint': 'تین کالز کا جواب نہیں۔ 1 سے 30۔',
   'orderPolicies.customerCancels': 'کسٹمرز اپنے آرڈر کے پیج سے منسوخ کر سکتے ہیں',

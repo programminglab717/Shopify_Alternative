@@ -94,7 +94,7 @@ describe('Order policies', () => {
     type('Calls end', '10:00');
     fireEvent.click(screen.getByLabelText(/^Wait for WhatsApp first/));
     type('Unreachable customers after (days)', '5');
-    type('Unpaid orders after (days)', '');
+    type('Unpaid orders after', '');
     fireEvent.click(screen.getByLabelText(/^Until they confirm it/));
 
     fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
@@ -117,6 +117,24 @@ describe('Order policies', () => {
       },
     });
     expect(sentOf(fake, 'OrderRiskSettingsUpdate')).toEqual([]);
+  });
+
+  it('cancels unpaid orders after hours instead of days, for a shop selling online alone (ADR-657)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    expect(((await screen.findByLabelText('Unpaid orders after')) as HTMLInputElement).value).toBe(
+      '3',
+    );
+    type('Unpaid orders after', '6');
+    fireEvent.change(screen.getByLabelText('In'), { target: { value: 'hours' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    expect(sentOf(fake, 'OrderSettingsUpdate').at(-1)).toEqual({
+      input: { cancelUnpaidAfterDays: null, cancelUnpaidAfterHours: 6 },
+    });
+    expect((screen.getByLabelText('In') as HTMLSelectElement).value).toBe('hours');
   });
 
   it('offers a paired product after the purchase at a percentage off, and offers none again (ADR-438)', async () => {

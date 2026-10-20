@@ -10790,6 +10790,11 @@ type OrderSettings {
   cancelUnpaidAfterDays: Int
 
   """
+  Hours instead of days, for a shop selling online alone (ADR-657): one or the other is set at most; null for never.
+  """
+  cancelUnpaidAfterHours: Int
+
+  """
   Days after an order was placed when, its customer unreachable (three calls unanswered), it is cancelled and its stock let go, by a sweep every few minutes; null for never.
   """
   cancelUnreachableAfterDays: Int
@@ -10835,8 +10840,11 @@ input OrderSettingsInput {
   """null for any time."""
   callingHours: CallingHoursInput
 
-  """1 to 30; null for never."""
+  """1 to 30; null for never. Clears the hours."""
   cancelUnpaidAfterDays: Int
+
+  """1 to 72; null for never. Clears the days."""
+  cancelUnpaidAfterHours: Int
 
   """1 to 30; null for never."""
   cancelUnreachableAfterDays: Int

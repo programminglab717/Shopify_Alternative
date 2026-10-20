@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-656 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-657 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -664,6 +664,7 @@
 | 654 | Agents go on duty at the Confirmation Desk for a shift of hours, and where the shop says so each order placed that needs a call is given to the one on duty with the fewest waiting | Accepted |
 | 655 | Orders a shop's staff take from chats, at its counter or by hand go to Meta's conversions API too where the shop says so, as chat, physical_store or other events matched by the customer's number | Accepted |
 | 656 | An agent going off duty at the Confirmation Desk may hand over the orders still waiting on them, each to whoever else is on duty with the fewest waiting | Accepted |
+| 657 | A shop selling online alone cancels orders never paid after hours rather than days, reminding their customers halfway | Accepted |
 
 ---
 
@@ -23116,3 +23117,23 @@
 * **Alternatives:** **Handing over by themselves when a shift lapses:** a sweep would move orders
   an agent may still be calling past the hour; left until shops ask. **Back to no one:** the
   orders would wait for someone to take them, which is what the desk's sharing is there to avoid.
+
+## ADR-657 · A shop selling online alone cancels orders never paid after hours rather than days, reminding their customers halfway
+
+* **Context:** Orders never paid were cancelled after 1 to 30 days (ADR-168), their customers
+  reminded a day before (ADR-174). A shop selling online alone, where an order is paid at once or
+  not at all, held stock for a whole day at least for orders no one would pay.
+* **Decision:** The shop's order settings take `cancelUnpaidAfterHours`, 1 to 72, beside
+  `cancelUnpaidAfterDays`: one or the other at most, setting either clearing the other and both
+  at once refused, the database checking it too. The worker's sweep passes the shop's wait, days
+  or hours, to the orders module, which cancels as before and says so on the timeline ("not paid
+  in 6 hours"). The reminder goes a day before as it did, and no sooner than twelve hours after
+  the order was placed, or halfway through a wait of a day or less, so a day's wait still reminds
+  at twelve hours and six hours' at three. A payment started
+  online in the last day still holds an order off. The admin's order policies take the number
+  with its unit, days or hours.
+* **Consequences:** Stock held by an order no one pays comes back within hours for shops that
+  want it to.
+* **Alternatives:** **Minutes:** a payment started at a gateway may take longer; an hour is the
+  least. **One setting in hours:** a shop counting days would type 72 for three; two fields keep
+  each shop's way of saying it, the database holding one.

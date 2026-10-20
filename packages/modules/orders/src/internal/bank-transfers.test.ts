@@ -309,6 +309,56 @@ describe.skipIf(!server)('Bank transfer', () => {
     });
   });
 
+  it('cancels the orders never paid after hours, for a shop selling online alone, reminding them halfway (ADR-657)', async () => {
+    unwrap(await f.bankTransfer.update(f.a, { enabled: true, account: TYPED }));
+    unwrap(await f.orderSettings.update(f.a, { cancelUnpaidAfterDays: 2 }));
+    // Hours clear the days, and the other way round; both at once are refused.
+    expect(unwrap(await f.orderSettings.update(f.a, { cancelUnpaidAfterHours: 6 }))).toMatchObject({
+      cancelUnpaidAfterDays: null,
+      cancelUnpaidAfterHours: 6,
+    });
+    expect(
+      refusalOf(
+        await f.orderSettings.update(f.a, { cancelUnpaidAfterDays: 1, cancelUnpaidAfterHours: 6 }),
+      ),
+    ).toBe('Cancel unpaid orders after days or after hours, not both');
+    expect(refusalOf(await f.orderSettings.update(f.a, { cancelUnpaidAfterHours: 73 }))).toBe(
+      'Cancel unpaid after hours must be a whole number from 1 to 72',
+    );
+
+    const placed = () => f.order(f.a, [kurta], { paymentMethod: 'bank_transfer' });
+    const [old, halfway, recent] = [await placed(), await placed(), await placed()];
+    await f.admin.query(
+      `UPDATE orders.orders SET created_at = now() - make_interval(hours => $2) WHERE id = $1`,
+      [old.id, 7],
+    );
+    await f.admin.query(
+      `UPDATE orders.orders SET created_at = now() - make_interval(hours => $2) WHERE id = $1`,
+      [halfway.id, 4],
+    );
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    // Past half its six hours an order's customer is reminded once; one placed lately is not.
+    expect(await f.orders.remindUnpaid(f.a.shopId, { hours: 6 })).toBe(1);
+    const reminded = (await f.outbox()).filter(
+      (event) => event.event_type === 'order.payment_reminded',
+    );
+    expect(reminded.map((event) => event.aggregate_id)).toEqual([halfway.id]);
+    expect(Date.parse(reminded[0]!.payload.cancelAt as string)).toBe(
+      (await f.orders.get(f.a, halfway.id))!.createdAt.getTime() + 6 * 3_600_000,
+    );
+    // Past six hours, cancelled; the others wait.
+    expect(await f.orders.cancelUnpaid(f.a.shopId, { hours: 6 })).toBe(1);
+    expect(await latest(old.id)).toEqual(['Cancelled: not paid in 6 hours']);
+    for (const order of [halfway, recent]) {
+      expect((await f.orders.get(f.a, order.id))!.stage).toBe('awaiting_payment');
+    }
+    expect(unwrap(await f.orderSettings.update(f.a, { cancelUnpaidAfterDays: 3 }))).toMatchObject({
+      cancelUnpaidAfterDays: 3,
+      cancelUnpaidAfterHours: null,
+    });
+  });
+
   it('holds a blocked number for review first, and keeps no account when the shop has none', async () => {
     unwrap(await f.blocklist.add(f.a, { phone: '03217654321', reason: 'fake_orders' }));
     const order = await f.order(f.a, [kurta], {

@@ -1934,20 +1934,24 @@ export class OrderService {
 
   /**
    * Reminds the customers of the shop's orders still waiting for their payment, which
-   * {@link cancelUnpaid} cancels `days` days after they were placed (ADR-174): once, a day before
-   * then and no sooner than half a day after the order was placed, the oldest first and
+   * {@link cancelUnpaid} cancels `after` they were placed (ADR-174): once, a day before then and
+   * no sooner than half a day after the order was placed, or halfway through a wait of a day or
+   * less (ADR-657), the oldest first and
    * {@link UNPAID_LIMITS.batch} at most. An event says when each is cancelled, for the worker to
    * tell its customer. One with a receipt waiting to be checked, or with a payment `underway`, is
    * left as it is. How many it reminded.
    */
   async remindUnpaid(
     shopId: string,
-    days: number,
+    wait: UnpaidWait,
     at: Date = new Date(),
     underway: (orderIds: string[]) => Promise<ReadonlySet<string>> = async () => new Set(),
   ): Promise<number> {
-    const window = days * 86_400_000;
-    const after = Math.max(window - UNPAID_LIMITS.reminderBeforeMs, UNPAID_LIMITS.reminderAfterMs);
+    const window = unpaidWait(wait).ms;
+    const after = Math.max(
+      window - UNPAID_LIMITS.reminderBeforeMs,
+      Math.min(UNPAID_LIMITS.reminderAfterMs, window / 2),
+    );
     const due = and(
       waitingForPayment(shopId),
       isNull(orders.paymentRemindedAt),
@@ -1998,7 +2002,8 @@ export class OrderService {
 
   /**
    * Cancels the shop's orders still waiting for their payment, by transfer or online or the
-   * advance asked of them, `days` days after they were placed (ADR-168), the oldest first and
+   * advance asked of them, `wait` after they were placed (ADR-168): days, or hours for a shop
+   * selling online alone (ADR-657). The oldest first and
    * {@link UNPAID_LIMITS.batch} at most: each in a transaction of its own, by the system, its
    * stock let go. One with a transfer receipt waiting to be checked is left for staff to look at,
    * and those `underway` names, with a payment started online that may still be made, for a
@@ -2007,13 +2012,14 @@ export class OrderService {
    */
   async cancelUnpaid(
     shopId: string,
-    days: number,
+    wait: UnpaidWait,
     at: Date = new Date(),
     underway: (orderIds: string[]) => Promise<ReadonlySet<string>> = async () => new Set(),
   ): Promise<number> {
+    const { ms, words } = unpaidWait(wait);
     const unpaid = and(
       waitingForPayment(shopId),
-      lt(orders.createdAt, new Date(at.getTime() - days * 86_400_000)),
+      lt(orders.createdAt, new Date(at.getTime() - ms)),
     );
     const found = await this.db.tenant(shopId, (tx) =>
       tx
@@ -2038,7 +2044,7 @@ export class OrderService {
         const result = await this.cancelLocked(tx, shopId, order, {
           actor: 'system',
           reason: 'unpaid',
-          message: `Cancelled: not paid in ${days} ${days === 1 ? 'day' : 'days'}`,
+          message: `Cancelled: not paid in ${words}`,
         });
         return result.ok;
       });
@@ -3168,6 +3174,23 @@ const CHANGE_NAMES: Record<string, string> = {
 /** The member of staff calling, by their account's ID, for `assignee:me`; null for an app. */
 export function staffMemberOf(tenant: TenantContext): string | null {
   return tenant.actor.kind === 'staff' ? tenant.actor.userId : null;
+}
+
+/**
+ * How long an order waits for its payment before it is cancelled: days, or hours for a shop
+ * selling online alone (ADR-657).
+ */
+export type UnpaidWait = number | { hours: number };
+
+/** The wait in milliseconds, and in words for the timeline. */
+function unpaidWait(wait: UnpaidWait): { ms: number; words: string } {
+  if (typeof wait === 'number') {
+    return { ms: wait * 86_400_000, words: `${wait} ${wait === 1 ? 'day' : 'days'}` };
+  }
+  return {
+    ms: wait.hours * 3_600_000,
+    words: `${wait.hours} ${wait.hours === 1 ? 'hour' : 'hours'}`,
+  };
 }
 
 /**

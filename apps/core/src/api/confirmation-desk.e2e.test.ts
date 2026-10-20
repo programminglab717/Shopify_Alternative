@@ -213,7 +213,8 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
         orderSettingsUpdate(input: $input) {
           orderSettings {
             callingHours { opens closes } firstCallMinutes cancelUnreachableAfterDays
-            cancelUnpaidAfterDays deskWaitsForReminder creditBackOnReturn confirmationCalls
+            cancelUnpaidAfterDays cancelUnpaidAfterHours deskWaitsForReminder creditBackOnReturn
+            confirmationCalls
             staffDiscountPercent
           }
           userErrors { field code message }
@@ -237,6 +238,8 @@ describe.skipIf(!server)('Admin GraphQL API: the Confirmation Desk', () => {
         firstCallMinutes: 5,
         cancelUnreachableAfterDays: 3,
         cancelUnpaidAfterDays: 2,
+        // Days or hours, not both (ADR-657).
+        cancelUnpaidAfterHours: null,
         // The desk deals orders as they are placed unless the shop asks it to wait (ADR-203).
         deskWaitsForReminder: false,
         creditBackOnReturn: true,

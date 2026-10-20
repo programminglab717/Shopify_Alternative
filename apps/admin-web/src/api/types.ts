@@ -3276,6 +3276,8 @@ export interface OrderSettings {
   firstCallMinutes: number | null;
   deskWaitsForReminder: boolean;
   cancelUnpaidAfterDays: number | null;
+  /** Hours instead, for a shop selling online alone (ADR-657). */
+  cancelUnpaidAfterHours?: number | null;
   cancelUnreachableAfterDays: number | null;
   customerCancellation: CustomerCancellation;
   /**
