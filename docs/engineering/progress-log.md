@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Redirect chains followed in one hop
+### afdc363 · Redirect chains followed in one hop
 
 * **The storefront sends shoppers to where a chain of redirects ends** ([ADR-617](../architecture/13-decision-log.md#adr-617--the-storefront-follows-a-chain-of-redirects-to-its-end-and-sends-shoppers-there-in-one-hop-through-addresses-it-has-no-page-at-five-redirects-past-the-first-at-most)), through
   addresses it has no page at, five redirects past the first at most, the answer purged when any
