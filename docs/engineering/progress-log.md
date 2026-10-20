@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The bar while checkout is paused
+### 60463ea · The bar while checkout is paused
 
 * **While checkout alone is paused, the storefront's pages carry the platform's bar saying orders
   are paused, the shop's message and when they come back** ([ADR-604](../architecture/13-decision-log.md#adr-604--while-checkout-alone-is-paused-the-storefronts-pages-carry-the-platforms-bar-saying-orders-are-paused-the-shops-message-and-when-they-come-back), OS-15).
