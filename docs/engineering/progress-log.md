@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A customer's refusal pushed before their next parcel ships
+### b761ef0 · A customer's refusal pushed before their next parcel ships
 
 * **A parcel its customer refused pushes who confirms orders of each other order of theirs
   confirmed and not yet shipped** ([ADR-672](../architecture/13-decision-log.md#adr-672--a-parcel-its-customer-refused-pushes-who-confirms-orders-of-each-other-order-of-theirs-confirmed-and-not-yet-shipped-to-call-them-before-it-ships)), to call them first; offered in the admin's
