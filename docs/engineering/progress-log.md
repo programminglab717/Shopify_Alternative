@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### 89ed39e · The account's address book
+
+* **A customer's address book is kept with their account, each address checked as checkout's
+  are, one the default while there are any** ([ADR-583](../architecture/13-decision-log.md#adr-583--a-customers-address-book-is-kept-with-their-account-each-address-checked-as-checkouts-are-one-the-default-while-there-are-any), CUS-02).
+* 3626 tests, 5 more: saving, defaults, the limit and refusals, merges,
+  erasure and the file, and the storefront API's routes and client.
+
 ### e21595b · Erasures done told to the shopper
 
 * **A shopper who asked for their erasure from their account is told once it is done, at the
