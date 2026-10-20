@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The Ajax cart in Urdu
+### bbbd9b4 · The Ajax cart in Urdu
 
 * **The Ajax cart answers in Urdu at its Urdu addresses** ([ADR-625](../architecture/13-decision-log.md#adr-625--the-ajax-carts-answers-at-the-urdu-addresses-urcartjs-and-the-rest-give-its-lines-titles-in-the-shops-urdu-and-their-addresses-under-ur-as-the-urdu-pages-show-them)): `/ur/cart.js` and the
   changes asked from Urdu pages give lines' titles in the shop's Urdu and their addresses under
