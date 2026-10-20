@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Photos turned
+### 81d484d · Photos turned
 
 * **A product's photo is turned by quarter turns as part of its crop** ([ADR-658](../architecture/13-decision-log.md#adr-658--a-products-photo-is-turned-by-quarter-turns-after-its-crop-is-cut-as-part-of-the-crop-a-photo-taken-on-its-side-is-turned-without-being-cropped)), cut first and
   turned after, and the admin's photos turn a quarter clockwise each tap.
