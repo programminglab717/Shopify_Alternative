@@ -16,6 +16,7 @@ import {
   UrlRedirectsExportQuery,
   UrlRedirectsImportMutation,
   UrlRedirectsQuery,
+  UrlRedirectsStraightenMutation,
   UrlRedirectUpdateMutation,
 } from '../api/operations';
 import type {
@@ -23,6 +24,7 @@ import type {
   UrlRedirectsData,
   UrlRedirectsExportData,
   UrlRedirectsImportData,
+  UrlRedirectsStraightenData,
   UrlRedirectUpdateData,
   UrlRedirectValue,
 } from '../api/types';
@@ -344,6 +346,49 @@ function ImportRedirects() {
   );
 }
 
+/**
+ * Every chain of redirects sent straight to its end at once (ADR-612), offered while one the list
+ * shows sends shoppers on through another; loops are left for the shop to break.
+ */
+function StraightenChains({ chained }: { chained: boolean }) {
+  const { t } = useLocale();
+  const straighten = useAdminMutation<UrlRedirectsStraightenData, Record<string, never>>(
+    UrlRedirectsStraightenMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const [done, setDone] = useState<number | null>(null);
+  if (!chained && done === null) return null;
+  const run = () =>
+    attempt(async () => {
+      const { urlRedirectsStraighten } = await straighten.mutateAsync({});
+      setDone(urlRedirectsStraighten.updated);
+      return urlRedirectsStraighten;
+    });
+  return (
+    <div className="flex flex-col gap-2">
+      {chained && (
+        <Alert tone="warning">
+          <span className="flex flex-col items-start gap-2">
+            {t('redirects.chained')}
+            <Button
+              variant="secondary"
+              busy={straighten.isPending}
+              icon={<CornerDownRight aria-hidden className="size-5" />}
+              onClick={() => void run()}
+            >
+              {t('redirects.straightenAll')}
+            </Button>
+          </span>
+        </Alert>
+      )}
+      {done !== null && (
+        <Alert tone="success">{t('redirects.straightened', { count: done })}</Alert>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
 /** The shop's redirects as Shopify's CSV, saved on the phone. */
 function ExportRedirects() {
   const { t } = useLocale();
@@ -419,7 +464,13 @@ export function RedirectsTab() {
           message={errorText(query.error, t)}
           action={<Button onClick={() => void query.refetch()}>{t('action.retry')}</Button>}
         />
-      ) : query.data.urlRedirects.nodes.length === 0 ? (
+      ) : null}
+      {query.data && (
+        <StraightenChains
+          chained={query.data.urlRedirects.nodes.some((redirect) => Boolean(redirect.finalTarget))}
+        />
+      )}
+      {query.isPending || query.isError ? null : query.data.urlRedirects.nodes.length === 0 ? (
         <Card>
           <EmptyState title={t(search.trim() ? 'redirects.noneFound' : 'redirects.none')} />
         </Card>

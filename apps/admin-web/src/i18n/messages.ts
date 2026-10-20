@@ -3398,6 +3398,11 @@ const en = {
   'redirects.changed': 'The redirect from {path} is changed.',
   'redirects.chain': 'Another redirect sends shoppers on from there, to {target}.',
   'redirects.straighten': 'Send straight to {target}',
+  'redirects.chained':
+    'Some redirects send shoppers on through others. Send each straight to where its chain ends, so shoppers and search engines take one step.',
+  'redirects.straightenAll': 'Straighten every chain',
+  'redirects.straightened': 'Sent {count} redirects straight to where their chains end.',
+  'redirects.straightened.one': 'Sent 1 redirect straight to where its chain ends.',
   'redirects.loops':
     'This goes round in a loop with other redirects: change where it goes, or delete it.',
   'orders.fresh': 'Show {count} new orders',
@@ -8549,6 +8554,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'redirects.changed': '{path} سے ری ڈائریکٹ بدل گیا۔',
   'redirects.chain': 'وہاں سے ایک اور ری ڈائریکٹ خریداروں کو آگے {target} پر بھیجتا ہے۔',
   'redirects.straighten': 'سیدھا {target} پر بھیجیں',
+  'redirects.chained':
+    'کچھ ری ڈائریکٹس خریداروں کو دوسروں کے ذریعے آگے بھیجتے ہیں۔ ہر ایک کو سیدھا وہاں بھیجیں جہاں اس کا سلسلہ ختم ہوتا ہے، تاکہ خریدار اور سرچ انجن ایک ہی قدم لیں۔',
+  'redirects.straightenAll': 'تمام سلسلے سیدھے کریں',
+  'redirects.straightened':
+    '{count} ری ڈائریکٹس سیدھے وہاں بھیج دیے گئے جہاں ان کے سلسلے ختم ہوتے ہیں۔',
+  'redirects.straightened.one':
+    '1 ری ڈائریکٹ سیدھا وہاں بھیج دیا گیا جہاں اس کا سلسلہ ختم ہوتا ہے۔',
   'redirects.loops':
     'یہ دوسرے ری ڈائریکٹس کے ساتھ چکر میں گھومتا ہے: اس کی منزل بدلیں یا اسے ڈیلیٹ کریں۔',
   'orders.fresh': '{count} نئے آرڈر دیکھیں',

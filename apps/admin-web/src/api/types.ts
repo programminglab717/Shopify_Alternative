@@ -2614,6 +2614,10 @@ export interface UrlRedirectsData {
   urlRedirects: { nodes: UrlRedirectValue[]; pageInfo: { hasNextPage: boolean } };
 }
 
+export interface UrlRedirectsStraightenData {
+  urlRedirectsStraighten: { updated: number; userErrors: UserError[] };
+}
+
 export interface UrlRedirectsImportData {
   urlRedirectsImport: {
     dryRun: boolean;

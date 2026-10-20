@@ -268,6 +268,17 @@ describe.skipIf(!server)('Admin GraphQL API: URL redirects', () => {
           'It would send shoppers round in a loop: /collections/eid → /sale-2025 → /sale-2026 → /collections/eid',
       },
     ]);
+    // Every chain straightened at once (ADR-612).
+    const STRAIGHTEN = 'mutation { urlRedirectsStraighten { updated userErrors { code } } }';
+    expect((await gql(tokens.reader, STRAIGHTEN)).errors?.[0]?.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(await call(tokens.a, STRAIGHTEN)).toEqual({ updated: 1, userErrors: [] });
+    expect(await call(tokens.reader, read, { id: first.urlRedirect.id })).toEqual({
+      target: '/collections/eid',
+      finalTarget: null,
+      loops: false,
+    });
   });
 
   it('needs the navigation scopes, as Shopify asks for them', async () => {

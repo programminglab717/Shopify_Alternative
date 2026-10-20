@@ -344,6 +344,46 @@ export class UrlRedirectService {
    * The shop's redirects as Shopify exports them, Redirect from and Redirect to, by path: a file
    * the import, or Shopify's, takes back.
    */
+  /**
+   * Sends every redirect whose target another redirect sends on straight to where its chain ends
+   * (ADR-612): a shopper takes one hop, not several, and search engines follow to the end. A
+   * chain that loops is left as it is, for the shop to break. In one transaction, with one
+   * `url_redirects.moved` event. How many redirects changed.
+   */
+  async straighten(tenant: TenantContext): Promise<{ updated: number }> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const rows = await tx
+        .select({ id: urlRedirects.id, path: urlRedirects.path, target: urlRedirects.target })
+        .from(urlRedirects)
+        .where(eq(urlRedirects.shopId, tenant.shopId))
+        .for('update');
+      const sends = new Map(rows.map((row) => [row.path, row.target]));
+      const straightened: { id: string; target: string }[] = [];
+      for (const row of rows) {
+        const end = chainEnd(sends, row.path, row.target);
+        if (end !== null && end !== row.target) straightened.push({ id: row.id, target: end });
+      }
+      for (let at = 0; at < straightened.length; at += IMPORT_BATCH) {
+        const batch = straightened.slice(at, at + IMPORT_BATCH);
+        await tx.execute(sql`
+          UPDATE online_store.url_redirects r
+             SET target = s.target, updated_at = now()
+            FROM unnest(${sql.param(batch.map((each) => each.id))}::uuid[],
+                        ${sql.param(batch.map((each) => each.target))}::text[]) AS s(id, target)
+           WHERE r.shop_id = ${tenant.shopId} AND r.id = s.id`);
+      }
+      if (straightened.length > 0) {
+        await appendEvent<UrlRedirectsMovedPayload>(tx, tenant.shopId, {
+          type: OnlineStoreEvents.UrlRedirectsMoved,
+          aggregateType: 'url_redirect',
+          aggregateId: tenant.shopId,
+          payload: { created: 0, updated: straightened.length, deleted: 0 },
+        });
+      }
+      return { updated: straightened.length };
+    });
+  }
+
   async export(tenant: TenantContext): Promise<{ csv: string; count: number }> {
     const rows = await this.db.tenant(tenant.shopId, (tx) => shopRedirectsOf(tx, tenant.shopId));
     return {
@@ -660,6 +700,23 @@ async function loopIn(
     at = pathOn(row.target);
   }
   return loopAmong(sends, path, target);
+}
+
+/**
+ * Where a redirect from `path` to `target` ends through the redirects `sends` keeps by path: the
+ * last target, on the shop or elsewhere, that no redirect is from; null for a chain that loops.
+ */
+function chainEnd(sends: ReadonlyMap<string, string>, path: string, target: string): string | null {
+  const seen = new Set([path]);
+  let end = target;
+  for (let at = pathOn(end); at !== null; at = pathOn(end)) {
+    const next = sends.get(at);
+    if (next === undefined) return end;
+    if (seen.has(at) || seen.size > MOST_HOPS) return null;
+    seen.add(at);
+    end = next;
+  }
+  return end;
 }
 
 function loopMessage(round: readonly string[]): string {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-611 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-612 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -619,6 +619,7 @@
 | 609 | A shopper signed in to their account with a number spends its store credit at checkout without a code; a browser's recent proof still asks one | Accepted |
 | 610 | Where the shop says so, the store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled | Accepted |
 | 611 | Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to confirm unanswered an hour is called once in Urdu, in calling hours: pressing 1 confirms it and 2 cancels it, the call a message on a voice channel of its own | Accepted |
+| 612 | The shop straightens every chain of redirects at once, each sent straight to where its chain ends, loops left for it to break | Accepted |
 
 ---
 
@@ -22173,3 +22174,25 @@
   messages (queueing, charges, statuses, the admin's list) built again. **Recorded prompts
   with the variables spoken apart:** truer Urdu, for the gateway chosen to do, once one is.
   **Calls in the shop's language:** an English call reaches no one an Urdu one does not.
+
+## ADR-612 · The shop straightens every chain of redirects at once, each sent straight to where its chain ends, loops left for it to break
+
+* **Context:** Each redirect says where the redirects in a row from it end, and the admin sends
+  one straight there at a time (ADR-607). A shop that moved its catalog more than once, or
+  imported a platform's redirects on top of its own, can hold hundreds of chains: straightening
+  them one by one is a chore nobody finishes, and every hop costs shoppers a round trip and
+  search engines some of the page's standing.
+* **Decision:** `urlRedirectsStraighten`, under `write_online_store_navigation`, sends every
+  redirect of the shop whose target another redirect is from straight to where its chain ends,
+  in one transaction that holds the shop's redirects while it reads and writes them. A redirect
+  in a loop, or whose chain runs into one, is left as it is: the shop breaks a loop by hand. The
+  updates go in batches, as imports do, and one `url_redirects.moved` event, with the count
+  updated, sends them to the storefront through the worker. The redirects tab says when any
+  redirect it shows is chained and offers to straighten them all, then says how many it sent.
+* **Consequences:** A shop clears every chain with one tap, and the storefront answers each old
+  address with a single hop. The storefront still follows only one redirect a request, so a
+  chain made again later waits for the shop to straighten it.
+* **Alternatives:** **Straighten as redirects are made:** a redirect made to an address that
+  itself redirects would silently go somewhere other than the shop typed, and changing the
+  later redirect would leave the earlier pointing at the old end. **Have the storefront follow
+  chains:** more lookups on every miss, and search engines still see the hops.

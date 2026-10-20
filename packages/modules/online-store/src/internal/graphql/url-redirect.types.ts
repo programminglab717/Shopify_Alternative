@@ -171,6 +171,17 @@ export class UrlRedirectsImportPayload {
   userErrors!: UserError[];
 }
 
+@ObjectType()
+export class UrlRedirectsStraightenPayload {
+  @Field(() => Int, {
+    description: 'Redirects sent straight to where their chains end; none for a chain that loops.',
+  })
+  updated!: number;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType({ description: "The shop's redirects as a file, as Shopify exports them." })
 export class UrlRedirectsExport {
   @Field({ description: 'CSV with Redirect from and Redirect to columns, by path.' })

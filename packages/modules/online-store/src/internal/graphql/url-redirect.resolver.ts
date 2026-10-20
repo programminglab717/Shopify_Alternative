@@ -20,6 +20,7 @@ import {
   UrlRedirectsArgs,
   UrlRedirectsExport,
   UrlRedirectsImportPayload,
+  UrlRedirectsStraightenPayload,
 } from './url-redirect.types.js';
 
 /** URL redirects, as Shopify's are, with its navigation scopes (ADR-052). */
@@ -126,6 +127,19 @@ export class UrlRedirectResolver {
       });
     }
     return Object.assign(new UrlRedirectsImportPayload(), { ...result.value, userErrors: [] });
+  }
+
+  @Mutation(() => UrlRedirectsStraightenPayload, {
+    description:
+      'Sends every redirect whose target another redirect sends on straight to where its chain ' +
+      'ends, in one hop (ADR-612). A chain that loops is left as it is.',
+  })
+  @RequireScopes('write_online_store_navigation')
+  async urlRedirectsStraighten(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<UrlRedirectsStraightenPayload> {
+    const { updated } = await this.service.straighten(tenant);
+    return Object.assign(new UrlRedirectsStraightenPayload(), { updated, userErrors: [] });
   }
 
   @Query(() => UrlRedirectsExport, {

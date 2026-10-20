@@ -207,6 +207,47 @@ describe.skipIf(!server)('UrlRedirectService', () => {
     });
   });
 
+  it('sends every redirect in a chain straight to its end at once, loops left (ADR-612)', async () => {
+    unwrap(await service.create(f.a, { path: '/a', target: '/b?x=1' }));
+    unwrap(await service.create(f.a, { path: '/b', target: '/c' }));
+    unwrap(await service.create(f.a, { path: '/c', target: 'https://zari.pk/d' }));
+    unwrap(await service.create(f.a, { path: '/e', target: '/collections/eid' }));
+    unwrap(await service.create(f.a, { path: '/f', target: '/e' }));
+    // A loop kept from before, and another shop's chain.
+    unwrap(await service.create(f.a, { path: '/l1', target: '/l2' }));
+    unwrap(await service.create(f.a, { path: '/l2', target: '/x' }));
+    await f.db.tenant(f.a.shopId, (tx) =>
+      tx.update(urlRedirects).set({ target: '/l1' }).where(eq(urlRedirects.path, '/l2')),
+    );
+    unwrap(await service.create(f.b, { path: '/m', target: '/n' }));
+    unwrap(await service.create(f.b, { path: '/n', target: '/o' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    expect(await service.straighten(f.a)).toEqual({ updated: 3 });
+    const list = await service.list(f.a, { first: 20 });
+    expect(list.items.map((r) => [r.path, r.target, r.finalTarget, r.loops])).toEqual([
+      ['/a', 'https://zari.pk/d', null, false],
+      ['/b', 'https://zari.pk/d', null, false],
+      ['/c', 'https://zari.pk/d', null, false],
+      ['/e', '/collections/eid', null, false],
+      ['/f', '/collections/eid', null, false],
+      ['/l1', '/l2', null, true],
+      ['/l2', '/l1', null, true],
+    ]);
+    const { rows: events } = await f.admin.query(
+      'SELECT event_type, payload FROM platform.outbox_events ORDER BY id',
+    );
+    expect(events).toEqual([
+      { event_type: 'url_redirects.moved', payload: { created: 0, updated: 3, deleted: 0 } },
+    ]);
+    // Straight already: nothing more, and no event; the other shop's are its own.
+    expect(await service.straighten(f.a)).toEqual({ updated: 0 });
+    expect((await service.list(f.b, { first: 5 })).items.map((r) => r.target)).toEqual([
+      '/n',
+      '/o',
+    ]);
+  });
+
   it("sends a moved page's old address to its new one, the long way round never", async () => {
     const moved = (from: string, to: string, shop = f.a) =>
       f.db.tenant(shop.shopId, (tx) => redirectMoved(tx, shop.shopId, from, to));

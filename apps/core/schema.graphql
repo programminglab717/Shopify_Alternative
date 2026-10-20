@@ -9190,6 +9190,11 @@ type Mutation {
   ): UrlRedirectsImportPayload!
 
   """
+  Sends every redirect whose target another redirect sends on straight to where its chain ends, in one hop (ADR-612). A chain that loops is left as it is.
+  """
+  urlRedirectsStraighten: UrlRedirectsStraightenPayload!
+
+  """
   Subscribes an app to a topic at an https address: the calling app, or for the owner and managers the app `appId` names. The app must be able to read what the topic tells of.
   """
   webhookSubscriptionCreate(appId: ID, topic: WebhookSubscriptionTopic!, webhookSubscription: WebhookSubscriptionInput!): WebhookSubscriptionPayload!
@@ -16842,6 +16847,14 @@ type UrlRedirectsImportPayload {
   Rows left as they are: the shop has a redirect from their paths already.
   """
   skipped: Int!
+  userErrors: [UserError!]!
+}
+
+type UrlRedirectsStraightenPayload {
+  """
+  Redirects sent straight to where their chains end; none for a chain that loops.
+  """
+  updated: Int!
   userErrors: [UserError!]!
 }
 

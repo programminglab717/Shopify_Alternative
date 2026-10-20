@@ -5739,6 +5739,19 @@ export const UrlRedirectDeleteMutation = /* GraphQL */ `
 `;
 
 /** Redirects from Shopify's CSV (ONB-05): checked first as a dry run, then added. */
+export const UrlRedirectsStraightenMutation = /* GraphQL */ `
+  mutation UrlRedirectsStraighten {
+    urlRedirectsStraighten {
+      updated
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
 export const UrlRedirectsImportMutation = /* GraphQL */ `
   mutation UrlRedirectsImport($csv: String!, $dryRun: Boolean) {
     urlRedirectsImport(csv: $csv, dryRun: $dryRun) {

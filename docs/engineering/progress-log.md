@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Redirect chains straightened at once
+
+* **Every chain of redirects is sent straight to where it ends in one tap** ([ADR-612](../architecture/13-decision-log.md#adr-612--the-shop-straightens-every-chain-of-redirects-at-once-each-sent-straight-to-where-its-chain-ends-loops-left-for-it-to-break)):
+  `urlRedirectsStraighten` updates each redirect whose target another redirect is from, in one
+  transaction, leaving loops for the shop to break, and the redirects tab offers it while any
+  redirect it shows is chained.
+* 3712 tests, 3 more: the service's straightening with a loop beside
+  it, the mutation's scope and result end to end, and the admin's offer and message.
+
 ### 987dbad · Calls to confirm in Urdu
 
 * **Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to

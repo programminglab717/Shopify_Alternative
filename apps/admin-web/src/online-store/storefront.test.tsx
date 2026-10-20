@@ -101,6 +101,8 @@ function core(role: StaffRole, redirects = REDIRECTS) {
             ? CHECKED
             : { ...CHECKED, dryRun: false, rowErrorCount: 0, rowErrors: [] },
         };
+      case 'UrlRedirectsStraighten':
+        return { urlRedirectsStraighten: { updated: 1, userErrors: [] } };
       case 'UrlRedirectsExport':
         return { urlRedirectsExport: { count: 1, csv: 'Redirect from,Redirect to\n' } };
       default:
@@ -344,6 +346,40 @@ describe("The storefront's preferences and redirects", () => {
       )
       .closest('li')!;
     expect(within(looping).getByText('/a')).toBeTruthy();
+  });
+
+  it('straightens every chain at once, offered while one is shown (ADR-612)', async () => {
+    const fake = core('manager', [
+      {
+        id: 'red_1',
+        path: '/sale-2025',
+        target: '/sale-2026',
+        finalTarget: '/collections/eid',
+        loops: false,
+      },
+      {
+        id: 'red_2',
+        path: '/sale-2026',
+        target: '/collections/eid',
+        finalTarget: null,
+        loops: false,
+      },
+    ]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=redirects');
+
+    await screen.findByText(/Some redirects send shoppers on through others/);
+    fireEvent.click(screen.getByRole('button', { name: 'Straighten every chain' }));
+    await screen.findByText('Sent 1 redirect straight to where its chain ends.');
+    expect(sentOf(fake, 'UrlRedirectsStraighten')).toEqual([{}]);
+  });
+
+  it('offers no straightening where no redirect is chained', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=redirects');
+    await screen.findByText('/products/old-lawn');
+    expect(screen.queryByRole('button', { name: 'Straighten every chain' })).toBeNull();
   });
 
   it('finds, adds, deletes, imports after checking, and exports redirects', async () => {
