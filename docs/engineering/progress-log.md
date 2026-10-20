@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Redirect loops refused, and chains shown
+### 7b3b17c · Redirect loops refused, and chains shown
 
 * **A redirect that would send shoppers round a loop is refused, and each redirect says where its
   redirects in a row end, for the admin to send it straight there** ([ADR-607](../architecture/13-decision-log.md#adr-607--a-redirect-that-would-send-shoppers-round-a-loop-is-refused-and-each-redirect-says-where-its-redirects-in-a-row-end-for-the-admin-to-send-it-straight-there), OS-09).
