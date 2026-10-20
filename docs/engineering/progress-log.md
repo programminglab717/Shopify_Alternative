@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Menu links by tag
+### 5e89a1d · Menu links by tag
 
 * **A menu's collection link narrowed by tags** ([ADR-644](../architecture/13-decision-log.md#adr-644--a-menus-link-to-a-collection-or-to-all-products-may-narrow-it-to-its-products-with-each-of-some-tags-as-shopifys-menuitem-tags-leading-to-the-collections-tag-page)): Shopify's `MenuItem` tags on
   collection and all-products links, leading to the collection's tag page, with a tags field in
