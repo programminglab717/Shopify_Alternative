@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Comments' spam kept aside, and those waiting pushed
+### 31d3df9 · Comments' spam kept aside, and those waiting pushed
 
 * **A comment that reads as spam is kept as spam** ([ADR-619](../architecture/13-decision-log.md#adr-619--a-comment-that-reads-as-spam-is-kept-as-spam-neither-shown-nor-held-links-in-its-name-link-markup-more-than-two-links-what-spam-sells-or-a-long-comment-again-within-the-day-and-a-comment-held-for-approval-is-pushed-to-who-writes-the-shops-blogs)), neither shown nor held: a link in
   its name, link markup, more than two links, spam's words, or a long comment again within the
