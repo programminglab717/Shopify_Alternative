@@ -70,6 +70,8 @@ import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@h
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { keepContactIn, recoverIn } from './abandoned.service.js';
+import { addressesIn } from './account-addresses.js';
+import { sessionIn } from './account.service.js';
 import { CartService, type KeptCart } from './cart.service.js';
 import {
   NO_COD_RULES,
@@ -568,11 +570,24 @@ export class CheckoutService {
     });
   }
 
-  /** What the checkout's page shows; with `shopId`, only for that shop's checkouts. */
-  async view(token: string, shopId?: string): Promise<CheckoutView> {
+  /**
+   * What the checkout's page shows; with `shopId`, only for that shop's checkouts. With the
+   * secret of a shopper's session signed in to their account on the shop (ADR-585), its form is
+   * filled in from the default address of their book, or with the number they signed in with.
+   */
+  async view(
+    token: string,
+    shopId?: string,
+    options: { account?: string | null } = {},
+  ): Promise<CheckoutView> {
     const found = await this.#resolve(token, shopId);
     if (!found) return { kind: 'not_found' };
-    return this.db.tenant(found.shopId, (tx) => this.#view(tx, found, false, EMPTY_FORM));
+    return this.db.tenant(found.shopId, async (tx) => {
+      const form = options.account
+        ? await accountFormIn(tx, found.shopId, options.account)
+        : EMPTY_FORM;
+      return this.#view(tx, found, false, form);
+    });
   }
 
   /**
@@ -1839,4 +1854,36 @@ export function orderNoteOf(cart: CartJson): string {
   const note = [cart.note.trim(), ...lines].filter((part) => part !== '').join('\n');
   const max = ORDER_LIMITS.note;
   return note.length <= max ? note : `${note.slice(0, max - 1)}…`;
+}
+
+/**
+ * The form a checkout's page opens with for the shopper the account session `secret` names
+ * (ADR-585): their book's default address, as the account keeps it, else only the number they
+ * signed in with; blank for no session of the shop's. The session proved the number it signed in
+ * with, as a code at checkout does (ADR-447), and the book is the shopper's own.
+ */
+async function accountFormIn(tx: Tx, shopId: string, secret: string): Promise<CheckoutForm> {
+  if (secret.length > 128) return EMPTY_FORM;
+  const session = await sessionIn(tx, shopId, secret);
+  if (!session) return EMPTY_FORM;
+  const book = session.customerId ? await addressesIn(tx, shopId, session.customerId) : [];
+  const chosen = book.find((record) => record.isDefault);
+  if (!chosen) return { ...EMPTY_FORM, phone: typedPhone(session.phone) };
+  const { address } = chosen;
+  return {
+    ...EMPTY_FORM,
+    name: address.name,
+    phone: typedPhone(address.phone),
+    city: address.city,
+    address1: address.address1,
+    address2: address.address2 ?? '',
+    landmark: address.landmark ?? '',
+    province: address.provinceCode ?? '',
+  };
+}
+
+/** A number in E.164, as a shopper types it in Pakistan: "+923001234567" as "0300 1234567". */
+function typedPhone(phone: string): string {
+  const pk = /^\+92(\d{3})(\d{7})$/.exec(phone);
+  return pk ? `0${pk[1]} ${pk[2]}` : phone;
 }

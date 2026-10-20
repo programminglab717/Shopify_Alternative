@@ -227,13 +227,15 @@ export class StorefrontApiClient {
 
   /**
    * The page of the checkout `checkoutToken` names, if it is the shop's; with `form`, the fields
-   * the shopper posted, which place the order, and `client`, where they posted them from.
+   * the shopper posted, which place the order, and `client`, where they posted them from; opened
+   * with the secret of the shopper's `account` session, filled in from their account (ADR-585).
    */
   async checkoutPage(
     shopId: string,
     checkoutToken: string,
     form: Record<string, string> | null,
     client?: CheckoutClient,
+    account?: string | null,
   ): Promise<CheckoutPageResponse> {
     const path = checkoutsPath(shopId, encodeURIComponent(checkoutToken));
     const from: Record<string, string> = {};
@@ -242,9 +244,16 @@ export class StorefrontApiClient {
     const ids = Object.entries(client?.browserIds ?? {}).filter(([, value]) => value);
     if (ids.length > 0) from[CLIENT_BROWSER_IDS_HEADER] = new URLSearchParams(ids).toString();
     if (client?.proof) from[CLIENT_PROOF_HEADER] = client.proof;
+    // Opened by a shopper signed in to their account: filled in from it (ADR-585).
     const response = form
       ? await this.#request('POST', path, null, form, from)
-      : await this.#request('GET', path, null);
+      : await this.#request(
+          'GET',
+          path,
+          null,
+          undefined,
+          account ? { [ACCOUNT_TOKEN_HEADER]: account } : {},
+        );
     if (response.status !== 200)
       throw new StorefrontApiError(response.status, await response.text());
     return (await response.json()) as CheckoutPageResponse;

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-584 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-585 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -592,6 +592,7 @@
 | 582 | A shopper who asked for their erasure from their account is told once it is done, at the number they signed in with, by a message forgotten once sent | Accepted |
 | 583 | A customer's address book is kept with their account, each address checked as checkout's are, one the default while there are any | Accepted |
 | 584 | The address book has its own page on the storefront, as Shopify's /account/addresses, its forms posting as Shopify's do | Accepted |
+| 585 | A signed-in shopper's checkout opens filled in from their default address, or with the number they signed in with | Accepted |
 
 ---
 
@@ -21592,3 +21593,27 @@
 * **Alternatives:** **An Ajax address book:** the page works without scripts, as the account's
   other forms do. **Errors as field names for the theme to word:** the storefront words them,
   as it does the sign-in's, so a theme written for Shopify shows them as they are.
+
+## ADR-585 · A signed-in shopper's checkout opens filled in from their default address, or with the number they signed in with
+
+* **Context:** A shopper keeps an address book with their account (ADR-583, ADR-584), but
+  checkout opens blank: only a code to their number fills it in, from their last order
+  (ADR-447).
+* **Decision:**
+  * **The storefront sends the session:** a checkout's page asked for on the shop's own address
+    goes to the core with the secret of the shopper's account session in `x-hatti-account`;
+    never with what is posted, which carries what the shopper typed.
+  * **The core fills in the form it opens with:** for a session of the shop's, the default
+    address of the customer's book, its number as a shopper types it ("0300 1234567"); else,
+    with no book, the number the session signed in with. The session proved that number by a
+    code, as checkout's own codes do, and the book is the shopper's own. Another shop's session,
+    one that is over or none leaves it blank.
+  * Nothing else changes: the shopper may change any of it, and placing the order checks it as
+    it does what is typed.
+* **Consequences:** A shopper signed in fills in nothing to order again. The checkout on the
+  core's own address is not filled in, having no account cookie. Placing still asks for a code
+  where the shop asks for one: the session is not yet taken as proof of the number.
+* **Alternatives:** **A choice of the book's addresses on the checkout's page:** more for the
+  page to carry; the default, changed by hand, does for most orders, and the book's page sets
+  it. **Taking the session as proof of the number for placing:** left for its own decision, as it
+  touches who checkout trusts.

@@ -159,6 +159,28 @@ describe('StorefrontApiClient', () => {
     await expect(client.openPaymentLink('shop-1', 'down')).rejects.toThrow(StorefrontApiError);
   });
 
+  it("opens a checkout's page filled in for a shopper signed in to their account (ADR-585)", async () => {
+    const page = { placed: false, status: 200, headers: {}, html: '<p>Hi</p>' };
+    const { client, requests } = clientAnswering(() => Response.json(page));
+    await client.checkoutPage('shop-1', 'c-secret', null, undefined, 'session-secret');
+    await client.checkoutPage('shop-1', 'c-secret', null);
+    await client.checkoutPage(
+      'shop-1',
+      'c-secret',
+      { name: 'Ayesha' },
+      { ip: '203.0.113.7', userAgent: null },
+      'session-secret',
+    );
+    // The session's secret goes with the page asked for alone.
+    expect(
+      requests.map((request) => [request.method, request.headers.get('x-hatti-account')]),
+    ).toEqual([
+      ['GET', 'session-secret'],
+      ['GET', null],
+      ['POST', null],
+    ]);
+  });
+
   it("fetches a checkout's page, and posts its form as JSON with where it came from", async () => {
     const page = { placed: false, status: 200, headers: { 'x-a': '1' }, html: '<p>Hi</p>' };
     const { client, requests } = clientAnswering((request) =>

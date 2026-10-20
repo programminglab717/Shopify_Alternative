@@ -727,7 +727,7 @@ export function toSessionJson(session: AccountSessionRecord): AccountSessionJson
  * once its first order is placed. A number taken off its customer since, or given to another,
  * ends it.
  */
-async function sessionIn(
+export async function sessionIn(
   tx: Tx,
   shopId: string,
   token: string,

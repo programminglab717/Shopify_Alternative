@@ -1650,7 +1650,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         ...(browserIds && { browserIds }),
         ...(proof && { proof }),
       };
-      const page = await core.checkoutPage(found.shopId, token, form, posted ? client : undefined);
+      // Opened by a shopper signed in to their account, filled in from it (ADR-585).
+      const account = posted ? null : accountTokenOf(request.headers.cookie);
+      const page = await core.checkoutPage(
+        found.shopId,
+        token,
+        form,
+        posted ? client : undefined,
+        account,
+      );
       // Its session reached checkout, and, once it is placed, converted (ADR-180).
       if (!posted && 'html' in page && page.status === 200) {
         await counted(request, found, 'reached_checkout');

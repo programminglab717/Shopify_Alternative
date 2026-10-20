@@ -302,6 +302,7 @@ class FakeCore {
     token: string;
     form: Record<string, string> | null;
     client?: CheckoutClient;
+    account?: string;
   }[] = [];
   page: CheckoutPageResponse | Error = new Error('No page');
 
@@ -371,8 +372,9 @@ class FakeCore {
     token: string,
     form: Record<string, string> | null,
     client?: CheckoutClient,
+    account?: string | null,
   ): Promise<CheckoutPageResponse> {
-    this.pages.push({ token, form, ...(client && { client }) });
+    this.pages.push({ token, form, ...(client && { client }), ...(account && { account }) });
     if (this.page instanceof Error) throw this.page;
     return this.page;
   }
@@ -1628,6 +1630,14 @@ describe('Carts', () => {
       'x-frame-options': 'DENY',
     });
     expect(page.headers['set-cookie']).toBeUndefined();
+    // Opened by a shopper signed in to their account, the core fills it in for them (ADR-585):
+    // the session's secret goes with the page asked for, never with what is posted.
+    await app.inject({
+      method: 'GET',
+      url: '/checkouts/c-secret',
+      headers: { host: 'localhost', cookie: `hatti_account=${ACCOUNT_TOKEN}; hatti_signed_in=1` },
+    });
+    expect(core.pages.pop()).toEqual({ token: 'c-secret', form: null, account: ACCOUNT_TOKEN });
 
     core.page = { placed: true };
     const placed = await app.inject({

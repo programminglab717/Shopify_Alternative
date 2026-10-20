@@ -2,6 +2,7 @@ import { PublicSite } from '@hatti/api';
 import { MARKETING_CHANNELS } from '@hatti/customers/public';
 import { browserIdsOf } from '@hatti/orders/public';
 import {
+  ACCOUNT_TOKEN_HEADER,
   CART_TOKEN_HEADER,
   CLIENT_BROWSER_IDS_HEADER,
   CLIENT_IP_HEADER,
@@ -164,7 +165,8 @@ export class CheckoutController {
  * secret names, keeping the visits its body's `visits` name (ADR-139), and answers where to send
  * the shopper, or 422 when the cart has nothing to order;
  * `GET` and `POST …/checkouts/{secret}` give its page to send, as JSON, for the shop's checkouts
- * only, the POST with where the shopper placed the order from in `x-hatti-client-ip` and
+ * only, the GET filled in for the shopper whose account session `x-hatti-account` names
+ * (ADR-585), the POST with where the shopper placed the order from in `x-hatti-client-ip` and
  * `x-hatti-client-user-agent`. The host application checks the storefront key before any of this
  * runs.
  */
@@ -200,9 +202,12 @@ export class StorefrontCheckoutController {
   async show(
     @Param('shopId') shopId: string,
     @Param('token') token: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) account: string | undefined,
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
-    return responseOf(await this.checkouts.view(token, shopId), false);
+    // Filled in for a shopper signed in to their account on the shop (ADR-585).
+    const view = await this.checkouts.view(token, shopId, { account: account ?? null });
+    return responseOf(view, false);
   }
 
   /** The name and number the shopper typed, as on the core's own address (ADR-393). */

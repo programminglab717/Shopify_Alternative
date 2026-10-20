@@ -1218,6 +1218,52 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(rows).toEqual([{ name: 'Elsewhere' }]);
   });
 
+  it("fills a signed-in shopper's checkout from their default address, or their number (ADR-585)", async () => {
+    const token = await signIn(JAZZ);
+    const formOf = async (account: string | null, tenant: TenantContext = f.a) => {
+      const { secret } = await checkout(tenant);
+      const view = await f.checkouts.view(secret, tenant.shopId, { account });
+      if (view.kind !== 'open') throw new Error(`Expected an open checkout, got ${view.kind}`);
+      return view.form;
+    };
+    // A number no customer has yet: the number it signed in with.
+    expect(await formOf(token)).toMatchObject({ name: '', phone: '0300 1234567', city: '' });
+
+    // Its default address once it keeps one.
+    await order(JAZZ);
+    await saved(token, typed('Home'));
+    await saved(
+      token,
+      typed('Office', {
+        phone: '0321 7654321',
+        city: 'Karachi',
+        landmark: 'Opposite the bank',
+        default: true,
+      }),
+    );
+    expect(await formOf(token)).toMatchObject({
+      name: 'Office',
+      phone: '0321 7654321',
+      address1: "Office's house, Street 4",
+      address2: '',
+      landmark: 'Opposite the bank',
+      city: 'Karachi',
+      province: 'SD',
+      payment: '',
+      code: '',
+    });
+
+    // No session, another shop's, or one that is over: nothing filled in.
+    const [shawl] = (await f.variantsOf(f.b, 'Shawl', { price: '900' })) as [string];
+    await f.stock(f.b, shawl, 10);
+    const inB = await signIn(JAZZ, f.b);
+    for (const account of [null, inB, 'x'.repeat(43), 'y'.repeat(500)]) {
+      expect(await formOf(account)).toMatchObject({ name: '', phone: '', city: '' });
+    }
+    await f.accounts.signOut(f.a.shopId, token);
+    expect(await formOf(token)).toMatchObject({ name: '', phone: '' });
+  });
+
   it('sweeps codes to sign in with once their day is up', async () => {
     await f.accounts.startSignIn(f.a.shopId, { phone: JAZZ });
     await f.accounts.startSignIn(f.a.shopId, { phone: ZONG });
