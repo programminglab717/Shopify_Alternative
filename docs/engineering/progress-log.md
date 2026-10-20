@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Calls to confirm in Urdu
+### 987dbad · Calls to confirm in Urdu
 
 * **Where the shop says so, a cash-on-delivery order whose customer leaves the reminder to
   confirm unanswered an hour is called once in Urdu: pressing 1 confirms it and 2 cancels it**
