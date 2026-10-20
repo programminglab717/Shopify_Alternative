@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Export totals beside the rows
+
+* **An order export's workbook has its rows' totals on sheets beside them** ([ADR-632](../architecture/13-decision-log.md#adr-632--an-order-exports-workbook-has-its-rows-totals-on-sheets-beside-them-by-the-day-orders-were-placed-and-by-stage-or-a-row-per-line-item-by-variant-each-ending-with-every-rows-a-csv-stays-the-rows-alone)): by the
+  day orders were placed and by stage, or by variant for a row per line item, each with an
+  "All" row; the workbook writer writes several sheets, one as before.
+* 3747 tests, two more: the writer's sheets and the export's totals.
+
 ### eb54d2f · Theme pictures from the shop's files
 
 * **A theme's picture setting chooses from the shop's own pictures** ([ADR-631](../architecture/13-decision-log.md#adr-631--a-themes-picture-setting-chooses-from-the-shops-own-pictures-among-its-files-the-newest-first-sixty-at-a-time-as-well-as-taking-one-uploaded-the-picture-chosen-is-shown-at-its-theme-images-address-as-one-uploaded-is)) as well as

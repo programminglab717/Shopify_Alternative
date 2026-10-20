@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ZIP_LIMITS, columnName, toXlsx, zipFiles, type XlsxSheet } from './index.js';
+import {
+  XLSX_MOST_SHEETS,
+  ZIP_LIMITS,
+  columnName,
+  readXlsx,
+  toXlsx,
+  toXlsxWorkbook,
+  zipFiles,
+  type XlsxSheet,
+} from './index.js';
 import { xlsxParts as unzip, xlsxRows } from './testing/index.js';
 
 const ORDERS: XlsxSheet = {
@@ -146,6 +155,61 @@ describe('Excel workbooks', () => {
     );
     expect(named("Ayesha's & Co")).toContain(`'Ayesha''s &amp; Co'!$A$1:$A$1`);
     expect(() => toXlsx({ name: 'None', columns: [], rows: [] })).toThrow(RangeError);
+  });
+
+  it('writes sheets beside the first, each with its own filter, the first open (ADR-632)', () => {
+    const totals: XlsxSheet = {
+      name: 'By day',
+      columns: [{ header: 'Day' }, { header: 'Orders', type: 'number' }],
+      rows: [
+        ['2026-09-29', 2],
+        ['All', 2],
+      ],
+    };
+    const file = toXlsxWorkbook([ORDERS, totals]);
+    const parts = unzip(file);
+    expect([...parts.keys()]).toEqual([
+      '[Content_Types].xml',
+      '_rels/.rels',
+      'xl/workbook.xml',
+      'xl/_rels/workbook.xml.rels',
+      'xl/styles.xml',
+      'xl/worksheets/sheet1.xml',
+      'xl/worksheets/sheet2.xml',
+    ]);
+    expect(parts.get('[Content_Types].xml')).toContain('/xl/worksheets/sheet2.xml');
+    expect(parts.get('xl/workbook.xml')).toContain(
+      '<sheets><sheet name="Orders" sheetId="1" r:id="rId1"/>' +
+        '<sheet name="By day" sheetId="2" r:id="rId2"/></sheets>',
+    );
+    expect(parts.get('xl/workbook.xml')).toContain(
+      `<definedName name="_xlnm._FilterDatabase" localSheetId="1" hidden="1">` +
+        `'By day'!$A$1:$B$3</definedName>`,
+    );
+    expect(parts.get('xl/_rels/workbook.xml.rels')).toContain(
+      'Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"',
+    );
+    expect(xlsxRows(file, 2)).toEqual([
+      ['Day', 'Orders'],
+      ['2026-09-29', 2],
+      ['All', 2],
+    ]);
+    // Read back, as an import reads a workbook, the first sheet is the one.
+    expect(readXlsx(file).sheet).toBe('Orders');
+    // One sheet as toXlsx writes it; tabs of one name, or none, or too many, refused.
+    expect(toXlsxWorkbook([ORDERS]).equals(toXlsx(ORDERS))).toBe(true);
+    expect(() => toXlsxWorkbook([ORDERS, { ...totals, name: 'orders' }])).toThrow(
+      'Two sheets share a name',
+    );
+    expect(() => toXlsxWorkbook([])).toThrow(RangeError);
+    expect(() =>
+      toXlsxWorkbook(
+        Array.from({ length: XLSX_MOST_SHEETS + 1 }, (_, index) => ({
+          ...totals,
+          name: `Sheet ${index}`,
+        })),
+      ),
+    ).toThrow(RangeError);
   });
 });
 

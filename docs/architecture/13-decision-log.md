@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-631 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-632 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -639,6 +639,7 @@
 | 629 | A customer whose order has part of what it waits for before it ships, by transfer or as staff record it, hears what came, what is left to pay and its page, as the new order_part_paid, once for each sum received | Accepted |
 | 630 | A crop an image is no longer shown in has its files removed from storage by the worker eight days after, past the week the edge may serve a page cached before; a crop shown again meanwhile stays, and the edge keeps what it has | Accepted |
 | 631 | A theme's picture setting chooses from the shop's own pictures among its files, the newest first, sixty at a time, as well as taking one uploaded; the picture chosen is shown at its theme-images address, as one uploaded is | Accepted |
+| 632 | An order export's workbook has its rows' totals on sheets beside them: by the day orders were placed and by stage, or, a row per line item, by variant, each ending with every row's; a CSV stays the rows alone | Accepted |
 
 ---
 
@@ -22619,3 +22620,25 @@
 * **Alternatives:** **A section of the admin's own for the shop's files:** a larger screen,
   for when shops manage many files; the picker is what themes need now. **Searching the files
   by name:** a shop's pictures are few enough to scroll for now.
+
+## ADR-632 · An order export's workbook has its rows' totals on sheets beside them: by the day orders were placed and by stage, or, a row per line item, by variant, each ending with every row's; a CSV stays the rows alone
+
+* **Context:** The order export comes as an Excel workbook of one sheet (ADR-182), and shops
+  send it to accountants and partners, who add it up in pivot tables of their own, by day for
+  the cash book and by product for stock, each time (status shortcut 97). The other exports
+  each have an import that takes their CSV back, so a workbook of theirs is not wanted yet.
+* **Decision:** The workbook writer writes a sheet or a few beside it, up to sixteen, each with
+  its own header, filter and widths, the first open, no two tabs of one name; one sheet comes out
+  as before, byte for byte. An order export's workbook, after its rows: **By day**, the day each
+  order was placed in the shop's time, and **By stage**, in the stages' own order, each with
+  orders, units, total, paid, refunded and cash on delivery, and an "All" row; or, a row per line
+  item, **By product**, each variant with its quantity, line total and tax, the most sold first,
+  and an "All" row. Amounts are numbers in the shop's currency, as the rows' are. A CSV stays the
+  rows alone, as one file can hold no more; a scheduled export's workbook (ADR-183) carries the
+  sheets too.
+* **Consequences:** An accountant opening the file sees the day's and the stage's sums at once,
+  and they agree with the rows, made from the same orders in the same transaction.
+* **Alternatives:** **Formulas over the rows:** they would break when rows are sorted or
+  filtered, and text is never a formula in Hatti's workbooks. **Totals rows under the rows:** a
+  filter or sort mixes them in. **Workbooks for the other exports:** each has an import that
+  reads its CSV, and none has asked for one.

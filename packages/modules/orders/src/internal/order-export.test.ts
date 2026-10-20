@@ -202,6 +202,61 @@ describe.skipIf(!server)('Order exports', () => {
     ]);
   });
 
+  it("puts the rows' totals beside them in a workbook: by day, stage and product (ADR-632)", async () => {
+    // Two on the 29th in Karachi, one confirmed and partly paid; one on the 30th.
+    const first = await f.order(f.a, [kurta, size8], { shippingPrice: '250' });
+    await placedAt(first.id, '2026-09-28T20:30:00Z');
+    unwrap(await f.orders.confirm(f.a, first.id));
+    unwrap(await f.orders.recordPayment(f.a, first.id, { amount: '1,000' }));
+    const second = await f.order(f.a, [kurta]);
+    await placedAt(second.id, '2026-09-29T08:00:00Z');
+    const third = await f.order(f.a, [size8, size8]);
+    await placedAt(third.id, '2026-09-30T08:00:00Z');
+    const total = (order: { total: bigint }) => Number(order.total) / 100;
+    const reread = async (id: string) => (await f.orders.get(f.a, id))!;
+    const [one, two, three] = [
+      await reread(first.id),
+      await reread(second.id),
+      await reread(third.id),
+    ];
+
+    const workbook = unwrap(await f.exports.export(f.a, { layout: 'orders', format: 'xlsx' }));
+    const header = ['Orders', 'Units', 'Total', 'Amount paid', 'Amount refunded', 'COD amount'];
+    const sums = (orders: (typeof one)[]) => [
+      orders.length,
+      orders.reduce((units, order) => units + order.lines.reduce((n, l) => n + l.quantity, 0), 0),
+      orders.reduce((sum, order) => sum + total(order), 0),
+      orders.reduce((sum, order) => sum + Number(order.amountPaid) / 100, 0),
+      0,
+      orders.reduce((sum, order) => sum + Number(order.codAmount) / 100, 0),
+    ];
+    expect(xlsxRows(workbook.file.content, 2)).toEqual([
+      ['Day', ...header],
+      ['2026-09-29', ...sums([one, two])],
+      ['2026-09-30', ...sums([three])],
+      ['All', ...sums([one, two, three])],
+    ]);
+    // By stage, in the stages' own order.
+    expect(xlsxRows(workbook.file.content, 3)).toEqual([
+      ['Stage', ...header],
+      ['needs_confirmation', ...sums([two, three])],
+      ['to_pack', ...sums([one])],
+      ['All', ...sums([one, two, three])],
+    ]);
+    expect(sums([one])[3]).toBe(1000);
+
+    // A row per line item: by variant, the most sold first.
+    const lines = unwrap(await f.exports.export(f.a, { layout: 'line_items', format: 'xlsx' }));
+    expect(xlsxRows(lines.file.content, 2)).toEqual([
+      ['Product', 'Variant', 'SKU', 'Quantity', 'Line total', 'Line tax'],
+      ['Peshawari Chappal', '8', 'PES-8', 3, 3 * 3499, 0],
+      ['Kurta', null, null, 2, 2 * 2000, 0],
+      ['All', null, null, 5, 3 * 3499 + 2 * 2000, 0],
+    ]);
+    // A CSV is the rows alone.
+    expect(unwrap(await f.exports.export(f.a, { layout: 'orders' })).csv).toContain('Order,');
+  });
+
   it('filters as the order list does, or lays out a row per line item', async () => {
     const early = await f.order(f.a, [kurta, size9]);
     await placedAt(early.id, '2026-09-01T10:00:00Z');

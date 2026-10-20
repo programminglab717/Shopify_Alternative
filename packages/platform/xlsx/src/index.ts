@@ -1,7 +1,8 @@
 import { crc32, deflateRawSync } from 'node:zlib';
 
 /**
- * Excel workbooks of one sheet for exports (Office Open XML, ECMA-376): cells kept as text,
+ * Excel workbooks for exports (Office Open XML, ECMA-376), of one sheet or a few beside it, such
+ * as its totals (ADR-632): cells kept as text,
  * numbers, amounts or times, as their columns say, under a bold header that stays in view with
  * a filter on it, each column as wide as its contents. Text is written as text, never as a
  * formula, so a cell that begins with "=" cannot run in a spreadsheet; characters XML cannot
@@ -44,23 +45,49 @@ export const XLSX_CONTENT_TYPE =
 
 /** The workbook of `sheet`, ready to save as a .xlsx file. */
 export function toXlsx(sheet: XlsxSheet): Buffer {
-  const { columns, rows } = sheet;
-  if (columns.length === 0 || columns.length > XLSX_LIMITS.columns) {
-    throw new RangeError(`A sheet has 1 to ${XLSX_LIMITS.columns} columns`);
+  return toXlsxWorkbook([sheet]);
+}
+
+/** The most sheets a workbook is written with. */
+export const XLSX_MOST_SHEETS = 16;
+
+/**
+ * The workbook of `sheets`, in their order, the first open: each with its header, filter and
+ * widths as {@link toXlsx} writes one. Two tabs may not share a name, as Excel takes it.
+ */
+export function toXlsxWorkbook(sheets: readonly XlsxSheet[]): Buffer {
+  if (sheets.length === 0 || sheets.length > XLSX_MOST_SHEETS) {
+    throw new RangeError(`A workbook has 1 to ${XLSX_MOST_SHEETS} sheets`);
   }
-  if (rows.length + 1 > XLSX_LIMITS.rows) {
-    throw new RangeError(`A sheet has at most ${XLSX_LIMITS.rows - 1} rows under its header`);
-  }
-  const name = sheetName(sheet.name);
-  const lastColumn = columnName(columns.length - 1);
-  const lastRow = rows.length + 1;
+  const written = sheets.map((sheet) => {
+    const { columns, rows } = sheet;
+    if (columns.length === 0 || columns.length > XLSX_LIMITS.columns) {
+      throw new RangeError(`A sheet has 1 to ${XLSX_LIMITS.columns} columns`);
+    }
+    if (rows.length + 1 > XLSX_LIMITS.rows) {
+      throw new RangeError(`A sheet has at most ${XLSX_LIMITS.rows - 1} rows under its header`);
+    }
+    const lastColumn = columnName(columns.length - 1);
+    const lastRow = rows.length + 1;
+    return {
+      name: sheetName(sheet.name),
+      filtered: `$A$1:$${lastColumn}$${lastRow}`,
+      xml: worksheet(columns, rows, `A1:${lastColumn}${lastRow}`),
+    };
+  });
+  // Excel names tabs without regard to case.
+  const names = new Set(written.map((sheet) => sheet.name.toLowerCase()));
+  if (names.size !== written.length) throw new RangeError('Two sheets share a name');
   const parts: [string, string][] = [
-    ['[Content_Types].xml', CONTENT_TYPES],
+    ['[Content_Types].xml', contentTypes(written.length)],
     ['_rels/.rels', ROOT_RELATIONSHIPS],
-    ['xl/workbook.xml', workbook(name, `$A$1:$${lastColumn}$${lastRow}`)],
-    ['xl/_rels/workbook.xml.rels', WORKBOOK_RELATIONSHIPS],
+    ['xl/workbook.xml', workbook(written)],
+    ['xl/_rels/workbook.xml.rels', workbookRelationships(written.length)],
     ['xl/styles.xml', STYLES],
-    ['xl/worksheets/sheet1.xml', worksheet(columns, rows, `A1:${lastColumn}${lastRow}`)],
+    ...written.map((sheet, index): [string, string] => [
+      `xl/worksheets/sheet${index + 1}.xml`,
+      sheet.xml,
+    ]),
   ];
   return zip(parts.map(([path, xml]) => ({ path, data: Buffer.from(xml, 'utf8') })));
 }
@@ -73,18 +100,25 @@ const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const RELATIONSHIPS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PACKAGE_RELATIONSHIPS = 'http://schemas.openxmlformats.org/package/2006/relationships';
 
-const CONTENT_TYPES =
-  XML +
-  '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-  '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-  '<Default Extension="xml" ContentType="application/xml"/>' +
-  '<Override PartName="/xl/workbook.xml" ' +
-  'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-  '<Override PartName="/xl/worksheets/sheet1.xml" ' +
-  'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-  '<Override PartName="/xl/styles.xml" ' +
-  'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
-  '</Types>';
+function contentTypes(sheets: number): string {
+  return (
+    XML +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ' +
+    'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    Array.from(
+      { length: sheets },
+      (_, index) =>
+        `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ` +
+        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+    ).join('') +
+    '<Override PartName="/xl/styles.xml" ' +
+    'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+    '</Types>'
+  );
+}
 
 const ROOT_RELATIONSHIPS =
   XML +
@@ -92,12 +126,21 @@ const ROOT_RELATIONSHIPS =
   `<Relationship Id="rId1" Type="${RELATIONSHIPS}/officeDocument" Target="xl/workbook.xml"/>` +
   '</Relationships>';
 
-const WORKBOOK_RELATIONSHIPS =
-  XML +
-  `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}">` +
-  `<Relationship Id="rId1" Type="${RELATIONSHIPS}/worksheet" Target="worksheets/sheet1.xml"/>` +
-  `<Relationship Id="rId2" Type="${RELATIONSHIPS}/styles" Target="styles.xml"/>` +
-  '</Relationships>';
+/** Each sheet's relationship, rId1 the first's, then the styles'. */
+function workbookRelationships(sheets: number): string {
+  return (
+    XML +
+    `<Relationships xmlns="${PACKAGE_RELATIONSHIPS}">` +
+    Array.from(
+      { length: sheets },
+      (_, index) =>
+        `<Relationship Id="rId${index + 1}" Type="${RELATIONSHIPS}/worksheet" ` +
+        `Target="worksheets/sheet${index + 1}.xml"/>`,
+    ).join('') +
+    `<Relationship Id="rId${sheets + 1}" Type="${RELATIONSHIPS}/styles" Target="styles.xml"/>` +
+    '</Relationships>'
+  );
+}
 
 // Calibri, as Excel's own workbooks are; the header bold; amounts "#,##0.00" and times
 // "yyyy-mm-dd hh:mm", as the CSV writes them.
@@ -127,15 +170,30 @@ const STYLES =
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   '</styleSheet>';
 
-function workbook(name: string, filtered: string): string {
-  const quoted = `'${name.replace(/'/g, "''")}'`;
+function workbook(sheets: readonly { name: string; filtered: string }[]): string {
   return (
     XML +
     `<workbook xmlns="${MAIN}" xmlns:r="${RELATIONSHIPS}">` +
-    `<sheets><sheet name="${escapeXml(name)}" sheetId="1" r:id="rId1"/></sheets>` +
-    // Excel's own name for the range its filter covers, as it writes it.
-    '<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">' +
-    `${escapeXml(`${quoted}!${filtered}`)}</definedName></definedNames>` +
+    '<sheets>' +
+    sheets
+      .map(
+        (sheet, index) =>
+          `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`,
+      )
+      .join('') +
+    '</sheets>' +
+    // Excel's own name for the range each sheet's filter covers, as it writes it.
+    '<definedNames>' +
+    sheets
+      .map((sheet, index) => {
+        const quoted = `'${sheet.name.replace(/'/g, "''")}'`;
+        return (
+          `<definedName name="_xlnm._FilterDatabase" localSheetId="${index}" hidden="1">` +
+          `${escapeXml(`${quoted}!${sheet.filtered}`)}</definedName>`
+        );
+      })
+      .join('') +
+    '</definedNames>' +
     '</workbook>'
   );
 }

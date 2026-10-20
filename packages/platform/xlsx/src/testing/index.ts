@@ -29,11 +29,11 @@ export function xlsxParts(file: Buffer): Map<string, string> {
 }
 
 /**
- * The sheet's rows, the header first, for tests: each cell its text, or its number as kept (a
- * time as days since 30 December 1899), an empty one null.
+ * A sheet's rows, the first sheet's unless said, the header first, for tests: each cell its text,
+ * or its number as kept (a time as days since 30 December 1899), an empty one null.
  */
-export function xlsxRows(file: Buffer): (string | number | null)[][] {
-  const sheet = xlsxParts(file).get('xl/worksheets/sheet1.xml');
+export function xlsxRows(file: Buffer, sheetNumber = 1): (string | number | null)[][] {
+  const sheet = xlsxParts(file).get(`xl/worksheets/sheet${sheetNumber}.xml`);
   if (sheet === undefined) throw new Error('No sheet');
   const rows: (string | number | null)[][] = [];
   for (const [, number, cells] of sheet.matchAll(/<row r="(\d+)">([\s\S]*?)<\/row>/g)) {

@@ -13,7 +13,13 @@ import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, maskPkMobile, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
-import { XLSX_CONTENT_TYPE, toXlsx, type XlsxColumn } from '@hatti/xlsx';
+import {
+  XLSX_CONTENT_TYPE,
+  toXlsxWorkbook,
+  type XlsxCell,
+  type XlsxColumn,
+  type XlsxSheet,
+} from '@hatti/xlsx';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type OrderExportCreatedPayload } from './events.js';
@@ -24,6 +30,7 @@ import { loadOrders } from './order-store.js';
 import { shownToStaff } from './plan-orders.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
+import { ORDER_STAGES } from './schema.js';
 
 export const EXPORT_LIMITS = {
   orders: 10_000,
@@ -150,11 +157,13 @@ export class OrderExportService {
           ? {
               filename,
               contentType: XLSX_CONTENT_TYPE,
-              content: toXlsx({
-                name: input.layout === 'orders' ? 'Orders' : 'Order items',
-                columns,
-                rows,
-              }),
+              // The rows, then their totals beside them (ADR-632).
+              content: toXlsxWorkbook([
+                { name: input.layout === 'orders' ? 'Orders' : 'Order items', columns, rows },
+                ...(input.layout === 'orders'
+                  ? orderTotals(orders, cells, tenant.currency)
+                  : lineTotals(orders, tenant.currency)),
+              ]),
             }
           : { filename, contentType: 'text/csv; charset=utf-8', content: Buffer.from(csv) };
 
@@ -270,6 +279,140 @@ const LINE_COLUMNS: readonly XlsxColumn[] = [
   { header: 'Currency' },
   { header: 'Exported' },
 ];
+
+/** What a sheet of totals adds up for each of its groups of orders. */
+const SUMMED_COLUMNS: readonly XlsxColumn[] = [
+  { header: 'Orders', type: 'number' },
+  { header: 'Units', type: 'number' },
+  { header: 'Total', type: 'amount' },
+  { header: 'Amount paid', type: 'amount' },
+  { header: 'Amount refunded', type: 'amount' },
+  { header: 'COD amount', type: 'amount' },
+];
+
+/** A group's sums, in minor units but its counts. */
+interface OrderSums {
+  orders: number;
+  units: number;
+  total: bigint;
+  paid: bigint;
+  refunded: bigint;
+  cod: bigint;
+}
+
+/**
+ * The orders' totals beside them (ADR-632): by the day each was placed, in the shop's time, and
+ * by stage, in the order of the stages, each ending with every order's. Amounts in the shop's
+ * currency, as its orders are.
+ */
+function orderTotals(
+  orders: readonly OrderRecord[],
+  cells: ExportCells,
+  currency: string,
+): XlsxSheet[] {
+  const amount = (value: bigint) => toMajorString(money(value, currency as CurrencyCode));
+  const row = (label: string, sums: OrderSums): XlsxCell[] => [
+    label,
+    sums.orders,
+    sums.units,
+    amount(sums.total),
+    amount(sums.paid),
+    amount(sums.refunded),
+    amount(sums.cod),
+  ];
+  const sum = (group: readonly OrderRecord[]): OrderSums =>
+    group.reduce<OrderSums>(
+      (sums, order) => ({
+        orders: sums.orders + 1,
+        units: sums.units + order.lines.reduce((units, line) => units + line.quantity, 0),
+        total: sums.total + order.total,
+        paid: sums.paid + order.amountPaid,
+        refunded: sums.refunded + order.amountRefunded,
+        cod: sums.cod + order.codAmount,
+      }),
+      { orders: 0, units: 0, total: 0n, paid: 0n, refunded: 0n, cod: 0n },
+    );
+  const grouped = (key: (order: OrderRecord) => string) => {
+    const groups = new Map<string, OrderRecord[]>();
+    for (const order of orders) groups.set(key(order), [...(groups.get(key(order)) ?? []), order]);
+    return groups;
+  };
+  const days = grouped((order) => cells.at(order.createdAt)!.slice(0, 10));
+  const stages = grouped((order) => order.stage);
+  const all = row('All', sum(orders));
+  return [
+    {
+      name: 'By day',
+      columns: [{ header: 'Day' }, ...SUMMED_COLUMNS],
+      rows: [...[...days.keys()].sort().map((day) => row(day, sum(days.get(day)!))), all],
+    },
+    {
+      name: 'By stage',
+      columns: [{ header: 'Stage' }, ...SUMMED_COLUMNS],
+      rows: [
+        ...ORDER_STAGES.filter((stage) => stages.has(stage)).map((stage) =>
+          row(stage, sum(stages.get(stage)!)),
+        ),
+        all,
+      ],
+    },
+  ];
+}
+
+/**
+ * The line items' totals beside them (ADR-632): by variant, the most sold first, with how many
+ * were bought and for how much, ending with every line's.
+ */
+function lineTotals(orders: readonly OrderRecord[], currency: string): XlsxSheet[] {
+  const amount = (value: bigint) => toMajorString(money(value, currency as CurrencyCode));
+  const variants = new Map<
+    string,
+    { line: OrderLineRecord; quantity: number; total: bigint; tax: bigint }
+  >();
+  for (const line of orders.flatMap((order) => order.lines)) {
+    const kept = variants.get(line.variantId) ?? { line, quantity: 0, total: 0n, tax: 0n };
+    variants.set(line.variantId, {
+      line: kept.line,
+      quantity: kept.quantity + line.quantity,
+      total: kept.total + line.total,
+      tax: kept.tax + line.tax,
+    });
+  }
+  const sold = [...variants.values()].sort(
+    (a, b) => b.quantity - a.quantity || a.line.title.localeCompare(b.line.title),
+  );
+  return [
+    {
+      name: 'By product',
+      columns: [
+        { header: 'Product' },
+        { header: 'Variant' },
+        { header: 'SKU' },
+        { header: 'Quantity', type: 'number' },
+        { header: 'Line total', type: 'amount' },
+        { header: 'Line tax', type: 'amount' },
+      ],
+      rows: [
+        ...sold.map(({ line, quantity, total, tax }) => [
+          line.title,
+          variantOf(line, '', ''),
+          line.sku,
+          quantity,
+          amount(total),
+          amount(tax),
+        ]),
+        [
+          'All',
+          null,
+          null,
+          sold.reduce((sum, each) => sum + each.quantity, 0),
+          amount(sold.reduce((sum, each) => sum + each.total, 0n)),
+          amount(sold.reduce((sum, each) => sum + each.tax, 0n)),
+        ],
+      ],
+    },
+  ];
+}
 
 /** An order's cells, as the caller may see them, with times in the shop's time zone. */
 class ExportCells {
