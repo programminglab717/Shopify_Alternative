@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The Ajax cart in Urdu
+
+* **The Ajax cart answers in Urdu at its Urdu addresses** ([ADR-625](../architecture/13-decision-log.md#adr-625--the-ajax-carts-answers-at-the-urdu-addresses-urcartjs-and-the-rest-give-its-lines-titles-in-the-shops-urdu-and-their-addresses-under-ur-as-the-urdu-pages-show-them)): `/ur/cart.js` and the
+  changes asked from Urdu pages give lines' titles in the shop's Urdu and their addresses under
+  `/ur`, so a drawer a script fills reads as its page.
+* 3739 tests, one more: reading, adding and changing from an Urdu page, and the shop's own
+  address as it was.
+
 ### 5449cdd · Urdu pages link Urdu pages
 
 * **On an Urdu page, objects' addresses carry `/ur`** ([ADR-624](../architecture/13-decision-log.md#adr-624--on-an-urdu-page-the-addresses-of-products-variants-collections-pages-blogs-articles-their-comments-cart-lines-and-the-shops-own-menu-links-carry-ur-as-shopifys-objects-url-carry-their-locales-predictive-searchs-json-at-its-urdu-address-likewise-in-the-shops-urdu)): products, variants,

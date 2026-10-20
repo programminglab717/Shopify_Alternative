@@ -910,6 +910,63 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("gives an Urdu page's scripts the cart in Urdu, at its Urdu addresses (ADR-625)", async () => {
+    const urduLawn = { ...lawn, translations: { ur: { title: 'لان کا سوٹ' } } };
+    const app = server({
+      sample: new MemoryStore({
+        ...sampleStore(),
+        products: sample.products.map((doc) => (doc.id === lawn.id ? urduLawn : doc)),
+      }),
+    });
+    core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-9', added: [line(2).key] });
+    const script = {
+      host: 'localhost',
+      cookie: 'cart=secret-9',
+      'content-type': 'application/json',
+    };
+    const read = async (url: string) =>
+      (await app.inject({ method: 'GET', url, headers: script })).json();
+    // A line added from an Urdu page, in Urdu.
+    const added = await app.inject({
+      method: 'POST',
+      url: '/ur/cart/add.js',
+      headers: script,
+      payload: { id: variant.id, quantity: 1 },
+    });
+    expect(added.json()).toMatchObject({
+      product_title: 'لان کا سوٹ',
+      url: `/ur/products/${lawn.handle}?variant=${variant.id}`,
+    });
+    const urdu = await read('/ur/cart.js');
+    expect(urdu).toMatchObject({
+      items: [
+        {
+          title: `لان کا سوٹ - ${variant.title}`,
+          product_title: 'لان کا سوٹ',
+          url: `/ur/products/${lawn.handle}?variant=${variant.id}`,
+        },
+      ],
+    });
+    // The shop's own words at the shop's own address, as before.
+    expect(await read('/cart.js')).toMatchObject({
+      items: [
+        {
+          title: `${lawn.title} - ${variant.title}`,
+          url: `/products/${lawn.handle}?variant=${variant.id}`,
+        },
+      ],
+    });
+    // The cart changed from one.
+    const changed = await app.inject({
+      method: 'POST',
+      url: '/ur/cart/change.js',
+      headers: script,
+      payload: { id: line(2).key, quantity: 2 },
+    });
+    expect(changed.json()).toMatchObject({ items: [{ product_title: 'لان کا سوٹ' }] });
+    await app.close();
+  });
+
   it("answers themes' scripts as Shopify's Ajax cart does", async () => {
     const app = server();
     core.answer = (action) => ({

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-624 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-625 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -632,6 +632,7 @@
 | 622 | While orders are paused, Hatti Base keeps the cart and turns its checkout button off, saying why, and its product page says what is added is kept for when orders come back; the platform's script turns the button on again once their time has come | Accepted |
 | 623 | A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses with .atom, their articles and products as those pages show them and linking them, under the same IDs as in English; Hatti Base's Urdu pages link them | Accepted |
 | 624 | On an Urdu page, the addresses of products, variants, collections, pages, blogs, articles, their comments, cart lines and the shop's own menu links carry `/ur`, as Shopify's objects' `url` carry their locale's; predictive search's JSON at its Urdu address likewise, in the shop's Urdu | Accepted |
+| 625 | The Ajax cart's answers at the Urdu addresses, `/ur/cart.js` and the rest, give its lines' titles in the shop's Urdu and their addresses under `/ur`, as the Urdu pages show them | Accepted |
 
 ---
 
@@ -22476,3 +22477,19 @@
 * **Alternatives:** **Rewriting links in the rendered page:** fragile, and themes' scripts would
   still read English addresses from objects. **A Liquid filter for themes to call:** Shopify's
   themes rely on `url` carrying the locale and would not call it.
+
+## ADR-625 · The Ajax cart's answers at the Urdu addresses, `/ur/cart.js` and the rest, give its lines' titles in the shop's Urdu and their addresses under `/ur`, as the Urdu pages show them
+
+* **Context:** Themes' scripts read the cart from `/cart.js` and have each change's answer as
+  JSON (ADR-042); a cart drawer prints its lines' titles from them. On Urdu pages they ask the
+  Urdu addresses, `/ur/cart.js`, `/ur/cart/add.js` and the rest, which answered in the shop's
+  own words with English addresses, while the cart page itself was in Urdu (status shortcut 113).
+* **Decision:** At the Urdu addresses, the Ajax cart's lines are read from the store in Urdu, as
+  the pages read it (ADR-238, ADR-241): `title`, `product_title` and `variant_title` in the
+  shop's Urdu where it gave some, and `url` under `/ur` (ADR-624). A line whose product is no
+  longer published keeps the core's words, the shop's own. Prices, keys and the rest are as they
+  were; at the shop's own addresses nothing changes.
+* **Consequences:** A drawer filled by a script reads as the page around it. The core keeps its
+  carts in the shop's own words, for checkout and orders, which stay in them.
+* **Alternatives:** **The core's carts in the shopper's language:** checkout, orders and messages
+  keep the shop's own words (ADR-238); the storefront translates at the edge, as for its pages.

@@ -259,11 +259,13 @@ export async function cartProducts(
 
 /**
  * A cart as Shopify's `/cart.js` gives it to scripts. Its discount code takes its part off the
- * whole cart, not off lines: `total_price` is what the items come to after it.
+ * whole cart, not off lines: `total_price` is what the items come to after it. At `/ur/cart.js`,
+ * `prefix` is `/ur` and `products` are as Urdu pages show them (ADR-625).
  */
 export function ajaxCart(
   cart: CartJson | null,
   products: ReadonlyMap<string, ProductDoc>,
+  prefix = '',
 ): Record<string, unknown> {
   const items = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
@@ -276,7 +278,7 @@ export function ajaxCart(
     total_discount: cart?.totalDiscount ?? 0,
     total_weight: cart?.totalWeightGrams ?? 0,
     item_count: cart?.itemCount ?? 0,
-    items: items.map((item) => ajaxLineItem(item, products.get(item.productId))),
+    items: items.map((item) => ajaxLineItem(item, products.get(item.productId), prefix)),
     requires_shipping: items.length > 0,
     currency: 'PKR',
     items_subtotal_price: subtotal,
@@ -343,9 +345,16 @@ function decimal(value: number): string {
 export function ajaxLineItem(
   item: CartLineJson,
   product: ProductDoc | undefined,
+  prefix = '',
 ): Record<string, unknown> {
   const variant = product?.variants.find((each) => each.id === item.variantId);
   const onlyDefault = !product || isOnlyDefault(product);
+  // In a language of the page's, its words as its pages show them, where its product is
+  // published still (ADR-625); the core's, the shop's own, otherwise.
+  const words =
+    prefix !== '' && product && variant
+      ? { ...item, title: product.title, variantTitle: variant.title }
+      : item;
   const imageDoc =
     (variant?.image !== null && variant?.image !== undefined
       ? product?.images[variant.image]
@@ -357,9 +366,9 @@ export function ajaxLineItem(
     key: item.key,
     quantity: item.quantity,
     properties: item.properties,
-    title: lineTitle(item, onlyDefault),
+    title: lineTitle(words, onlyDefault),
     product_title: product?.title ?? item.title,
-    variant_title: onlyDefault ? null : item.variantTitle,
+    variant_title: onlyDefault ? null : words.variantTitle,
     variant_options: variant?.options ?? [],
     options_with_values: (product?.options ?? []).map((option, index) => ({
       name: option.name,
@@ -382,7 +391,7 @@ export function ajaxLineItem(
     product_type: product?.productType ?? '',
     product_has_only_default_variant: onlyDefault,
     handle: product?.handle ?? null,
-    url: product ? `/products/${product.handle}?variant=${item.variantId}` : null,
+    url: product ? `${prefix}/products/${product.handle}?variant=${item.variantId}` : null,
     image: imageDoc?.src ?? null,
     featured_image: imageDoc
       ? {

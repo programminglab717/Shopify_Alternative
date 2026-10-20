@@ -1529,7 +1529,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         const shown = token && core ? await core.read(found.shopId, token) : null;
         if (core) keep(shown ? token : null, shown);
         if (asksForSections(url)) return await sendSections(reply, found, url, shown);
-        if (json) return await reply.send(await ajax(shown, found.store));
+        if (json) return await reply.send(await ajax(shown, found.store, urdu));
         // What came of buying an order again (ADR-574), as its address says.
         const reorder = reorderNoticeOf(url.searchParams.get('reorder'));
         const cartError = reorder && reorderNoticeMessage(reorder, words);
@@ -1572,12 +1572,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
               sections: await sectionsOf(found, sectionsPage(params, request), asked, result.cart),
             };
       if (action !== 'add') {
-        return await reply.send(await withSections(await ajax(result.cart, found.store)));
+        return await reply.send(await withSections(await ajax(result.cart, found.store, urdu)));
       }
-      const products = await cartProducts(result.cart, (ids) => found.store.products(ids));
+      const store = urdu ? new TranslatedStore(found.store, 'ur') : found.store;
+      const products = await cartProducts(result.cart, (ids) => store.products(ids));
       const added = result.added.flatMap((key) => {
         const line = result.cart.items.find((item) => item.key === key);
-        return line ? [ajaxLineItem(line, products.get(line.productId))] : [];
+        return line ? [ajaxLineItem(line, products.get(line.productId), urdu ? '/ur' : '')] : [];
       });
       return await reply.send(await withSections(single ? (added[0] ?? {}) : { items: added }));
     } catch (error) {
@@ -3275,9 +3276,17 @@ function contentTypes(types: readonly string[]): ContentType[] {
   );
 }
 
-/** The cart as `/cart.js` gives it, with its lines' products. */
-async function ajax(cart: CartJson | null, store: StoreData): Promise<Record<string, unknown>> {
-  return ajaxCart(cart, await cartProducts(cart, (ids) => store.products(ids)));
+/**
+ * The cart as `/cart.js` gives it, with its lines' products; at `/ur/cart.js`, in Urdu as its
+ * pages are (ADR-625).
+ */
+async function ajax(
+  cart: CartJson | null,
+  store: StoreData,
+  urdu = false,
+): Promise<Record<string, unknown>> {
+  const shown = urdu ? new TranslatedStore(store, 'ur') : store;
+  return ajaxCart(cart, await cartProducts(cart, (ids) => shown.products(ids)), urdu ? '/ur' : '');
 }
 
 /** Shopify's Ajax cart error. */
