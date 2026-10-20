@@ -1,5 +1,5 @@
 import type { Database } from '@hatti/db';
-import { readyImagesIn } from '@hatti/files/public';
+import { fileVersionOf, readyImagesIn } from '@hatti/files/public';
 import { isUuid } from '@hatti/ids';
 import { shopPreferencesOf } from '@hatti/online-store/public';
 import type { FastifyInstance } from 'fastify';
@@ -11,9 +11,12 @@ export const SHARING_IMAGES_PATH = 'sharing-images';
 /** The image is the shop's to change: browsers and the edge keep it an hour. */
 const AN_HOUR = 'public, max-age=3600';
 
-/** The path of the shop's social sharing image, naming its file, so that another is fetched anew. */
-export function sharingImagePathOf(shopId: string, fileId: string): string {
-  return `/${SHARING_IMAGES_PATH}/${shopId}?v=${fileId.slice(0, 8)}`;
+/**
+ * The path of the shop's social sharing image, naming what its file holds, kept at `key`, so that
+ * another, or the file replaced (ADR-647), is fetched anew.
+ */
+export function sharingImagePathOf(shopId: string, key: string): string {
+  return `/${SHARING_IMAGES_PATH}/${shopId}?v=${fileVersionOf(key)}`;
 }
 
 /**

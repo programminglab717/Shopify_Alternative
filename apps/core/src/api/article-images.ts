@@ -1,5 +1,5 @@
 import type { Database } from '@hatti/db';
-import { readyImagesIn } from '@hatti/files/public';
+import { fileVersionOf, readyImagesIn } from '@hatti/files/public';
 import { isUuid } from '@hatti/ids';
 import { publishedArticleImageOf } from '@hatti/online-store/public';
 import type { FastifyInstance } from 'fastify';
@@ -11,9 +11,12 @@ export const ARTICLE_IMAGES_PATH = 'article-images';
 /** An article's image is the shop's to change: browsers and the edge keep it an hour. */
 const AN_HOUR = 'public, max-age=3600';
 
-/** The path of an article's image, naming its file, so that another is fetched anew. */
-export function articleImagePathOf(shopId: string, articleId: string, fileId: string): string {
-  return `/${ARTICLE_IMAGES_PATH}/${shopId}/${articleId}?v=${fileId.slice(0, 8)}`;
+/**
+ * The path of an article's image, naming what its file holds, kept at `key`, so that another, or
+ * the file replaced (ADR-647), is fetched anew.
+ */
+export function articleImagePathOf(shopId: string, articleId: string, key: string): string {
+  return `/${ARTICLE_IMAGES_PATH}/${shopId}/${articleId}?v=${fileVersionOf(key)}`;
 }
 
 /**

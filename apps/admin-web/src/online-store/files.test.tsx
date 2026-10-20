@@ -183,6 +183,35 @@ describe("The online store's files (ADR-636)", () => {
     ]);
   });
 
+  it('replaces what a file holds, wherever it is used (ADR-647)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=files');
+    await screen.findByText('Size guide.pdf');
+
+    expect(
+      screen.getByLabelText('A file to replace Size guide.pdf with').getAttribute('accept'),
+    ).toBe('application/pdf');
+    fireEvent.change(screen.getByLabelText('A file to replace Size guide.pdf with'), {
+      target: {
+        files: [new File([new Uint8Array(12)], 'Sizes 2026.pdf', { type: 'application/pdf' })],
+      },
+    });
+    expect(
+      await screen.findByText('Replaced. Wherever it is used shows the new one.'),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'StagedUploadsCreate')).toEqual([
+      { input: [{ filename: 'Sizes 2026.pdf', mimeType: 'application/pdf', fileSize: '12' }] },
+    ]);
+    expect(fake.uploads).toEqual([
+      { url: `${STORAGE}/new?expires=1&signature=s`, type: 'application/pdf', size: 12 },
+    ]);
+    expect(sentOf(fake, 'FileUpdate')).toEqual([
+      { files: [{ id: 'fil_2', originalSource: `${STORAGE}/new` }] },
+    ]);
+    expect(sentOf(fake, 'FileCreate')).toEqual([]);
+  });
+
   it('keeps the files to those who keep them', async () => {
     vi.stubGlobal('fetch', core('confirmation_agent').fetcher);
     renderAdmin('/shop_1/online-store?tab=files');

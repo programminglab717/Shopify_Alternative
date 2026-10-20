@@ -310,6 +310,11 @@ describe('What storefront documents an event makes stale', () => {
       'every-article',
     ]);
     expect(itemsFor(event('file.updated', { changed: ['filename'] }))).toEqual([]);
+    // What it holds replaced, the addresses naming it change (ADR-647).
+    expect(itemsFor(event('file.updated', { changed: ['file'] }))).toEqual([
+      'shop',
+      'every-article',
+    ]);
   });
 
   it('publishes a shop whole once it is opened (ADR-145)', () => {
@@ -1099,7 +1104,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     const imageOf = async (handle: string) => (await store().articleByHandle(handle))?.image;
     expect(await imageOf('lookbook/eid-lawn')).toEqual({
-      src: `http://localhost:4000/article-images/${shopId}/${eid.id}?v=${photo.slice(0, 8)}`,
+      src: `http://localhost:4000/article-images/${shopId}/${eid.id}?v=${photo.slice(-8)}`,
       width: 0,
       height: 0,
       alt: 'Lawn, folded',
@@ -1111,7 +1116,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await articles.update(tenant, sizes.id, { image: { fileId: plain } }));
     await deliver();
     const plainImage = {
-      src: `http://localhost:4000/article-images/${shopId}/${sizes.id}?v=${plain.slice(0, 8)}`,
+      src: `http://localhost:4000/article-images/${shopId}/${sizes.id}?v=${plain.slice(-8)}`,
       width: 0,
       height: 0,
       alt: null,
@@ -2195,14 +2200,14 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await brands.update(tenant, { logo, squareLogo: square }));
     expect(await deliver()).toEqual(['shop_brand.updated']);
     expect((await store().shop()).brand).toEqual({
-      logo: `http://localhost:4000/logos/${shopId}?v=${logo.slice(0, 8)}`,
-      squareLogo: `http://localhost:4000/logos/${shopId}/square?v=${square.slice(0, 8)}`,
+      logo: `http://localhost:4000/logos/${shopId}?v=${logo.slice(-8)}`,
+      squareLogo: `http://localhost:4000/logos/${shopId}/square?v=${square.slice(-8)}`,
     });
     expect(forgotten.flat()).toContain(shopTag(shopId));
     unwrap(await brands.update(tenant, { squareLogo: null }));
     await deliver();
     expect((await store().shop()).brand).toEqual({
-      logo: `http://localhost:4000/logos/${shopId}?v=${logo.slice(0, 8)}`,
+      logo: `http://localhost:4000/logos/${shopId}?v=${logo.slice(-8)}`,
       squareLogo: null,
     });
     unwrap(await brands.update(tenant, { logo: null }));
@@ -2230,7 +2235,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect([shop.seo, shop.sharingImage]).toEqual([
       { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
       {
-        src: `http://localhost:4000/sharing-images/${shopId}?v=${image.slice(0, 8)}`,
+        src: `http://localhost:4000/sharing-images/${shopId}?v=${image.slice(-8)}`,
         width: 0,
         height: 0,
         alt: 'Three lawn suits',

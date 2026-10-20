@@ -4859,6 +4859,11 @@ input FileUpdateInput {
   """
   filename: String
   id: ID!
+
+  """
+  A staged upload's resourceUrl, uploaded: the file holds it in place of what it held, keeping its ID, so whatever uses the file shows it. An image is replaced by an image, any other file by one of its type; the file takes the upload's name unless filename is given.
+  """
+  originalSource: String
 }
 
 type FileUpdatePayload {
@@ -8234,7 +8239,7 @@ type Mutation {
   fileDelete(fileIds: [ID!]!): FileDeletePayload!
 
   """
-  Renames files, up to 10 at a time, each keeping its extension, or changes the words for what they show (ADR-638). Where each is used, it stays.
+  Renames files, up to 10 at a time, each keeping its extension, changes the words for what they show (ADR-638), or replaces what they hold with staged uploads (ADR-647). Where each is used, it stays, showing what it holds now.
   """
   fileUpdate(files: [FileUpdateInput!]!): FileUpdatePayload!
 

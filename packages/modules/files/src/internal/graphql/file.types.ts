@@ -169,6 +169,15 @@ export class FileUpdateInput {
 
   @Field(() => String, { nullable: true, description: 'Up to 512 characters.' })
   alt?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "A staged upload's resourceUrl, uploaded: the file holds it in place of what it held, " +
+      'keeping its ID, so whatever uses the file shows it. An image is replaced by an image, any ' +
+      "other file by one of its type; the file takes the upload's name unless filename is given.",
+  })
+  originalSource?: string | null;
 }
 
 @ObjectType()

@@ -17,9 +17,12 @@ export interface FileCreatedPayload {
 
 export type FileDeletedPayload = Record<string, never>;
 
-/** A file renamed, or its words for what it shows changed (ADR-638). */
+/**
+ * A file renamed, its words for what it shows changed (ADR-638), or what it holds replaced
+ * (ADR-647).
+ */
 export interface FileUpdatedPayload {
-  /** What changed: "filename", "alt". */
+  /** What changed: "file", "filename", "alt". */
   changed: string[];
 }
 

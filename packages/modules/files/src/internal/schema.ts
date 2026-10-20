@@ -22,7 +22,10 @@ export const files = filesSchema.table(
   {
     shopId: uuid('shop_id').notNull(),
     id: uuid('id').notNull(),
-    /** Where storage keeps it: shops/{shopId}/files/{id}/{name}. */
+    /**
+     * Where storage keeps it: shops/{shopId}/files/{id}/{name}, or its upload's folder once it
+     * was replaced (ADR-647).
+     */
     key: text('key').notNull(),
     filename: text('filename').notNull(),
     contentType: text('content_type').notNull(),

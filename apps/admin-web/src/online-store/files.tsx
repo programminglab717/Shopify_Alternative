@@ -1,4 +1,4 @@
-import { Copy, FileText, Pencil, Search, Trash2, Upload } from 'lucide-react';
+import { Copy, FileText, Pencil, RefreshCw, Search, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -13,7 +13,7 @@ import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
 import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
-import { useFileUpload } from '../shell/use-image-upload';
+import { useFileReplace, useFileUpload } from '../shell/use-image-upload';
 import { Button } from '../ui/button';
 import { Alert, Card, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -185,6 +185,28 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
   const [copied, setCopied] = useState(false);
   const [asking, setAsking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // What it holds replaced by another upload, its ID kept (ADR-647).
+  const replace = useFileReplace();
+  const replacer = useRef<HTMLInputElement>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [replaced, setReplaced] = useState(false);
+
+  const swap = async (chosen: FileList | null) => {
+    const next = chosen?.[0];
+    if (!next) return;
+    setProblem(null);
+    setReplaced(false);
+    setReplacing(true);
+    try {
+      const done = await replace(file.id, next);
+      if ('problem' in done) setProblem(done.problem);
+      else setReplaced(true);
+    } catch (error) {
+      setProblem(errorText(error, t));
+    }
+    setReplacing(false);
+    if (replacer.current) replacer.current.value = '';
+  };
 
   const drop = async () => {
     setProblem(null);
@@ -247,6 +269,23 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
         </Button>
         <Button
           variant="tertiary"
+          icon={<RefreshCw aria-hidden className="size-5" />}
+          aria-label={t('shopFiles.replaceName', { name: file.filename })}
+          busy={replacing}
+          onClick={() => replacer.current?.click()}
+        >
+          {t('shopFiles.replace')}
+        </Button>
+        <input
+          ref={replacer}
+          type="file"
+          hidden
+          aria-label={t('shopFiles.replaceWith', { name: file.filename })}
+          accept={file.mimeType.startsWith('image/') ? 'image/*' : file.mimeType}
+          onChange={(event) => void swap(event.target.files)}
+        />
+        <Button
+          variant="tertiary"
           icon={<Trash2 aria-hidden className="size-5" />}
           aria-label={t('shopFiles.deleteName', { name: file.filename })}
           onClick={() => setAsking(true)}
@@ -295,6 +334,7 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
           </div>
         </Alert>
       )}
+      {replaced && <Alert tone="success">{t('shopFiles.replaced')}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </li>
   );

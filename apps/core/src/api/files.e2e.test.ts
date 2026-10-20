@@ -191,6 +191,33 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       'filename="Eid lawn.png"',
     );
 
+    // Replaced by another upload, keeping its ID and its words (ADR-647).
+    const restaged = await gql(tokens.owner, STAGE, {
+      input: [{ filename: 'Eid lawn 2026.png', mimeType: 'image/png', fileSize: '80' }],
+    });
+    const [next] = restaged.data!.stagedUploadsCreate.stagedTargets;
+    expect((await call('PUT', next.url, png(80))).statusCode).toBe(200);
+    const replaced = await gql(
+      tokens.owner,
+      `mutation ($files: [FileUpdateInput!]!) {
+        fileUpdate(files: $files) { files { id filename alt fileSize url } userErrors { code } }
+      }`,
+      { files: [{ id: file.id, originalSource: next.resourceUrl }] },
+    );
+    expect(replaced.data?.fileUpdate).toMatchObject({
+      files: [
+        {
+          id: file.id,
+          filename: 'Eid lawn 2026.png',
+          alt: 'Three lawn suits, for Eid',
+          fileSize: 80,
+        },
+      ],
+      userErrors: [],
+    });
+    const fresh = await call('GET', replaced.data?.fileUpdate.files[0].url);
+    expect(fresh.rawPayload.equals(png(80))).toBe(true);
+
     const deleted = await gql(
       tokens.owner,
       `mutation ($ids: [ID!]!) { fileDelete(fileIds: $ids) { deletedFileIds userErrors { code } } }`,

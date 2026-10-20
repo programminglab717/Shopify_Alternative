@@ -11,7 +11,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BrandService, shopLogoOf } from './brand.service.js';
 import { FileService, type StagedUploadInput } from './file.service.js';
-import { keyName, looksLike } from './file-types.js';
+import { fileVersionOf, keyName, looksLike } from './file-types.js';
 import type { FileRecord } from './records.js';
 import { brands as brandsTable, files as filesTable } from './schema.js';
 
@@ -450,6 +450,99 @@ describe.skipIf(!server)('FileService', () => {
       ),
     ).toEqual([['files', 'INVALID']]);
     expect(errorsOf(await service.update(a, []))).toEqual([['files', 'BLANK']]);
+  });
+
+  it('replaces what a file holds, keeping its ID, the old one removed from storage (ADR-647)', async () => {
+    const [first, guideUpload] = unwrap(
+      await stage([
+        { filename: 'Eid banner.png', mimeType: 'image/png', fileSize: '16' },
+        { filename: 'guide.pdf', mimeType: 'application/pdf', fileSize: String(pdf.length) },
+      ]),
+    );
+    await storage.put(keyOf(first!.resourceUrl), png(16), 'image/png');
+    await storage.put(keyOf(guideUpload!.resourceUrl), pdf, 'application/pdf');
+    const [banner, guide] = unwrap(
+      await service.create(a, [
+        { originalSource: first!.resourceUrl, alt: 'Lawn' },
+        { originalSource: guideUpload!.resourceUrl },
+      ]),
+    );
+    expect(fileVersionOf(banner!.key)).toBe(banner!.id.slice(-8));
+    const [next, notUploaded, aPdf] = unwrap(
+      await stage([
+        { filename: 'Eid banner 2026.png', mimeType: 'image/png', fileSize: '24' },
+        { filename: 'later.png', mimeType: 'image/png', fileSize: '20' },
+        { filename: 'sizes.pdf', mimeType: 'application/pdf', fileSize: String(pdf.length) },
+      ]),
+    );
+    await storage.put(keyOf(next!.resourceUrl), png(24), 'image/png');
+    await storage.put(keyOf(aPdf!.resourceUrl), pdf, 'application/pdf');
+    await admin.query('DELETE FROM platform.outbox_events');
+
+    // An image by an image, a PDF by a PDF; an upload not in yet, or another shop's, is none.
+    expect(
+      errorsOf(
+        await service.update(a, [
+          { id: banner!.id, originalSource: aPdf!.resourceUrl },
+          { id: guide!.id, originalSource: notUploaded!.resourceUrl },
+        ]),
+      ),
+    ).toEqual([['files.1.originalSource', 'INVALID']]);
+    expect(
+      errorsOf(await service.update(a, [{ id: banner!.id, originalSource: aPdf!.resourceUrl }])),
+    ).toEqual([['files.0.originalSource', 'INVALID']]);
+    expect(
+      errorsOf(await service.update(b, [{ id: banner!.id, originalSource: next!.resourceUrl }])),
+    ).toEqual([['files.0.originalSource', 'NOT_FOUND']]);
+    // Named as its upload unless given a name, which keeps the upload's extension.
+    expect(
+      errorsOf(
+        await service.update(a, [
+          { id: banner!.id, originalSource: next!.resourceUrl, filename: 'Eid.jpg' },
+        ]),
+      ),
+    ).toEqual([['files.0.filename', 'INVALID']]);
+    expect(
+      errorsOf(
+        await service.update(a, [
+          { id: banner!.id, originalSource: next!.resourceUrl },
+          { id: guide!.id, originalSource: next!.resourceUrl },
+        ]),
+      ),
+    ).toEqual([['files', 'INVALID']]);
+    expect(await outbox()).toEqual([]);
+
+    const [replaced] = unwrap(
+      await service.update(a, [{ id: banner!.id, originalSource: ` ${next!.resourceUrl} ` }]),
+    );
+    expect(replaced).toMatchObject({
+      id: banner!.id,
+      filename: 'Eid banner 2026.png',
+      contentType: 'image/png',
+      size: 24,
+      alt: 'Lawn',
+      key: keyOf(next!.resourceUrl),
+    });
+    // Its addresses name what it holds now; what it held is gone, and the upload is no file.
+    expect(fileVersionOf(replaced!.key)).not.toBe(fileVersionOf(banner!.key));
+    expect(await storage.head(banner!.key)).toBeNull();
+    expect(await storage.head(replaced!.key)).not.toBeNull();
+    expect((await service.list(a, { first: 10 })).items.map((file) => file.id).sort()).toEqual(
+      [banner!.id, guide!.id].sort(),
+    );
+    expect((await outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      ['file.updated', { changed: ['file', 'filename'] }],
+    ]);
+    // An upload taken is taken.
+    expect(
+      errorsOf(await service.update(a, [{ id: guide!.id, originalSource: next!.resourceUrl }])),
+    ).toEqual([['files.0.originalSource', 'NOT_FOUND']]);
+    const [pdfReplaced] = unwrap(
+      await service.update(a, [
+        { id: guide!.id, originalSource: aPdf!.resourceUrl, filename: 'Size guide.pdf' },
+      ]),
+    );
+    expect(pdfReplaced).toMatchObject({ id: guide!.id, filename: 'Size guide.pdf' });
   });
 
   it('finds files by the words of their names, in any case, newest first (ADR-636)', async () => {

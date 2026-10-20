@@ -40,6 +40,16 @@ export function keyName(filename: string, type: FileTypeValue): string {
 }
 
 /**
+ * A short mark of what a file holds, from where storage keeps it (ADR-647): its folder's last
+ * characters, the random end of its own ID until it is replaced, so an address naming it changes
+ * when it does.
+ */
+export function fileVersionOf(key: string): string {
+  const parts = key.split('/');
+  return (parts[parts.length - 2] ?? '').slice(-8);
+}
+
+/**
  * Where the sizes and formats the API makes of the image kept at `key` are kept (ADR-538): beside
  * it, under its own folder, so that removing the file removes them.
  */

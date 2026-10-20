@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Files replaced
+
+* **A shop's file has what it holds replaced by an upload** ([ADR-647](../architecture/13-decision-log.md#adr-647--a-shops-file-has-what-it-holds-replaced-by-an-upload-with-shopifys-fileupdate-and-originalsource-keeping-its-id-so-wherever-it-is-used-shows-the-new-one)), keeping its ID, so its
+  logos, sharing image, articles and themes show the new one; Replace on the Files tab.
+* 3778 tests, two more: the files module's replacement and the Files tab's Replace.
+
 ### ddb82c2 · Tags offered to menu links
 
 * **The menu editor offers the shop's tags in use** ([ADR-646](../architecture/13-decision-log.md#adr-646--the-menu-editor-offers-the-shops-tags-in-use-to-a-collections-link-the-most-used-first-each-added-with-a-tap)) to a collection's or all

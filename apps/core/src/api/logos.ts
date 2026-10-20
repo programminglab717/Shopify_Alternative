@@ -1,5 +1,10 @@
 import type { Database } from '@hatti/db';
-import { shopLogoOf, type BrandImageValue, type ShopLogo } from '@hatti/files/public';
+import {
+  fileVersionOf,
+  shopLogoOf,
+  type BrandImageValue,
+  type ShopLogo,
+} from '@hatti/files/public';
 import { isUuid } from '@hatti/ids';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { FileImages } from './file-images.js';
@@ -13,10 +18,13 @@ export const LOGOS_PATH = 'logos';
 /** A logo is the shop's to change: emails and browsers keep it an hour. */
 const AN_HOUR = 'public, max-age=3600';
 
-/** The path of the shop's logo or square logo, naming its file, so that another is fetched anew. */
+/**
+ * The path of the shop's logo or square logo, naming what its file holds, so that another, or the
+ * file replaced (ADR-647), is fetched anew.
+ */
 export function logoPathOf(shopId: string, which: BrandImageValue, logo: ShopLogo): string {
   const square = which === 'squareLogo' ? '/square' : '';
-  return `/${LOGOS_PATH}/${shopId}${square}?v=${logo.id.slice(0, 8)}`;
+  return `/${LOGOS_PATH}/${shopId}${square}?v=${fileVersionOf(logo.key)}`;
 }
 
 /**

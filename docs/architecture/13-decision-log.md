@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-646 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-647 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -654,6 +654,7 @@
 | 644 | A menu's link to a collection or to all products may narrow it to its products with each of some tags, as Shopify's MenuItem tags, leading to the collection's tag page | Accepted |
 | 645 | A payment link lists the orders placed through it, the latest first: its checkouts that became orders, read with the orders module's own Order | Accepted |
 | 646 | The menu editor offers the shop's tags in use to a collection's link, the most used first, each added with a tap | Accepted |
+| 647 | A shop's file has what it holds replaced by an upload, with Shopify's `fileUpdate` and `originalSource`, keeping its ID, so wherever it is used shows the new one | Accepted |
 
 ---
 
@@ -22917,3 +22918,26 @@
 * **Consequences:** A link's tags are those its products carry, spelt as they are.
 * **Alternatives:** **Tags of the link's own collection alone:** a query of its own over the
   collection's products; the shop's tags serve while a shop has few, and remain the target.
+
+## ADR-647 · A shop's file has what it holds replaced by an upload, with Shopify's `fileUpdate` and `originalSource`, keeping its ID, so wherever it is used shows the new one
+
+* **Context:** A logo, the sharing image, an article's image or a theme's picture made from a
+  file is changed by uploading another and choosing it in each place; the old one stays used
+  wherever it was not changed (status shortcut 124).
+* **Decision:** `fileUpdate` takes `originalSource`, the `resourceUrl` of one of the shop's
+  staged uploads, as Shopify's does. The upload is checked as `fileCreate` checks it, then
+  taken once in the file's transaction: the file keeps its ID and takes the upload's key, type,
+  size and, unless given one, name. An image is replaced by an image alone, any other file by
+  one of its type, so its extension is the upload's. What storage kept of the old one is
+  removed after the commit. `file.updated` says `file` changed, and the storefront rebuilds the
+  shop's pages and articles as it does for new words for what it shows. A file is kept where
+  its upload was staged (migration 0288 checks the shop's own prefix alone), and the addresses
+  of logos, the sharing image and articles' images carry the last eight characters of its
+  folder, so a file replaced is fetched afresh. The admin's Files tab has Replace on each file,
+  an image made ready as photos are, a PDF as it is; the words are in English and Urdu.
+* **Consequences:** A file replaced shows the new one wherever it is used, at once on logos,
+  the sharing image and articles' images. A theme's picture keeps its address, so browsers and
+  the edge may show the old one for the hour they keep it.
+* **Alternatives:** **A theme's picture's address changing with its file:** the theme's
+  settings name the file's public ID; a version in the address needs the renderer to look the
+  file up per picture, and remains the target.

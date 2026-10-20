@@ -53,11 +53,16 @@ export interface StagedUploadInput {
   fileSize: string;
 }
 
-/** A file's name or words for what it shows, changed (ADR-638); what is left out stays. */
+/**
+ * A file's name or words for what it shows, changed (ADR-638), or what it holds replaced by a
+ * staged upload's (ADR-647); what is left out stays.
+ */
 export interface FileUpdateInput {
   id: string;
   filename?: string | null;
   alt?: string | null;
+  /** A staged upload's `resourceUrl`: the file holds it in place of what it held. */
+  originalSource?: string | null;
 }
 
 export interface FileCreateInput {
@@ -159,7 +164,7 @@ export class FileService {
         errors.push({
           field,
           code: 'NOT_FOUND',
-          message: 'Give the resourceUrl of an upload stagedUploadsCreate staged',
+          message: NOT_STAGED,
         });
       } else if (row.status === 'staged') {
         const problem = await this.#problemWith(row);
@@ -248,9 +253,12 @@ export class FileService {
   }
 
   /**
-   * Renames files, or changes the words for what they show (ADR-638), up to ten at a time: a
-   * name keeps its extension, as Shopify's `fileUpdate` asks, so its type never seems to change;
-   * where storage keeps it stays. Records `file.updated` for each that changed.
+   * Renames files, or changes the words for what they show (ADR-638), or replaces what they hold
+   * with a staged upload's (ADR-647), up to ten at a time. A name keeps its extension, as
+   * Shopify's `fileUpdate` asks, so its type never seems to change: a file replaced takes its
+   * upload's name, and an image is replaced by an image, any other by one of its type. A file
+   * replaced keeps its ID, so whatever uses it shows the new one; what storage kept of the old
+   * one is removed. Records `file.updated` for each that changed.
    */
   async update(
     tenant: TenantContext,
@@ -258,6 +266,7 @@ export class FileService {
   ): Promise<MutationResult<FileRecord[]>> {
     const check = new InputChecker();
     countOf(check, ['files'], inputs.length);
+    const prefix = `shops/${tenant.shopId}/files/`;
     const changes = inputs.map((input, index) => {
       const field = ['files', String(index)];
       const filename =
@@ -271,73 +280,172 @@ export class FileService {
         input.alt === undefined || input.alt === null
           ? undefined
           : (check.text([...field, 'alt'], input.alt, { max: FILE_LIMITS.alt }) ?? '');
-      return { id: input.id, filename: filename ?? undefined, alt };
+      const source = input.originalSource?.trim();
+      const key = source ? this.storage.keyOf(source) : undefined;
+      return {
+        id: input.id,
+        filename: filename ?? undefined,
+        alt,
+        // A source that is none of the shop's staged uploads is null.
+        key:
+          source === undefined || source === '' ? undefined : key?.startsWith(prefix) ? key : null,
+      };
     });
     if (!check.ok) return fail(check.errors);
-    return this.db.tenant(tenant.shopId, async (tx) => {
-      const ids = changes.map((change) => change.id);
-      const found = await tx
-        .select()
-        .from(files)
-        .where(
-          and(eq(files.shopId, tenant.shopId), inArray(files.id, ids), eq(files.status, 'ready')),
-        )
-        .for('update');
-      const byId = new Map(found.map((row) => [row.id, row]));
-      const errors: FieldError[] = [];
-      changes.forEach((change, index) => {
-        const row = byId.get(change.id);
-        if (!row) {
-          errors.push({
-            field: ['files', String(index), 'id'],
-            code: 'NOT_FOUND',
-            message: 'File not found',
-          });
-        } else if (
-          change.filename !== undefined &&
-          extensionOf(change.filename) !== extensionOf(row.filename)
-        ) {
-          const kept = extensionOf(row.filename);
-          errors.push({
-            field: ['files', String(index), 'filename'],
-            code: 'INVALID',
-            message: kept ? `Keep its extension, ${kept}` : 'Give it no extension, as it has none',
-          });
-        }
-      });
-      if (new Set(ids).size !== ids.length) {
-        errors.push({ field: ['files'], code: 'INVALID', message: 'Give each file once' });
+    // The uploads replacing files, checked in storage outside the transaction, as `create` does.
+    const keys = changes.flatMap((change) => (change.key ? [change.key] : []));
+    const staged =
+      keys.length === 0
+        ? []
+        : await this.db.tenant(tenant.shopId, (tx) =>
+            tx
+              .select()
+              .from(files)
+              .where(
+                and(
+                  eq(files.shopId, tenant.shopId),
+                  inArray(files.key, keys),
+                  eq(files.status, 'staged'),
+                ),
+              ),
+          );
+    const stagedByKey = new Map(staged.map((row) => [row.key, row]));
+    const errors: FieldError[] = [];
+    const unusable: string[] = [];
+    for (const [index, change] of changes.entries()) {
+      if (change.key === undefined) continue;
+      const field = ['files', String(index), 'originalSource'];
+      const row = change.key === null ? undefined : stagedByKey.get(change.key);
+      const problem = row ? await this.#problemWith(row) : null;
+      if (!row) {
+        errors.push({ field, code: 'NOT_FOUND', message: NOT_STAGED });
+      } else if (problem) {
+        errors.push({ field, code: 'INVALID', message: problem });
+        if (problem !== NOT_UPLOADED) unusable.push(row.key);
       }
-      if (errors.length > 0) return fail(errors);
-      const updated: FileRecord[] = [];
-      for (const change of changes) {
-        const row = byId.get(change.id)!;
-        const filename = change.filename ?? row.filename;
-        const alt = change.alt ?? row.alt;
-        if (filename === row.filename && alt === row.alt) {
-          updated.push(toRecord(row));
-          continue;
-        }
-        const [saved] = await tx
-          .update(files)
-          .set({ filename, alt, updatedAt: sql`now()` })
-          .where(and(eq(files.shopId, tenant.shopId), eq(files.id, row.id)))
-          .returning();
-        await appendEvent<FileUpdatedPayload>(tx, tenant.shopId, {
-          type: FileEvents.FileUpdated,
-          aggregateType: 'file',
-          aggregateId: row.id,
-          payload: {
-            changed: [
-              ...(filename === row.filename ? [] : ['filename']),
-              ...(alt === row.alt ? [] : ['alt']),
-            ],
-          },
+    }
+    if (new Set(keys).size !== keys.length) {
+      errors.push({ field: ['files'], code: 'INVALID', message: 'Give each upload once' });
+    }
+    if (errors.length > 0) {
+      await this.#remove(unusable);
+      return fail(errors);
+    }
+    const result = await this.db
+      .tenant(tenant.shopId, async (tx): Promise<Replaced> => {
+        const ids = changes.map((change) => change.id);
+        const found = await tx
+          .select()
+          .from(files)
+          .where(
+            and(eq(files.shopId, tenant.shopId), inArray(files.id, ids), eq(files.status, 'ready')),
+          )
+          .for('update');
+        const byId = new Map(found.map((row) => [row.id, row]));
+        const errors: FieldError[] = [];
+        changes.forEach((change, index) => {
+          const row = byId.get(change.id);
+          const upload = change.key ? stagedByKey.get(change.key) : undefined;
+          // A file replaced is named as its upload, unless given a name.
+          const named = upload?.filename ?? row?.filename ?? '';
+          if (!row) {
+            errors.push({
+              field: ['files', String(index), 'id'],
+              code: 'NOT_FOUND',
+              message: 'File not found',
+            });
+          } else if (upload && !sameKind(row.contentType, upload.contentType)) {
+            errors.push({
+              field: ['files', String(index), 'originalSource'],
+              code: 'INVALID',
+              message: isImage(row.contentType)
+                ? 'Replace an image with another image'
+                : `Replace it with another ${row.contentType} file`,
+            });
+          } else if (
+            change.filename !== undefined &&
+            extensionOf(change.filename) !== extensionOf(named)
+          ) {
+            const kept = extensionOf(named);
+            errors.push({
+              field: ['files', String(index), 'filename'],
+              code: 'INVALID',
+              message: kept
+                ? `Keep its extension, ${kept}`
+                : 'Give it no extension, as it has none',
+            });
+          }
         });
-        updated.push(toRecord(saved!));
-      }
-      return { ok: true as const, value: updated };
-    });
+        if (new Set(ids).size !== ids.length) {
+          errors.push({ field: ['files'], code: 'INVALID', message: 'Give each file once' });
+        }
+        if (errors.length > 0) return { outcome: fail(errors), replacedKeys: [] };
+        const updated: FileRecord[] = [];
+        const replacedKeys: string[] = [];
+        for (const change of changes) {
+          const row = byId.get(change.id)!;
+          const upload = change.key ? stagedByKey.get(change.key) : undefined;
+          // The upload is taken once, by whoever locks it first.
+          const taken = upload
+            ? await tx
+                .delete(files)
+                .where(
+                  and(
+                    eq(files.shopId, tenant.shopId),
+                    eq(files.id, upload.id),
+                    eq(files.status, 'staged'),
+                  ),
+                )
+                .returning({ id: files.id })
+            : [];
+          if (upload && taken.length === 0) {
+            throw new StagedUploadTaken();
+          }
+          const filename = change.filename ?? upload?.filename ?? row.filename;
+          const alt = change.alt ?? row.alt;
+          if (!upload && filename === row.filename && alt === row.alt) {
+            updated.push(toRecord(row));
+            continue;
+          }
+          const [saved] = await tx
+            .update(files)
+            .set({
+              filename,
+              alt,
+              ...(upload && {
+                key: upload.key,
+                contentType: upload.contentType,
+                size: upload.size,
+              }),
+              updatedAt: sql`now()`,
+            })
+            .where(and(eq(files.shopId, tenant.shopId), eq(files.id, row.id)))
+            .returning();
+          if (upload) replacedKeys.push(row.key);
+          await appendEvent<FileUpdatedPayload>(tx, tenant.shopId, {
+            type: FileEvents.FileUpdated,
+            aggregateType: 'file',
+            aggregateId: row.id,
+            payload: {
+              changed: [
+                ...(upload ? ['file'] : []),
+                ...(filename === row.filename ? [] : ['filename']),
+                ...(alt === row.alt ? [] : ['alt']),
+              ],
+            },
+          });
+          updated.push(toRecord(saved!));
+        }
+        return { outcome: { ok: true, value: updated }, replacedKeys };
+      })
+      .catch((error: unknown): Replaced => {
+        if (!(error instanceof StagedUploadTaken)) throw error;
+        const taken: FieldError = { field: ['files'], code: 'INVALID', message: NOT_STAGED };
+        return { outcome: fail([taken]), replacedKeys: [] };
+      });
+    // What storage kept of the files replaced, and the sizes made of them, go once committed.
+    await this.#remove(result.replacedKeys);
+    return result.outcome;
   }
 
   /** Deletes files, and what storage keeps of them; the IDs deleted. */
@@ -408,6 +516,25 @@ export class FileService {
 }
 
 const NOT_UPLOADED = 'Nothing has been uploaded to its URL yet';
+const NOT_STAGED = 'Give the resourceUrl of an upload stagedUploadsCreate staged';
+
+/** What replacing files came to, and the keys of what they held before (ADR-647). */
+interface Replaced {
+  outcome: MutationResult<FileRecord[]>;
+  replacedKeys: string[];
+}
+
+/** Another request made a file of the upload first. */
+class StagedUploadTaken extends Error {}
+
+/** Whether a file of type `b` may replace one of type `a` (ADR-647): images for images. */
+function sameKind(a: string, b: string): boolean {
+  return isImage(a) ? isImage(b) : a === b;
+}
+
+function isImage(type: string): boolean {
+  return type.startsWith('image/');
+}
 
 /**
  * Hands a staged upload of the shop's, never made a file, to another module that keeps its bytes

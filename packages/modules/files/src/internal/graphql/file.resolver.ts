@@ -118,8 +118,9 @@ export class FileResolver {
 
   @Mutation(() => FileUpdatePayload, {
     description:
-      'Renames files, up to 10 at a time, each keeping its extension, or changes the words for ' +
-      'what they show (ADR-638). Where each is used, it stays.',
+      'Renames files, up to 10 at a time, each keeping its extension, changes the words for ' +
+      'what they show (ADR-638), or replaces what they hold with staged uploads (ADR-647). ' +
+      'Where each is used, it stays, showing what it holds now.',
   })
   @RequireScopes('write_files')
   async fileUpdate(

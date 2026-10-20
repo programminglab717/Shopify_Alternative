@@ -416,11 +416,14 @@ export function itemsFor(event: DomainEvent): string[] {
     case FileEvents.FileDeleted:
       return [Items.shop, Items.everyArticle];
     // A file's words for what it shows stand in for an article's or the sharing image's own
-    // (ADR-638); its name is shown nowhere.
-    case FileEvents.FileUpdated:
-      return (event.payload as unknown as FileUpdatedPayload).changed.includes('alt')
+    // (ADR-638), and the addresses of its logos and images name what a file holds (ADR-647); its
+    // name is shown nowhere.
+    case FileEvents.FileUpdated: {
+      const { changed } = event.payload as unknown as FileUpdatedPayload;
+      return changed.includes('alt') || changed.includes('file')
         ? [Items.shop, Items.everyArticle]
         : [];
+    }
     case ShopEvents.ShopOpened:
       // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
       return [Items.everything];
@@ -903,7 +906,7 @@ export class StorefrontPublisher {
       (await this.services.files.readyImagesIn(tx, shopId, [sharing.fileId])).get(sharing.fileId);
     const sharingImage = sharingFile
       ? {
-          src: images.url(sharingImagePathOf(shopId, sharingFile.id)),
+          src: images.url(sharingImagePathOf(shopId, sharingFile.key)),
           width: 0,
           height: 0,
           alt: sharing!.altText || sharingFile.alt || null,
@@ -1316,7 +1319,7 @@ export class StorefrontPublisher {
     const imageOf = (record: ArticleRecord): ImageDoc | null => {
       const file = record.image && ready.get(record.image.fileId);
       if (!record.image || !file) return null;
-      const path = articleImagePathOf(shopId, record.id, file.id);
+      const path = articleImagePathOf(shopId, record.id, file.key);
       return {
         src: images.url(path),
         width: 0,
