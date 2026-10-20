@@ -2185,13 +2185,14 @@ export class OrderService {
    * it (ORD-10, ADR-127). The caller says who: the core checks that they work in the shop, and
    * their name goes on the timeline. Giving it to whoever has it already changes nothing. Without
    * `fromOthers`, which owners, managers and apps have, an order someone else has stays theirs:
-   * the caller takes an order no one has, or gives back their own.
+   * the caller takes an order no one has, or gives back their own. With `batch`, it is one of
+   * many given at once ({@link bulkAssign}), and its event says so.
    */
   async assign(
     tenant: TenantContext,
     id: string,
     assignee: { staffMemberId: string; name: string } | null,
-    options: { fromOthers: boolean },
+    options: { fromOthers: boolean; batch?: { id: string; size: number } },
   ): Promise<MutationResult<OrderRecord>> {
     return this.#change(
       tenant,
@@ -2244,6 +2245,7 @@ export class OrderService {
             payload: {
               assigneeId: assignee.staffMemberId,
               assignedBy: staffMemberOf(tenant),
+              ...(options.batch ? { batch: options.batch } : {}),
               stage: updated.stage,
               version: updated.version,
             },
@@ -2431,6 +2433,20 @@ export class OrderService {
     }
     if (!check.ok) return Promise.resolve({ ok: false, errors: check.errors });
     return this.#bulk(ids, (id) => this.cancel(tenant, id, options));
+  }
+
+  /**
+   * Gives many orders to one member of staff, or to no one; see {@link assign}. Their events
+   * share one batch (ADR-634), so whoever is given them is told once, not once an order.
+   */
+  bulkAssign(
+    tenant: TenantContext,
+    ids: readonly string[],
+    assignee: { staffMemberId: string; name: string } | null,
+    options: { fromOthers: boolean },
+  ): Promise<MutationResult<BulkResult>> {
+    const batch = { id: newId(), size: new Set(ids).size };
+    return this.#bulk(ids, (id) => this.assign(tenant, id, assignee, { ...options, batch }));
   }
 
   /** Marks many orders packed; see {@link markPacked}. */

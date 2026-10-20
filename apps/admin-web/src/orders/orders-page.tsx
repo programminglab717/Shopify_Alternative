@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   ShieldAlert,
   Tags,
+  UserPlus,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -36,7 +37,8 @@ import { SavedSearches } from '../shell/saved-searches';
 import { useAdminMutation, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
-import { CancelPanel, refusals, TagsPanel } from './bulk';
+import { AssignPanel, CancelPanel, refusals, TagsPanel } from './bulk';
+import { ASSIGNS } from './details';
 import type { BulkOutcome } from './bulk';
 import { EXPORTS_ORDERS } from './export-page';
 import { FreshOrdersNotice, useFreshOrders } from './fresh-orders';
@@ -196,8 +198,10 @@ export function OrdersPage() {
   // Those who change orders tag them on any tab, and cancel those not yet shipped.
   const changes = permits(shop, SAVES_ORDER_SEARCHES);
   const cancels = changes && stage !== undefined && CANCELLABLE.includes(stage);
+  // Those who give orders to anyone give many at once (ADR-634).
+  const assigns = changes && permits(shop, ASSIGNS);
   const selecting = Boolean(bulk) || prints || changes;
-  const [panel, setPanel] = useState<'print' | 'tags' | 'cancel' | null>(null);
+  const [panel, setPanel] = useState<'print' | 'tags' | 'assign' | 'cancel' | null>(null);
   const confirm = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkConfirmMutation);
   const pack = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkMarkPackedMutation);
   const queryClient = useQueryClient();
@@ -447,6 +451,7 @@ export function OrdersPage() {
         />
       )}
       {panel === 'tags' && <TagsPanel ids={ids} names={names} onDone={closePanel} />}
+      {panel === 'assign' && <AssignPanel ids={ids} names={names} onDone={closePanel} />}
       {panel === 'cancel' && <CancelPanel ids={ids} names={names} onDone={closePanel} />}
       {!empty && <FreshOrdersNotice fresh={fresh} busy={showing} onShow={() => void showFresh()} />}
       {orders.isPending ? (
@@ -548,6 +553,18 @@ export function OrdersPage() {
               }}
             >
               {t('bulk.tag', { count: formatCount(selected.size) })}
+            </Button>
+          )}
+          {assigns && (
+            <Button
+              variant="secondary"
+              icon={<UserPlus aria-hidden className="size-5" />}
+              onClick={() => {
+                setOutcome(null);
+                setPanel('assign');
+              }}
+            >
+              {t('bulk.assign', { count: formatCount(selected.size) })}
             </Button>
           )}
           {cancels && (

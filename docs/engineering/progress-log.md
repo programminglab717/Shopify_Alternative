@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Many orders given at once
+
+* **Owners and managers give up to 250 orders at once to a member of staff** ([ADR-634](../architecture/13-decision-log.md#adr-634--owners-and-managers-give-up-to-250-orders-at-once-to-a-member-of-staff-or-to-no-one-among-the-lists-bulk-actions-whoever-is-given-them-is-told-once-of-them-all-on-whatsapp-and-in-their-browser)), or to
+  no one, among the orders list's bulk actions; whoever is given them is told once, on WhatsApp
+  and in their browser, not once an order.
+* 3752 tests, three more: the orders given at once and their batch, the admin's Assign, and
+  its mutation checked against the schema; the staff alerts' and assignment API's tests check the
+  batch too. The admin's count includes ADR-631's query, which was not counted.
+
 ### 3a29178 · Staff pushed of their own work
 
 * **A member of staff is pushed of an order given to them and of a comment naming them**

@@ -1,17 +1,21 @@
-/** Orders tagged or cancelled many at once from the list (ORD-05). */
-import { Ban, Tags } from 'lucide-react';
+/** Orders tagged, given to staff or cancelled many at once from the list (ORD-05). */
+import { Ban, Tags, UserPlus } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   OrderBulkAddTagsMutation,
+  OrderBulkAssignMutation,
   OrderBulkCancelMutation,
   OrderBulkRemoveTagsMutation,
+  StaffQuery,
 } from '../api/operations';
-import type { OrderBulkData, OrderCancelReason, UserError } from '../api/types';
+import type { OrderBulkData, OrderCancelReason, StaffData, UserError } from '../api/types';
+import { useMe } from '../auth/context';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { useAdminMutation } from '../shell/shop-context';
+import { SelectField } from '../settings/settings-form';
+import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -123,6 +127,74 @@ export function TagsPanel({
           {t('returns.cancel')}
         </Button>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * The orders chosen given to one member of staff, or to no one (ADR-634): whoever is given them
+ * is told once, of them all.
+ */
+export function AssignPanel({
+  ids,
+  names,
+  onDone,
+}: {
+  ids: readonly string[];
+  names: ReadonlyMap<string, string>;
+  onDone: (outcome: BulkOutcome | null) => void;
+}) {
+  const { t } = useLocale();
+  const me = useMe().data?.user.id;
+  const staff = useAdminQuery<StaffData>(['staff'], StaffQuery);
+  const assign = useAdminMutation<OrderBulkData, { ids: string[]; staffMemberId: string | null }>(
+    OrderBulkAssignMutation,
+  );
+  const [chosen, setChosen] = useState('');
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    onDone(
+      await outcomeOf(
+        () => assign.mutateAsync({ ids: [...ids], staffMemberId: chosen || null }),
+        ids,
+        names,
+        (error) => errorText(error, t),
+      ),
+    );
+  };
+
+  return (
+    <Card className="p-4">
+      <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
+        <h2 className="font-semibold">{t('bulk.assignTitle', { count: ids.length })}</h2>
+        <SelectField<string>
+          label={t('details.assignee')}
+          value={chosen}
+          options={[
+            { value: '', label: t('details.nobody') },
+            ...(staff.data?.staffMembers ?? []).map((member) => ({
+              value: member.id,
+              label: member.id === me ? t('details.me', { name: member.name }) : member.name,
+            })),
+          ]}
+          onChange={setChosen}
+        />
+        <p className="text-secondary">{t('bulk.assignHint')}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="submit"
+            busy={assign.isPending}
+            disabled={staff.isPending}
+            icon={<UserPlus aria-hidden className="size-5" />}
+          >
+            {t('bulk.assignSubmit', { count: ids.length })}
+          </Button>
+          <Button variant="tertiary" onClick={() => onDone(null)}>
+            {t('returns.cancel')}
+          </Button>
+        </div>
+      </form>
     </Card>
   );
 }

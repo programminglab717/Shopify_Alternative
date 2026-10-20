@@ -2268,6 +2268,30 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect(await alerts()).toHaveLength(4);
     // His browser is his own to turn off, and costs the shop nothing.
     expect(pushed(6)).toEqual([['Bilal', `Zari Fashions: آرڈر #${third.number} پر آپ کا ذکر ہوا`]]);
+
+    // Many given at once tell him once, of them all (ADR-634), opening his own orders.
+    const [fourth, fifth] = [await placeOnline(), await placeOnline()];
+    const toBilal = { staffMemberId: bilalId, name: 'Bilal Ahmed' };
+    unwrap(
+      await orders().bulkAssign(tenant, [fourth.id, fifth.id, third.id], toBilal, {
+        fromOthers: true,
+      }),
+    );
+    await dispatch(2);
+    expect((await alerts()).slice(4)).toEqual([
+      [
+        'order_assigned',
+        'whatsapp',
+        BILAL,
+        { shop: 'Zari Fashions', order: `#${fourth.number} (+2)` },
+      ],
+    ]);
+    expect(pushed(7)).toEqual([['Bilal', 'Zari Fashions: 3 آرڈرز آپ کے سپرد']]);
+    expect(browsers.sent.at(-1)?.message).toMatchObject({
+      body: 'یہ آپ کو کام کے لیے دیے گئے ہیں۔',
+      url: `/${toPublicId('shop', shopId)}/orders?q=assignee%3Ame`,
+      tag: expect.stringMatching(/^push:order_assigned:batch:/),
+    });
   });
 
   it("tells staff a customer sent the receipt of their transfer: its order's own member, else its owners and managers (ADR-247)", async () => {

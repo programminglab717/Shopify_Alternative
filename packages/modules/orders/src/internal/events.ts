@@ -133,6 +133,11 @@ export interface OrderAssignedPayload extends OrderState {
   assigneeId: string;
   /** Who gave it: a member of staff's account; null for an app. */
   assignedBy: string | null;
+  /**
+   * Given with others in one bulk action (ADR-634): the action's id, the same on each order's
+   * event, and how many orders it was asked to give, for the worker to tell them once.
+   */
+  batch?: { id: string; size: number };
 }
 
 /** A comment on an order's timeline, written or changed (ADR-191); its words stay with it. */

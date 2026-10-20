@@ -11,7 +11,7 @@ import {
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { StaffService, type StaffMemberRecord } from '@hatti/identity/public';
-import { Order, OrderService, toOrder } from '@hatti/orders/public';
+import { Order, OrderBulkPayload, OrderService, toOrder } from '@hatti/orders/public';
 import {
   Args,
   Field,
@@ -77,36 +77,74 @@ export class OrderAssignmentResolver {
   ): Promise<OrderAssignPayload> {
     const orderId = tryFromPublicId(id, 'order');
     if (!orderId) throw badUserInput(`Invalid order id: ${id.slice(0, 64)}`);
-    const reassigning = mayReassign(tenant);
-    let assignee: { staffMemberId: string; name: string } | null = null;
-    if (staffMemberId) {
-      const userId = tryFromPublicId(staffMemberId, 'user');
-      if (!reassigning && userId !== staffMemberOf(tenant)) {
-        throw deniedToRole(
-          'Access denied. Only owners and managers give orders to others; staff take them for ' +
-            'themselves.',
-        );
-      }
-      const member = userId
-        ? (await this.staff.staffOf(tenant.shopId)).find((each) => each.userId === userId)
-        : undefined;
-      if (!member) {
-        return Object.assign(new OrderAssignPayload(), {
-          order: null,
-          userErrors: UserError.list([
-            { field: ['staffMemberId'], code: 'NOT_FOUND', message: 'Staff member not found' },
-          ]),
-        });
-      }
-      assignee = { staffMemberId: member.userId, name: member.name };
+    const assignee = await this.#assignee(tenant, staffMemberId);
+    if (assignee === NOT_STAFF) {
+      return Object.assign(new OrderAssignPayload(), { order: null, userErrors: notStaff() });
     }
     const result = await this.orders.assign(tenant, orderId, assignee, {
-      fromOthers: reassigning,
+      fromOthers: mayReassign(tenant),
     });
     return Object.assign(new OrderAssignPayload(), {
       order: result.ok ? toOrder(result.value, tenant) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
+  }
+
+  @Mutation(() => OrderBulkPayload, {
+    description:
+      'Gives up to 250 orders to a member of staff, or, without staffMemberId, to no one, as ' +
+      'orderAssign does each (ADR-634). Whoever is given them by someone else is told once, of ' +
+      'them all.',
+  })
+  @RequireScopes('write_orders')
+  async orderBulkAssign(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('staffMemberId', {
+      type: () => ID,
+      nullable: true,
+      description: 'Their account: usr_…',
+    })
+    staffMemberId?: string | null,
+  ): Promise<OrderBulkPayload> {
+    const orderIds = ids.map((id) => {
+      const orderId = tryFromPublicId(id, 'order');
+      if (!orderId) throw badUserInput(`Invalid order id: ${id.slice(0, 64)}`);
+      return orderId;
+    });
+    const assignee = await this.#assignee(tenant, staffMemberId);
+    if (assignee === NOT_STAFF) {
+      return Object.assign(new OrderBulkPayload(), { orders: [], userErrors: notStaff() });
+    }
+    const result = await this.orders.bulkAssign(tenant, orderIds, assignee, {
+      fromOthers: mayReassign(tenant),
+    });
+    return Object.assign(new OrderBulkPayload(), {
+      orders: result.ok ? result.value.orders.map((order) => toOrder(order, tenant)) : [],
+      userErrors: UserError.list(result.ok ? result.value.errors : result.errors),
+    });
+  }
+
+  /**
+   * Whom `staffMemberId` names, from the shop's staff; null for no one. Staff who may not give
+   * orders to others name only themselves.
+   */
+  async #assignee(
+    tenant: TenantContext,
+    staffMemberId: string | null | undefined,
+  ): Promise<{ staffMemberId: string; name: string } | null | typeof NOT_STAFF> {
+    if (!staffMemberId) return null;
+    const userId = tryFromPublicId(staffMemberId, 'user');
+    if (!mayReassign(tenant) && userId !== staffMemberOf(tenant)) {
+      throw deniedToRole(
+        'Access denied. Only owners and managers give orders to others; staff take them for ' +
+          'themselves.',
+      );
+    }
+    const member = userId
+      ? (await this.staff.staffOf(tenant.shopId)).find((each) => each.userId === userId)
+      : undefined;
+    return member ? { staffMemberId: member.userId, name: member.name } : NOT_STAFF;
   }
 
   @ResolveField(() => OrderAssignee, {
@@ -134,6 +172,15 @@ export class OrderAssignmentResolver {
         })
       : null;
   }
+}
+
+/** No member of the shop's staff. */
+const NOT_STAFF = Symbol('not staff');
+
+function notStaff(): UserError[] {
+  return UserError.list([
+    { field: ['staffMemberId'], code: 'NOT_FOUND', message: 'Staff member not found' },
+  ]);
 }
 
 /**

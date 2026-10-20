@@ -26,7 +26,13 @@ import {
  * a receipt its customer sent for its transfer.
  */
 type Alert =
-  | { kind: 'order_assigned'; orderId: string; assigneeId: string }
+  | {
+      kind: 'order_assigned';
+      orderId: string;
+      assigneeId: string;
+      /** Given with others at once (ADR-634): told once for them all. */
+      batch: { id: string; size: number } | null;
+    }
   | { kind: 'order_mentioned'; orderId: string; commentId: string }
   | { kind: 'order_receipt_sent'; orderId: string };
 
@@ -102,9 +108,11 @@ export class StaffAlerts {
         told = mentionsIn(comment.message, staff).filter((userId) => userId !== comment.authorId);
       }
       if (told.length === 0) return [];
+      // Many given at once say the first handled and how many more: "#1043 (+24)".
+      const batch = alert.kind === 'order_assigned' ? alert.batch : null;
       const variables = {
         shop: (await shopProfile(tx, shopId)).name,
-        order: orderName(facts.number),
+        order: orderName(facts.number) + (batch ? ` (+${batch.size - 1})` : ''),
       };
       for (const userId of told) {
         const member = staff.find((each) => each.userId === userId);
@@ -114,11 +122,13 @@ export class StaffAlerts {
           recipient: member.phone,
           // In their own language, which may not be the shop's (ADR-194).
           language: member.language,
-          // Each assignment once; each comment once for each member it names, edited or not; each
-          // receipt once for each member told.
+          // Each assignment once, and many given at once once for them all; each comment once for
+          // each member it names, edited or not; each receipt once for each member told.
           dedupeKey:
             alert.kind === 'order_assigned'
-              ? `order_assigned:${event.id}`
+              ? batch
+                ? `order_assigned:batch:${batch.id}`
+                : `order_assigned:${event.id}`
               : alert.kind === 'order_receipt_sent'
                 ? `order_receipt_sent:${event.id}:${userId}`
                 : `order_mentioned:${alert.commentId}:${userId}`,
@@ -128,7 +138,10 @@ export class StaffAlerts {
       }
       if (alert.kind === 'order_receipt_sent') return [];
       // Pushed whether or not they proved a number: their browser is theirs.
-      const url = `/${toPublicId('shop', shopId)}/orders/${toPublicId('order', alert.orderId)}`;
+      const orders = `/${toPublicId('shop', shopId)}/orders`;
+      const url = batch
+        ? `${orders}?q=${encodeURIComponent('assignee:me')}`
+        : `${orders}/${toPublicId('order', alert.orderId)}`;
       return told.flatMap((userId): StaffPush[] => {
         const member = staff.find((each) => each.userId === userId);
         if (!member) return [];
@@ -137,7 +150,9 @@ export class StaffAlerts {
             kind: alert.kind,
             dedupeKey:
               alert.kind === 'order_assigned'
-                ? `push:order_assigned:${event.id}`
+                ? batch
+                  ? `push:order_assigned:batch:${batch.id}`
+                  : `push:order_assigned:${event.id}`
                 : `push:order_mentioned:${alert.commentId}:${userId}`,
             recipient: {
               userId,
@@ -146,7 +161,9 @@ export class StaffAlerts {
               scopes: member.scopes,
               capabilities: member.capabilities,
             },
-            message: staffPushMessage(alert.kind, variables.shop, variables.order, url),
+            message: batch
+              ? manyGivenMessage(variables.shop, batch.size, url)
+              : staffPushMessage(alert.kind, variables.shop, variables.order, url),
           },
         ];
       });
@@ -194,13 +211,27 @@ function staffPushMessage(
       };
 }
 
+/** "Zari: 25 orders are yours", opening the member's own orders (ADR-634). */
+function manyGivenMessage(shop: string, size: number, url: string): PushMessage {
+  return {
+    en: { title: `${shop}: ${size} orders are yours`, body: 'They were given to you to work on.' },
+    ur: { title: `${shop}: ${size} آرڈرز آپ کے سپرد`, body: 'یہ آپ کو کام کے لیے دیے گئے ہیں۔' },
+    url,
+  };
+}
+
 /** What `event` tells staff of, if anything. Taking an order for oneself needs no telling. */
 function alertOf(event: DomainEvent): Alert | null {
   switch (event.type) {
     case OrderEvents.OrderAssigned: {
-      const { assigneeId, assignedBy } = event.payload as Partial<OrderAssignedPayload>;
+      const { assigneeId, assignedBy, batch } = event.payload as Partial<OrderAssignedPayload>;
       if (!assigneeId || assigneeId === assignedBy) return null;
-      return { kind: 'order_assigned', orderId: event.aggregateId, assigneeId };
+      return {
+        kind: 'order_assigned',
+        orderId: event.aggregateId,
+        assigneeId,
+        batch: batch && batch.size > 1 ? batch : null,
+      };
     }
     case OrderEvents.OrderCommentCreated:
     case OrderEvents.OrderCommentUpdated: {

@@ -733,6 +733,21 @@ export const OrderBulkAddTagsMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Up to 250 orders given to a member of staff, or to no one, at once (ADR-634). */
+export const OrderBulkAssignMutation = /* GraphQL */ `
+  mutation OrderBulkAssign($ids: [ID!]!, $staffMemberId: ID) {
+    orderBulkAssign(ids: $ids, staffMemberId: $staffMemberId) {
+      orders {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Tags taken off up to 250 orders at once, in any case (ORD-05). */
 export const OrderBulkRemoveTagsMutation = /* GraphQL */ `
   mutation OrderBulkRemoveTags($ids: [ID!]!, $tags: [String!]!) {

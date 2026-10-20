@@ -1029,6 +1029,44 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
            order { assignee { id } } } }`,
       );
       expect(taken.orderAssign.order.assignee).toEqual({ id: toPublicId('user', manager.userId) });
+
+      // Many at once, as orderAssign does each (ADR-634).
+      const third = await orderOfShopA(app, 'CASH_ON_DELIVERY');
+      const bulk = (token: string, ids: string[], staffMemberId: string | null) =>
+        as(
+          token,
+          `mutation { orderBulkAssign(ids: ${JSON.stringify(ids)}${staffMemberId ? `, staffMemberId: "${staffMemberId}"` : ''}) {
+             orders { id assignee { id } } userErrors { field code } } }`,
+        );
+      expect((await bulk(manager.accessToken, [second, third], agentId)).data).toEqual({
+        orderBulkAssign: {
+          orders: [
+            { id: second, assignee: { id: agentId } },
+            { id: third, assignee: { id: agentId } },
+          ],
+          userErrors: [],
+        },
+      });
+      expect((await bulk(manager.accessToken, [second], toPublicId('user', newId()))).data).toEqual(
+        {
+          orderBulkAssign: {
+            orders: [],
+            userErrors: [{ field: ['staffMemberId'], code: 'NOT_FOUND' }],
+          },
+        },
+      );
+      expect(
+        (await bulk(agent.accessToken, [third], toPublicId('user', manager.userId))).errors[0],
+      ).toMatchObject({ extensions: { code: 'ACCESS_DENIED' } });
+      expect((await bulk(manager.accessToken, [second, third], null)).data).toEqual({
+        orderBulkAssign: {
+          orders: [
+            { id: second, assignee: null },
+            { id: third, assignee: null },
+          ],
+          userErrors: [],
+        },
+      });
     });
 
     it("lets staff and apps comment on an order's timeline, each changing their own (ADR-128)", async () => {

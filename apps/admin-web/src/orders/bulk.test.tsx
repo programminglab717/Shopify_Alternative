@@ -35,6 +35,15 @@ function core(role: StaffRole) {
       }
       case 'OrderBulkAddTags':
         return { orderBulkAddTags: { orders: [{ id: 'ord_1' }, { id: 'ord_2' }], userErrors: [] } };
+      case 'Staff':
+        return {
+          staffMembers: [
+            { id: 'usr_1', name: 'Sana' },
+            { id: 'usr_2', name: 'Bilal Ahmed' },
+          ],
+        };
+      case 'OrderBulkAssign':
+        return { orderBulkAssign: { orders: [{ id: 'ord_1' }, { id: 'ord_2' }], userErrors: [] } };
       case 'OrderBulkRemoveTags':
         return { orderBulkRemoveTags: { orders: [{ id: 'ord_1' }], userErrors: [] } };
       case 'OrderBulkCancel':
@@ -96,6 +105,32 @@ describe('Orders tagged and cancelled many at once', () => {
     expect(sentOf(fake, 'OrderBulkRemoveTags')).toEqual([{ ids: ['ord_1'], tags: ['eid'] }]);
   });
 
+  it('gives the orders chosen to a member of staff, or to no one (ADR-634)', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders');
+
+    await screen.findByText('#1011');
+    fireEvent.click(screen.getByLabelText('Select all shown'));
+    await press('Assign 2');
+    expect(screen.getByRole('heading', { name: 'Give 2 orders to' })).toBeTruthy();
+    const assignee = screen.getByLabelText('Given to');
+    await screen.findByRole('option', { name: 'Bilal Ahmed' });
+    expect(screen.getByRole('option', { name: 'Sana (you)' })).toBeTruthy();
+    fireEvent.change(assignee, { target: { value: 'usr_2' } });
+    await press('Assign 2 orders');
+    await screen.findByText('2 orders updated.');
+
+    fireEvent.click(screen.getByLabelText('Select all shown'));
+    await press('Assign 2');
+    await press('Assign 2 orders');
+    await screen.findByText('2 orders updated.');
+    expect(sentOf(fake, 'OrderBulkAssign')).toEqual([
+      { ids: ['ord_1', 'ord_2'], staffMemberId: 'usr_2' },
+      { ids: ['ord_1', 'ord_2'], staffMemberId: null },
+    ]);
+  });
+
   it('cancels the orders chosen for a reason, one refused named', async () => {
     const fake = core('confirmation_agent');
     vi.stubGlobal('fetch', fake.fetcher);
@@ -125,6 +160,15 @@ describe('Orders tagged and cancelled many at once', () => {
     expect(screen.getByRole('button', { name: 'Print 2' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Tag 2' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Cancel 2' })).toBeNull();
+    cleanup();
+
+    // Agents change orders, but give them to no one else.
+    vi.stubGlobal('fetch', core('confirmation_agent').fetcher);
+    renderAdmin('/shop_1/orders?stage=TO_PACK');
+    await screen.findByText('#1011');
+    fireEvent.click(screen.getByLabelText('Select all shown'));
+    expect(screen.getByRole('button', { name: 'Tag 2' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Assign 2' })).toBeNull();
     cleanup();
 
     vi.stubGlobal('fetch', core('accountant').fetcher);

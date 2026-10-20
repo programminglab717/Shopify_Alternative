@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-633 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-634 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -641,6 +641,7 @@
 | 631 | A theme's picture setting chooses from the shop's own pictures among its files, the newest first, sixty at a time, as well as taking one uploaded; the picture chosen is shown at its theme-images address, as one uploaded is | Accepted |
 | 632 | An order export's workbook has its rows' totals on sheets beside them: by the day orders were placed and by stage, or, a row per line item, by variant, each ending with every row's; a CSV stays the rows alone | Accepted |
 | 633 | A member of staff is pushed in their browser of an order given to them and of a comment naming them, whatever their role, if they may see orders, number or none, once each, in their language, opening the order and saying neither its customer nor the comment | Accepted |
+| 634 | Owners and managers give up to 250 orders at once to a member of staff, or to no one, among the list's bulk actions; whoever is given them is told once, of them all, on WhatsApp and in their browser | Accepted |
 
 ---
 
@@ -22664,3 +22665,26 @@
 * **Alternatives:** **Push in place of WhatsApp:** a member who never turned on notifications
   would hear nothing. **The comment's words in the push:** they may hold a customer's details.
   **Pushing only those without a number:** a member at their desk would still wait on WhatsApp.
+
+## ADR-634 · Owners and managers give up to 250 orders at once to a member of staff, or to no one, among the list's bulk actions; whoever is given them is told once, of them all, on WhatsApp and in their browser
+
+* **Context:** An order is given to one member of staff at a time, from its own page (ADR-127),
+  and each one given tells them on WhatsApp and now in their browser (ADR-191, ADR-633). A shop
+  sharing out the morning's orders among its agents opens each in turn, and an agent given forty
+  hears forty times, each WhatsApp message paid from the shop's credit (status shortcut 61).
+* **Decision:** `orderBulkAssign` gives up to 250 orders to one member of staff, or to no one,
+  as `orderAssign` does each, with the same checks: owners, managers, their custom roles that
+  keep `assign_orders`, and apps give orders to anyone; other staff take orders no one has for
+  themselves. Each order is changed in its own transaction, so one refused leaves the rest done.
+  Their events carry one batch, its id and the number of orders asked, and the worker tells the
+  member once for the batch: on WhatsApp, the first order it handles with how many more, "#1043
+  (+24)"; in the browser, "25 orders are yours", opening their own orders (`assignee:me`). The
+  admin's orders list offers **Assign** among its bulk actions to those who give orders to anyone,
+  with the shop's staff to choose from.
+* **Consequences:** Sharing out a morning's orders is a choice of rows and a name, and the agent
+  hears of them once. The number told is of the orders asked: one refused, or theirs already, is
+  still counted.
+* **Alternatives:** **One event for the whole batch:** it would be written after the orders, in
+  a transaction of its own, and lost if that failed; each order's event stays with its change.
+  **Each order told as before:** forty messages for forty orders, paid for each. **Telling the
+  exact number given:** the worker would wait for every order's event, which arrive apart.

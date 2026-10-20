@@ -28,7 +28,7 @@ import { WORKS_PARCELS } from './parcels';
  * Owners and managers give orders to anyone, from the shop's staff, and take them from whoever has
  * them (`assign_orders`).
  */
-const ASSIGNS = gate(
+export const ASSIGNS = gate(
   ['owner', 'manager'],
   (shop) => hasCapability(shop, 'assign_orders') && can(shop, 'read_settings'),
 );

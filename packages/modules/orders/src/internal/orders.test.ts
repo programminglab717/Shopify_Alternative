@@ -731,6 +731,68 @@ describe.skipIf(!server)('OrderService', () => {
     expect(await f.orders.release(f.a, bilalId)).toBe(0);
   });
 
+  it('gives many orders at once, their events one batch, those failing left out (ADR-634)', async () => {
+    const [kurta] = await f.variantsOf(f.a, 'Kurta');
+    const [one, two, three] = [
+      await f.order(f.a, [kurta!]),
+      await f.order(f.a, [kurta!]),
+      await f.order(f.a, [kurta!]),
+    ];
+    const [sanaId, bilalId] = [newId(), newId()];
+    const toSana = { staffMemberId: sanaId, name: 'Sana Iqbal' };
+    const bilal: TenantContext = {
+      ...f.a,
+      actor: {
+        kind: 'staff',
+        userId: bilalId,
+        sessionId: newId(),
+        authenticatedAt: new Date(),
+        role: 'packer',
+      },
+    };
+    const before = (await f.outbox()).length;
+    // The third is Sana's already: nothing new for it. An order given twice counts once.
+    unwrap(await f.orders.assign(f.a, three.id, toSana, { fromOthers: true }));
+    const missing = newId();
+    const result = unwrap(
+      await f.orders.bulkAssign(f.a, [one.id, two.id, one.id, three.id, missing], toSana, {
+        fromOthers: true,
+      }),
+    );
+    expect(result.orders.map((order) => [order.id, order.assignee?.staffMemberId])).toEqual([
+      [one.id, sanaId],
+      [two.id, sanaId],
+      [three.id, sanaId],
+    ]);
+    expect(result.errors.map((error) => [error.field, error.code])).toEqual([
+      [['ids', '4'], 'NOT_FOUND'],
+    ]);
+    const assigned = (await f.outbox())
+      .slice(before)
+      .filter((event) => event.event_type === 'order.assigned');
+    expect(assigned.map((event) => event.aggregate_id)).toEqual([three.id, one.id, two.id]);
+    // One batch for the two given now, of the four orders asked; the one given alone has none.
+    const batch = assigned[1]!.payload.batch as { id: string; size: number };
+    expect(batch).toEqual({ id: expect.any(String), size: 4 });
+    expect(assigned.map((event) => event.payload.batch)).toEqual([undefined, batch, batch]);
+
+    // Staff who may not give orders to others take many for themselves, but not someone else's.
+    const taken = unwrap(
+      await f.orders.bulkAssign(
+        bilal,
+        [one.id],
+        { staffMemberId: bilalId, name: 'Bilal' },
+        { fromOthers: false },
+      ),
+    );
+    expect(taken.errors.map((error) => [error.field, error.code])).toEqual([
+      [['ids', '0'], 'INVALID'],
+    ]);
+    expect(errorsOf(await f.orders.bulkAssign(f.a, [], null, { fromOthers: true }))).toEqual([
+      ['ids', 'BLANK'],
+    ]);
+  });
+
   it('masks customers’ numbers for everyone but owners, managers and apps', async () => {
     const [kurta] = await f.variantsOf(f.a, 'Kurta');
     // Placed through checkout: where it came from is theirs to see, as the number is.

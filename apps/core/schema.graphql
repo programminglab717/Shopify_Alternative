@@ -8465,6 +8465,16 @@ type Mutation {
   """
   orderBulkAddTags(ids: [ID!]!, tags: [String!]!): OrderBulkPayload!
 
+  """
+  Gives up to 250 orders to a member of staff, or, without staffMemberId, to no one, as orderAssign does each (ADR-634). Whoever is given them by someone else is told once, of them all.
+  """
+  orderBulkAssign(
+    ids: [ID!]!
+
+    """Their account: usr_…"""
+    staffMemberId: ID
+  ): OrderBulkPayload!
+
   """Cancels up to 250 orders for one reason, as orderCancel does each."""
   orderBulkCancel(
     ids: [ID!]!

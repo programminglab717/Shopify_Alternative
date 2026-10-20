@@ -364,6 +364,7 @@ export {
   MailingAddress,
   Order,
   OrderAgreement,
+  OrderBulkPayload,
   OrderEvent,
 } from '../internal/graphql/order.types.js';
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
