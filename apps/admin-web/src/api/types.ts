@@ -441,7 +441,8 @@ export interface ConfirmationDeskDutyStartData {
 }
 
 export interface ConfirmationDeskDutyEndData {
-  confirmationDeskDutyEnd: { userErrors: UserError[] };
+  /** How many of the caller's orders went to others on duty (ADR-656). */
+  confirmationDeskDutyEnd: { handedOver: number; userErrors: UserError[] };
 }
 
 export interface OrderPhoneRevealData {

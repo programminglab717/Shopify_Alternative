@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-655 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-656 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -663,6 +663,7 @@
 | 653 | A cash-on-delivery order still waiting for its advance may be let go without it, the courier collecting what it owed, until any of it ships | Accepted |
 | 654 | Agents go on duty at the Confirmation Desk for a shift of hours, and where the shop says so each order placed that needs a call is given to the one on duty with the fewest waiting | Accepted |
 | 655 | Orders a shop's staff take from chats, at its counter or by hand go to Meta's conversions API too where the shop says so, as chat, physical_store or other events matched by the customer's number | Accepted |
+| 656 | An agent going off duty at the Confirmation Desk may hand over the orders still waiting on them, each to whoever else is on duty with the fewest waiting | Accepted |
 
 ---
 
@@ -23095,3 +23096,23 @@
   the chat's ad referral kept with the order, and only WhatsApp gives it; left for when the inbox
   keeps it. **All staff orders, without a switch:** a shop reporting them already would have them
   counted twice.
+
+## ADR-656 · An agent going off duty at the Confirmation Desk may hand over the orders still waiting on them, each to whoever else is on duty with the fewest waiting
+
+* **Context:** Orders shared among the agents on duty (ADR-654) stayed with an agent after their
+  shift: going home with orders still to call left them waiting until the next morning, or until a
+  manager gave them to someone by hand.
+* **Decision:** `confirmationDeskDutyEnd(handOver: true)` ends the caller's shift and, in the same
+  transaction, gives each of their open orders still waiting to be confirmed, oldest first, to
+  whoever else is on duty, by the rule new orders follow: the fewest waiting, then the one given one
+  longest ago. Each order's version moves, its timeline says who handed it over to whom, and
+  `OrderUpdated` and `OrderAssigned` are appended with the leaver as who gave it, so the one given
+  it is told (ADR-191). With no one else on duty, the orders stay with the leaver; the payload says
+  how many went. It does not hang on the shop's sharing switch: it is the agent's own choice. The
+  desk's card offers it beside going off duty when the caller has orders waiting and someone else
+  is on duty.
+* **Consequences:** An agent leaving the desk passes on what they could not call, and the others
+  are told as of any order given to them.
+* **Alternatives:** **Handing over by themselves when a shift lapses:** a sweep would move orders
+  an agent may still be calling past the hour; left until shops ask. **Back to no one:** the
+  orders would wait for someone to take them, which is what the desk's sharing is there to avoid.

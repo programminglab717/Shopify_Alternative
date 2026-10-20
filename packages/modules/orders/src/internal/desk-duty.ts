@@ -1,9 +1,9 @@
 import { failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
-import { appendEvent } from '@hatti/events';
+import { appendEvent, appendEvents } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { OrderEvents, type OrderAssignedPayload } from './events.js';
+import { OrderEvents, type OrderAssignedPayload, type OrderUpdatedPayload } from './events.js';
 import { orderSettingsIn } from './order-settings.service.js';
 import { addTimelineEntry } from './order-store.js';
 
@@ -91,18 +91,86 @@ export class DeskDutyService {
     });
   }
 
-  /** Ends the caller's shift; the orders they were given stay theirs. */
-  async end(tenant: TenantContext): Promise<void> {
-    if (tenant.actor.kind !== 'staff') return;
+  /**
+   * Ends the caller's shift. The orders they were given stay theirs, unless they `handOver` those
+   * still waiting to be confirmed (ADR-656): each goes to whoever else is on duty with the fewest
+   * waiting, as a new order would. With no one else on duty they stay. Returns how many went.
+   */
+  async end(tenant: TenantContext, options: { handOver?: boolean } = {}): Promise<number> {
+    if (tenant.actor.kind !== 'staff') return 0;
     const userId = tenant.actor.userId;
-    await this.db.tenant(tenant.shopId, (tx) => endDutyIn(tx, tenant.shopId, userId));
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const leaver = await endDutyIn(tx, tenant.shopId, userId);
+      if (!options.handOver) return 0;
+      const { rows: waiting } = await tx.execute<{ id: string }>(sql`
+        SELECT id FROM orders.orders
+         WHERE shop_id = ${tenant.shopId} AND assignee_id = ${userId}
+           AND status = 'open' AND stage = 'needs_confirmation'
+         ORDER BY created_at, id
+           FOR UPDATE`);
+      let handed = 0;
+      for (const { id } of waiting) {
+        const agent = await nextOnDuty(tx, tenant.shopId);
+        if (!agent) break;
+        const { rows } = await tx.execute<Pick<OrderUpdatedPayload, 'stage' | 'version'>>(sql`
+          UPDATE orders.orders
+             SET assignee_id = ${agent.staff_member_id}, assigned_at = now(),
+                 version = version + 1, updated_at = now()
+           WHERE shop_id = ${tenant.shopId} AND id = ${id}
+          RETURNING stage, version`);
+        const order = rows[0]!;
+        await addTimelineEntry(
+          tx,
+          tenant.shopId,
+          id,
+          tenant.actor,
+          'assigned',
+          `Handed over ${leaver ? `by ${leaver} ` : ''}to ${agent.name}, on duty at the Confirmation Desk`,
+        );
+        await appendEvents(tx, tenant.shopId, [
+          {
+            type: OrderEvents.OrderUpdated,
+            aggregateType: 'order',
+            aggregateId: id,
+            payload: {
+              changed: ['assignee'],
+              stage: order.stage,
+              version: order.version,
+            } satisfies OrderUpdatedPayload,
+          },
+          {
+            // For the worker to tell them (ADR-191).
+            type: OrderEvents.OrderAssigned,
+            aggregateType: 'order',
+            aggregateId: id,
+            payload: {
+              assigneeId: agent.staff_member_id,
+              assignedBy: userId,
+              stage: order.stage as OrderAssignedPayload['stage'],
+              version: order.version,
+            } satisfies OrderAssignedPayload,
+          },
+        ]);
+        handed += 1;
+      }
+      return handed;
+    });
   }
 }
 
-/** Ends a member of staff's shift at the desk, if they are on one: when they leave the shop. */
-export async function endDutyIn(tx: Tx, shopId: string, staffMemberId: string): Promise<void> {
-  await tx.execute(sql`
-    DELETE FROM orders.desk_duty WHERE shop_id = ${shopId} AND staff_member_id = ${staffMemberId}`);
+/**
+ * Ends a member of staff's shift at the desk, if they are on one, as they leave it or the shop:
+ * the name they were on duty under, if they were.
+ */
+export async function endDutyIn(
+  tx: Tx,
+  shopId: string,
+  staffMemberId: string,
+): Promise<string | null> {
+  const { rows } = await tx.execute<{ name: string }>(sql`
+    DELETE FROM orders.desk_duty WHERE shop_id = ${shopId} AND staff_member_id = ${staffMemberId}
+    RETURNING name`);
+  return rows[0]?.name ?? null;
 }
 
 /**
@@ -118,22 +186,11 @@ export async function shareOutIn(
 ): Promise<void> {
   if (order.stage !== 'needs_confirmation' || order.assigneeId !== null) return;
   if (!(await orderSettingsIn(tx, shopId)).shareNewOrders) return;
-  // Locked, so that orders placed at once are dealt one after another.
-  const { rows } = await tx.execute<{ staff_member_id: string; name: string }>(sql`
-    SELECT d.staff_member_id, d.name
-      FROM orders.desk_duty d
-     WHERE d.shop_id = ${shopId} AND d.ends_at > now()
-     ORDER BY ${WAITING}, d.last_given_at NULLS FIRST, d.started_at, d.staff_member_id
-     LIMIT 1
-       FOR UPDATE OF d`);
-  const agent = rows[0];
+  const agent = await nextOnDuty(tx, shopId);
   if (!agent) return;
   await tx.execute(sql`
     UPDATE orders.orders SET assignee_id = ${agent.staff_member_id}, assigned_at = now()
      WHERE shop_id = ${shopId} AND id = ${order.id}`);
-  await tx.execute(sql`
-    UPDATE orders.desk_duty SET last_given_at = clock_timestamp()
-     WHERE shop_id = ${shopId} AND staff_member_id = ${agent.staff_member_id}`);
   await addTimelineEntry(
     tx,
     shopId,
@@ -154,6 +211,31 @@ export async function shareOutIn(
       version: order.version,
     },
   });
+}
+
+/**
+ * The agent on duty to give the next order to: the one with the fewest waiting to be confirmed,
+ * then the one given one longest ago. Locked, so that orders given at once are dealt one after
+ * another; marked as given one now.
+ */
+async function nextOnDuty(
+  tx: Tx,
+  shopId: string,
+): Promise<{ staff_member_id: string; name: string } | undefined> {
+  const { rows } = await tx.execute<{ staff_member_id: string; name: string }>(sql`
+    SELECT d.staff_member_id, d.name
+      FROM orders.desk_duty d
+     WHERE d.shop_id = ${shopId} AND d.ends_at > now()
+     ORDER BY ${WAITING}, d.last_given_at NULLS FIRST, d.started_at, d.staff_member_id
+     LIMIT 1
+       FOR UPDATE OF d`);
+  const agent = rows[0];
+  if (agent) {
+    await tx.execute(sql`
+      UPDATE orders.desk_duty SET last_given_at = clock_timestamp()
+       WHERE shop_id = ${shopId} AND staff_member_id = ${agent.staff_member_id}`);
+  }
+  return agent;
 }
 
 function toRecord(row: DutyRow): DeskDutyRecord {

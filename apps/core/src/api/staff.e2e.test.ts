@@ -1138,8 +1138,26 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         { name: 'Sana Iqbal', waiting: 1, isYou: false },
       ]);
 
-      // Off duty, the agent is given no more.
-      await as(agent.accessToken, 'mutation { confirmationDeskDutyEnd { userErrors { code } } }');
+      // Off duty, the agent hands over what still waits to the manager, on duty too (ADR-656),
+      // and is given no more.
+      await as(
+        manager.accessToken,
+        'mutation { confirmationDeskDutyStart { userErrors { code } } }',
+      );
+      const ended = await as(
+        agent.accessToken,
+        'mutation { confirmationDeskDutyEnd(handOver: true) { handedOver userErrors { code } } }',
+      );
+      expect(ended.data.confirmationDeskDutyEnd).toEqual({ handedOver: 1, userErrors: [] });
+      const handed = await as(
+        manager.accessToken,
+        `{ order(id: "${after}") { assignee { id } } confirmationDeskDuty { waiting isYou } }`,
+      );
+      expect(handed.data).toEqual({
+        order: { assignee: { id: toPublicId('user', manager.userId) } },
+        confirmationDeskDuty: [{ waiting: 1, isYou: true }],
+      });
+      await as(manager.accessToken, 'mutation { confirmationDeskDutyEnd { handedOver } }');
       expect((await as(agent.accessToken, '{ confirmationDeskDuty { name } }')).data).toEqual({
         confirmationDeskDuty: [],
       });

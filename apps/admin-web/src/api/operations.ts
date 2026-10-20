@@ -891,8 +891,9 @@ export const ConfirmationDeskDutyStartMutation = /* GraphQL */ `
 
 /** The caller goes off duty; the orders given to them stay theirs. */
 export const ConfirmationDeskDutyEndMutation = /* GraphQL */ `
-  mutation ConfirmationDeskDutyEnd {
-    confirmationDeskDutyEnd {
+  mutation ConfirmationDeskDutyEnd($handOver: Boolean) {
+    confirmationDeskDutyEnd(handOver: $handOver) {
+      handedOver
       userErrors {
         ...Problems
       }

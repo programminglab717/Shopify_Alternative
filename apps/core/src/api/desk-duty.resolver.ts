@@ -50,6 +50,9 @@ export class DeskDutyStartPayload {
 
 @ObjectType()
 export class DeskDutyEndPayload {
+  @Field(() => Int, { description: 'How many of your orders went to others on duty.' })
+  handedOver!: number;
+
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
@@ -101,14 +104,18 @@ export class DeskDutyResolver {
   }
 
   @Mutation(() => DeskDutyEndPayload, {
-    description: 'Takes you off duty at the desk; the orders given to you stay yours.',
+    description:
+      'Takes you off duty at the desk. The orders given to you stay yours, unless you hand over ' +
+      'those still waiting to be confirmed: each goes to whoever else is on duty with the fewest ' +
+      'waiting (ADR-656).',
   })
   @RequireScopes('write_orders')
   async confirmationDeskDutyEnd(
     @CurrentTenant() tenant: TenantContext,
+    @Args('handOver', { nullable: true, defaultValue: false }) handOver: boolean,
   ): Promise<DeskDutyEndPayload> {
-    await this.duty.end(tenant);
-    return Object.assign(new DeskDutyEndPayload(), { userErrors: [] });
+    const handedOver = await this.duty.end(tenant, { handOver });
+    return Object.assign(new DeskDutyEndPayload(), { handedOver, userErrors: [] });
   }
 }
 

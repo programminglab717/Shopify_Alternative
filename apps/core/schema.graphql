@@ -4195,6 +4195,8 @@ type DeskDuty {
 }
 
 type DeskDutyEndPayload {
+  """How many of your orders went to others on duty."""
+  handedOver: Int!
   userErrors: [UserError!]!
 }
 
@@ -7996,8 +7998,10 @@ type Mutation {
   """Marks a comment as spam: the storefront no longer shows it."""
   commentSpam(id: ID!): CommentSpamPayload!
 
-  """Takes you off duty at the desk; the orders given to you stay yours."""
-  confirmationDeskDutyEnd: DeskDutyEndPayload!
+  """
+  Takes you off duty at the desk. The orders given to you stay yours, unless you hand over those still waiting to be confirmed: each goes to whoever else is on duty with the fewest waiting (ADR-656).
+  """
+  confirmationDeskDutyEnd(handOver: Boolean = false): DeskDutyEndPayload!
 
   """
   Puts you on duty at the Confirmation Desk for 1 to 12 hours, 8 unless you say; on duty already, it moves when your shift ends. For members of staff: no order is given to an app.

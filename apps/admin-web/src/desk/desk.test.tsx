@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeCore, LATER, press, renderAdmin, signedIn } from '../test-support';
 
@@ -67,7 +67,7 @@ function deskCore() {
         return {
           confirmationDeskDuty: you
             ? [
-                { staffMemberId: 'usr_1', name: 'Sana', endsAt: LATER, waiting: 0, isYou: true },
+                { staffMemberId: 'usr_1', name: 'Sana', endsAt: LATER, waiting: 2, isYou: true },
                 bilal,
               ]
             : [bilal],
@@ -77,7 +77,10 @@ function deskCore() {
         return { confirmationDeskDutyStart: { duty: null, userErrors: [] } };
       case 'ConfirmationDeskDutyEnd':
         you = null;
-        return { confirmationDeskDutyEnd: { userErrors: [] } };
+        // Bilal, on duty too, takes the two waiting on her if she hands them over (ADR-656).
+        return {
+          confirmationDeskDutyEnd: { handedOver: variables.handOver ? 2 : 0, userErrors: [] },
+        };
       case 'OrderPhoneReveal':
         return { orderPhoneReveal: { phone: '+923001234567', userErrors: [] } };
       case 'OrderConfirmationCall':
@@ -110,6 +113,7 @@ describe('The Confirmation Desk', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
   });
 
@@ -156,12 +160,27 @@ describe('The Confirmation Desk', () => {
     expect(within(duty).getByText(/^Bilal: 3 waiting, until/)).toBeTruthy();
     fireEvent.change(within(duty).getByLabelText('For'), { target: { value: '4' } });
     await press('Go on duty');
-    await within(duty).findByText(/^You: 0 waiting, until/);
+    await within(duty).findByText(/^You: 2 waiting, until/);
     expect(
       core.sent.find((each) => each.operation === 'ConfirmationDeskDutyStart')?.variables,
     ).toEqual({ hours: 4 });
     await press('Go off duty');
     await within(duty).findByRole('button', { name: 'Go on duty' });
     expect(within(duty).queryByText(/^You:/)).toBeNull();
+    expect(within(duty).queryByRole('status')).toBeNull();
+  });
+
+  it('hands over the orders waiting on the agent as they go off duty (ADR-656)', async () => {
+    renderAdmin('/shop_1/desk');
+
+    const duty = await screen.findByRole('region', { name: 'On duty' });
+    await press('Go on duty');
+    fireEvent.click(
+      await within(duty).findByRole('button', { name: 'Go off duty, handing over your 2 waiting' }),
+    );
+    expect(await within(duty).findByText('2 handed over to others on duty.')).toBeTruthy();
+    expect(
+      core.sent.filter((each) => each.operation === 'ConfirmationDeskDutyEnd')[0]?.variables,
+    ).toEqual({ handOver: true });
   });
 });

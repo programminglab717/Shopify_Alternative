@@ -33,18 +33,22 @@ export function DeskDutyCard({ timezone }: { timezone: string }) {
   const start = useAdminMutation<ConfirmationDeskDutyStartData, { hours: number }>(
     ConfirmationDeskDutyStartMutation,
   );
-  const end = useAdminMutation<ConfirmationDeskDutyEndData, Record<string, never>>(
+  const end = useAdminMutation<ConfirmationDeskDutyEndData, { handOver?: boolean }>(
     ConfirmationDeskDutyEndMutation,
   );
   const [hours, setHours] = useState<(typeof SHIFTS)[number]>('8');
   const [problem, setProblem] = useState<string | null>(null);
+  const [handedOver, setHandedOver] = useState(0);
 
   if (!duty.data) return null;
   const onDuty = duty.data.confirmationDeskDuty;
   const you = onDuty.find((each) => each.isYou);
+  // Whoever else is on duty takes what still waits on the caller, if they ask (ADR-656).
+  const canHandOver = you !== undefined && you.waiting > 0 && onDuty.length > 1;
 
   const act = async (run: () => Promise<{ userErrors: { message: string }[] }>) => {
     setProblem(null);
+    setHandedOver(0);
     try {
       const { userErrors } = await run();
       if (userErrors.length > 0) setProblem(userErrors.map((error) => error.message).join(' '));
@@ -76,17 +80,41 @@ export function DeskDutyCard({ timezone }: { timezone: string }) {
             </ul>
           )}
           {problem && <Alert tone="danger">{problem}</Alert>}
+          {handedOver > 0 && (
+            <Alert tone="success">
+              {t('desk.duty.handedOver', { count: formatCount(handedOver) })}
+            </Alert>
+          )}
           {you ? (
-            <Button
-              variant="secondary"
-              className="self-start"
-              busy={end.isPending}
-              onClick={() =>
-                void act(async () => (await end.mutateAsync({})).confirmationDeskDutyEnd)
-              }
-            >
-              {t('desk.duty.end')}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                busy={end.isPending && !end.variables?.handOver}
+                disabled={end.isPending}
+                onClick={() =>
+                  void act(async () => (await end.mutateAsync({})).confirmationDeskDutyEnd)
+                }
+              >
+                {t('desk.duty.end')}
+              </Button>
+              {canHandOver && (
+                <Button
+                  variant="secondary"
+                  busy={end.isPending && end.variables?.handOver === true}
+                  disabled={end.isPending}
+                  onClick={() =>
+                    void act(async () => {
+                      const ended = (await end.mutateAsync({ handOver: true }))
+                        .confirmationDeskDutyEnd;
+                      setHandedOver(ended.handedOver);
+                      return ended;
+                    })
+                  }
+                >
+                  {t('desk.duty.handOver', { count: formatCount(you.waiting) })}
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="flex flex-wrap items-end gap-2">
               <SelectField<(typeof SHIFTS)[number]>

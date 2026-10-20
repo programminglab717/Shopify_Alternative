@@ -126,6 +126,42 @@ describe.skipIf(!server)('Agents on duty at the Confirmation Desk (ADR-654)', ()
     expect(held.assignee).toBeNull();
   });
 
+  it('hands over the orders still waiting on whoever goes off duty, when they ask (ADR-656)', async () => {
+    unwrap(await f.orderSettings.update(f.a, { shareNewOrders: true }));
+    const [sana, ali, hina] = [agent(), agent(), agent()];
+    unwrap(await duty.start(sana, 'Sana', 8));
+    const [first, second, third] = [await placed(1), await placed(2), await placed(3)];
+    unwrap(await f.orders.confirm(f.a, third.id));
+    unwrap(await duty.start(ali, 'Ali', 8));
+    unwrap(await duty.start(hina, 'Hina', 8));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    // Her two still waiting go one each to Ali and Hina; the confirmed one stays hers.
+    expect(await duty.end(sana, { handOver: true })).toBe(2);
+    const holders = async (...ids: string[]) =>
+      Promise.all(ids.map(async (id) => (await f.orders.get(f.a, id))!.assignee?.staffMemberId));
+    expect(await holders(first.id, second.id, third.id)).toEqual([
+      ali.actor.userId,
+      hina.actor.userId,
+      sana.actor.userId,
+    ]);
+    expect(await assigned()).toEqual([
+      [first.id, ali.actor.userId, sana.actor.userId],
+      [second.id, hina.actor.userId, sana.actor.userId],
+    ]);
+    const timeline = await f.orders.timeline(f.a, first.id, { first: 10 });
+    expect(timeline.items.map((entry) => entry.message)).toContain(
+      'Handed over by Sana to Ali, on duty at the Confirmation Desk',
+    );
+    expect((await f.orders.get(f.a, first.id))!.version).toBe(first.version + 1);
+
+    // Off duty without asking, or with no one else on duty, orders stay with whoever has them.
+    expect(await duty.end(ali)).toBe(0);
+    expect(await duty.end(hina, { handOver: true })).toBe(0);
+    expect(await holders(first.id, second.id)).toEqual([ali.actor.userId, hina.actor.userId]);
+    expect(await duty.end(f.a, { handOver: true })).toBe(0);
+  });
+
   it('keeps shifts to 1 to 12 hours, for members of staff alone, and ends them as they leave', async () => {
     const sana = agent();
     expect(errorsOf(await duty.start(sana, 'Sana', 0))).toEqual([['hours', 'INVALID']]);
