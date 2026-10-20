@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Theme pictures from the shop's files
+### eb54d2f · Theme pictures from the shop's files
 
 * **A theme's picture setting chooses from the shop's own pictures** ([ADR-631](../architecture/13-decision-log.md#adr-631--a-themes-picture-setting-chooses-from-the-shops-own-pictures-among-its-files-the-newest-first-sixty-at-a-time-as-well-as-taking-one-uploaded-the-picture-chosen-is-shown-at-its-theme-images-address-as-one-uploaded-is)) as well as
   taking one uploaded: its files, the newest first, sixty at a time, PDFs and videos left out.
