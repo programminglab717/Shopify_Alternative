@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Where the shop's files are used
+### 365518c · Where the shop's files are used
 
 * **A file says where it is used, and the Files tab says so before it is deleted** ([ADR-639](../architecture/13-decision-log.md#adr-639--a-shops-file-says-where-it-is-used-its-logos-the-sharing-image-articles-and-themes-and-the-files-tab-says-so-before-it-is-deleted)):
   its logos, the sharing image, articles and themes, put together by the core from the files
