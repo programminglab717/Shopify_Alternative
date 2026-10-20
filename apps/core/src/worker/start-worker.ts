@@ -73,6 +73,7 @@ import {
 } from '@hatti/online-store/public';
 import {
   CustomerAnswers,
+  DeskDutyService,
   ExportScheduleService,
   FulfillmentService,
   ORDER_LINK_PATH,
@@ -152,6 +153,7 @@ import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
+import { LapsedShifts } from './lapsed-shifts.js';
 
 export interface RunningWorker {
   stop(): Promise<void>;
@@ -447,6 +449,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => sweeps.stop());
+    // What waits on agents whose shift at the desk ran out handed over (ADR-666).
+    const lapsed = new LapsedShifts(new DeskDutyService(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => lapsed.stop());
     // Customers who have not answered asked once more to confirm (ADR-175).
     const asking = new ConfirmationReminders(database, workerOrders(database), logger).start(
       config.SWEEP_INTERVAL_MS,

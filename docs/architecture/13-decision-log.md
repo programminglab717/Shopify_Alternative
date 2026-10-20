@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-665 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-666 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -673,6 +673,7 @@
 | 663 | Cancelling an order whose refunds took part of what its store credit paid gives back as much as they left, to the credits it came from, as a parcel that came back does | Accepted |
 | 664 | Cancelling an order whose refunds took part of what gift cards paid gives back to the cards as much as refunds and store credit left, and the timeline says what the cards got | Accepted |
 | 665 | The menu editor says which of a link's tags none of its collection's products has, or none of the shop's for all products, as typing stops | Accepted |
+| 666 | Where the shop shares new orders out, the orders still waiting on an agent whose shift ran out are handed over by the worker to those on duty | Accepted |
 
 ---
 
@@ -23295,3 +23296,24 @@
 * **Alternatives:** **Refusing the menu:** a link made ahead of its products, for a sale coming,
   is a fair one. **Checking against the tags offered:** they are the thirty most used, so a tag
   past them would be flagged wrongly.
+
+## ADR-666 · Where the shop shares new orders out, the orders still waiting on an agent whose shift ran out are handed over by the worker to those on duty
+
+* **Context:** Agents go on duty at the Confirmation Desk for a shift of hours, and where the shop
+  shares new orders out each is given to the one on duty with the fewest waiting (ADR-654). An
+  agent going off duty may hand over what still waits on them (ADR-656), but one who left without
+  ending their shift kept their orders when it ran out, waiting on no one at the desk until
+  someone noticed.
+* **Decision:** Each sweep of the worker finds the shops that share new orders out and have a
+  shift that ran out, with the system role, and in each shop's own transaction hands over the
+  orders still waiting to be confirmed on such an agent, each to whoever is on duty with the
+  fewest waiting, as ending a shift with a hand-over does: by the system, the timeline saying from
+  whom and to whom, the one given it told. A lapsed shift is let go once nothing waits on it, so
+  it is handed over once; where no one is on duty it is kept for the next sweep, and let go a day
+  after it ended whatever is left, which stays with its agent. A shop that shares nothing out
+  hands over nothing: it gives its orders by hand.
+* **Consequences:** Orders do not sit on an agent who went home. The orders module's fixture now
+  has the system role, for its cross-shop functions.
+* **Alternatives:** **Ending shifts when they run out, with no hand-over:** the orders would still
+  wait on the agent. **Handing them over as each new order is shared out:** it would tie the
+  hand-over to orders coming, and a quiet hour would leave them where they are.

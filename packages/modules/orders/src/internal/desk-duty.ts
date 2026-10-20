@@ -102,60 +102,140 @@ export class DeskDutyService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const leaver = await endDutyIn(tx, tenant.shopId, userId);
       if (!options.handOver) return 0;
-      const { rows: waiting } = await tx.execute<{ id: string }>(sql`
-        SELECT id FROM orders.orders
-         WHERE shop_id = ${tenant.shopId} AND assignee_id = ${userId}
-           AND status = 'open' AND stage = 'needs_confirmation'
-         ORDER BY created_at, id
-           FOR UPDATE`);
+      return handOverIn(tx, tenant.shopId, userId, {
+        actor: tenant.actor,
+        assignedBy: userId,
+        text: (agent) =>
+          `Handed over ${leaver ? `by ${leaver} ` : ''}to ${agent}, on duty at the Confirmation Desk`,
+      });
+    });
+  }
+
+  /**
+   * {@link handOverLapsed} in every shop with a lapsed shift that shares new orders out, the
+   * shops found with the system role and each handed over in its own transaction: the worker's
+   * sweep (ADR-666). How many orders went.
+   */
+  async handOverAllLapsed(at: Date = new Date()): Promise<number> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT d.shop_id FROM orders.desk_duty d
+          JOIN orders.order_settings s ON s.shop_id = d.shop_id AND s.share_new_orders
+         WHERE d.ends_at <= ${at.toISOString()}::timestamptz`),
+    );
+    let handed = 0;
+    for (const { shop_id: shopId } of rows) handed += await this.handOverLapsed(shopId, at);
+    return handed;
+  }
+
+  /**
+   * Hands over the orders still waiting on agents whose shift at the desk ran out without their
+   * ending it, where the shop shares new orders out (ADR-666): each to whoever is on duty with the
+   * fewest waiting, by the system. A lapsed shift is let go once nothing waits on it, or a day
+   * after it ended, whatever is left staying with its agent. How many orders went.
+   */
+  async handOverLapsed(shopId: string, at: Date = new Date()): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      if (!(await orderSettingsIn(tx, shopId)).shareNewOrders) return 0;
+      const { rows: lapsed } = await tx.execute<{
+        staff_member_id: string;
+        name: string;
+        ends_at: string;
+      }>(sql`
+        SELECT staff_member_id, name, ends_at FROM orders.desk_duty
+         WHERE shop_id = ${shopId} AND ends_at <= ${at.toISOString()}::timestamptz
+         ORDER BY ends_at, staff_member_id
+           FOR UPDATE SKIP LOCKED`);
       let handed = 0;
-      for (const { id } of waiting) {
-        const agent = await nextOnDuty(tx, tenant.shopId);
-        if (!agent) break;
-        const { rows } = await tx.execute<Pick<OrderUpdatedPayload, 'stage' | 'version'>>(sql`
-          UPDATE orders.orders
-             SET assignee_id = ${agent.staff_member_id}, assigned_at = now(),
-                 version = version + 1, updated_at = now()
-           WHERE shop_id = ${tenant.shopId} AND id = ${id}
-          RETURNING stage, version`);
-        const order = rows[0]!;
-        await addTimelineEntry(
-          tx,
-          tenant.shopId,
-          id,
-          tenant.actor,
-          'assigned',
-          `Handed over ${leaver ? `by ${leaver} ` : ''}to ${agent.name}, on duty at the Confirmation Desk`,
-        );
-        await appendEvents(tx, tenant.shopId, [
-          {
-            type: OrderEvents.OrderUpdated,
-            aggregateType: 'order',
-            aggregateId: id,
-            payload: {
-              changed: ['assignee'],
-              stage: order.stage,
-              version: order.version,
-            } satisfies OrderUpdatedPayload,
-          },
-          {
-            // For the worker to tell them (ADR-191).
-            type: OrderEvents.OrderAssigned,
-            aggregateType: 'order',
-            aggregateId: id,
-            payload: {
-              assigneeId: agent.staff_member_id,
-              assignedBy: userId,
-              stage: order.stage as OrderAssignedPayload['stage'],
-              version: order.version,
-            } satisfies OrderAssignedPayload,
-          },
-        ]);
-        handed += 1;
+      for (const shift of lapsed) {
+        handed += await handOverIn(tx, shopId, shift.staff_member_id, {
+          actor: 'system',
+          assignedBy: null,
+          text: (agent) =>
+            `Handed over from ${shift.name}, whose shift ended, to ${agent}, on duty at the ` +
+            'Confirmation Desk',
+        });
+        const { rows } = await tx.execute<{ waiting: number }>(sql`
+          SELECT count(*)::int AS waiting FROM orders.orders
+           WHERE shop_id = ${shopId} AND assignee_id = ${shift.staff_member_id}
+             AND status = 'open' AND stage = 'needs_confirmation'`);
+        const old = at.getTime() - new Date(shift.ends_at).getTime() >= LAPSED_KEPT_MS;
+        if (rows[0]!.waiting === 0 || old) {
+          await tx.execute(sql`
+            DELETE FROM orders.desk_duty
+             WHERE shop_id = ${shopId} AND staff_member_id = ${shift.staff_member_id}
+               AND ends_at <= ${at.toISOString()}::timestamptz`);
+        }
       }
       return handed;
     });
   }
+}
+
+/** How long a lapsed shift is kept for its orders to be handed over (ADR-666). */
+const LAPSED_KEPT_MS = 24 * 3_600_000;
+
+/**
+ * Gives each order still waiting to be confirmed on `fromId` to whoever is on duty with the
+ * fewest waiting, as a new order would be, in the caller's transaction: the timeline says so in
+ * `by.text`, and the one given it is told (ADR-191). As many as there is someone on duty for; how
+ * many went.
+ */
+async function handOverIn(
+  tx: Tx,
+  shopId: string,
+  fromId: string,
+  by: {
+    actor: TenantContext['actor'] | 'system';
+    assignedBy: string | null;
+    text: (agent: string) => string;
+  },
+): Promise<number> {
+  const { rows: waiting } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM orders.orders
+     WHERE shop_id = ${shopId} AND assignee_id = ${fromId}
+       AND status = 'open' AND stage = 'needs_confirmation'
+     ORDER BY created_at, id
+       FOR UPDATE`);
+  let handed = 0;
+  for (const { id } of waiting) {
+    const agent = await nextOnDuty(tx, shopId);
+    if (!agent || agent.staff_member_id === fromId) break;
+    const { rows } = await tx.execute<Pick<OrderUpdatedPayload, 'stage' | 'version'>>(sql`
+      UPDATE orders.orders
+         SET assignee_id = ${agent.staff_member_id}, assigned_at = now(),
+             version = version + 1, updated_at = now()
+       WHERE shop_id = ${shopId} AND id = ${id}
+      RETURNING stage, version`);
+    const order = rows[0]!;
+    await addTimelineEntry(tx, shopId, id, by.actor, 'assigned', by.text(agent.name));
+    await appendEvents(tx, shopId, [
+      {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: id,
+        payload: {
+          changed: ['assignee'],
+          stage: order.stage,
+          version: order.version,
+        } satisfies OrderUpdatedPayload,
+      },
+      {
+        // For the worker to tell them (ADR-191).
+        type: OrderEvents.OrderAssigned,
+        aggregateType: 'order',
+        aggregateId: id,
+        payload: {
+          assigneeId: agent.staff_member_id,
+          assignedBy: by.assignedBy,
+          stage: order.stage as OrderAssignedPayload['stage'],
+          version: order.version,
+        } satisfies OrderAssignedPayload,
+      },
+    ]);
+    handed += 1;
+  }
+  return handed;
 }
 
 /**

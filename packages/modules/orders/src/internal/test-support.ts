@@ -162,7 +162,11 @@ export async function ordersFixture(
   } = {},
 ): Promise<OrdersFixture> {
   const testDb = await createTestDatabase(server);
-  const db = new Database({ appUrl: testDb.appUrl, applicationName: 'orders-test' });
+  const db = new Database({
+    appUrl: testDb.appUrl,
+    systemUrl: testDb.systemUrl,
+    applicationName: 'orders-test',
+  });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
   await admin.connect();
   const a = tenant(newId());

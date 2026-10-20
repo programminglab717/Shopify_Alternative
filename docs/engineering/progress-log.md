@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Lapsed shifts handed over
+
+* **What still waits on an agent whose shift at the Confirmation Desk ran out goes by itself to
+  those on duty** ([ADR-666](../architecture/13-decision-log.md#adr-666--where-the-shop-shares-new-orders-out-the-orders-still-waiting-on-an-agent-whose-shift-ran-out-are-handed-over-by-the-worker-to-those-on-duty)), where the shop shares new orders out: a sweep of the worker. Shortcut
+  42 stays as it is: chains of redirects are straightened at once (ADR-612), and following more
+  than five costs a page's render each.
+* 3822 tests, two more: the orders module's desk duty and the worker's sweep.
+
 ### 8d8ec61 · A menu link's missing tags
 
 * **The menu editor says which of a link's tags none of its products has** ([ADR-665](../architecture/13-decision-log.md#adr-665--the-menu-editor-says-which-of-a-links-tags-none-of-its-collections-products-has-or-none-of-the-shops-for-all-products-as-typing-stops)), through the
