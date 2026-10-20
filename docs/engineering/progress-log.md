@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Questions and answers on a page
+### cd64eff · Questions and answers on a page
 
 * **Hatti Base answers shoppers' questions on a page, and tells search engines** ([ADR-615](../architecture/13-decision-log.md#adr-615--hatti-base-answers-shoppers-questions-on-a-page-of-the-shops-choosing-each-opened-in-place-and-tells-search-engines-the-same-as-an-faqpage-unless-the-section-says-not-to)): a
   `faq` section of question blocks in a `page.faq` template, opened in place, and given as an
