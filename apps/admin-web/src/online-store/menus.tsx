@@ -451,6 +451,9 @@ function MenuForm({ menu }: { menu: Menu | null }) {
   const [drafts, setDrafts] = useState<Draft[]>(() => draftsOf(menu?.items ?? []));
   const [saved, setSaved] = useState(false);
   const [asking, setAsking] = useState(false);
+  // When the menu was last saved as this form knows it: a save made since by someone else is
+  // refused rather than saved over (ADR-642).
+  const [readAt, setReadAt] = useState(menu?.updatedAt ?? null);
   const choices: Choices = {
     collections: (collections.data?.collections.nodes ?? []).map((each) => ({
       value: each.id,
@@ -480,6 +483,7 @@ function MenuForm({ menu }: { menu: Menu | null }) {
               id: menu.id,
               title: title.trim(),
               items: linksInput(drafts),
+              ifUnchangedSince: readAt,
             })
           : await create.mutateAsync({
               title: title.trim(),
@@ -488,7 +492,13 @@ function MenuForm({ menu }: { menu: Menu | null }) {
             }),
       )[0]!;
       result.id = payload.menu?.id;
-      return payload;
+      if (payload.menu?.updatedAt) setReadAt(payload.menu.updatedAt);
+      return {
+        ...payload,
+        userErrors: payload.userErrors.map((error) =>
+          error.code === 'STALE' ? { ...error, field: null, message: t('menus.stale') } : error,
+        ),
+      };
     });
     if (!ok) return;
     if (menu) setSaved(true);

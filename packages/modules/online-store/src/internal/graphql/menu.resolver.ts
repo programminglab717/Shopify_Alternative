@@ -6,7 +6,7 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, GraphQLISODateTime, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import type { MenuItemInput } from '../menu-items.js';
 import { MenuService } from '../menu.service.js';
 import { toMenu, toMenuConnection, uuidOf } from './mappers.js';
@@ -84,11 +84,20 @@ export class MenuResolver {
     @Args('title') title: string,
     @Args('items', { type: () => [MenuItemUpdateInput] }) items: MenuItemUpdateInput[],
     @Args('handle', { type: () => String, nullable: true }) handle?: string | null,
+    @Args('ifUnchangedSince', {
+      type: () => GraphQLISODateTime,
+      nullable: true,
+      description:
+        "The menu's updatedAt as its editor read it: refused as STALE if it was saved since " +
+        '(ADR-642). Left out, this save stands over any other.',
+    })
+    ifUnchangedSince?: Date | null,
   ): Promise<MenuUpdatePayload> {
     const result = await this.service.update(tenant, uuidOf('menu', id), {
       title,
       handle,
       items: itemInputs(items),
+      ifUnchangedSince,
     });
     return Object.assign(new MenuUpdatePayload(), {
       menu: result.ok ? toMenu(result.value) : null,

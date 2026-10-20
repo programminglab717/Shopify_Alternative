@@ -21,7 +21,7 @@ interface GraphQLResponse {
 }
 
 const ITEM_FIELDS = 'id title type resourceId url tags';
-const MENU_FIELDS = `id handle title isDefault items { ${ITEM_FIELDS} items { ${ITEM_FIELDS} } }`;
+const MENU_FIELDS = `id handle title isDefault updatedAt items { ${ITEM_FIELDS} items { ${ITEM_FIELDS} } }`;
 
 describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
   let testDb: TestDatabase;
@@ -220,6 +220,20 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
     expect(updated).toEqual({
       menu: { handle: 'shop', title: 'Shop', items: [{ id: home.id, title: 'Home' }] },
       userErrors: [],
+    });
+    // Saved as it was read before that save, it is refused, not saved over (ADR-642).
+    const stale = await call(
+      tokens.a,
+      `mutation ($id: ID!, $since: DateTime) {
+        menuUpdate(id: $id, title: "Old", items: [], ifUnchangedSince: $since) {
+          menu { title } userErrors { field code }
+        }
+      }`,
+      { id: created.menu.id, since: created.menu.updatedAt },
+    );
+    expect(stale).toEqual({
+      menu: null,
+      userErrors: [{ field: ['ifUnchangedSince'], code: 'STALE' }],
     });
 
     const DELETE = `mutation ($id: ID!) {

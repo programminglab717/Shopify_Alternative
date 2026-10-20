@@ -32,6 +32,11 @@ export interface MenuInput {
   handle?: string | null;
   /** All of the menu's items: those not given go. */
   items: readonly MenuItemInput[];
+  /**
+   * On an update, when the menu was last saved as its editor read it: a menu saved since is not
+   * saved over (ADR-642). Left out, the last save stands, as Shopify's does.
+   */
+  ifUnchangedSince?: Date | null;
 }
 
 /**
@@ -118,6 +123,13 @@ export class MenuService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const menu = await this.#find(tx, tenant.shopId, id, { lock: true });
       if (!menu) return failOne(['id'], 'NOT_FOUND', 'Menu not found');
+      if (input.ifUnchangedSince && menu.updatedAt.getTime() !== input.ifUnchangedSince.getTime()) {
+        return failOne(
+          ['ifUnchangedSince'],
+          'STALE',
+          'Someone saved this menu after you opened it: open it again to see their changes',
+        );
+      }
       const check = new InputChecker();
       const title = check.text(['title'], input.title, { required: true, max: MENU_LIMITS.title });
       const handle =

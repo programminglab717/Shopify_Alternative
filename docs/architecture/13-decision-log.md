@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-641 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-642 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -649,6 +649,7 @@
 | 639 | A shop's file says where it is used, its logos, the sharing image, articles and themes, and the Files tab says so before it is deleted | Accepted |
 | 640 | Menus link to the search page and to the shop's policies, a policy by its ID at its page and gone once cleared, with Shopify's search_link and policy_link | Accepted |
 | 641 | Hatti Base shows a menu three levels deep: links under a link open below it across the page, and in a drawer on phones, with no script | Accepted |
+| 642 | A menu saved as its editor read it is not saved over: menuUpdate takes ifUnchangedSince, the menu's updatedAt, and a save made since is refused as STALE | Accepted |
 
 ---
 
@@ -22828,3 +22829,21 @@
 * **Alternatives:** **Opening on hover:** phones have no hover, and a menu that opens on a tap
   works on both. **One menu styled for both widths:** a closed `<details>` hides what is in it,
   and CSS cannot show it at one width alone everywhere.
+
+## ADR-642 · A menu saved as its editor read it is not saved over: menuUpdate takes ifUnchangedSince, the menu's updatedAt, and a save made since is refused as STALE
+
+* **Context:** A menu is saved whole, every link at once (ADR-040), so of two members editing the
+  same menu the last to save wipes out the other's links without either knowing (status shortcut
+  35). Shopify's `menuUpdate` has nothing to stop it.
+* **Decision:** A menu says when it was last saved, `updatedAt`. `menuUpdate` takes
+  `ifUnchangedSince`, that time as the editor read it: with the menu locked, a menu saved since
+  is refused with `STALE` on `ifUnchangedSince`, and nothing of the save is kept. Left out, the
+  last save stands, as Shopify's does, so apps written for Shopify go on working. The admin's
+  menu editor sends the time it read, keeps the time each save returns for the next one, and
+  says, in the member's language, that someone saved the menu after they opened it and that they
+  should open it again.
+* **Consequences:** A member's links are never lost to another's save in the admin. The one
+  refused opens the menu again and makes their change on what is there.
+* **Alternatives:** **Merging two saves link by link:** menus are small, and a merge the member
+  did not see could put links where neither wanted them. **A version number:** `updatedAt`
+  already changes with every save, and apps can read it.

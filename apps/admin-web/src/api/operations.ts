@@ -4945,6 +4945,7 @@ export const MenusQuery = /* GraphQL */ `
         title
         handle
         isDefault
+        updatedAt
         items {
           ...MenuLink
           items {
@@ -4975,12 +4976,21 @@ export const MenuCreateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** A menu's title and all its links, those left out going. */
+/**
+ * A menu's title and all its links, those left out going; refused if it was saved since it was
+ * read (ADR-642).
+ */
 export const MenuUpdateMutation = /* GraphQL */ `
-  mutation MenuUpdate($id: ID!, $title: String!, $items: [MenuItemUpdateInput!]!) {
-    menuUpdate(id: $id, title: $title, items: $items) {
+  mutation MenuUpdate(
+    $id: ID!
+    $title: String!
+    $items: [MenuItemUpdateInput!]!
+    $ifUnchangedSince: DateTime
+  ) {
+    menuUpdate(id: $id, title: $title, items: $items, ifUnchangedSince: $ifUnchangedSince) {
       menu {
         id
+        updatedAt
       }
       userErrors {
         ...Problems

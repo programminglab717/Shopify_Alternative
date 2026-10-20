@@ -279,6 +279,48 @@ describe.skipIf(!server)('MenuService', () => {
     ]);
   });
 
+  it('saves over a menu only as it was read, when asked (ADR-642)', async () => {
+    const menu = unwrap(await f.menus.create(f.a, { title: 'Help', handle: 'help', items: [] }));
+    const read = menu.updatedAt;
+    // Another member saves it first.
+    const theirs = unwrap(
+      await f.menus.update(f.a, menu.id, {
+        title: 'Help',
+        items: [{ title: 'Search', type: 'search' }],
+        ifUnchangedSince: read,
+      }),
+    );
+    expect(theirs.updatedAt.getTime()).toBeGreaterThan(read.getTime());
+    expect(
+      errorsOf(
+        await f.menus.update(f.a, menu.id, {
+          title: 'Help me',
+          items: [],
+          ifUnchangedSince: read,
+        }),
+      ),
+    ).toEqual([
+      [
+        'ifUnchangedSince',
+        'STALE',
+        'Someone saved this menu after you opened it: open it again to see their changes',
+      ],
+    ]);
+    const kept = (await f.menus.get(f.a, menu.id))!;
+    expect([kept.title, kept.items.map((item) => item.title)]).toEqual(['Help', ['Search']]);
+    // As read again, it is saved; given nothing, the last save stands, as Shopify's does.
+    unwrap(
+      await f.menus.update(f.a, menu.id, {
+        title: 'Help me',
+        items: [],
+        ifUnchangedSince: kept.updatedAt,
+      }),
+    );
+    expect(unwrap(await f.menus.update(f.a, menu.id, { title: 'Help', items: [] })).title).toBe(
+      'Help',
+    );
+  });
+
   it('deletes menus other than the main and footer menus', async () => {
     const footer = await byHandle('footer');
     expect(errorsOf(await f.menus.delete(f.a, footer.id))).toEqual([

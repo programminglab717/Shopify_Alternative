@@ -121,6 +121,7 @@ export function toMenu(record: MenuRecord): Menu {
     title: record.title,
     isDefault: record.isDefault,
     items: record.items.map(toMenuItem),
+    updatedAt: record.updatedAt,
   });
 }
 

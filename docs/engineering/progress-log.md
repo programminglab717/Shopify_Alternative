@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Menus not saved over
+
+* **A menu saved as its editor read it is not saved over** ([ADR-642](../architecture/13-decision-log.md#adr-642--a-menu-saved-as-its-editor-read-it-is-not-saved-over-menuupdate-takes-ifunchangedsince-the-menus-updatedat-and-a-save-made-since-is-refused-as-stale)): `menuUpdate`'s
+  `ifUnchangedSince`, refused as `STALE` once someone saved the menu since, and the admin's
+  editor sending it and saying so.
+* 3770 tests, two more: the menus module's stale save and the editor's; the menus API test
+  now saves a stale menu.
+
 ### 01d5a9f · Hatti Base's menus three levels deep
 
 * **Hatti Base shows a menu three levels deep** ([ADR-641](../architecture/13-decision-log.md#adr-641--hatti-base-shows-a-menu-three-levels-deep-links-under-a-link-open-below-it-across-the-page-and-in-a-drawer-on-phones-with-no-script)): links under a link open below it

@@ -2158,6 +2158,8 @@ export interface Menu {
   title: string;
   handle: string;
   isDefault: boolean;
+  /** When it was last saved, sent back so that a save made since is not saved over (ADR-642). */
+  updatedAt: string;
   items: MenuLink[];
 }
 
@@ -2167,7 +2169,7 @@ export interface MenusData {
 
 export interface MenuMutationData {
   [field: string]: {
-    menu?: { id: string } | null;
+    menu?: { id: string; updatedAt?: string } | null;
     deletedMenuId?: string | null;
     userErrors: UserError[];
   };

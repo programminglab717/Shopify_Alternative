@@ -17,6 +17,7 @@ const MAIN = {
   title: 'Main menu',
   handle: 'main-menu',
   isDefault: true,
+  updatedAt: '2026-10-20T09:00:00.000Z',
   items: [
     link('mi_1', 'Home', 'FRONTPAGE', { url: '/' }),
     link('mi_2', 'Women', 'COLLECTION', { resourceId: 'col_1', url: '/collections/eid-edit' }, [
@@ -30,11 +31,12 @@ const HELP = {
   title: 'Help',
   handle: 'help',
   isDefault: false,
+  updatedAt: '2026-10-20T09:00:00.000Z',
   items: [link('mi_9', 'Sizes', 'PAGE', { resourceId: 'pag_2', url: '/pages/size-guide' })],
 };
 
 function core(role: StaffRole) {
-  return fakeCore(role, (operation) => {
+  return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Menus':
         return {
@@ -95,7 +97,21 @@ function core(role: StaffRole) {
       case 'MenuCreate':
         return { menuCreate: { menu: { id: 'menu_7' }, userErrors: [] } };
       case 'MenuUpdate':
-        return { menuUpdate: { menu: { id: 'menu_1' }, userErrors: [] } };
+        return variables.title === 'Too late'
+          ? {
+              menuUpdate: {
+                menu: null,
+                userErrors: [
+                  { field: ['ifUnchangedSince'], code: 'STALE', message: 'Someone saved it' },
+                ],
+              },
+            }
+          : {
+              menuUpdate: {
+                menu: { id: 'menu_1', updatedAt: '2026-10-20T09:05:00.000Z' },
+                userErrors: [],
+              },
+            };
       case 'MenuDelete':
         return { menuDelete: { deletedMenuId: 'menu_3', userErrors: [] } };
       default:
@@ -167,9 +183,40 @@ describe("The online store's menus", () => {
           },
           { title: 'Size guide', type: 'PAGE', resourceId: 'pag_2', items: [] },
         ],
+        // As it was read, so that a save made since is not saved over (ADR-642).
+        ifUnchangedSince: '2026-10-20T09:00:00.000Z',
       }),
     );
     expect(await screen.findByText(/Saved\. The storefront shows it/)).toBeTruthy();
+  });
+
+  it('saves as the menu was last saved, and says so when someone saved it first (ADR-642)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/menu_3');
+
+    await screen.findByLabelText('Link 1: title');
+    fireEvent.click(screen.getByRole('button', { name: 'Save the menu' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'MenuUpdate')).toMatchObject({
+        ifUnchangedSince: '2026-10-20T09:00:00.000Z',
+      }),
+    );
+    // Saved again, it goes as the last save left it.
+    await screen.findByText(/Saved\. The storefront shows it/);
+    type('Title', 'Too late');
+    fireEvent.click(screen.getByRole('button', { name: 'Save the menu' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'MenuUpdate')).toMatchObject({
+        title: 'Too late',
+        ifUnchangedSince: '2026-10-20T09:05:00.000Z',
+      }),
+    );
+    expect(
+      await screen.findByText(
+        'Someone saved this menu after you opened it. Open it again to see their changes, then make yours.',
+      ),
+    ).toBeTruthy();
   });
 
   it('makes a menu with a handle from its title and a link to a product found by name', async () => {

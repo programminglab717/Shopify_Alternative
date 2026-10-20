@@ -1646,6 +1646,8 @@ const en = {
   'menus.chooseCollection': 'Choose a collection',
   'menus.choosePage': 'Choose a page',
   'menus.choosePolicy': 'Choose a policy',
+  'menus.stale':
+    'Someone saved this menu after you opened it. Open it again to see their changes, then make yours.',
   'menus.chooseProduct': 'Find the product it goes to.',
   'menus.findProduct': 'Find a product by name',
   'menus.linkTo': 'Link to {title}',
@@ -6891,6 +6893,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'menus.chooseCollection': 'کلیکشن چنیں',
   'menus.choosePage': 'صفحہ چنیں',
   'menus.choosePolicy': 'پالیسی چنیں',
+  'menus.stale':
+    'آپ کے کھولنے کے بعد کسی اور نے یہ مینو محفوظ کیا۔ ان کی تبدیلیاں دیکھنے کے لیے اسے دوبارہ کھولیں، پھر اپنی کریں۔',
   'menus.chooseProduct': 'وہ پروڈکٹ تلاش کریں جس پر یہ جاتا ہے۔',
   'menus.findProduct': 'نام سے پروڈکٹ تلاش کریں',
   'menus.linkTo': '{title} سے جوڑیں',

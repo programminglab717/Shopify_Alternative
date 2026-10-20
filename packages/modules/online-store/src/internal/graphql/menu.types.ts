@@ -1,5 +1,14 @@
 import { PageInfo, UserError } from '@hatti/api';
-import { ArgsType, Field, ID, InputType, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import {
+  ArgsType,
+  Field,
+  GraphQLISODateTime,
+  ID,
+  InputType,
+  Int,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 
 export enum MenuItemType {
   FRONTPAGE = 'FRONTPAGE',
@@ -102,6 +111,13 @@ export class Menu {
 
   @Field(() => [MenuItem])
   items!: MenuItem[];
+
+  @Field(() => GraphQLISODateTime, {
+    description:
+      'When it was last saved: given back to menuUpdate as ifUnchangedSince, a save made since is ' +
+      'not saved over (ADR-642).',
+  })
+  updatedAt!: Date;
 }
 
 @ObjectType()

@@ -6953,6 +6953,11 @@ type Menu {
   isDefault: Boolean!
   items: [MenuItem!]!
   title: String!
+
+  """
+  When it was last saved: given back to menuUpdate as ifUnchangedSince, a save made since is not saved over (ADR-642).
+  """
+  updatedAt: DateTime!
 }
 
 type MenuConnection {
@@ -8434,7 +8439,17 @@ type Mutation {
   """
   Changes a menu: its title, its handle (not the main or footer menu's), and all its items, those not given going.
   """
-  menuUpdate(handle: String, id: ID!, items: [MenuItemUpdateInput!]!, title: String!): MenuUpdatePayload!
+  menuUpdate(
+    handle: String
+    id: ID!
+
+    """
+    The menu's updatedAt as its editor read it: refused as STALE if it was saved since (ADR-642). Left out, this save stands over any other.
+    """
+    ifUnchangedSince: DateTime
+    items: [MenuItemUpdateInput!]!
+    title: String!
+  ): MenuUpdatePayload!
 
   """
   Changes how the shop's customers are told about their orders, from the next message: by WhatsApp or SMS, in English or Urdu, and which notifications they get.
