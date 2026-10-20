@@ -141,6 +141,18 @@ export async function shopLogoOf(
   return row ? { id: row.id, key: row.key, contentType: row.contentType as FileTypeValue } : null;
 }
 
+/** Which of the shop's logos its file `fileId` is (ADR-639), in the caller's transaction `tx`. */
+export async function brandUsesOf(
+  tx: Tx,
+  shopId: string,
+  fileId: string,
+): Promise<BrandImageValue[]> {
+  const [row] = await tx.select().from(brands).where(eq(brands.shopId, shopId));
+  return BRAND_IMAGES.filter((which) =>
+    which === 'logo' ? row?.logoFileId === fileId : row?.squareLogoFileId === fileId,
+  );
+}
+
 /** One of the shop's files that a page can show as an image, as a logo is. */
 export interface ShopImage {
   id: string;

@@ -57,6 +57,7 @@ export {
   type ShownComments,
 } from '../internal/comment.service.js';
 export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
+export { onlineStoreUsesOf, type OnlineStoreFileUse } from '../internal/file-uses.js';
 export {
   DOMAIN_CHECK_HOURS,
   DOMAIN_GRACE_HOURS,

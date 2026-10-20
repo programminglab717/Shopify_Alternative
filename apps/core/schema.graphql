@@ -4813,6 +4813,11 @@ type File {
   Where it is shown, for an hour from when it was asked for: ask again for a new one.
   """
   url: String!
+
+  """
+  Where it is used, as the shop keeps it now: its logos, the sharing image, articles by title and themes by name. A page or a product names none of the shop’s files.
+  """
+  uses: [FileUse!]!
 }
 
 type FileConnection {
@@ -4859,6 +4864,27 @@ input FileUpdateInput {
 type FileUpdatePayload {
   files: [File!]
   userErrors: [UserError!]!
+}
+
+"""Where one of the shop's files is used (ADR-639)."""
+type FileUse {
+  """The article or theme; null for the rest."""
+  id: ID
+  kind: FileUseKind!
+
+  """The article's or theme's title."""
+  title: String
+}
+
+"""
+What uses one of the shop's files (ADR-639): its logo or square logo, the sharing image of its pages, an article's image, or a theme's settings.
+"""
+enum FileUseKind {
+  ARTICLE_IMAGE
+  LOGO
+  SHARING_IMAGE
+  SQUARE_LOGO
+  THEME
 }
 
 """

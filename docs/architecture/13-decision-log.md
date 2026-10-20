@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-638 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-639 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -646,6 +646,7 @@
 | 636 | The shop's files are searched by the words of their names, and kept in a Files tab of the online store: found, added as pictures or PDFs, their links copied and deleted | Accepted |
 | 637 | Staff name someone in an order's comment by picking them from a list of the shop's staff by name, which whoever reads orders may see, with nothing of how they sign in | Accepted |
 | 638 | The shop's files are renamed, keeping their extensions, and their words for what they show changed, with Shopify's fileUpdate; where each is used, it stays | Accepted |
+| 639 | A shop's file says where it is used, its logos, the sharing image, articles and themes, and the Files tab says so before it is deleted | Accepted |
 
 ---
 
@@ -22768,3 +22769,22 @@
 * **Alternatives:** **The extension changed with the name:** a PDF named ".jpg" would be
   downloaded as a picture. **Storage's key renamed too:** the key is the file's address, which
   pages already hold; it names the file only for the people who read storage.
+
+## ADR-639 · A shop's file says where it is used, its logos, the sharing image, articles and themes, and the Files tab says so before it is deleted
+
+* **Context:** A file deleted leaves nothing where it was used (ADR-079): a logo gone from the
+  checkout, an article without its image, a theme's banner empty. The Files tab's delete warned
+  of that in general (ADR-636), but could not say whether this file was used at all (status
+  shortcut 124).
+* **Decision:** A file's `uses` lists where the shop uses it now, as the modules keep it: its
+  logo or square logo, from the files module (ADR-205); the sharing image of its pages, articles
+  whose image it is, by title, and themes whose files name its theme-images address, by name,
+  from the online store (ADR-243, ADR-213, ADR-326). The core puts the two together through
+  each module's public functions. The Files tab's delete lists them before asking, or says
+  nothing uses it.
+* **Consequences:** A shop clears out old files knowing what each leaves empty. A theme found by
+  its files naming the file's ID counts once, whichever of its templates names it. A file is
+  still deleted when used: the shop decides.
+* **Alternatives:** **Refusing to delete a file in use:** a shop replacing its logo would have
+  to unset it first, and a theme no longer published would hold its files for ever. **Each
+  module asked by the files module:** the files module would depend on those that use it.

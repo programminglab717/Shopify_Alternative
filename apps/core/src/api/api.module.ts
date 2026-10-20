@@ -72,6 +72,7 @@ import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
 import { SetupChecklistService } from './setup-checklist.js';
 import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
+import { FileUsesResolver } from './file-uses.resolver.js';
 import { OrderAssignmentResolver } from './order-assignment.resolver.js';
 import { ParcelHandOverResolver } from './parcel-hand-over.resolver.js';
 import { OrderEventResolver } from './order-event.resolver.js';
@@ -331,6 +332,7 @@ export class ApiModule {
         StaffInvitationCustomRoleResolver,
         SupportAccessResolver,
         OrderAgreementResolver,
+        FileUsesResolver,
         OrderAssignmentResolver,
         ParcelHandOverResolver,
         OrderEventResolver,

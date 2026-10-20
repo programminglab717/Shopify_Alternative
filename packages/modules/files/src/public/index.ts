@@ -4,6 +4,7 @@ export {
   BrandService,
   LOGO_TYPES,
   LOGO_URL_SECONDS,
+  brandUsesOf,
   readyImagesIn,
   shopLogoOf,
   type BrandImageValue,
@@ -33,7 +34,7 @@ export {
 export { FILE_TYPES, shownFilePrefixOf, type FileTypeValue } from '../internal/file-types.js';
 export { FilesModule } from '../internal/files.module.js';
 export { toShopBrand } from '../internal/graphql/brand.resolver.js';
-export { ShopBrand } from '../internal/graphql/file.types.js';
+export { File, ShopBrand } from '../internal/graphql/file.types.js';
 export type { FileRecord, StagedUpload } from '../internal/records.js';
 export { STORE_EXPORT_STATUSES, type StoreExportStatusValue } from '../internal/schema.js';
 export {

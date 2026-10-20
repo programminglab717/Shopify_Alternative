@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Where the shop's files are used
+
+* **A file says where it is used, and the Files tab says so before it is deleted** ([ADR-639](../architecture/13-decision-log.md#adr-639--a-shops-file-says-where-it-is-used-its-logos-the-sharing-image-articles-and-themes-and-the-files-tab-says-so-before-it-is-deleted)):
+  its logos, the sharing image, articles and themes, put together by the core from the files
+  module and the online store.
+* 3765 tests, two more: the Files tab's delete of a file nothing uses, and the uses query
+  checked against the schema; the files tests now ask each kind of use, and the Files tab's
+  delete lists them.
+
 ### f2b9033 · The shop's files renamed
 
 * **The shop's files are renamed, keeping their extensions** ([ADR-638](../architecture/13-decision-log.md#adr-638--the-shops-files-are-renamed-keeping-their-extensions-and-their-words-for-what-they-show-changed-with-shopifys-fileupdate-where-each-is-used-it-stays)): `fileUpdate` as

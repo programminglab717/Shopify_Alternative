@@ -5530,6 +5530,20 @@ export const ShopFilesQuery = /* GraphQL */ `
 `;
 
 /** Files of the shop's deleted, with what storage keeps of them (ADR-636). */
+/** Where one of the shop's files is used, asked before it is deleted (ADR-639). */
+export const FileUsesQuery = /* GraphQL */ `
+  query FileUses($id: ID!) {
+    file(id: $id) {
+      id
+      uses {
+        kind
+        id
+        title
+      }
+    }
+  }
+`;
+
 export const FileUpdateMutation = /* GraphQL */ `
   mutation FileUpdate($files: [FileUpdateInput!]!) {
     fileUpdate(files: $files) {

@@ -41,6 +41,19 @@ function core(role: StaffRole) {
         };
       case 'FileCreate':
         return { fileCreate: { files: [{ id: 'fil_4' }], userErrors: [] } };
+      case 'FileUses':
+        return {
+          file: {
+            id: variables.id,
+            uses:
+              variables.id === 'fil_2'
+                ? [
+                    { kind: 'ARTICLE_IMAGE', id: 'art_1', title: 'Our sizes' },
+                    { kind: 'THEME', id: 'thm_1', title: 'Eid' },
+                  ]
+                : [],
+          },
+        };
       case 'FileUpdate':
         return { fileUpdate: { files: variables.files, userErrors: [] } };
       case 'FileDelete':
@@ -99,8 +112,22 @@ describe("The online store's files (ADR-636)", () => {
 
     await press('Delete Size guide.pdf');
     const ask = screen.getByText(/^Delete Size guide\.pdf\?/).closest('[role="status"]')!;
+    // What will show nothing once it goes (ADR-639).
+    expect(await within(ask as HTMLElement).findByText('It is used as:')).toBeTruthy();
+    expect(
+      within(ask as HTMLElement).getByText('The image of the article “Our sizes”'),
+    ).toBeTruthy();
+    expect(within(ask as HTMLElement).getByText('A picture in the theme “Eid”')).toBeTruthy();
     fireEvent.click(within(ask as HTMLElement).getByRole('button', { name: 'Delete the file' }));
     await waitFor(() => expect(sentOf(fake, 'FileDelete')).toEqual([{ fileIds: ['fil_2'] }]));
+  });
+
+  it('says nothing uses a file before it is deleted (ADR-639)', async () => {
+    vi.stubGlobal('fetch', core('owner').fetcher);
+    renderAdmin('/shop_1/online-store?tab=files');
+    await screen.findByText('lawn_2026.png');
+    await press('Delete lawn_2026.png');
+    expect(await screen.findByText('Nothing in your online store uses it.')).toBeTruthy();
   });
 
   it('renames a file, its extension kept (ADR-638)', async () => {

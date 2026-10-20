@@ -29,6 +29,9 @@ const CREATE = `mutation ($files: [FileCreateInput!]!) {
   }
 }`;
 
+/** Where a file is used (ADR-639). */
+const USES = 'query ($id: ID!) { file(id: $id) { uses { kind id title } } }';
+
 /** A PNG's signature, then `size` bytes in all. */
 const png = (size: number) =>
   Buffer.concat([
@@ -278,6 +281,15 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       'image/png',
     ]);
     expect(servedSquare.rawPayload.equals(png(48))).toBe(true);
+    // Each says it is a logo, before either goes (ADR-639).
+    for (const [id, kind] of [
+      [logo, 'LOGO'],
+      [square, 'SQUARE_LOGO'],
+    ] as const) {
+      expect((await gql(tokens.reader, USES, { id })).data?.file.uses).toEqual([
+        { kind, id: null, title: null },
+      ]);
+    }
     const removed = await gql(tokens.owner, UPDATE, { input: { logo: null, squareLogo: null } });
     expect(removed.data?.shopBrandUpdate).toEqual({ brand: { logo: null }, userErrors: [] });
     // None now, nor for another shop, nor for what is no shop.
@@ -416,6 +428,11 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     });
     const article = created.data!.articleCreate.article;
     expect(article.image).toEqual({ fileId: photo, altText: 'Lawn, folded', alt: 'Lawn, folded' });
+    // The photo says which article shows it; a file nothing uses says nothing (ADR-639).
+    expect((await gql(writer, USES, { id: photo })).data?.file.uses).toEqual([
+      { kind: 'ARTICLE_IMAGE', id: article.id, title: 'Eid lawn' },
+    ]);
+    expect((await gql(writer, USES, { id: described })).data?.file.uses).toEqual([]);
     const articleId = fromPublicId(article.id as string, 'article');
     // Served at the API's own address, read as the shop, while the article is published.
     const served = await call('GET', `/article-images/${shop}/${articleId}`);
@@ -501,6 +518,9 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       },
       userErrors: [],
     });
+    expect((await gql(writer, USES, { id: photo })).data?.file.uses).toEqual([
+      { kind: 'SHARING_IMAGE', id: null, title: null },
+    ]);
     // Served at the API's own address, read as the shop, for its pages' link previews.
     const served = await call('GET', `/sharing-images/${shop}`);
     expect([
@@ -624,6 +644,10 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       { id: theme, files: [{ filename: 'templates/index.json', body: index }] },
     );
     expect(saved.data!.themeFilesUpsert.userErrors).toEqual([]);
+    // The theme that names it, by name (ADR-639).
+    expect((await gql(writer, USES, { id: banner })).data?.file.uses).toEqual([
+      { kind: 'THEME', id: theme, title: 'Eid' },
+    ]);
     const shown = await fetchImage(shop, banner);
     expect([shown.statusCode, shown.headers['content-type']]).toEqual([200, 'image/png']);
     expect(shown.rawPayload.equals(png(80))).toBe(true);

@@ -1,7 +1,12 @@
 import { Copy, FileText, Pencil, Search, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { FileDeleteMutation, FileUpdateMutation, ShopFilesQuery } from '../api/operations';
+import {
+  FileDeleteMutation,
+  FileUpdateMutation,
+  FileUsesQuery,
+  ShopFilesQuery,
+} from '../api/operations';
 import type { ShopFilesData, UserError } from '../api/types';
 import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -278,6 +283,7 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
         <Alert tone="warning">
           <div className="flex flex-col gap-2">
             <span>{t('shopFiles.deleteAsk', { name: file.filename })}</span>
+            <FileUses id={file.id} />
             <div className="flex flex-wrap gap-2">
               <Button variant="destructive" busy={remove.isPending} onClick={() => void drop()}>
                 {t('shopFiles.deleteConfirm')}
@@ -291,5 +297,34 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </li>
+  );
+}
+
+type FileUseKind = 'LOGO' | 'SQUARE_LOGO' | 'SHARING_IMAGE' | 'ARTICLE_IMAGE' | 'THEME';
+
+/** Where a file is used, asked as its delete is (ADR-639): what will show nothing once it goes. */
+function FileUses({ id }: { id: string }) {
+  const { t } = useLocale();
+  const uses = useAdminQuery<{
+    file: {
+      id: string;
+      uses: { kind: FileUseKind; id: string | null; title: string | null }[];
+    } | null;
+  }>(['files', 'uses', id], FileUsesQuery, { id });
+  if (uses.isPending) return <span className="text-secondary">{t('shopFiles.usesLoading')}</span>;
+  if (uses.error) return <span>{errorText(uses.error, t)}</span>;
+  const found = uses.data.file?.uses ?? [];
+  if (found.length === 0) return <span>{t('shopFiles.usesNone')}</span>;
+  return (
+    <div className="flex flex-col gap-1">
+      <span>{t('shopFiles.usesSome')}</span>
+      <ul className="list-disc ps-5">
+        {found.map((use) => (
+          <li key={`${use.kind}:${use.id ?? ''}`} dir="auto">
+            {t(`shopFiles.use.${use.kind}`, { title: use.title ?? '' })}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
