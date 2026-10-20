@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Menus not saved over
+### f06bc9d · Menus not saved over
 
 * **A menu saved as its editor read it is not saved over** ([ADR-642](../architecture/13-decision-log.md#adr-642--a-menu-saved-as-its-editor-read-it-is-not-saved-over-menuupdate-takes-ifunchangedsince-the-menus-updatedat-and-a-save-made-since-is-refused-as-stale)): `menuUpdate`'s
   `ifUnchangedSince`, refused as `STALE` once someone saved the menu since, and the admin's
