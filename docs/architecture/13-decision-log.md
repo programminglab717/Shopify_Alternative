@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-632 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-633 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -640,6 +640,7 @@
 | 630 | A crop an image is no longer shown in has its files removed from storage by the worker eight days after, past the week the edge may serve a page cached before; a crop shown again meanwhile stays, and the edge keeps what it has | Accepted |
 | 631 | A theme's picture setting chooses from the shop's own pictures among its files, the newest first, sixty at a time, as well as taking one uploaded; the picture chosen is shown at its theme-images address, as one uploaded is | Accepted |
 | 632 | An order export's workbook has its rows' totals on sheets beside them: by the day orders were placed and by stage, or, a row per line item, by variant, each ending with every row's; a CSV stays the rows alone | Accepted |
+| 633 | A member of staff is pushed in their browser of an order given to them and of a comment naming them, whatever their role, if they may see orders, number or none, once each, in their language, opening the order and saying neither its customer nor the comment | Accepted |
 
 ---
 
@@ -22642,3 +22643,24 @@
   filtered, and text is never a formula in Hatti's workbooks. **Totals rows under the rows:** a
   filter or sort mixes them in. **Workbooks for the other exports:** each has an import that
   reads its CSV, and none has asked for one.
+
+## ADR-633 · A member of staff is pushed in their browser of an order given to them and of a comment naming them, whatever their role, if they may see orders, number or none, once each, in their language, opening the order and saying neither its customer nor the comment
+
+* **Context:** Staff hear of an order given to them, and of a comment naming them, on WhatsApp
+  alone, at a number they proved (ADR-191): one who signed up with an email and proved none
+  hears nothing, and each alert is paid from the shop's credit (status shortcuts 61 and 62).
+  Their phones can be pushed the shop's news already (ADR-506), by the kinds each chooses.
+* **Decision:** Two more kinds of push, **Orders given to you** and **Comments naming you**,
+  for every role, of those who may see orders (ADR-581), a custom role's only if it holds
+  `read_orders`. The worker that queues the WhatsApp alert pushes too, after its transaction,
+  to the same members, whether or not they proved a number: an order given to them once for
+  the event, a comment once for each member it names, edited or not. Each is in the member's own
+  language, says the shop and the order's number, and opens the order in the admin; it says
+  neither the customer nor the comment's words, which push services would carry. The shop's
+  switch for the WhatsApp alert leaves the push alone: it costs the shop nothing, and each member
+  turns it on or off on their own device. A receipt sent for a transfer stays WhatsApp's alone.
+* **Consequences:** A member with no number hears of their own work; one with both hears twice,
+  on their phone's WhatsApp and in the browser they chose, and may turn either kind off there.
+* **Alternatives:** **Push in place of WhatsApp:** a member who never turned on notifications
+  would hear nothing. **The comment's words in the push:** they may hold a customer's details.
+  **Pushing only those without a number:** a member at their desk would still wait on WhatsApp.

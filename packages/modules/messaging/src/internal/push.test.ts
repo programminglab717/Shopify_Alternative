@@ -101,12 +101,18 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       'new_order',
       'needs_review',
       'orders_overdue',
+      'order_assigned',
+      'order_mentioned',
     ]);
     const books = recipient('usr', 'accountant', 'en', {
       scopes: ['read_orders'],
       capabilities: ['reconcile_payments'],
     });
-    expect(PUSH_KINDS.filter((kind) => pushedTo(kind, books))).toEqual(['cash_remitted']);
+    expect(PUSH_KINDS.filter((kind) => pushedTo(kind, books))).toEqual([
+      'cash_remitted',
+      'order_assigned',
+      'order_mentioned',
+    ]);
     // Never beyond their preset's roles, whatever they hold.
     const caller = recipient('usr', 'confirmation_agent', 'en', {
       scopes: ['write_orders'],
@@ -116,7 +122,26 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       'new_order',
       'needs_review',
       'orders_overdue',
+      'order_assigned',
+      'order_mentioned',
     ]);
+  });
+
+  it('tells any member of an order given to them, or a comment naming them, who may see orders (ADR-633)', () => {
+    for (const kind of ['order_assigned', 'order_mentioned'] as const) {
+      const told = (role: StaffRole, scopes?: string[]) =>
+        pushedTo(kind, recipient('usr', role, 'en', scopes ? { scopes, capabilities: [] } : null));
+      expect(
+        (
+          ['owner', 'manager', 'confirmation_agent', 'packer', 'marketer', 'accountant'] as const
+        ).map((role) => told(role)),
+      ).toEqual([true, true, true, true, true, true]);
+      // A custom role's member who may not see orders is not.
+      expect([told('packer', ['read_products']), told('packer', ['read_orders'])]).toEqual([
+        false,
+        true,
+      ]);
+    }
   });
 
   it('tells who answers customers of a message through the contact form (ADR-591)', () => {

@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Staff pushed of their own work
+
+* **A member of staff is pushed of an order given to them and of a comment naming them**
+  ([ADR-633](../architecture/13-decision-log.md#adr-633--a-member-of-staff-is-pushed-in-their-browser-of-an-order-given-to-them-and-of-a-comment-naming-them-whatever-their-role-if-they-may-see-orders-number-or-none-once-each-in-their-language-opening-the-order-and-saying-neither-its-customer-nor-the-comment)): two kinds of push for every role that may see orders, sent with the WhatsApp alert
+  to the same members, those with no number too, in their language, opening the order; the
+  admin offers them under Notifications on this device.
+* 3749 tests, one more: who of a shop's staff each new kind is pushed to; the staff alerts'
+  test now checks the pushes too. The admin's count was one short, and is corrected.
+
 ### faa3c7c · Export totals beside the rows
 
 * **An order export's workbook has its rows' totals on sheets beside them** ([ADR-632](../architecture/13-decision-log.md#adr-632--an-order-exports-workbook-has-its-rows-totals-on-sheets-beside-them-by-the-day-orders-were-placed-and-by-stage-or-a-row-per-line-item-by-variant-each-ending-with-every-rows-a-csv-stays-the-rows-alone)): by the

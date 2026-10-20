@@ -103,7 +103,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
 
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const lowStock = await within(card).findByRole('checkbox', { name: /Low stock/ });
-    expect(within(card).getAllByRole('checkbox')).toHaveLength(7);
+    expect(within(card).getAllByRole('checkbox')).toHaveLength(9);
     fireEvent.click(lowStock);
     fireEvent.click(within(card).getByRole('button', { name: 'Turn on notifications' }));
     await waitFor(() =>
@@ -116,6 +116,8 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'NEW_ORDER',
             'NEEDS_REVIEW',
             'ORDERS_OVERDUE',
+            'ORDER_ASSIGNED',
+            'ORDER_MENTIONED',
             'CASH_REMITTED',
             'CONTACT_MESSAGE',
             'COMMENT_PENDING',
@@ -135,6 +137,8 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'NEW_ORDER',
             'NEEDS_REVIEW',
             'ORDERS_OVERDUE',
+            'ORDER_ASSIGNED',
+            'ORDER_MENTIONED',
             'CONTACT_MESSAGE',
             'COMMENT_PENDING',
           ],
@@ -154,6 +158,9 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const boxes = await within(card).findAllByRole('checkbox');
     expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
+      // Whoever may see orders is told of their own (ADR-633).
+      'Orders given to youAn order given to you to work on.',
+      'Comments naming youA comment on an order that names you with @.',
       'Cash remittedA courier’s statement of the cash they sent.',
     ]);
   });
@@ -169,6 +176,8 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
       // Those waiting too long for their first call (ADR-627).
       'Orders not called in timeOrders waiting for their first call longer than your target, ' +
         'at most once an hour.',
+      expect.stringMatching(/^Orders given to you/),
+      expect.stringMatching(/^Comments naming you/),
       'Contact form messagesA shopper writing to you from your online store’s contact page.',
     ]);
   });
@@ -179,6 +188,8 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const boxes = await within(card).findAllByRole('checkbox');
     expect(boxes.map((box) => box.closest('label')!.textContent)).toEqual([
+      expect.stringMatching(/^Orders given to you/),
+      expect.stringMatching(/^Comments naming you/),
       'Comments to approveA shopper’s comment on an article, waiting for you to approve it.',
     ]);
   });
@@ -200,13 +211,20 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
       expect.stringMatching(/^New orders/),
       expect.stringMatching(/^Orders to review/),
       expect.stringMatching(/^Orders not called in time/),
+      expect.stringMatching(/^Orders given to you/),
+      expect.stringMatching(/^Comments naming you/),
     ]);
   });
 
   it('says why where notifications cannot be turned on', async () => {
     browser.allowed = false;
     browser.blocked = true;
-    const fake = core('packer');
+    // A packer whose own role may not see orders.
+    const fake = core('packer', KEY, {
+      scopes: ['write_inventory'],
+      capabilities: [],
+      customRole: { id: 'role_2', name: 'Stock room' },
+    });
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/account');
     let card = await screen.findByRole('region', { name: 'Notifications on this device' });

@@ -1,4 +1,5 @@
 import {
+  STAFF_ROLES,
   failOne,
   scopeWithin,
   type AccessScope,
@@ -28,6 +29,10 @@ export const PUSH_KINDS = [
   'comment_pending',
   // Orders wait for their first call longer than the shop's target (ADR-627).
   'orders_overdue',
+  // An order given to the member, and a comment naming them (ADR-633): their own, whatever
+  // their role.
+  'order_assigned',
+  'order_mentioned',
 ] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
@@ -40,6 +45,8 @@ export const PUSH_ROLES: Record<PushKind, readonly StaffRole[]> = {
   contact_message: ['owner', 'manager', 'confirmation_agent'],
   comment_pending: ['owner', 'manager', 'marketer'],
   orders_overdue: ['owner', 'manager', 'confirmation_agent'],
+  order_assigned: STAFF_ROLES,
+  order_mentioned: STAFF_ROLES,
 };
 
 /**
@@ -54,6 +61,8 @@ export const PUSH_NEEDS: Record<PushKind, AccessScope | StaffCapability> = {
   contact_message: 'write_conversations',
   comment_pending: 'write_content',
   orders_overdue: 'write_orders',
+  order_assigned: 'read_orders',
+  order_mentioned: 'read_orders',
 };
 
 /** Whether `recipient` is told of news of `kind`: their role's work, which they may do. */

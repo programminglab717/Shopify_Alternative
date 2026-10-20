@@ -2,7 +2,14 @@ import { scopeWithin, shopProfile } from '@hatti/api';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import { staffPhonesIn } from '@hatti/identity/public';
-import type { MessageKind, MessagesService } from '@hatti/messaging/public';
+import { toPublicId } from '@hatti/ids';
+import type {
+  MessageKind,
+  MessagesService,
+  PushMessage,
+  PushRecipient,
+  PushService,
+} from '@hatti/messaging/public';
 import type { StaffRole } from '@hatti/api';
 import {
   OrderEvents,
@@ -39,7 +46,9 @@ const PAYMENT_ROLES: readonly StaffRole[] = ['owner', 'manager'];
  * an order that still waits for its transfer (ADR-247): told to whom the order is given, else to
  * the owners and managers who may mark it paid (ADR-581), once a receipt. Nothing for those who
  * left the shop or proved no number, nor what the shop turned off; each is the shop's message,
- * paid from its credit as its other alerts are.
+ * paid from its credit as its other alerts are. An order given to a member, and a comment naming
+ * them, are pushed to their browsers too (ADR-633), number or none, once each, in their language,
+ * opening the order, saying neither its customer nor the comment's words.
  */
 export class StaffAlerts {
   /** The events {@link handle} reads. */
@@ -53,13 +62,14 @@ export class StaffAlerts {
   constructor(
     private readonly database: Database,
     private readonly messages: MessagesService,
+    private readonly push: PushService | null = null,
   ) {}
 
   async handle(event: DomainEvent): Promise<void> {
     const alert = alertOf(event);
     if (!alert) return;
     const { shopId } = event;
-    await this.database.tenant(shopId, async (tx) => {
+    const pushes = await this.database.tenant(shopId, async (tx): Promise<StaffPush[]> => {
       // Through identity's function for the shop of the transaction, never its tables (ADR-193).
       const staff = await staffPhonesIn(tx, shopId);
       const facts = await staffAlertFactsIn(
@@ -68,15 +78,15 @@ export class StaffAlerts {
         alert.orderId,
         alert.kind === 'order_mentioned' ? alert.commentId : null,
       );
-      if (!facts) return;
+      if (!facts) return [];
       let told: string[];
       if (alert.kind === 'order_assigned') {
         // Given to another since, who is told instead.
-        if (facts.assigneeId !== alert.assigneeId) return;
+        if (facts.assigneeId !== alert.assigneeId) return [];
         told = [alert.assigneeId];
       } else if (alert.kind === 'order_receipt_sent') {
         // Marked paid, or cancelled, since: nothing left to look for.
-        if (!facts.awaitingTransfer) return;
+        if (!facts.awaitingTransfer) return [];
         const assignee = staff.find((member) => member.userId === facts.assigneeId);
         told = assignee
           ? [assignee.userId]
@@ -88,10 +98,10 @@ export class StaffAlerts {
               .map((member) => member.userId);
       } else {
         const comment = facts.comment;
-        if (!comment) return;
+        if (!comment) return [];
         told = mentionsIn(comment.message, staff).filter((userId) => userId !== comment.authorId);
       }
-      if (told.length === 0) return;
+      if (told.length === 0) return [];
       const variables = {
         shop: (await shopProfile(tx, shopId)).name,
         order: orderName(facts.number),
@@ -116,8 +126,72 @@ export class StaffAlerts {
           channel: 'whatsapp',
         });
       }
+      if (alert.kind === 'order_receipt_sent') return [];
+      // Pushed whether or not they proved a number: their browser is theirs.
+      const url = `/${toPublicId('shop', shopId)}/orders/${toPublicId('order', alert.orderId)}`;
+      return told.flatMap((userId): StaffPush[] => {
+        const member = staff.find((each) => each.userId === userId);
+        if (!member) return [];
+        return [
+          {
+            kind: alert.kind,
+            dedupeKey:
+              alert.kind === 'order_assigned'
+                ? `push:order_assigned:${event.id}`
+                : `push:order_mentioned:${alert.commentId}:${userId}`,
+            recipient: {
+              userId,
+              role: member.role,
+              language: member.language,
+              scopes: member.scopes,
+              capabilities: member.capabilities,
+            },
+            message: staffPushMessage(alert.kind, variables.shop, variables.order, url),
+          },
+        ];
+      });
     });
+    // After the transaction: a push service may be slow, and the messages are kept already.
+    const push = this.push;
+    if (!push) return;
+    for (const each of pushes) {
+      await push.push(shopId, each.kind, each.dedupeKey, [each.recipient], each.message);
+    }
   }
+}
+
+/** A push to one member of their own work (ADR-633). */
+interface StaffPush {
+  kind: 'order_assigned' | 'order_mentioned';
+  dedupeKey: string;
+  recipient: PushRecipient;
+  message: PushMessage;
+}
+
+/** "Zari: order #1043 is yours", in English and Urdu, opening the order. */
+function staffPushMessage(
+  kind: StaffPush['kind'],
+  shop: string,
+  order: string,
+  url: string,
+): PushMessage {
+  return kind === 'order_assigned'
+    ? {
+        en: { title: `${shop}: order ${order} is yours`, body: 'It was given to you to work on.' },
+        ur: { title: `${shop}: آرڈر ${order} آپ کے سپرد`, body: 'یہ آپ کو کام کے لیے دیا گیا ہے۔' },
+        url,
+      }
+    : {
+        en: {
+          title: `${shop}: you were named on order ${order}`,
+          body: 'Open it to read the comment.',
+        },
+        ur: {
+          title: `${shop}: آرڈر ${order} پر آپ کا ذکر ہوا`,
+          body: 'تبصرہ پڑھنے کے لیے کھولیں۔',
+        },
+        url,
+      };
 }
 
 /** What `event` tells staff of, if anything. Taking an order for oneself needs no telling. */

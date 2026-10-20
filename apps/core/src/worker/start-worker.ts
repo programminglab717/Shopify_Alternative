@@ -408,7 +408,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         billing: new BillingNotices(database, new MessagesService(database)),
         partnerEarnings: new PartnerEarnings(database),
         push: new PushNotices(database, pushes),
-        staff: new StaffAlerts(database, new MessagesService(database)),
+        staff: new StaffAlerts(database, new MessagesService(database), pushes),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         giftCards: new GiftCardSales(database, new MessagesService(database)),
         cashback: new CashbackRewards(database),

@@ -32,7 +32,15 @@ type PushKind =
   | 'LOW_STOCK'
   | 'CONTACT_MESSAGE'
   | 'COMMENT_PENDING'
-  | 'ORDERS_OVERDUE';
+  | 'ORDERS_OVERDUE'
+  | 'ORDER_ASSIGNED'
+  | 'ORDER_MENTIONED';
+
+/** A member's own orders and comments, whatever their role, if they may see orders (ADR-633). */
+const OWN_WORK = gate(
+  ['owner', 'manager', 'confirmation_agent', 'packer', 'marketer', 'accountant'],
+  'read_orders',
+);
 
 /**
  * Whose work each kind of news is, and what it needs of them, as the core pushes it (ADR-506,
@@ -61,6 +69,18 @@ const KINDS: {
     gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_orders'),
     label: 'push.ordersOverdue',
     hint: 'push.ordersOverdueHint',
+  },
+  {
+    kind: 'ORDER_ASSIGNED',
+    gate: OWN_WORK,
+    label: 'push.orderAssigned',
+    hint: 'push.orderAssignedHint',
+  },
+  {
+    kind: 'ORDER_MENTIONED',
+    gate: OWN_WORK,
+    label: 'push.orderMentioned',
+    hint: 'push.orderMentionedHint',
   },
   {
     kind: 'CASH_REMITTED',

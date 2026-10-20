@@ -4559,6 +4559,10 @@ const en = {
   'push.ordersOverdue': 'Orders not called in time',
   'push.ordersOverdueHint':
     'Orders waiting for their first call longer than your target, at most once an hour.',
+  'push.orderAssigned': 'Orders given to you',
+  'push.orderAssignedHint': 'An order given to you to work on.',
+  'push.orderMentioned': 'Comments naming you',
+  'push.orderMentionedHint': 'A comment on an order that names you with @.',
   'push.commentPending': 'Comments to approve',
   'push.commentPendingHint': 'A shopper’s comment on an article, waiting for you to approve it.',
   'push.turnOn': 'Turn on notifications',
@@ -9751,6 +9755,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'push.ordersOverdue': 'وقت پر کال نہ ہونے والے آرڈرز',
   'push.ordersOverdueHint':
     'آپ کے ہدف سے زیادہ دیر سے پہلی کال کے منتظر آرڈرز، گھنٹے میں زیادہ سے زیادہ ایک بار۔',
+  'push.orderAssigned': 'آپ کو دیے گئے آرڈرز',
+  'push.orderAssignedHint': 'جب کوئی آرڈر آپ کو کام کے لیے دیا جائے۔',
+  'push.orderMentioned': 'آپ کا ذکر کرنے والے تبصرے',
+  'push.orderMentionedHint': 'کسی آرڈر پر تبصرہ جس میں @ سے آپ کا نام لیا گیا ہو۔',
   'push.commentPending': 'منظوری کے لیے تبصرے',
   'push.commentPendingHint': 'کسی مضمون پر خریدار کا تبصرہ، جو آپ کی منظوری کا منتظر ہے۔',
   'push.turnOn': 'نوٹیفکیشنز آن کریں',

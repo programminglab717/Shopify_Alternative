@@ -20,6 +20,8 @@ export enum PushNotificationKind {
   CONTACT_MESSAGE = 'CONTACT_MESSAGE',
   COMMENT_PENDING = 'COMMENT_PENDING',
   ORDERS_OVERDUE = 'ORDERS_OVERDUE',
+  ORDER_ASSIGNED = 'ORDER_ASSIGNED',
+  ORDER_MENTIONED = 'ORDER_MENTIONED',
 }
 
 registerEnumType(PushNotificationKind, {
@@ -31,7 +33,8 @@ registerEnumType(PushNotificationKind, {
     "first call longer than the shop's target, ORDERS_OVERDUE. Each goes to the roles whose " +
     'work it is: orders and contact messages to owners, managers and confirmation agents; cash ' +
     'to owners, managers and accountants; stock to owners and managers; comments to owners, ' +
-    'managers and marketers.',
+    "managers and marketers. And a member's own: an order given to them, ORDER_ASSIGNED, or " +
+    'a comment on an order naming them, ORDER_MENTIONED, whatever their role.',
 });
 
 @ObjectType({

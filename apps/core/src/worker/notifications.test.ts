@@ -19,7 +19,7 @@ import { BlocklistService, CustomerService, StoreCreditService } from '@hatti/cu
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { appendEvent, type DomainEvent } from '@hatti/events';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import {
   InventoryService,
   LocationService,
@@ -30,11 +30,15 @@ import { createLogger } from '@hatti/logger';
 import {
   MessagesService,
   MessagingSettingsService,
+  PushService,
   SmsGatewayProvider,
   WhatsAppCloudProvider,
+  generateVapidKeys,
   type MessageChannel,
   type MessageProvider,
   type OutgoingMessage,
+  type PushOutcome,
+  type WebPushSender,
 } from '@hatti/messaging/public';
 import { DomainService } from '@hatti/online-store/public';
 import {
@@ -76,6 +80,17 @@ function unwrap<T>(result: MutationResult<T>): T {
 const AYESHA = '+923001112223';
 const DAY = 24 * 3_600_000;
 
+/** A push service, each push kept. */
+class FakePushSender {
+  readonly publicKey = generateVapidKeys().publicKey;
+  readonly sent: { endpoint: string; message: Record<string, string> }[] = [];
+
+  send(subscription: { endpoint: string }, message: object): Promise<PushOutcome> {
+    this.sent.push({ endpoint: subscription.endpoint, message: message as Record<string, string> });
+    return Promise.resolve('sent');
+  }
+}
+
 describe.skipIf(!server)("What a shop's customers are told about their orders", () => {
   let testDb: TestDatabase;
   let database: Database;
@@ -96,6 +111,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     scopes: new Set(['write_products', 'write_inventory', 'write_orders', 'write_settings']),
   };
   let variantId: string;
+  /** What staff's browsers were pushed. */
+  const browsers = new FakePushSender();
 
   const messages = () => new MessagesService(database);
   const orders = () => workerOrders(database);
@@ -153,7 +170,11 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         messages(),
       ),
       billing: new BillingNotices(database, messages()),
-      staff: new StaffAlerts(database, messages()),
+      staff: new StaffAlerts(
+        database,
+        messages(),
+        new PushService(database, browsers as unknown as WebPushSender),
+      ),
       storeCredit: new StoreCreditNotices(database, messages()),
       domains: new DomainNotices(database, messages()),
       planOrders: new PlanOrders(database, messages(), orders()),
@@ -2126,6 +2147,27 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
        VALUES ($1, $4, 'owner'), ($2, $4, 'packer'), ($3, $4, 'confirmation_agent')`,
       [ayeshaId, bilalId, sanaId, shopId],
     );
+    // Each chose to be pushed of their own work in a browser (ADR-633).
+    const browser = (userId: string) => `https://fcm.googleapis.com/fcm/send/staff-${userId}`;
+    for (const userId of [ayeshaId, bilalId, sanaId]) {
+      await admin.query(
+        `INSERT INTO messaging.push_subscriptions (shop_id, user_id, endpoint, p256dh, auth, kinds)
+         VALUES ($1, $2, $3, $4, $5, '{order_assigned,order_mentioned}')`,
+        [shopId, userId, browser(userId), 'B'.repeat(87), 'a'.repeat(22)],
+      );
+    }
+    const names = new Map([
+      [browser(ayeshaId), 'Ayesha'],
+      [browser(bilalId), 'Bilal'],
+      [browser(sanaId), 'Sana'],
+    ]);
+    /** Who was pushed what, in order of title, from `since` on. */
+    const pushed = (since = 0) =>
+      browsers.sent
+        .filter((each) => names.has(each.endpoint))
+        .slice(since)
+        .map((each) => [names.get(each.endpoint), each.message.title])
+        .sort((a, b) => `${a[0]}${a[1]}`.localeCompare(`${b[0]}${b[1]}`));
     const as = (userId: string, role: StaffRole): TenantContext => ({
       ...tenant,
       actor: { kind: 'staff', userId, sessionId: newId(), authenticatedAt: new Date(), role },
@@ -2173,6 +2215,18 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       { recipient: BILAL, language: 'ur' },
       { recipient: AYESHA_MALIK, language: 'en' },
     ]);
+    // Pushed too, Sana with no number as well, each in their language, opening the order.
+    expect(pushed()).toEqual([
+      ['Ayesha', `Zari Fashions: order #${third.number} is yours`],
+      ['Bilal', `Zari Fashions: آرڈر #${first.number} آپ کے سپرد`],
+      ['Sana', `Zari Fashions: order #${second.number} is yours`],
+    ]);
+    expect(browsers.sent.find((each) => each.endpoint === browser(bilalId))?.message).toEqual({
+      title: `Zari Fashions: آرڈر #${first.number} آپ کے سپرد`,
+      body: 'یہ آپ کو کام کے لیے دیا گیا ہے۔',
+      url: `/${toPublicId('shop', shopId)}/orders/${toPublicId('order', first.id)}`,
+      tag: expect.stringMatching(/^push:order_assigned:/),
+    });
 
     // Ayesha names Bilal, Sana and herself: Bilal is told; Sana has no number, and she wrote it.
     const comments = new OrderCommentService(database);
@@ -2186,6 +2240,10 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await dispatch(2);
     const mentioned = ['order_mentioned', 'whatsapp', BILAL, said(first)];
     expect(await alerts()).toEqual([...assigned, mentioned]);
+    expect(pushed(3)).toEqual([
+      ['Bilal', `Zari Fashions: آرڈر #${first.number} پر آپ کا ذکر ہوا`],
+      ['Sana', `Zari Fashions: you were named on order #${first.number}`],
+    ]);
     // Changed and naming him still: once a comment. An app's naming Ayesha tells her.
     unwrap(await comments.update(as(ayeshaId, 'owner'), note.id, '@Bilal Ahmed: after 6 now'));
     unwrap(await comments.create(tenant, second.id, 'The courier asked for @Ayesha Malik'));
@@ -2194,6 +2252,9 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       ...assigned,
       mentioned,
       ['order_mentioned', 'whatsapp', AYESHA_MALIK, said(second)],
+    ]);
+    expect(pushed(5)).toEqual([
+      ['Ayesha', `Zari Fashions: you were named on order #${second.number}`],
     ]);
 
     // Turned off, as the shop's other alerts are.
@@ -2205,6 +2266,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     unwrap(await comments.create(tenant, third.id, '@Bilal Ahmed, packed?'));
     await dispatch();
     expect(await alerts()).toHaveLength(4);
+    // His browser is his own to turn off, and costs the shop nothing.
+    expect(pushed(6)).toEqual([['Bilal', `Zari Fashions: آرڈر #${third.number} پر آپ کا ذکر ہوا`]]);
   });
 
   it("tells staff a customer sent the receipt of their transfer: its order's own member, else its owners and managers (ADR-247)", async () => {
