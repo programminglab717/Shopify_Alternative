@@ -1,0 +1,32 @@
+{%- comment -%}
+  A menu's links three levels deep (ADR-641): a link with links under it opens them, itself
+  first among them; the header shows it across the page, and in its drawer on phones.
+{%- endcomment -%}
+<ul class="header__menu" role="list">
+  {%- for link in menu.links -%}
+    <li>
+      {%- if link.links.size > 0 -%}
+        <details class="header__submenu">
+          <summary dir="auto">{{ link.title | escape }}</summary>
+          <ul class="header__children" role="list">
+            <li><a href="{{ link.url }}" dir="auto">{{ link.title | escape }}</a></li>
+            {%- for child in link.links -%}
+              <li>
+                <a href="{{ child.url }}" dir="auto">{{ child.title | escape }}</a>
+                {%- if child.links.size > 0 -%}
+                  <ul class="header__grandchildren" role="list">
+                    {%- for grandchild in child.links -%}
+                      <li><a href="{{ grandchild.url }}" dir="auto">{{ grandchild.title | escape }}</a></li>
+                    {%- endfor -%}
+                  </ul>
+                {%- endif -%}
+              </li>
+            {%- endfor -%}
+          </ul>
+        </details>
+      {%- else -%}
+        <a href="{{ link.url }}" dir="auto">{{ link.title | escape }}</a>
+      {%- endif -%}
+    </li>
+  {%- endfor -%}
+</ul>

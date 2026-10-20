@@ -7,12 +7,18 @@
         {{ shop.name | escape }}
       {%- endif -%}
     </a>
+    {%- comment -%}
+      On phones, the menu is a drawer opened from the header; wider, it runs across the page,
+      its links with links under them opening below (ADR-641). Neither needs a script.
+    {%- endcomment -%}
+    <details class="header__drawer">
+      <summary>{{ 'general.menu_open' | t }}</summary>
+      <nav class="header__drawer-nav" aria-label="{{ 'general.menu' | t }}">
+        {%- render 'header-menu', menu: section.settings.menu -%}
+      </nav>
+    </details>
     <nav class="header__nav" aria-label="{{ 'general.menu' | t }}">
-      <ul class="header__menu" role="list">
-        {%- for link in section.settings.menu.links -%}
-          <li><a href="{{ link.url }}" dir="auto">{{ link.title | escape }}</a></li>
-        {%- endfor -%}
-      </ul>
+      {%- render 'header-menu', menu: section.settings.menu -%}
     </nav>
     <div class="header__tools">
       <details class="header__search">
@@ -72,12 +78,29 @@
   .header__inner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; padding-block: 0.75rem; }
   .header__logo { font-weight: 700; font-size: 1.25rem; color: inherit; text-decoration: none; }
   .header__logo-image { display: block; block-size: 2.5rem; inline-size: auto; max-inline-size: 12rem; object-fit: contain; }
-  .header__nav { order: 3; inline-size: 100%; overflow-x: auto; }
-  .header__menu { display: flex; gap: 1.25rem; margin: 0; padding: 0; list-style: none; white-space: nowrap; }
-  .header__menu a { color: inherit; text-decoration: none; }
+  .header__menu, .header__children, .header__grandchildren { margin: 0; padding: 0; list-style: none; }
+  .header__menu a, .header__submenu > summary { color: inherit; text-decoration: none; }
+  .header__submenu > summary { cursor: pointer; list-style: none; }
+  .header__submenu > summary::-webkit-details-marker, .header__drawer > summary::-webkit-details-marker { display: none; }
+  .header__submenu > summary::after { content: ' ▾'; }
+  .header__grandchildren { padding-inline-start: 1rem; }
+  /* Phones: a drawer of the menu, each link a row, the links under it opening below it. */
+  .header__drawer { order: -1; }
+  .header__drawer > summary { cursor: pointer; list-style: none; text-decoration: underline; }
+  .header__drawer-nav { position: absolute; inset-inline: 0; inset-block-start: 100%; z-index: 10; max-block-size: 80vh; overflow-y: auto; padding: 0.75rem 1rem; border-block-end: 1px solid var(--color-border); background: var(--color-background); }
+  .header__drawer-nav .header__menu > li, .header__drawer-nav .header__children > li { padding-block: 0.5rem; }
+  .header__drawer-nav .header__children { padding-inline-start: 1rem; }
+  .header__nav { display: none; }
+  @media (min-width: 750px) {
+    .header__drawer { display: none; }
+    .header__nav { display: block; }
+    .header__nav > .header__menu { display: flex; gap: 1.25rem; white-space: nowrap; }
+    .header__nav .header__submenu { position: relative; }
+    .header__nav .header__children { position: absolute; inset-inline-start: 0; inset-block-start: 100%; z-index: 10; min-inline-size: 12rem; padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; background: var(--color-background); white-space: normal; }
+    .header__nav .header__children > li { padding-block: 0.25rem; }
+  }
   .header__tools { display: flex; gap: 1rem; margin-inline-start: auto; }
   .header__cart .count, .header__wishlist .count { display: inline-block; min-inline-size: 1.5em; border-radius: 1em; background: var(--color-accent); color: #fff; text-align: center; }
-  @media (min-width: 750px) { .header__nav { order: 0; inline-size: auto; } }
   .header__search > summary { cursor: pointer; list-style: none; text-decoration: underline; }
   .header__search > summary::-webkit-details-marker { display: none; }
   .search-panel { position: absolute; inset-inline: 0; inset-block-start: 100%; z-index: 10; padding-block: 0.75rem; border-block-end: 1px solid var(--color-border); background: var(--color-background); }

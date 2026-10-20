@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Hatti Base's menus three levels deep
+
+* **Hatti Base shows a menu three levels deep** ([ADR-641](../architecture/13-decision-log.md#adr-641--hatti-base-shows-a-menu-three-levels-deep-links-under-a-link-open-below-it-across-the-page-and-in-a-drawer-on-phones-with-no-script)): links under a link open below it
+  across the page, and in a drawer on phones, all with `<details>` and no script.
+* 3768 tests, one more: the header's nested menu, in English and Urdu.
+
 ### 5f80817 · Menus link search and policies
 
 * **Menus link to the search page and to the shop's policies** ([ADR-640](../architecture/13-decision-log.md#adr-640--menus-link-to-the-search-page-and-to-the-shops-policies-a-policy-by-its-id-at-its-page-and-gone-once-cleared-with-shopifys-search_link-and-policy_link)): Shopify's `SEARCH` and

@@ -566,6 +566,57 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("opens a menu's links under its links, across the page and in a drawer on phones (ADR-641)", async () => {
+    const sample = sampleStore();
+    const nested = (title: string, url: string, links: MenuLinkDoc[] = []): MenuLinkDoc => ({
+      title,
+      url,
+      type: 'http_link',
+      links,
+    });
+    const data = new MemoryStore({
+      ...sample,
+      menus: sample.menus.map((menu) =>
+        menu.handle === 'main-menu'
+          ? {
+              ...menu,
+              links: [
+                nested('Women', '/collections/women', [
+                  nested('Lawn', '/collections/eid-lawn', [
+                    nested('Unstitched', '/collections/unstitched'),
+                  ]),
+                  nested('Khussas', '/collections/khussa'),
+                ]),
+                nested('All', '/collections/all'),
+              ],
+            }
+          : menu,
+      ),
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const { html } = await renderer.render({ path: '/' }, data.fresh());
+    const header = /<header class="header"[\s\S]*?<\/header>/.exec(html)![0];
+    // Once in the drawer and once across the page, each the same three levels.
+    expect(count(header, '<details class="header__submenu">')).toBe(2);
+    expect(header).toContain('<summary>Menu</summary>');
+    const nav = /<nav class="header__nav"[\s\S]*?<\/nav>/.exec(header)![0];
+    const links = [...nav.matchAll(/<a href="([^"]*)" dir="auto">([^<]*)<\/a>/g)].map(
+      ([, href, text]) => [text, href],
+    );
+    expect(links).toEqual([
+      // A link with links under it is among them, first, so it still leads somewhere.
+      ['Women', '/collections/women'],
+      ['Lawn', '/collections/eid-lawn'],
+      ['Unstitched', '/collections/unstitched'],
+      ['Khussas', '/collections/khussa'],
+      ['All', '/collections/all'],
+    ]);
+    expect(nav).toContain('<summary dir="auto">Women</summary>');
+    // In Urdu, its drawer says so in Urdu.
+    const urdu = (await renderer.render({ path: '/', locale: 'ur' }, data.fresh())).html;
+    expect(urdu).toContain('<summary>مینو</summary>');
+  });
+
   it('shows where each page sits above it, unless the theme turns it off (ADR-614)', async () => {
     const trailOf = async (request: PageRequest, theme = files) => {
       const renderer = new PageRenderer(loadTheme(theme), {

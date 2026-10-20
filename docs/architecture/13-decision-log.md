@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-640 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-641 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -648,6 +648,7 @@
 | 638 | The shop's files are renamed, keeping their extensions, and their words for what they show changed, with Shopify's fileUpdate; where each is used, it stays | Accepted |
 | 639 | A shop's file says where it is used, its logos, the sharing image, articles and themes, and the Files tab says so before it is deleted | Accepted |
 | 640 | Menus link to the search page and to the shop's policies, a policy by its ID at its page and gone once cleared, with Shopify's search_link and policy_link | Accepted |
+| 641 | Hatti Base shows a menu three levels deep: links under a link open below it across the page, and in a drawer on phones, with no script | Accepted |
 
 ---
 
@@ -22809,3 +22810,21 @@
 * **Alternatives:** **A policy linked by its type:** survives a policy rewritten, but Shopify's
   API names it by ID, and apps send that. **Links that filter a collection by tag:** the
   storefront serves no /collections/{handle}/{tag} pages yet, so they would lead nowhere.
+
+## ADR-641 · Hatti Base shows a menu three levels deep: links under a link open below it across the page, and in a drawer on phones, with no script
+
+* **Context:** Menus keep three levels of links (ADR-040), and themes read them through Shopify's
+  `link.links`, but Hatti Base's header showed the first level alone, in a row that scrolled
+  sideways on phones: a shop's "Women" with "Lawn" and "Khussas" under it showed "Women" only
+  (status shortcut 35).
+* **Decision:** The header renders its menu through a `header-menu` snippet, three levels deep.
+  A link with links under it is a `<details>` that opens them below it, itself first among them
+  so that it still leads to its own page; the links under those are listed beneath each. On
+  phones the menu is a drawer, a `<details>` in the header saying "Menu" ("مینو" in Urdu),
+  each link a row; from 750 pixels wide it runs across the page, the links under a link opening
+  in a panel beneath it. Neither needs a script, as the theme's search and filters do not.
+* **Consequences:** Shops with many collections group them, and shoppers on phones reach every
+  link. The menu is in the page twice, once for each width, as Dawn has it.
+* **Alternatives:** **Opening on hover:** phones have no hover, and a menu that opens on a tap
+  works on both. **One menu styled for both widths:** a closed `<details>` hides what is in it,
+  and CSS cannot show it at one width alone everywhere.
