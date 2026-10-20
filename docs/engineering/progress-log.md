@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit's history in the account
+### 2545521 · Store credit's history in the account
 
 * **A shopper's account lists what happened to their store credit** ([ADR-668](../architecture/13-decision-log.md#adr-668--a-shoppers-account-lists-what-happened-to-their-store-credit-its-latest-20-changes-the-newest-first-each-with-its-order-without-the-shops-notes)), its latest 20
   changes, each with its order, as Shopify's `store_credit_account.transactions`, in Hatti Base's
