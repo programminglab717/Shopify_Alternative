@@ -97,6 +97,73 @@ describe('What is left to put in Urdu, in the admin', () => {
     await screen.findByText('None with words of their own yet.');
   });
 
+  it("writes one field of many things in Urdu at once, each kept for its own words' digest (ADR-650)", async () => {
+    // The core keeps what is written, and lists it so again.
+    const products = KINDS.PRODUCT!.map((each) => structuredClone(each));
+    const core = fakeCore('owner', (operation, variables) => {
+      const resource = products.find((each) => each.resourceId === variables.resourceId);
+      if (operation === 'TranslationsRegister') {
+        const [kept] = variables.translations as { key: string; value: string }[];
+        resource!.translations = [
+          ...resource!.translations.filter((each) => each.key !== kept!.key),
+          { key: kept!.key, value: kept!.value, outdated: false },
+        ];
+        return { translationsRegister: { userErrors: [] } };
+      }
+      if (operation === 'TranslationsRemove') {
+        resource!.translations = resource!.translations.filter(
+          (each) => !(variables.keys as string[]).includes(each.key),
+        );
+        return { translationsRemove: { userErrors: [] } };
+      }
+      return { translatableResources: { nodes: products, pageInfo: { hasNextPage: false } } };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/online-store?tab=urdu');
+
+    await screen.findByText('1 of 3 all in Urdu.');
+    // The fields of a line or two that some of them have words for.
+    const fields = within(screen.getByLabelText('Write')).getAllByRole('option');
+    expect(fields.map((each) => each.textContent)).toEqual([
+      'Each on its own page',
+      'Title, all of them here',
+      'Title for search engines, all of them here',
+    ]);
+    fireEvent.change(screen.getByLabelText('Write'), { target: { value: 'title' } });
+    // Those whose title is left to write; the others are in Urdu already.
+    expect((screen.getByLabelText('Shawl in Urdu') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByLabelText('Lawn suit in Urdu')).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Only what is left to write or check' }));
+    const kurta = screen.getByLabelText('Kurta in Urdu') as HTMLInputElement;
+    expect(kurta.value).toBe('کرتا');
+
+    fireEvent.change(screen.getByLabelText('Shawl in Urdu'), { target: { value: 'شال' } });
+    // Emptied, it is forgotten; each is kept in the list's order.
+    fireEvent.change(kurta, { target: { value: '' } });
+    await press('Save 2 in Urdu');
+    await screen.findByText('2 saved in Urdu.');
+    expect(
+      core.sent
+        .filter((each) => each.operation.startsWith('Translations'))
+        .map((each) => [each.operation, each.variables]),
+    ).toEqual([
+      ['TranslationsRemove', { resourceId: 'prd_2', keys: ['title'] }],
+      [
+        'TranslationsRegister',
+        {
+          resourceId: 'prd_3',
+          translations: [
+            { key: 'title', locale: 'ur', translatableContentDigest: 'd-title', value: 'شال' },
+          ],
+        },
+      ],
+    ]);
+    await waitFor(() =>
+      expect((screen.getByLabelText('Shawl in Urdu') as HTMLInputElement).value).toBe('شال'),
+    );
+    expect((screen.getByLabelText('Kurta in Urdu') as HTMLInputElement).value).toBe('');
+  });
+
   it('shows more of a long list, up to the newest 250, to those who write Urdu', async () => {
     const core = urduCore('marketer', true);
     vi.stubGlobal('fetch', core.fetcher);

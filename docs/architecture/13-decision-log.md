@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-649 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-650 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -657,6 +657,7 @@
 | 647 | A shop's file has what it holds replaced by an upload, with Shopify's `fileUpdate` and `originalSource`, keeping its ID, so wherever it is used shows the new one | Accepted |
 | 648 | The link page's QR code is drawn in the admin by Hatti's own encoder, of its address marked `utm_source=qr`, and downloaded as a PNG to print | Accepted |
 | 649 | A listing is written on the Search listings tab itself, with the card its own page has, and stays shown while it is open once it is described | Accepted |
+| 650 | The In Urdu tab writes one field of a line or two, a title say, across many of the shop's things at once, each kept for its own words' digest, emptied ones forgotten | Accepted |
 
 ---
 
@@ -22974,3 +22975,21 @@
   alone; what saving refuses is said under it.
 * **Alternatives:** **One form of many listings, saved together:** a bulk update the core does
   not yet have, which a sitting of many listings may ask for, and remains the target.
+
+## ADR-650 · The In Urdu tab writes one field of a line or two, a title say, across many of the shop's things at once, each kept for its own words' digest, emptied ones forgotten
+
+* **Context:** The shop's words are put in Urdu a thing at a time, each on a page of its own
+  (ADR-327, ADR-328), and the In Urdu tab lists what is left (ADR-340); a shop translating its
+  catalogue's titles at a sitting opens a page for each (status shortcut 125).
+* **Decision:** Over the list of a kind, "Write" offers each on its own page, as before, or one
+  field of a line or two that some of them have words for: a title, a product's type, or the
+  title or description for search engines. Chosen, the tab lists each thing's own words above
+  an Urdu box, those left to write or check at first, all once asked for; saving keeps each
+  changed one through `translationsRegister` with its own words' digest, one thing after
+  another in the list's order, and forgets each emptied one through `translationsRemove`. A
+  thing refused is named with why, the others kept. The words are in English and Urdu.
+* **Consequences:** A catalogue's titles are put in Urdu at one sitting. One out of date says
+  so, and is kept again only when changed.
+* **Alternatives:** **Descriptions and text too:** paragraphs want the room their own pages
+  give them, and remain the target. **One mutation for many things:** Shopify's
+  `translationsRegister` is a thing at a time, as the core's is.

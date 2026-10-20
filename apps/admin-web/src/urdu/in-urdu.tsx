@@ -95,7 +95,7 @@ interface Field {
   named: boolean;
 }
 
-const LABELS: Readonly<Record<string, MessageKey>> = {
+export const LABELS: Readonly<Record<string, MessageKey>> = {
   title: 'urdu.field.title',
   body_html: 'urdu.field.description',
   summary_html: 'urdu.field.summary',

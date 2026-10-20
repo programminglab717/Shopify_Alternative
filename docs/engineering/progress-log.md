@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A field put in Urdu across many things
+
+* **The In Urdu tab writes one field across many things at once** ([ADR-650](../architecture/13-decision-log.md#adr-650--the-in-urdu-tab-writes-one-field-of-a-line-or-two-a-title-say-across-many-of-the-shops-things-at-once-each-kept-for-its-own-words-digest-emptied-ones-forgotten)), a title say,
+  each kept for its own words' digest and emptied ones forgotten.
+* 3780 tests, one more: titles written and forgotten from the tab.
+
 ### ceb20ca · Listings written on the Search listings tab
 
 * **A listing is written on the Search listings tab itself** ([ADR-649](../architecture/13-decision-log.md#adr-649--a-listing-is-written-on-the-search-listings-tab-itself-with-the-card-its-own-page-has-and-stays-shown-while-it-is-open-once-it-is-described)), with the card its own
