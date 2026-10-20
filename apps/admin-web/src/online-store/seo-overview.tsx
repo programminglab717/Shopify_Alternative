@@ -81,14 +81,21 @@ function undescribedIn(html: string | undefined): number {
 /**
  * How many of a listing's images say nothing of what they show (ADR-618), which search engines'
  * image results and screen readers go by: a product's photos, an article's image (its file's
- * words standing for its own), and the images in a page's or an article's text.
+ * words standing for its own), and the images in a page's or an article's text, or in a
+ * product's or a collection's description (ADR-626).
  */
 export function undescribedImagesOf(listed: SeoListed): number {
   const photos = (listed.media ?? []).filter(
     (media) => media.mediaContentType === 'IMAGE' && !media.alt.trim(),
   ).length;
   const image = listed.image && !listed.image.alt.trim() ? 1 : 0;
-  return photos + image + undescribedIn(listed.body) + undescribedIn(listed.summary ?? undefined);
+  return (
+    photos +
+    image +
+    undescribedIn(listed.body) +
+    undescribedIn(listed.summary ?? undefined) +
+    undescribedIn(listed.description)
+  );
 }
 
 export function problemsOf(listed: SeoListed): ListingProblem[] {

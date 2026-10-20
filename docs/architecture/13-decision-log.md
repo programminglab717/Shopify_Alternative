@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-625 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-626 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -633,6 +633,7 @@
 | 623 | A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses with .atom, their articles and products as those pages show them and linking them, under the same IDs as in English; Hatti Base's Urdu pages link them | Accepted |
 | 624 | On an Urdu page, the addresses of products, variants, collections, pages, blogs, articles, their comments, cart lines and the shop's own menu links carry `/ur`, as Shopify's objects' `url` carry their locale's; predictive search's JSON at its Urdu address likewise, in the shop's Urdu | Accepted |
 | 625 | The Ajax cart's answers at the Urdu addresses, `/ur/cart.js` and the rest, give its lines' titles in the shop's Urdu and their addresses under `/ur`, as the Urdu pages show them | Accepted |
+| 626 | The Search listings tab counts the images without words for what they show in a product's or a collection's description too, as it does those in pages' and articles' text | Accepted |
 
 ---
 
@@ -22493,3 +22494,19 @@
   carts in the shop's own words, for checkout and orders, which stay in them.
 * **Alternatives:** **The core's carts in the shopper's language:** checkout, orders and messages
   keep the shop's own words (ADR-238); the storefront translates at the edge, as for its pages.
+
+## ADR-626 · The Search listings tab counts the images without words for what they show in a product's or a collection's description too, as it does those in pages' and articles' text
+
+* **Context:** The Search listings tab flags images that say nothing of what they show (ADR-618):
+  a product's photos, an article's image and the images in pages' and articles' text. Shops put
+  pictures in products' and collections' descriptions too, size charts and close-ups pasted in,
+  and those went uncounted (status shortcut 110).
+* **Decision:** The tab reads a product's and a collection's description as it reads a page's
+  body, which the API already gives it, and counts each `<img>` there without an `alt`, or with
+  one of only spaces, among the listing's images to describe. The badge, the count and "needing
+  work" follow as before.
+* **Consequences:** Every image a listing's page shows from the shop's own words is counted, and
+  the listing opens where they are written. The home page's sharing image is still not among
+  them: the admin does not set it yet, and the tab would name a fix the shop cannot make there.
+* **Alternatives:** **Counting in the core:** the tab already parses the text it shows, and a
+  field for it would be another query per listing.

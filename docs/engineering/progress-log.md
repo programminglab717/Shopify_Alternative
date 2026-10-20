@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Images in descriptions counted
+
+* **The Search listings tab counts the undescribed images in products' and collections'
+  descriptions** ([ADR-626](../architecture/13-decision-log.md#adr-626--the-search-listings-tab-counts-the-images-without-words-for-what-they-show-in-a-products-or-a-collections-description-too-as-it-does-those-in-pages-and-articles-text)), as it does those in pages' and articles' text.
+* 3739 tests, as many: the tab's test reads a description's images, one described and one
+  not.
+
 ### bbbd9b4 · The Ajax cart in Urdu
 
 * **The Ajax cart answers in Urdu at its Urdu addresses** ([ADR-625](../architecture/13-decision-log.md#adr-625--the-ajax-carts-answers-at-the-urdu-addresses-urcartjs-and-the-rest-give-its-lines-titles-in-the-shops-urdu-and-their-addresses-under-ur-as-the-urdu-pages-show-them)): `/ur/cart.js` and the

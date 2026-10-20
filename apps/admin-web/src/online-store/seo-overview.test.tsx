@@ -166,6 +166,14 @@ describe("Every page's search engine listing, in the admin", () => {
     expect(undescribedImagesOf(listed('pag_3', 'Size guide', {}, { body: '<img alt="">' }))).toBe(
       1,
     );
+    // The images in a product's or a collection's description (ADR-626), those described not.
+    const lawn = '<p>Lawn</p><img src="/a.jpg"><img src="/b.jpg" alt="Printed lawn, front">';
+    expect(
+      undescribedImagesOf(listed('prd_8', 'Lawn', { description: 'Lawn' }, { description: lawn })),
+    ).toBe(1);
+    expect(
+      problemsOf(listed('col_8', 'Eid', { description: 'Eid' }, { description: lawn })),
+    ).toEqual(['IMAGES']);
     // Text of only tags or spaces says nothing.
     expect(problemsOf(listed('pag_2', 'Empty', {}, { body: '<p> </p>' }))).toEqual(['NOTHING']);
     expect(problemsOf(listed('prd_9', 'Cap', { description: 'x'.repeat(161) }))).toEqual([
