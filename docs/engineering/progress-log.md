@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Many orders given at once
+### 2afe727 · Many orders given at once
 
 * **Owners and managers give up to 250 orders at once to a member of staff** ([ADR-634](../architecture/13-decision-log.md#adr-634--owners-and-managers-give-up-to-250-orders-at-once-to-a-member-of-staff-or-to-no-one-among-the-lists-bulk-actions-whoever-is-given-them-is-told-once-of-them-all-on-whatsapp-and-in-their-browser)), or to
   no one, among the orders list's bulk actions; whoever is given them is told once, on WhatsApp
