@@ -284,6 +284,7 @@ export interface OrderSettingsUpdatedPayload {
   cancelUnpaidAfterDays: number | null;
   /** The post-purchase offer's percentage off (ADR-438); null for no offer. */
   upsellPercentOff: number | null;
+  creditBackOnReturn: boolean;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

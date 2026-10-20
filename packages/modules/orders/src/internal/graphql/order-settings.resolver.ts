@@ -50,6 +50,8 @@ export class OrderSettingsResolver {
         cancelUnpaidAfterDays: input.cancelUnpaidAfterDays,
       }),
       ...(input.upsellPercentOff !== undefined && { upsellPercentOff: input.upsellPercentOff }),
+      ...(input.creditBackOnReturn !== undefined &&
+        input.creditBackOnReturn !== null && { creditBackOnReturn: input.creditBackOnReturn }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -72,6 +74,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     cancelUnreachableAfterDays: record.cancelUnreachableAfterDays,
     cancelUnpaidAfterDays: record.cancelUnpaidAfterDays,
     upsellPercentOff: record.upsellPercentOff,
+    creditBackOnReturn: record.creditBackOnReturn,
     updatedAt: record.updatedAt,
   });
 }

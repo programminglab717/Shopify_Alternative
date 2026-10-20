@@ -65,6 +65,7 @@ function orderInputOf(state: {
   cancellation: CustomerCancellation;
   upsell: boolean;
   upsellPercent: string;
+  creditBack: boolean;
 }) {
   return {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
@@ -75,6 +76,7 @@ function orderInputOf(state: {
     customerCancellation: state.cancellation,
     // Offered at no percentage given is offered at its price (ADR-438).
     upsellPercentOff: state.upsell ? (wholeOrNone(state.upsellPercent) ?? 0) : null,
+    creditBackOnReturn: state.creditBack,
   };
 }
 
@@ -94,6 +96,7 @@ function stateOf(settings: OrderSettings) {
     cancellation: settings.customerCancellation,
     upsell: upsell !== null,
     upsellPercent: upsell === null ? '' : String(upsell),
+    creditBack: settings.creditBackOnReturn ?? false,
   };
 }
 
@@ -269,6 +272,12 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
             </label>
           ))}
         </fieldset>
+        <CheckField
+          label={t('orderPolicies.creditBack')}
+          hint={t('orderPolicies.creditBackHint')}
+          checked={state.creditBack}
+          onChange={(creditBack) => set({ creditBack })}
+        />
       </FormSection>
 
       <FormSection title={t('orderPolicies.upsell')} hint={t('orderPolicies.upsellHint')}>

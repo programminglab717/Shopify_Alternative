@@ -97,6 +97,13 @@ export class OrderSettings {
   })
   upsellPercentOff!: number | null;
 
+  @Field({
+    description:
+      'Whether the store credit that paid an order goes back to its customer once its every ' +
+      'parcel came back unaccepted (ORD-09, ADR-610), as it does when the order is cancelled.',
+  })
+  creditBackOnReturn!: boolean;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -135,6 +142,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '0 to 50; null for no offer.' })
   upsellPercentOff?: number | null;
+
+  @Field(() => Boolean, { nullable: true })
+  creditBackOnReturn?: boolean | null;
 }
 
 @ObjectType()

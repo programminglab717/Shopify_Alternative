@@ -79,6 +79,7 @@ import {
   parcelSummary,
   searchTextOf,
   updateOrder,
+  voidedStatusOf,
 } from './order-store.js';
 import { parcelWorth } from './parcel-claims.js';
 import type {
@@ -116,7 +117,6 @@ import {
   type CancelReasonValue,
   type ConfirmationStatusValue,
   type DeliveryMethodValue,
-  type FinancialStatusValue,
   type OrderRow,
   type OrderSourceValue,
   type OrderStageValue,
@@ -404,16 +404,6 @@ function sourceOf(tenant: TenantContext): OrderSourceValue {
  * Cash-on-delivery orders are scored for how likely they are to come back unpaid, and wait for
  * review at the shop's threshold; bank-transfer orders wait for their money (ADR-074).
  */
-/**
- * A cancelled order's financial status once its store credit, `paid` left, is given back
- * (ADR-185): `voided` when nothing paid is left.
- */
-function voidedStatusOf(paid: bigint, order: OrderRow): FinancialStatusValue {
-  if (paid === 0n) return 'voided';
-  if (order.amountRefunded === 0n) return paid >= order.total ? 'paid' : 'partially_paid';
-  return order.amountRefunded >= paid ? 'refunded' : 'partially_refunded';
-}
-
 @Injectable()
 export class OrderService {
   constructor(

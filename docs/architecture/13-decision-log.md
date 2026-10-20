@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-609 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-610 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -617,6 +617,7 @@
 | 607 | A redirect that would send shoppers round a loop is refused, and each redirect says where its redirects in a row end, for the admin to send it straight there | Accepted |
 | 608 | Hatti Base tells search engines where each page sits as a BreadcrumbList, and the sitemap index says when each of its files last changed | Accepted |
 | 609 | A shopper signed in to their account with a number spends its store credit at checkout without a code; a browser's recent proof still asks one | Accepted |
+| 610 | Where the shop says so, the store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled | Accepted |
 
 ---
 
@@ -22117,3 +22118,26 @@
 * **Alternatives:** **The browser's proof too:** fewer codes still, but on a shared phone the
   next shopper could spend another's credit. **A fresh code for large spends:** a limit no shop
   has asked for.
+
+## ADR-610 · Where the shop says so, the store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled
+
+* **Context:** Store credit that paid an order goes back to its customer when the order is
+  cancelled, but an order whose parcels came back unaccepted keeps it spent, as it keeps an
+  advance (ADR-185): a refused parcel cost the shop its delivery and return. Many shops give
+  the credit back anyway, as a goodwill gesture or because the parcel was never theirs to
+  refuse (a late courier, a wrong address), and today staff have to credit the customer again
+  by hand.
+* **Decision:** The shop's order settings gain `creditBackOnReturn`, off by default so that
+  nothing changes for a shop that does not ask. On, the moment an order turns returned, its
+  every parcel back, the credit that paid it goes back in the same transaction to the credits
+  it came from, as on cancelling: the ledger records it as reverting the order's payment
+  (`order_cancellation`, the event Shopify's set offers). The order's amount paid drops by it,
+  and its payment status follows. Where refunds left less than the credit, the credit stays
+  spent and the timeline says to refund what is owed, as on cancelling. The order settings page
+  offers it as a checkbox under cancelling.
+* **Consequences:** A shop that takes refused parcels on itself no longer credits customers by
+  hand. An advance paid in money still stays with the shop: the setting reverts only credit.
+* **Alternatives:** **Always give it back:** a refused parcel's cost would fall on every shop,
+  whether or not it chose to bear it. **Give back what is left after the return's cost:** a
+  partial credit is harder for customers to understand, and the cost of a return is known only
+  once the courier's statement comes.

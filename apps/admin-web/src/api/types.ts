@@ -3212,6 +3212,11 @@ export interface OrderSettings {
    * fake core leaves it out.
    */
   upsellPercentOff?: number | null;
+  /**
+   * Whether store credit that paid an order goes back once its parcels came back (ADR-610);
+   * absent where a fake core leaves it out.
+   */
+  creditBackOnReturn?: boolean;
   updatedAt: string | null;
 }
 

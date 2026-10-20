@@ -2612,6 +2612,9 @@ const en = {
   'orderPolicies.cancelHint.UNTIL_PACKED':
     'Even once confirmed: a cancellation then costs you nothing, where a parcel refused at the door costs a return.',
   'orderPolicies.cancelHint.UNTIL_CONFIRMED': 'Only while the order waits for them to confirm it.',
+  'orderPolicies.creditBack': 'Give store credit back when a parcel comes back',
+  'orderPolicies.creditBackHint':
+    'Store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled. Off, it stays spent, as an advance does.',
   'orderPolicies.risk': 'Risky orders',
   'orderPolicies.riskHint':
     "Each cash-on-delivery order gets a risk score from its customer's history, its number and its value. For orders placed from now on.",
@@ -7760,6 +7763,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.cancelHint.UNTIL_PACKED':
     'کنفرم ہونے کے بعد بھی: تب منسوخی کا آپ کو کوئی خرچ نہیں، جبکہ دروازے پر انکار ہونے والا پارسل واپسی کا خرچ ہے۔',
   'orderPolicies.cancelHint.UNTIL_CONFIRMED': 'صرف جب تک آرڈر ان کی کنفرمیشن کا انتظار کر رہا ہو۔',
+  'orderPolicies.creditBack': 'پارسل واپس آنے پر اسٹور کریڈٹ واپس کریں',
+  'orderPolicies.creditBackHint':
+    'جس اسٹور کریڈٹ سے آرڈر کی ادائیگی ہوئی، وہ اس کے سارے پارسل قبول کیے بغیر واپس آنے پر گاہک کو واپس مل جاتا ہے، جیسے آرڈر منسوخ ہونے پر ملتا ہے۔ بند ہو تو ایڈوانس کی طرح خرچ شدہ رہتا ہے۔',
   'orderPolicies.risk': 'خطرناک آرڈرز',
   'orderPolicies.riskHint':
     'ہر کیش آن ڈیلیوری آرڈر کو کسٹمر کی تاریخ، نمبر اور مالیت سے رسک اسکور ملتا ہے۔ اب سے آنے والے آرڈرز کے لیے۔',

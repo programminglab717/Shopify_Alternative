@@ -146,6 +146,28 @@ describe('Order policies', () => {
     );
   });
 
+  it('gives store credit back when a parcel comes back, where the shop says so (ADR-610)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    const back = (await screen.findByLabelText(
+      /^Give store credit back when a parcel comes back/,
+    )) as HTMLInputElement;
+    expect(back.checked).toBe(false);
+    fireEvent.click(back);
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([{ input: { creditBackOnReturn: true } }]);
+    expect(
+      (
+        screen.getByLabelText(
+          /^Give store credit back when a parcel comes back/,
+        ) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+  });
+
   it('changes high value and the score that holds an order, and refuses what is not a number', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);

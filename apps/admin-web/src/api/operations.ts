@@ -6712,6 +6712,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     cancelUnreachableAfterDays
     customerCancellation
     upsellPercentOff
+    creditBackOnReturn
     updatedAt
   }
 `;

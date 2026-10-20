@@ -28,6 +28,7 @@ import {
   orders,
   type ActorKind,
   type BankAccountValue,
+  type FinancialStatusValue,
   type OrderRow,
   type RiskLevelValue,
   type RiskReasonValue,
@@ -643,6 +644,16 @@ export type OrderStamp =
 type OrderChanges = Partial<
   Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'fulfillmentStatus' | 'version' | 'updatedAt'>
 >;
+
+/**
+ * An order's financial status once the store credit that paid it, `paid` left, is given back
+ * (ADR-185, ADR-610): `voided` when nothing paid is left.
+ */
+export function voidedStatusOf(paid: bigint, order: OrderRow): FinancialStatusValue {
+  if (paid === 0n) return 'voided';
+  if (order.amountRefunded === 0n) return paid >= order.total ? 'paid' : 'partially_paid';
+  return order.amountRefunded >= paid ? 'refunded' : 'partially_refunded';
+}
 
 /**
  * Writes `changes` to a locked order and sets the `stamps` to now. Then it brings what follows

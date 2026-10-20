@@ -10617,6 +10617,11 @@ type OrderSettings {
   Days after an order was placed when, its customer unreachable (three calls unanswered), it is cancelled and its stock let go, by a sweep every few minutes; null for never.
   """
   cancelUnreachableAfterDays: Int
+
+  """
+  Whether the store credit that paid an order goes back to its customer once its every parcel came back unaccepted (ORD-09, ADR-610), as it does when the order is cancelled.
+  """
+  creditBackOnReturn: Boolean!
   customerCancellation: CustomerCancellation!
 
   """
@@ -10648,6 +10653,7 @@ input OrderSettingsInput {
 
   """1 to 30; null for never."""
   cancelUnreachableAfterDays: Int
+  creditBackOnReturn: Boolean
   customerCancellation: CustomerCancellation
   deskWaitsForReminder: Boolean
 

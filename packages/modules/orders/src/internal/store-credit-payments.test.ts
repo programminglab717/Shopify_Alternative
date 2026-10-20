@@ -164,6 +164,43 @@ describe.skipIf(!server)('Orders paid with store credit (ORD-09, ADR-185)', () =
     expect((await ledger(order.customerId)).entries).toHaveLength(5);
   });
 
+  it('gives the credit back with a parcel that came back, where the shop says so (ADR-610)', async () => {
+    /** An order paid Rs 1,000 in store credit, shipped and refused: its parcel back with the shop. */
+    async function refusedWithCredit() {
+      const order = await f.order(f.a, [kurta]);
+      unwrap(await f.storeCredit.credit(f.a, { customerId: order.customerId }, rupees('1000')));
+      unwrap(await f.orders.payWithStoreCredit(f.a, order.id, { amount: '1,000' }));
+      unwrap(await f.orders.confirm(f.a, order.id));
+      const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));
+      unwrap(await f.fulfillments.markReturning(f.a, fulfillmentId));
+      const back = unwrap(await f.fulfillments.receiveReturn(f.a, fulfillmentId));
+      return { order, back: back.order };
+    }
+
+    // By default the credit stays spent, as an advance does.
+    const kept = await refusedWithCredit();
+    expect(kept.back).toMatchObject({ stage: 'returned', amountPaid: 1_000_00n });
+    expect((await ledger(kept.order.customerId)).balance).toBe(0n);
+    expect((await latest(kept.order.id))[0]).toMatch(/^Parcel checked back in/);
+
+    expect(unwrap(await f.orderSettings.update(f.a, { creditBackOnReturn: true }))).toMatchObject({
+      creditBackOnReturn: true,
+    });
+    const given = await refusedWithCredit();
+    expect(given.back).toMatchObject({
+      stage: 'returned',
+      amountPaid: 0n,
+      financialStatus: 'voided',
+    });
+    expect(await latest(given.order.id, 2)).toEqual([
+      'Gave Rs 1,000 of store credit, which paid it, back to its customer, as its parcel came back',
+      'Parcel checked back in: 1 item back in stock',
+    ]);
+    const { balance, entries } = await ledger(given.order.customerId);
+    expect(balance).toBe(1_000_00n);
+    expect(entries[0]).toEqual(['debit_revert', 'order_cancellation', 1_000_00n, given.order.id]);
+  });
+
   it('leaves to staff credit refunds took the place of, and takes none on a closed order', async () => {
     const order = await f.order(f.a, [kurta]);
     unwrap(await f.storeCredit.credit(f.a, { customerId: order.customerId }, rupees('1000')));
