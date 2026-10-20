@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Atom feeds in Urdu
+### 047e555 · Atom feeds in Urdu
 
 * **A blog's and a collection's Atom feeds are in Urdu at their Urdu pages' addresses**
   ([ADR-623](../architecture/13-decision-log.md#adr-623--a-blogs-and-a-collections-atom-feeds-are-in-urdu-at-their-urdu-pages-addresses-with-atom-their-articles-and-products-as-those-pages-show-them-and-linking-them-under-the-same-ids-as-in-english-hatti-bases-urdu-pages-link-them)), `/ur/blogs/{handle}.atom` and `/ur/collections/{handle}.atom`, their articles
