@@ -32,6 +32,8 @@ import {
 import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type {
+  AccountAddress,
+  AccountAddressRequest,
   AccountDataEraseResponse,
   AccountDataExportJson,
   AccountDataExportResponse,
@@ -43,6 +45,12 @@ import type {
 } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import {
+  addressesIn,
+  deleteAddressIn,
+  saveAddressIn,
+  toAccountAddress,
+} from './account-addresses.js';
 import { ACCOUNT_DATA, ACCOUNT_DATA_TYPE, accountDataKey } from './account-data.js';
 import {
   addToWishlistIn,
@@ -438,6 +446,78 @@ export class AccountService {
     return this.#wishlist(shopId, token, (tx, owner) =>
       removeFromWishlistIn(tx, shopId, owner, productId),
     );
+  }
+
+  /**
+   * The address book of the account the session `token` names (CUS-02, ADR-583): the default
+   * first, then the latest changed; empty for a number no customer has yet. Null without a session.
+   */
+  async addresses(shopId: string, token: string): Promise<AccountAddress[] | null> {
+    if (!TOKEN.test(token)) return null;
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, token);
+      if (!session) return null;
+      if (!session.customerId) return [];
+      return (await addressesIn(tx, shopId, session.customerId)).map(toAccountAddress);
+    });
+  }
+
+  /**
+   * Saves `input` to the address book of the account the session `token` names (ADR-583): a new
+   * address, or the one `addressId` names changed, checked as checkout's are. The book as it is
+   * now, or what was wrong; a number no customer has yet keeps no book, its addresses coming with
+   * its first order. Null without a session.
+   */
+  async saveAddress(
+    shopId: string,
+    token: string,
+    input: AccountAddressRequest,
+    addressId: string | null,
+  ): Promise<
+    | { kind: 'saved'; addresses: AccountAddress[] }
+    | { kind: 'invalid'; errors: FieldError[] }
+    | null
+  > {
+    if (!TOKEN.test(token)) return null;
+    const id = addressId === null ? null : tryFromPublicId(addressId, 'accountAddress');
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, token);
+      if (!session) return null;
+      const check = new InputChecker();
+      if (!session.customerId) {
+        check.addMessage([], 'INVALID', 'Your addresses are kept once you place your first order');
+        return { kind: 'invalid', errors: check.errors };
+      }
+      if (addressId !== null && !id) {
+        check.add(['id'], 'NOT_FOUND', 'is not one of your addresses');
+        return { kind: 'invalid', errors: check.errors };
+      }
+      const saved = await saveAddressIn(tx, check, shopId, session.customerId, input, id);
+      if (!saved) return { kind: 'invalid', errors: check.errors };
+      const book = await addressesIn(tx, shopId, session.customerId);
+      return { kind: 'saved', addresses: book.map(toAccountAddress) };
+    });
+  }
+
+  /**
+   * Takes the address `addressId` out of the address book of the account the session `token`
+   * names (ADR-583), the newest left becoming the default where it was: the book as it is now,
+   * the same for an address not in it. Null without a session.
+   */
+  async deleteAddress(
+    shopId: string,
+    token: string,
+    addressId: string,
+  ): Promise<AccountAddress[] | null> {
+    if (!TOKEN.test(token)) return null;
+    const id = tryFromPublicId(addressId, 'accountAddress');
+    return this.db.tenant(shopId, async (tx) => {
+      const session = await sessionIn(tx, shopId, token);
+      if (!session) return null;
+      if (!session.customerId) return [];
+      if (id) await deleteAddressIn(tx, shopId, session.customerId, id);
+      return (await addressesIn(tx, shopId, session.customerId)).map(toAccountAddress);
+    });
   }
 
   /** The wishlist of the session `token` names once `change` changed it; null without one. */

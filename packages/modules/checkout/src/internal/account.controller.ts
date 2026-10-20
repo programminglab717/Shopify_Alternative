@@ -1,8 +1,11 @@
+import type { FieldError } from '@hatti/api';
 import {
   ACCOUNT_TOKEN_HEADER,
   ACCOUNT_WISHLIST_MAX,
   CLIENT_IP_HEADER,
   accountPath,
+  type AccountAddressRequest,
+  type AccountAddressesResponse,
   type AccountDataEraseResponse,
   type AccountDataExportResponse,
   type AccountErrorResponse,
@@ -25,6 +28,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { AccountService, toSessionJson } from './account.service.js';
@@ -42,8 +46,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
  * gives the one kept, and `GET` a new link to it; `POST …/account/data/erase` asks for their
  * erasure. Their wishlist (ADR-575): `GET …/account/wishlist` reads it, `POST` with `productIds`
  * adds to it, and `DELETE …/account/wishlist/{productId}` takes one off, each answering it as it
- * is then; IDs that name no product of the shop's are left out. 422 says what was wrong with what was typed or sent; 404, that there is no session, or
- * nothing to link to. The host application checks the storefront key before any of this runs.
+ * is then; IDs that name no product of the shop's are left out. Their address book (ADR-583):
+ * `GET …/account/addresses` reads it, `POST` adds an address to it, `PUT …/account/addresses/{id}`
+ * changes one and `DELETE` takes one out, each answering the book as it is then. 422 says what was
+ * wrong with what was typed or sent; 404, that there is no session, or nothing to link to. The host application checks the storefront key before any of this runs.
  */
 @Controller(accountPath(':shopId').slice(1))
 export class StorefrontAccountController {
@@ -67,11 +73,7 @@ export class StorefrontAccountController {
       },
       { ip: ip ?? null },
     );
-    if (started.kind === 'invalid') {
-      throw new UnprocessableEntityException({
-        errors: started.errors.map(({ field, message }) => ({ field: field.join('.'), message })),
-      } satisfies AccountErrorResponse);
-    }
+    if (started.kind === 'invalid') throw invalid(started.errors);
     return { state: started.kind, phone: started.phone, channel: started.channel };
   }
 
@@ -245,6 +247,96 @@ export class StorefrontAccountController {
     if (!productIds) throw new NotFoundException();
     return { productIds };
   }
+
+  @Get('addresses')
+  @Header('cache-control', 'no-store')
+  async addresses(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountAddressesResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const addresses = token ? await this.accounts.addresses(shopId, token) : null;
+    if (!addresses) throw new NotFoundException();
+    return { addresses };
+  }
+
+  @Post('addresses')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async addAddress(
+    @Param('shopId') shopId: string,
+    @Body() body: unknown,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountAddressesResponse> {
+    return this.#saveAddress(shopId, body, token, null);
+  }
+
+  @Put('addresses/:addressId')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async changeAddress(
+    @Param('shopId') shopId: string,
+    @Param('addressId') addressId: string,
+    @Body() body: unknown,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountAddressesResponse> {
+    return this.#saveAddress(shopId, body, token, addressId);
+  }
+
+  @Delete('addresses/:addressId')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async deleteAddress(
+    @Param('shopId') shopId: string,
+    @Param('addressId') addressId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountAddressesResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const addresses = token ? await this.accounts.deleteAddress(shopId, token, addressId) : null;
+    if (!addresses) throw new NotFoundException();
+    return { addresses };
+  }
+
+  async #saveAddress(
+    shopId: string,
+    body: unknown,
+    token: string | undefined,
+    addressId: string | null,
+  ): Promise<AccountAddressesResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const saved = token
+      ? await this.accounts.saveAddress(shopId, token, addressBody(body), addressId)
+      : null;
+    if (!saved) throw new NotFoundException();
+    if (saved.kind === 'invalid') throw invalid(saved.errors);
+    return { addresses: saved.addresses };
+  }
+}
+
+/** The address a JSON body sends, its text fields blank or null where it lacks them. */
+function addressBody(body: unknown): AccountAddressRequest {
+  const optional = (name: string): string | null => field(body, name) || null;
+  return {
+    name: field(body, 'name'),
+    phone: field(body, 'phone'),
+    address1: field(body, 'address1'),
+    address2: optional('address2'),
+    landmark: optional('landmark'),
+    city: field(body, 'city'),
+    province: optional('province'),
+    zip: optional('zip'),
+    default:
+      typeof body === 'object' && body !== null
+        ? (body as Record<string, unknown>).default === true
+        : false,
+  };
+}
+
+/** A 422 saying what was wrong, as the storefront shows it. */
+function invalid(errors: FieldError[]): UnprocessableEntityException {
+  return new UnprocessableEntityException({
+    errors: errors.map(({ field, message }) => ({ field: field.join('.'), message })),
+  } satisfies AccountErrorResponse);
 }
 
 /** A text field of a JSON body; blank for one it lacks. */

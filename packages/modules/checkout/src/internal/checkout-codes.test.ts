@@ -175,6 +175,7 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
       // it (ADR-575).
       accountSessions: [],
       wishlist: [],
+      addresses: [],
     });
     await f.admin.query(
       `UPDATE checkout.number_proofs

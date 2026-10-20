@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-582 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-583 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -590,6 +590,7 @@
 | 580 | The admin shows each member what their own scopes and capabilities let them use, a custom role's member no more than it holds | Accepted |
 | 581 | Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email names the shop's own role it gives | Accepted |
 | 582 | A shopper who asked for their erasure from their account is told once it is done, at the number they signed in with, by a message forgotten once sent | Accepted |
+| 583 | A customer's address book is kept with their account, each address checked as checkout's are, one the default while there are any | Accepted |
 
 ---
 
@@ -21530,3 +21531,32 @@
 * **Alternatives:** **The number in the `customer.erased` event, for the worker to tell them:**
   the outbox would keep it. **Telling them when staff erase them unasked:** the shop may have its
   own reasons, and no number was given to tell.
+
+## ADR-583 · A customer's address book is kept with their account, each address checked as checkout's are, one the default while there are any
+
+* **Context:** Shopify's customers keep addresses with their accounts, one of them the default,
+  and checkout offers them. A shopper signed in to their account (ADR-570) has only the
+  addresses their orders went to, and types the next one again.
+* **Decision:**
+  * **A book per customer** (migration 0274, `checkout.account_addresses`): each address kept in
+    checkout's shape (the orders module's `checkAddress`, its number in E.164, its city spelled
+    the standard way and its province found from it), at most 20. The first saved becomes the
+    default, as does one saved asking to be; the default taken out, the newest left becomes it.
+    The book is locked while one is saved, so two saves at once count and choose alike.
+  * **A customer's, not a number's:** a number no customer has yet keeps none; saving says the
+    addresses come with its first order. Unlike the wishlist (ADR-575), nothing is kept for a
+    number to sweep.
+  * **Through the storefront API:** `GET …/account/addresses` reads the book, the default first
+    and then the latest changed, `POST` adds to it, `PUT …/account/addresses/{id}` changes one
+    and `DELETE` takes one out, each answering the book as it is then, never cached; 422 says
+    what was wrong field by field, as checkout's page does; 404 without a session. IDs are
+    `addr_…`; one that names no address of theirs is refused, or, taken out, changes nothing.
+  * **With the customer's data:** merged, the duplicate's addresses join the customer kept's, its
+    default staying, the newest 20 kept; erased, the book goes; in their own file, the book
+    without the storefront's IDs.
+* **Consequences:** Storefronts can offer a shopper their saved addresses. The storefront's
+  pages for the book, Shopify's `customer.addresses` in themes, and checkout filling in from the
+  default come next.
+* **Alternatives:** **The addresses of past orders as the book:** a shopper could not keep one
+  they have not ordered to, nor take one away. **A book for a number with no customer:** it
+  would need its own sweep, and checkout fills in from a proved number already (ADR-447).

@@ -405,4 +405,84 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
     expect(await client.accountWishlistAdd(shop, session, [kurta])).toBeNull();
     expect(await client.accountWishlistRemove(shop, session, kurta)).toBeNull();
   });
+
+  it("keeps the shopper's address book with their account, checked as checkout's (ADR-583)", async () => {
+    // Without the storefront's key, nothing; without a session, nothing either.
+    expect(
+      (await app.inject({ method: 'GET', url: accountPath(shop, 'addresses') })).statusCode,
+    ).toBe(401);
+    expect(await client.accountAddresses(shop, 'x'.repeat(43))).toBeNull();
+
+    await client.accountLoginStart(shop, { phone: '0300 1234567' });
+    const verified = await client.accountLoginVerify(shop, {
+      phone: '0300 1234567',
+      code: (await codes()).at(-1)!.code,
+    });
+    if (!verified.ok) throw new Error(`Expected signed in, got ${verified.error}`);
+    const session = verified.token;
+    expect(await client.accountAddresses(shop, session)).toEqual([]);
+    const typed = {
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      address1: 'House 12, Street 4',
+      landmark: 'Near the mosque',
+      city: 'karachi',
+    };
+    const saved = await client.accountAddressSave(shop, session, typed);
+    if (!saved?.ok) throw new Error(`Expected saved, got ${JSON.stringify(saved)}`);
+    const [home] = saved.addresses;
+    expect(home).toEqual({
+      id: expect.stringMatching(/^addr_/) as unknown,
+      name: 'Ayesha Khan',
+      phone: '+923001234567',
+      address1: 'House 12, Street 4',
+      address2: null,
+      landmark: 'Near the mosque',
+      city: 'Karachi',
+      provinceCode: 'SD',
+      zip: null,
+      default: true,
+    });
+    const office = await client.accountAddressSave(shop, session, {
+      ...typed,
+      address1: 'Office 3, Shahrah-e-Faisal',
+      default: true,
+    });
+    expect(office?.ok && office.addresses.map((a) => [a.address1, a.default])).toEqual([
+      ['Office 3, Shahrah-e-Faisal', true],
+      ['House 12, Street 4', false],
+    ]);
+    // What will not do, said field by field.
+    expect(
+      await client.accountAddressSave(shop, session, { ...typed, city: '' }, home!.id),
+    ).toEqual({ ok: false, errors: [{ field: 'city', message: "City can't be blank" }] });
+    const headers = { authorization: `Bearer ${TEST_STOREFRONT_KEY}`, 'x-hatti-account': session };
+    const refused = await app.inject({
+      method: 'PUT',
+      url: `${accountPath(shop, 'addresses')}/addr_nothing`,
+      headers,
+      payload: typed,
+    });
+    expect([refused.statusCode, refused.headers['cache-control'], refused.json()]).toEqual([
+      422,
+      'no-store',
+      { errors: [{ field: 'id', message: 'Id is not one of your addresses' }] },
+    ]);
+    const blank = await app.inject({
+      method: 'POST',
+      url: accountPath(shop, 'addresses'),
+      headers,
+      payload: {},
+    });
+    expect(blank.json()).toMatchObject({
+      errors: [{ field: 'name' }, { field: 'phone' }, { field: 'address1' }, { field: 'city' }],
+    });
+    // Taken out; the other shop has none of them.
+    expect(await client.accountAddressDelete(shop, session, home!.id)).toMatchObject([
+      { address1: 'Office 3, Shahrah-e-Faisal', default: true },
+    ]);
+    expect(await client.accountAddresses(other, session)).toBeNull();
+    await client.accountLogout(shop, session);
+    expect(await client.accountAddresses(shop, session)).toBeNull();
+  });
 });

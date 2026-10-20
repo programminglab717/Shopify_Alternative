@@ -13,6 +13,7 @@ import { listAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { MESSAGING_CUSTOMER_DATA } from '@hatti/messaging/public';
 import { ORDER_CUSTOMER_DATA } from '@hatti/orders/public';
+import { ACCOUNT_ADDRESSES_MAX, type AccountAddressRequest } from '@hatti/storefront-api';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ACCOUNT_DATA } from './account-data.js';
 import { ACCOUNT_SESSION, type SignInVerify } from './account.service.js';
@@ -1011,6 +1012,208 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     await f.accounts.signOut(f.a.shopId, jazz);
     expect(await f.expiry.deleteExpired()).toMatchObject({ sessions: 1, wishlists: 0 });
     expect(await wished()).toHaveLength(1);
+  });
+
+  /** An address as typed in the account's form. */
+  const typed = (
+    name: string,
+    extra: Partial<AccountAddressRequest> = {},
+  ): AccountAddressRequest => ({
+    name,
+    phone: '0300-1234567',
+    address1: `${name}'s house, Street 4`,
+    city: 'Lahore',
+    ...extra,
+  });
+
+  /** The names in the book, the default marked with a star. */
+  const names = (addresses: { name: string; default: boolean }[] | null | undefined) =>
+    addresses?.map((address) => (address.default ? `*${address.name}` : address.name));
+
+  /** Saves `input` to the book of the session `token`, expecting it saved: the names. */
+  async function saved(token: string, input: AccountAddressRequest, id: string | null = null) {
+    const result = await f.accounts.saveAddress(f.a.shopId, token, input, id);
+    if (result?.kind !== 'saved') throw new Error(`Expected saved, got ${JSON.stringify(result)}`);
+    return result.addresses;
+  }
+
+  it("keeps a customer's address book, the default first, checked as checkout's (ADR-583)", async () => {
+    const token = await signIn(JAZZ);
+    // A number no customer has keeps no book: its addresses come with its first order.
+    expect(await f.accounts.addresses(f.a.shopId, token)).toEqual([]);
+    expect(await f.accounts.saveAddress(f.a.shopId, token, typed('Home'), null)).toEqual({
+      kind: 'invalid',
+      errors: [
+        expect.objectContaining({
+          field: [],
+          message: 'Your addresses are kept once you place your first order',
+        }),
+      ],
+    });
+    await order(JAZZ);
+
+    // The first saved becomes the default, kept in checkout's shape.
+    const [home] = await saved(token, typed('Home', { landmark: 'Near the mosque' }));
+    expect(home).toEqual({
+      id: expect.stringMatching(/^addr_/) as unknown,
+      name: 'Home',
+      phone: JAZZ,
+      address1: "Home's house, Street 4",
+      address2: null,
+      landmark: 'Near the mosque',
+      city: 'Lahore',
+      provinceCode: 'PB',
+      zip: null,
+      default: true,
+    });
+    // Another is not, unless asked.
+    const office = (await saved(token, typed('Office'))).find((a) => a.name === 'Office')!;
+    expect(names(await f.accounts.addresses(f.a.shopId, token))).toEqual(['*Home', 'Office']);
+    expect(names(await saved(token, typed('Shop', { default: true })))).toEqual([
+      '*Shop',
+      'Office',
+      'Home',
+    ]);
+    // Changed, it is the latest; made the default, it comes first.
+    expect(names(await saved(token, typed('Office', { city: 'Karachi' }), office.id))).toEqual([
+      '*Shop',
+      'Office',
+      'Home',
+    ]);
+    const changed = await saved(token, typed('Office', { default: true }), office.id);
+    expect(names(changed)).toEqual(['*Office', 'Shop', 'Home']);
+    expect(changed[0]).toMatchObject({ id: office.id, city: 'Lahore' });
+
+    // What will not do, and addresses not in the book.
+    expect(
+      await f.accounts.saveAddress(
+        f.a.shopId,
+        token,
+        typed('Bad', { city: '', phone: '123' }),
+        null,
+      ),
+    ).toMatchObject({
+      kind: 'invalid',
+      errors: [
+        expect.objectContaining({ field: ['phone'] }),
+        expect.objectContaining({ field: ['city'] }),
+      ],
+    });
+    for (const id of [toPublicId('accountAddress', newId()), 'nope']) {
+      expect(await f.accounts.saveAddress(f.a.shopId, token, typed('Lost'), id)).toEqual({
+        kind: 'invalid',
+        errors: [expect.objectContaining({ field: ['id'], code: 'NOT_FOUND' })],
+      });
+    }
+    // Another customer's is not in it either.
+    const zong = await signIn(ZONG);
+    await order(ZONG);
+    expect(await f.accounts.saveAddress(f.a.shopId, zong, typed('Mine'), office.id)).toMatchObject({
+      kind: 'invalid',
+    });
+    expect(await f.accounts.addresses(f.a.shopId, zong)).toEqual([]);
+    expect(names(await f.accounts.deleteAddress(f.a.shopId, zong, office.id))).toEqual([]);
+
+    // The default taken out, the newest left becomes it.
+    expect(names(await f.accounts.deleteAddress(f.a.shopId, token, office.id))).toEqual([
+      '*Shop',
+      'Home',
+    ]);
+    expect(names(await f.accounts.deleteAddress(f.a.shopId, token, office.id))).toEqual([
+      '*Shop',
+      'Home',
+    ]);
+    expect(names(await f.accounts.deleteAddress(f.a.shopId, token, 'nope'))).toEqual([
+      '*Shop',
+      'Home',
+    ]);
+
+    // Without a session, or in another shop, nothing.
+    expect(await f.accounts.addresses(f.b.shopId, token)).toBeNull();
+    expect(await f.accounts.addresses(f.a.shopId, 'x'.repeat(43))).toBeNull();
+    expect(await f.accounts.saveAddress(f.a.shopId, 'x'.repeat(43), typed('X'), null)).toBeNull();
+    expect(await f.accounts.deleteAddress(f.a.shopId, 'x'.repeat(43), office.id)).toBeNull();
+  });
+
+  it(`keeps ${ACCOUNT_ADDRESSES_MAX} addresses at most (ADR-583)`, async () => {
+    const token = await signIn(JAZZ);
+    await order(JAZZ);
+    for (let index = 1; index <= ACCOUNT_ADDRESSES_MAX; index += 1) {
+      await saved(token, typed(`Address ${index}`));
+    }
+    const full = await f.accounts.saveAddress(f.a.shopId, token, typed('One more'), null);
+    expect(full).toEqual({
+      kind: 'invalid',
+      errors: [expect.objectContaining({ field: [], code: 'TOO_MANY' })],
+    });
+    // One already in it can still change.
+    const [first] = (await f.accounts.addresses(f.a.shopId, token))!;
+    expect(await saved(token, typed('Changed'), first!.id)).toHaveLength(ACCOUNT_ADDRESSES_MAX);
+  });
+
+  it("joins merged customers' address books, gives them in their file and erases them (ADR-583)", async () => {
+    const token = await signIn(JAZZ);
+    const ayesha = (await order(JAZZ)).customerId;
+    await saved(token, typed('Home'));
+    const zong = await signIn(ZONG);
+    const bilal = (await order(ZONG)).customerId;
+    await saved(zong, typed('Office', { default: true }));
+    await saved(zong, typed('Shop'));
+    expect(names(await f.accounts.addresses(f.a.shopId, zong))).toEqual(['*Office', 'Shop']);
+
+    // Merged into hers, his addresses join her book, her default staying.
+    unwrap(await data.merge(f.a, ayesha, bilal));
+    expect(names(await f.accounts.addresses(f.a.shopId, token))).toEqual([
+      '*Home',
+      'Shop',
+      'Office',
+    ]);
+    expect(names(await f.accounts.addresses(f.a.shopId, zong))).toEqual([
+      '*Home',
+      'Shop',
+      'Office',
+    ]);
+
+    // In her own file, the default first, without the IDs the storefront uses.
+    const filed = await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.export(tx, f.a.shopId, { id: ayesha, phones: [JAZZ], email: null }),
+    );
+    expect(filed.addresses).toEqual(
+      ['Home', 'Shop', 'Office'].map((name) => ({
+        name,
+        phone: JAZZ,
+        address1: `${name}'s house, Street 4`,
+        address2: null,
+        landmark: null,
+        city: 'Lahore',
+        provinceCode: 'PB',
+        zip: null,
+        default: name === 'Home',
+        savedAt: expect.any(Date) as unknown,
+        changedAt: expect.any(Date) as unknown,
+      })),
+    );
+
+    // Erased, her book goes; another shop's stays.
+    const [shawl] = (await f.variantsOf(f.b, 'Shawl', { price: '900' })) as [string];
+    await f.stock(f.b, shawl, 10);
+    const inB = await signIn(JAZZ, f.b);
+    await order(JAZZ, f.b, shawl);
+    expect(await f.accounts.saveAddress(f.b.shopId, inB, typed('Elsewhere'), null)).toMatchObject({
+      kind: 'saved',
+    });
+    await f.db.tenant(f.a.shopId, (tx) =>
+      CHECKOUT_CUSTOMER_DATA.erase(
+        tx,
+        f.a.shopId,
+        { id: ayesha, phones: [JAZZ], email: null },
+        'system',
+      ),
+    );
+    const { rows } = await f.admin.query<{ name: string }>(
+      `SELECT address ->> 'name' AS name FROM checkout.account_addresses`,
+    );
+    expect(rows).toEqual([{ name: 'Elsewhere' }]);
   });
 
   it('sweeps codes to sign in with once their day is up', async () => {

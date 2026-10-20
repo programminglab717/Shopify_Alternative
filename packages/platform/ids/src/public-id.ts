@@ -123,6 +123,8 @@ export const ID_PREFIXES = {
   conversationMessage: 'cmsg',
   fiscalInvoice: 'fbr',
   supportRequestMessage: 'smsg',
+  // An address in a shopper's book, kept with their account (ADR-583).
+  accountAddress: 'addr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

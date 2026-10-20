@@ -2,7 +2,11 @@ import {
   ACCOUNT_TOKEN_HEADER,
   accountOrderLinkPath,
   accountPath,
+  accountAddressPath,
   accountWishlistItemPath,
+  type AccountAddress,
+  type AccountAddressRequest,
+  type AccountAddressesResponse,
   type AccountDataEraseResponse,
   type AccountDataExportResponse,
   type AccountErrorResponse,
@@ -639,6 +643,73 @@ export class StorefrontApiClient {
     return this.#wishlist(
       await this.#request('DELETE', path, null, undefined, { [ACCOUNT_TOKEN_HEADER]: token }),
     );
+  }
+
+  /** The address book of the account the cookie's `token` names (ADR-583); null without a session. */
+  async accountAddresses(shopId: string, token: string | null): Promise<AccountAddress[] | null> {
+    if (!token) return null;
+    const response = await this.#request('GET', accountPath(shopId, 'addresses'), null, undefined, {
+      [ACCOUNT_TOKEN_HEADER]: token,
+    });
+    const answer = await this.#addresses(response);
+    return answer && answer.ok ? answer.addresses : null;
+  }
+
+  /**
+   * Adds `address` to the book of the account the cookie's `token` names, or changes the one
+   * `addressId` names (ADR-583): the book as it is now, or what was wrong with it; null without a
+   * session.
+   */
+  async accountAddressSave(
+    shopId: string,
+    token: string | null,
+    address: AccountAddressRequest,
+    addressId?: string,
+  ): Promise<
+    { ok: true; addresses: AccountAddress[] } | ({ ok: false } & AccountErrorResponse) | null
+  > {
+    if (!token) return null;
+    const path = addressId
+      ? accountAddressPath(shopId, encodeURIComponent(addressId))
+      : accountPath(shopId, 'addresses');
+    return this.#addresses(
+      await this.#request(addressId ? 'PUT' : 'POST', path, null, address, {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      }),
+    );
+  }
+
+  /**
+   * Takes the address `addressId` out of the book of the account the cookie's `token` names
+   * (ADR-583): the book as it is now; null without a session.
+   */
+  async accountAddressDelete(
+    shopId: string,
+    token: string | null,
+    addressId: string,
+  ): Promise<AccountAddress[] | null> {
+    if (!token) return null;
+    const path = accountAddressPath(shopId, encodeURIComponent(addressId));
+    const answer = await this.#addresses(
+      await this.#request('DELETE', path, null, undefined, { [ACCOUNT_TOKEN_HEADER]: token }),
+    );
+    return answer && answer.ok ? answer.addresses : null;
+  }
+
+  /** An address book's answer: the book, or what was wrong; null without a session. */
+  async #addresses(
+    response: Response,
+  ): Promise<
+    { ok: true; addresses: AccountAddress[] } | ({ ok: false } & AccountErrorResponse) | null
+  > {
+    if (response.status === 404) return null;
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as AccountErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, addresses: ((await response.json()) as AccountAddressesResponse).addresses };
   }
 
   /** A wishlist's answer: its products; null without a session. */

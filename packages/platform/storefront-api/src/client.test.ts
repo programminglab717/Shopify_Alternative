@@ -494,6 +494,89 @@ describe('StorefrontApiClient', () => {
     );
   });
 
+  it("reads, saves and takes from a signed-in shopper's address book (ADR-583)", async () => {
+    const home = {
+      id: 'addr_1',
+      name: 'Ayesha Khan',
+      phone: '+923001234567',
+      address1: 'House 12, Street 4',
+      address2: null,
+      landmark: null,
+      city: 'Lahore',
+      provinceCode: 'PB',
+      zip: null,
+      default: true,
+    };
+    const typed = {
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      address1: 'House 12, Street 4',
+      city: 'Lahore',
+    };
+    const { client, requests } = clientAnswering((request) => {
+      if (request.headers.get('x-hatti-account') !== 'session-secret') {
+        return new Response('Not found', { status: 404 });
+      }
+      if (request.url.endsWith('/addr_bad')) {
+        return Response.json(
+          { errors: [{ field: 'city', message: "City can't be blank" }] },
+          {
+            status: 422,
+          },
+        );
+      }
+      return Response.json({ addresses: request.method === 'DELETE' ? [] : [home] });
+    });
+    expect(await client.accountAddresses('shop-1', null)).toBeNull();
+    expect(await client.accountAddressSave('shop-1', null, typed)).toBeNull();
+    expect(await client.accountAddressDelete('shop-1', null, 'addr_1')).toBeNull();
+    expect(requests).toEqual([]);
+
+    expect(await client.accountAddresses('shop-1', 'session-secret')).toEqual([home]);
+    expect(await client.accountAddressSave('shop-1', 'session-secret', typed)).toEqual({
+      ok: true,
+      addresses: [home],
+    });
+    expect(
+      await client.accountAddressSave(
+        'shop-1',
+        'session-secret',
+        { ...typed, default: true },
+        'addr_1',
+      ),
+    ).toEqual({ ok: true, addresses: [home] });
+    expect(await client.accountAddressSave('shop-1', 'session-secret', typed, 'addr_bad')).toEqual({
+      ok: false,
+      errors: [{ field: 'city', message: "City can't be blank" }],
+    });
+    expect(await client.accountAddressDelete('shop-1', 'session-secret', 'addr_1')).toEqual([]);
+    expect(await client.accountAddresses('shop-1', 'gone')).toBeNull();
+    expect(await client.accountAddressSave('shop-1', 'gone', typed)).toBeNull();
+    expect(await client.accountAddressDelete('shop-1', 'gone', 'addr_1')).toBeNull();
+    expect(requests.slice(0, 5).map((request) => [request.method, request.url])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/account/addresses'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/addresses'],
+      ['PUT', 'http://core.test/storefront/shops/shop-1/account/addresses/addr_1'],
+      ['PUT', 'http://core.test/storefront/shops/shop-1/account/addresses/addr_bad'],
+      ['DELETE', 'http://core.test/storefront/shops/shop-1/account/addresses/addr_1'],
+    ]);
+    expect(await requests[1]!.json()).toEqual(typed);
+    expect(await requests[2]!.json()).toEqual({ ...typed, default: true });
+    // An ID is one segment of the path, whatever it holds.
+    await client.accountAddressDelete('shop-1', 'session-secret', '../wishlist');
+    expect(requests.at(-1)!.url).toBe(
+      'http://core.test/storefront/shops/shop-1/account/addresses/..%2Fwishlist',
+    );
+
+    const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
+    await expect(down.accountAddresses('shop-1', 'session-secret')).rejects.toThrow(
+      StorefrontApiError,
+    );
+    await expect(down.accountAddressSave('shop-1', 'session-secret', typed)).rejects.toThrow(
+      StorefrontApiError,
+    );
+  });
+
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
     await expect(client.read('shop-1', 'secret')).rejects.toThrow(StorefrontApiError);

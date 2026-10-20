@@ -3,6 +3,7 @@ import { toDate, type Tx } from '@hatti/db';
 import { toPublicId } from '@hatti/ids';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { addressesIn, joinAddressesIn, toAccountAddress } from './account-addresses.js';
 import { joinWishlistIn } from './account-wishlist.js';
 
 /**
@@ -17,7 +18,7 @@ import { joinWishlistIn } from './account-wishlist.js';
  * either way, by the worker's sweep, which storage keeps them until: merged, the customer kept may
  * ask for one of everything that is now theirs. Their wishlist kept with their account (ADR-575)
  * goes when they are erased, with those of their numbers, and is in their file; merged, it joins
- * the customer kept's.
+ * the customer kept's. So does their address book (ADR-583), the customer kept's default staying.
  */
 export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'checkout',
@@ -34,6 +35,8 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
     await letGoOfFilesIn(tx, shopId, fromId);
     // Their wishlist joins the customer's (ADR-575).
     await joinWishlistIn(tx, shopId, { customerId: fromId }, { customerId: intoId });
+    // Their address book too (ADR-583).
+    await joinAddressesIn(tx, shopId, fromId, intoId);
   },
 
   async erase(tx, shopId, customer) {
@@ -64,6 +67,10 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
        WHERE shop_id = ${shopId}
          AND (customer_id = ${customer.id}
               OR phone = ANY(${sql.param(customer.phones)}::text[]))`);
+    // Their address book (ADR-583).
+    await tx.execute(sql`
+      DELETE FROM checkout.account_addresses
+       WHERE shop_id = ${shopId} AND customer_id = ${customer.id}`);
   },
 
   async export(tx, shopId, customer) {
@@ -107,6 +114,7 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
          AND (customer_id = ${customer.id}
               OR phone = ANY(${sql.param(customer.phones)}::text[]))
        ORDER BY added_at DESC, product_id`);
+    const book = await addressesIn(tx, shopId, customer.id);
     return {
       numberProofs: rows.map((row) => ({
         number: row.phone,
@@ -139,6 +147,11 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
         addedAt: toDate(row.added_at),
         ...(row.phone && { number: row.phone }),
       })),
+      // Their address book (ADR-583), the default first.
+      addresses: book.map((record) => {
+        const { id: _id, ...address } = toAccountAddress(record);
+        return { ...address, savedAt: record.createdAt, changedAt: record.updatedAt };
+      }),
     };
   },
 };

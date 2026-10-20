@@ -35,7 +35,14 @@ export function accountCookieCleared(options: { secure: boolean }): string {
 
 /** What a storefront asks of a shop's accounts, each under `…/account`. */
 export type AccountRoute =
-  'login' | 'login/verify' | 'session' | 'logout' | 'data/export' | 'data/erase' | 'wishlist';
+  | 'login'
+  | 'login/verify'
+  | 'session'
+  | 'logout'
+  | 'data/export'
+  | 'data/erase'
+  | 'wishlist'
+  | 'addresses';
 
 /**
  * A shop's accounts: GET `…/account` reads the account of the session `x-hatti-account` names;
@@ -44,8 +51,9 @@ export type AccountRoute =
  * `…/account/data/export` makes the shopper's file, or gives the one kept, and GET links to the
  * one kept, an {@link AccountDataExportResponse}; POST `…/account/data/erase` asks for their
  * erasure, an {@link AccountDataEraseResponse} (ADR-572). GET `…/account/wishlist` reads the
- * account's wishlist and POST adds to it, an {@link AccountWishlistResponse} (ADR-575). Each is 404
- * without a session.
+ * account's wishlist and POST adds to it, an {@link AccountWishlistResponse} (ADR-575). GET
+ * `…/account/addresses` reads the account's address book and POST adds to it, an
+ * {@link AccountAddressesResponse} (ADR-583). Each is 404 without a session.
  */
 export function accountPath(shopId: string, route?: AccountRoute): string {
   return `${STOREFRONT_API_PREFIX}shops/${shopId}/account${route ? `/${route}` : ''}`;
@@ -60,6 +68,14 @@ export function accountOrderLinkPath(shopId: string, orderId: string): string {
 export function accountWishlistItemPath(shopId: string, productId: string): string {
   return `${accountPath(shopId, 'wishlist')}/${productId}`;
 }
+
+/** PUT changes, and DELETE takes away, the address `addressId` of the account's book (ADR-583). */
+export function accountAddressPath(shopId: string, addressId: string): string {
+  return `${accountPath(shopId, 'addresses')}/${addressId}`;
+}
+
+/** The most addresses an account's book keeps (ADR-583). */
+export const ACCOUNT_ADDRESSES_MAX = 20;
 
 /**
  * The most products an account's wishlist keeps (ADR-575): adding more, the oldest go to make room,
@@ -302,4 +318,49 @@ export interface AccountWishlistAddRequest {
  */
 export interface AccountWishlistResponse {
   productIds: string[];
+}
+
+/**
+ * An address in the account's book (CUS-02, ADR-583), as checkout keeps a shipping address: its
+ * number in E.164, its city spelled the standard way, and its province's code.
+ */
+export interface AccountAddress {
+  id: string;
+  name: string;
+  phone: string;
+  address1: string;
+  address2: string | null;
+  landmark: string | null;
+  city: string;
+  provinceCode: string | null;
+  zip: string | null;
+  /** The one the account delivers to first; one of them while it has any. */
+  default: boolean;
+}
+
+/**
+ * POST `…/account/addresses`, or PUT `…/account/addresses/{id}` (ADR-583): an address as typed,
+ * checked as checkout's are; `default` makes it the one delivered to first. 422 with an
+ * {@link AccountErrorResponse} for one that will not do, for a book full at
+ * {@link ACCOUNT_ADDRESSES_MAX}, or for a number no customer has yet, whose addresses come with
+ * their first order.
+ */
+export interface AccountAddressRequest {
+  name: string;
+  phone: string;
+  address1: string;
+  address2?: string | null;
+  landmark?: string | null;
+  city: string;
+  province?: string | null;
+  zip?: string | null;
+  default?: boolean;
+}
+
+/**
+ * The account's address book (ADR-583): the default first, then the latest changed. Each of GET,
+ * POST, PUT and DELETE answers it, as it is now; empty for a number no customer has yet.
+ */
+export interface AccountAddressesResponse {
+  addresses: AccountAddress[];
 }
