@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Staff's orders to Meta
+### 4c644eb · Staff's orders to Meta
 
 * **Orders a shop's staff take go to Meta's conversions API too, where the shop says so** ([ADR-655](../architecture/13-decision-log.md#adr-655--orders-a-shops-staff-take-from-chats-at-its-counter-or-by-hand-go-to-metas-conversions-api-too-where-the-shop-says-so-as-chat-physical_store-or-other-events-matched-by-the-customers-number)):
   from a chat as `chat` events, at the counter as `physical_store`, by hand as `other`, matched by
