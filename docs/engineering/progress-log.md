@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Comments from spam's addresses kept as spam
+### 0c15102 · Comments from spam's addresses kept as spam
 
 * **A comment from an email address the shop's spam holds is kept as spam too** ([ADR-671](../architecture/13-decision-log.md#adr-671--a-comment-from-an-email-address-the-shops-spam-holds-a-comment-of-from-the-last-90-days-is-kept-as-spam-too-until-the-shop-marks-that-one-not-spam)), until
   the shop marks that one not spam, or 90 days pass.
