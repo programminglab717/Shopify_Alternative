@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Redirect chains straightened at once
+### 7a146cb · Redirect chains straightened at once
 
 * **Every chain of redirects is sent straight to where it ends in one tap** ([ADR-612](../architecture/13-decision-log.md#adr-612--the-shop-straightens-every-chain-of-redirects-at-once-each-sent-straight-to-where-its-chain-ends-loops-left-for-it-to-break)):
   `urlRedirectsStraighten` updates each redirect whose target another redirect is from, in one
