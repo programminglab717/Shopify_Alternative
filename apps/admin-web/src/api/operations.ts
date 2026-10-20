@@ -5530,6 +5530,21 @@ export const ShopFilesQuery = /* GraphQL */ `
 `;
 
 /** Files of the shop's deleted, with what storage keeps of them (ADR-636). */
+export const FileUpdateMutation = /* GraphQL */ `
+  mutation FileUpdate($files: [FileUpdateInput!]!) {
+    fileUpdate(files: $files) {
+      files {
+        id
+        filename
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const FileDeleteMutation = /* GraphQL */ `
   mutation FileDelete($fileIds: [ID!]!) {
     fileDelete(fileIds: $fileIds) {

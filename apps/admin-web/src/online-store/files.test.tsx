@@ -41,6 +41,8 @@ function core(role: StaffRole) {
         };
       case 'FileCreate':
         return { fileCreate: { files: [{ id: 'fil_4' }], userErrors: [] } };
+      case 'FileUpdate':
+        return { fileUpdate: { files: variables.files, userErrors: [] } };
       case 'FileDelete':
         return { fileDelete: { deletedFileIds: variables.fileIds, userErrors: [] } };
       default:
@@ -99,6 +101,36 @@ describe("The online store's files (ADR-636)", () => {
     const ask = screen.getByText(/^Delete Size guide\.pdf\?/).closest('[role="status"]')!;
     fireEvent.click(within(ask as HTMLElement).getByRole('button', { name: 'Delete the file' }));
     await waitFor(() => expect(sentOf(fake, 'FileDelete')).toEqual([{ fileIds: ['fil_2'] }]));
+  });
+
+  it('renames a file, its extension kept (ADR-638)', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=files');
+    await screen.findByText('Size guide.pdf');
+
+    await press('Rename Size guide.pdf');
+    const box = screen.getByLabelText('New name') as HTMLInputElement;
+    expect(box.value).toBe('Size guide');
+    expect(screen.getByText('.pdf')).toBeTruthy();
+    type('New name', '  Size guide for lawn  ');
+    fireEvent.click(screen.getByRole('button', { name: 'Save the name' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'FileUpdate')).toEqual([
+        { files: [{ id: 'fil_2', filename: 'Size guide for lawn.pdf' }] },
+      ]),
+    );
+    await waitFor(() => expect(screen.queryByLabelText('New name')).toBeNull());
+
+    // A name without words is not sent; one ending in nothing keeps nothing.
+    await press('Rename lawn_2026.png');
+    type('New name', '   ');
+    expect(
+      (screen.getByRole('button', { name: 'Save the name' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('New name')).toBeNull();
+    expect(sentOf(fake, 'FileUpdate')).toHaveLength(1);
   });
 
   it('adds a PDF from the device, as it is', async () => {

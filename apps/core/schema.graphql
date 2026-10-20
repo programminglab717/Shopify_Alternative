@@ -4844,6 +4844,23 @@ type FileEdge {
   node: File!
 }
 
+"""A file's new name or words for what it shows (ADR-638)."""
+input FileUpdateInput {
+  """Up to 512 characters."""
+  alt: String
+
+  """
+  Up to 255 characters, keeping its extension: "Size guide.pdf" stays a .pdf.
+  """
+  filename: String
+  id: ID!
+}
+
+type FileUpdatePayload {
+  files: [File!]
+  userErrors: [UserError!]!
+}
+
 """
 Whether the shop is on FBR's Active Taxpayers List, as it says: ACTIVE, INACTIVE, or UNKNOWN, taken as not on it.
 """
@@ -8180,6 +8197,11 @@ type Mutation {
 
   """Deletes files, up to 10 at a time, and what storage keeps of them."""
   fileDelete(fileIds: [ID!]!): FileDeletePayload!
+
+  """
+  Renames files, up to 10 at a time, each keeping its extension, or changes the words for what they show (ADR-638). Where each is used, it stays.
+  """
+  fileUpdate(files: [FileUpdateInput!]!): FileUpdatePayload!
 
   """
   Reports again one FBR refused, or one that disconnecting left unsent, once the shop has put right why, while it reports through what the invoice was kept for.

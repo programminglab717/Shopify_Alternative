@@ -1,7 +1,7 @@
-import { Copy, FileText, Search, Trash2, Upload } from 'lucide-react';
+import { Copy, FileText, Pencil, Search, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { FileDeleteMutation, ShopFilesQuery } from '../api/operations';
+import { FileDeleteMutation, FileUpdateMutation, ShopFilesQuery } from '../api/operations';
 import type { ShopFilesData, UserError } from '../api/types';
 import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -158,9 +158,21 @@ function FilesPage({
   );
 }
 
-/** One of the shop's files: small, named, its link to copy, deleted after asking. */
+/** A filename's extension with its dot, which a new name keeps (ADR-638): ".pdf"; "" for none. */
+function extensionOf(filename: string): string {
+  return /\.[^./\\]{1,16}$/.exec(filename)?.[0] ?? '';
+}
+
+/** One of the shop's files: small, named, its link to copy, renamed, deleted after asking. */
 function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
   const { t } = useLocale();
+  const rename = useAdminMutation<
+    { fileUpdate: { files: { id: string; filename: string }[] | null; userErrors: UserError[] } },
+    { files: { id: string; filename: string }[] }
+  >(FileUpdateMutation);
+  const extension = extensionOf(file.filename);
+  // The name being written, without its extension, which stays; null when not renaming.
+  const [name, setName] = useState<string | null>(null);
   const remove = useAdminMutation<
     { fileDelete: { deletedFileIds: string[] | null; userErrors: UserError[] } },
     { fileIds: string[] }
@@ -175,6 +187,22 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
       const { fileDelete } = await remove.mutateAsync({ fileIds: [file.id] });
       const error = fileDelete.userErrors[0];
       if (error) setProblem(problemText(error, t));
+    } catch (error) {
+      setProblem(errorText(error, t));
+    }
+  };
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (name === null || name.trim() === '') return;
+    setProblem(null);
+    try {
+      const { fileUpdate } = await rename.mutateAsync({
+        files: [{ id: file.id, filename: `${name.trim()}${extension}` }],
+      });
+      const error = fileUpdate.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else setName(null);
     } catch (error) {
       setProblem(errorText(error, t));
     }
@@ -206,6 +234,14 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
         </Button>
         <Button
           variant="tertiary"
+          icon={<Pencil aria-hidden className="size-5" />}
+          aria-label={t('shopFiles.renameName', { name: file.filename })}
+          onClick={() => setName(file.filename.slice(0, file.filename.length - extension.length))}
+        >
+          {t('shopFiles.rename')}
+        </Button>
+        <Button
+          variant="tertiary"
           icon={<Trash2 aria-hidden className="size-5" />}
           aria-label={t('shopFiles.deleteName', { name: file.filename })}
           onClick={() => setAsking(true)}
@@ -213,6 +249,31 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
           {t('shopFiles.delete')}
         </Button>
       </div>
+      {name !== null && (
+        <form onSubmit={save} className="flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <TextField
+              label={t('shopFiles.newName')}
+              dir="auto"
+              maxLength={255 - extension.length}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              autoFocus
+            />
+          </div>
+          {extension && (
+            <span className="pb-2 text-secondary" dir="ltr">
+              {extension}
+            </span>
+          )}
+          <Button type="submit" busy={rename.isPending} disabled={name.trim() === ''}>
+            {t('shopFiles.renameSave')}
+          </Button>
+          <Button variant="tertiary" onClick={() => setName(null)}>
+            {t('shopFiles.renameCancel')}
+          </Button>
+        </form>
+      )}
       {asking && (
         <Alert tone="warning">
           <div className="flex flex-col gap-2">

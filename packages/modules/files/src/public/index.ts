@@ -16,6 +16,7 @@ export {
   FileEvents,
   type FileCreatedPayload,
   type FileDeletedPayload,
+  type FileUpdatedPayload,
   type ShopBrandUpdatePayload,
   type StoreExportPayload,
 } from '../internal/events.js';
@@ -26,6 +27,7 @@ export {
   UPLOAD_SECONDS,
   takeStagedUploadIn,
   type FileCreateInput,
+  type FileUpdateInput,
   type StagedUploadInput,
 } from '../internal/file.service.js';
 export { FILE_TYPES, shownFilePrefixOf, type FileTypeValue } from '../internal/file-types.js';

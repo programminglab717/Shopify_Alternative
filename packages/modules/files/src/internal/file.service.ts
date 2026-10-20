@@ -11,7 +11,12 @@ import { newId } from '@hatti/ids';
 import { ObjectStorage, maxUploadBytesOf } from '@hatti/storage';
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, ilike, inArray, lt, sql } from 'drizzle-orm';
-import { FileEvents, type FileCreatedPayload, type FileDeletedPayload } from './events.js';
+import {
+  FileEvents,
+  type FileCreatedPayload,
+  type FileDeletedPayload,
+  type FileUpdatedPayload,
+} from './events.js';
 import {
   FILE_TYPES,
   SNIFF_BYTES,
@@ -46,6 +51,13 @@ export interface StagedUploadInput {
   mimeType: string;
   /** Bytes, as a decimal string, as Shopify takes it: "123456". */
   fileSize: string;
+}
+
+/** A file's name or words for what it shows, changed (ADR-638); what is left out stays. */
+export interface FileUpdateInput {
+  id: string;
+  filename?: string | null;
+  alt?: string | null;
 }
 
 export interface FileCreateInput {
@@ -235,6 +247,99 @@ export class FileService {
     });
   }
 
+  /**
+   * Renames files, or changes the words for what they show (ADR-638), up to ten at a time: a
+   * name keeps its extension, as Shopify's `fileUpdate` asks, so its type never seems to change;
+   * where storage keeps it stays. Records `file.updated` for each that changed.
+   */
+  async update(
+    tenant: TenantContext,
+    inputs: FileUpdateInput[],
+  ): Promise<MutationResult<FileRecord[]>> {
+    const check = new InputChecker();
+    countOf(check, ['files'], inputs.length);
+    const changes = inputs.map((input, index) => {
+      const field = ['files', String(index)];
+      const filename =
+        input.filename === undefined || input.filename === null
+          ? undefined
+          : check.text([...field, 'filename'], input.filename, {
+              required: true,
+              max: FILE_LIMITS.filename,
+            });
+      const alt =
+        input.alt === undefined || input.alt === null
+          ? undefined
+          : (check.text([...field, 'alt'], input.alt, { max: FILE_LIMITS.alt }) ?? '');
+      return { id: input.id, filename: filename ?? undefined, alt };
+    });
+    if (!check.ok) return fail(check.errors);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const ids = changes.map((change) => change.id);
+      const found = await tx
+        .select()
+        .from(files)
+        .where(
+          and(eq(files.shopId, tenant.shopId), inArray(files.id, ids), eq(files.status, 'ready')),
+        )
+        .for('update');
+      const byId = new Map(found.map((row) => [row.id, row]));
+      const errors: FieldError[] = [];
+      changes.forEach((change, index) => {
+        const row = byId.get(change.id);
+        if (!row) {
+          errors.push({
+            field: ['files', String(index), 'id'],
+            code: 'NOT_FOUND',
+            message: 'File not found',
+          });
+        } else if (
+          change.filename !== undefined &&
+          extensionOf(change.filename) !== extensionOf(row.filename)
+        ) {
+          const kept = extensionOf(row.filename);
+          errors.push({
+            field: ['files', String(index), 'filename'],
+            code: 'INVALID',
+            message: kept ? `Keep its extension, ${kept}` : 'Give it no extension, as it has none',
+          });
+        }
+      });
+      if (new Set(ids).size !== ids.length) {
+        errors.push({ field: ['files'], code: 'INVALID', message: 'Give each file once' });
+      }
+      if (errors.length > 0) return fail(errors);
+      const updated: FileRecord[] = [];
+      for (const change of changes) {
+        const row = byId.get(change.id)!;
+        const filename = change.filename ?? row.filename;
+        const alt = change.alt ?? row.alt;
+        if (filename === row.filename && alt === row.alt) {
+          updated.push(toRecord(row));
+          continue;
+        }
+        const [saved] = await tx
+          .update(files)
+          .set({ filename, alt, updatedAt: sql`now()` })
+          .where(and(eq(files.shopId, tenant.shopId), eq(files.id, row.id)))
+          .returning();
+        await appendEvent<FileUpdatedPayload>(tx, tenant.shopId, {
+          type: FileEvents.FileUpdated,
+          aggregateType: 'file',
+          aggregateId: row.id,
+          payload: {
+            changed: [
+              ...(filename === row.filename ? [] : ['filename']),
+              ...(alt === row.alt ? [] : ['alt']),
+            ],
+          },
+        });
+        updated.push(toRecord(saved!));
+      }
+      return { ok: true as const, value: updated };
+    });
+  }
+
   /** Deletes files, and what storage keeps of them; the IDs deleted. */
   async delete(tenant: TenantContext, ids: string[]): Promise<MutationResult<string[]>> {
     const check = new InputChecker();
@@ -328,6 +433,11 @@ export async function takeStagedUploadIn(
     )
     .returning({ id: files.id });
   return taken.length > 0;
+}
+
+/** A filename's extension, in small letters with its dot: ".pdf"; "" where it has none. */
+function extensionOf(filename: string): string {
+  return /\.[^./\\]{1,16}$/.exec(filename.trim())?.[0].toLowerCase() ?? '';
 }
 
 function countOf(check: InputChecker, field: string[], count: number): void {

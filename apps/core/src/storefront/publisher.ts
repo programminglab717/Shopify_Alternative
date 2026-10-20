@@ -44,6 +44,7 @@ import type { DomainEvent } from '@hatti/events';
 import {
   FileEvents,
   readyImagesIn,
+  type FileUpdatedPayload,
   shopLogoOf,
   type BrandImageValue,
   type ShopImage,
@@ -413,6 +414,12 @@ export function itemsFor(event: DomainEvent): string[] {
     // A file deleted may have been one of its logos, or an article's image (ADR-213).
     case FileEvents.FileDeleted:
       return [Items.shop, Items.everyArticle];
+    // A file's words for what it shows stand in for an article's or the sharing image's own
+    // (ADR-638); its name is shown nowhere.
+    case FileEvents.FileUpdated:
+      return (event.payload as unknown as FileUpdatedPayload).changed.includes('alt')
+        ? [Items.shop, Items.everyArticle]
+        : [];
     case ShopEvents.ShopOpened:
       // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
       return [Items.everything];
@@ -485,6 +492,7 @@ export const PUBLISHED_EVENTS = [
   MarketingEvents.GoogleAnalyticsDeleted,
   FileEvents.ShopBrandUpdated,
   FileEvents.FileDeleted,
+  FileEvents.FileUpdated,
   ShopEvents.ShopOpened,
   ShopEvents.DevelopmentStoreTransferred,
   TrustEvents.StoreSuspended,

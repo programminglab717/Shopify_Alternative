@@ -383,6 +383,75 @@ describe.skipIf(!server)('FileService', () => {
     ]);
   });
 
+  it('renames files, keeping their extensions and where storage keeps them (ADR-638)', async () => {
+    const [first, second] = unwrap(
+      await stage([
+        { filename: 'IMG_2041.PNG', mimeType: 'image/png', fileSize: '16' },
+        { filename: 'guide.pdf', mimeType: 'application/pdf', fileSize: String(pdf.length) },
+      ]),
+    );
+    await storage.put(keyOf(first!.resourceUrl), png(16), 'image/png');
+    await storage.put(keyOf(second!.resourceUrl), pdf, 'application/pdf');
+    const [photo, guide] = unwrap(
+      await service.create(a, [
+        { originalSource: first!.resourceUrl },
+        { originalSource: second!.resourceUrl },
+      ]),
+    );
+    await admin.query('DELETE FROM platform.outbox_events');
+
+    const renamed = unwrap(
+      await service.update(a, [
+        { id: photo!.id, filename: ' Eid banner.png ', alt: 'Lawn on a rooftop' },
+        { id: guide!.id, filename: 'Size guide.PDF' },
+      ]),
+    );
+    expect(renamed.map((file) => [file.filename, file.alt, file.key])).toEqual([
+      ['Eid banner.png', 'Lawn on a rooftop', photo!.key],
+      ['Size guide.PDF', '', guide!.key],
+    ]);
+    expect((await service.get(a, photo!.id))!.filename).toBe('Eid banner.png');
+    expect((await outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      ['file.updated', { changed: ['filename', 'alt'] }],
+      ['file.updated', { changed: ['filename'] }],
+    ]);
+
+    // Nothing changed records nothing; the alt alone may change.
+    await admin.query('DELETE FROM platform.outbox_events');
+    unwrap(await service.update(a, [{ id: guide!.id, filename: 'Size guide.PDF' }]));
+    expect(unwrap(await service.update(a, [{ id: guide!.id, alt: 'Sizes' }]))[0]!.filename).toBe(
+      'Size guide.PDF',
+    );
+    expect((await outbox()).map((event) => event.payload)).toEqual([{ changed: ['alt'] }]);
+
+    expect(
+      errorsOf(
+        await service.update(a, [
+          { id: photo!.id, filename: 'Eid banner.jpg' },
+          { id: guide!.id, filename: 'Size guide' },
+        ]),
+      ),
+    ).toEqual([
+      ['files.0.filename', 'INVALID'],
+      ['files.1.filename', 'INVALID'],
+    ]);
+    expect(errorsOf(await service.update(a, [{ id: photo!.id, filename: '  ' }]))).toEqual([
+      ['files.0.filename', 'BLANK'],
+    ]);
+    expect(errorsOf(await service.update(b, [{ id: photo!.id, filename: 'x.png' }]))).toEqual([
+      ['files.0.id', 'NOT_FOUND'],
+    ]);
+    expect(
+      errorsOf(
+        await service.update(a, [
+          { id: photo!.id, alt: 'a' },
+          { id: photo!.id, alt: 'b' },
+        ]),
+      ),
+    ).toEqual([['files', 'INVALID']]);
+    expect(errorsOf(await service.update(a, []))).toEqual([['files', 'BLANK']]);
+  });
+
   it('finds files by the words of their names, in any case, newest first (ADR-636)', async () => {
     const made = async (filename: string, owner = a) => {
       const [upload] = unwrap(

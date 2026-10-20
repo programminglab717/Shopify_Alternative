@@ -156,9 +156,37 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     for (const [token, query] of [
       [tokens.clerk, '{ files(first: 5) { nodes { id } } }'],
       [tokens.reader, `mutation { fileDelete(fileIds: ["${file.id}"]) { deletedFileIds } }`],
+      [
+        tokens.reader,
+        `mutation { fileUpdate(files: [{ id: "${file.id}", filename: "x.png" }]) { files { id } } }`,
+      ],
     ] as const) {
       expect((await gql(token, query)).errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
+
+    // Renamed, keeping its extension, and shown by its new name (ADR-638).
+    const UPDATE = `mutation ($files: [FileUpdateInput!]!) {
+      fileUpdate(files: $files) { files { id filename alt } userErrors { field code } }
+    }`;
+    const renamed = await gql(tokens.owner, UPDATE, {
+      files: [{ id: file.id, filename: 'Eid lawn.png', alt: 'Three lawn suits, for Eid' }],
+    });
+    expect(renamed.data?.fileUpdate).toEqual({
+      files: [{ id: file.id, filename: 'Eid lawn.png', alt: 'Three lawn suits, for Eid' }],
+      userErrors: [],
+    });
+    const again = await gql(tokens.owner, UPDATE, {
+      files: [{ id: file.id, filename: 'Eid lawn.pdf' }],
+    });
+    expect(again.data?.fileUpdate).toEqual({
+      files: null,
+      userErrors: [{ field: ['files', '0', 'filename'], code: 'INVALID' }],
+    });
+    const named = await gql(tokens.reader, `{ file(id: "${file.id}") { filename url } }`);
+    expect(named.data?.file.filename).toBe('Eid lawn.png');
+    expect((await call('GET', named.data?.file.url)).headers['content-disposition']).toContain(
+      'filename="Eid lawn.png"',
+    );
 
     const deleted = await gql(
       tokens.owner,

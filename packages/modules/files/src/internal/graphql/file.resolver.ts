@@ -20,6 +20,8 @@ import {
   FileCreatePayload,
   FileDeletePayload,
   FileEdge,
+  FileUpdateInput,
+  FileUpdatePayload,
   FilesArgs,
   StagedMediaUploadTarget,
   StagedUploadInput,
@@ -109,6 +111,26 @@ export class FileResolver {
   ): Promise<FileCreatePayload> {
     const result = await this.service.create(tenant, files);
     return Object.assign(new FileCreatePayload(), {
+      files: result.ok ? result.value.map((record) => this.#toFile(record)) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => FileUpdatePayload, {
+    description:
+      'Renames files, up to 10 at a time, each keeping its extension, or changes the words for ' +
+      'what they show (ADR-638). Where each is used, it stays.',
+  })
+  @RequireScopes('write_files')
+  async fileUpdate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('files', { type: () => [FileUpdateInput] }) files: FileUpdateInput[],
+  ): Promise<FileUpdatePayload> {
+    const result = await this.service.update(
+      tenant,
+      files.map((file) => ({ ...file, id: uuidOf(file.id) })),
+    );
+    return Object.assign(new FileUpdatePayload(), {
       files: result.ok ? result.value.map((record) => this.#toFile(record)) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

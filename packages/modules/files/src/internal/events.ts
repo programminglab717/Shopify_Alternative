@@ -2,6 +2,7 @@
 export const FileEvents = {
   FileCreated: 'file.created',
   FileDeleted: 'file.deleted',
+  FileUpdated: 'file.updated',
   ShopBrandUpdated: 'shop_brand.updated',
   StoreExportRequested: 'store_export.requested',
   StoreExportReady: 'store_export.ready',
@@ -15,6 +16,12 @@ export interface FileCreatedPayload {
 }
 
 export type FileDeletedPayload = Record<string, never>;
+
+/** A file renamed, or its words for what it shows changed (ADR-638). */
+export interface FileUpdatedPayload {
+  /** What changed: "filename", "alt". */
+  changed: string[];
+}
 
 export interface ShopBrandUpdatePayload {
   /** What changed: "logo", "squareLogo". */

@@ -304,6 +304,12 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('shop_brand.updated', { changed: ['squareLogo'] }))).toEqual(['shop']);
     // A file deleted may have been an article's image too (ADR-213).
     expect(itemsFor(event('file.deleted', {}))).toEqual(['shop', 'every-article']);
+    // Its words for what it shows stand in for theirs; its name is shown nowhere (ADR-638).
+    expect(itemsFor(event('file.updated', { changed: ['filename', 'alt'] }))).toEqual([
+      'shop',
+      'every-article',
+    ]);
+    expect(itemsFor(event('file.updated', { changed: ['filename'] }))).toEqual([]);
   });
 
   it('publishes a shop whole once it is opened (ADR-145)', () => {

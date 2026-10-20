@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### The shop's files renamed
+
+* **The shop's files are renamed, keeping their extensions** ([ADR-638](../architecture/13-decision-log.md#adr-638--the-shops-files-are-renamed-keeping-their-extensions-and-their-words-for-what-they-show-changed-with-shopifys-fileupdate-where-each-is-used-it-stays)): `fileUpdate` as
+  Shopify's, also for a file's words for what it shows; the Files tab's Rename; a new `alt`
+  rebuilds the storefront's articles.
+* 3763 tests, three more: the files module's renaming, the Files tab's rename, and its
+  mutation checked against the schema; the files and publisher tests now rename and describe.
+
 ### c9dd10d · Staff named in comments, picked by name
 
 * **Staff name someone in an order's comment by picking them from the shop's staff** ([ADR-637](../architecture/13-decision-log.md#adr-637--staff-name-someone-in-an-orders-comment-by-picking-them-from-a-list-of-the-shops-staff-by-name-which-whoever-reads-orders-may-see-with-nothing-of-how-they-sign-in)):

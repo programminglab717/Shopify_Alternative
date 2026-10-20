@@ -156,6 +156,30 @@ export class FileCreatePayload {
   userErrors!: UserError[];
 }
 
+@InputType({ description: "A file's new name or words for what it shows (ADR-638)." })
+export class FileUpdateInput {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Up to 255 characters, keeping its extension: "Size guide.pdf" stays a .pdf.',
+  })
+  filename?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'Up to 512 characters.' })
+  alt?: string | null;
+}
+
+@ObjectType()
+export class FileUpdatePayload {
+  @Field(() => [File], { nullable: true })
+  files!: File[] | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class FileDeletePayload {
   @Field(() => [ID], { nullable: true })

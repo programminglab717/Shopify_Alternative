@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-637 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-638 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -645,6 +645,7 @@
 | 635 | The Confirmation Desk deals an agent the orders given to them first, then those given to no one, and those given to someone else last, each kind the most urgent first | Accepted |
 | 636 | The shop's files are searched by the words of their names, and kept in a Files tab of the online store: found, added as pictures or PDFs, their links copied and deleted | Accepted |
 | 637 | Staff name someone in an order's comment by picking them from a list of the shop's staff by name, which whoever reads orders may see, with nothing of how they sign in | Accepted |
+| 638 | The shop's files are renamed, keeping their extensions, and their words for what they show changed, with Shopify's fileUpdate; where each is used, it stays | Accepted |
 
 ---
 
@@ -22748,3 +22749,22 @@
   changes how comments are kept and read by apps; the names picked here are the ones the match
   finds. **Suggestions as @ is typed:** a list under the box as one types is harder to use on a
   phone and by a screen reader than a field of its own.
+
+## ADR-638 · The shop's files are renamed, keeping their extensions, and their words for what they show changed, with Shopify's fileUpdate; where each is used, it stays
+
+* **Context:** The online store's Files tab finds the shop's files by name (ADR-636), but a
+  photo comes off a phone as "IMG_2041.jpg" and stays so: nothing renames a file, and the words
+  for what a file shows are set only when it is made (status shortcut 124).
+* **Decision:** `fileUpdate(files:)`, as Shopify's, renames up to ten files at a time or
+  changes their `alt`, for those who keep files (`write_files`). A new name is up to 255
+  characters and keeps the old one's extension, in any case, so a file's type never seems to
+  change; storage keeps it where it was, so its links and the pages, articles and themes that
+  use it go on showing it, and its downloads take the new name. A file renamed or described
+  records `file.updated`, saying which changed; a new `alt` rebuilds the shop's storefront and
+  its articles, whose images take a file's words where they have none of their own. The Files
+  tab's **Rename** writes the name without its extension, which is shown beside it.
+* **Consequences:** Shops find their files by names of their own choosing. A name is no more
+  than a label: nothing that uses a file follows it by name.
+* **Alternatives:** **The extension changed with the name:** a PDF named ".jpg" would be
+  downloaded as a picture. **Storage's key renamed too:** the key is the file's address, which
+  pages already hold; it names the file only for the people who read storage.
