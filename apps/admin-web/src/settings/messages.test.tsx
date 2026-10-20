@@ -8,6 +8,7 @@ const SETTINGS = {
   language: 'UR',
   disabledNotifications: ['STOCK_OUT'],
   alertsPhone: null,
+  replyToEmail: null,
   updatedAt: null,
 };
 
@@ -97,6 +98,20 @@ function core(role: StaffRole, requests: Request[] = []) {
         return { messagingSettings: settings, billingMessagePrices: PRICES };
       case 'MessagingSettingsUpdate': {
         const input = variables.input as Record<string, unknown>;
+        if (input.replyToEmail === 'help@zari') {
+          return {
+            messagingSettingsUpdate: {
+              messagingSettings: null,
+              userErrors: [
+                {
+                  field: ['input', 'replyToEmail'],
+                  code: 'INVALID',
+                  message: 'must be an email address, like name@example.com',
+                },
+              ],
+            },
+          };
+        }
         if (input.alertsPhone === '12345') {
           return {
             messagingSettingsUpdate: {
@@ -188,6 +203,41 @@ describe('Customer messages', () => {
       },
     });
     expect((screen.getByLabelText('Alerts number') as HTMLInputElement).value).toBe('0300 1234567');
+  });
+
+  it("sends replies to the shop's emails where it says, blank for none (ADR-659)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const field = (await screen.findByLabelText('Replies to emails go to')) as HTMLInputElement;
+    expect(field.value).toBe('');
+    expect(
+      screen.getByText(/leave it blank and the emails say replies aren't read\.$/),
+    ).toBeTruthy();
+    type('Replies to emails go to', 'help@zari');
+    fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
+    expect(
+      await screen.findByText(
+        'Replies to emails go to: must be an email address, like name@example.com',
+      ),
+    ).toBeTruthy();
+
+    type('Replies to emails go to', ' help@zari.pk ');
+    fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
+    expect(await screen.findByText('Saved. Messages from now on go like this.')).toBeTruthy();
+    // Alone of what changed.
+    expect(sentOf(fake, 'MessagingSettingsUpdate').at(-1)).toEqual({
+      input: { replyToEmail: 'help@zari.pk' },
+    });
+
+    type('Replies to emails go to', '');
+    fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'MessagingSettingsUpdate').at(-1)).toEqual({
+        input: { replyToEmail: null },
+      }),
+    );
   });
 
   it("asks for the shop's own SMS sender name, checked as typed, and withdraws it (ADR-469)", async () => {

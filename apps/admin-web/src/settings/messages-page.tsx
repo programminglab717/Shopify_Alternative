@@ -69,6 +69,7 @@ type StatusChoice = (typeof STATUSES)[number];
 
 const LABELS: Partial<Record<string, MessageKey>> = {
   alertsPhone: 'messages.alertsPhone',
+  replyToEmail: 'messages.replyTo',
   disabledNotifications: 'messages.which',
 };
 
@@ -118,12 +119,14 @@ function inputOf(
   language: MessageLanguage,
   disabled: readonly string[],
   phone: string,
+  replyTo: string,
 ) {
   return {
     routing,
     language,
     disabledNotifications: [...disabled].sort(),
     alertsPhone: phone.trim() || null,
+    replyToEmail: replyTo.trim() || null,
   };
 }
 
@@ -143,15 +146,17 @@ function SettingsForm({
   const [language, setLanguage] = useState(settings.language);
   const [disabled, setDisabled] = useState<string[]>(settings.disabledNotifications);
   const [phone, setPhone] = useState(settings.alertsPhone ? formatPhone(settings.alertsPhone) : '');
+  const [replyTo, setReplyTo] = useState(settings.replyToEmail ?? '');
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
-  const now = inputOf(routing, language, disabled, phone);
+  const now = inputOf(routing, language, disabled, phone, replyTo);
   const was = inputOf(
     settings.routing,
     settings.language,
     settings.disabledNotifications,
     settings.alertsPhone ? formatPhone(settings.alertsPhone) : '',
+    settings.replyToEmail ?? '',
   );
   const changes = Object.fromEntries(
     Object.entries(now).filter(
@@ -184,6 +189,7 @@ function SettingsForm({
         return;
       }
       setPhone(kept.alertsPhone ? formatPhone(kept.alertsPhone) : '');
+      setReplyTo(kept.replyToEmail ?? '');
       setSaved(true);
     } catch (failure) {
       setProblems([errorText(failure, t)]);
@@ -246,6 +252,17 @@ function SettingsForm({
 
       <FormSection title={t('messages.toCustomers')} hint={t('messages.toCustomersHint')}>
         {checks(TO_CUSTOMERS)}
+        <TextField
+          label={t('messages.replyTo')}
+          hint={t('messages.replyToHint')}
+          type="email"
+          inputMode="email"
+          placeholder="help@yourshop.pk"
+          autoComplete="off"
+          ltr
+          value={replyTo}
+          onChange={(event) => setReplyTo(event.target.value)}
+        />
       </FormSection>
 
       <FormSection title={t('messages.toShop')} hint={t('messages.toShopHint')}>

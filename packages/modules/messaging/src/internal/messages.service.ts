@@ -202,14 +202,18 @@ export async function queueMessageIn(
     RETURNING id`);
   const id = rows[0]?.id ?? null;
   const email = emailOf(message.email);
-  // Its copy goes with it: queued now, or not again.
+  // Its copy goes with it: queued now, or not again; replies to it go where the shop says, as
+  // the shop said when it was queued (ADR-659).
   if (id && email && EMAILED_KINDS.includes(message.kind)) {
+    const variables: MessageVariables = settings.replyToEmail
+      ? { ...message.variables, replyTo: settings.replyToEmail }
+      : message.variables;
     await tx.execute(sql`
       INSERT INTO messaging.messages
              (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
               dedupe_key, next_attempt_at)
       VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
-              ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
+              ${JSON.stringify(variables)}::jsonb, ${message.orderId ?? null},
               ${message.customerId ?? null}, ${`${message.dedupeKey}:email`},
               coalesce(${notBefore}::timestamptz, now()))
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);

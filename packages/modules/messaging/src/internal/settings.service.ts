@@ -25,6 +25,11 @@ export interface MessagingSettingsRecord {
   disabled: MessageKind[];
   /** Where Hatti's alerts to the shop go, in E.164 (ADR-157); none sends none. */
   alertsPhone: string | null;
+  /**
+   * Where replies to its customers' emails about their orders go (ADR-659): their Reply-To, and
+   * their words say a reply reaches the shop. None says replies aren't read.
+   */
+  replyToEmail: string | null;
   updatedAt: Date | null;
 }
 
@@ -34,6 +39,8 @@ export interface MessagingSettingsInput {
   disabled?: readonly string[] | null;
   /** Left out, it stays; null or blank stops the alerts. */
   alertsPhone?: string | null;
+  /** Left out, it stays; null or blank leaves replies unread. */
+  replyToEmail?: string | null;
 }
 
 const DEFAULTS: MessagingSettingsRecord = {
@@ -41,6 +48,7 @@ const DEFAULTS: MessagingSettingsRecord = {
   language: 'en',
   disabled: [],
   alertsPhone: null,
+  replyToEmail: null,
   updatedAt: null,
 };
 
@@ -51,9 +59,10 @@ export async function settingsIn(tx: Tx, shopId: string): Promise<MessagingSetti
     language: MessageLanguage;
     disabled: MessageKind[];
     alerts_phone: string | null;
+    reply_to_email: string | null;
     updated_at: string | Date;
   }>(sql`
-    SELECT routing, language, disabled, alerts_phone, updated_at
+    SELECT routing, language, disabled, alerts_phone, reply_to_email, updated_at
       FROM messaging.settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   return row
@@ -62,6 +71,7 @@ export async function settingsIn(tx: Tx, shopId: string): Promise<MessagingSetti
         language: row.language,
         disabled: row.disabled,
         alertsPhone: row.alerts_phone,
+        replyToEmail: row.reply_to_email,
         updatedAt: toDateOrNull(row.updated_at),
       }
     : DEFAULTS;
@@ -120,6 +130,11 @@ export class MessagingSettingsService {
         : input.alertsPhone?.trim()
           ? check.mobile(['input', 'alertsPhone'], input.alertsPhone)
           : null;
+    // A blank address leaves replies unread; anything else must be one.
+    const replyToEmail =
+      input.replyToEmail === undefined
+        ? undefined
+        : (check.email(['input', 'replyToEmail'], input.replyToEmail)?.toLowerCase() ?? null);
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -130,20 +145,24 @@ export class MessagingSettingsService {
         disabled: ((disabled ?? current.disabled) as MessageKind[]).sort(),
       };
       const phone = alertsPhone === undefined ? current.alertsPhone : alertsPhone;
+      const replyTo = replyToEmail === undefined ? current.replyToEmail : replyToEmail;
       const changed = [
         ...(next.routing !== current.routing ? ['routing'] : []),
         ...(next.language !== current.language ? ['language'] : []),
         ...(next.disabled.join() !== [...current.disabled].sort().join() ? ['disabled'] : []),
         ...(phone !== current.alertsPhone ? ['alertsPhone'] : []),
+        ...(replyTo !== current.replyToEmail ? ['replyToEmail'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: current };
       await tx.execute(sql`
-        INSERT INTO messaging.settings (shop_id, routing, language, disabled, alerts_phone)
+        INSERT INTO messaging.settings
+               (shop_id, routing, language, disabled, alerts_phone, reply_to_email)
         VALUES (${tenant.shopId}, ${next.routing}, ${next.language},
-                ${sql.param(next.disabled)}::text[], ${phone})
+                ${sql.param(next.disabled)}::text[], ${phone}, ${replyTo})
             ON CONFLICT (shop_id) DO UPDATE
                    SET routing = excluded.routing, language = excluded.language,
                        disabled = excluded.disabled, alerts_phone = excluded.alerts_phone,
+                       reply_to_email = excluded.reply_to_email,
                        version = messaging.settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MessagingSettingsUpdatedPayload>(tx, tenant.shopId, {
@@ -157,7 +176,7 @@ export class MessagingSettingsService {
         subjectType: 'shop',
         subjectId: tenant.shopId,
         ...actor,
-        // Never the alerts number itself: the log keeps no contact details.
+        // Never the alerts number nor the address for replies: the log keeps no contact details.
         details: {
           changed,
           ...next,

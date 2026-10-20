@@ -284,6 +284,28 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect(charges.charged.map((charge) => charge.id)).toEqual([id]);
   });
 
+  it('gives the email copy the address the shop gave for replies, as it was when queued (ADR-659)', async () => {
+    unwrap(await settings.update(a, { replyToEmail: 'help@zari.pk' }));
+    const order = newId();
+    await messages.queue(a.shopId, { ...placed(order), email: 'ayesha@example.pk' });
+    unwrap(await settings.update(a, { replyToEmail: null }));
+    const later = newId();
+    await messages.queue(a.shopId, { ...placed(later), email: 'ayesha@example.pk' });
+    const { rows: queued } = await admin.query<{ dedupe_key: string; reply_to: string | null }>(
+      `SELECT dedupe_key, variables ->> 'replyTo' AS reply_to FROM messaging.messages
+        ORDER BY created_at, dedupe_key`,
+    );
+    expect(new Map(queued.map((row) => [row.dedupe_key, row.reply_to]))).toEqual(
+      new Map([
+        // The WhatsApp message has no use for it.
+        [`order_placed:${order}`, null],
+        [`order_placed:${order}:email`, 'help@zari.pk'],
+        [`order_placed:${later}`, null],
+        [`order_placed:${later}:email`, null],
+      ]),
+    );
+  });
+
   it('drops a code once it is sent, after any SMS in its place took it, and always sends codes', async () => {
     const code = (n: number) => ({
       kind: 'one_time_code' as const,
@@ -961,6 +983,7 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       language: 'en',
       disabled: [],
       alertsPhone: null,
+      replyToEmail: null,
       updatedAt: null,
     });
     const wrong = await settings.update(a, {
@@ -968,12 +991,14 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       language: 'fr' as never,
       disabled: ['order_placed', 'order_lost'],
       alertsPhone: '12345',
+      replyToEmail: 'help at zari',
     });
     expect(wrong.ok || wrong.errors.map((error) => [error.field.join('.'), error.code])).toEqual([
       ['input.routing', 'INVALID'],
       ['input.language', 'INVALID'],
       ['input.disabled', 'INVALID'],
       ['input.alertsPhone', 'INVALID'],
+      ['input.replyToEmail', 'INVALID'],
     ]);
 
     const changed = unwrap(
@@ -999,6 +1024,12 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     );
     expect(unwrap(await settings.update(a, {})).alertsPhone).toBe('+923001234567');
     expect(unwrap(await settings.update(a, { alertsPhone: '' })).alertsPhone).toBeNull();
+    // Where replies to its emails go (ADR-659): an address, in lower case; blank, none.
+    expect(unwrap(await settings.update(a, { replyToEmail: ' Help@Zari.PK ' })).replyToEmail).toBe(
+      'help@zari.pk',
+    );
+    expect(unwrap(await settings.update(a, {})).replyToEmail).toBe('help@zari.pk');
+    expect(unwrap(await settings.update(a, { replyToEmail: ' ' })).replyToEmail).toBeNull();
     expect(await settings.get(b)).toMatchObject({ routing: 'rich', updatedAt: null });
 
     const { rows: events } = await admin.query<{ event_type: string; payload: { changed: [] } }>(
@@ -1009,6 +1040,8 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       ['messaging_settings.updated', ['routing']],
       ['messaging_settings.updated', ['alertsPhone']],
       ['messaging_settings.updated', ['alertsPhone']],
+      ['messaging_settings.updated', ['replyToEmail']],
+      ['messaging_settings.updated', ['replyToEmail']],
     ]);
     const { rows: audit } = await admin.query<{ action: string; details: object }>(
       'SELECT action, details FROM platform.audit_log ORDER BY id',
@@ -1024,8 +1057,11 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       },
       { action: 'messaging_settings.updated', details: { changed: ['alertsPhone'] } },
       { action: 'messaging_settings.updated', details: { changed: ['alertsPhone'] } },
+      { action: 'messaging_settings.updated', details: { changed: ['replyToEmail'] } },
+      { action: 'messaging_settings.updated', details: { changed: ['replyToEmail'] } },
     ]);
-    // The log keeps no contact details: never the number itself.
+    // The log keeps no contact details: never the number nor the address itself.
     expect(JSON.stringify(audit)).not.toContain('923001234567');
+    expect(JSON.stringify(audit)).not.toContain('zari.pk');
   });
 });

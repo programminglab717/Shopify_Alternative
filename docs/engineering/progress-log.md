@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Replies to emails
+
+* **A shop gives an address for replies to its customers' emails** ([ADR-659](../architecture/13-decision-log.md#adr-659--a-shop-gives-an-address-for-replies-to-its-customers-emails-they-carry-it-as-their-reply-to-and-say-a-reply-reaches-the-shop)): the emails carry it
+  as their Reply-To and say a reply reaches the shop, rather than that replies aren't read.
+* 3809 tests, four more: the messaging settings and queue, the email's words, SES's request and
+  the admin's field.
+
 ### 81d484d · Photos turned
 
 * **A product's photo is turned by quarter turns as part of its crop** ([ADR-658](../architecture/13-decision-log.md#adr-658--a-products-photo-is-turned-by-quarter-turns-after-its-crop-is-cut-as-part-of-the-crop-a-photo-taken-on-its-side-is-turned-without-being-cropped)), cut first and

@@ -3247,6 +3247,8 @@ export interface MessagingSettings {
   language: MessageLanguage;
   disabledNotifications: string[];
   alertsPhone: string | null;
+  /** Where replies to the shop's emails to its customers go (ADR-659). */
+  replyToEmail: string | null;
   updatedAt: string | null;
 }
 

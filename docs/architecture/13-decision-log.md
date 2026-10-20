@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-658 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-659 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -666,6 +666,7 @@
 | 656 | An agent going off duty at the Confirmation Desk may hand over the orders still waiting on them, each to whoever else is on duty with the fewest waiting | Accepted |
 | 657 | A shop selling online alone cancels orders never paid after hours rather than days, reminding their customers halfway | Accepted |
 | 658 | A product's photo is turned by quarter turns, after its crop is cut, as part of the crop: a photo taken on its side is turned without being cropped | Accepted |
+| 659 | A shop gives an address for replies to its customers' emails: they carry it as their Reply-To, and say a reply reaches the shop | Accepted |
 
 ---
 
@@ -23157,3 +23158,23 @@
 * **Alternatives:** **Turning the whole image's clean copy:** every crop made of it would move,
   and auto-crop's frames with it. **Any angle, to straighten a tilted shot:** it leaves corners to
   fill or crop away; left until merchants ask.
+
+## ADR-659 · A shop gives an address for replies to its customers' emails: they carry it as their Reply-To, and say a reply reaches the shop
+
+* **Context:** A shop's emails to its customers about their orders came from Hatti's address under
+  the shop's name, and said replies to them aren't read (ADR-181): a customer who answered one,
+  asking after their parcel, reached no one, and the shop had nowhere to send them.
+* **Decision:** The shop's messaging settings take `replyToEmail`, an email address in lower case,
+  blank for none; it is a contact detail, so the audit log names it changed and never keeps it.
+  When an email's copy of a message is queued, it carries the address the settings have then, so
+  an email waiting to go is answered where the shop said when it was written. The worker gives it
+  to SES as the email's `ReplyToAddresses`, and the email's last line says a reply reaches the
+  shop, in English or Urdu, rather than that replies aren't read. Hatti's own notices to the
+  shop's owner never carry it. An address that is not one, as one with a line break, is ignored.
+  The admin's customer messages page takes it under the messages to customers.
+* **Consequences:** Customers reply to an order's email as they would to any shop's, and the
+  answer lands in the shop's own mailbox; Hatti keeps nothing of it.
+* **Alternatives:** **Replies to Hatti, passed on to the shop's inbox:** Hatti would receive and
+  keep its customers' mail, with an inbound mail pipeline to run, for what the shop's own mailbox
+  does already. **Sending from the shop's own domain:** it needs the shop's DNS to vouch for SES,
+  and stays on the shortcut's target.

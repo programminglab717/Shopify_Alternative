@@ -349,6 +349,8 @@ export interface MessageVariables {
   logo?: string;
   items?: string;
   more?: string;
+  /** For an email of the shop's to its customer (ADR-659): where replies to it go, if anywhere. */
+  replyTo?: string;
   /**
    * For an email of an order's news (ADR-599): the day checkout said to expect it by,
    * "2026-10-22", while its delivery is still to come.
@@ -1321,6 +1323,8 @@ export interface MessageEmail {
    * shop's owner, from Hatti (ADR-195).
    */
   from: 'shop' | 'hatti';
+  /** Where replies go: the shop's address for them, on its own emails alone (ADR-659). */
+  replyTo: string | null;
   subject: string;
   text: string;
   html: string;
@@ -1338,10 +1342,19 @@ const EMAIL_WORDS = {
     en: "{shop} sent this through Hatti because you gave this email with your order. Replies to it aren't read.",
     ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
   },
+  /** Why it came, where replies reach the shop (ADR-659). */
+  whyReply: {
+    en: '{shop} sent this through Hatti because you gave this email with your order. Reply to it to reach {shop}.',
+    ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے اپنے آرڈر کے ساتھ یہ ای میل دی تھی۔ {shop} سے رابطے کے لیے اس ای میل کا جواب دیں۔',
+  },
   /** Why news that is no order's came: the customer's store credit (ADR-602). */
   customer: {
     en: "{shop} sent this through Hatti because you gave it this email. Replies to it aren't read.",
     ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے انہیں یہ ای میل دی تھی۔ اس ای میل کے جواب پڑھے نہیں جاتے۔',
+  },
+  customerReply: {
+    en: '{shop} sent this through Hatti because you gave it this email. Reply to it to reach {shop}.',
+    ur: '{shop} نے یہ ای میل ہٹی کے ذریعے بھیجی ہے کیونکہ آپ نے انہیں یہ ای میل دی تھی۔ {shop} سے رابطے کے لیے اس ای میل کا جواب دیں۔',
   },
   /** Why Hatti's notice of the shop's bills came, to its owner (ADR-195). */
   owner: {
@@ -1368,10 +1381,18 @@ export function messageEmail(
   const { subject, text, hattiPays } = TEMPLATES[kind];
   if (!subject) return null;
   const words = fill(text[language], variables);
+  // Replies reach the shop where it gave an address for them; Hatti's own notices, none.
+  const replyTo = !hattiPays && emailAddress(variables.replyTo) ? variables.replyTo! : null;
   const why = fill(
-    (hattiPays ? EMAIL_WORDS.owner : variables.order ? EMAIL_WORDS.why : EMAIL_WORDS.customer)[
-      language
-    ],
+    (hattiPays
+      ? EMAIL_WORDS.owner
+      : variables.order
+        ? replyTo
+          ? EMAIL_WORDS.whyReply
+          : EMAIL_WORDS.why
+        : replyTo
+          ? EMAIL_WORDS.customerReply
+          : EMAIL_WORDS.customer)[language],
     variables,
   );
   const { url } = variables;
@@ -1392,6 +1413,7 @@ export function messageEmail(
   const end = rtl ? 'left' : 'right';
   return {
     from: hattiPays ? 'hatti' : 'shop',
+    replyTo,
     subject: fill(subject[language], variables).replace(/\s+/g, ' ').trim(),
     text: [words, expected, listed.join('\n'), url, why].filter(Boolean).join('\n\n'),
     html:
@@ -1458,6 +1480,11 @@ function expectedByOf(day: string | undefined, language: MessageLanguage): strin
 /** Whether `value` is a colour an email may be styled with: "#B45309" or "#B53". */
 function colourOf(value: string | undefined): boolean {
   return value !== undefined && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+}
+
+/** Whether `value` is an email address, one line, as a Reply-To header must be. */
+function emailAddress(value: string | undefined): boolean {
+  return value !== undefined && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 /** Whether `value` is an address on the web, as an email's image must be. */

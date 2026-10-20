@@ -831,6 +831,48 @@ describe("Messages' words", () => {
     ).toBeNull();
   });
 
+  it('says replies reach the shop where it gave an address for them, and none for Hatti (ADR-659)', () => {
+    const answered = { ...SHIPPED.variables, replyTo: 'help@zari.pk' };
+    const shipped = messageEmail('order_shipped', 'en', answered)!;
+    expect(shipped.replyTo).toBe('help@zari.pk');
+    expect(shipped.text.split('\n\n').at(-1)).toBe(
+      'Zari Fashions sent this through Hatti because you gave this email with your order. ' +
+        'Reply to it to reach Zari Fashions.',
+    );
+    expect(shipped.html).not.toContain("aren't read");
+    expect(messageEmail('order_shipped', 'ur', answered)!.text).toContain(
+      'Zari Fashions سے رابطے کے لیے اس ای میل کا جواب دیں۔',
+    );
+    // News that is no order's says the same.
+    const credit = messageEmail('store_credit_given', 'en', {
+      shop: 'Zari Fashions',
+      amount: 'Rs 500',
+      balance: 'Rs 500',
+      replyTo: 'help@zari.pk',
+    })!;
+    expect(credit.text).toMatch(
+      /because you gave it this email\. Reply to it to reach Zari Fashions\.$/,
+    );
+    // None given, or one that is no address: replies aren't read, and go nowhere of the shop's.
+    expect(messageEmail('order_shipped', 'en', SHIPPED.variables)!.replyTo).toBeNull();
+    const broken = messageEmail('order_shipped', 'en', {
+      ...SHIPPED.variables,
+      replyTo: 'help@zari.pk\r\nBcc: all@example.com',
+    })!;
+    expect(broken.replyTo).toBeNull();
+    expect(broken.text).toContain("Replies to it aren't read.");
+    // Hatti's own notice to the shop's owner is Hatti's, its replies never the shop's.
+    const bill = messageEmail('invoice_due', 'en', {
+      shop: 'Zari Fashions',
+      invoice: 'HB-1042',
+      plan: 'Starter',
+      amount: 'Rs 2,499',
+      replyTo: 'help@zari.pk',
+    })!;
+    expect(bill.replyTo).toBeNull();
+    expect(bill.text).toContain("Replies to it aren't read.");
+  });
+
   it("lays out a shop's email as its own: its logo or name, its colour, the order's lines (ADR-198)", () => {
     const placed = {
       name: 'Ayesha',

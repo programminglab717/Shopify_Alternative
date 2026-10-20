@@ -2584,6 +2584,9 @@ const en = {
     "Hatti's alerts to the shop go to this number on WhatsApp; staff get theirs at their own numbers.",
   'messages.alertsPhone': 'Alerts number',
   'messages.alertsPhoneHint': 'A Pakistani mobile. Leave it blank for none.',
+  'messages.replyTo': 'Replies to emails go to',
+  'messages.replyToHint':
+    "Customers who gave an email hear of their orders there too. Give your address and their replies reach you; leave it blank and the emails say replies aren't read.",
   'messages.which': 'Messages',
   'messages.always':
     "Codes customers prove their number with at checkout, and Hatti's notices about your bills, plan and domain, always go.",
@@ -7888,6 +7891,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'دکان کے لیے ہٹی کے الرٹس اس نمبر پر واٹس ایپ پر جاتے ہیں؛ اسٹاف کو ان کے اپنے نمبروں پر۔',
   'messages.alertsPhone': 'الرٹس نمبر',
   'messages.alertsPhoneHint': 'پاکستانی موبائل۔ کوئی نہیں چاہیے تو خالی چھوڑ دیں۔',
+  'messages.replyTo': 'ای میلز کے جواب یہاں جائیں',
+  'messages.replyToHint':
+    'جن کسٹمرز نے ای میل دی انہیں ان کے آرڈرز کی خبر وہاں بھی جاتی ہے۔ اپنا ای میل ایڈریس دیں تو ان کے جواب آپ تک پہنچیں گے؛ خالی چھوڑیں تو ای میلز میں لکھا ہوگا کہ جواب پڑھے نہیں جاتے۔',
   'messages.which': 'میسجز',
   'messages.always':
     'چیک آؤٹ پر نمبر ثابت کرنے کے کوڈ، اور آپ کے بلوں، پلان اور ڈومین کے بارے میں ہٹی کے نوٹس ہمیشہ جاتے ہیں۔',

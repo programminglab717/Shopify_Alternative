@@ -248,6 +248,21 @@ describe("Shops' emails to their customers about their orders (ADR-181)", () => 
     });
   });
 
+  it('sends replies to the address the shop gave for them (ADR-659)', async () => {
+    asked.length = 0;
+    answer = { status: 200, body: '{"MessageId":"0100018f-order"}' };
+    const answered = { ...shipped, variables: { ...shipped.variables, replyTo: 'help@zari.pk' } };
+    expect(await ses().send(answered)).toEqual({ ok: true, providerMessageId: '0100018f-order' });
+    const email = messageEmail('order_shipped', 'en', answered.variables)!;
+    expect(JSON.parse(asked[0]!.body)).toMatchObject({
+      FromEmailAddress: '"Zari Fashions" <no-reply@hatti.pk>',
+      Destination: { ToAddresses: ['ayesha@example.pk'] },
+      ReplyToAddresses: ['help@zari.pk'],
+      Content: { Simple: { Body: { Text: { Data: email.text } } } },
+    });
+    expect(email.text).toContain('Reply to it to reach Zari Fashions.');
+  });
+
   it("sends Hatti's notices of a shop's bills to its owner from Hatti itself, in their language (ADR-195)", async () => {
     asked.length = 0;
     answer = { status: 200, body: '{"MessageId":"0100018f-bill"}' };

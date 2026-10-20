@@ -6864,6 +6864,7 @@ const MESSAGING_SETTINGS = /* GraphQL */ `
     language
     disabledNotifications
     alertsPhone
+    replyToEmail
     updatedAt
   }
 `;

@@ -553,6 +553,14 @@ export class MessagingSettings {
   })
   alertsPhone!: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Where replies to the shop's emails to its customers go, as their Reply-To: their words " +
+      "say a reply reaches the shop. None says replies aren't read.",
+  })
+  replyToEmail!: string | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'Null while never changed.' })
   updatedAt!: Date | null;
 }
@@ -578,6 +586,14 @@ export class MessagingSettingsInput {
       '"+923001234567". Null or blank stops them.',
   })
   alertsPhone?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Where replies to the shop's emails to its customers go: an email address. Null or blank " +
+      'leaves replies unread.',
+  })
+  replyToEmail?: string | null;
 }
 
 @ObjectType()

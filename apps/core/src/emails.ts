@@ -34,6 +34,8 @@ export interface SesOptions {
 interface SesEmail {
   from: string;
   to: string;
+  /** Where replies go, if not to `from` (ADR-659). */
+  replyTo?: string | null;
   subject: string;
   text: string;
   html: string;
@@ -73,6 +75,7 @@ class Ses {
     return this.#post({
       FromEmailAddress: email.from,
       Destination: { ToAddresses: [email.to] },
+      ...(email.replyTo && { ReplyToAddresses: [email.replyTo] }),
       Content: {
         Simple: {
           Subject: utf8(email.subject),
@@ -241,6 +244,8 @@ export class SesMessageEmails implements MessageProvider {
         from:
           email.from === 'hatti' ? this.#from : namedAddress(message.variables.shop, this.#address),
         to: message.recipient,
+        // Replies to the shop's own reach the address it gave for them (ADR-659).
+        replyTo: email.replyTo,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);

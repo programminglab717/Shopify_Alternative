@@ -7545,6 +7545,11 @@ type MessagingSettings {
 
   """The messages' language."""
   language: MessageLanguage!
+
+  """
+  Where replies to the shop's emails to its customers go, as their Reply-To: their words say a reply reaches the shop. None says replies aren't read.
+  """
+  replyToEmail: String
   routing: MessageRouting!
 
   """Null while never changed."""
@@ -7560,6 +7565,11 @@ input MessagingSettingsInput {
   """The notifications to turn off, all of them; the others are on."""
   disabledNotifications: [MessageKind!]
   language: MessageLanguage
+
+  """
+  Where replies to the shop's emails to its customers go: an email address. Null or blank leaves replies unread.
+  """
+  replyToEmail: String
   routing: MessageRouting
 }
 
