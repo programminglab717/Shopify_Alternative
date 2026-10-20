@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Part of a payment told
+### 48aa844 · Part of a payment told
 
 * **A customer whose order has part of what it waits for before it ships hears so** ([ADR-629](../architecture/13-decision-log.md#adr-629--a-customer-whose-order-has-part-of-what-it-waits-for-before-it-ships-by-transfer-or-as-staff-record-it-hears-what-came-what-is-left-to-pay-and-its-page-as-the-new-order_part_paid-once-for-each-sum-received)):
   what came, what is left to pay and the order's page, as the new template `order_part_paid`,
