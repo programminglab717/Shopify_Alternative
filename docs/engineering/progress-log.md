@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### The shop's files renamed
+### f2b9033 · The shop's files renamed
 
 * **The shop's files are renamed, keeping their extensions** ([ADR-638](../architecture/13-decision-log.md#adr-638--the-shops-files-are-renamed-keeping-their-extensions-and-their-words-for-what-they-show-changed-with-shopifys-fileupdate-where-each-is-used-it-stays)): `fileUpdate` as
   Shopify's, also for a file's words for what it shows; the Files tab's Rename; a new `alt`
