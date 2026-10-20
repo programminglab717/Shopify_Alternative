@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### robots.txt tested before crawlers meet it
+### e5c954c · robots.txt tested before crawlers meet it
 
 * **A shop tries an address against its robots.txt** ([ADR-616](../architecture/13-decision-log.md#adr-616--a-shop-tries-an-address-against-its-robotstxt-before-crawlers-do-the-rules-as-written-saved-or-not-read-as-rfc-9309-reads-them-and-the-admin-edits-them-beside-the-test)): the file is built in
   `@hatti/storefront-api` with a matcher that reads it as RFC 9309 does; `robotsTxtTest` tries
