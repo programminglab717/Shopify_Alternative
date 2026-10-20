@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A courier's dispute sheet
+### 31aa621 · A courier's dispute sheet
 
 * **A courier's dispute sheet: the parcels it delivered a week or more ago whose cash the shop has
   not had in full, as an Excel workbook to send it** ([ADR-605](../architecture/13-decision-log.md#adr-605--a-couriers-dispute-sheet-the-parcels-it-delivered-a-week-or-more-ago-whose-cash-the-shop-has-not-had-in-full-as-an-excel-workbook-to-send-it), COD-10); downloaded from the cash page.
