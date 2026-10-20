@@ -82,6 +82,9 @@ export class ArticleImage {
     description: "What it shows, for those who cannot see it; null for its file's own.",
   })
   altText!: string | null;
+
+  /** Its file's own ID, for `alt`. */
+  fileUuid!: string;
 }
 
 @ObjectType({ description: 'Who an article is by.' })

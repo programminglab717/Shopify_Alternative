@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SeoListed } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, press, renderAdmin, signedIn } from '../test-support';
-import { problemsOf } from './seo-overview';
+import { problemsOf, undescribedImagesOf } from './seo-overview';
 
 function listed(
   id: string,
@@ -32,7 +32,15 @@ const LISTED: Record<string, SeoListed[]> = {
         title: 'Wedding lehenga in red with zardozi, hand embroidered in Lahore by our karigars',
         description: 'Red lehenga.',
       },
-      { description: '' },
+      {
+        description: '',
+        media: [
+          { alt: '', mediaContentType: 'IMAGE' },
+          { alt: 'Red lehenga, front', mediaContentType: 'IMAGE' },
+          { alt: ' ', mediaContentType: 'IMAGE' },
+          { alt: '', mediaContentType: 'VIDEO' },
+        ],
+      },
     ),
   ],
   SeoPages: [listed('pag_1', 'About us', { description: 'Who we are.' }, { body: '<p>Us</p>' })],
@@ -41,7 +49,12 @@ const LISTED: Record<string, SeoListed[]> = {
       'art_1',
       'Eid looks',
       {},
-      { body: '<p>Long text</p>', summary: 'Five looks for Eid.', blog: { handle: 'news' } },
+      {
+        body: '<p>Long text</p><img src="a.jpg" alt="Green lawn"><img src="b.jpg">',
+        summary: 'Five looks for Eid.',
+        blog: { handle: 'news' },
+        image: { alt: 'Three suits' },
+      },
     ),
   ],
 };
@@ -75,6 +88,15 @@ describe("Every page's search engine listing, in the admin", () => {
     renderAdmin('/shop_1/online-store?tab=seo');
 
     await screen.findByText('2 of 4 without a description of their own.');
+    expect(
+      screen.getByText(
+        '1 with images that say nothing of what they show, for search engines and screen readers.',
+      ),
+    ).toBeTruthy();
+    // Described, but with photos that say nothing of what they show (ADR-618).
+    const lehenga = rowOf('Wedding lehenga');
+    expect(within(lehenga).getByText('2 images without a description')).toBeTruthy();
+    expect(within(lehenga).getByText('Title cut short')).toBeTruthy();
     const lawn = rowOf('Lawn suit');
     expect(lawn.getAttribute('href')).toBe('/shop_1/products/prd_1');
     expect(within(lawn).getByText('No description')).toBeTruthy();
@@ -84,15 +106,16 @@ describe("Every page's search engine listing, in the admin", () => {
     expect(within(rowOf('Shawl')).getByText('Nothing to describe it')).toBeTruthy();
     // Described, so shown once asked for.
     expect(screen.queryByText('Kurta')).toBeNull();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Only those without a description' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Only those missing a description' }));
     expect(within(rowOf('Kurta')).queryByText('No description')).toBeNull();
-    expect(within(rowOf('Wedding lehenga')).getByText('Title cut short')).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'PAGE' } });
     await screen.findByText('0 of 1 without a description of their own.');
     expect(rowOf('About us').getAttribute('href')).toBe('/shop_1/online-store/pages/pag_1');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Only those without a description' }));
-    expect(screen.getByText('Each of these has a description of its own.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Only those missing a description' }));
+    expect(
+      screen.getByText('Each of these has a description of its own, and each of their images too.'),
+    ).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'BLOG' } });
     await screen.findByText('None of these yet.');
@@ -112,6 +135,7 @@ describe("Every page's search engine listing, in the admin", () => {
     const eid = (await screen.findAllByText('Eid looks'))[0]!.closest('a')!;
     expect(eid.getAttribute('href')).toBe('/shop_1/online-store/articles/art_1');
     expect(within(eid).getByText('Five looks for Eid.')).toBeTruthy();
+    expect(within(eid).getByText('1 image without a description')).toBeTruthy();
     expect(within(eid).getByText('zari.hatti.pk › blogs › news › eid-looks')).toBeTruthy();
     await press('Show more');
     await screen.findByText('The first 250 are shown here; find the others from their own pages.');
@@ -130,7 +154,18 @@ describe("Every page's search engine listing, in the admin", () => {
 
     expect(problemsOf(LISTED.SeoProducts![0]!)).toEqual(['NO_DESCRIPTION']);
     expect(problemsOf(LISTED.SeoProducts![2]!)).toEqual(['NOTHING']);
-    expect(problemsOf(LISTED.SeoProducts![3]!)).toEqual(['TITLE_CUT']);
+    expect(problemsOf(LISTED.SeoProducts![3]!)).toEqual(['TITLE_CUT', 'IMAGES']);
+    // A product's photos, not its videos; an article's image and those in its text.
+    expect(undescribedImagesOf(LISTED.SeoProducts![3]!)).toBe(2);
+    expect(undescribedImagesOf(LISTED.SeoArticles![0]!)).toBe(1);
+    expect(
+      undescribedImagesOf(
+        listed('art_2', 'Lawn', {}, { body: '<p>Lawn</p>', image: { alt: '' }, summary: null }),
+      ),
+    ).toBe(1);
+    expect(undescribedImagesOf(listed('pag_3', 'Size guide', {}, { body: '<img alt="">' }))).toBe(
+      1,
+    );
     // Text of only tags or spaces says nothing.
     expect(problemsOf(listed('pag_2', 'Empty', {}, { body: '<p> </p>' }))).toEqual(['NOTHING']);
     expect(problemsOf(listed('prd_9', 'Cap', { description: 'x'.repeat(161) }))).toEqual([

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-617 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-618 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -625,6 +625,7 @@
 | 615 | Hatti Base answers shoppers' questions on a page of the shop's choosing, each opened in place, and tells search engines the same as an FAQPage unless the section says not to | Accepted |
 | 616 | A shop tries an address against its robots.txt before crawlers do: the rules as written, saved or not, read as RFC 9309 reads them, and the admin edits them beside the test | Accepted |
 | 617 | The storefront follows a chain of redirects to its end and sends shoppers there in one hop, through addresses it has no page at, five redirects past the first at most | Accepted |
+| 618 | The Search listings tab flags images that say nothing of what they show: a product's photos, an article's image and the images in pages' and articles' text, an article's image described by its file's words where it has none of its own | Accepted |
 
 ---
 
@@ -22317,3 +22318,26 @@
 * **Alternatives:** **Straightening chains as they are saved:** the admin's choice to make, and
   saving one redirect would rewrite others silently (ADR-612). **Following without checking for
   a page:** a redirect left from a path a page took again would hide that page.
+
+## ADR-618 · The Search listings tab flags images that say nothing of what they show: a product's photos, an article's image and the images in pages' and articles' text, an article's image described by its file's words where it has none of its own
+
+* **Context:** The Search listings tab (ADR-606) shows the listings without a description of
+  their own. Search engines also list images, by the words that say what they show, and screen
+  readers read those words; a photo without them is lost to both. A product's photos have their
+  description (ADR-079), an article's image its own words or its file's (ADR-213), and pages'
+  and articles' text may hold images of their own, but no screen showed which of them had none
+  (status shortcut 110).
+* **Decision:** The tab counts, for each listing, its images without words for what they show: a
+  product's photos (not its videos), an article's image, and the `<img>` in a page's or an
+  article's text and summary with no `alt`, or one of only spaces. A listing with any carries a
+  badge saying how many, is shown with those without a description when only those are asked
+  for, and the tab says how many of the kind have them. An article's image takes the new field
+  `ArticleImage.alt`: its own words, or, where it has none, its file's, as the storefront shows
+  it; empty for neither. The files are looked up once a request, together.
+* **Consequences:** A shop sees, kind by kind, where its images need words, and each row opens
+  the page where they are written. An empty `alt` counts against an image even where a theme
+  means it as decoration, as Shopify's own checks count it. The text's images are read in the
+  browser from what the tab already fetches.
+* **Alternatives:** **Counting in the core:** a field for each kind, for the same answer the
+  admin reads from what it has. **Leaving out empty `alt`s:** a shop that typed nothing would
+  never be told.

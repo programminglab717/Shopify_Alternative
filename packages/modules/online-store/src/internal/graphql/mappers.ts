@@ -291,6 +291,7 @@ export function toArticle(record: ArticleRecord): OnlineStoreArticle {
       Object.assign(new ArticleImage(), {
         fileId: toPublicId('file', record.image.fileId),
         altText: record.image.altText === '' ? null : record.image.altText,
+        fileUuid: record.image.fileId,
       }),
     seo: Object.assign(new SEO(), record.seo),
     createdAt: record.createdAt,

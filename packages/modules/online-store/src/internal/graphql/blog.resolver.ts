@@ -18,6 +18,7 @@ import {
   ArticleCreateInput,
   ArticleCreatePayload,
   ArticleDeletePayload,
+  ArticleImage,
   ArticleUpdateInput,
   ArticleUpdatePayload,
   ArticlesArgs,
@@ -267,4 +268,26 @@ function within(input: string, errors: readonly FieldError[]): FieldError[] {
       ? error
       : { ...error, field: [input, ...error.field] },
   );
+}
+
+@Resolver(() => ArticleImage)
+export class ArticleImageResolver {
+  constructor(private readonly articleService: ArticleService) {}
+
+  @ResolveField(() => String, {
+    description:
+      'What a page says it shows, for those who cannot see it (ADR-618): its own words, or ' +
+      "its file's where it has none; empty for neither.",
+  })
+  async alt(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() image: ArticleImage,
+  ): Promise<string> {
+    if (image.altText) return image.altText;
+    const alts = loaders.get<string, string>('articleImageAlt', (ids) =>
+      this.articleService.fileAlts(tenant, ids),
+    );
+    return (await alts.load(image.fileUuid)) ?? '';
+  }
 }

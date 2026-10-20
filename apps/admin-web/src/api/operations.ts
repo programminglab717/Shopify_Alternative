@@ -9718,6 +9718,10 @@ export const SeoProductsQuery = /* GraphQL */ `
       nodes {
         ${SEO_LISTED}
         description
+        media {
+          alt
+          mediaContentType
+        }
       }
       pageInfo {
         hasNextPage
@@ -9788,6 +9792,9 @@ export const SeoArticlesQuery = /* GraphQL */ `
         summary
         blog {
           handle
+        }
+        image {
+          alt
         }
       }
       pageInfo {

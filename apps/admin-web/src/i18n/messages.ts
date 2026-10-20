@@ -3379,9 +3379,9 @@ const en = {
   'seoAll.kind.PAGE': 'Pages',
   'seoAll.kind.BLOG': 'Blogs',
   'seoAll.kind.ARTICLE': 'Articles',
-  'seoAll.missingOnly': 'Only those without a description',
+  'seoAll.missingOnly': 'Only those missing a description',
   'seoAll.none': 'None of these yet.',
-  'seoAll.allDone': 'Each of these has a description of its own.',
+  'seoAll.allDone': 'Each of these has a description of its own, and each of their images too.',
   'seoAll.summary': '{missing} of {count} without a description of their own.',
   'seoAll.summaryFirst': '{missing} of the first {count} without a description of their own.',
   'seoAll.first': 'The first {count} are shown here; find the others from their own pages.',
@@ -3390,6 +3390,12 @@ const en = {
   'seoAll.problem.NO_DESCRIPTION': 'No description',
   'seoAll.problem.TITLE_CUT': 'Title cut short',
   'seoAll.problem.DESCRIPTION_CUT': 'Description cut short',
+  'seoAll.problem.IMAGES': '{count} images without a description',
+  'seoAll.problem.IMAGES.one': '1 image without a description',
+  'seoAll.imagesSummary':
+    '{count} with images that say nothing of what they show, for search engines and screen readers.',
+  'seoAll.imagesSummary.one':
+    '1 with images that say nothing of what they show, for search engines and screen readers.',
   'urduAll.hint':
     "Your store's Urdu pages show your Urdu where you wrote it, and your own words where you didn't. Each counts its own words; a product's options are on its Urdu page.",
   'urduAll.show': 'Show',
@@ -8550,9 +8556,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'seoAll.kind.PAGE': 'صفحات',
   'seoAll.kind.BLOG': 'بلاگز',
   'seoAll.kind.ARTICLE': 'مضامین',
-  'seoAll.missingOnly': 'صرف وہ جن کی تفصیل نہیں',
+  'seoAll.missingOnly': 'صرف وہ جن میں تفصیل کم ہے',
   'seoAll.none': 'ابھی ان میں سے کوئی نہیں۔',
-  'seoAll.allDone': 'ان سب کی اپنی تفصیل ہے۔',
+  'seoAll.allDone': 'ان سب کی اپنی تفصیل ہے، اور ان کی ہر تصویر کی بھی۔',
   'seoAll.summary': '{count} میں سے {missing} کی اپنی تفصیل نہیں۔',
   'seoAll.summaryFirst': 'پہلے {count} میں سے {missing} کی اپنی تفصیل نہیں۔',
   'seoAll.first': 'یہاں پہلے {count} دکھائے گئے ہیں؛ باقی ان کے اپنے صفحات سے ڈھونڈیں۔',
@@ -8561,6 +8567,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'seoAll.problem.NO_DESCRIPTION': 'تفصیل نہیں',
   'seoAll.problem.TITLE_CUT': 'عنوان کٹ جاتا ہے',
   'seoAll.problem.DESCRIPTION_CUT': 'تفصیل کٹ جاتی ہے',
+  'seoAll.problem.IMAGES': '{count} تصاویر کی تفصیل نہیں',
+  'seoAll.problem.IMAGES.one': '1 تصویر کی تفصیل نہیں',
+  'seoAll.imagesSummary':
+    '{count} ایسے ہیں جن کی تصاویر نہیں بتاتیں کہ ان میں کیا ہے، سرچ انجنوں اور اسکرین ریڈرز کے لیے۔',
+  'seoAll.imagesSummary.one':
+    '1 ایسا ہے جس کی تصاویر نہیں بتاتیں کہ ان میں کیا ہے، سرچ انجنوں اور اسکرین ریڈرز کے لیے۔',
   'urduAll.hint':
     'آپ کے اسٹور کے اردو صفحات وہاں آپ کی اردو دکھاتے ہیں جہاں آپ نے لکھی، اور جہاں نہیں لکھی وہاں آپ کے اپنے الفاظ۔ ہر چیز اپنے الفاظ گنتی ہے؛ پروڈکٹ کے آپشنز اس کے اردو صفحے پر ہیں۔',
   'urduAll.show': 'دکھائیں',

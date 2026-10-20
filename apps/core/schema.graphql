@@ -287,6 +287,11 @@ type ArticleEdge {
 An article's image (ADR-213): one of the shop's files, which the storefront serves while the article is published.
 """
 type ArticleImage {
+  """
+  What a page says it shows, for those who cannot see it (ADR-618): its own words, or its file's where it has none; empty for neither.
+  """
+  alt: String!
+
   """What it shows, for those who cannot see it; null for its file's own."""
   altText: String
 

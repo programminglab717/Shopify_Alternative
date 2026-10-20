@@ -5,7 +5,7 @@ import { BlogService } from './blog.service.js';
 import { StorefrontCommentsController } from './comment.controller.js';
 import { CommentService } from './comment.service.js';
 import { DomainService } from './domain.service.js';
-import { ArticleResolver, BlogResolver } from './graphql/blog.resolver.js';
+import { ArticleImageResolver, ArticleResolver, BlogResolver } from './graphql/blog.resolver.js';
 import { ArticleCommentsResolver, CommentResolver } from './graphql/comment.resolver.js';
 import { DomainResolver } from './graphql/domain.resolver.js';
 import { LinkTapsResolver } from './graphql/link-taps.resolver.js';
@@ -49,6 +49,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     BlogResolver,
     ArticleService,
     ArticleResolver,
+    ArticleImageResolver,
     CommentService,
     CommentResolver,
     ArticleCommentsResolver,

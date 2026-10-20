@@ -1,6 +1,6 @@
 /** Every page's search engine listing in one place, those without a description first (OS-09). */
 import { Link } from '@tanstack/react-router';
-import { CircleAlert, CircleCheck, FileQuestion, Scissors } from 'lucide-react';
+import { CircleAlert, CircleCheck, FileQuestion, ImageOff, Scissors } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -64,8 +64,32 @@ function ownTextOf(listed: SeoListed): string {
   return listed.summary || listed.description || listed.body || '';
 }
 
-/** What is wrong with a listing, worst first: nothing to describe it, no description of its own, words cut short. */
-export type ListingProblem = 'NOTHING' | 'NO_DESCRIPTION' | 'TITLE_CUT' | 'DESCRIPTION_CUT';
+/**
+ * What is wrong with a listing, worst first: nothing to describe it, no description of its own,
+ * words cut short, images that say nothing of what they show (ADR-618).
+ */
+export type ListingProblem =
+  'NOTHING' | 'NO_DESCRIPTION' | 'TITLE_CUT' | 'DESCRIPTION_CUT' | 'IMAGES';
+
+/** The images in `html` without words for what they show: no `alt`, or one of only spaces. */
+function undescribedIn(html: string | undefined): number {
+  if (!html || !html.includes('<img')) return 0;
+  const images = new DOMParser().parseFromString(html, 'text/html').querySelectorAll('img');
+  return [...images].filter((image) => !(image.getAttribute('alt') ?? '').trim()).length;
+}
+
+/**
+ * How many of a listing's images say nothing of what they show (ADR-618), which search engines'
+ * image results and screen readers go by: a product's photos, an article's image (its file's
+ * words standing for its own), and the images in a page's or an article's text.
+ */
+export function undescribedImagesOf(listed: SeoListed): number {
+  const photos = (listed.media ?? []).filter(
+    (media) => media.mediaContentType === 'IMAGE' && !media.alt.trim(),
+  ).length;
+  const image = listed.image && !listed.image.alt.trim() ? 1 : 0;
+  return photos + image + undescribedIn(listed.body) + undescribedIn(listed.summary ?? undefined);
+}
 
 export function problemsOf(listed: SeoListed): ListingProblem[] {
   const own = (listed.seo.description ?? '').trim();
@@ -75,6 +99,7 @@ export function problemsOf(listed: SeoListed): ListingProblem[] {
   if (!own) problems.push(description ? 'NO_DESCRIPTION' : 'NOTHING');
   if (Array.from(title).length > TITLE_SHOWN) problems.push('TITLE_CUT');
   if (own && Array.from(own).length > DESCRIPTION_SHOWN) problems.push('DESCRIPTION_CUT');
+  if (undescribedImagesOf(listed) > 0) problems.push('IMAGES');
   return problems;
 }
 
@@ -86,7 +111,22 @@ const BADGES: Record<
   NO_DESCRIPTION: { colour: 'needsConfirmation', icon: FileQuestion },
   TITLE_CUT: { colour: 'cancelled', icon: Scissors },
   DESCRIPTION_CUT: { colour: 'cancelled', icon: Scissors },
+  IMAGES: { colour: 'needsConfirmation', icon: ImageOff },
 };
+
+/** What a badge says of a problem; of images, how many. */
+function problemLabel(problem: ListingProblem, listed: SeoListed, t: Translate): string {
+  return problem === 'IMAGES'
+    ? t('seoAll.problem.IMAGES', { count: undescribedImagesOf(listed) })
+    : t(`seoAll.problem.${problem}` as MessageKey);
+}
+
+/** What the tab shows at first: those without a description, or with images without one. */
+function needsWork(problems: readonly ListingProblem[]): boolean {
+  return problems.some(
+    (problem) => problem === 'NOTHING' || problem === 'NO_DESCRIPTION' || problem === 'IMAGES',
+  );
+}
 
 const ROW = 'flex flex-col gap-2 px-4 py-3 hover:bg-canvas';
 
@@ -166,7 +206,8 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
   const missing = listings.filter(({ problems }) =>
     problems.some((problem) => problem === 'NOTHING' || problem === 'NO_DESCRIPTION'),
   );
-  const shown = missingOnly ? missing : listings;
+  const imageless = listings.filter(({ problems }) => problems.includes('IMAGES'));
+  const shown = missingOnly ? listings.filter(({ problems }) => needsWork(problems)) : listings;
 
   return (
     <div className="flex flex-col gap-3">
@@ -177,6 +218,9 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
             count: String(listings.length),
           })}
         </p>
+      )}
+      {imageless.length > 0 && (
+        <p className="text-secondary">{t('seoAll.imagesSummary', { count: imageless.length })}</p>
       )}
       {listings.length === 0 ? (
         <Card>
@@ -203,7 +247,7 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
                       <Badge
                         key={problem}
                         {...BADGES[problem]}
-                        label={t(`seoAll.problem.${problem}` as MessageKey)}
+                        label={problemLabel(problem, listed, t)}
                       />
                     ))}
                   </span>

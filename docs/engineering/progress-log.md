@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Images without words flagged with the search listings
+
+* **The Search listings tab counts the images that say nothing of what they show** ([ADR-618](../architecture/13-decision-log.md#adr-618--the-search-listings-tab-flags-images-that-say-nothing-of-what-they-show-a-products-photos-an-articles-image-and-the-images-in-pages-and-articles-text-an-articles-image-described-by-its-files-words-where-it-has-none-of-its-own)): a
+  product's photos, an article's image and the images in pages' and articles' text, shown with
+  the listings without a description. `ArticleImage.alt` gives an article's image's words, its
+  own or its file's.
+* 3724 tests, two more than the status said: the admin's were two more than it counted
+  before this change, and the tests of the tab and of an article's image now count images too.
+
 ### afdc363 · Redirect chains followed in one hop
 
 * **The storefront sends shoppers to where a chain of redirects ends** ([ADR-617](../architecture/13-decision-log.md#adr-617--the-storefront-follows-a-chain-of-redirects-to-its-end-and-sends-shoppers-there-in-one-hop-through-addresses-it-has-no-page-at-five-redirects-past-the-first-at-most)), through

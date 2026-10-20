@@ -123,6 +123,18 @@ export class ArticleService {
     });
   }
 
+  /**
+   * What each of these files shows, for those who cannot see it (ADR-618): an article's image
+   * without words of its own is described by its file's; empty for none, or a file not ready.
+   */
+  async fileAlts(tenant: TenantContext, fileIds: readonly string[]): Promise<Map<string, string>> {
+    if (fileIds.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const found = await readyImagesIn(tx, tenant.shopId, fileIds);
+      return new Map([...found].map(([id, image]) => [id, image.alt]));
+    });
+  }
+
   /** The shop's articles with these IDs, by ID, as comments name theirs. */
   async byIds(tenant: TenantContext, ids: readonly string[]): Promise<Map<string, ArticleRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {

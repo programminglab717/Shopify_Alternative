@@ -340,18 +340,19 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
 
   it("shows an article's image, one of the shop's files, at an address of its own while the article is published (ADR-213)", async () => {
     const writer = await issueToken(['write_files', 'write_content']);
-    const upload = async (filename: string, mimeType: string, bytes: Buffer) => {
+    const upload = async (filename: string, mimeType: string, bytes: Buffer, alt?: string) => {
       const staged = await gql(writer, STAGE, {
         input: [{ filename, mimeType, fileSize: String(bytes.length) }],
       });
       const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
       expect((await call('PUT', target.url, bytes, mimeType)).statusCode).toBe(200);
       const created = await gql(writer, CREATE, {
-        files: [{ originalSource: target.resourceUrl }],
+        files: [{ originalSource: target.resourceUrl, alt }],
       });
       return created.data!.fileCreate.files[0].id as string;
     };
     const photo = await upload('Eid lawn.png', 'image/png', png(96));
+    const described = await upload('Line.png', 'image/png', png(48), 'Lawn on a line');
     const catalogue = await upload('Lookbook.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n'));
     const blog = (
       await gql(
@@ -361,7 +362,7 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     ).data!.blogCreate.blog.id as string;
     const CREATE_ARTICLE = `mutation ($article: ArticleCreateInput!) {
       articleCreate(article: $article) {
-        article { id image { fileId altText } }
+        article { id image { fileId altText alt } }
         userErrors { field code message }
       }
     }`;
@@ -386,7 +387,7 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       },
     });
     const article = created.data!.articleCreate.article;
-    expect(article.image).toEqual({ fileId: photo, altText: 'Lawn, folded' });
+    expect(article.image).toEqual({ fileId: photo, altText: 'Lawn, folded', alt: 'Lawn, folded' });
     const articleId = fromPublicId(article.id as string, 'article');
     // Served at the API's own address, read as the shop, while the article is published.
     const served = await call('GET', `/article-images/${shop}/${articleId}`);
@@ -402,6 +403,21 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
         userErrors { field message }
       }
     }`;
+    // Without words of its own, it is described by its file's, or by nothing (ADR-618).
+    const IMAGE_ALT = `query ($id: ID!) { article(id: $id) { image { altText alt } } }`;
+    await gql(writer, UPDATE_ARTICLE, {
+      id: article.id,
+      article: { image: { fileId: described } },
+    });
+    expect((await gql(writer, IMAGE_ALT, { id: article.id })).data!.article.image).toEqual({
+      altText: null,
+      alt: 'Lawn on a line',
+    });
+    await gql(writer, UPDATE_ARTICLE, { id: article.id, article: { image: { fileId: photo } } });
+    expect((await gql(writer, IMAGE_ALT, { id: article.id })).data!.article.image).toEqual({
+      altText: null,
+      alt: '',
+    });
     await gql(writer, UPDATE_ARTICLE, { id: article.id, article: { isPublished: false } });
     expect((await call('GET', `/article-images/${shop}/${articleId}`)).statusCode).toBe(404);
     // Taken off, it is served no more, nor anything at an address naming nothing.
