@@ -13792,6 +13792,16 @@ type Query {
   reviewSettings: ReviewSettings!
 
   """
+  Tries an address against the storefront's robots.txt (ADR-616): whether a crawler, Googlebot unless another is named, may fetch it, and the rule that says so. The rules given are tried in place of the shop's saved ones, as they would be saved, without saving them.
+  """
+  robotsTxtTest(
+    """A path on the storefront, or its whole address."""
+    path: String!
+    robotsTxtRules: String
+    userAgent: String
+  ): RobotsTxtTest!
+
+  """
   The role presets, with the scopes and capabilities each holds: what a custom role made from one holds some of (ADR-578). Staff need to be the owner or a manager.
   """
   rolePresets: [RolePreset!]!
@@ -14331,6 +14341,27 @@ input ReviewSettingsInput {
 type ReviewSettingsPayload {
   reviewSettings: ReviewSettings
   userErrors: [UserError!]!
+}
+
+"""
+Whether a crawler may fetch an address by the storefront's robots.txt, as the crawler reads it (ADR-616).
+"""
+type RobotsTxtTest {
+  """Null when the address is none a crawler could ask for."""
+  allowed: Boolean
+
+  """
+  What is wrong with the address, or with lines of the rules tried, which the test leaves out as saving them would refuse.
+  """
+  problems: [String!]!
+
+  """
+  The Allow or Disallow line that decided, as written; null when none did.
+  """
+  rule: String
+
+  """The User-agent group the crawler followed: its own name, or *."""
+  userAgent: String!
 }
 
 """

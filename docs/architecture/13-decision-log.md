@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-615 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-616 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -623,6 +623,7 @@
 | 613 | A refund may be for a customer return, at most what was paid for its items and is not refunded yet, in money or as store credit; each return says what it is worth and what was refunded for it | Accepted |
 | 614 | Hatti Base shows where each page sits above it, the home page to the page as the BreadcrumbList gives it, unless the shop turns it off in the theme's settings | Accepted |
 | 615 | Hatti Base answers shoppers' questions on a page of the shop's choosing, each opened in place, and tells search engines the same as an FAQPage unless the section says not to | Accepted |
+| 616 | A shop tries an address against its robots.txt before crawlers do: the rules as written, saved or not, read as RFC 9309 reads them, and the admin edits them beside the test | Accepted |
 
 ---
 
@@ -22269,3 +22270,28 @@
   screen of their own, where the theme editor already edits blocks. **Rich-text answers:** links
   and lists in answers, at the cost of printing a setting's HTML as it is; worth it once settings'
   HTML is cleaned as pages' bodies are.
+
+## ADR-616 · A shop tries an address against its robots.txt before crawlers do: the rules as written, saved or not, read as RFC 9309 reads them, and the admin edits them beside the test
+
+* **Context:** A shop adds rules to its robots.txt (ADR-055), checked line by line as they are
+  saved, but nothing says what a crawler will do with them: a `Disallow: /` under the wrong
+  `User-agent`, or a pattern a character too short, takes a shop's products out of search with no
+  warning. The admin had no place to write the rules at all (status shortcut 41).
+* **Decision:** The robots.txt the storefront serves is built in `@hatti/storefront-api`, the
+  package the storefront and the core both use, with a matcher beside it that reads a robots.txt
+  as RFC 9309 and Google do: the group naming the crawler (the longest name its product token
+  starts with, ignoring case, every group of that name together), else `*`'s; of its rules, the
+  longest pattern matching the path, `*` for anything and a final `$` for its end, an `Allow`
+  winning a tie; allowed when none matches; /robots.txt itself always allowed. The Admin API's
+  `robotsTxtTest(path, userAgent, robotsTxtRules)`, under `read_settings`, tries an address, a
+  path or a whole web address, against the robots.txt the storefront would serve in the shop's
+  languages, with the saved rules or those given, unsaved; it answers whether the crawler,
+  Googlebot by default, may fetch it, the line that decided and the group it followed, and the
+  lines of the given rules that saving would refuse, which it leaves out as saving would. The
+  storefront's preferences gain a section for the rules, with the tester under them.
+* **Consequences:** A shop sees what its rules do before crawlers meet them, and the storefront
+  and the tester read the same file, built by the same code. The languages tried are the platform
+  theme's, which every shop's theme is built on.
+* **Alternatives:** **A tester in the admin alone:** the platform's rules and the matcher written
+  twice, apart from the file served. **Fetching the live robots.txt:** tests only saved rules, and
+  a closed storefront serves one that disallows everything.

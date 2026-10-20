@@ -1872,6 +1872,17 @@ const en = {
   'storefront.consentOn':
     'A banner asks each shopper until they accept or decline. Pixels load only once they accept, and orders of those who did not go to no ad platform.',
   'storefront.consentOff': 'Your pixels load on every page, as they do now.',
+  'storefront.robots': 'What search engines may crawl',
+  'storefront.robotsHint':
+    'Your robots.txt already keeps crawlers out of carts, checkout and searches. Add rules of your own, one a line, and try an address before you save them.',
+  'storefront.robotsRules': 'Your robots.txt rules',
+  'storefront.robotsTest': 'Try an address',
+  'storefront.robotsPath': 'Address on your store',
+  'storefront.robotsCrawler': 'Crawler',
+  'storefront.robotsTry': 'Try it',
+  'storefront.robotsAllowed': '{crawler} may crawl this address.',
+  'storefront.robotsBlocked': '{crawler} may not crawl this address.',
+  'storefront.robotsRule': 'The rule that decides:',
   'onlineStore.filters': 'Filters',
   'filters.title': 'Storefront filters',
   'filters.intro':
@@ -7042,6 +7053,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.consentOn':
     'ایک بینر ہر خریدار سے پوچھتا ہے جب تک وہ قبول یا انکار نہ کرے۔ پکسلز صرف قبول کرنے پر لوڈ ہوتے ہیں، اور انکار کرنے والوں کے آرڈر کسی اشتہاری پلیٹ فارم کو نہیں جاتے۔',
   'storefront.consentOff': 'آپ کے پکسلز ہر صفحے پر لوڈ ہوتے ہیں، جیسے ابھی ہوتے ہیں۔',
+  'storefront.robots': 'سرچ انجن کیا دیکھ سکتے ہیں',
+  'storefront.robotsHint':
+    'آپ کی robots.txt پہلے ہی کرالرز کو کارٹ، چیک آؤٹ اور سرچ سے دور رکھتی ہے۔ اپنے اصول شامل کریں، ہر لائن میں ایک، اور محفوظ کرنے سے پہلے کوئی ایڈریس آزما لیں۔',
+  'storefront.robotsRules': 'آپ کے robots.txt کے اصول',
+  'storefront.robotsTest': 'کوئی ایڈریس آزمائیں',
+  'storefront.robotsPath': 'آپ کے اسٹور کا ایڈریس',
+  'storefront.robotsCrawler': 'کرالر',
+  'storefront.robotsTry': 'آزمائیں',
+  'storefront.robotsAllowed': '{crawler} یہ ایڈریس دیکھ سکتا ہے۔',
+  'storefront.robotsBlocked': '{crawler} یہ ایڈریس نہیں دیکھ سکتا۔',
+  'storefront.robotsRule': 'فیصلہ کرنے والا اصول:',
   'onlineStore.filters': 'فلٹرز',
   'filters.title': 'اسٹور فرنٹ کے فلٹرز',
   'filters.intro':

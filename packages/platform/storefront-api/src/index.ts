@@ -147,3 +147,4 @@ export {
   type ThemeImage,
   type ThemePreviewResponse,
 } from './theme.js';
+export { robotsTxt, robotsVerdict, type RobotsVerdict } from './robots.js';

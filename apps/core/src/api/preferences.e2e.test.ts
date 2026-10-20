@@ -158,6 +158,25 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
       preferences: null,
       userErrors: [{ field: ['robotsTxtRules'], code: 'INVALID' }],
     });
+    // Rules are tried before they are saved (ADR-616).
+    const TEST = `query ($path: String!, $agent: String, $rules: String) {
+      robotsTxtTest(path: $path, userAgent: $agent, robotsTxtRules: $rules) {
+        allowed rule userAgent problems
+      }
+    }`;
+    const tried = await gql(tokens.a, TEST, {
+      path: '/collections/sale',
+      agent: 'Googlebot',
+      rules: 'disallow: /collections/sale\nnoindex: /x',
+    });
+    expect(tried.data?.robotsTxtTest).toEqual({
+      allowed: false,
+      rule: 'Disallow: /collections/sale',
+      userAgent: '*',
+      problems: [expect.stringMatching(/^Line 2 isn't a rule crawlers read/)],
+    });
+    const cart = await gql(tokens.a, TEST, { path: '/cart' });
+    expect(cart.data?.robotsTxtTest).toMatchObject({ allowed: false, rule: 'Disallow: /cart' });
     const opened = await gql(tokens.a, PASSWORD, { input: { passwordEnabled: false } });
     expect(opened.data?.onlineStorePreferencesUpdate.preferences).toEqual({
       passwordEnabled: false,

@@ -101,6 +101,18 @@ function core(role: StaffRole, redirects = REDIRECTS) {
             ? CHECKED
             : { ...CHECKED, dryRun: false, rowErrorCount: 0, rowErrors: [] },
         };
+      case 'RobotsTxtTest': {
+        const rules = (variables.robotsTxtRules as string | undefined) ?? '';
+        const blocked = rules.includes('Disallow: /collections/sale');
+        return {
+          robotsTxtTest: {
+            allowed: !blocked,
+            rule: blocked ? 'Disallow: /collections/sale' : null,
+            userAgent: '*',
+            problems: rules.includes('Noindex') ? ["Line 2 isn't a rule crawlers read"] : [],
+          },
+        };
+      }
       case 'UrlRedirectsStraighten':
         return { urlRedirectsStraighten: { updated: 1, userErrors: [] } };
       case 'UrlRedirectsExport':
@@ -124,6 +136,34 @@ describe("The storefront's preferences and redirects", () => {
     cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('tries an address against the robots.txt rules being written, then saves them (ADR-616)', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const rules = (await screen.findByLabelText('Your robots.txt rules')) as HTMLTextAreaElement;
+    fireEvent.change(rules, { target: { value: 'Disallow: /collections/sale\nNoindex: /x' } });
+    type('Address on your store', '/collections/sale');
+    fireEvent.click(screen.getByRole('button', { name: 'Try it' }));
+    await screen.findByText(/Googlebot may not crawl this address\./);
+    expect(screen.getByText('Disallow: /collections/sale')).toBeTruthy();
+    expect(screen.getByText("Line 2 isn't a rule crawlers read")).toBeTruthy();
+    expect(sentOf(fake, 'RobotsTxtTest').at(-1)).toEqual({
+      path: '/collections/sale',
+      userAgent: 'Googlebot',
+      robotsTxtRules: 'Disallow: /collections/sale\nNoindex: /x',
+    });
+
+    fireEvent.change(rules, { target: { value: 'Disallow: /collections/sale' } });
+    const form = rules.closest('form')!;
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { robotsTxtRules: 'Disallow: /collections/sale' },
+      }),
+    );
   });
 
   it('keeps the storefront behind a password, pauses it until a time, and sets its home page for search engines', async () => {

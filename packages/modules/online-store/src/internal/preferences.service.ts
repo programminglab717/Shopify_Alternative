@@ -17,6 +17,7 @@ import { appendEvent } from '@hatti/events';
 import { readyImagesIn } from '@hatti/files/public';
 import { isUuid } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
+import { platformTheme } from '@hatti/themes';
 import { Injectable, Optional } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type PreferencesUpdatedPayload } from './events.js';
@@ -26,7 +27,14 @@ import type {
   PreferencesRecord,
   StorefrontFilterKind,
 } from './records.js';
-import { ROBOTS_RULES_LIMITS, robotsRules } from './robots-rules.js';
+import {
+  ROBOTS_RULES_LIMITS,
+  robotsRules,
+  robotsTest,
+  type RobotsTestInput,
+  type RobotsTestResult,
+} from './robots-rules.js';
+import { BASE_THEME } from './theme-files.js';
 import { preferences } from './schema.js';
 
 export interface PreferencesInput {
@@ -149,6 +157,21 @@ export class PreferencesService {
     return this.db.tenant(tenant.shopId, async (tx) =>
       this.#current(tx, tenant.shopId, this.#view(tenant.shopId, await rowOf(tx, tenant.shopId))),
     );
+  }
+
+  /**
+   * Whether a crawler may fetch an address by the storefront's robots.txt (ADR-616), with the
+   * shop's saved rules or those given to try, in the languages of the platform's theme.
+   */
+  async robotsTest(tenant: TenantContext, input: RobotsTestInput): Promise<RobotsTestResult> {
+    const [{ robotsTxtRules }, theme] = await Promise.all([
+      this.get(tenant),
+      platformTheme(BASE_THEME),
+    ]);
+    return robotsTest(robotsTxtRules, input, {
+      locales: [...theme.locales.keys()],
+      defaultLocale: theme.defaultLocale,
+    });
   }
 
   /** Changes those given; records `online_store_preferences.updated` if any changed. */

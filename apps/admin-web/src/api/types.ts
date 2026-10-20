@@ -2530,6 +2530,17 @@ export interface StorefrontPreferences {
   hidePoweredBy: boolean;
   /** Whether the storefront asks shoppers before the ad platforms' pixels load (ADR-551). */
   consentBanner: boolean;
+  /** Rules the shop adds to its robots.txt (ADR-055); absent where a fake core leaves it out. */
+  robotsTxtRules?: string;
+}
+
+export interface RobotsTxtTestData {
+  robotsTxtTest: {
+    allowed: boolean | null;
+    rule: string | null;
+    userAgent: string;
+    problems: string[];
+  };
 }
 
 export interface StorefrontPreferencesData {

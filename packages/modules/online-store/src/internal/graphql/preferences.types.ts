@@ -372,3 +372,32 @@ export class OnlineStorePreferencesUpdatePayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({
+  description:
+    "Whether a crawler may fetch an address by the storefront's robots.txt, as the crawler reads " +
+    'it (ADR-616).',
+})
+export class RobotsTxtTest {
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Null when the address is none a crawler could ask for.',
+  })
+  allowed!: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The Allow or Disallow line that decided, as written; null when none did.',
+  })
+  rule!: string | null;
+
+  @Field({ description: 'The User-agent group the crawler followed: its own name, or *.' })
+  userAgent!: string;
+
+  @Field(() => [String], {
+    description:
+      'What is wrong with the address, or with lines of the rules tried, which the test leaves ' +
+      'out as saving them would refuse.',
+  })
+  problems!: string[];
+}

@@ -1,3 +1,5 @@
+import { robotsTxt, robotsVerdict } from '@hatti/storefront-api';
+
 /** The most a shop's robots.txt rules may be: room for many groups, not a second site. */
 export const ROBOTS_RULES_LIMITS = { lines: 200, length: 10_000 } as const;
 
@@ -79,5 +81,66 @@ function isWebAddress(value: string): boolean {
     return url.protocol === 'https:' || url.protocol === 'http:';
   } catch {
     return false;
+  }
+}
+
+/** What the shop asks of a robots.txt test (ADR-616). */
+export interface RobotsTestInput {
+  /** The address to try: a path on the storefront, /products/lawn, or the whole address. */
+  path: string;
+  /** The crawler, as robots.txt names it; Googlebot if left out. */
+  userAgent?: string | null;
+  /** Rules to try in place of the saved ones, as they would be saved; the saved ones if left out. */
+  robotsTxtRules?: string | null;
+}
+
+/** Whether a crawler may fetch an address by the storefront's robots.txt, and why. */
+export interface RobotsTestResult {
+  /** Null when the address is none a crawler could ask for. */
+  allowed: boolean | null;
+  /** The Allow or Disallow line that decided; null when none did. */
+  rule: string | null;
+  /** The group the crawler followed: its own name, or `*`. */
+  userAgent: string;
+  /** What is wrong with the address, or with the lines of the rules tried, which are left out. */
+  problems: string[];
+}
+
+/**
+ * Tries an address against the robots.txt the storefront would serve with `rules`, in the shop's
+ * languages, as a crawler reads it (ADR-616).
+ */
+export function robotsTest(
+  rules: string,
+  input: RobotsTestInput,
+  languages: { locales: readonly string[]; defaultLocale: string },
+): RobotsTestResult {
+  const tried =
+    input.robotsTxtRules !== undefined && input.robotsTxtRules !== null
+      ? robotsRules(input.robotsTxtRules)
+      : null;
+  const problems = [...(tried?.problems ?? [])];
+  const crawler = input.userAgent?.trim() || 'Googlebot';
+  const path = pathOf(input.path);
+  if (path === null) {
+    problems.unshift('Give an address on the shop, such as /products/lawn-suit');
+    return { allowed: null, rule: null, userAgent: crawler, problems };
+  }
+  // The origin names the sitemap alone, which no verdict reads.
+  const txt = robotsTxt('https://shop.invalid', languages, tried ? tried.rules : rules);
+  const verdict = robotsVerdict(txt, crawler, path);
+  return { allowed: verdict.allowed, rule: verdict.rule, userAgent: verdict.group, problems };
+}
+
+/** The path and query of an address, from a path or a whole web address; null for neither. */
+function pathOf(given: string): string | null {
+  const text = given.trim();
+  if (text.startsWith('/')) return text.length <= 2048 && !/\s/.test(text) ? text : null;
+  if (!/^https?:\/\//i.test(text)) return null;
+  try {
+    const url = new URL(text);
+    return url.pathname + url.search;
+  } catch {
+    return null;
   }
 }

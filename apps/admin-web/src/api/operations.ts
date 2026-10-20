@@ -5603,6 +5603,7 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
     returnExchangesOnly
     hidePoweredBy
     consentBanner
+    robotsTxtRules
   }
 `;
 
@@ -5617,6 +5618,21 @@ export const StorefrontPreferencesQuery = /* GraphQL */ `
     }
   }
   ${STOREFRONT_PREFERENCES}
+`;
+
+/**
+ * Whether a crawler may fetch an address by the storefront's robots.txt (ADR-616), with the saved
+ * rules or those being written.
+ */
+export const RobotsTxtTestQuery = /* GraphQL */ `
+  query RobotsTxtTest($path: String!, $userAgent: String, $robotsTxtRules: String) {
+    robotsTxtTest(path: $path, userAgent: $userAgent, robotsTxtRules: $robotsTxtRules) {
+      allowed
+      rule
+      userAgent
+      problems
+    }
+  }
 `;
 
 /** Some of the storefront's preferences changed: those given; the others stay. */

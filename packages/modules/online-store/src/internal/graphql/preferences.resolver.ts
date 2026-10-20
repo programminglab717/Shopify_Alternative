@@ -9,6 +9,7 @@ import {
   OnlineStorePreferences,
   OnlineStorePreferencesInput,
   OnlineStorePreferencesUpdatePayload,
+  RobotsTxtTest,
   SharingImage,
 } from './preferences.types.js';
 
@@ -26,6 +27,27 @@ export class PreferencesResolver {
     @CurrentTenant() tenant: TenantContext,
   ): Promise<OnlineStorePreferences> {
     return toPreferences(await this.service.get(tenant));
+  }
+
+  @Query(() => RobotsTxtTest, {
+    description:
+      "Tries an address against the storefront's robots.txt (ADR-616): whether a crawler, " +
+      'Googlebot unless another is named, may fetch it, and the rule that says so. The rules ' +
+      "given are tried in place of the shop's saved ones, as they would be saved, without " +
+      'saving them.',
+  })
+  @RequireScopes('read_settings')
+  async robotsTxtTest(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('path', { description: 'A path on the storefront, or its whole address.' }) path: string,
+    @Args('userAgent', { type: () => String, nullable: true }) userAgent?: string | null,
+    @Args('robotsTxtRules', { type: () => String, nullable: true })
+    robotsTxtRules?: string | null,
+  ): Promise<RobotsTxtTest> {
+    return Object.assign(
+      new RobotsTxtTest(),
+      await this.service.robotsTest(tenant, { path, userAgent, robotsTxtRules }),
+    );
   }
 
   @Mutation(() => OnlineStorePreferencesUpdatePayload, {

@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { StorefrontPreferencesQuery, StorefrontPreferencesUpdateMutation } from '../api/operations';
+import {
+  RobotsTxtTestQuery,
+  StorefrontPreferencesQuery,
+  StorefrontPreferencesUpdateMutation,
+} from '../api/operations';
 import type {
+  RobotsTxtTestData,
   StorefrontPreferences,
   StorefrontPreferencesData,
   StorefrontPreferencesUpdateData,
@@ -304,6 +309,103 @@ function ConsentForm({ preferences }: { preferences: StorefrontPreferences }) {
 }
 
 /**
+ * Rules the shop adds to its robots.txt (ADR-055), and a tester (ADR-616): an address and a
+ * crawler tried against the robots.txt the storefront would serve with the rules as written, saved
+ * or not, saying whether the crawler may fetch it and the rule that decided.
+ */
+function RobotsForm({ preferences }: { preferences: StorefrontPreferences }) {
+  const { t } = useLocale();
+  const id = useId();
+  const saved = preferences.robotsTxtRules ?? '';
+  const [rules, setRules] = useState(saved);
+  const [path, setPath] = useState('');
+  const [crawler, setCrawler] = useState('Googlebot');
+  const [asked, setAsked] = useState<Record<string, unknown> | null>(null);
+  const tested = useAdminQuery<RobotsTxtTestData>(
+    ['robots-txt-test'],
+    RobotsTxtTestQuery,
+    asked ?? {},
+    {
+      enabled: asked !== null,
+    },
+  );
+  const input = rules.trim() === saved ? {} : { robotsTxtRules: rules.trim() };
+  const verdict = asked && tested.data?.robotsTxtTest;
+  const test = () =>
+    setAsked({
+      path: path.trim(),
+      userAgent: crawler.trim() || null,
+      ...(rules.trim() === saved ? {} : { robotsTxtRules: rules }),
+    });
+  return (
+    <PreferencesForm title={t('storefront.robots')} hint={t('storefront.robotsHint')} input={input}>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={id} className="font-medium">
+          {t('storefront.robotsRules')}
+        </label>
+        <textarea
+          id={id}
+          value={rules}
+          rows={6}
+          dir="ltr"
+          spellCheck={false}
+          placeholder={'Disallow: /collections/sale\n\nUser-agent: GPTBot\nDisallow: /'}
+          onChange={(event) => setRules(event.target.value)}
+          className="rounded-control border border-line bg-surface px-3 py-2 font-mono text-text"
+        />
+      </div>
+      <div className="flex flex-col gap-3 rounded-control border border-line p-3">
+        <p className="font-medium">{t('storefront.robotsTest')}</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <TextField
+            label={t('storefront.robotsPath')}
+            ltr
+            placeholder="/products/lawn-suit"
+            value={path}
+            onChange={(event) => setPath(event.target.value)}
+          />
+          <TextField
+            label={t('storefront.robotsCrawler')}
+            ltr
+            value={crawler}
+            onChange={(event) => setCrawler(event.target.value)}
+          />
+        </div>
+        <Button
+          variant="secondary"
+          className="self-start"
+          disabled={path.trim() === ''}
+          busy={asked !== null && tested.isFetching}
+          onClick={test}
+        >
+          {t('storefront.robotsTry')}
+        </Button>
+        {verdict && verdict.allowed !== null && (
+          <Alert tone={verdict.allowed ? 'success' : 'warning'}>
+            {t(verdict.allowed ? 'storefront.robotsAllowed' : 'storefront.robotsBlocked', {
+              crawler:
+                verdict.userAgent === '*' ? crawler.trim() || 'Googlebot' : verdict.userAgent,
+            })}
+            {verdict.rule && (
+              <>
+                {' '}
+                {t('storefront.robotsRule')} <code dir="ltr">{verdict.rule}</code>
+              </>
+            )}
+          </Alert>
+        )}
+        {verdict &&
+          verdict.problems.map((problem) => (
+            <Alert key={problem} tone="danger">
+              {problem}
+            </Alert>
+          ))}
+      </div>
+    </PreferencesForm>
+  );
+}
+
+/**
  * The storefront's preferences (OS-09, OS-11, OS-15), for owners and managers: its password while
  * the shop gets ready, a pause while it is open, its home page for search engines, its return
  * window, whether it says "Powered by Hatti", and whether it asks shoppers before its pixels load.
@@ -329,6 +431,7 @@ export function StorefrontPreferencesTab() {
       <PasswordForm preferences={preferences} />
       <PauseForm preferences={preferences} />
       <SearchForm preferences={preferences} />
+      <RobotsForm preferences={preferences} />
       <ReturnsForm preferences={preferences} />
       <BrandingForm preferences={preferences} />
       <ConsentForm preferences={preferences} />

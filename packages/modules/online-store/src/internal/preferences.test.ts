@@ -193,6 +193,44 @@ describe.skipIf(!server)('PreferencesService', () => {
     ]);
   });
 
+  it("tries an address against the storefront's robots.txt, saved rules or rules to try (ADR-616)", async () => {
+    unwrap(
+      await f.preferences.update(f.a, {
+        robotsTxtRules: 'Disallow: /collections/sale\n\nUser-agent: GPTBot\nDisallow: /',
+      }),
+    );
+    expect(await f.preferences.robotsTest(f.a, { path: '/collections/sale' })).toEqual({
+      allowed: false,
+      rule: 'Disallow: /collections/sale',
+      userAgent: '*',
+      problems: [],
+    });
+    // The platform's own rules, in Urdu too, and a whole address read as its path.
+    expect(
+      await f.preferences.robotsTest(f.a, { path: 'https://zari.pk/ur/cart?x=1' }),
+    ).toMatchObject({ allowed: false, rule: 'Disallow: /ur/cart' });
+    expect(
+      await f.preferences.robotsTest(f.a, { path: '/products/lawn', userAgent: 'GPTBot' }),
+    ).toMatchObject({ allowed: false, rule: 'Disallow: /', userAgent: 'GPTBot' });
+    expect(await f.preferences.robotsTest(f.a, { path: '/products/lawn' })).toMatchObject({
+      allowed: true,
+      rule: null,
+    });
+    // Rules to try, unsaved, with what saving them would refuse said and left out.
+    const tried = await f.preferences.robotsTest(f.a, {
+      path: '/collections/sale',
+      robotsTxtRules: 'Allow: /collections/\nNoindex: /x',
+    });
+    expect(tried).toMatchObject({ allowed: true, rule: 'Allow: /collections/' });
+    expect(tried.problems).toEqual([expect.stringMatching(/^Line 2 isn't a rule crawlers read/)]);
+    expect((await f.preferences.get(f.a)).robotsTxtRules).toContain('/collections/sale');
+    // An address no crawler could ask for.
+    expect(await f.preferences.robotsTest(f.a, { path: 'lawn suit' })).toMatchObject({
+      allowed: null,
+      problems: ['Give an address on the shop, such as /products/lawn-suit'],
+    });
+  });
+
   it("keeps the shop's link page, its links checked and its products the shop's (ADR-161)", async () => {
     const lawn = unwrap(
       await f.products.create(f.a, {
