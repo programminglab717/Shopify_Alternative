@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Pins on packing slips and labels
+### 5fcfb46 · Pins on packing slips and labels
 
 * **A delivery address's pin prints on its packing slip and courier label** ([ADR-628](../architecture/13-decision-log.md#adr-628--a-delivery-addresss-pin-prints-on-its-packing-slip-and-its-courier-label-as-a-qr-code-of-its-place-in-google-maps-for-the-rider-to-scan-with-a-phones-camera-an-invoice-the-customers-carries-none)) as a
   QR code of its place in Google Maps, for the rider to scan for the way to the door; the
