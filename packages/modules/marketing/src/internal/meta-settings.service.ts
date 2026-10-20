@@ -33,6 +33,11 @@ export interface MetaConversionsRecord {
   tokenHint: string | null;
   testEventCode: string | null;
   purchaseAt: ConversionMomentValue;
+  /**
+   * Whether orders the shop's staff take from chats, at its counter or by hand go to Meta too
+   * (ADR-655), as checkout's do.
+   */
+  staffOrders: boolean;
   updatedAt: Date;
 }
 
@@ -46,6 +51,7 @@ export interface MetaConversionsInput {
   /** Blank or null takes it away. */
   testEventCode?: string | null;
   purchaseAt?: ConversionMomentValue | null;
+  staffOrders?: boolean | null;
 }
 
 /** The dataset the worker sends the shop's events to, its token opened. */
@@ -59,6 +65,7 @@ type SettingsRow = {
   token_hint: string | null;
   test_event_code: string | null;
   purchase_at: ConversionMomentValue;
+  staff_orders: boolean;
   updated_at: string | Date;
 };
 
@@ -140,6 +147,7 @@ export class MetaConversionsService {
         testEventCode:
           testEventCode === undefined ? (current?.test_event_code ?? null) : testEventCode,
         purchaseAt: input.purchaseAt ?? current?.purchase_at ?? 'placed',
+        staffOrders: input.staffOrders ?? current?.staff_orders ?? false,
       };
       const changed = [
         ...(next.pixelId !== current?.pixel_id ? ['pixelId'] : []),
@@ -148,6 +156,7 @@ export class MetaConversionsService {
           : []),
         ...(next.testEventCode !== (current?.test_event_code ?? null) ? ['testEventCode'] : []),
         ...(next.purchaseAt !== (current?.purchase_at ?? 'placed') ? ['purchaseAt'] : []),
+        ...(next.staffOrders !== (current?.staff_orders ?? false) ? ['staffOrders'] : []),
       ];
       if (current && changed.length === 0) return { ok: true, value: toRecord(current) };
       const sealed =
@@ -158,14 +167,15 @@ export class MetaConversionsService {
         accessToken === undefined ? (current?.token_hint ?? null) : accessToken.slice(-4);
       await tx.execute(sql`
         INSERT INTO marketing.meta_settings
-               (shop_id, pixel_id, access_token, token_hint, test_event_code, purchase_at)
+               (shop_id, pixel_id, access_token, token_hint, test_event_code, purchase_at,
+                staff_orders)
         VALUES (${tenant.shopId}, ${next.pixelId}, ${sealed}, ${hint}, ${next.testEventCode},
-                ${next.purchaseAt})
+                ${next.purchaseAt}, ${next.staffOrders})
             ON CONFLICT (shop_id) DO UPDATE
                    SET pixel_id = excluded.pixel_id, access_token = excluded.access_token,
                        token_hint = excluded.token_hint,
                        test_event_code = excluded.test_event_code,
-                       purchase_at = excluded.purchase_at,
+                       purchase_at = excluded.purchase_at, staff_orders = excluded.staff_orders,
                        version = marketing.meta_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MetaConversionsUpdatedPayload>(tx, tenant.shopId, {
@@ -185,11 +195,13 @@ export class MetaConversionsService {
           tokenHint: hint,
           testEventCode: next.testEventCode,
           purchaseAt: next.purchaseAt,
+          staffOrders: next.staffOrders,
           before: current && {
             pixelId: current.pixel_id,
             tokenHint: current.token_hint,
             testEventCode: current.test_event_code,
             purchaseAt: current.purchase_at,
+            staffOrders: current.staff_orders,
           },
         },
       });
@@ -262,7 +274,8 @@ async function settingsIn(
   options: { lock?: boolean } = {},
 ): Promise<SettingsRow | null> {
   const { rows } = await tx.execute<SettingsRow>(sql`
-    SELECT pixel_id, access_token, token_hint, test_event_code, purchase_at, updated_at
+    SELECT pixel_id, access_token, token_hint, test_event_code, purchase_at, staff_orders,
+           updated_at
       FROM marketing.meta_settings
      WHERE shop_id = ${shopId}
      ${options.lock ? sql`FOR UPDATE` : sql``}`);
@@ -275,6 +288,7 @@ function toRecord(row: SettingsRow): MetaConversionsRecord {
     tokenHint: row.token_hint,
     testEventCode: row.test_event_code,
     purchaseAt: row.purchase_at,
+    staffOrders: row.staff_orders,
     updatedAt: toDate(row.updated_at),
   };
 }

@@ -6676,6 +6676,7 @@ const META_CONVERSIONS = /* GraphQL */ `
     accessTokenHint
     purchaseAt
     testEventCode
+    staffOrders
     updatedAt
   }
 `;

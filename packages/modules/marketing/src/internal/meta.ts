@@ -69,6 +69,35 @@ export interface ConversionOrder {
    */
   browserIds: { fbp?: string; fbc?: string; ttp?: string; ga?: string } | null;
   lines: readonly { variantId: string; quantity: number; unitPrice: bigint }[];
+  /** Where it was placed, as the order says: `online_store` when left out (ADR-655). */
+  source?: string;
+}
+
+/**
+ * Where an order was placed, as Meta's conversions API names it: through the storefront's
+ * checkout, or taken by the shop's staff from a chat, at its shop's counter or by hand (ADR-655).
+ */
+export type MetaActionSource = 'website' | 'chat' | 'physical_store' | 'other';
+
+/**
+ * Where an order from `source` was placed, as Meta hears of it; null for one Meta hears not of:
+ * placed through an app, a marketplace or a reseller, whose customers the shop's ads never saw.
+ */
+export function metaActionSourceOf(source: string): MetaActionSource | null {
+  switch (source) {
+    case 'online_store':
+      return 'website';
+    case 'whatsapp':
+    case 'instagram':
+    case 'facebook':
+      return 'chat';
+    case 'pos':
+      return 'physical_store';
+    case 'manual':
+      return 'other';
+    default:
+      return null;
+  }
 }
 
 /** A server event, as Meta's conversions API takes it. */
@@ -76,8 +105,9 @@ export interface MetaServerEvent {
   event_name: string;
   event_time: number;
   event_id: string;
-  event_source_url: string;
-  action_source: 'website';
+  /** For a website event alone. */
+  event_source_url?: string;
+  action_source: MetaActionSource;
   user_data: MetaUserData;
   custom_data: {
     currency: string;
@@ -116,13 +146,15 @@ export function metaEvent(
   conversion: { moment: ConversionMomentValue; occurredAt: Date },
   options: { purchaseAt: ConversionMomentValue; sourceUrl: string },
 ): MetaServerEvent {
+  // An order staff took names no page it was placed on (ADR-655).
+  const actionSource = metaActionSourceOf(order.source ?? 'online_store') ?? 'other';
   const amount = (minor: bigint) => Number(toMajorString(money(minor, order.currency)));
   return {
     event_name: metaEventName(conversion.moment, options.purchaseAt),
     event_time: Math.floor(conversion.occurredAt.getTime() / 1000),
     event_id: `order-${order.number}-${conversion.moment}`,
-    event_source_url: options.sourceUrl,
-    action_source: 'website',
+    ...(actionSource === 'website' && { event_source_url: options.sourceUrl }),
+    action_source: actionSource,
     user_data: metaUserData(order),
     custom_data: {
       currency: order.currency,

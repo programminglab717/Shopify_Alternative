@@ -105,6 +105,14 @@ export class MetaConversions {
   })
   purchaseAt!: ConversionMoment;
 
+  @Field({
+    description:
+      "Whether orders the shop's staff take go to Meta too (ADR-655), as checkout's do: from " +
+      'WhatsApp, Instagram and Facebook as chat events, from the counter as physical store ' +
+      "ones, and the rest taken by hand as other ones. TikTok and Google hear of checkout's alone.",
+  })
+  staffOrders!: boolean;
+
   @Field(() => GraphQLISODateTime)
   updatedAt!: Date;
 }
@@ -134,6 +142,9 @@ export class MetaConversionsInput {
 
   @Field(() => ConversionMoment, { nullable: true, description: 'PLACED unless set.' })
   purchaseAt?: ConversionMoment | null;
+
+  @Field(() => Boolean, { nullable: true, description: 'false unless set.' })
+  staffOrders?: boolean | null;
 }
 
 @ObjectType()

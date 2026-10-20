@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Staff's orders to Meta
+
+* **Orders a shop's staff take go to Meta's conversions API too, where the shop says so** ([ADR-655](../architecture/13-decision-log.md#adr-655--orders-a-shops-staff-take-from-chats-at-its-counter-or-by-hand-go-to-metas-conversions-api-too-where-the-shop-says-so-as-chat-physical_store-or-other-events-matched-by-the-customers-number)):
+  from a chat as `chat` events, at the counter as `physical_store`, by hand as `other`, matched by
+  the customer's number, so ads that start chats are counted. Shortcut 71's row now says what its
+  earlier ADRs did.
+* 3795 tests, four more: the marketing module's sources and setting, the worker, and the Meta
+  tab.
+
 ### 321211d · Agents on duty at the desk
 
 * **Agents go on duty at the Confirmation Desk for a shift of hours** ([ADR-654](../architecture/13-decision-log.md#adr-654--agents-go-on-duty-at-the-confirmation-desk-for-a-shift-of-hours-and-where-the-shop-says-so-each-order-placed-that-needs-a-call-is-given-to-the-one-on-duty-with-the-fewest-waiting)), and where the shop

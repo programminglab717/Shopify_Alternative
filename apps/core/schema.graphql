@@ -7632,6 +7632,11 @@ type MetaConversions {
   purchaseAt: ConversionMoment!
 
   """
+  Whether orders the shop's staff take go to Meta too (ADR-655), as checkout's do: from WhatsApp, Instagram and Facebook as chat events, from the counter as physical store ones, and the rest taken by hand as other ones. TikTok and Google hear of checkout's alone.
+  """
+  staffOrders: Boolean!
+
+  """
   Events Manager's code for test events: while it is set, Events Manager shows the shop's events among them as they come.
   """
   testEventCode: String
@@ -7655,6 +7660,9 @@ input MetaConversionsInput {
 
   """PLACED unless set."""
   purchaseAt: ConversionMoment
+
+  """false unless set."""
+  staffOrders: Boolean
 
   """Events Manager's code for test events; blank or null takes it away."""
   testEventCode: String

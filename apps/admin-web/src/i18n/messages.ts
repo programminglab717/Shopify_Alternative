@@ -2456,6 +2456,9 @@ const en = {
     'Once the customer or your staff confirm it, or its payment comes in. Meta learns from fewer fake orders.',
   'meta.purchaseHint.DELIVERED':
     'Only the parcels customers took count as purchases, so Meta finds people who pay. They reach Meta days later.',
+  'meta.staffOrders': 'Send orders your staff take',
+  'meta.staffOrdersHint':
+    'Orders taken from WhatsApp, Instagram or Facebook chats, at your counter or by hand go to Meta too, so ads that start chats are counted. They are matched by the customer’s number.',
   'meta.testEventCode': 'Test event code',
   'meta.testEventCodeHint':
     "From Events Manager's Test events, while you try it out. Clear it when you are done.",
@@ -7753,6 +7756,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'جب کسٹمر یا آپ کا اسٹاف کنفرم کرے، یا ادائیگی آ جائے۔ میٹا کم جعلی آرڈرز سے سیکھتا ہے۔',
   'meta.purchaseHint.DELIVERED':
     'صرف وہ پارسل خریداری گنے جاتے ہیں جو کسٹمرز نے لیے، تاکہ میٹا ادائیگی کرنے والے لوگ ڈھونڈے۔ یہ میٹا تک کچھ دن بعد پہنچتے ہیں۔',
+  'meta.staffOrders': 'عملے کے لیے گئے آرڈر بھی بھیجیں',
+  'meta.staffOrdersHint':
+    'واٹس ایپ، انسٹاگرام یا فیس بک چیٹ سے، آپ کے کاؤنٹر پر یا ہاتھ سے لیے گئے آرڈر بھی میٹا کو جائیں گے، تاکہ چیٹ شروع کروانے والے اشتہار گنے جائیں۔ انہیں کسٹمر کے نمبر سے ملایا جاتا ہے۔',
   'meta.testEventCode': 'ٹیسٹ ایونٹ کوڈ',
   'meta.testEventCodeHint':
     'ایونٹس مینیجر کے Test events سے، جب تک آپ آزما رہے ہوں۔ ختم ہونے پر ہٹا دیں۔',

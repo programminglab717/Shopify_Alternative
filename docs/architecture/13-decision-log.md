@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-654 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-655 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -662,6 +662,7 @@
 | 652 | A draft's amount off given by hand keeps to the shop's limit for staff, as an order's does; a discount code's is the shop's own | Accepted |
 | 653 | A cash-on-delivery order still waiting for its advance may be let go without it, the courier collecting what it owed, until any of it ships | Accepted |
 | 654 | Agents go on duty at the Confirmation Desk for a shift of hours, and where the shop says so each order placed that needs a call is given to the one on duty with the fewest waiting | Accepted |
+| 655 | Orders a shop's staff take from chats, at its counter or by hand go to Meta's conversions API too where the shop says so, as chat, physical_store or other events matched by the customer's number | Accepted |
 
 ---
 
@@ -23071,3 +23072,26 @@
 * **Alternatives:** **Round robin among all agents:** an agent away from the desk would be given
   orders no one calls. **Sharing in a sweep:** orders would wait for it; giving in the placing
   transaction keeps it exact.
+
+## ADR-655 · Orders a shop's staff take from chats, at its counter or by hand go to Meta's conversions API too where the shop says so, as chat, physical_store or other events matched by the customer's number
+
+* **Context:** Only orders placed through checkout went to Meta (ADR-143). Most of a Pakistani
+  shop's orders start in a chat: an ad that opens WhatsApp, Instagram or Messenger, then an agent
+  taking the order. Meta never heard of them, so the ads that brought them looked as if they sold
+  nothing, and Meta's delivery learned from the few checkout orders alone.
+* **Decision:** The shop turns on `staffOrders` on its Meta settings. An order placed from then
+  that its staff took is recorded for Meta alone, with the same moments as checkout's (placed,
+  confirmed, delivered, the shop's chosen one as Purchase), and sent by the same worker. Its
+  `action_source` follows the order's source: `chat` for WhatsApp, Instagram and Facebook, and
+  `physical_store` for the shop's counter, `other` for one entered by hand; such an event has no
+  `event_source_url`, and no browser, address or click, only the customer's hashed details, chiefly
+  their number. Orders an app sends, and a part split from an order, are sent as before: not at
+  all. TikTok and Google take events from the browser that placed an order, so they are given none.
+  The admin's Meta tab has the switch.
+* **Consequences:** Ads that start chats are counted as the sales they bring, matched by the
+  customer's number. A shop that also sends Meta its own events from elsewhere leaves the switch
+  off, so nothing is counted twice.
+* **Alternatives:** **Meta's `business_messaging` events tied to the chat's click ID:** they need
+  the chat's ad referral kept with the order, and only WhatsApp gives it; left for when the inbox
+  keeps it. **All staff orders, without a switch:** a shop reporting them already would have them
+  counted twice.

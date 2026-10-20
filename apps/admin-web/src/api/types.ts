@@ -3141,6 +3141,8 @@ export interface MetaConversions {
   accessTokenHint: string | null;
   purchaseAt: ConversionMoment;
   testEventCode: string | null;
+  /** Orders staff take from chats, at the counter or by hand sent too (ADR-655). */
+  staffOrders: boolean;
   updatedAt: string;
 }
 

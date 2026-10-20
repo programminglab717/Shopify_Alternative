@@ -6,6 +6,7 @@ import { MetaConversionsClient } from './meta-client.js';
 import {
   META_EVENT_WINDOW_MS,
   clickOf,
+  metaActionSourceOf,
   metaEvent,
   metaEventName,
   metaUserData,
@@ -162,6 +163,27 @@ describe("Meta's conversions API: events", () => {
         num_items: 4,
       },
     });
+  });
+
+  it('names where an order staff took was placed, and no page for it (ADR-655)', () => {
+    const occurredAt = new Date('2026-10-02T06:30:15.900Z');
+    const event = (source: string) =>
+      metaEvent(
+        { ...order, source },
+        { moment: 'placed', occurredAt },
+        { purchaseAt: 'placed', sourceUrl: 'https://www.zari.pk/checkout' },
+      );
+    expect(event('whatsapp')).toMatchObject({ action_source: 'chat', event_name: 'Purchase' });
+    expect(event('whatsapp')).not.toHaveProperty('event_source_url');
+    expect(event('instagram').action_source).toBe('chat');
+    expect(event('pos').action_source).toBe('physical_store');
+    expect(event('manual').action_source).toBe('other');
+    expect(event('online_store')).toMatchObject({
+      action_source: 'website',
+      event_source_url: 'https://www.zari.pk/checkout',
+    });
+    // Orders from apps, marketplaces and resellers go not.
+    expect(['api', 'marketplace', 'reseller'].map(metaActionSourceOf)).toEqual([null, null, null]);
   });
 
   it('tries again a minute after the first try, doubling to six hours, within seven days', () => {

@@ -171,8 +171,11 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     },
   };
 
-  /** Places an order as checkout does, from the online store. */
-  const placeOnline = async (overrides: Partial<OrderToPlace> = {}) => {
+  /** Places an order as checkout does, from the online store, or as staff do from a chat. */
+  const placeOnline = async (
+    overrides: Partial<OrderToPlace> = {},
+    source: 'online_store' | 'whatsapp' = 'online_store',
+  ) => {
     const service = orders();
     return unwrap(
       await database.tenant(shopId, (tx) =>
@@ -182,8 +185,8 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
             shopId,
             currency: 'PKR',
             actor: 'system',
-            source: 'online_store',
-            how: 'from the online store',
+            source,
+            how: source === 'online_store' ? 'from the online store' : 'from WhatsApp',
           },
           {
             field: [],
@@ -820,6 +823,44 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     expect(await statusOf(another.id)).toEqual([
       'skipped',
       'Not sent: the shop disconnected Google',
+    ]);
+  });
+
+  it('sends an order staff took from a chat to Meta alone, where the shop says so (ADR-655)', async () => {
+    unwrap(await meta().update(tenant, { pixelId: '1234567890', accessToken: TOKEN }));
+    unwrap(
+      await tiktok().update(tenant, { pixelCode: 'CABC123DEF456GHI789J', accessToken: TOKEN }),
+    );
+    // Not sent until the shop says so.
+    const before = await placeOnline({ attribution: null, agreement: null }, 'whatsapp');
+    await dispatch();
+    expect(await recorded()).toEqual([]);
+
+    unwrap(await meta().update(tenant, { staffOrders: true }));
+    const order = await placeOnline({ attribution: null, agreement: null }, 'whatsapp');
+    await dispatch();
+    // For Meta alone: TikTok takes events from the browser that placed an order.
+    expect(await recorded()).toEqual([[order.id, 'placed', 'pending', null, null]]);
+    expect(await sender().sweep()).toBe(1);
+    const [event] = requests.splice(0)[0]!.events;
+    expect(event).toMatchObject({
+      event_name: 'Purchase',
+      event_id: `order-${order.number}-placed`,
+      action_source: 'chat',
+      user_data: { ph: [sha256('923001112223')] },
+    });
+    // No page it was placed on, no browser.
+    expect(event).not.toHaveProperty('event_source_url');
+    expect(event!.user_data).not.toHaveProperty('client_ip_address');
+    expect(tiktokRequests).toEqual([]);
+
+    // Its later moments follow, as checkout's do; the order before stays unsent.
+    unwrap(await orders().confirm(tenant, order.id));
+    unwrap(await orders().confirm(tenant, before.id));
+    await dispatch();
+    expect(await sender().sweep()).toBe(1);
+    expect(requests.splice(0)[0]!.events.map((each) => each.event_id)).toEqual([
+      `order-${order.number}-confirmed`,
     ]);
   });
 

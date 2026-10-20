@@ -204,6 +204,22 @@ describe.skipIf(!server)("Meta's conversions API: the shop's dataset and its mom
     expect((await moments.list(b, { first: 10, after: null })).items).toEqual([]);
   });
 
+  it('records an order staff took for Meta alone, once the shop sends such orders (ADR-655)', async () => {
+    const [first, second] = [newId(), newId()];
+    unwrap(await meta.update(a, { pixelId: '1234567890', accessToken: TOKEN }));
+    expect((await meta.get(a))!.staffOrders).toBe(false);
+    expect(await moments.recordPlaced(a.shopId, first, new Date(), { byStaff: true })).toBe(0);
+
+    expect(unwrap(await meta.update(a, { staffOrders: true })).staffOrders).toBe(true);
+    expect(await moments.recordPlaced(a.shopId, second, new Date(), { byStaff: true })).toBe(1);
+    expect(await statuses()).toEqual([[second, 'placed', 'pending', 0]]);
+    const { rows } = await admin.query<{ platform: string }>(
+      'SELECT platform FROM marketing.conversions',
+    );
+    expect(rows).toEqual([{ platform: 'meta' }]);
+    expect(await outbox()).toContainEqual(['meta_conversions.updated', ['staffOrders']]);
+  });
+
   it('hands moments due to one sender at a time, and settles them as sending went', async () => {
     unwrap(await meta.update(a, { pixelId: '1234567890', accessToken: TOKEN }));
     unwrap(await meta.update(b, { pixelId: '9876543210', accessToken: TOKEN }));

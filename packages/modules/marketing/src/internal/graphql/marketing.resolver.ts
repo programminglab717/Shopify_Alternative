@@ -331,6 +331,7 @@ export class MarketingResolver {
       purchaseAt: input.purchaseAt
         ? (input.purchaseAt.toLowerCase() as ConversionMomentValue)
         : null,
+      staffOrders: input.staffOrders ?? null,
     });
     return Object.assign(new MetaConversionsUpdatePayload(), {
       metaConversions: result.ok ? toMetaConversions(result.value) : null,
@@ -508,6 +509,7 @@ function toMetaConversions(record: MetaConversionsRecord): MetaConversions {
     accessTokenHint: record.tokenHint,
     testEventCode: record.testEventCode,
     purchaseAt: record.purchaseAt.toUpperCase() as ConversionMoment,
+    staffOrders: record.staffOrders,
     updatedAt: record.updatedAt,
   });
 }

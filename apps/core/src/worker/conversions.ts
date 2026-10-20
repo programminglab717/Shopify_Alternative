@@ -13,6 +13,7 @@ import {
   TikTokEventsClient,
   TikTokEventsService,
   googleEvent,
+  metaActionSourceOf,
   metaEvent,
   retryDelayMs,
   tiktokEvent,
@@ -50,7 +51,8 @@ export function workerConversionOrders(database: Database): ConversionOrders {
 
 /**
  * Records the moments of orders placed through checkout that the ad platforms hear of (MKT-10,
- * ADR-143): placed, for the shop's connected platforms; then confirmed, by its customer or staff,
+ * ADR-143), and of those its staff take, for Meta where the shop says so (ADR-655): placed, for
+ * the shop's connected platforms; then confirmed, by its customer or staff,
  * or, for an order paid ahead, as its money comes in; then delivered. A part split from an order
  * was placed once already, as that order. Each moment is recorded once, however often its event
  * comes.
@@ -74,8 +76,14 @@ export class ConversionMoments {
     switch (event.type) {
       case OrderEvents.OrderCreated: {
         const { source, splitFromId } = event.payload as Partial<OrderCreatedPayload>;
-        if (source === 'online_store' && !splitFromId) {
+        if (!source || splitFromId) return;
+        if (source === 'online_store') {
           await this.conversions.recordPlaced(event.shopId, event.aggregateId, at);
+        } else if (metaActionSourceOf(source)) {
+          // Taken by staff, for Meta alone where the shop says so (ADR-655).
+          await this.conversions.recordPlaced(event.shopId, event.aggregateId, at, {
+            byStaff: true,
+          });
         }
         return;
       }
@@ -400,5 +408,6 @@ function toConversionOrder(order: OrderConversionFacts): ConversionOrder {
     })),
     browserIds: order.browserIds,
     lines: order.lines,
+    source: order.source,
   };
 }

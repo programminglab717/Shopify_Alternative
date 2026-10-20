@@ -101,6 +101,7 @@ export {
   CONVERSION_STATUSES,
   META_EVENT_WINDOW_MS,
   clickOf,
+  metaActionSourceOf,
   metaEvent,
   metaEventName,
   metaUserData,
@@ -109,6 +110,7 @@ export {
   type ConversionOrder,
   type ConversionPlatformValue,
   type ConversionStatusValue,
+  type MetaActionSource,
   type MetaServerEvent,
 } from '../internal/meta.js';
 export {

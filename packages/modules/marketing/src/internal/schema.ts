@@ -1,6 +1,15 @@
 // Drizzle mirror of the marketing module's tables. The SQL migrations in db/migrations are the
 // source of truth; marketing.test.ts checks this file against the migrated database.
-import { integer, pgSchema, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  integer,
+  pgSchema,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { CONVERSION_MOMENTS, CONVERSION_PLATFORMS, CONVERSION_STATUSES } from './meta.js';
 
 export const marketingSchema = pgSchema('marketing');
@@ -16,6 +25,8 @@ export const metaSettings = marketingSchema.table('meta_settings', {
   testEventCode: text('test_event_code'),
   /** Which of an order's moments is Meta's Purchase. */
   purchaseAt: text('purchase_at', { enum: CONVERSION_MOMENTS }).notNull().default('placed'),
+  /** Whether orders its staff take go to Meta too (ADR-655). */
+  staffOrders: boolean('staff_orders').notNull().default(false),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

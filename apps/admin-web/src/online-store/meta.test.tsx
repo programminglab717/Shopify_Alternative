@@ -18,6 +18,7 @@ const CONNECTED = {
   accessTokenHint: 'x9Qz',
   purchaseAt: 'DELIVERED',
   testEventCode: null,
+  staffOrders: false,
   updatedAt: '2026-10-01T10:00:00Z',
 };
 
@@ -81,6 +82,7 @@ function core(role: StaffRole, connected: typeof CONNECTED | null = null) {
             pixelId: '',
             purchaseAt: 'PLACED',
             testEventCode: null,
+            staffOrders: false,
             ...meta,
             ...kept,
             accessTokenHint: accessToken
@@ -225,6 +227,27 @@ describe('Meta and the catalog feed', () => {
       { input: { testEventCode: 'TEST4821' } },
       { input: { testEventCode: 'TEST4821' } },
     ]);
+  });
+
+  it('sends orders staff take once the shop says so (ADR-655)', async () => {
+    const fake = core('owner', CONNECTED);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=meta');
+
+    const box = await screen.findByRole('checkbox', { name: /Send orders your staff take/ });
+    expect((box as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    expect(
+      await screen.findByText('Saved. Orders placed from now on go to Meta like this.'),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'MetaConversionsUpdate').at(-1)).toEqual({ input: { staffOrders: true } });
+    expect(
+      (screen.getByRole('checkbox', { name: /Send orders your staff take/ }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
   });
 
   it('disconnects Meta once asked whether they mean it', async () => {

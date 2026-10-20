@@ -25,7 +25,7 @@ import { formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
-import { Problems, SelectField, settingProblem } from '../settings/settings-form';
+import { CheckField, Problems, SelectField, settingProblem } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
@@ -93,6 +93,7 @@ function MetaForm({ current }: { current: MetaConversions | null }) {
   const [accessToken, setAccessToken] = useState('');
   const [purchaseAt, setPurchaseAt] = useState<ConversionMoment>(current?.purchaseAt ?? 'PLACED');
   const [testEventCode, setTestEventCode] = useState(current?.testEventCode ?? '');
+  const [staffOrders, setStaffOrders] = useState(current?.staffOrders ?? false);
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
@@ -100,6 +101,7 @@ function MetaForm({ current }: { current: MetaConversions | null }) {
     ...(pixelId.trim() !== (current?.pixelId ?? '') && { pixelId: pixelId.trim() }),
     ...(accessToken.trim() && { accessToken: accessToken.trim() }),
     ...(purchaseAt !== (current?.purchaseAt ?? 'PLACED') && { purchaseAt }),
+    ...(staffOrders !== (current?.staffOrders ?? false) && { staffOrders }),
     ...(testEventCode.trim() !== (current?.testEventCode ?? '') && {
       testEventCode: testEventCode.trim() || null,
     }),
@@ -127,6 +129,7 @@ function MetaForm({ current }: { current: MetaConversions | null }) {
         setAccessToken('');
         setPurchaseAt(kept.purchaseAt);
         setTestEventCode(kept.testEventCode ?? '');
+        setStaffOrders(kept.staffOrders);
         setSaved(true);
       },
       (failure) => setProblems([errorText(failure, t)]),
@@ -172,6 +175,12 @@ function MetaForm({ current }: { current: MetaConversions | null }) {
           {t(`meta.purchaseHint.${purchaseAt}` as MessageKey)}
         </p>
       </div>
+      <CheckField
+        label={t('meta.staffOrders')}
+        hint={t('meta.staffOrdersHint')}
+        checked={staffOrders}
+        onChange={setStaffOrders}
+      />
       <TextField
         label={t('meta.testEventCode')}
         hint={t('meta.testEventCodeHint')}

@@ -93,10 +93,29 @@ export class ConversionsService {
 
   /**
    * Records an order's placing, once, for each platform its shop has connected, Meta's, TikTok's
-   * (ADR-541) and Google's (ADR-547): how many it was recorded for.
+   * (ADR-541) and Google's (ADR-547): how many it was recorded for. An order `byStaff`, taken from a
+   * chat, at the counter or by hand, goes to Meta alone, where the shop sends such orders
+   * (ADR-655): TikTok and Google take events from the browser that placed it.
    */
-  async recordPlaced(shopId: string, orderId: string, occurredAt: Date): Promise<number> {
+  async recordPlaced(
+    shopId: string,
+    orderId: string,
+    occurredAt: Date,
+    options: { byStaff?: boolean } = {},
+  ): Promise<number> {
     return this.db.tenant(shopId, async (tx) => {
+      // An order staff took goes to Meta alone, where the shop says so (ADR-655).
+      if (options.byStaff) {
+        const { rows } = await tx.execute<{ id: string }>(sql`
+          INSERT INTO marketing.conversions (shop_id, platform, order_id, moment, occurred_at)
+          SELECT shop_id, 'meta', ${orderId}::uuid, 'placed',
+                 ${occurredAt.toISOString()}::timestamptz
+            FROM marketing.meta_settings
+           WHERE shop_id = ${shopId} AND access_token IS NOT NULL AND staff_orders
+              ON CONFLICT DO NOTHING
+          RETURNING id`);
+        return rows.length;
+      }
       const { rows } = await tx.execute<{ id: string }>(sql`
         INSERT INTO marketing.conversions (shop_id, platform, order_id, moment, occurred_at)
         SELECT shop_id, 'meta', ${orderId}::uuid, 'placed',
