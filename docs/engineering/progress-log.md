@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit chosen at checkout
+### 37aa7c1 · Store credit chosen at checkout
 
 * **A shopper chooses how much of their store credit checkout spends, and a signed-in shopper
   sees their number's balance there, spending it still asking what proves the number** ([ADR-592](../architecture/13-decision-log.md#adr-592--a-shopper-chooses-how-much-of-their-store-credit-checkout-spends-and-a-signed-in-shopper-sees-their-numbers-balance-there-spending-it-still-asking-what-proves-the-number),
