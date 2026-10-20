@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Unpaid orders after hours
+### 7647c33 · Unpaid orders after hours
 
 * **A shop selling online alone cancels orders never paid after 1 to 72 hours** ([ADR-657](../architecture/13-decision-log.md#adr-657--a-shop-selling-online-alone-cancels-orders-never-paid-after-hours-rather-than-days-reminding-their-customers-halfway)) rather
   than days, their customers reminded halfway through a wait of a day or less.
