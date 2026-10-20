@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Handing over at the desk
+### 9cf2d7a · Handing over at the desk
 
 * **An agent going off duty may hand over the orders still waiting on them** ([ADR-656](../architecture/13-decision-log.md#adr-656--an-agent-going-off-duty-at-the-confirmation-desk-may-hand-over-the-orders-still-waiting-on-them-each-to-whoever-else-is-on-duty-with-the-fewest-waiting)), each to
   whoever else is on duty with the fewest waiting, who is told of it.
