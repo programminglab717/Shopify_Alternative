@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A breadcrumb trail shoppers see
+### 2573fde · A breadcrumb trail shoppers see
 
 * **Hatti Base shows where each page sits above it** ([ADR-614](../architecture/13-decision-log.md#adr-614--hatti-base-shows-where-each-page-sits-above-it-the-home-page-to-the-page-as-the-breadcrumblist-gives-it-unless-the-shop-turns-it-off-in-the-themes-settings)): the home page, a blog before its
   article, then the page, in the page's language and direction, wherever the BreadcrumbList is
