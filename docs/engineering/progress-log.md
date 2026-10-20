@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Contact form messages pushed to staff
+### 80ca811 · Contact form messages pushed to staff
 
 * **Staff who answer customers may be told on their phones when a shopper writes through the
   contact form, the push saying neither who nor what** ([ADR-591](../architecture/13-decision-log.md#adr-591--staff-who-answer-customers-may-be-told-on-their-phones-when-a-shopper-writes-through-the-contact-form-the-push-saying-neither-who-nor-what), OS-08, APP-03).
