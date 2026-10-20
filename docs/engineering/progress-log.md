@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Orders keep the promised delivery day
+### 11d7b7c · Orders keep the promised delivery day
 
 * **An order placed through checkout keeps the day the page said to expect delivery by, which its
   page shows while it is still to come, and staff see** ([ADR-595](../architecture/13-decision-log.md#adr-595--an-order-placed-through-checkout-keeps-the-day-the-page-said-to-expect-delivery-by-which-its-page-shows-while-it-is-still-to-come-and-staff-see), CHK-05).
