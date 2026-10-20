@@ -181,7 +181,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       phone: ZONG,
       name: null,
       orders: [],
-      storeCredit: { balance: 0, currency: 'PKR', expiring: null },
+      storeCredit: { balance: 0, currency: 'PKR', expiring: null, history: [] },
       dataRequests: { available: false, erasureWaitDays: 10, export: null, erasure: null },
     });
     // Not in another shop.
@@ -384,11 +384,32 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
         },
       ],
     });
-    expect(account.storeCredit).toEqual({
+    expect(account.storeCredit).toMatchObject({
       balance: 750_00,
       currency: 'PKR',
       expiring: { amount: 500_00, expiresAt: expect.any(String) as unknown },
     });
+    // What happened to it, the newest first, the shop's notes its own (ADR-668).
+    expect(account.storeCredit.history).toEqual([
+      {
+        kind: 'credit',
+        event: 'adjustment',
+        amount: 250_00,
+        balanceAfter: 750_00,
+        at: expect.any(String) as unknown,
+        expiresAt: null,
+        orderId: null,
+      },
+      {
+        kind: 'credit',
+        event: 'adjustment',
+        amount: 500_00,
+        balanceAfter: 500_00,
+        at: expect.any(String) as unknown,
+        expiresAt: expect.any(String) as unknown,
+        orderId: null,
+      },
+    ]);
 
     // Merged, the other number's orders are theirs, and its sessions read their account.
     const otherToken = await signIn(ZONG);

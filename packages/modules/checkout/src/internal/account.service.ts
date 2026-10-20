@@ -11,6 +11,7 @@ import {
   ERASURE_WAIT_DAYS,
   customerExistsIn,
   customerOfPhoneIn,
+  storeCreditHistoryOfCustomerIn,
   storeCreditOfCustomerIn,
   type OwnErasureRecord,
 } from '@hatti/customers/public';
@@ -90,6 +91,8 @@ export const ACCOUNT_SESSION = {
   orders: 20,
   /** The lines of each it reads, to buy again: as many as an order takes. */
   lines: 100,
+  /** The changes of their store credit it lists, the newest first (ADR-668). */
+  credits: 20,
 } as const;
 
 /** A token as {@link secretToken} makes them: anything else names no session, unlooked for. */
@@ -268,6 +271,15 @@ export class AccountService {
       const credit = session.customerId
         ? await storeCreditOfCustomerIn(tx, shopId, session.customerId, currency)
         : { balance: 0n, expiring: null };
+      const history = session.customerId
+        ? await storeCreditHistoryOfCustomerIn(
+            tx,
+            shopId,
+            session.customerId,
+            currency,
+            ACCOUNT_SESSION.credits,
+          )
+        : [];
       const kept = session.customerId ? await keptExportIn(tx, shopId, session.customerId) : null;
       const erasure = session.customerId
         ? await this.data.ownErasureIn(tx, shopId, session.customerId)
@@ -301,6 +313,15 @@ export class AccountService {
             amount: Number(credit.expiring.amount),
             expiresAt: credit.expiring.expiresAt.toISOString(),
           },
+          history: history.map((entry) => ({
+            kind: entry.kind,
+            event: entry.kind === 'expiration' ? null : entry.event,
+            amount: Number(entry.amount),
+            balanceAfter: Number(entry.balanceAfter),
+            at: entry.createdAt.toISOString(),
+            expiresAt: entry.kind === 'credit' ? (entry.expiresAt?.toISOString() ?? null) : null,
+            orderId: entry.orderId && toPublicId('order', entry.orderId),
+          })),
         },
         dataRequests,
       };

@@ -47,7 +47,7 @@
     </p>
 
     {%- assign credit = customer.store_credit_account -%}
-    {%- if credit.balance > 0 -%}
+    {%- if credit.balance > 0 or credit.transactions.size > 0 -%}
       <div class="account__credit">
         <h2>{{ 'customer.account.store_credit' | t }}</h2>
         <p class="account__credit-balance">{{ credit.balance | money }}</p>
@@ -59,6 +59,54 @@
           </p>
         {%- endif -%}
         <p class="account__muted">{{ 'customer.account.store_credit_note' | t }}</p>
+        {%- if credit.transactions.size > 0 -%}
+          <h3>{{ 'customer.account.store_credit_history' | t }}</h3>
+          <ul class="account__credit-history" role="list">
+            {%- for entry in credit.transactions -%}
+              <li class="account__credit-entry">
+                <span class="account__muted">{{ entry.created_at | date: format: 'day_month_year' }}</span>
+                <span>
+                  {%- case entry.kind -%}
+                    {%- when 'credit' -%}
+                      {%- if entry.event == 'order_refund' -%}
+                        {{- 'customer.account.store_credit_refunded' | t -}}
+                      {%- elsif entry.event == 'order_cancellation' -%}
+                        {{- 'customer.account.store_credit_given_back' | t -}}
+                      {%- else -%}
+                        {{- 'customer.account.store_credit_given' | t -}}
+                      {%- endif -%}
+                    {%- when 'debit' -%}
+                      {%- if entry.event == 'order_payment' -%}
+                        {{- 'customer.account.store_credit_spent' | t -}}
+                      {%- else -%}
+                        {{- 'customer.account.store_credit_taken' | t -}}
+                      {%- endif -%}
+                    {%- when 'debit_revert' -%}
+                      {{- 'customer.account.store_credit_given_back' | t -}}
+                    {%- else -%}
+                      {{- 'customer.account.store_credit_expired' | t -}}
+                  {%- endcase -%}
+                  {%- if entry.order -%}
+                    {{ ' · ' }}
+                    {%- if entry.order.url -%}
+                      <a href="{{ entry.order.url }}">{{ entry.order.name }}</a>
+                    {%- else -%}
+                      {{ entry.order.name }}
+                    {%- endif -%}
+                  {%- endif -%}
+                  {%- if entry.expires_at -%}
+                    {%- assign entry_expires = entry.expires_at | date: format: 'day_month_year' -%}
+                    <span class="account__muted"> · {{ 'customer.account.store_credit_expires' | t: date: entry_expires }}</span>
+                  {%- endif -%}
+                </span>
+                <span class="account__credit-amount" dir="ltr">
+                  {%- if entry.amount > 0 -%}+{%- else -%}−{%- endif -%}
+                  {{- entry.amount | abs | money -}}
+                </span>
+              </li>
+            {%- endfor -%}
+          </ul>
+        {%- endif -%}
       </div>
     {%- endif -%}
 

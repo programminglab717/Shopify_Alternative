@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-667 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-668 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -675,6 +675,7 @@
 | 665 | The menu editor says which of a link's tags none of its collection's products has, or none of the shop's for all products, as typing stops | Accepted |
 | 666 | Where the shop shares new orders out, the orders still waiting on an agent whose shift ran out are handed over by the worker to those on duty | Accepted |
 | 667 | A product's photos that say nothing of what they show are described on the search listings tab itself, each beside its picture, and saved together | Accepted |
+| 668 | A shopper's account lists what happened to their store credit, its latest 20 changes the newest first, each with its order, without the shop's notes | Accepted |
 
 ---
 
@@ -23333,3 +23334,21 @@
 * **Consequences:** A shop describes a product's photos where it found them wanting.
 * **Alternatives:** **Each photo saved by itself:** the page has that; the tab is for working down
   a list.
+
+## ADR-668 · A shopper's account lists what happened to their store credit, its latest 20 changes the newest first, each with its order, without the shop's notes
+
+* **Context:** A shopper's account says what store credit they have and what of it expires
+  soonest (ADR-570), and they hear of each credit as it is given (ADR-192), but the account did
+  not say where it came from or went: a shopper asking why their balance fell had to ask the
+  shop, which reads the ledger on the customer's page.
+* **Decision:** The account's store credit carries its latest 20 changes in the shop's currency,
+  the newest first, read from the ledger the shop reads (`storeCreditHistoryOfCustomerIn`): each
+  its kind, what gave or took it (a refund, a cancellation's or a payment's, or the shop's hand;
+  none for an expiry), the amount signed, the balance after, when, when a credit expires, and
+  its order's public ID. The ledger's notes are the shop's and stay with it. The storefront gives
+  them as Shopify's `store_credit_account.transactions`, each order linked where it has a page,
+  and Hatti Base's account page lists them under the balance, in English and Urdu, shown too
+  when the balance is spent. Older cores give no history, and none is shown.
+* **Consequences:** A shopper sees why their credit is what it is without asking the shop.
+* **Alternatives:** **The whole ledger, a page at a time:** twenty is what a shopper reads; more
+  can be paged when one asks. **The notes too:** the shop writes them for its staff.

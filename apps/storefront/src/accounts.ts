@@ -547,6 +547,20 @@ export function customerObject(
         amount: credit.expiring.amount,
         expires_at: credit.expiring.expiresAt,
       },
+      // Hatti's: its latest changes, the newest first (ADR-668), each with the order it paid
+      // or came back from where the account lists it.
+      transactions: (credit.history ?? []).map((entry) => {
+        const order = entry.orderId ? orders.find((each) => each.id === entry.orderId) : undefined;
+        return {
+          kind: entry.kind,
+          event: entry.event,
+          amount: entry.amount,
+          balance_after: entry.balanceAfter,
+          created_at: entry.at,
+          expires_at: entry.expiresAt,
+          order: order ? { name: order.name, url: order.url } : null,
+        };
+      }),
     },
     // Hatti's: their own data (ADR-572). Whether the shop keeps any; their file kept, which
     // downloads through the storefront; their erasure waiting, or held; and the days one waits.

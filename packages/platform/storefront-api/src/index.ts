@@ -16,6 +16,7 @@ export {
   type AccountErasureJson,
   type AccountErrorResponse,
   type AccountJson,
+  type AccountStoreCreditEntryJson,
   type AccountLoginStartRequest,
   type AccountLoginStartResponse,
   type AccountLoginVerifyErrorResponse,

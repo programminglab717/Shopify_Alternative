@@ -200,7 +200,7 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
           ],
         },
       ],
-      storeCredit: { balance: 0, currency: 'PKR', expiring: null },
+      storeCredit: { balance: 0, currency: 'PKR', expiring: null, history: [] },
     });
     // Bought again (ADR-574): its variant as the cart names it, which the cart takes.
     const [line] = account!.orders[0]!.lines;

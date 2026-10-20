@@ -249,6 +249,27 @@ export interface AccountDataRequestsJson {
   erasure: AccountErasureJson | null;
 }
 
+/**
+ * A change of a shopper's store credit (ADR-668): given (`credit`), spent on an order (`debit`),
+ * given back as the order it paid was cancelled (`debit_revert`), or ended unspent
+ * (`expiration`).
+ */
+export interface AccountStoreCreditEntryJson {
+  kind: 'credit' | 'debit' | 'debit_revert' | 'expiration';
+  /** Why: by the shop's hand, a refund, an order it paid, or one cancelled; null for an expiry. */
+  event: 'adjustment' | 'order_refund' | 'order_payment' | 'order_cancellation' | null;
+  /** Minor units, signed: more than 0 given, less than 0 taken. */
+  amount: number;
+  /** Minor units: what they had after it. */
+  balanceAfter: number;
+  /** ISO 8601. */
+  at: string;
+  /** ISO 8601: when a credit expires; null for one that never does, and for the others. */
+  expiresAt: string | null;
+  /** The order it paid or came back from, by its public ID as the account's orders name it. */
+  orderId: string | null;
+}
+
 /** A shopper's account with the shop. */
 export interface AccountJson {
   /** E.164: the number they signed in with, whole, as it is theirs. */
@@ -267,6 +288,8 @@ export interface AccountJson {
     currency: string;
     /** Null while none of it expires. */
     expiring: { amount: number; expiresAt: string } | null;
+    /** Its latest changes, the newest first, at most 20 (ADR-668); absent from older cores. */
+    history?: AccountStoreCreditEntryJson[];
   };
   /** Their file, and their erasure, as they asked for them (ADR-572). */
   dataRequests: AccountDataRequestsJson;

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit's history in the account
+
+* **A shopper's account lists what happened to their store credit** ([ADR-668](../architecture/13-decision-log.md#adr-668--a-shoppers-account-lists-what-happened-to-their-store-credit-its-latest-20-changes-the-newest-first-each-with-its-order-without-the-shops-notes)), its latest 20
+  changes, each with its order, as Shopify's `store_credit_account.transactions`, in Hatti Base's
+  account page in English and Urdu.
+* 3823 tests, as many as before: the account's tests in checkout, the core and the storefront
+  read the history.
+
 ### 49a16d0 · Photos described on the Search listings tab
 
 * **A product's photos without words for what they show are described on the Search listings

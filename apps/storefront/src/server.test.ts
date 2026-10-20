@@ -3730,6 +3730,36 @@ const ACCOUNT: AccountJson = {
     balance: 50_000,
     currency: 'PKR',
     expiring: { amount: 20_000, expiresAt: '2026-12-31T00:00:00.000Z' },
+    // Its latest changes, the newest first (ADR-668).
+    history: [
+      {
+        kind: 'debit',
+        event: 'order_payment',
+        amount: -30_000,
+        balanceAfter: 50_000,
+        at: '2026-10-02T09:00:00.000Z',
+        expiresAt: null,
+        orderId: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1x',
+      },
+      {
+        kind: 'credit',
+        event: 'order_refund',
+        amount: 60_000,
+        balanceAfter: 80_000,
+        at: '2026-09-20T09:00:00.000Z',
+        expiresAt: '2026-12-31T00:00:00.000Z',
+        orderId: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1y',
+      },
+      {
+        kind: 'credit',
+        event: 'adjustment',
+        amount: 20_000,
+        balanceAfter: 20_000,
+        at: '2026-09-01T09:00:00.000Z',
+        expiresAt: null,
+        orderId: null,
+      },
+    ],
   },
   dataRequests: { available: true, erasureWaitDays: 10, export: null, erasure: null },
 };
@@ -4050,6 +4080,20 @@ describe("Shoppers' accounts (ADR-571)", () => {
     // Its store credit, and what of it expires soonest.
     expect(html).toContain('<p class="account__credit-balance">Rs 500</p>');
     expect(html).toContain('Rs 200 of it expires on 31 December 2026.');
+    // What happened to it, the newest first (ADR-668): spent on an order it links to, refunded
+    // from the cancelled one it names, and given by the shop.
+    const history = html.slice(html.indexOf('<ul class="account__credit-history"'));
+    const entries = history.slice(0, history.indexOf('</ul>')).split('<li').slice(1);
+    expect(entries).toHaveLength(3);
+    expect(entries[0]).toContain(
+      'Spent · <a href="/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x">#1002</a>',
+    );
+    expect(entries[0]).toMatch(/dir="ltr">−Rs 300</);
+    expect(entries[1]).toContain('Refunded · #1001');
+    expect(entries[1]).toContain('expires on 31 December 2026');
+    expect(entries[1]).toMatch(/dir="ltr">\+Rs 600</);
+    expect(entries[2]).toContain('Given by the shop');
+    expect(entries[2]).not.toContain('expires on');
     // Its orders, the newest first: the one with a page links to it through the storefront.
     expect(html).toContain(
       '<a href="/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x" aria-label="View order #1002"><bdi>#1002</bdi></a>',
@@ -4073,6 +4117,7 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(urdu.body).toContain('<dd>ادائیگی باقی</dd>');
     expect(urdu.body).toContain('<dd>روانہ ہو گیا</dd>');
     expect(urdu.body).toContain('<dd>منسوخ</dd>');
+    expect(urdu.body).toContain('<h3>اس کی تفصیل</h3>');
     expect(urdu.body).toContain('href="/ur/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x"');
     expect(urdu.body).toContain('<form method="post" action="/ur/account/logout">');
 
@@ -4081,7 +4126,7 @@ describe("Shoppers' accounts (ADR-571)", () => {
       ...ACCOUNT,
       name: null,
       orders: [],
-      storeCredit: { balance: 0, currency: 'PKR', expiring: null },
+      storeCredit: { balance: 0, currency: 'PKR', expiring: null, history: [] },
     });
     const empty = await app.inject({
       method: 'GET',

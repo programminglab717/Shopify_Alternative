@@ -708,6 +708,27 @@ export async function storeCreditOfPhoneIn(
   return BigInt(rows[0]!.balance);
 }
 
+/**
+ * The latest `limit` changes of the customer `customerId`'s store credit in `currency`, the
+ * newest first, in the caller's transaction: for their account on the shop's storefront to list
+ * (ADR-668). None for a customer with no account in it. The ledger's notes are the shop's, and
+ * stay with it.
+ */
+export async function storeCreditHistoryOfCustomerIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  currency: string,
+  limit: number,
+): Promise<StoreCreditTransactionRecord[]> {
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM customers.store_credit_accounts
+     WHERE shop_id = ${shopId} AND customer_id = ${customerId} AND currency = ${currency}`);
+  const account = rows[0];
+  if (!account) return [];
+  return (await ledgerIn(tx, shopId, account.id, { limit })).map(toTransaction);
+}
+
 /** What a customer has of store credit in a currency, and what of it expires soonest. */
 export interface StoreCreditBalance {
   /** Minor units: what their credits have left that has not expired. */

@@ -88,6 +88,7 @@ export {
   revertOrderStoreCreditIn,
   shopGivesStoreCreditIn,
   storeCreditAccountsIn,
+  storeCreditHistoryOfCustomerIn,
   storeCreditOfCustomerIn,
   storeCreditOfPhoneIn,
   storeCreditNoticeFactsIn,
