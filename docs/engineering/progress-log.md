@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Tags offered to menu links
+### ddb82c2 · Tags offered to menu links
 
 * **The menu editor offers the shop's tags in use** ([ADR-646](../architecture/13-decision-log.md#adr-646--the-menu-editor-offers-the-shops-tags-in-use-to-a-collections-link-the-most-used-first-each-added-with-a-tap)) to a collection's or all
   products' link, each added with a tap.
