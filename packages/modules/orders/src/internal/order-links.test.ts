@@ -919,6 +919,29 @@ describe.skipIf(!server)('Order links', () => {
     expect(orderLinkPage(await shownOn(token)).html).not.toContain('Expected by');
   });
 
+  it("says what store credit the order's customer has with the shop (ADR-596)", async () => {
+    const order = await f.order(f.a, [kurta]);
+    unwrap(await f.orders.confirm(f.a, order.id));
+    const token = await linkFor(order.id);
+    expect((await shownOn(token)).storeCredit).toBe(0n);
+    expect(orderLinkPage(await shownOn(token)).html).not.toContain('store credit');
+    unwrap(
+      await f.storeCredit.credit(
+        f.a,
+        { customerId: order.customerId! },
+        { amount: '1500', currencyCode: 'PKR' },
+      ),
+    );
+    const view = await shownOn(token);
+    expect(view.storeCredit).toBe(1_500_00n);
+    const page = orderLinkPage(view).html;
+    // In the shop's name, whatever earlier tests named it.
+    expect(page).toMatch(
+      /You have Rs 1,500 of store credit with [^<]+\. It can pay your next order at checkout\./,
+    );
+    expect(page).toContain('اسٹور کریڈٹ ہے۔');
+  });
+
   it('shows the address to correct, as it is or as the customer typed it', async () => {
     const order = await f.order(f.a, [kurta], {
       shippingAddress: { ...ADDRESS, name: 'Ayesha "Ash" <Khan>' },

@@ -243,6 +243,7 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           reviewed: Boolean(options.reviewed) && !problem,
           offer: view.offer,
           added: Boolean(options.added) && !problem,
+          storeCredit: view.storeCredit,
         });
       }
       return confirmPage({
@@ -758,6 +759,8 @@ function statusPage(
     offer?: PostPurchaseOffer | null;
     /** The item offered them was added just now. */
     added?: boolean;
+    /** What the customer has of store credit with the shop (ADR-596), minor units; 0 for none. */
+    storeCredit?: bigint;
   },
 ): LinkPage {
   const {
@@ -774,6 +777,7 @@ function statusPage(
     reviewed = false,
     offer = null,
     added = false,
+    storeCredit = 0n,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -810,6 +814,12 @@ function statusPage(
         paragraphs(sentence, 'center'),
         order.splitFrom && paragraphs(partWords(order.splitFrom), 'center small muted'),
         ...rest,
+        // The customer's store credit, which pays their next order at checkout (ADR-596).
+        storeCredit > 0n &&
+          paragraphs(
+            storeCreditWords(amount(storeCredit, order.currency), shop.name),
+            'center small',
+          ),
       ],
       // Paying online answers with a gateway's page: the form goes on there.
       { formTargets: gatewayOrigins(onlinePayment?.gateways ?? []) },
@@ -1509,6 +1519,15 @@ function preorderWords(shipsOn: string): Words {
     year: 'numeric',
   }).format(new Date(`${shipsOn}T00:00:00Z`));
   return { en: `Pre-order: ships by ${day}`, ur: `پیشگی آرڈر: ${day} تک روانہ ہوگا` };
+}
+
+/** What a customer has of store credit with the shop, as their order's page says it (ADR-596). */
+function storeCreditWords(credit: string, shopName: string): Sentence {
+  return {
+    en: `You have ${credit} of store credit with ${shopName}. It can pay your next order at checkout.`,
+    ur: html`${shopName} کے پاس آپ کا ${ltr(credit)} اسٹور کریڈٹ ہے۔ یہ چیک آؤٹ پر آپ کے اگلے آرڈر
+    کی ادائیگی کر سکتا ہے۔`,
+  };
 }
 
 /** The day delivery is expected by, YYYY-MM-DD (ADR-595): "Thursday 22 October". */

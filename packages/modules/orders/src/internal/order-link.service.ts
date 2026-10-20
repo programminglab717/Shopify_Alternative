@@ -16,6 +16,7 @@ import {
   type OrderReview,
   type ReviewInput,
 } from '@hatti/catalog/public';
+import { storeCreditAccountsIn } from '@hatti/customers/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { ObjectStorage } from '@hatti/storage';
@@ -146,6 +147,11 @@ export type OrderLinkView =
        */
       offer: PostPurchaseOffer | null;
       problem: LinkProblem | null;
+      /**
+       * What its customer has of store credit with the shop in its currency (ADR-596), minor
+       * units: 0 for none, or a customer erased.
+       */
+      storeCredit: bigint;
       /**
        * The form that takes the customer on to the shop's gateway, once they asked to pay online
        * and its page takes one, as JazzCash's does (ADR-163).
@@ -546,9 +552,17 @@ export class OrderLinkService {
       ),
       reviewable: reviewable(record) ? await reviewableIn(tx, shopId, record) : [],
       offer: this.offers ? await this.offers.offerIn(tx, shopId, record) : null,
+      storeCredit: await customerCreditIn(tx, shopId, record),
       problem,
     };
   }
+}
+
+/** What the order's customer has of store credit in its currency (ADR-596): 0 for none. */
+async function customerCreditIn(tx: Tx, shopId: string, order: OrderRecord): Promise<bigint> {
+  if (!order.customerId || order.customerErasedAt) return 0n;
+  const accounts = await storeCreditAccountsIn(tx, shopId, order.customerId);
+  return accounts.find((account) => account.currency === order.currency)?.balance ?? 0n;
 }
 
 /** Whether the order's customer may rate what they bought: once it was delivered to them. */

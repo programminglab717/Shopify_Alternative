@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Store credit on the order's page
+
+* **An order's page says what store credit its customer has with the shop, which pays their next
+  order at checkout** ([ADR-596](../architecture/13-decision-log.md#adr-596--an-orders-page-says-what-store-credit-its-customer-has-with-the-shop-which-pays-their-next-order-at-checkout), ORD-09).
+* 3661 tests, 1 more: the balance said, or nothing without one.
+
 ### 11d7b7c · Orders keep the promised delivery day
 
 * **An order placed through checkout keeps the day the page said to expect delivery by, which its

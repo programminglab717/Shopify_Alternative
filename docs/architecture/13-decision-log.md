@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-595 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-596 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -603,6 +603,7 @@
 | 593 | Hatti Base puts a WhatsApp button on every page, its message naming the product and variant, or the collection, the shopper was looking at, with its link | Accepted |
 | 594 | Checkout says the day to expect delivery by, the shop's working days for the city counted past Sundays and Pakistan's public holidays | Accepted |
 | 595 | An order placed through checkout keeps the day the page said to expect delivery by, which its page shows while it is still to come, and staff see | Accepted |
+| 596 | An order's page says what store credit its customer has with the shop, which pays their next order at checkout | Accepted |
 
 ---
 
@@ -21837,3 +21838,18 @@
   re-estimated.
 * **Alternatives:** **Working the day out again whenever the page is read:** it would move with
   the shop's settings and with the days that pass, and no longer be what the customer was told.
+
+## ADR-596 · An order's page says what store credit its customer has with the shop, which pays their next order at checkout
+
+* **Context:** A shop gives store credit by refunds, by hand and by its cashback (ADR-184,
+  ADR-453), and a customer is told when credit comes; after that, only a customer signed in to
+  their account sees what they have (ADR-570). The page of each of their orders, which the shop
+  sends them, said nothing of it.
+* **Decision:** The order's page says what its customer has of store credit with the shop in the
+  order's currency, while they have any, and that it pays their next order at checkout, in both
+  languages: under what the page says of the order, at every stage after it is confirmed. A
+  customer erased has none.
+* **Consequences:** A customer reminded of their credit comes back to spend it. Whoever holds
+  the order's link sees the amount, as they see the order and its address.
+* **Alternatives:** **Spending it from the order's page:** an order placed is paid as staff take
+  it (ADR-185); the next order is where credit is spent.
