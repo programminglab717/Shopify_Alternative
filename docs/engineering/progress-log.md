@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Store credit shown once the number is proved
+### 17b7c0d · Store credit shown once the number is proved
 
 * **Checkout shows the store credit of the number typed once a code proves it, or the browser
   proved it lately, without signing in** ([ADR-598](../architecture/13-decision-log.md#adr-598--checkout-shows-the-store-credit-of-the-number-typed-once-a-code-proves-it-for-the-checkout-or-the-browser-proved-it-lately-without-signing-in), ORD-09); spending it still asks a code.
