@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A collection's tags
+### 5846c1f · A collection's tags
 
 * **A menu's link to a collection is offered its products' tags alone** ([ADR-660](../architecture/13-decision-log.md#adr-660--a-menus-link-to-a-collection-is-offered-the-tags-of-that-collections-products-alone-a-link-to-all-products-the-shops)), through the
   Admin API's `productTags(collectionId:)`; a link to all products is offered the shop's.
