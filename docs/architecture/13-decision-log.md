@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-645 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-646 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -653,6 +653,7 @@
 | 643 | A collection's page narrows to its products with each of some tags, at /collections/{handle}/{tag+tag} as Shopify's, the tags given to themes as current_tags | Accepted |
 | 644 | A menu's link to a collection or to all products may narrow it to its products with each of some tags, as Shopify's MenuItem tags, leading to the collection's tag page | Accepted |
 | 645 | A payment link lists the orders placed through it, the latest first: its checkouts that became orders, read with the orders module's own Order | Accepted |
+| 646 | The menu editor offers the shop's tags in use to a collection's link, the most used first, each added with a tap | Accepted |
 
 ---
 
@@ -22904,3 +22905,15 @@
 * **Alternatives:** **A `payment_link` filter in the orders search:** the orders module would
   have to read the checkout module's tables, which modules do not do. **Orders keeping the
   link's ID:** a second copy of what the checkout already keeps.
+
+## ADR-646 · The menu editor offers the shop's tags in use to a collection's link, the most used first, each added with a tap
+
+* **Context:** A collection's or all products' link narrows by tags (ADR-644) typed by hand, and
+  a tag mistyped leads to an empty page (status shortcut 35).
+* **Decision:** Under a collection's or all products' link, the admin's menu editor offers up
+  to twelve of the shop's tags in use, the most used first, from the catalog's `productTags`;
+  a tap adds one to the link's tags, and the tags a link has, whatever their case, are offered
+  no more. The words are in English and Urdu.
+* **Consequences:** A link's tags are those its products carry, spelt as they are.
+* **Alternatives:** **Tags of the link's own collection alone:** a query of its own over the
+  collection's products; the shop's tags serve while a shop has few, and remain the target.

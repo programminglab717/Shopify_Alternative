@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Tags offered to menu links
+
+* **The menu editor offers the shop's tags in use** ([ADR-646](../architecture/13-decision-log.md#adr-646--the-menu-editor-offers-the-shops-tags-in-use-to-a-collections-link-the-most-used-first-each-added-with-a-tap)) to a collection's or all
+  products' link, each added with a tap.
+* 3776 tests, two more: the editor's offered tags and the new `ProductTags` document.
+
 ### 2617cec · A payment link's orders
 
 * **A payment link lists its orders** ([ADR-645](../architecture/13-decision-log.md#adr-645--a-payment-link-lists-the-orders-placed-through-it-the-latest-first-its-checkouts-that-became-orders-read-with-the-orders-modules-own-order)): `PaymentLink.orders`, the latest first, found

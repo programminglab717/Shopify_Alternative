@@ -1132,6 +1132,13 @@ export const ProductSuggestionsQuery = /* GraphQL */ `
   }
 `;
 
+/** The tags the shop's products use, the most used first, to offer a menu link (ADR-646). */
+export const ProductTagsQuery = /* GraphQL */ `
+  query ProductTags {
+    productTags(first: 30)
+  }
+`;
+
 /** Its variants' prices and SKUs changed, together. */
 export const ProductVariantsBulkUpdateMutation = /* GraphQL */ `
   mutation ProductVariantsBulkUpdate(

@@ -92,6 +92,8 @@ function core(role: StaffRole) {
             ],
           },
         };
+      case 'ProductTags':
+        return { productTags: ['sale', 'Eid', 'new in'] };
       case 'CollectionProductSearch':
         return { products: { nodes: [{ id: 'prod_9', title: 'Chappal', status: 'ACTIVE' }] } };
       case 'MenuCreate':
@@ -243,6 +245,26 @@ describe("The online store's menus", () => {
       }),
     );
     expect((sentOf(fake, 'MenuUpdate')!.items as unknown[])[0]).not.toHaveProperty('tags');
+  });
+
+  it("offers the shop's tags in use to a collection's link, each added with a tap (ADR-646)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/menu_1');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the tag sale to link 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add the tag Eid to link 2' }));
+    expect((screen.getByLabelText('Link 2: tags') as HTMLInputElement).value).toBe('sale, Eid');
+    // Those it has are offered no more, whatever their case; a link to the home page takes none.
+    type('Link 2: tags', 'sale, Eid, NEW IN');
+    expect(screen.queryByRole('button', { name: /^Add the tag .* to link 2$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /to link 1$/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save the menu' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'MenuUpdate')).toMatchObject({
+        items: [{ id: 'mi_1' }, { id: 'mi_2', tags: ['sale', 'Eid', 'NEW IN'] }],
+      }),
+    );
   });
 
   it('makes a menu with a handle from its title and a link to a product found by name', async () => {

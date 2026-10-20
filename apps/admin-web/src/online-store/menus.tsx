@@ -11,6 +11,7 @@ import {
   MenuUpdateMutation,
   PagesQuery,
   PoliciesQuery,
+  ProductTagsQuery,
 } from '../api/operations';
 import type {
   CollectionProductSearchData,
@@ -22,6 +23,7 @@ import type {
   MenusData,
   PagesData,
   PoliciesData,
+  ProductTagsData,
 } from '../api/types';
 import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -234,6 +236,48 @@ interface Choices {
   pages: { value: string; label: string }[];
   /** The shop's policies that have words (ADR-640). */
   policies: { value: string; label: string }[];
+  /** The tags its products use, the most used first, to add to a link's (ADR-646). */
+  tags: string[];
+}
+
+/** How many of the shop's tags a link's tags field offers. */
+const TAGS_OFFERED = 12;
+
+/** The shop's tags in use that a link does not have yet, each added with a tap (ADR-646). */
+function TagsOffered({
+  number,
+  chosen,
+  tags,
+  add,
+}: {
+  number: string;
+  chosen: readonly string[];
+  tags: readonly string[];
+  add: (tag: string) => void;
+}) {
+  const { t } = useLocale();
+  const has = new Set(chosen.map((tag) => tag.toLowerCase()));
+  const offered = tags.filter((tag) => !has.has(tag.toLowerCase())).slice(0, TAGS_OFFERED);
+  if (offered.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+        {t('menus.tagsInUse')}
+      </span>
+      {offered.map((tag) => (
+        <button
+          key={tag}
+          type="button"
+          aria-label={t('menus.addTag', { tag, number })}
+          className="min-h-8 rounded-control border border-line bg-surface px-2 text-[length:var(--hatti-type-body-sm-size)]"
+          dir="auto"
+          onClick={() => add(tag)}
+        >
+          + {tag}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** One link: its title, what it leads to, moved, taken out, and the links under it. */
@@ -329,6 +373,14 @@ function LinkEditor({
             />
           )}
         </div>
+        {TAGGED.includes(draft.type) && (
+          <TagsOffered
+            number={number}
+            chosen={tagsOf(draft.tags)}
+            tags={choices.tags}
+            add={(tag) => set({ tags: [...tagsOf(draft.tags), tag].join(', ') })}
+          />
+        )}
         {draft.type === 'PRODUCT' && (
           <div className="flex flex-col gap-2">
             <p className="text-secondary">
@@ -470,6 +522,7 @@ function MenuForm({ menu }: { menu: Menu | null }) {
   });
   const pages = useAdminQuery<PagesData>(['pages'], PagesQuery);
   const policies = useAdminQuery<PoliciesData>(['policies'], PoliciesQuery);
+  const tags = useAdminQuery<ProductTagsData>(['productTags'], ProductTagsQuery);
   const create = useAdminMutation<MenuMutationData, Record<string, unknown>>(MenuCreateMutation);
   const update = useAdminMutation<MenuMutationData, Record<string, unknown>>(MenuUpdateMutation);
   const remove = useAdminMutation<MenuMutationData, { id: string }>(MenuDeleteMutation);
@@ -492,6 +545,7 @@ function MenuForm({ menu }: { menu: Menu | null }) {
       value: each.id,
       label: each.title,
     })),
+    tags: tags.data?.productTags ?? [],
   };
   const shownHandle = handle || handleOf(title);
   const ready = title.trim() !== '' && complete(drafts) && (menu !== null || shownHandle !== '');

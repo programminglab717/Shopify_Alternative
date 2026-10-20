@@ -2630,6 +2630,10 @@ export interface UrlRedirectUpdateData {
 }
 
 /** The product types and vendors a shop uses, to suggest as products are written. */
+export interface ProductTagsData {
+  productTags: string[];
+}
+
 export interface ProductSuggestionsData {
   productTypes: string[];
   productVendors: string[];
