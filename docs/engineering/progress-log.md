@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Images in descriptions counted
+### 6997249 · Images in descriptions counted
 
 * **The Search listings tab counts the undescribed images in products' and collections'
   descriptions** ([ADR-626](../architecture/13-decision-log.md#adr-626--the-search-listings-tab-counts-the-images-without-words-for-what-they-show-in-a-products-or-a-collections-description-too-as-it-does-those-in-pages-and-articles-text)), as it does those in pages' and articles' text.
