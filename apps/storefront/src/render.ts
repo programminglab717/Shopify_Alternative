@@ -1093,11 +1093,15 @@ const RESOURCE_TEMPLATES: Readonly<Record<string, string>> = {
   pages: 'page',
 };
 
-/** A route: its template, the handle it names, and for a blog's articles with a tag, the tag. */
+/**
+ * A route: its template, the handle it names, for a blog's articles with a tag, the tag, and for a
+ * collection's products with tags, the tags (ADR-643).
+ */
 interface Route {
   name: string;
   handle: string | null;
   tag?: string;
+  tags?: string[];
 }
 
 /** The template for a path, and the handle it names. */
@@ -1125,10 +1129,35 @@ function route(path: string): Route {
   }
   const article = /^\/blogs\/([\w-]+)\/([\w-]+)\/?$/.exec(path);
   if (article) return { name: 'article', handle: `${article[1]}/${article[2]}` };
+  // A collection's products with each of some tags, as Shopify's /collections/{handle}/{tag+tag}
+  // (ADR-643).
+  const tagged = /^\/collections\/([\w-]+)\/([^/]+)\/?$/.exec(path);
+  if (tagged) {
+    const tags = tagged[2]!.split('+').map(tagOf);
+    return tags.some((tag) => tag === null) || tags.length > COLLECTION_TAGS_MOST
+      ? { name: '404', handle: null }
+      : { name: 'collection', handle: tagged[1]!, tags: [...new Set(tags as string[])] };
+  }
   const match = /^\/(products|collections|pages)\/([\w-]+)\/?$/.exec(path);
   if (!match) return { name: '404', handle: null };
   return { name: RESOURCE_TEMPLATES[match[1]!]!, handle: match[2]! };
 }
+
+/** Of `ids`, the products tagged with each of `tags`, handles, in their order (ADR-643). */
+async function taggedIn(
+  ids: readonly string[],
+  tags: readonly string[],
+  ctx: ObjectContext,
+): Promise<string[]> {
+  const docs = await ctx.data.products(ids);
+  return ids.filter((_, index) => {
+    const own = new Set((docs[index]?.tags ?? []).map(handleize));
+    return docs[index] !== null && tags.every((tag) => own.has(tag));
+  });
+}
+
+/** How many tags a collection's address narrows it by at most (ADR-643). */
+const COLLECTION_TAGS_MOST = 10;
 
 /** A tag as its address has it, as a handle: null when it is not one. */
 function tagOf(segment: string): string | null {
@@ -1197,11 +1226,15 @@ async function resourceOf(
   if (found.name === 'collection' && found.handle) {
     const doc = await ctx.data.collection(found.handle);
     if (!doc) return null;
+    // Its products with each of the address's tags, a tag matching as its handle does (ADR-643).
+    const ids = found.tags?.length
+      ? await taggedIn(doc.productIds, found.tags, ctx)
+      : doc.productIds;
     // Narrowed by the page's filters, and its filters counted (SRC-03, ADR-478): those the shop
     // chose (ADR-568).
     const listing = ctx.filters
       ? await filteredListing(
-          doc.productIds,
+          ids,
           ctx.filters,
           (ids) => ctx.data.products(ids),
           'collection',
@@ -1210,6 +1243,7 @@ async function resourceOf(
       : undefined;
     return {
       collection: collectionObject(doc, ctx, listing),
+      current_tags: found.tags ?? [],
       [SEO]: seoOf(doc.seo, doc.descriptionHtml),
     };
   }

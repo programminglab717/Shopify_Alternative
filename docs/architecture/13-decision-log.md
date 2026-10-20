@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-642 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-643 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -650,6 +650,7 @@
 | 640 | Menus link to the search page and to the shop's policies, a policy by its ID at its page and gone once cleared, with Shopify's search_link and policy_link | Accepted |
 | 641 | Hatti Base shows a menu three levels deep: links under a link open below it across the page, and in a drawer on phones, with no script | Accepted |
 | 642 | A menu saved as its editor read it is not saved over: menuUpdate takes ifUnchangedSince, the menu's updatedAt, and a save made since is refused as STALE | Accepted |
+| 643 | A collection's page narrows to its products with each of some tags, at /collections/{handle}/{tag+tag} as Shopify's, the tags given to themes as current_tags | Accepted |
 
 ---
 
@@ -22847,3 +22848,23 @@
 * **Alternatives:** **Merging two saves link by link:** menus are small, and a merge the member
   did not see could put links where neither wanted them. **A version number:** `updatedAt`
   already changes with every save, and apps can read it.
+
+## ADR-643 · A collection's page narrows to its products with each of some tags, at /collections/{handle}/{tag+tag} as Shopify's, the tags given to themes as current_tags
+
+* **Context:** Shopify's themes link to a collection's products with a tag at
+  `/collections/{handle}/{tag}`, several tags joined with `+`, and read the tags of the page
+  as `current_tags`: a shop's "Lawn on sale" is often `/collections/lawn/sale`. Hatti's
+  storefront answered such an address as not found, so menus could not link a collection by tag
+  (status shortcut 35), and themes brought from Shopify lost their tag links.
+* **Decision:** The storefront answers `/collections/{handle}/{tags}` with the collection's
+  page narrowed to its products tagged with each of the tags, a tag matching as its handle does
+  (`Sale` and `sale` alike), in the collection's own order. Themes get the tags as
+  `current_tags`, and the collection's `products_count` counts what is left while
+  `all_products_count` counts the whole collection. The page's filters and sorting narrow it
+  further, their links keeping the tag's address, and an Urdu page's links its language. A tag
+  that is no handle, more than ten tags, or a collection the shop lacks is not found.
+* **Consequences:** Shopify's tag links in themes and menus' addresses work. A tagged page
+  reads the collection's products to know their tags, as its filters already do.
+* **Alternatives:** **Tags as a filter parameter:** Shopify's themes link the path, not a
+  parameter. **Any of the tags rather than each:** Shopify's narrows by each, and a shop
+  wanting either makes a collection.

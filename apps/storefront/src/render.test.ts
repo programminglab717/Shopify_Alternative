@@ -958,6 +958,53 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("narrows a collection to products with each of its address's tags, Shopify's current_tags (ADR-643)", async () => {
+    const lawn = sampleStore().products.filter((each) => each.id.startsWith('p-eid-lawn-'));
+    const onSale = lawn.filter((each) => each.tags.includes('sale'));
+    expect(onSale.length).toBeGreaterThan(0);
+    expect(onSale.length).toBeLessThan(lawn.length);
+    const sale = await render({ path: '/collections/eid-lawn/sale' });
+    expect(sale.status).toBe(200);
+    expect(sale.errors).toEqual([]);
+    expect(sale.html).toContain(`${onSale.length} products`);
+    // Tags joined with +, matched as their handles, each of them.
+    const both = await render({ path: '/collections/eid-lawn/Sale+unstitched-suit/' });
+    expect(both.html).toContain(`${onSale.length} products`);
+    expect((await render({ path: '/collections/eid-lawn/sale+new' })).html).toContain('0 products');
+    // In Urdu too, and filters narrow it further, their links keeping the tag's address.
+    const params: [string, string][] = [['filter.v.availability', '0']];
+    const urdu = await render({
+      path: '/collections/eid-lawn/sale',
+      query: Object.fromEntries(params),
+      params,
+      locale: 'ur',
+    });
+    expect(urdu.errors).toEqual([]);
+    expect(urdu.html).toContain('<a href="/ur/collections/eid-lawn/sale" aria-label=');
+    // Themes get the tags as Shopify's current_tags, and the collection's count without them.
+    const extra = {
+      'sections/main-collection.liquid':
+        '<p class="tags">{{ current_tags | join: "," }} {{ collection.products_count }}/{{ collection.all_products_count }}</p>' +
+        '{% schema %}{ "name": "Collection" }{% endschema %}',
+    };
+    expect(
+      (await render({ path: '/collections/eid-lawn/sale+new+sale' }, { extra })).html,
+    ).toContain(`<p class="tags">sale,new 0/${lawn.length}</p>`);
+    expect((await render({ path: '/collections/eid-lawn' }, { extra })).html).toContain(
+      `<p class="tags"> ${lawn.length}/${lawn.length}</p>`,
+    );
+    // A tag that is no handle, too many tags, or a collection the shop lacks are not found.
+    const many = Array.from({ length: 11 }, (_, index) => `t${index}`).join('+');
+    for (const path of [
+      '/collections/eid-lawn/%E0',
+      '/collections/eid-lawn/+',
+      `/collections/eid-lawn/${many}`,
+      '/collections/nothing/sale',
+    ]) {
+      expect((await render({ path })).status, path).toBe(404);
+    }
+  });
+
   it('shows the filters the shop chose on its collection and search pages, its params alone (ADR-568)', async () => {
     const sample = sampleStore();
     const store = new MemoryStore({

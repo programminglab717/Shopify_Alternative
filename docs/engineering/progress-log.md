@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Collections by tag
+
+* **A collection's page narrows to its products by tag** ([ADR-643](../architecture/13-decision-log.md#adr-643--a-collections-page-narrows-to-its-products-with-each-of-some-tags-at-collectionshandletagtag-as-shopifys-the-tags-given-to-themes-as-current_tags)):
+  `/collections/{handle}/{tag+tag}` as Shopify's, with `current_tags` for themes.
+* 3771 tests, one more: the storefront's tagged collection pages.
+
 ### f06bc9d · Menus not saved over
 
 * **A menu saved as its editor read it is not saved over** ([ADR-642](../architecture/13-decision-log.md#adr-642--a-menu-saved-as-its-editor-read-it-is-not-saved-over-menuupdate-takes-ifunchangedsince-the-menus-updatedat-and-a-save-made-since-is-refused-as-stale)): `menuUpdate`'s
