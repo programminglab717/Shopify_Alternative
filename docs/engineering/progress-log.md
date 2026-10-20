@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A theme's picture fetched afresh when its file is replaced
+### c080daf · A theme's picture fetched afresh when its file is replaced
 
 * **A theme's picture's address carries what its file holds** ([ADR-670](../architecture/13-decision-log.md#adr-670--a-themes-pictures-address-carries-what-its-file-holds-from-the-shops-document-so-a-file-replaced-is-fetched-afresh)), from the shop's
   document, so a file replaced shows at once rather than after the hour browsers and the edge
