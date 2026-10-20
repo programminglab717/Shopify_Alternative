@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### A return's refund
+### dd40fdf · A return's refund
 
 * **A refund may be for a customer return** ([ADR-613](../architecture/13-decision-log.md#adr-613--a-refund-may-be-for-a-customer-return-at-most-what-was-paid-for-its-items-and-is-not-refunded-yet-in-money-or-as-store-credit-each-return-says-what-it-is-worth-and-what-was-refunded-for-it)): each return says what was paid for its
   items, discounts shared out, and what refunds for it gave back; a refund for it gives back at
