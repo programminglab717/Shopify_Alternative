@@ -92,3 +92,4 @@ export {
   type TrustBadgeKind,
   type TrustBadgeValue,
 } from '../internal/trust-badges.js';
+export { PaymentLink } from '../internal/graphql/payment-link.types.js';

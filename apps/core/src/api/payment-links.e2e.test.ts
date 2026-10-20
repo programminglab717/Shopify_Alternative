@@ -142,6 +142,11 @@ describe.skipIf(!server)('Payment links', () => {
         query ($id: ID!) {
           paymentLink(id: $id) {
             ordersPlaced
+            orders {
+              id
+              name
+              source
+            }
           }
         }
       `,
@@ -150,6 +155,10 @@ describe.skipIf(!server)('Payment links', () => {
       },
     );
     expect(read.paymentLink.ordersPlaced).toBe(1);
+    // Listed on it, as the orders module has them (ADR-645).
+    expect(read.paymentLink.orders).toEqual([
+      { id: expect.stringMatching(/^ord_/), name: '#1001', source: 'ONLINE_STORE' },
+    ]);
 
     // Closed by staff: the page says so, and no other shop's storefront opens it.
     const closed = await graphql(

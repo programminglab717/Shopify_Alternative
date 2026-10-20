@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### A payment link's orders
+
+* **A payment link lists its orders** ([ADR-645](../architecture/13-decision-log.md#adr-645--a-payment-link-lists-the-orders-placed-through-it-the-latest-first-its-checkouts-that-became-orders-read-with-the-orders-modules-own-order)): `PaymentLink.orders`, the latest first, found
+  by an index of the link's checkouts (migration 0287) and read as the orders module's orders;
+  the admin's payment links page names each link's latest five.
+* Status shortcut 114 has its Target and Revisit again.
+* 3774 tests, one more: the admin's link orders; the checkout module's and the API's payment
+  link tests now list a link's orders.
+
 ### 5e89a1d · Menu links by tag
 
 * **A menu's collection link narrowed by tags** ([ADR-644](../architecture/13-decision-log.md#adr-644--a-menus-link-to-a-collection-or-to-all-products-may-narrow-it-to-its-products-with-each-of-some-tags-as-shopifys-menuitem-tags-leading-to-the-collections-tag-page)): Shopify's `MenuItem` tags on

@@ -2889,6 +2889,8 @@ export interface PaymentLinkValue {
   lastOrderAt: string | null;
   createdAt: string;
   items: { variantId: string; title: string | null; quantity: number }[];
+  /** The latest orders placed through it (ADR-645). */
+  orders: { id: string; name: string }[];
 }
 
 export interface PaymentLinksData {

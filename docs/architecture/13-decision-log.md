@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-644 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-645 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -652,6 +652,7 @@
 | 642 | A menu saved as its editor read it is not saved over: menuUpdate takes ifUnchangedSince, the menu's updatedAt, and a save made since is refused as STALE | Accepted |
 | 643 | A collection's page narrows to its products with each of some tags, at /collections/{handle}/{tag+tag} as Shopify's, the tags given to themes as current_tags | Accepted |
 | 644 | A menu's link to a collection or to all products may narrow it to its products with each of some tags, as Shopify's MenuItem tags, leading to the collection's tag page | Accepted |
+| 645 | A payment link lists the orders placed through it, the latest first: its checkouts that became orders, read with the orders module's own Order | Accepted |
 
 ---
 
@@ -22886,3 +22887,20 @@
   making a collection of them. A tag no product carries leads to an empty page, as Shopify's.
 * **Alternatives:** **Tags as an http link's address:** they would break with the collection's
   handle; a tagged link follows it.
+
+## ADR-645 · A payment link lists the orders placed through it, the latest first: its checkouts that became orders, read with the orders module's own Order
+
+* **Context:** A payment link counts its orders (ADR-248) but did not say which they were
+  (status shortcut 114), so staff who shared a link on Instagram could not open what it brought
+  in without searching the orders by hand.
+* **Decision:** `PaymentLink.orders(first)` gives the orders placed through the link, the latest
+  first, ten unless more are asked for, up to 250. The checkout module knows which of the link's
+  checkouts became orders, by an index of their own (migration 0287); the core reads those
+  orders through the orders module's facade and gives them as its `Order`, so a link's orders
+  show what any order shows, as it is now, and are seen under the same scopes as the link. The
+  admin's payment links page names each link's latest five orders, each leading to its page.
+* **Consequences:** Staff open a link's orders from the link. `ordersPlaced` still counts them
+  all, those listed and those past the page.
+* **Alternatives:** **A `payment_link` filter in the orders search:** the orders module would
+  have to read the checkout module's tables, which modules do not do. **Orders keeping the
+  link's ID:** a second copy of what the checkout already keeps.

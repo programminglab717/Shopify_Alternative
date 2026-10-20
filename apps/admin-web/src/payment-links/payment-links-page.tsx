@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import {
   CircleCheck,
   CircleOff,
@@ -266,6 +267,7 @@ function Share({ link }: { link: PaymentLinkValue }) {
 
 function LinkRow({ link, edits }: { link: PaymentLinkValue; edits: boolean }) {
   const { t, locale } = useLocale();
+  const shop = useShop();
   const timezone = useShopTimezone();
   const update = useAdminMutation<
     PaymentLinkUpdateData,
@@ -322,6 +324,21 @@ function LinkRow({ link, edits }: { link: PaymentLinkValue; edits: boolean }) {
             date: formatDate(link.expiresAt, timezone, locale),
           })}`}
       </p>
+      {(link.orders ?? []).length > 0 && (
+        <p className="flex flex-wrap items-baseline gap-x-2 text-[length:var(--hatti-type-body-sm-size)]">
+          <span className="text-secondary">{t('links.latestOrders')}</span>
+          {link.orders.map((order) => (
+            <Link
+              key={order.id}
+              to="/$shopId/orders/$orderId"
+              params={{ shopId: shop.id, orderId: order.id }}
+              className="num font-medium text-primary underline"
+            >
+              {order.name}
+            </Link>
+          ))}
+        </p>
+      )}
       <code className="num break-all text-secondary" dir="ltr">
         {link.url}
       </code>

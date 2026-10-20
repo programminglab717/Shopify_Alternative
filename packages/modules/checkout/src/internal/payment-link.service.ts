@@ -13,7 +13,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { discountCodeIn } from '@hatti/pricing/public';
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { CartService } from './cart.service.js';
 import { CheckoutService, itemName } from './checkout.service.js';
 import { CheckoutEvents, type PaymentLinkChangedPayload } from './events.js';
@@ -27,7 +27,7 @@ import {
   type PaymentLinkItemValue,
   type PaymentLinkRecord,
 } from './payment-links.js';
-import { paymentLinks, type PaymentLinkRow } from './schema.js';
+import { checkouts, paymentLinks, type PaymentLinkRow } from './schema.js';
 
 /** 128 random bits in base64url, as checkouts' secrets. */
 const TOKEN_BYTES = 16;
@@ -92,6 +92,30 @@ export class PaymentLinkService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const row = await this.#row(tx, tenant.shopId, id);
       return row ? ((await this.#records(tx, tenant.shopId, [row]))[0] ?? null) : null;
+    });
+  }
+
+  /**
+   * The orders placed through the shop's link `id` (ADR-645), the latest first, `first` of them
+   * at most: its checkouts that became orders. None for a link the shop lacks.
+   */
+  async orderIdsOf(tenant: TenantContext, id: string, first: number): Promise<string[]> {
+    if (!UUID.test(id)) return [];
+    const limit = Math.min(Math.max(first, 1), 250);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const rows = await tx
+        .select({ orderId: checkouts.orderId })
+        .from(checkouts)
+        .where(
+          and(
+            eq(checkouts.shopId, tenant.shopId),
+            eq(checkouts.paymentLinkId, id),
+            isNotNull(checkouts.orderId),
+          ),
+        )
+        .orderBy(desc(checkouts.completedAt), desc(checkouts.id))
+        .limit(limit);
+      return rows.map((row) => row.orderId!);
     });
   }
 

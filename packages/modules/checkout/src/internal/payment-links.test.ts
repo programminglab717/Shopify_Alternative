@@ -257,10 +257,17 @@ describe.skipIf(!server)('PaymentLinkService', () => {
       'placed from the online store through the payment link "Eid lawn"',
     );
     const other = open(await f.checkouts.view(two));
-    placedOrder(await f.checkouts.place(two, other.shown, { ...FORM, phone: '0321-7654321' }));
+    const later = placedOrder(
+      await f.checkouts.place(two, other.shown, { ...FORM, phone: '0321-7654321' }),
+    );
     const counted = (await links.get(f.a, link.id))!;
     expect(counted.ordersPlaced).toBe(2);
     expect(counted.lastOrderAt).toBeInstanceOf(Date);
+    // Listed on it, the latest first (ADR-645); none for another shop or an ID it lacks.
+    expect(await links.orderIdsOf(f.a, link.id, 10)).toEqual([later.id, order.id]);
+    expect(await links.orderIdsOf(f.a, link.id, 1)).toEqual([later.id]);
+    expect(await links.orderIdsOf(f.b, link.id, 10)).toEqual([]);
+    expect(await links.orderIdsOf(f.a, 'not-a-link', 10)).toEqual([]);
   });
 
   it('opens nothing once closed, past its time or used up, nor for an address it lacks', async () => {

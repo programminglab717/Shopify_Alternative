@@ -22,6 +22,10 @@ const OPEN = {
     { variantId: 'var_2', title: 'Lawn suit · Large', quantity: 2 },
     { variantId: 'var_9', title: null, quantity: 1 },
   ],
+  orders: [
+    { id: 'ord_7', name: '#1007' },
+    { id: 'ord_5', name: '#1005' },
+  ],
 };
 
 const CLOSED = {
@@ -37,6 +41,7 @@ const CLOSED = {
   discountCode: null,
   expiresAt: null,
   items: [{ variantId: 'var_3', title: 'Chikankari kurta', quantity: 1 }],
+  orders: [],
 };
 
 function core(role: StaffRole) {
@@ -149,6 +154,19 @@ describe('Payment links', () => {
     await waitFor(() =>
       expect(sentOf(fake, 'PaymentLinkUpdate')).toEqual([{ id: 'pl_1', input: { active: false } }]),
     );
+  });
+
+  it('names the latest orders placed through a link, each leading to its page (ADR-645)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/payment-links');
+
+    const [open, closed] = within(await screen.findByRole('list')).getAllByRole('listitem');
+    expect(open!.textContent).toContain('Latest orders:#1007#1005');
+    expect(within(open!).getByRole('link', { name: '#1007' }).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_7',
+    );
+    expect(closed!.textContent).not.toContain('Latest orders');
   });
 
   it('makes a link of items found by name, closing at the day’s end in Pakistan, and says what the core turned down', async () => {
