@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Alerts by what staff may do
+### dae6d0c · Alerts by what staff may do
 
 * **Staff's push and WhatsApp alerts go by what each member may do, and an invitation's email
   names the shop's own role it gives** ([ADR-581](../architecture/13-decision-log.md#adr-581--staffs-push-and-whatsapp-alerts-go-by-what-each-member-may-do-and-an-invitations-email-names-the-shops-own-role-it-gives), ADM-01).
