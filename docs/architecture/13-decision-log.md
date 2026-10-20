@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-666 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-667 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -674,6 +674,7 @@
 | 664 | Cancelling an order whose refunds took part of what gift cards paid gives back to the cards as much as refunds and store credit left, and the timeline says what the cards got | Accepted |
 | 665 | The menu editor says which of a link's tags none of its collection's products has, or none of the shop's for all products, as typing stops | Accepted |
 | 666 | Where the shop shares new orders out, the orders still waiting on an agent whose shift ran out are handed over by the worker to those on duty | Accepted |
+| 667 | A product's photos that say nothing of what they show are described on the search listings tab itself, each beside its picture, and saved together | Accepted |
 
 ---
 
@@ -23317,3 +23318,18 @@
 * **Alternatives:** **Ending shifts when they run out, with no hand-over:** the orders would still
   wait on the agent. **Handing them over as each new order is shared out:** it would tie the
   hand-over to orders coming, and a quiet hour would leave them where they are.
+
+## ADR-667 · A product's photos that say nothing of what they show are described on the search listings tab itself, each beside its picture, and saved together
+
+* **Context:** The Search listings tab counts a listing's images without words for what they show
+  (ADR-618, ADR-626), and its listing is written on the tab (ADR-649), but its photos' words were
+  written on the product's page, one photo at a time: a shop working down the tab left it for
+  each product.
+* **Decision:** A product's listing opened on the tab shows, below its card, each of its photos
+  without a description, its picture beside a box for what it shows, and one button saves the
+  words written, all in one `productUpdateMedia`, as the product's page saves one. A photo left
+  blank keeps none. The tab's query reads each photo's ID and picture for it. The images in a
+  page's, an article's or a description's text are still described where that text is written.
+* **Consequences:** A shop describes a product's photos where it found them wanting.
+* **Alternatives:** **Each photo saved by itself:** the page has that; the tab is for working down
+  a list.

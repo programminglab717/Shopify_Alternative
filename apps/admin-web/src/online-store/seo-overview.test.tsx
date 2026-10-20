@@ -35,10 +35,10 @@ const LISTED: Record<string, SeoListed[]> = {
       {
         description: '',
         media: [
-          { alt: '', mediaContentType: 'IMAGE' },
-          { alt: 'Red lehenga, front', mediaContentType: 'IMAGE' },
-          { alt: ' ', mediaContentType: 'IMAGE' },
-          { alt: '', mediaContentType: 'VIDEO' },
+          { id: 'med_1', alt: '', mediaContentType: 'IMAGE', previewImage: { url: '/i/1.jpg' } },
+          { id: 'med_2', alt: 'Red lehenga, front', mediaContentType: 'IMAGE' },
+          { id: 'med_3', alt: ' ', mediaContentType: 'IMAGE' },
+          { id: 'med_4', alt: '', mediaContentType: 'VIDEO' },
         ],
       },
     ),
@@ -170,6 +170,47 @@ describe("Every page's search engine listing, in the admin", () => {
     fireEvent.click(screen.getByRole('button', { name: "Done with Lawn suit's listing" }));
     expect(screen.queryByText('Lawn suit')).toBeNull();
     expect(rowOf('Shawl')).toBeTruthy();
+  });
+
+  it("describes a product's photos on the tab itself, saved together (ADR-667)", async () => {
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'ProductUpdateMedia') return { productUpdateMedia: { userErrors: [] } };
+      return {
+        shop: { url: 'https://zari.hatti.pk' },
+        listed: { nodes: LISTED[operation] ?? [], pageInfo: {} },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/online-store?tab=seo');
+
+    await screen.findByText('2 of 4 without a description of their own.');
+    fireEvent.click(screen.getByRole('button', { name: "Write Wedding lehenga's listing here" }));
+    expect(
+      screen.getByText('Photos of Wedding lehenga that say nothing of what they show'),
+    ).toBeTruthy();
+    // The two photos without words, not the one described nor the video.
+    fireEvent.change(screen.getByLabelText('What photo 1 of Wedding lehenga shows'), {
+      target: { value: ' Red lehenga, back ' },
+    });
+    fireEvent.change(screen.getByLabelText('What photo 2 of Wedding lehenga shows'), {
+      target: { value: 'Zardozi on the sleeve' },
+    });
+    expect(screen.queryByLabelText('What photo 3 of Wedding lehenga shows')).toBeNull();
+    await press('Save the photos’ words');
+    await screen.findByText('Saved: search engines and screen readers now read them.');
+    expect(
+      core.sent
+        .filter((each) => each.operation === 'ProductUpdateMedia')
+        .map((each) => each.variables),
+    ).toEqual([
+      {
+        productId: 'prd_4',
+        media: [
+          { id: 'med_1', alt: 'Red lehenga, back' },
+          { id: 'med_3', alt: 'Zardozi on the sleeve' },
+        ],
+      },
+    ]);
   });
 
   it("shows more of a long list, and only the kinds a member's role keeps", async () => {

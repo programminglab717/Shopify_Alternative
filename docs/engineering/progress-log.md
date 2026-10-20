@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Photos described on the Search listings tab
+
+* **A product's photos without words for what they show are described on the Search listings
+  tab itself** ([ADR-667](../architecture/13-decision-log.md#adr-667--a-products-photos-that-say-nothing-of-what-they-show-are-described-on-the-search-listings-tab-itself-each-beside-its-picture-and-saved-together)), each beside its picture, saved together.
+* 3823 tests, one more: the admin's Search listings tab.
+
 ### 1c323b9 · Lapsed shifts handed over
 
 * **What still waits on an agent whose shift at the Confirmation Desk ran out goes by itself to

@@ -3,27 +3,30 @@ import { Link } from '@tanstack/react-router';
 import { CircleAlert, CircleCheck, FileQuestion, ImageOff, Pencil, Scissors } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import {
+  ProductUpdateMediaMutation,
   SeoArticlesQuery,
   SeoBlogsQuery,
   SeoCollectionsQuery,
   SeoPagesQuery,
   SeoProductsQuery,
 } from '../api/operations';
-import type { SeoKind, SeoListed, SeoListingsData } from '../api/types';
+import type { SeoKind, SeoListed, SeoListingsData, UserError } from '../api/types';
 import { gate, permits, type Gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { problemText } from '../products/product-form';
 import { ProductSearchListing } from '../products/search-listing';
 import { EDITS_PRODUCTS } from '../products/status';
 import { CheckField, SelectField } from '../settings/settings-form';
-import { useAdminQuery, useShop } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, Loading } from '../ui/feedback';
+import { TextField } from '../ui/field';
 import { WRITES_BLOGS, WRITES_PAGES } from './pages';
 import { DESCRIPTION_SHOWN, SearchListingPreview, TITLE_SHOWN, excerpt } from './search-listing';
 import {
@@ -246,6 +249,82 @@ function ListingEditor({
   }
 }
 
+/** What a photo's words may be at most, as its product's page takes them. */
+const ALT_LENGTH = 512;
+
+/**
+ * A product's photos that say nothing of what they show, each described on the tab itself and
+ * saved together (ADR-667), as its page's photos are one by one.
+ */
+function PhotosDescribed({ listed }: { listed: SeoListed }) {
+  const { t } = useLocale();
+  const update = useAdminMutation<
+    { productUpdateMedia: { userErrors: UserError[] } },
+    { productId: string; media: { id: string; alt: string }[] }
+  >(ProductUpdateMediaMutation);
+  const [photos] = useState(() =>
+    (listed.media ?? []).filter(
+      (media) => media.id && media.mediaContentType === 'IMAGE' && !media.alt.trim(),
+    ),
+  );
+  const [words, setWords] = useState<Record<string, string>>({});
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  if (photos.length === 0) return null;
+  const name = nameOf(listed, t);
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    setSaved(false);
+    const media = photos
+      .map((photo) => ({ id: photo.id!, alt: (words[photo.id!] ?? '').trim() }))
+      .filter((photo) => photo.alt !== '');
+    if (media.length === 0) return;
+    try {
+      const { productUpdateMedia } = await update.mutateAsync({ productId: listed.id, media });
+      const error = productUpdateMedia.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else setSaved(true);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-3">
+      <p className="font-medium">{t('seoAll.photosOf', { name })}</p>
+      <ul className="flex flex-col gap-3">
+        {photos.map((photo, index) => (
+          <li key={photo.id} className="flex items-start gap-3">
+            {photo.previewImage?.url && (
+              <img
+                src={`${photo.previewImage.url}${photo.previewImage.url.includes('?') ? '&' : '?'}width=128`}
+                alt=""
+                className="size-16 shrink-0 rounded-control border border-line object-cover"
+              />
+            )}
+            <TextField
+              label={t('seoAll.photoAlt', { position: index + 1, name })}
+              hint={t('photos.altHint')}
+              dir="auto"
+              className="flex-1"
+              maxLength={ALT_LENGTH}
+              value={words[photo.id!] ?? ''}
+              onChange={(event) => setWords((was) => ({ ...was, [photo.id!]: event.target.value }))}
+            />
+          </li>
+        ))}
+      </ul>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      {saved && <Alert tone="success">{t('seoAll.photosSaved')}</Alert>}
+      <Button type="submit" className="self-start" busy={update.isPending}>
+        {t('seoAll.photosSave')}
+      </Button>
+    </form>
+  );
+}
+
 function nameOf(listed: SeoListed, t: Translate): string {
   return listed.title.trim() || t('seoAll.untitled');
 }
@@ -346,6 +425,7 @@ function KindList({ kind, missingOnly }: { kind: SeoKind; missingOnly: boolean }
                   {open.has(listed.id) && (
                     <ListingEditor kind={kind} listed={listed} storefront={storefront} />
                   )}
+                  {open.has(listed.id) && kind === 'PRODUCT' && <PhotosDescribed listed={listed} />}
                 </div>
               </li>
             ))}

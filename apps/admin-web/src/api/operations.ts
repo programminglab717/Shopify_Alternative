@@ -9927,8 +9927,12 @@ export const SeoProductsQuery = /* GraphQL */ `
         ${SEO_LISTED}
         description
         media {
+          id
           alt
           mediaContentType
+          previewImage {
+            url
+          }
         }
       }
       pageInfo {

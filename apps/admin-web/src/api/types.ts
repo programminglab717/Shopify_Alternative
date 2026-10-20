@@ -4800,7 +4800,12 @@ export interface SeoListed {
   summary?: string | null;
   blog?: { handle: string };
   /** A product's photos and videos, for those without words for what they show (ADR-618). */
-  media?: { alt: string; mediaContentType: 'IMAGE' | 'VIDEO' | 'EXTERNAL_VIDEO' }[];
+  media?: {
+    id?: string;
+    alt: string;
+    mediaContentType: 'IMAGE' | 'VIDEO' | 'EXTERNAL_VIDEO';
+    previewImage?: { url: string } | null;
+  }[];
   /** An article's image, by the words a page shows for it (ADR-618). */
   image?: { alt: string } | null;
 }
