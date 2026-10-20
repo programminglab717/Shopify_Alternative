@@ -44,16 +44,28 @@ export interface ThemeEditorRecord extends EditorSchemas {
   files: ThemeEditorFileRecord[];
 }
 
-/** What a menu's item links to (ADR-040), pages (ADR-045), blogs and articles (ADR-178) too. */
+/**
+ * What a menu's item links to (ADR-040), pages (ADR-045), blogs and articles (ADR-178) too, and
+ * the search page and the shop's policies (ADR-640).
+ */
 export type MenuItemTypeValue =
-  'frontpage' | 'catalog' | 'collection' | 'product' | 'page' | 'blog' | 'article' | 'http';
+  | 'frontpage'
+  | 'catalog'
+  | 'collection'
+  | 'product'
+  | 'page'
+  | 'blog'
+  | 'article'
+  | 'search'
+  | 'shop_policy'
+  | 'http';
 
 /** A menu's item as kept: what it links to, and the items under it. */
 export interface MenuItemValue {
   id: string;
   title: string;
   type: MenuItemTypeValue;
-  /** The collection, product, page, blog or article a link of that type leads to. */
+  /** The collection, product, page, blog, article or policy a link of that type leads to. */
   resourceId: string | null;
   /** An http link's address. */
   url: string | null;

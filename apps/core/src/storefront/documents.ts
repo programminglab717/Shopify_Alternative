@@ -469,7 +469,8 @@ function linkDocs(
           {
             title: titleOf(item),
             url: item.url,
-            type: `${item.type}_link`,
+            // Shopify's link.type: a policy's is policy_link (ADR-640).
+            type: item.type === 'shop_policy' ? 'policy_link' : `${item.type}_link`,
             links: linkDocs(item.items, titleOf),
           },
         ]

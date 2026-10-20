@@ -28,7 +28,7 @@ export const MENU_HANDLE = /^[a-z0-9]([a-z0-9-]{0,98}[a-z0-9])?$/;
 /** How many collections the main menu is made with, before "All products". */
 const MENU_COLLECTIONS = 5;
 
-/** What an item may link to until search exists. */
+/** What an item may link to: the search page and policies too (ADR-640). */
 const TYPES: ReadonlySet<string> = new Set<MenuItemTypeValue>([
   'frontpage',
   'catalog',
@@ -37,6 +37,8 @@ const TYPES: ReadonlySet<string> = new Set<MenuItemTypeValue>([
   'page',
   'blog',
   'article',
+  'search',
+  'shop_policy',
   'http',
 ]);
 
@@ -47,6 +49,7 @@ const RESOURCED: ReadonlySet<string> = new Set([
   'page',
   'blog',
   'article',
+  'shop_policy',
 ]);
 
 /**
@@ -60,8 +63,8 @@ export interface MenuItemInput {
   id?: string | null;
   title: string;
   /**
-   * frontpage, catalog, collection, product, page, blog, article or http, or one of Shopify's
-   * others, refused.
+   * frontpage, catalog, collection, product, page, blog, article, search, shop_policy or http,
+   * or one of Shopify's others, refused.
    */
   type: string;
   resourceId?: string | null;
@@ -101,13 +104,14 @@ export function checkMenuItems(
       const resourced = RESOURCED.has(type);
       const resourceId = item.resourceId ?? null;
       if (resourced && !resourceId) {
-        check.addMessage([...at, 'resourceId'], 'BLANK', `A ${type} link needs its ${type}`);
+        const kind = type === 'shop_policy' ? 'policy' : type;
+        check.addMessage([...at, 'resourceId'], 'BLANK', `A ${kind} link needs its ${kind}`);
       }
       if (!resourced && resourceId) {
         check.addMessage(
           [...at, 'resourceId'],
           'INVALID',
-          'Only collection, product, page, blog and article links take a resource ID',
+          'Only collection, product, page, blog, article and policy links take a resource ID',
         );
       }
       const url = type === 'http' ? (item.url?.trim() ?? '') : null;

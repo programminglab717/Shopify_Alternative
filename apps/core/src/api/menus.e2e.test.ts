@@ -30,7 +30,7 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
   let app: NestFastifyApplication;
   const shopA = newId();
   const shopB = newId();
-  const tokens = { a: '', reader: '', products: '', b: '' };
+  const tokens = { a: '', reader: '', products: '', b: '', legal: '' };
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -84,6 +84,7 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
     );
     tokens.a = await issueToken(shopA, ['write_online_store_navigation', 'write_products']);
     tokens.reader = await issueToken(shopA, ['read_online_store_navigation']);
+    tokens.legal = await issueToken(shopA, ['write_legal_policies']);
     tokens.products = await issueToken(shopA, ['write_products']);
     tokens.b = await issueToken(shopB, ['write_online_store_navigation', 'write_products']);
     api = await startTestApi(testDb);
@@ -157,7 +158,7 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
       tokens.a,
       `mutation {
         menuCreate(title: "Help", handle: "help", items: [
-          { title: "Search", type: SEARCH }, { title: "Sale", type: HTTP, url: "javascript:x()" }
+          { title: "All", type: COLLECTIONS }, { title: "Sale", type: HTTP, url: "javascript:x()" }
         ]) { menu { id } userErrors { field code } }
       }`,
     );
@@ -167,6 +168,42 @@ describe.skipIf(!server)('Admin GraphQL API: online store menus', () => {
         { field: ['items', '0', 'type'], code: 'INVALID' },
         { field: ['items', '1', 'url'], code: 'INVALID' },
       ],
+    });
+
+    // The search page, and a policy by its ID at its page (ADR-640).
+    const refunds = await call(
+      tokens.legal,
+      `mutation { shopPolicyUpdate(shopPolicy: { type: REFUND_POLICY, body: "<p>7 days.</p>" }) {
+        shopPolicy { id } userErrors { code }
+      } }`,
+    );
+    const linked = await call(
+      tokens.a,
+      `mutation ($items: [MenuItemCreateInput!]!) {
+        menuCreate(title: "Help", handle: "help", items: $items) {
+          menu { items { title type resourceId url } } userErrors { field code }
+        }
+      }`,
+      {
+        items: [
+          { title: 'Search', type: 'SEARCH' },
+          { title: 'Returns', type: 'SHOP_POLICY', resourceId: refunds.shopPolicy.id },
+        ],
+      },
+    );
+    expect(linked).toEqual({
+      menu: {
+        items: [
+          { title: 'Search', type: 'SEARCH', resourceId: null, url: '/search' },
+          {
+            title: 'Returns',
+            type: 'SHOP_POLICY',
+            resourceId: refunds.shopPolicy.id,
+            url: '/policies/refund-policy',
+          },
+        ],
+      },
+      userErrors: [],
     });
 
     // Changed whole: an item given again keeps its ID; the others go.

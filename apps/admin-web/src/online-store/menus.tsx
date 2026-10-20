@@ -10,6 +10,7 @@ import {
   MenusQuery,
   MenuUpdateMutation,
   PagesQuery,
+  PoliciesQuery,
 } from '../api/operations';
 import type {
   CollectionProductSearchData,
@@ -20,6 +21,7 @@ import type {
   MenuMutationData,
   MenusData,
   PagesData,
+  PoliciesData,
 } from '../api/types';
 import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -48,11 +50,20 @@ const OFFERED: readonly MenuItemType[] = [
   'COLLECTION',
   'PRODUCT',
   'PAGE',
+  'SHOP_POLICY',
+  'SEARCH',
   'HTTP',
 ];
 
 /** The links that name what they lead to by ID. */
-const RESOURCED: readonly MenuItemType[] = ['COLLECTION', 'PRODUCT', 'PAGE', 'BLOG', 'ARTICLE'];
+const RESOURCED: readonly MenuItemType[] = [
+  'COLLECTION',
+  'PRODUCT',
+  'PAGE',
+  'BLOG',
+  'ARTICLE',
+  'SHOP_POLICY',
+];
 
 /** A link as the editor holds it: what the core keeps, and what it last showed as leading to. */
 interface Draft {
@@ -203,6 +214,8 @@ function ProductTarget({ onChoose }: { onChoose: (id: string, title: string) => 
 interface Choices {
   collections: { value: string; label: string }[];
   pages: { value: string; label: string }[];
+  /** The shop's policies that have words (ADR-640). */
+  policies: { value: string; label: string }[];
 }
 
 /** One link: its title, what it leads to, moved, taken out, and the links under it. */
@@ -266,6 +279,14 @@ function LinkEditor({
               label={t('menus.linkPage', { number })}
               value={draft.resourceId ?? ''}
               options={choose(choices.pages, 'menus.choosePage')}
+              onChange={(resourceId) => set({ resourceId: resourceId || null })}
+            />
+          )}
+          {draft.type === 'SHOP_POLICY' && (
+            <SelectField
+              label={t('menus.linkPolicy', { number })}
+              value={draft.resourceId ?? ''}
+              options={choose(choices.policies, 'menus.choosePolicy')}
               onChange={(resourceId) => set({ resourceId: resourceId || null })}
             />
           )}
@@ -420,6 +441,7 @@ function MenuForm({ menu }: { menu: Menu | null }) {
     query: null,
   });
   const pages = useAdminQuery<PagesData>(['pages'], PagesQuery);
+  const policies = useAdminQuery<PoliciesData>(['policies'], PoliciesQuery);
   const create = useAdminMutation<MenuMutationData, Record<string, unknown>>(MenuCreateMutation);
   const update = useAdminMutation<MenuMutationData, Record<string, unknown>>(MenuUpdateMutation);
   const remove = useAdminMutation<MenuMutationData, { id: string }>(MenuDeleteMutation);
@@ -435,6 +457,10 @@ function MenuForm({ menu }: { menu: Menu | null }) {
       label: each.title,
     })),
     pages: (pages.data?.pages.nodes ?? []).map((each) => ({ value: each.id, label: each.title })),
+    policies: (policies.data?.shop.shopPolicies ?? []).map((each) => ({
+      value: each.id,
+      label: each.title,
+    })),
   };
   const shownHandle = handle || handleOf(title);
   const ready = title.trim() !== '' && complete(drafts) && (menu !== null || shownHandle !== '');

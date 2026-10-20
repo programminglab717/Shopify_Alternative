@@ -23,7 +23,8 @@ import {
   type MenuItemInput,
 } from './menu-items.js';
 import type { MenuItemRecord, MenuItemValue, MenuRecord, Page } from './records.js';
-import { articles, blogs, menus, pages, type MenuRow } from './schema.js';
+import { policyHandle } from './policy-types.js';
+import { articles, blogs, menus, pages, policies, type MenuRow } from './schema.js';
 
 export interface MenuInput {
   title: string;
@@ -218,12 +219,13 @@ export class MenuService {
     const named = (type: string) => [
       ...new Set(items.filter((item) => item.type === type).map((item) => item.resourceId!)),
     ];
-    const [collectionIds, productIds, pageIds, blogIds, articleIds] = [
+    const [collectionIds, productIds, pageIds, blogIds, articleIds, policyIds] = [
       named('collection'),
       named('product'),
       named('page'),
       named('blog'),
       named('article'),
+      named('shop_policy'),
     ];
     const collections = new Map(
       (collectionIds.length > 0
@@ -270,6 +272,16 @@ export class MenuService {
         : []
       ).map((blog) => [blog.id, blog.handle]),
     );
+    // A policy at its page while the shop has it: one cleared is gone (ADR-640).
+    const linkedPolicies = new Map(
+      (policyIds.length > 0
+        ? await tx
+            .select({ id: policies.id, type: policies.type })
+            .from(policies)
+            .where(and(eq(policies.shopId, shopId), inArray(policies.id, policyIds)))
+        : []
+      ).map((policy) => [policy.id, policy]),
+    );
     const resolve = (item: MenuItemValue): MenuItemRecord => {
       const where = (): { url: string | null; shown: boolean } => {
         switch (item.type) {
@@ -307,6 +319,13 @@ export class MenuService {
               // Published, and its time come (ADR-215).
               shown: article.publishedAt !== null && article.publishedAt.getTime() <= Date.now(),
             };
+          }
+          case 'search':
+            return { url: '/search', shown: true };
+          case 'shop_policy': {
+            const policy = linkedPolicies.get(item.resourceId!);
+            if (!policy) return GONE;
+            return { url: `/policies/${policyHandle(policy.type)}`, shown: true };
           }
           case 'http':
             return { url: item.url, shown: true };
@@ -352,7 +371,8 @@ export class MenuService {
             page: 'Page',
             blog: 'Blog',
             article: 'Article',
-          }[item.type as 'collection' | 'product' | 'page' | 'blog' | 'article'];
+            shop_policy: 'Policy',
+          }[item.type as 'collection' | 'product' | 'page' | 'blog' | 'article' | 'shop_policy'];
           errors.push({
             field: [...at, 'resourceId'],
             code: 'NOT_FOUND',

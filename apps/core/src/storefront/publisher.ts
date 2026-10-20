@@ -365,8 +365,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.UrlRedirectsMoved:
       return [Items.redirects];
     case OnlineStoreEvents.PolicyUpdated:
-      // Its page, and the footers that list the shop's policies.
-      return [Items.policies, Items.shop];
+      // Its page, the footers that list the shop's policies, and menus that link it while it
+      // has words (ADR-640).
+      return [Items.policies, Items.shop, Items.menus];
     case OnlineStoreEvents.TranslationsUpdated: {
       // Its document has its Urdu (ADR-238); a menu's and its items' are in the menus'.
       const { kind, productId } = event.payload as unknown as TranslationsUpdatedPayload;

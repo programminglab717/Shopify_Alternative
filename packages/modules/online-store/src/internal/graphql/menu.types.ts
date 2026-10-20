@@ -21,7 +21,7 @@ const NOT_YET = { description: 'Not available yet: menus refuse it.' };
 
 registerEnumType(MenuItemType, {
   name: 'MenuItemType',
-  description: "What a menu item links to. Shopify's kinds, of which eight work now.",
+  description: "What a menu item links to. Shopify's kinds, of which ten work now.",
   valuesMap: {
     FRONTPAGE: { description: 'The home page.' },
     CATALOG: { description: 'All products, at /collections/all.' },
@@ -36,8 +36,12 @@ registerEnumType(MenuItemType, {
         'a web, mail or phone address.',
     },
     COLLECTIONS: NOT_YET,
-    SEARCH: NOT_YET,
-    SHOP_POLICY: NOT_YET,
+    SEARCH: { description: 'The search page, at /search (ADR-640).' },
+    SHOP_POLICY: {
+      description:
+        "One of the shop's policies, which `resourceId` names, at its page; gone once the policy " +
+        'is cleared (ADR-640).',
+    },
     METAOBJECT: NOT_YET,
     CUSTOMER_ACCOUNT_PAGE: NOT_YET,
   },

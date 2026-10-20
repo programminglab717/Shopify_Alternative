@@ -128,8 +128,8 @@ function itemInputs(
 }
 
 /**
- * A link's collection, product, page, blog or article; any other's given as it is, which the
- * service refuses.
+ * A link's collection, product, page, blog, article or policy; any other's given as it is, which
+ * the service refuses.
  */
 function resourceIdOf(type: MenuItemType, id: string): string {
   if (type === MenuItemType.COLLECTION) return uuidOf('collection', id);
@@ -137,5 +137,6 @@ function resourceIdOf(type: MenuItemType, id: string): string {
   if (type === MenuItemType.PAGE) return uuidOf('page', id);
   if (type === MenuItemType.BLOG) return uuidOf('blog', id);
   if (type === MenuItemType.ARTICLE) return uuidOf('article', id);
+  if (type === MenuItemType.SHOP_POLICY) return uuidOf('shopPolicy', id);
   return id;
 }

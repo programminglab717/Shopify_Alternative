@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-639 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-640 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -647,6 +647,7 @@
 | 637 | Staff name someone in an order's comment by picking them from a list of the shop's staff by name, which whoever reads orders may see, with nothing of how they sign in | Accepted |
 | 638 | The shop's files are renamed, keeping their extensions, and their words for what they show changed, with Shopify's fileUpdate; where each is used, it stays | Accepted |
 | 639 | A shop's file says where it is used, its logos, the sharing image, articles and themes, and the Files tab says so before it is deleted | Accepted |
+| 640 | Menus link to the search page and to the shop's policies, a policy by its ID at its page and gone once cleared, with Shopify's search_link and policy_link | Accepted |
 
 ---
 
@@ -22788,3 +22789,23 @@
 * **Alternatives:** **Refusing to delete a file in use:** a shop replacing its logo would have
   to unset it first, and a theme no longer published would hold its files for ever. **Each
   module asked by the files module:** the files module would depend on those that use it.
+
+## ADR-640 · Menus link to the search page and to the shop's policies, a policy by its ID at its page and gone once cleared, with Shopify's search_link and policy_link
+
+* **Context:** A menu links the home page, all products, collections, products, pages, blogs,
+  articles and addresses (ADR-040, ADR-178). A shop's footer, as most shops have it, links its
+  search page and its refund and shipping policies, and these could only be typed as addresses,
+  /policies/refund-policy kept by hand and left behind once the policy was cleared (status
+  shortcut 35).
+* **Decision:** Shopify's `SEARCH` and `SHOP_POLICY` menu items work. A search link leads to
+  /search. A policy link names one of the shop's policies by its ID (`shopPolicy`'s) and leads to
+  its page; a policy cleared is gone, as a deleted page is: its link leaves the storefront's menu
+  and the admin says so. The storefront's links say `search_link` and `policy_link`, as Shopify's
+  `link.type` does. A policy changed rebuilds the menus too. The admin's menu editor offers
+  **Search** and **A policy**, the policy chosen from the shop's own.
+* **Consequences:** Footers link policies that follow them. A policy written again after being
+  cleared is a new one, whose link is chosen again. `COLLECTIONS`, tags on links and the rest of
+  Shopify's kinds are still refused.
+* **Alternatives:** **A policy linked by its type:** survives a policy rewritten, but Shopify's
+  API names it by ID, and apps send that. **Links that filter a collection by tag:** the
+  storefront serves no /collections/{handle}/{tag} pages yet, so they would lead nowhere.

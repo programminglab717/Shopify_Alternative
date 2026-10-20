@@ -4,6 +4,7 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { MenuItemInput } from './menu-items.js';
 import type { MenuItemRecord, MenuRecord } from './records.js';
+import { PolicyService } from './policy.service.js';
 import { menus } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 
@@ -160,11 +161,11 @@ describe.skipIf(!server)('MenuService', () => {
     ]);
     const cases: [MenuItemInput, [string, string, string]][] = [
       [
-        { title: 'Search', type: 'search' },
+        { title: 'Collections', type: 'collections' },
         [
           'items.0.type',
           'INVALID',
-          "Menus can't link to search yet: use an http link to its address",
+          "Menus can't link to collections yet: use an http link to its address",
         ],
       ],
       [
@@ -180,7 +181,7 @@ describe.skipIf(!server)('MenuService', () => {
         [
           'items.0.resourceId',
           'INVALID',
-          'Only collection, product, page, blog and article links take a resource ID',
+          'Only collection, product, page, blog, article and policy links take a resource ID',
         ],
       ],
       [
@@ -386,6 +387,67 @@ describe.skipIf(!server)('MenuService', () => {
         }),
       ),
     ).toEqual([['items.0.resourceId', 'NOT_FOUND', 'Blog not found']]);
+  });
+
+  it('links to the search page and to policies by ID, a policy cleared gone (ADR-640)', async () => {
+    // Its storefront's address is not needed to keep a policy.
+    const policies = new PolicyService(f.db, {} as never, {} as never);
+    const refunds = unwrap(
+      await policies.update(f.a, { type: 'refund_policy', body: '<p>7 days.</p>' }),
+    )!;
+    const footer = await byHandle('footer');
+    unwrap(
+      await f.menus.update(f.a, footer.id, {
+        title: 'Footer menu',
+        items: [
+          { title: 'Search', type: 'SEARCH' },
+          { title: 'Returns', type: 'shop_policy', resourceId: refunds.id },
+        ],
+      }),
+    );
+    const read = async () =>
+      (await f.db.tenant(f.a.shopId, (tx) => f.menus.menusOf(tx, f.a.shopId))).find(
+        (menu) => menu.handle === 'footer',
+      )!;
+    expect(outline((await read()).items)).toEqual([
+      'Search search /search',
+      'Returns shop_policy /policies/refund-policy',
+    ]);
+    unwrap(await policies.update(f.a, { type: 'refund_policy', body: '' }));
+    expect(outline((await read()).items)).toEqual([
+      'Search search /search',
+      'Returns shop_policy (gone) (not shown)',
+    ]);
+    // A policy link needs its policy, of the shop's own; search takes none.
+    const theirs = unwrap(
+      await policies.update(f.b, { type: 'privacy_policy', body: '<p>Ours.</p>' }),
+    )!;
+    expect(
+      errorsOf(
+        await f.menus.update(f.a, footer.id, {
+          title: 'Footer menu',
+          items: [
+            { title: 'Policy', type: 'shop_policy' },
+            { title: 'Search', type: 'search', resourceId: theirs.id },
+          ],
+        }),
+      ),
+    ).toEqual([
+      ['items.0.resourceId', 'BLANK', 'A policy link needs its policy'],
+      [
+        'items.1.resourceId',
+        'INVALID',
+        'Only collection, product, page, blog, article and policy links take a resource ID',
+      ],
+    ]);
+    expect(
+      errorsOf(
+        await f.menus.update(f.a, footer.id, {
+          title: 'Footer menu',
+          items: [{ title: 'Theirs', type: 'shop_policy', resourceId: theirs.id }],
+        }),
+      ),
+    ).toEqual([['items.0.resourceId', 'NOT_FOUND', 'Policy not found']]);
   });
 
   it("keeps each shop's menus to itself", async () => {

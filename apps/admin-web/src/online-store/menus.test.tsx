@@ -76,6 +76,20 @@ function core(role: StaffRole) {
             ],
           },
         };
+      case 'Policies':
+        return {
+          shop: {
+            shopPolicies: [
+              {
+                id: 'spol_1',
+                type: 'REFUND_POLICY',
+                title: 'Refund policy',
+                body: '<p>7 days.</p>',
+                url: 'https://zari.hatti.pk/policies/refund-policy',
+              },
+            ],
+          },
+        };
       case 'CollectionProductSearch':
         return { products: { nodes: [{ id: 'prod_9', title: 'Chappal', status: 'ACTIVE' }] } };
       case 'MenuCreate':
@@ -183,6 +197,40 @@ describe("The online store's menus", () => {
       }),
     );
     expect(handleOf('  Ramzan — Offers! ')).toBe('ramzan-offers');
+  });
+
+  it('links the search page and a policy chosen from the shop’s (ADR-640)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/menus/new');
+
+    await screen.findByLabelText('Title');
+    type('Title', 'Help');
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    type('Link 1: title', 'Search');
+    fireEvent.change(screen.getByLabelText('Link 1: goes to'), { target: { value: 'SEARCH' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add a link' }));
+    type('Link 2: title', 'Returns');
+    fireEvent.change(screen.getByLabelText('Link 2: goes to'), {
+      target: { value: 'SHOP_POLICY' },
+    });
+    const make = screen.getByRole('button', { name: 'Make the menu' }) as HTMLButtonElement;
+    // A policy link waits for its policy.
+    expect(make.disabled).toBe(true);
+    await screen.findByRole('option', { name: 'Refund policy' });
+    fireEvent.change(screen.getByLabelText('Link 2: policy'), { target: { value: 'spol_1' } });
+    fireEvent.click(make);
+
+    await waitFor(() =>
+      expect(sentOf(fake, 'MenuCreate')).toEqual({
+        title: 'Help',
+        handle: 'help',
+        items: [
+          { title: 'Search', type: 'SEARCH', items: [] },
+          { title: 'Returns', type: 'SHOP_POLICY', resourceId: 'spol_1', items: [] },
+        ],
+      }),
+    );
   });
 
   it('deletes a menu of its own after asking, but never the main or footer menu', async () => {

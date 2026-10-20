@@ -132,8 +132,9 @@ function toMenuItem(record: MenuItemRecord): MenuItem {
       page: 'page',
       blog: 'blog',
       article: 'article',
+      shop_policy: 'shopPolicy',
     } as const
-  )[record.type as 'collection' | 'product' | 'page' | 'blog' | 'article'];
+  )[record.type as 'collection' | 'product' | 'page' | 'blog' | 'article' | 'shop_policy'];
   return Object.assign(new MenuItem(), {
     id: toPublicId('menuItem', record.id),
     title: record.title,

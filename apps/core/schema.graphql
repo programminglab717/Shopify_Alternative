@@ -7013,7 +7013,7 @@ input MenuItemCreateInput {
   url: String
 }
 
-"""What a menu item links to. Shopify's kinds, of which eight work now."""
+"""What a menu item links to. Shopify's kinds, of which ten work now."""
 enum MenuItemType {
   """An article, which `resourceId` names."""
   ARTICLE
@@ -7050,10 +7050,12 @@ enum MenuItemType {
   """A product, which `resourceId` names."""
   PRODUCT
 
-  """Not available yet: menus refuse it."""
+  """The search page, at /search (ADR-640)."""
   SEARCH
 
-  """Not available yet: menus refuse it."""
+  """
+  One of the shop's policies, which `resourceId` names, at its page; gone once the policy is cleared (ADR-640).
+  """
   SHOP_POLICY
 }
 

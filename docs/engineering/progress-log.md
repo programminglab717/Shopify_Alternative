@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Menus link search and policies
+
+* **Menus link to the search page and to the shop's policies** ([ADR-640](../architecture/13-decision-log.md#adr-640--menus-link-to-the-search-page-and-to-the-shops-policies-a-policy-by-its-id-at-its-page-and-gone-once-cleared-with-shopifys-search_link-and-policy_link)): Shopify's `SEARCH` and
+  `SHOP_POLICY` items, a policy's link gone once it is cleared, `search_link` and `policy_link`
+  on the storefront, and the admin's editor offering both.
+* 3767 tests, two more: the menus module's search and policy links, and the editor's; the
+  menus API and publisher tests now link both.
+
 ### 365518c · Where the shop's files are used
 
 * **A file says where it is used, and the Files tab says so before it is deleted** ([ADR-639](../architecture/13-decision-log.md#adr-639--a-shops-file-says-where-it-is-used-its-logos-the-sharing-image-articles-and-themes-and-the-files-tab-says-so-before-it-is-deleted)):

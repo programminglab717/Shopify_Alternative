@@ -284,10 +284,10 @@ describe('What storefront documents an event makes stale', () => {
     }
   });
 
-  it("rebuilds the shop's policies when one changes, and the shop, whose document lists them", () => {
+  it("rebuilds the shop's policies when one changes, the shop, whose document lists them, and menus that link it (ADR-640)", () => {
     expect(
       itemsFor(event('shop_policy.updated', { type: 'refund_policy', removed: false })),
-    ).toEqual(['policies', 'shop']);
+    ).toEqual(['policies', 'shop', 'menus']);
   });
 
   it('rebuilds the shop when its Meta pixel changes, whose document names it, and not otherwise', () => {
@@ -2025,16 +2025,38 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   it("publishes the shop's policies, their bodies apart, and lists them in its document", async () => {
     forgotten.length = 0;
     unwrap(await policies.update(tenant, { type: 'shipping_policy', body: '<p>Rs 250.</p>' }));
-    unwrap(await policies.update(tenant, { type: 'refund_policy', body: '<p>7 days.</p>' }));
+    const refunds = unwrap(
+      await policies.update(tenant, { type: 'refund_policy', body: '<p>7 days.</p>' }),
+    )!;
+    // A menu links the search page and a policy, as Shopify's link types say (ADR-640).
+    const help = unwrap(
+      await menus.create(tenant, {
+        title: 'Help',
+        handle: 'help',
+        items: [
+          { title: 'Search', type: 'search' },
+          { title: 'Returns', type: 'shop_policy', resourceId: refunds.id },
+        ],
+      }),
+    );
     await deliver();
     expect((await store().shop()).policies).toEqual(['refund_policy', 'shipping_policy']);
     expect(await store().policy('refund_policy')).toBe('<p>7 days.</p>');
     expect(forgotten.flat()).toContain(shopTag(shopId));
+    expect((await store().menu('help'))!.links).toEqual([
+      { title: 'Search', url: '/search', type: 'search_link', links: [] },
+      { title: 'Returns', url: '/policies/refund-policy', type: 'policy_link', links: [] },
+    ]);
     unwrap(await policies.update(tenant, { type: 'refund_policy', body: '' }));
     unwrap(await policies.update(tenant, { type: 'shipping_policy', body: '' }));
     await deliver();
     expect((await store().shop()).policies).toEqual([]);
     expect(await store().policy('refund_policy')).toBeNull();
+    // The policy gone, its link goes from the menu too.
+    expect((await store().menu('help'))!.links).toEqual([
+      { title: 'Search', url: '/search', type: 'search_link', links: [] },
+    ]);
+    unwrap(await menus.delete(tenant, help.id));
   });
 
   it("publishes a policy's Urdu beside it while it translates the policy as it is (ADR-239)", async () => {
