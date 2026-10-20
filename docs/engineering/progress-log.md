@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Search engine listings of collections, pages, blogs and articles
+### 7c50b5b · Search engine listings of collections, pages, blogs and articles
 
 * **Collections, pages, blogs and articles have the same search engine listing card in the admin as
   products** ([ADR-601](../architecture/13-decision-log.md#adr-601--collections-pages-blogs-and-articles-have-the-same-search-engine-listing-card-in-the-admin-as-products), OS-09).
