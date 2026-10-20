@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
-### Old crops' files removed
+### e23ff33 · Old crops' files removed
 
 * **A crop an image is no longer shown in has its files removed eight days after** ([ADR-630](../architecture/13-decision-log.md#adr-630--a-crop-an-image-is-no-longer-shown-in-has-its-files-removed-from-storage-by-the-worker-eight-days-after-past-the-week-the-edge-may-serve-a-page-cached-before-a-crop-shown-again-meanwhile-stays-and-the-edge-keeps-what-it-has)):
   a trigger records it (migration 0285), and the worker's image round removes its folder with
