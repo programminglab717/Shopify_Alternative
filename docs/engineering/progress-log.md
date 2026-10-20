@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-20
 
+### Questions and answers on a page
+
+* **Hatti Base answers shoppers' questions on a page, and tells search engines** ([ADR-615](../architecture/13-decision-log.md#adr-615--hatti-base-answers-shoppers-questions-on-a-page-of-the-shops-choosing-each-opened-in-place-and-tells-search-engines-the-same-as-an-faqpage-unless-the-section-says-not-to)): a
+  `faq` section of question blocks in a `page.faq` template, opened in place, and given as an
+  FAQPage unless the section says not to.
+* 3718 tests, 1 more: the questions shown and given, one without its
+  answer left out, the structured data turned off, and none on other pages.
+
 ### 2573fde · A breadcrumb trail shoppers see
 
 * **Hatti Base shows where each page sits above it** ([ADR-614](../architecture/13-decision-log.md#adr-614--hatti-base-shows-where-each-page-sits-above-it-the-home-page-to-the-page-as-the-breadcrumblist-gives-it-unless-the-shop-turns-it-off-in-the-themes-settings)): the home page, a blog before its

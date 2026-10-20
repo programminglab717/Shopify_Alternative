@@ -1,0 +1,33 @@
+{
+  "sections": {
+    "main": { "type": "main-page" },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "delivery": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "Two to five working days across Pakistan."
+          }
+        },
+        "payment": {
+          "type": "question",
+          "settings": {
+            "question": "Can I pay cash on delivery?",
+            "answer": "Yes. Pay the rider when your parcel arrives."
+          }
+        },
+        "returns": {
+          "type": "question",
+          "settings": {
+            "question": "Can I return or exchange an item?",
+            "answer": "Yes, within 7 days of delivery, unworn and with its tags."
+          }
+        }
+      },
+      "block_order": ["delivery", "payment", "returns"]
+    }
+  },
+  "order": ["main", "faq"]
+}

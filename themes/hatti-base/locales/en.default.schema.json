@@ -164,6 +164,31 @@
         }
       }
     },
+    "faq": {
+      "name": "Questions and answers",
+      "settings": {
+        "heading": {
+          "label": "Heading"
+        },
+        "structured_data": {
+          "label": "Tell search engines these questions and answers",
+          "info": "As an FAQPage, which search results may show beneath the page."
+        }
+      },
+      "blocks": {
+        "question": {
+          "name": "Question",
+          "settings": {
+            "question": {
+              "label": "Question"
+            },
+            "answer": {
+              "label": "Answer"
+            }
+          }
+        }
+      }
+    },
     "newsletter": {
       "name": "Newsletter",
       "settings": {

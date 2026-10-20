@@ -524,6 +524,70 @@ describe('Storefront rendering', () => {
     expect(await trailOf({ path: '/collections/eid-lawn' }, off)).toBeNull();
   });
 
+  it("answers shoppers' questions on a page, and tells search engines as an FAQPage (ADR-615)", async () => {
+    const sample = sampleStore();
+    const store = new MemoryStore({
+      ...sample,
+      pages: [
+        ...sample.pages,
+        { ...sample.pages[0]!, id: 'pg-faq', handle: 'faq', title: 'FAQs', templateSuffix: 'faq' },
+      ],
+    });
+    const render = async (theme = files) => {
+      const renderer = new PageRenderer(loadTheme(theme), {
+        platformUrl: 'https://hatti.pk',
+        limits: { timeMs: 10_000 },
+      });
+      const { html } = await renderer.render({ path: '/pages/faq' }, store.fresh());
+      const faqs = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+        .map(([, json]) => JSON.parse(json!) as Record<string, unknown>)
+        .filter((data) => data['@type'] === 'FAQPage');
+      return { html, faqs };
+    };
+
+    const { html, faqs } = await render();
+    expect([...html.matchAll(/<summary dir="auto">([^<]*)<\/summary>/g)].map(([, q]) => q)).toEqual(
+      [
+        'How long does delivery take?',
+        'Can I pay cash on delivery?',
+        'Can I return or exchange an item?',
+      ],
+    );
+    expect(faqs).toHaveLength(1);
+    expect(faqs[0]!.mainEntity).toEqual([
+      {
+        '@type': 'Question',
+        name: 'How long does delivery take?',
+        acceptedAnswer: { '@type': 'Answer', text: 'Two to five working days across Pakistan.' },
+      },
+      expect.objectContaining({ name: 'Can I pay cash on delivery?' }),
+      expect.objectContaining({ name: 'Can I return or exchange an item?' }),
+    ]);
+
+    // A question without its answer is left out of both; search engines are told nothing where
+    // the section says not to.
+    const template = JSON.parse(files['templates/page.faq.json']!) as {
+      sections: {
+        faq: {
+          settings?: Record<string, unknown>;
+          blocks: Record<string, { settings: Record<string, string> }>;
+        };
+      };
+    };
+    template.sections.faq.blocks.payment!.settings.answer = '';
+    template.sections.faq.settings = { structured_data: false };
+    const edited = await render({ ...files, 'templates/page.faq.json': JSON.stringify(template) });
+    expect(edited.html).not.toContain('Can I pay cash on delivery?');
+    expect(edited.html).toContain('How long does delivery take?');
+    expect(edited.faqs).toEqual([]);
+    // Other pages have none.
+    const { html: returns } = await new PageRenderer(loadTheme(files), {
+      platformUrl: 'https://hatti.pk',
+      limits: { timeMs: 10_000 },
+    }).render({ path: '/pages/returns' }, store.fresh());
+    expect(returns).not.toContain('FAQPage');
+  });
+
   it("shows the shop's own Urdu on its Urdu pages, and its own words where it gave none (ADR-238)", async () => {
     const sample = sampleStore();
     const urdu = <T extends { id: string }>(docs: T[], id: string, translations: unknown) =>

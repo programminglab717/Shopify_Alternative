@@ -164,6 +164,31 @@
         }
       }
     },
+    "faq": {
+      "name": "سوال و جواب",
+      "settings": {
+        "heading": {
+          "label": "عنوان"
+        },
+        "structured_data": {
+          "label": "یہ سوال و جواب سرچ انجنز کو بتائیں",
+          "info": "FAQPage کے طور پر، جو سرچ کے نتائج صفحے کے نیچے دکھا سکتے ہیں۔"
+        }
+      },
+      "blocks": {
+        "question": {
+          "name": "سوال",
+          "settings": {
+            "question": {
+              "label": "سوال"
+            },
+            "answer": {
+              "label": "جواب"
+            }
+          }
+        }
+      }
+    },
     "newsletter": {
       "name": "نیوز لیٹر",
       "settings": {

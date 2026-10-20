@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-614 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-615 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -622,6 +622,7 @@
 | 612 | The shop straightens every chain of redirects at once, each sent straight to where its chain ends, loops left for it to break | Accepted |
 | 613 | A refund may be for a customer return, at most what was paid for its items and is not refunded yet, in money or as store credit; each return says what it is worth and what was refunded for it | Accepted |
 | 614 | Hatti Base shows where each page sits above it, the home page to the page as the BreadcrumbList gives it, unless the shop turns it off in the theme's settings | Accepted |
+| 615 | Hatti Base answers shoppers' questions on a page of the shop's choosing, each opened in place, and tells search engines the same as an FAQPage unless the section says not to | Accepted |
 
 ---
 
@@ -22245,3 +22246,26 @@
   editor, but six templates to change and a trail easily missed on one; the layout shows it
   everywhere at once. **A product's collection in its trail:** Shopify's themes show it only for
   a product reached through a collection's address, which Hatti's storefront does not serve.
+
+## ADR-615 · Hatti Base answers shoppers' questions on a page of the shop's choosing, each opened in place, and tells search engines the same as an FAQPage unless the section says not to
+
+* **Context:** Shops in Pakistan answer the same questions all day on WhatsApp: how long delivery
+  takes, whether cash on delivery is taken, how returns work. Hatti Base had nowhere to put the
+  answers but a page's body, which search engines read as prose, and the structured data it gives
+  (ADR-237, ADR-608) had no FAQPage (status shortcut 41).
+* **Decision:** A section, `faq`, of question blocks, each a question and its answer (plain text,
+  its lines kept), up to 50, shown as `<details>` a shopper opens in place, with a heading. Where
+  its `structured_data` setting is on, the default, the same questions and answers go to search
+  engines as schema.org's `FAQPage`, written in Liquid with the `json` filter as the other
+  structured data is. A question without its answer, or an answer without its question, is left
+  out of both, so nothing is told to search engines that shoppers cannot read. The section ships
+  in a page template, `page.faq`, with three questions a Pakistani shop is asked to start from;
+  the shop picks it for a page and edits the questions in the theme editor, which edits a
+  template's blocks but adds no sections.
+* **Consequences:** A shop gives its answers once, on a page shoppers find and search results may
+  show beneath it. Answers are text, not rich text, so a theme's setting cannot carry markup the
+  storefront would print unchecked.
+* **Alternatives:** **Questions kept by the core, per shop or per product:** an API and an admin
+  screen of their own, where the theme editor already edits blocks. **Rich-text answers:** links
+  and lists in answers, at the cost of printing a setting's HTML as it is; worth it once settings'
+  HTML is cleaned as pages' bodies are.
