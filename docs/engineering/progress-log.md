@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A landmark asked for where riders could not find houses
+
+* **Checkout asks once for a landmark or the pin where the shop's couriers lately could not find
+  houses** ([ADR-717](../architecture/13-decision-log.md#adr-717--checkout-asks-once-for-a-landmark-or-the-pin-where-the-shops-couriers-lately-could-not-find-houses-the-area-learned-from-its-own-parcels-failed-deliveries)): the orders module's `hardToFindIn` reads the shop's last 180 days of parcels
+  to the area, and the steps whose courier named the address as the trouble.
+* 3989 tests, one more: the checkout module's.
+
 ### e8ce8ac · The admin's stock held at checkout
 
 * **Settings → Checkout chooses how long a checkout holds its cart's stock** ([ADR-716](../architecture/13-decision-log.md#adr-716--the-admins-checkout-settings-choose-how-long-a-checkout-holds-its-carts-stock-from-a-few-minutes-or-not-at-all-offering-minutes-set-through-the-api-too)): "Don't

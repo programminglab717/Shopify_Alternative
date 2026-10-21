@@ -98,6 +98,8 @@ export {
   type DeliveryToRescue,
   type RescueAnswerValue,
 } from '../internal/delivery-rescue.service.js';
+// Areas riders struggle to find houses in, learned from the shop's parcels (ADR-717).
+export { HARD_TO_FIND, hardToFindIn } from '../internal/hard-to-find.js';
 export {
   REVIEW_REQUEST_LIMITS,
   markReviewRequestedIn,

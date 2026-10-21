@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-716 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-717 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -724,6 +724,7 @@
 | 714 | Checkout's links back to the shop go to its primary domain while DNS points it at the platform, its platform subdomain otherwise | Accepted |
 | 715 | Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, at the location the order would ship from; the holder's cart counts it as theirs, and the order, another checkout of the cart or the sweep gives it back | Accepted |
 | 716 | The admin's checkout settings choose how long a checkout holds its cart's stock, from a few minutes or not at all, offering minutes set through the API too | Accepted |
+| 717 | Checkout asks once for a landmark or the pin where the shop's couriers lately could not find houses, the area learned from its own parcels' failed deliveries | Accepted |
 
 ---
 
@@ -24506,3 +24507,31 @@
   in the activity log as "Stock held at checkout".
 * **Alternatives:** **A number field of any minutes from 5 to 60:** a few choices are quicker to
   tap on a phone, and the API still takes any.
+
+## ADR-717 · Checkout asks once for a landmark or the pin where the shop's couriers lately could not find houses, the area learned from its own parcels' failed deliveries
+
+* **Context:** Checkout asks once about an address that leaves out a house number or the street
+  ([ADR-682](#adr-682--checkout-asks-once-for-more-of-an-address-that-leaves-out-a-house-number-or-the-street-saying-what-riders-look-for-and-places-it-as-it-is-when-the-shopper-posts-it-again)). It had no deliveries to learn from. Now couriers' steps are kept for each
+  parcel, with what they said: "Address incomplete", "Location not found", "Ghalat pata". Some
+  areas' houses are hard to find whatever the shopper types, and a landmark or a pin
+  ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)) is what gets the rider there.
+* **Decision:**
+  * **The orders module says whether an area is hard to find** (`hardToFindIn`, on its facade).
+    It looks at the shop's parcels to that area of the city in the last 180 days. The area is the
+    address's second line, read alike however it was typed. The area is hard to find when at
+    least two of those parcels, and at least a quarter of them, had a step in which the courier
+    said the address was the trouble. Such a step is a delivery tried, or the parcel coming back
+    or failing. What counts as the address's trouble is the courier's words naming the address,
+    the location or the "pata", in English, Roman Urdu or Urdu, or calling it untraceable. A
+    refusal, or a customer who didn't answer, is not.
+  * **Checkout asks once there**, for an order to be delivered whose address has no landmark and
+    no pin. It names the area and says that a landmark, or the pin on the map, helps riders find
+    the house. As with ADR-682, posting again unchanged places the order as it is.
+* **Consequences:** A shop's own failed deliveries make its checkout ask the next shopper in the
+  same area for what riders needed. An area with one failure, or few failures among many
+  deliveries, is never asked about. The query reads the shop's parcels for the last 180 days on
+  each such order, which an index on the area would make cheaper once shops ship many.
+* **Alternatives:**
+  * **Learning across all shops:** more parcels to learn from, but each shop's customers' addresses
+    are theirs. A shared table of areas alone may come later.
+  * **Counting every failed delivery:** refusals and unanswered calls are not the address's fault.

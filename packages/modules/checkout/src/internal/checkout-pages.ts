@@ -1594,6 +1594,19 @@ function vagueAddressWords(gaps: readonly AddressGap[]): Sentence {
   };
 }
 
+/** An area riders have lately struggled to find houses in, by the shop's parcels (ADR-717). */
+function hardToFindWords(area: string): Sentence {
+  return {
+    en:
+      `Riders have had trouble finding houses in ${area} lately. A landmark near you, or your ` +
+      'pin on the map, helps them find yours. Add one below if you can, or press the button ' +
+      'again to place your order as it is.',
+    ur: html`رائیڈرز کو حال ہی میں <span dir="auto">${area}</span> میں گھر ڈھونڈنے میں مشکل ہوئی ہے۔
+      آپ کے قریب کوئی نشانی، یا نقشے پر آپ کی پن، انہیں آپ کا گھر ڈھونڈنے میں مدد دیتی ہے۔ ہو سکے تو
+      نیچے لکھ دیں، یا اپنا آرڈر ایسے ہی دینے کے لیے بٹن دوبارہ دبائیں۔`,
+  };
+}
+
 function codeWords(problem: Extract<CheckoutProblem, { kind: 'code' }>): Sentence {
   const phone = problem.phone;
   const where =
@@ -1796,7 +1809,9 @@ function problemWords(
         ur: 'آپ کی معلومات میں کچھ کمی یا غلطی ہے۔ نیچے دیکھیں۔',
       };
     case 'vague_address':
-      return vagueAddressWords(problem.gaps);
+      return problem.hardToFind
+        ? hardToFindWords(problem.hardToFind)
+        : vagueAddressWords(problem.gaps);
     case 'unavailable':
       return {
         en: 'Some of your cart is no longer available. Go back to your cart to change it.',

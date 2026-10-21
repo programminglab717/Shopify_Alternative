@@ -499,6 +499,69 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(addressGaps(FORM)).toEqual([]);
   });
 
+  it("asks for a landmark where riders lately struggled to find houses, by the shop's parcels (ADR-717)", async () => {
+    const system = { shopId: f.a.shopId, actor: 'system' as const };
+    /** An order to Gulshan-e-Iqbal from `phone`, shipped, and what its courier said of it. */
+    const shipped = async (phone: string, message: string | null) => {
+      const { token } = await lawnCart();
+      const { secret, view } = await started(token);
+      const order = placedOrder(await f.checkouts.place(secret, view.shown, { ...FORM, phone }));
+      unwrap(await f.orders.confirm(f.a, order.id));
+      const parcel = unwrap(await f.fulfillments.fulfill(f.a, order.id, {})).fulfillmentId;
+      if (message) {
+        unwrap(
+          await f.fulfillments.recordEvent(system, parcel, {
+            status: 'attempted_delivery',
+            message,
+          }),
+        );
+      }
+    };
+    const bare = { ...FORM, landmark: '', address2: '  gulshan-E-iqbal ' };
+    const ask = async (form: CheckoutForm) => {
+      const { token } = await lawnCart();
+      const { secret, view } = await started(token);
+      return { secret, view, asked: await f.checkouts.place(secret, view.shown, form) };
+    };
+
+    await shipped('0300-1111111', 'Address incomplete, consignee not found');
+    await shipped('0300-2222222', 'Customer not available');
+    // One parcel whose address was the trouble is not yet the area's.
+    const once = await ask(bare);
+    expect(once.asked.kind).toBe('placed');
+
+    await shipped('0300-3333333', 'Ghalat pata');
+    // Two of four: an address there with no landmark nor pin is asked about once, however the
+    // area is typed.
+    const { secret, view, asked } = await ask({ ...bare, phone: '0300-4444444' });
+    expect(open(asked).problem).toEqual({
+      kind: 'vague_address',
+      gaps: ['landmark'],
+      hardToFind: 'gulshan-E-iqbal',
+    });
+    const page = checkoutPage(asked);
+    expect(page.status).toBe(422);
+    expect(page.html).toContain(
+      'Riders have had trouble finding houses in gulshan-E-iqbal lately.',
+    );
+    expect(page.html).toContain('رائیڈرز کو حال ہی میں');
+    // Posted again as it was: placed as it is.
+    placedOrder(
+      await f.checkouts.place(secret, view.shown, {
+        ...bare,
+        phone: '0300-4444444',
+        addressChecked: bare.address1,
+      }),
+    );
+    // With a landmark, or to another area, nothing is asked.
+    expect((await ask({ ...bare, phone: '0300-5555555', landmark: 'Near Nipa' })).asked.kind).toBe(
+      'placed',
+    );
+    expect((await ask({ ...bare, phone: '0300-6666666', address2: 'Clifton' })).asked.kind).toBe(
+      'placed',
+    );
+  });
+
   it("keeps the pin the shopper's phone added at the address, and refuses one far from it (ADR-259)", async () => {
     const { token } = await lawnCart();
     const { secret, view } = await started(token);

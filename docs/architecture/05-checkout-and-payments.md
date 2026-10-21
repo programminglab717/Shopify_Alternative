@@ -148,7 +148,7 @@ customer's phone is, added by the page's one script when they say they are at th
 kept in Pakistan and near the city typed ([ADR-259](./13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)). Not yet: a map to move
 the pin on, and couriers' own area lists. An address whose house-and-street line has no
 number or no street is asked about once, saying what riders look for, and placed as it is when
-posted again ([ADR-682](./13-decision-log.md#adr-682--checkout-asks-once-for-more-of-an-address-that-leaves-out-a-house-number-or-the-street-saying-what-riders-look-for-and-places-it-as-it-is-when-the-shopper-posts-it-again)).
+posted again ([ADR-682](./13-decision-log.md#adr-682--checkout-asks-once-for-more-of-an-address-that-leaves-out-a-house-number-or-the-street-saying-what-riders-look-for-and-places-it-as-it-is-when-the-shopper-posts-it-again)). Where the shop's couriers lately could not find houses in the area typed, it asks once for a landmark or the pin too ([ADR-717](./13-decision-log.md#adr-717--checkout-asks-once-for-a-landmark-or-the-pin-where-the-shops-couriers-lately-could-not-find-houses-the-area-learned-from-its-own-parcels-failed-deliveries)).
 * **Address quality score:** heuristics and later ML flag vague addresses ("near market") and
   prompt the shopper to add detail. Poor address quality is a leading cause of failed delivery.
 * Phone validation: Pakistani mobile numbers normalised to E.164 (`+923XXXXXXXXX`) with the local

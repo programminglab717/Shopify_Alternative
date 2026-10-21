@@ -43,6 +43,7 @@ import {
   checkAddress,
   chosenGateway,
   codLimitError,
+  hardToFindIn,
   offeredBankTransferIn,
   prepaidDiscountOf,
   savedAddressIn,
@@ -375,9 +376,10 @@ export type CheckoutProblem =
   | { kind: 'address'; errors: FieldError[] }
   /**
    * The address leaves out what riders look for (CHK-02, ADR-682): the page asks once for more,
-   * and places it as it is when posted again unchanged.
+   * and places it as it is when posted again unchanged. With `hardToFind`, the area riders have
+   * lately struggled to find houses in, which asks for a landmark or the pin (ADR-717).
    */
-  | { kind: 'vague_address'; gaps: AddressGap[] }
+  | { kind: 'vague_address'; gaps: AddressGap[]; hardToFind?: string }
   /** Some of the cart cannot be bought now, as when it sold out. */
   | { kind: 'unavailable' }
   /** It would collect more cash on delivery than the law allows an order (TAX-07). */
@@ -1106,6 +1108,20 @@ export class CheckoutService {
       if (!pickupAt && (form.addressChecked ?? '').trim() !== form.address1.trim()) {
         const gaps = addressGaps(form);
         if (isVague(gaps)) return { ...view, problem: { kind: 'vague_address', gaps } };
+        // In an area where riders have lately struggled to find houses, by the shop's own parcels,
+        // a landmark or the pin is asked for too (ADR-717).
+        const area = address.address2?.trim() ?? '';
+        if (
+          area &&
+          !address.landmark &&
+          !address.location &&
+          (await hardToFindIn(tx, found.shopId, { city: address.city, area }))
+        ) {
+          return {
+            ...view,
+            problem: { kind: 'vague_address', gaps: ['landmark'], hardToFind: area },
+          };
+        }
       }
       // Not more orders lately from the number, or the internet address, than checkout takes.
       const recent = await this.orders.checkoutOrdersFrom(tx, found.shopId, {
