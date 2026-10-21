@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### An advance on the tagged products alone
+### 1e59e5c · An advance on the tagged products alone
 
 * **An advance naming products' tags may be counted on those products alone, a share of what they
   come to after the code's share of them, or an amount up to it** ([ADR-712](../architecture/13-decision-log.md#adr-712--an-advance-naming-products-tags-may-be-counted-on-those-products-alone-a-share-of-what-they-come-to-after-the-codes-share-of-them-or-an-amount-up-to-it)): CHK-10's suits
