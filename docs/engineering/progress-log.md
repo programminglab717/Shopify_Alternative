@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The theme's settings in the preview
+
+* **The theme editor's preview shows the theme's settings as they change, every section of the
+  page rendered again with them, the few around the sections once saved** ([ADR-708](../architecture/13-decision-log.md#adr-708--the-theme-editors-preview-shows-the-themes-settings-as-they-change-every-section-of-the-page-rendered-again-with-them-the-few-around-the-sections-once-saved)): OS-02's
+  visual editor, its last MVP shortcut.
+* 3963 tests, one more: the storefront's; the admin's preview test asks for the page's
+  sections now.
+
 ### a822403 · Rich-text theme settings
 
 * **Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme

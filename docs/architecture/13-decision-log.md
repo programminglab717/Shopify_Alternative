@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-707 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-708 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -715,6 +715,7 @@
 | 705 | A theme's sections play YouTube and Vimeo videos from Shopify's video_url setting, the address checked as it is saved, and Hatti Base has a video section | Accepted |
 | 706 | The admin's theme editor adds sections to a page from the theme's presets, as Shopify's does, opened to be set up, 25 at most, and gives a video_url setting its box | Accepted |
 | 707 | Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme Check refusing anything else, and Hatti Base's FAQ answers are rich text | Accepted |
+| 708 | The theme editor's preview shows the theme's settings as they change, every section of the page rendered again with them, the few around the sections once saved | Accepted |
 
 ---
 
@@ -24294,3 +24295,25 @@
   silently; refusing says what is wrong. **Cleaning as the storefront prints:** a cost on every
   page for what is checked once. **A formatting toolbar in the editor:** the page body's plain
   text already writes the same HTML, on a phone too.
+
+## ADR-708 · The theme editor's preview shows the theme's settings as they change, every section of the page rendered again with them, the few around the sections once saved
+
+* **Context:** The preview showed a section's changes as they were made ([ADR-325](#adr-325--the-theme-editors-preview-frames-the-storefront-beside-the-editor-and-shows-changes-as-they-are-made-the-pages-sections-following-the-editors-files-the-themes-settings-show-once-saved))
+  and the theme's colours and widths through the layout's CSS ([ADR-700](#adr-700--the-theme-editors-preview-shows-the-themes-colours-and-widths-as-they-change-the-layouts--style--css-rendered-again-with-the-unsaved-settings-and-put-in-the-page)), but the
+  theme's other settings, such as whether the cart is a drawer or a page and the WhatsApp order
+  button, only once saved and the page opened again. Sections read those settings, and the
+  storefront already renders any section of the page with the editor's unsaved files.
+* **Decision:**
+  * **A change to the theme's settings renders every section of the page again** with them,
+    the static ones too, such as the cart drawer, five to a request as the storefront takes
+    them, the layout's CSS with the first; the page's script puts each in place as it does a
+    changed one. A section may read any of the theme's settings, so none is left out.
+  * **What the layout prints around its sections**, Hatti Base's breadcrumbs and WhatsApp chat
+    button, still shows once saved, the page opened again with it; the preview says so.
+* **Consequences:** A merchant sees the cart, the product page's buttons and the rest change
+  as they choose; a page of ten sections costs two renders a change, after the editor's pause
+  between keystrokes.
+* **Alternatives:** **Only the sections that read the setting changed:** the storefront would
+  have to follow every snippet a section renders to know, for little saved. **The whole page
+  loaded again:** it loses the shopper's scroll and the merchant's place, as Shopify's editor
+  does not.

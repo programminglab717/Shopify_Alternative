@@ -754,26 +754,49 @@ describe("A theme's editor", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open the page again' }));
     expect(src()).toBe(`${STOREFRONT}/?preview=v1.k1.preview-token`);
 
-    // The theme's colours show as they change, the layout's CSS rendered again with them, and
-    // the rest of its settings once saved: the page opened again with them (ADR-700).
+    // The theme's settings show as they change: every section of the page rendered again with
+    // them, five at a time, and the layout's CSS (ADR-700, ADR-708); the few around the
+    // sections once saved, the page opened again with them.
     frame = await preview();
-    frame.tell(ready('/', 'templates/index.json'));
-    fireEvent.click(screen.getByRole('button', { name: 'Colours' }));
-    type('Buttons and links: colour code', '#B45309');
+    const onPage = [
+      ['header-group__announcement', 'sections/header-group.json', 'announcement'],
+      ['header-group__header', 'sections/header-group.json', 'header'],
+      ['banner', 'templates/index.json', 'banner'],
+      ['lawn', 'templates/index.json', 'lawn'],
+      ['khussa', 'templates/index.json', 'khussa'],
+      ['footer-group__footer', 'sections/footer-group.json', 'footer'],
+      ['cart-drawer', 'config/settings_data.json', 'cart-drawer'],
+    ].map(([id, file, key]) => ({ id, file, key }));
+    frame.tell({ ...ready('/', 'templates/index.json'), sections: onPage });
+    fireEvent.click(screen.getByRole('button', { name: 'Orders' }));
+    fireEvent.change(screen.getByLabelText('When a product is added to the cart'), {
+      target: { value: 'page' },
+    });
     expect(
       screen.getByText(
-        'Colours and the page’s width show as you change them; the theme’s other settings once you save them.',
+        'The theme’s settings show as you change them, but for the few around the page’s sections, such as breadcrumbs and the WhatsApp button, which show once you save them.',
       ),
     ).toBeTruthy();
-    await waitFor(() => expect(frame.renders()).toHaveLength(1));
-    const [styled] = frame.renders();
-    expect(styled).toMatchObject({ sections: [], styles: true });
-    expect(styled!.files['config/settings_data.json']).toContain('#B45309');
+    await waitFor(() => expect(frame.renders()).toHaveLength(2));
+    const [styled, rest] = frame.renders();
+    expect(styled).toMatchObject({
+      sections: onPage.slice(0, 5).map((section) => section.id),
+      styles: true,
+    });
+    expect(rest).toMatchObject({ sections: onPage.slice(5).map((section) => section.id) });
+    expect(rest!.styles).toBeUndefined();
+    expect(styled!.files['config/settings_data.json']).toContain('"cart_type":"page"');
+    frame.tell({ type: 'hatti:rendered', id: 1, sections: [], problems: [] });
+    frame.tell({ type: 'hatti:rendered', id: 2, sections: [], problems: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Colours' }));
+    type('Buttons and links: colour code', '#B45309');
+    await waitFor(() => expect(frame.renders()).toHaveLength(4));
+    expect(frame.renders()[2]!.files['config/settings_data.json']).toContain('#B45309');
     const shown = frame.element;
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('Saved. Your store shows it in a moment.');
     expect(screen.getByTitle('Hatti Base on your store')).not.toBe(shown);
-    expect(frame.renders()).toHaveLength(1);
+    expect(frame.renders()).toHaveLength(4);
     // With the link the editor opened with, though the theme read again came with another.
     expect(src()).toBe(`${STOREFRONT}/?preview=v1.k1.preview-token`);
   });

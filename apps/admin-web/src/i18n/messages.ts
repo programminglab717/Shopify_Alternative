@@ -3276,7 +3276,7 @@ const en = {
   'editor.preview.otherPage':
     'No page of your store uses this template yet, so the preview shows another page.',
   'editor.preview.settingsLater':
-    'Colours and the page’s width show as you change them; the theme’s other settings once you save them.',
+    'The theme’s settings show as you change them, but for the few around the page’s sections, such as breadcrumbs and the WhatsApp button, which show once you save them.',
   'editor.preview.silent':
     "This preview can't show changes as you make them. Save them to see them.",
   'editor.preview.failed':
@@ -8783,7 +8783,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'editor.preview.otherPage':
     'آپ کے اسٹور کا کوئی صفحہ ابھی یہ ٹیمپلیٹ استعمال نہیں کرتا، اس لیے پیش منظر کوئی اور صفحہ دکھا رہا ہے۔',
   'editor.preview.settingsLater':
-    'رنگ اور صفحے کی چوڑائی بدلتے ہی دکھتے ہیں؛ تھیم کی باقی سیٹنگز محفوظ کرنے کے بعد۔',
+    'تھیم کی سیٹنگز بدلتے ہی دکھتی ہیں، سوائے ان چند کے جو صفحے کے سیکشنز کے گرد ہیں، جیسے بریڈکرمبز اور واٹس ایپ بٹن، جو محفوظ کرنے کے بعد دکھتی ہیں۔',
   'editor.preview.silent':
     'یہ پیش منظر تبدیلیاں ساتھ ساتھ نہیں دکھا سکتا۔ انہیں دیکھنے کے لیے محفوظ کریں۔',
   'editor.preview.failed':

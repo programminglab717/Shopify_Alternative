@@ -820,6 +820,35 @@ describe('Storefront rendering', () => {
     expect(html).not.toContain('Can I return or exchange an item?');
   });
 
+  it("renders a page's sections again with the theme's settings the editor has not saved, its static ones too (ADR-708)", async () => {
+    const store = new MemoryStore(sampleStore());
+    const renderer = new PageRenderer(loadTheme(files), {
+      platformUrl: 'https://hatti.pk',
+      limits: { timeMs: 10_000 },
+    });
+    const editing = (current: Record<string, unknown>) => {
+      const theme = loadTheme({
+        ...files,
+        'config/settings_data.json': JSON.stringify({ current }),
+      });
+      return () => theme;
+    };
+    // In design mode, as the editor asks for sections.
+    const ask = { path: '/', editor: { origins: ['https://admin.hatti.pk'] } };
+    const drawer = await renderer.sections(ask, store.fresh(), ['cart-drawer'], editing({}));
+    expect(drawer.get('cart-drawer')).toContain('<cart-drawer');
+    expect(drawer.get('cart-drawer')).toContain('data-hatti-editor-section=');
+    // The cart a page, unsaved: the drawer gone from the page at once.
+    const page = await renderer.sections(
+      ask,
+      store.fresh(),
+      ['cart-drawer'],
+      editing({ cart_type: 'page' }),
+    );
+    expect(page.get('cart-drawer')).not.toContain('<cart-drawer');
+    expect(page.get('cart-drawer')).toMatch(/^<div id="hatti-section-cart-drawer"/);
+  });
+
   it("shows the shop's own Urdu on its Urdu pages, and its own words where it gave none (ADR-238)", async () => {
     const sample = sampleStore();
     const urdu = <T extends { id: string }>(docs: T[], id: string, translations: unknown) =>

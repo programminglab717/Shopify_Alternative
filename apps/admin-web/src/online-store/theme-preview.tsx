@@ -115,23 +115,27 @@ export function LivePreview({
       nowOf,
       savedOf,
     );
-    // The theme's settings, unsaved, with every render; changed, the layout's CSS too.
+    // The theme's settings, unsaved, with every render; changed, every section of the page, as
+    // any may read them, and the layout's CSS too (ADR-700, ADR-708).
     const settings = nowOf(SETTINGS_FILE);
     const styles = settings !== (shown.current[SETTINGS_FILE] ?? savedOf(SETTINGS_FILE));
     if (plan.changed.length === 0 && !styles) return;
+    const sections = styles
+      ? [...new Set([...plan.sections, ...here.sections.map((section) => section.id)])]
+      : plan.sections;
     const files =
       settings === savedOf(SETTINGS_FILE)
         ? plan.files
         : { ...plan.files, [SETTINGS_FILE]: settings };
     heard.current = [];
     setFailure(null);
-    renderGroups(plan.sections).forEach((sections, at) => {
+    renderGroups(sections).forEach((group, at) => {
       asked.current += 1;
       pending.current.add(asked.current);
       post({
         type: 'hatti:render',
         id: asked.current,
-        sections,
+        sections: group,
         files,
         ...(styles && at === 0 && { styles: true }),
       });
