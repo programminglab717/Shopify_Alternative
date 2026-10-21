@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A pin from a Google Maps link
+### 0ff9241 · A pin from a Google Maps link
 
 * **Checkout pins the address from a Google Maps link or coordinates the shopper pastes**
   ([ADR-718](../architecture/13-decision-log.md#adr-718--checkout-pins-the-address-from-a-google-maps-link-or-coordinates-the-shopper-pastes-its-short-links-followed-on-googles-own-hosts-where-they-are-not-at-the-address)): the orders module's `pointOfMapLink` reads the place from the link, following the
