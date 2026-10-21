@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Lines' properties shown
+### 872a216 · Lines' properties shown
 
 * **The admin's order page and the customer's order page show what the shopper wrote on each
   line, and checkout no longer copies it into the order's note** ([ADR-688](../architecture/13-decision-log.md#adr-688--the-admins-order-page-and-the-customers-order-page-show-what-the-shopper-wrote-on-each-line-and-checkout-no-longer-copies-it-into-the-orders-note)): CAT-15's
