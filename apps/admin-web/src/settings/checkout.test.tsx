@@ -35,6 +35,8 @@ function core(role: StaffRole, whatsappNumber: string | null) {
     offerDiscountCode: null,
     offerAfterHours: null,
   };
+  // Set through the API to minutes the form doesn't list (ADR-715).
+  let holdMinutes: number | null = 20;
   let gifts: { wrap: unknown; messages: boolean } = {
     wrap: {
       variantId: 'var_9',
@@ -55,6 +57,7 @@ function core(role: StaffRole, whatsappNumber: string | null) {
           checkoutRecoverySettings: { reminderAfterMinutes, ...offer },
           discountCodes: { nodes: codes },
           checkoutGiftOptions: gifts,
+          checkoutStockHold: { minutes: holdMinutes },
         };
       case 'DraftVariants':
         return {
@@ -90,6 +93,14 @@ function core(role: StaffRole, whatsappNumber: string | null) {
         };
         return { checkoutGiftOptionsUpdate: { checkoutGiftOptions: gifts, userErrors: [] } };
       }
+      case 'CheckoutStockHoldUpdate':
+        holdMinutes = variables.minutes as number | null;
+        return {
+          checkoutStockHoldUpdate: {
+            checkoutStockHold: { minutes: holdMinutes },
+            userErrors: [],
+          },
+        };
       case 'CheckoutRecoverySettingsUpdate': {
         reminderAfterMinutes = variables.reminderAfterMinutes as number | null;
         const code = codes.find((each) => each.id === variables.offerDiscountCodeId);
@@ -255,6 +266,37 @@ describe('The checkout page', () => {
         { input: { wrapVariantId: 'var_5', messages: true } },
         { input: { wrapVariantId: null, messages: true } },
       ]),
+    );
+  });
+
+  it("holds a cart's stock while its shopper checks out for the minutes chosen, or not (ADR-716)", async () => {
+    const fake = core('manager', null);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/checkout');
+
+    const hold = (await screen.findByLabelText('Hold for')) as HTMLSelectElement;
+    // Minutes set through the API are offered with the form's own, in order.
+    expect(hold.value).toBe('20');
+    expect([...hold.options].map((option) => option.text)).toEqual([
+      "Don't hold",
+      '5 minutes',
+      '10 minutes',
+      '15 minutes',
+      '20 minutes',
+      '30 minutes',
+      '60 minutes',
+    ]);
+    expect(screen.getByText(/the last pieces go to whoever got to checkout first/)).toBeTruthy();
+    fireEvent.change(hold, { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    expect(await screen.findByText('Saved. The checkout shows it in a moment.')).toBeTruthy();
+    expect(sentOf(fake, 'CheckoutStockHoldUpdate')).toEqual([{ minutes: 15 }]);
+    expect(sentOf(fake, 'CheckoutGiftOptionsUpdate')).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('Hold for'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'CheckoutStockHoldUpdate')).toEqual([{ minutes: 15 }, { minutes: null }]),
     );
   });
 

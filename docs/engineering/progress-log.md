@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The admin's stock held at checkout
+
+* **Settings → Checkout chooses how long a checkout holds its cart's stock** ([ADR-716](../architecture/13-decision-log.md#adr-716--the-admins-checkout-settings-choose-how-long-a-checkout-holds-its-carts-stock-from-a-few-minutes-or-not-at-all-offering-minutes-set-through-the-api-too)): "Don't
+  hold" or 5 to 60 minutes, and minutes set through the API offered too.
+* 3988 tests, two more: the admin's, one of them a test the count had missed before.
+
 ### 817bc0a · Stock held while a shopper checks out
 
 * **Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes** ([ADR-715](../architecture/13-decision-log.md#adr-715--where-the-shop-asks-a-checkout-begun-holds-its-carts-stock-for-the-shops-minutes-at-the-location-the-order-would-ship-from-the-holders-cart-counts-it-as-theirs-and-the-order-another-checkout-of-the-cart-or-the-sweep-gives-it-back)):

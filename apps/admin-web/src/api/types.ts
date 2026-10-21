@@ -3525,6 +3525,15 @@ export interface CheckoutPageData {
   };
   /** Gift wrap and messages (ADR-413); absent where a fake core leaves it out. */
   checkoutGiftOptions?: CheckoutGiftOptions;
+  /** How long a checkout holds its cart's stock (ADR-715); absent where a fake core leaves it out. */
+  checkoutStockHold?: { minutes: number | null };
+}
+
+export interface CheckoutStockHoldUpdateData {
+  checkoutStockHoldUpdate: {
+    checkoutStockHold: { minutes: number | null } | null;
+    userErrors: UserError[];
+  };
 }
 
 /** What checkout offers to send a gift with (CHK-16, ADR-413). */

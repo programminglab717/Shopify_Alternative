@@ -128,7 +128,7 @@ intent, waits.
 Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, from 5 to
 60, at the location the order would ship from: others find it gone, its shopper's cart and
 page offer it still and say until when, and the order, another checkout of the cart or the
-expiry sweep gives it back ([ADR-715](./13-decision-log.md#adr-715--where-the-shop-asks-a-checkout-begun-holds-its-carts-stock-for-the-shops-minutes-at-the-location-the-order-would-ship-from-the-holders-cart-counts-it-as-theirs-and-the-order-another-checkout-of-the-cart-or-the-sweep-gives-it-back)).
+expiry sweep gives it back ([ADR-715](./13-decision-log.md#adr-715--where-the-shop-asks-a-checkout-begun-holds-its-carts-stock-for-the-shops-minutes-at-the-location-the-order-would-ship-from-the-holders-cart-counts-it-as-theirs-and-the-order-another-checkout-of-the-cart-or-the-sweep-gives-it-back)). The shop chooses the minutes in Settings → Checkout ([ADR-716](./13-decision-log.md#adr-716--the-admins-checkout-settings-choose-how-long-a-checkout-holds-its-carts-stock-from-a-few-minutes-or-not-at-all-offering-minutes-set-through-the-api-too)).
 
 ### 2.1 Address capture tuned for Pakistan
 

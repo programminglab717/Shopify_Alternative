@@ -6,6 +6,7 @@ import {
   CheckoutMarketingChannelsUpdateMutation,
   CheckoutPageQuery,
   CheckoutRecoverySettingsUpdateMutation,
+  CheckoutStockHoldUpdateMutation,
   CheckoutTrustBadgesUpdateMutation,
 } from '../api/operations';
 import type {
@@ -13,6 +14,7 @@ import type {
   CheckoutMarketingChannelsUpdateData,
   CheckoutPageData,
   CheckoutRecoverySettingsUpdateData,
+  CheckoutStockHoldUpdateData,
   CheckoutTrustBadgeKind,
   CheckoutTrustBadgesUpdateData,
   MarketingChannel,
@@ -55,6 +57,9 @@ const MOST_TEXT = 60;
 /** How long after a shopper leaves the shop may remind them, in minutes (ADR-393); '' for never. */
 export const REMINDER_DELAYS = ['', '30', '60', '180', '600'] as const;
 type ReminderDelay = (typeof REMINDER_DELAYS)[number];
+
+/** How long a checkout may hold its cart's stock, in minutes (ADR-715); '' for not at all. */
+const HOLD_MINUTES = ['', '5', '10', '15', '30', '60'] as const;
 
 /** How many hours after the reminder the shop may offer one of its codes (ADR-426). */
 const OFFER_DELAYS = ['12', '24', '48'] as const;
@@ -148,6 +153,16 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   const giftChanged =
     (wrap?.variantId ?? null) !== (giftWas.wrap?.variantId ?? null) ||
     messages !== giftWas.messages;
+  const updateHold = useAdminMutation<CheckoutStockHoldUpdateData, { minutes: number | null }>(
+    CheckoutStockHoldUpdateMutation,
+  );
+  // Stock held while a shopper checks out (ADR-715): minutes set through the API offered too.
+  const holdWas = String(data.checkoutStockHold?.minutes ?? '');
+  const [hold, setHold] = useState(holdWas);
+  const holdOptions: string[] = [...HOLD_MINUTES];
+  if (!holdOptions.includes(holdWas)) holdOptions.push(holdWas);
+  holdOptions.sort((a, b) => Number(a) - Number(b));
+  const holdChanged = hold !== holdWas;
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const hasWhatsapp = Boolean(data.onlineStorePreferences.whatsappNumber);
@@ -174,7 +189,7 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   const offerNow = delay === '' ? '' : offer;
   const delayChanged =
     delay !== delayWas || offerNow !== offerWas || (offerNow !== '' && hours !== hoursWas);
-  const changed = badgesChanged || channelsChanged || delayChanged || giftChanged;
+  const changed = badgesChanged || channelsChanged || delayChanged || giftChanged || holdChanged;
 
   const move = (index: number, by: -1 | 1) =>
     setRows((all) => {
@@ -243,6 +258,15 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
         });
         if (checkoutGiftOptionsUpdate.userErrors.length > 0) {
           setProblems(checkoutGiftOptionsUpdate.userErrors.map((error) => problemText(error, t)));
+          return;
+        }
+      }
+      if (holdChanged) {
+        const { checkoutStockHoldUpdate } = await updateHold.mutateAsync({
+          minutes: hold === '' ? null : Number(hold),
+        });
+        if (checkoutStockHoldUpdate.userErrors.length > 0) {
+          setProblems(checkoutStockHoldUpdate.userErrors.map((error) => problemText(error, t)));
           return;
         }
       }
@@ -495,6 +519,21 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
         />
       </FormSection>
 
+      <FormSection title={t('checkoutPage.hold')} hint={t('checkoutPage.holdHint')}>
+        <SelectField<string>
+          label={t('checkoutPage.holdFor')}
+          value={hold}
+          options={holdOptions.map((value) => ({
+            value,
+            label:
+              value === ''
+                ? t('checkoutPage.holdNever')
+                : t('checkoutPage.holdMinutes', { minutes: value }),
+          }))}
+          onChange={setHold}
+        />
+      </FormSection>
+
       <Problems problems={problems} />
       {saved && !changed && <Alert tone="success">{t('checkoutPage.saved')}</Alert>}
       <Button
@@ -504,7 +543,8 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
           updateBadges.isPending ||
           updateChannels.isPending ||
           updateRecovery.isPending ||
-          updateGift.isPending
+          updateGift.isPending ||
+          updateHold.isPending
         }
         disabled={!changed}
         icon={<Save aria-hidden className="size-5" />}
@@ -520,7 +560,8 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
  * shopper paying on delivery, up to four in the shop's order, with the days for exchanges and
  * returns; the boxes it offers for the shop's news and offers, each unticked until ticked; how
  * long after a shopper leaves it they are reminded on WhatsApp, if at all (CHK-12, ADR-393); and
- * which of the shop's codes those who still do not order are offered after, if any (ADR-426).
+ * which of the shop's codes those who still do not order are offered after, if any (ADR-426);
+ * and how long a checkout holds its cart's stock for its shopper, if at all (ADR-715).
  */
 export function CheckoutPage() {
   const { t } = useLocale();

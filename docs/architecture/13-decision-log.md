@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-715 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-716 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -723,6 +723,7 @@
 | 713 | The checkout's page shows its total as the city is typed: a script posts the form to the page's own address to show it, placing nothing, and puts the summary it answers with in place | Accepted |
 | 714 | Checkout's links back to the shop go to its primary domain while DNS points it at the platform, its platform subdomain otherwise | Accepted |
 | 715 | Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, at the location the order would ship from; the holder's cart counts it as theirs, and the order, another checkout of the cart or the sweep gives it back | Accepted |
+| 716 | The admin's checkout settings choose how long a checkout holds its cart's stock, from a few minutes or not at all, offering minutes set through the API too | Accepted |
 
 ---
 
@@ -24491,3 +24492,17 @@
     typed everything by then.
   * **A hold kept outside inventory's levels:** other shoppers' carts, the storefront and the
     reports would each have to subtract it.
+
+## ADR-716 · The admin's checkout settings choose how long a checkout holds its cart's stock, from a few minutes or not at all, offering minutes set through the API too
+
+* **Context:** Checkout can hold a cart's stock for the shop's minutes ([ADR-715](#adr-715--where-the-shop-asks-a-checkout-begun-holds-its-carts-stock-for-the-shops-minutes-at-the-location-the-order-would-ship-from-the-holders-cart-counts-it-as-theirs-and-the-order-another-checkout-of-the-cart-or-the-sweep-gives-it-back)), set
+  only through the Admin API.
+* **Decision:** Settings → Checkout has a card, **Stock held at checkout**, whose choice is
+  "Don't hold" or 5, 10, 15, 30 or 60 minutes. Minutes set through the API that are not among
+  these are offered too, in their order. Like the page's other cards, it is saved with the page's
+  one button, and only when it changed. It says what holding does: in a drop, the last pieces go
+  to whoever reached checkout first, and others see them sold out meanwhile.
+* **Consequences:** A shop turns holds on for a drop and off after it without an app. Changes show
+  in the activity log as "Stock held at checkout".
+* **Alternatives:** **A number field of any minutes from 5 to 60:** a few choices are quicker to
+  tap on a phone, and the API still takes any.

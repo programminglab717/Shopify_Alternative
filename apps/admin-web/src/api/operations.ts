@@ -7377,8 +7377,26 @@ export const CheckoutPageQuery = /* GraphQL */ `
     checkoutGiftOptions {
       ...GiftOptions
     }
+    checkoutStockHold {
+      minutes
+    }
   }
   ${GIFT_OPTIONS}
+`;
+
+/** How many minutes a checkout holds its cart's stock, 5 to 60, null for none (ADR-715). */
+export const CheckoutStockHoldUpdateMutation = /* GraphQL */ `
+  mutation CheckoutStockHoldUpdate($minutes: Int) {
+    checkoutStockHoldUpdate(minutes: $minutes) {
+      checkoutStockHold {
+        minutes
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 /**
