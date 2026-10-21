@@ -240,7 +240,7 @@ describe.skipIf(!server)('Returns shoppers ask for (ADR-675)', () => {
     unwrap(await requests.decline(f.a, waiting!.id, 'Worn shoes are not taken back'));
     const declined = orderLinkPage(await f.links.viewLink(token)).html;
     expect(declined).toContain(
-      "can&#39;t take back 1 × Peshawari Chappal: Worn shoes are not taken back",
+      'can&#39;t take back 1 × Peshawari Chappal: Worn shoes are not taken back',
     );
     // Asked again while the days last.
     expect(declined).toContain('value="return"');
