@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Google Ads' spend pulled through the owner's grant
+### a694530 · Google Ads' spend pulled through the owner's grant
 
 * **A shop's owner grants Hatti the reading of their Google Ads account on Google's consent
   screen, and the same worker pulls its spend by campaign, with an access token from the grant
