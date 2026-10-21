@@ -3276,6 +3276,19 @@ const en = {
   'analytics.sessionsOverTime': 'Sessions over time',
   'analytics.sessionsBar': '{date}: {count} sessions, {converted} ordered',
   'analytics.sessionsBar.one': '{date}: 1 session, {converted} ordered',
+  'searches.title': 'What shoppers search for',
+  'searches.hint':
+    'Searches on your online store in these days, as shoppers made them: the most searched, and those that found nothing.',
+  'searches.none': 'No searches on your online store in these days.',
+  'searches.searches': 'Searches',
+  'searches.foundNothingShare': 'Found nothing',
+  'searches.top': 'Most searched',
+  'searches.nothingFound': 'Searches that found nothing',
+  'searches.nothingFoundHint':
+    'Shoppers wanted these and saw nothing: add the products, or put these words in your titles, tags or Urdu.',
+  'searches.allFound': 'Every search found something.',
+  'searches.times': '{count} times',
+  'searches.times.one': 'Once',
   'parcels.ship': 'Mark as shipped',
   'parcels.ship.title': 'Mark {name} as shipped',
   'parcels.ship.hint':
@@ -8657,6 +8670,19 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'analytics.sessionsOverTime': 'وقت کے ساتھ سیشنز',
   'analytics.sessionsBar': '{date}: {count} سیشنز، {converted} نے آرڈر کیا',
   'analytics.sessionsBar.one': '{date}: 1 سیشن، {converted} نے آرڈر کیا',
+  'searches.title': 'خریدار کیا تلاش کرتے ہیں',
+  'searches.hint':
+    'ان دنوں میں آپ کے آن لائن اسٹور پر خریداروں کی تلاشیں: سب سے زیادہ تلاش کی گئیں، اور وہ جن میں کچھ نہیں ملا۔',
+  'searches.none': 'ان دنوں میں آپ کے آن لائن اسٹور پر کوئی تلاش نہیں ہوئی۔',
+  'searches.searches': 'تلاشیں',
+  'searches.foundNothingShare': 'کچھ نہیں ملا',
+  'searches.top': 'سب سے زیادہ تلاش',
+  'searches.nothingFound': 'تلاشیں جن میں کچھ نہیں ملا',
+  'searches.nothingFoundHint':
+    'خریدار یہ چاہتے تھے اور انہیں کچھ نظر نہیں آیا: یہ پروڈکٹس شامل کریں، یا یہ الفاظ اپنے عنوانات، ٹیگز یا اردو میں لکھیں۔',
+  'searches.allFound': 'ہر تلاش میں کچھ ملا۔',
+  'searches.times': '{count} بار',
+  'searches.times.one': 'ایک بار',
   'parcels.ship': 'روانہ شدہ کریں',
   'parcels.ship.title': '{name} روانہ شدہ کریں',
   'parcels.ship.hint':

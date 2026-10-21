@@ -3605,6 +3605,28 @@ export const StorefrontLiveViewQuery = /* GraphQL */ `
   ${STOREFRONT_SESSION_COUNTS}
 `;
 
+/** What shoppers searched the online store for over the last days (SRC-06, ADR-683). */
+export const StoreSearchesQuery = /* GraphQL */ `
+  query StoreSearches($days: Int!) {
+    storeSearches(days: $days) {
+      days
+      searches
+      foundNothing
+      foundNothingRate
+      top {
+        terms
+        searches
+        foundNothing
+      }
+      nothingFound {
+        terms
+        searches
+        foundNothing
+      }
+    }
+  }
+`;
+
 const COD_DELIVERY = /* GraphQL */ `
   fragment CodDeliveryFigures on CodDelivery {
     shipped

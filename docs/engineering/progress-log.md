@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### What shoppers search for, in the admin
+
+* **The admin's analytics show what shoppers searched for over the period the page shows, the
+  most searched and those that found nothing, each opening the products list searched for its
+  words** ([ADR-684](../architecture/13-decision-log.md#adr-684--the-admins-analytics-show-what-shoppers-searched-for-over-the-period-the-page-shows-the-most-searched-and-those-that-found-nothing-each-opening-the-products-list-searched-for-its-words)): SRC-06 for merchants.
+* 3884 tests, three more: the admin's.
+
 ### 8cd7f6f · What shoppers search for
 
 * **What shoppers search a shop for is reported by the search's own page, counted by its words a

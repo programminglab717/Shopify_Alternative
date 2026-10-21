@@ -66,11 +66,21 @@ const NO_STOCK = {
 };
 
 /**
- * The online store's visits, couriers' parcels and stock, none: the page asks for them beside its
- * sales.
+ * The online store's visits and searches, couriers' parcels and stock, none: the page asks for
+ * them beside its sales.
  */
 const NO_VISITS: Record<string, unknown> = {
   CourierPerformance: { courierPerformance: [] },
+  StoreSearches: {
+    storeSearches: {
+      days: 30,
+      searches: 0,
+      foundNothing: 0,
+      foundNothingRate: null,
+      top: [],
+      nothingFound: [],
+    },
+  },
   InventoryReport: { inventoryReport: NO_STOCK },
   StorefrontLiveView: { storefrontLiveView: { visitorsNow: 0, today: none } },
   StorefrontSessions: {

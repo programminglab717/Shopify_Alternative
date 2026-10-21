@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-683 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-684 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -691,6 +691,7 @@
 | 681 | The admin's web client keeps a random ID for its browser and sends it with each request to /auth, so that a sign-in from the browser its owner uses is known as theirs | Accepted |
 | 682 | Checkout asks once for more of an address that leaves out a house number or the street, saying what riders look for, and places it as it is when the shopper posts it again | Accepted |
 | 683 | What shoppers search a shop for is reported by the search's own page, counted by its words a day at a time in Valkey with those that found nothing, and read through storeSearches | Accepted |
+| 684 | The admin's analytics show what shoppers searched for over the period the page shows, the most searched and those that found nothing, each opening the products list searched for its words | Accepted |
 
 ---
 
@@ -23719,3 +23720,22 @@
   without it. **Searches kept by the worker in Postgres, as sessions are:** a later step, once
   shops want more than 90 days or searches beside their sessions in ClickHouse. **Which result a
   shopper opened:** a later step, with the storefront's events.
+
+## ADR-684 · The admin's analytics show what shoppers searched for over the period the page shows, the most searched and those that found nothing, each opening the products list searched for its words
+
+* **Context:** The core counts what shoppers search the online store for, and what found nothing
+  ([ADR-683](#adr-683--what-shoppers-search-a-shop-for-is-reported-by-the-searchs-own-page-counted-by-its-words-a-day-at-a-time-in-valkey-with-those-that-found-nothing-and-read-through-storesearches)); merchants read their store's figures on the admin's Analytics page, whose
+  period tabs choose 7, 30 or 90 days ([ADR-250](#adr-250--the-sales-report-says-what-the-period-as-long-just-before-came-to-and-the-home-what-yesterday-came-to-by-this-time-of-day-refunds-are-said-beside-sales-not-taken-off-them)), with the store's visits on it
+  ([ADR-329](#adr-329--the-admins-analytics-show-the-online-stores-visits-beside-its-sales-who-is-on-it-now-asked-again-every-half-minute-and-the-periods-sessions-against-the-period-as-long-before-asked-in-one-document-with-how-far-they-went-towards-an-order)).
+* **Decision:** Analytics has a section on what shoppers search for, under the visits, for the
+  same roles: the period's searches, the share that found nothing, the 25 most searched with how
+  often, and the 25 that most often found nothing with how often, saying to add those products or
+  put those words in titles, tags or Urdu. It asks `storeSearches` for the days the page's tab
+  shows. Each search's words open the products list searched for them, to see what the shop has
+  for them. A period without searches says so alone.
+* **Consequences:** A merchant sees in one place what shoppers wanted that the store did not show
+  them. The words are as shoppers typed them, folded; the products list's search reads them as it
+  reads the merchant's own.
+* **Alternatives:** **A page of its own:** searches sit beside the store's visits and sales, for
+  the same period. **The storefront's search for the words, at the shop's address:** the products
+  list is where a merchant can change what is found.

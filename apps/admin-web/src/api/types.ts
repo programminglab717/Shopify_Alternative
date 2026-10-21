@@ -1620,6 +1620,24 @@ export interface StorefrontLiveViewData {
   storefrontLiveView: { visitorsNow: number; today: StorefrontSessionCounts };
 }
 
+/** A search on the online store, by its words (ADR-683). */
+export interface StoreSearchTermsValue {
+  terms: string;
+  searches: number;
+  foundNothing: number;
+}
+
+export interface StoreSearchesData {
+  storeSearches: {
+    days: number;
+    searches: number;
+    foundNothing: number;
+    foundNothingRate: number | null;
+    top: StoreSearchTermsValue[];
+    nothingFound: StoreSearchTermsValue[];
+  };
+}
+
 export type CodHealthDimension = 'CITY' | 'PRODUCT' | 'SOURCE' | 'COURIER';
 
 export interface CodDeliveryFigures {

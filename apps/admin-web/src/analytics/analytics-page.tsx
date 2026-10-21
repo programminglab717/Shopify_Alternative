@@ -16,6 +16,7 @@ import { CodHealth } from './cod-health';
 import { CourierPerformance } from './courier-performance';
 import { Bars, Figure } from './figures';
 import { type Days, PeriodTabs, usePeriod } from './period';
+import { Searches } from './searches';
 import { StockReport } from './stock-report';
 import { LiveView, Visits } from './visits';
 
@@ -107,8 +108,9 @@ function Totals({
  * Sales over time (ANL-02, ADR-250): who is on the online store now; the last 7, 30 or 90 days
  * against the period as long before, with what the ads cost and brought in (ADR-553), net sales
  * by day (by week over 90), what sold most, where the orders came from, the online store's visits
- * and how far they went, how its cash-on-delivery orders turned out, and how its stock sold
- * (ANL-05); for owners and managers, the way to how each agent of the Confirmation Desk did.
+ * and how far they went, what shoppers searched it for (ADR-684), how its cash-on-delivery orders
+ * turned out, and how its stock sold (ANL-05); for owners and managers, the way to how each agent
+ * of the Confirmation Desk did.
  */
 export function AnalyticsPage() {
   const { t, locale } = useLocale();
@@ -208,6 +210,7 @@ export function AnalyticsPage() {
         </>
       )}
       <Visits from={from} before={before} previousFrom={previousFrom} interval={interval} />
+      <Searches days={days} />
       <CodHealth from={from} before={before} />
       <CourierPerformance from={from} before={before} />
       <StockReport days={days} />
