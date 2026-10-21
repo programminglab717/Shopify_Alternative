@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A landmark asked for where riders could not find houses
+### 59a7052 · A landmark asked for where riders could not find houses
 
 * **Checkout asks once for a landmark or the pin where the shop's couriers lately could not find
   houses** ([ADR-717](../architecture/13-decision-log.md#adr-717--checkout-asks-once-for-a-landmark-or-the-pin-where-the-shops-couriers-lately-could-not-find-houses-the-area-learned-from-its-own-parcels-failed-deliveries)): the orders module's `hardToFindIn` reads the shop's last 180 days of parcels
