@@ -7,7 +7,7 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
-import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { PREVIEW_DAYS, ThemePreviewService } from '../theme-preview.js';
 import { ThemeService } from '../theme.service.js';
 import {
@@ -24,11 +24,14 @@ import {
   OnlineStoreThemeEditor,
   OnlineStoreThemeFile,
   OnlineStoreThemeFilesUpsertFileInput,
+  OnlineStoreThemeVersion,
   ThemeCreatePayload,
   ThemeDeletePayload,
   ThemeFilesDeletePayload,
   ThemeFilesUpsertPayload,
   ThemePublishPayload,
+  ThemeRollbackPayload,
+  ThemeVersionCause,
   ThemesArgs,
 } from './theme.types.js';
 
@@ -80,6 +83,27 @@ export class ThemeResolver {
   ): Promise<OnlineStoreThemeFile[]> {
     const records = await this.service.files(tenant, uuidOf('theme', theme.id), filenames);
     return records.map(toThemeFile);
+  }
+
+  @ResolveField(() => [OnlineStoreThemeVersion], {
+    description:
+      "The changes to the shop's own files the theme keeps, the newest first: the last 30 " +
+      '(ADR-694). The newest is the theme as it is.',
+  })
+  @RequireScopes('read_themes')
+  async versions(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() theme: OnlineStoreTheme,
+  ): Promise<OnlineStoreThemeVersion[]> {
+    const records = await this.service.versions(tenant, uuidOf('theme', theme.id));
+    return records.map((record) =>
+      Object.assign(new OnlineStoreThemeVersion(), {
+        version: record.version,
+        changedFiles: record.changed,
+        cause: record.cause.toUpperCase() as ThemeVersionCause,
+        createdAt: record.createdAt,
+      }),
+    );
   }
 
   @ResolveField(() => OnlineStoreThemeEditor, {
@@ -148,6 +172,25 @@ export class ThemeResolver {
   ): Promise<ThemePublishPayload> {
     const result = await this.service.publish(tenant, uuidOf('theme', id));
     return Object.assign(new ThemePublishPayload(), {
+      theme: result.ok ? toTheme(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => ThemeRollbackPayload, {
+    description:
+      'Takes a theme back to one of its versions, its files as the change that made it left ' +
+      'them (OS-03, ADR-694): the changes since are undone together, as a change of its own ' +
+      'that can be undone too. The main theme shows it on the storefront a moment later.',
+  })
+  @RequireScopes('write_themes')
+  async themeRollback(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('version', { type: () => Int }) version: number,
+  ): Promise<ThemeRollbackPayload> {
+    const result = await this.service.rollback(tenant, uuidOf('theme', id), version);
+    return Object.assign(new ThemeRollbackPayload(), {
       theme: result.ok ? toTheme(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

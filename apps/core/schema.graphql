@@ -9429,6 +9429,11 @@ type Mutation {
   themePublish(id: ID!): ThemePublishPayload!
 
   """
+  Takes a theme back to one of its versions, its files as the change that made it left them (OS-03, ADR-694): the changes since are undone together, as a change of its own that can be undone too. The main theme shows it on the storefront a moment later.
+  """
+  themeRollback(id: ID!, version: Int!): ThemeRollbackPayload!
+
+  """
   Connects the shop's TikTok advertiser account, in place of any it had, or gives it another token (ADR-566), once TikTok says the token reads it and that it bills in the shop's currency: from then on, the worker pulls its spend by day and campaign every few hours, the last week's again each time, and the last 30 days' at once, as a Meta ad account's. What the shop typed by hand stays its own. On plans with true profit. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   tiktokAdAccountConnect(input: TikTokAdAccountConnectInput!): TikTokAdAccountConnectPayload!
@@ -9816,6 +9821,11 @@ type OnlineStoreTheme {
 
   """Goes up with every change to the theme."""
   version: Int!
+
+  """
+  The changes to the shop's own files the theme keeps, the newest first: the last 30 (ADR-694). The newest is the theme as it is.
+  """
+  versions: [OnlineStoreThemeVersion!]!
 }
 
 type OnlineStoreThemeConnection {
@@ -9909,6 +9919,20 @@ type OnlineStoreThemeSection {
 
   """As templates and section groups place it, such as image-banner."""
   type: String!
+}
+
+"""
+A change to a theme's own files that the theme keeps, the last 30 (OS-03, ADR-694): the theme can be taken back to the version it made.
+"""
+type OnlineStoreThemeVersion {
+  cause: ThemeVersionCause!
+
+  """The files it touched, by filename."""
+  changedFiles: [String!]!
+  createdAt: DateTime!
+
+  """The theme's version the change made."""
+  version: Int!
 }
 
 """
@@ -17072,6 +17096,23 @@ enum ThemeRole {
 
   """Being prepared, or shown before; publish it to show it."""
   UNPUBLISHED
+}
+
+type ThemeRollbackPayload {
+  theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+"""What made a change to a theme's own files (ADR-694)."""
+enum ThemeVersionCause {
+  """Files deleted, the platform theme's showing again."""
+  DELETED
+
+  """The theme taken back to a version before."""
+  ROLLED_BACK
+
+  """Files saved, by the editor or the API."""
+  SAVED
 }
 
 """

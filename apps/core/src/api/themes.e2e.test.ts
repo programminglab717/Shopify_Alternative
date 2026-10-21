@@ -231,6 +231,60 @@ describe.skipIf(!server)('Admin GraphQL API: online store themes', () => {
     expect(new URL(read.previewUrl).searchParams.get('preview')).toMatch(/^v1\./);
   });
 
+  it("keeps a theme's changes and takes it back to one of its versions (ADR-694)", async () => {
+    const created = await call(
+      tokens.a,
+      `mutation { themeCreate(name: "Eid look") { theme { id } userErrors { code } } }`,
+    );
+    const id = created.theme.id;
+    const UPSERT = `mutation ($id: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
+      themeFilesUpsert(themeId: $id, files: $files) { theme { version } userErrors { code } }
+    }`;
+    const accent = (color: string) => JSON.stringify({ current: { color_accent: color } });
+    const first = await call(tokens.a, UPSERT, {
+      id,
+      files: [{ filename: 'config/settings_data.json', body: accent('#B45309') }],
+    });
+    await call(tokens.a, UPSERT, {
+      id,
+      files: [
+        { filename: 'config/settings_data.json', body: accent('#0F766E') },
+        { filename: 'templates/index.json', body: INDEX },
+      ],
+    });
+    const VERSIONS = `query ($id: ID!) {
+      theme(id: $id) { version versions { version changedFiles cause } files { filename body } }
+    }`;
+    expect((await call(tokens.reader, VERSIONS, { id })).versions).toEqual([
+      {
+        version: 3,
+        changedFiles: ['config/settings_data.json', 'templates/index.json'],
+        cause: 'SAVED',
+      },
+      { version: 2, changedFiles: ['config/settings_data.json'], cause: 'SAVED' },
+    ]);
+
+    const ROLLBACK = `mutation ($id: ID!, $version: Int!) {
+      themeRollback(id: $id, version: $version) { theme { version } userErrors { field code } }
+    }`;
+    const back = await call(tokens.a, ROLLBACK, { id, version: first.theme.version });
+    expect(back).toEqual({ theme: { version: 4 }, userErrors: [] });
+    const now = await call(tokens.reader, VERSIONS, { id });
+    expect(now.files).toEqual([{ filename: 'config/settings_data.json', body: accent('#B45309') }]);
+    expect(now.versions[0]).toEqual({
+      version: 4,
+      changedFiles: ['config/settings_data.json', 'templates/index.json'],
+      cause: 'ROLLED_BACK',
+    });
+    // A version it doesn't keep is refused; readers can't take a theme back.
+    expect(await call(tokens.a, ROLLBACK, { id, version: 1 })).toEqual({
+      theme: null,
+      userErrors: [{ field: ['version'], code: 'NOT_FOUND' }],
+    });
+    const denied = await gql(tokens.reader, ROLLBACK, { id, version: 2 });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('needs the themes scopes, and keeps each shop to its own themes', async () => {
     for (const [token, query] of [
       [tokens.products, '{ themes(first: 1) { nodes { id } } }'],

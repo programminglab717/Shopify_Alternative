@@ -12,7 +12,14 @@ import {
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
 } from './events.js';
-import type { Page, ThemeEditorRecord, ThemeFileRecord, ThemeRecord } from './records.js';
+import type {
+  Page,
+  ThemeEditorRecord,
+  ThemeFileRecord,
+  ThemeRecord,
+  ThemeVersionCause,
+  ThemeVersionRecord,
+} from './records.js';
 import { themeFiles, themes, type ThemeRoleValue, type ThemeRow } from './schema.js';
 import {
   BASE_THEME,
@@ -341,6 +348,7 @@ export class ThemeService {
           `A theme can keep at most ${THEME_LIMITS.filesPerTheme} files of the shop's own`,
         );
       }
+      const before = await this.#bodiesOf(tx, tenant.shopId, themeId, [...names]);
       const saved = await tx
         .insert(themeFiles)
         .values(
@@ -357,6 +365,7 @@ export class ThemeService {
         })
         .returning();
       const updated = await this.#changed(tx, tenant.shopId, theme, [...names]);
+      await this.#keep(tx, tenant.shopId, themeId, updated.version, before, 'saved');
       return {
         ok: true,
         value: {
@@ -383,6 +392,7 @@ export class ThemeService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const theme = await this.#find(tx, tenant.shopId, themeId, { lock: true });
       if (!theme) return failOne(['themeId'], 'NOT_FOUND', 'Theme not found');
+      const before = await this.#bodiesOf(tx, tenant.shopId, themeId, filenames);
       const deleted = await tx
         .delete(themeFiles)
         .where(
@@ -394,12 +404,134 @@ export class ThemeService {
         )
         .returning({ filename: themeFiles.filename });
       const names = deleted.map((row) => row.filename).sort();
-      const updated =
-        names.length > 0
-          ? await this.#changed(tx, tenant.shopId, theme, names)
-          : toThemeRecord(theme);
+      if (names.length === 0) {
+        return { ok: true, value: { theme: toThemeRecord(theme), deleted: names } };
+      }
+      const updated = await this.#changed(tx, tenant.shopId, theme, names);
+      const touched = Object.fromEntries(names.map((name) => [name, before[name] ?? null]));
+      await this.#keep(tx, tenant.shopId, themeId, updated.version, touched, 'deleted');
       return { ok: true, value: { theme: updated, deleted: names } };
     });
+  }
+
+  /** The changes a theme keeps, the newest first, as many as {@link THEME_LIMITS}' versions. */
+  async versions(tenant: TenantContext, themeId: string): Promise<ThemeVersionRecord[]> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        version: number;
+        changed: string[];
+        cause: ThemeVersionCause;
+        created_at: Date;
+      }>(sql`
+        SELECT version, ARRAY(SELECT jsonb_object_keys(before) ORDER BY 1) AS changed, cause,
+               created_at
+          FROM online_store.theme_versions
+         WHERE shop_id = ${tenant.shopId} AND theme_id = ${themeId}
+         ORDER BY version DESC`);
+      return rows.map((row) => ({
+        version: row.version,
+        changed: row.changed,
+        cause: row.cause,
+        createdAt: new Date(row.created_at),
+      }));
+    });
+  }
+
+  /**
+   * Takes a theme back to `version`, the files as the change that made it left them: the changes
+   * kept since are undone, newest first, as one change of its own, which can be undone too.
+   */
+  async rollback(
+    tenant: TenantContext,
+    themeId: string,
+    version: number,
+  ): Promise<MutationResult<ThemeRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const shopId = tenant.shopId;
+      const theme = await this.#find(tx, shopId, themeId, { lock: true });
+      if (!theme) return failOne(['id'], 'NOT_FOUND', 'Theme not found');
+      const { rows } = await tx.execute<{ version: number; before: Record<string, string | null> }>(
+        sql`
+        SELECT version, before FROM online_store.theme_versions
+         WHERE shop_id = ${shopId} AND theme_id = ${themeId}
+         ORDER BY version DESC`,
+      );
+      if (!rows.some((row) => row.version === version)) {
+        return failOne(['version'], 'NOT_FOUND', 'The theme keeps no such version');
+      }
+      const undone = rows.filter((row) => row.version > version);
+      if (undone.length === 0) {
+        return failOne(['version'], 'INVALID', 'The theme is at this version already');
+      }
+      // Each file as the oldest change undone found it.
+      const restored: Record<string, string | null> = {};
+      for (const row of undone) Object.assign(restored, row.before);
+      const names = Object.keys(restored).sort();
+      const before = await this.#bodiesOf(tx, shopId, themeId, names);
+      const kept = names.filter((name) => restored[name] !== null);
+      const gone = names.filter((name) => restored[name] === null);
+      if (kept.length > 0) {
+        await tx
+          .insert(themeFiles)
+          .values(
+            kept.map((filename) => ({ shopId, themeId, filename, body: restored[filename]! })),
+          )
+          .onConflictDoUpdate({
+            target: [themeFiles.shopId, themeFiles.themeId, themeFiles.filename],
+            set: { body: sql`excluded.body`, updatedAt: sql`now()` },
+          });
+      }
+      if (gone.length > 0) {
+        await tx
+          .delete(themeFiles)
+          .where(
+            and(
+              eq(themeFiles.shopId, shopId),
+              eq(themeFiles.themeId, themeId),
+              inArray(themeFiles.filename, gone),
+            ),
+          );
+      }
+      const updated = await this.#changed(tx, shopId, theme, names);
+      await this.#keep(tx, shopId, themeId, updated.version, before, 'rolled_back');
+      return { ok: true, value: updated };
+    });
+  }
+
+  /** The bodies of `filenames` in a theme now, null for those it has none of its own of. */
+  async #bodiesOf(
+    tx: Tx,
+    shopId: string,
+    themeId: string,
+    filenames: readonly string[],
+  ): Promise<Record<string, string | null>> {
+    const rows = await this.#files(tx, shopId, themeId, filenames);
+    const bodies: Record<string, string | null> = Object.fromEntries(
+      filenames.map((name) => [name, null]),
+    );
+    for (const row of rows) bodies[row.filename] = row.body;
+    return bodies;
+  }
+
+  /** Keeps what a change made `version` touched, as it was, and forgets the oldest past the limit. */
+  async #keep(
+    tx: Tx,
+    shopId: string,
+    themeId: string,
+    version: number,
+    before: Record<string, string | null>,
+    cause: ThemeVersionCause,
+  ): Promise<void> {
+    await tx.execute(sql`
+      INSERT INTO online_store.theme_versions (shop_id, theme_id, version, before, cause)
+      VALUES (${shopId}, ${themeId}, ${version}, ${JSON.stringify(before)}::jsonb, ${cause})`);
+    await tx.execute(sql`
+      DELETE FROM online_store.theme_versions
+       WHERE shop_id = ${shopId} AND theme_id = ${themeId}
+         AND version < (SELECT min(version) FROM (
+               SELECT version FROM online_store.theme_versions
+                WHERE shop_id = ${shopId} AND theme_id = ${themeId}
+                ORDER BY version DESC LIMIT ${THEME_LIMITS.versions}) AS newest)`);
   }
 
   /** Raises a theme's version for a change to `changed`, and records it. */

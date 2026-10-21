@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-693 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-694 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -701,6 +701,7 @@
 | 691 | The cart refuses a line its product asks more of: a required answer missing, an answer past its length or not among its choices, said in the theme's words | Accepted |
 | 692 | A shop pins products to the top of a term's search, in its order, and hides others from it: the whole search as the search folds it, read live as synonyms are | Accepted |
 | 693 | The admin's online store has a Search results tab, for those who change products: a term's products pinned in order and hidden, and a top search opened from analytics | Accepted |
+| 694 | A theme keeps its last 30 changes, each with the files it touched as they were, and is taken back to the version one made as a change of its own | Accepted |
 
 ---
 
@@ -23969,3 +23970,26 @@
 * **Alternatives:** **Pins on the product's page:** a product is pinned for a search, and the
   search is what the merchant has in mind. **Ordering by dragging:** buttons that move a product
   up or down work by keyboard and on a phone, as the pairings card's do.
+
+## ADR-694 · A theme keeps its last 30 changes, each with the files it touched as they were, and is taken back to the version one made as a change of its own
+
+* **Context:** A theme keeps the shop's own JSON files over the platform theme
+  ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)), and a change replaced the file before it: a bad save, or the Eid look
+  after Eid, could not be undone but by hand (OS-03).
+* **Decision:**
+  * **Each change keeps what it touched** (`online_store.theme_versions`): the theme's version
+    it made, each file it saved or deleted as it was before, or null where the platform theme's
+    showed, and what made it, saved, deleted or rolled back. A theme keeps its last 30; the
+    oldest go as new ones come.
+  * **Taking a theme back to a version** undoes the changes kept since, newest first: each file
+    as the oldest of them found it, saved again or deleted. It is a change of its own, raising
+    the theme's version, telling the storefront as any change does and kept like the others, so
+    it can be undone too. A version it doesn't keep, or the one it is at, is refused.
+  * **Admin API:** a theme's `versions`, the newest first, each with its version, the files it
+    changed, its cause and when; and `themeRollback(id, version)`, with `write_themes`.
+* **Consequences:** A merchant undoes a theme change, or a run of them, without remembering
+  what the files were; publishing stays a change of role, not of files, so a version is a theme's
+  files alone.
+* **Alternatives:** **Whole snapshots of every file at each change:** most changes touch one
+  file, and a theme keeps up to a hundred of 256 KB each. **Versions without end:** thirty is a
+  season of changes, kept without a sweep.

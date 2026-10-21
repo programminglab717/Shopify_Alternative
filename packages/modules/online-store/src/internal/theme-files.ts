@@ -11,6 +11,8 @@ export const THEME_LIMITS = {
   filesPerTheme: 100,
   /** A file, in bytes. */
   fileBytes: 256 * 1024,
+  /** The changes a theme keeps to be taken back to (ADR-694). */
+  versions: 30,
   /** Sections in a template or section group, as Shopify allows. */
   sections: 25,
   /** Blocks in a section. */

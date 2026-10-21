@@ -26,6 +26,19 @@ export interface ThemeFileRecord {
   updatedAt: Date;
 }
 
+/** What made a change to a theme's own files (ADR-694). */
+export type ThemeVersionCause = 'saved' | 'deleted' | 'rolled_back';
+
+/** A change to a theme's own files, which it can be taken back to (ADR-694). */
+export interface ThemeVersionRecord {
+  /** The theme's version the change made. */
+  version: number;
+  /** The files it touched, by filename. */
+  changed: string[];
+  cause: ThemeVersionCause;
+  createdAt: Date;
+}
+
 /** A JSON file of a theme as the storefront reads it, for the theme editor (ADR-323). */
 export interface ThemeEditorFileRecord {
   filename: string;

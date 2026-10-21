@@ -24,6 +24,50 @@ registerEnumType(ThemeRole, {
   },
 });
 
+export enum ThemeVersionCause {
+  SAVED = 'SAVED',
+  DELETED = 'DELETED',
+  ROLLED_BACK = 'ROLLED_BACK',
+}
+
+registerEnumType(ThemeVersionCause, {
+  name: 'ThemeVersionCause',
+  description: "What made a change to a theme's own files (ADR-694).",
+  valuesMap: {
+    SAVED: { description: 'Files saved, by the editor or the API.' },
+    DELETED: { description: "Files deleted, the platform theme's showing again." },
+    ROLLED_BACK: { description: 'The theme taken back to a version before.' },
+  },
+});
+
+@ObjectType({
+  description:
+    "A change to a theme's own files that the theme keeps, the last 30 (OS-03, ADR-694): the " +
+    'theme can be taken back to the version it made.',
+})
+export class OnlineStoreThemeVersion {
+  @Field(() => Int, { description: "The theme's version the change made." })
+  version!: number;
+
+  @Field(() => [String], { description: 'The files it touched, by filename.' })
+  changedFiles!: string[];
+
+  @Field(() => ThemeVersionCause)
+  cause!: ThemeVersionCause;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
+@ObjectType()
+export class ThemeRollbackPayload {
+  @Field(() => OnlineStoreTheme, { nullable: true })
+  theme!: OnlineStoreTheme | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType({
   description:
     "One of the shop's own files in a theme, over the platform theme's file of that name: a " +
