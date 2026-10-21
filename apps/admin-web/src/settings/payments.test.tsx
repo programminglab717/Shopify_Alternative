@@ -77,6 +77,7 @@ describe('Delivery and payment settings in the admin', () => {
         days: { min: 3, max: 5 },
         zones: [{ name: 'Lahore', charge: '150', cities: ['Lahore', 'kasur'], days: null }],
         cutoffHour: null,
+        weights: [],
       },
     });
   });
@@ -103,6 +104,60 @@ describe('Delivery and payment settings in the admin', () => {
     expect(
       core.sent.find((each) => each.operation === 'DeliverySettingsUpdate')?.variables,
     ).toMatchObject({ input: { cutoffHour: 12 } });
+  });
+
+  it('saves what heavier orders cost more, weights in kilograms sent in grams (ADR-703)', async () => {
+    let answer: unknown = saved;
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'DeliverySettings') {
+        return {
+          deliverySettings: {
+            ...DELIVERY,
+            weights: [{ aboveGrams: 2000, charge: rupees('100.00') }],
+          },
+        };
+      }
+      if (operation === 'DeliverySettingsUpdate') return { deliverySettingsUpdate: answer };
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/delivery');
+
+    expect(((await screen.findByLabelText('Over (kg)')) as HTMLInputElement).value).toBe('2');
+    expect((screen.getByLabelText('Costs more') as HTMLInputElement).value).toBe('100');
+    await press('Add a weight');
+    fireEvent.change(screen.getAllByLabelText('Over (kg)')[1]!, { target: { value: 'heavy' } });
+    fireEvent.change(screen.getAllByLabelText('Costs more')[1]!, { target: { value: '300' } });
+    await press('Save');
+    expect(screen.getByText('Weight 2: type a weight in kilograms, such as 2 or 2.5')).toBeTruthy();
+    expect(core.sent.some((each) => each.operation === 'DeliverySettingsUpdate')).toBe(false);
+
+    fireEvent.change(screen.getAllByLabelText('Over (kg)')[1]!, { target: { value: '5.5' } });
+    await press('Save');
+    await screen.findByText('Saved. Checkout uses it from now on.');
+    expect(
+      core.sent.find((each) => each.operation === 'DeliverySettingsUpdate')?.variables,
+    ).toMatchObject({
+      input: {
+        weights: [
+          { aboveGrams: 2000, charge: '100' },
+          { aboveGrams: 5500, charge: '300' },
+        ],
+      },
+    });
+
+    // The core's problems name the weight.
+    answer = {
+      userErrors: [
+        {
+          field: ['input', 'weights', '1', 'aboveGrams'],
+          code: 'TAKEN',
+          message: 'This weight has a charge already',
+        },
+      ],
+    };
+    await press('Save');
+    await screen.findByText('Weight 2 · Over (kg): This weight has a charge already');
   });
 
   it("names the zone a problem is in, and keeps days that aren't numbers from the core", async () => {

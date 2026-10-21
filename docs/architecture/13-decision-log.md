@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-702 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-703 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -710,6 +710,7 @@
 | 700 | The theme editor's preview shows the theme's colours and widths as they change: the layout's {% style %} CSS rendered again with the unsaved settings and put in the page | Accepted |
 | 701 | The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as forms in an address are; one carrying a file is refused, as nothing would keep it | Accepted |
 | 702 | Heavier orders cost more to deliver: a shop names weights, each with what an order over it costs more, and checkout adds the heaviest the cart passes to the city's charge | Accepted |
+| 703 | The admin's delivery settings take heavier orders' charges: weights typed in kilograms, sent in grams, each with what it costs more, added and removed as zones are | Accepted |
 
 ---
 
@@ -24176,3 +24177,21 @@
 * **Alternatives:** **Shopify's rates by weight replacing the charge:** a shop with zones would
   need a rate for each weight in each zone. **A charge per kilogram:** couriers charge by bands,
   and a shop knows its bands.
+
+## ADR-703 · The admin's delivery settings take heavier orders' charges: weights typed in kilograms, sent in grams, each with what it costs more, added and removed as zones are
+
+* **Context:** Heavier orders cost more to deliver through the Admin API's `weights`
+  ([ADR-702](#adr-702--heavier-orders-cost-more-to-deliver-a-shop-names-weights-each-with-what-an-order-over-it-costs-more-and-checkout-adds-the-heaviest-the-cart-passes-to-the-citys-charge)), which no merchant would set by hand. The admin's delivery settings are one
+  form of everything they set, saved at once ([ADR-272](#adr-272--the-admins-settings-take-delivery-charges-cash-on-deliverys-rules-and-bank-transfer-each-a-form-of-everything-it-sets-saved-at-once-as-checkout-will-use-it-risk-scores-are-shown-out-of-100-for-the-cores-0-to-1-and-the-bank-account-is-given-once-the-member-confirms-who-they-are)).
+* **Decision:**
+  * **A section of its own, "Heavier orders",** under the zones: each weight a row with what it
+    is over, in kilograms as merchants weigh parcels, and what it costs more, added and removed
+    as zones are, ten at most, as the core keeps.
+  * **Kilograms become whole grams** when the form is sent, 2.5 as 2500; a weight that is not a
+    number above nothing is named before anything is sent, and the core's problems name the
+    weight they are in, as they name the zone.
+  * **The form sends its weights with the rest**, replacing them all, an empty list for none.
+* **Consequences:** A shop sets what its heavier orders cost where it sets its other charges,
+  in English or Urdu.
+* **Alternatives:** **Weights in grams:** merchants and couriers speak of kilograms. **A page of
+  their own:** a charge added to the zones' belongs beside them.

@@ -1211,6 +1211,8 @@ export interface DeliverySettingsValue {
   }[];
   /** From which hour the day's orders count from the next day (ADR-597); absent in old fakes. */
   cutoffHour?: number | null;
+  /** What heavier orders cost more, the lightest first (ADR-702); absent in old fakes. */
+  weights?: { aboveGrams: number; charge: MoneyValue }[];
   updatedAt: string | null;
 }
 

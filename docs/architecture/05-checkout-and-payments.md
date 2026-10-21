@@ -185,7 +185,8 @@ and prices them at step 1 whenever they are read: each variant's price in the ca
 the stock that can be sold online holding back what is added. Storefronts change carts as
 Shopify's cart forms and Ajax cart do. Step 4 in part: each shop's delivery charge, one for
 everywhere, by zones of cities, more for orders over a weight
-([ADR-702](./13-decision-log.md#adr-702--heavier-orders-cost-more-to-deliver-a-shop-names-weights-each-with-what-an-order-over-it-costs-more-and-checkout-adds-the-heaviest-the-cart-passes-to-the-citys-charge)), and nothing from a subtotal
+([ADR-702](./13-decision-log.md#adr-702--heavier-orders-cost-more-to-deliver-a-shop-names-weights-each-with-what-an-order-over-it-costs-more-and-checkout-adds-the-heaviest-the-cart-passes-to-the-citys-charge), set in the admin's delivery settings in kilograms,
+[ADR-703](./13-decision-log.md#adr-703--the-admins-delivery-settings-take-heavier-orders-charges-weights-typed-in-kilograms-sent-in-grams-each-with-what-it-costs-more-added-and-removed-as-zones-are)), and nothing from a subtotal
 ([ADR-043](./13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)), which the storefront shows on product and cart
 pages, and checkout adds to the order for the address's city
 ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)), and how many working days delivery takes,

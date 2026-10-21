@@ -31,6 +31,9 @@ import { BackToSettings } from './settings-page';
 /** The most zones a shop has (the core's DELIVERY_LIMITS). */
 const MOST_ZONES = 20;
 
+/** The most weights a shop charges for (the core's DELIVERY_LIMITS). */
+const MOST_WEIGHTS = 10;
+
 interface DaysState {
   min: string;
   max: string;
@@ -44,6 +47,13 @@ interface ZoneState {
   days: DaysState;
 }
 
+/** What orders over a weight cost more (ADR-702): the weight in kilograms, as typed. */
+interface WeightState {
+  key: number;
+  kg: string;
+  charge: string;
+}
+
 interface DeliveryState {
   charge: string;
   freeAbove: string;
@@ -51,6 +61,7 @@ interface DeliveryState {
   zones: ZoneState[];
   /** The cut-off hour, "1" to "23", or "" for none (ADR-597). */
   cutoffHour: string;
+  weights: WeightState[];
 }
 
 function daysState(days: DeliveryDaysValue | null): DaysState {
@@ -73,7 +84,19 @@ function stateOf(settings: DeliverySettingsValue): DeliveryState {
       settings.cutoffHour === undefined || settings.cutoffHour === null
         ? ''
         : String(settings.cutoffHour),
+    weights: (settings.weights ?? []).map((weight, key) => ({
+      key,
+      kg: String(weight.aboveGrams / 1000),
+      charge: priceText(weight.charge.amount),
+    })),
   };
+}
+
+/** Kilograms as typed, in whole grams for the API; null when not a weight above nothing. */
+function gramsOf(kg: string): number | null {
+  const value = Number(kg.trim());
+  if (kg.trim() === '' || !Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value * 1000);
 }
 
 /** The hours a cut-off may be, as a clock says them: "3 pm". */
@@ -98,14 +121,18 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   cutoffHour: 'delivery.cutoff',
   name: 'delivery.zoneName',
   cities: 'delivery.zoneCities',
+  aboveGrams: 'delivery.weightOver',
 };
 
-/** "Zone 2" for a problem with the second zone. */
+/** "Zone 2" for a problem with the second zone, "Weight 1" with the first weight. */
 function zoneOf(t: Translate) {
   return (field: string[]) => {
-    const at = field.indexOf('zones');
+    const zone = field.indexOf('zones');
+    const weight = field.indexOf('weights');
+    const at = zone >= 0 ? zone : weight;
     const index = Number(field[at + 1]);
-    return at >= 0 && Number.isInteger(index) ? t('delivery.zoneNumber', { n: index + 1 }) : null;
+    if (at < 0 || !Number.isInteger(index)) return null;
+    return t(zone >= 0 ? 'delivery.zoneNumber' : 'delivery.weightNumber', { n: index + 1 });
   };
 }
 
@@ -201,6 +228,52 @@ function ZoneFields({
   );
 }
 
+function WeightFields({
+  weight,
+  number,
+  onChange,
+  onRemove,
+}: {
+  weight: WeightState;
+  number: number;
+  onChange: (weight: WeightState) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <li className="flex flex-col gap-2 rounded-control border border-line p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold">{t('delivery.weightNumber', { n: number })}</h3>
+        <Button
+          variant="danger"
+          icon={<Trash2 aria-hidden className="size-5" />}
+          onClick={onRemove}
+        >
+          {t('delivery.removeZone')}
+        </Button>
+      </div>
+      <Pair>
+        <TextField
+          label={t('delivery.weightOver')}
+          required
+          inputMode="decimal"
+          ltr
+          value={weight.kg}
+          onChange={(event) => onChange({ ...weight, kg: event.target.value })}
+        />
+        <TextField
+          label={t('delivery.weightCharge')}
+          required
+          inputMode="decimal"
+          ltr
+          value={weight.charge}
+          onChange={(event) => onChange({ ...weight, charge: event.target.value })}
+        />
+      </Pair>
+    </li>
+  );
+}
+
 function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
   const { t } = useLocale();
   const save = useAdminMutation<
@@ -208,7 +281,7 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
     { input: Record<string, unknown> }
   >(DeliverySettingsUpdateMutation);
   const [state, setState] = useState(() => stateOf(settings));
-  const [nextKey, setNextKey] = useState(settings.zones.length);
+  const [nextKey, setNextKey] = useState(settings.zones.length + (settings.weights?.length ?? 0));
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
@@ -217,11 +290,17 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
     setSaved(false);
     const days = daysInput(state.days);
     const zones = state.zones.map((zone) => ({ zone, days: daysInput(zone.days) }));
+    const weights = state.weights.map((weight) => ({ weight, grams: gramsOf(weight.kg) }));
     const badDays = [
       ...(days === 'bad' ? [`${t('delivery.days')}: ${t('delivery.badDays')}`] : []),
       ...zones.flatMap(({ days: zoneDays }, index) =>
         zoneDays === 'bad'
           ? [`${t('delivery.zoneNumber', { n: index + 1 })}: ${t('delivery.badDays')}`]
+          : [],
+      ),
+      ...weights.flatMap(({ grams }, index) =>
+        grams === null
+          ? [`${t('delivery.weightNumber', { n: index + 1 })}: ${t('delivery.badWeight')}`]
           : [],
       ),
     ];
@@ -243,6 +322,10 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
             days: zoneDays,
           })),
           cutoffHour: state.cutoffHour === '' ? null : Number(state.cutoffHour),
+          weights: weights.map(({ weight, grams }) => ({
+            aboveGrams: grams,
+            charge: weight.charge.trim(),
+          })),
         },
       });
       if (deliverySettingsUpdate.userErrors.length > 0) {
@@ -259,6 +342,11 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
 
   const setZone = (key: number, zone: ZoneState) =>
     setState({ ...state, zones: state.zones.map((each) => (each.key === key ? zone : each)) });
+  const setWeight = (key: number, weight: WeightState) =>
+    setState({
+      ...state,
+      weights: state.weights.map((each) => (each.key === key ? weight : each)),
+    });
 
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-4">
@@ -338,6 +426,39 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           </Button>
         )}
       </FormSection>
+      <FormSection title={t('delivery.weights')} hint={t('delivery.weightsHint')}>
+        {state.weights.length > 0 && (
+          <ul className="flex flex-col gap-4">
+            {state.weights.map((weight, index) => (
+              <WeightFields
+                key={weight.key}
+                weight={weight}
+                number={index + 1}
+                onChange={(next) => setWeight(weight.key, next)}
+                onRemove={() =>
+                  setState({ ...state, weights: state.weights.filter((each) => each !== weight) })
+                }
+              />
+            ))}
+          </ul>
+        )}
+        {state.weights.length < MOST_WEIGHTS && (
+          <Button
+            variant="secondary"
+            className="self-start"
+            icon={<Plus aria-hidden className="size-5" />}
+            onClick={() => {
+              setState({
+                ...state,
+                weights: [...state.weights, { key: nextKey, kg: '', charge: '' }],
+              });
+              setNextKey(nextKey + 1);
+            }}
+          >
+            {t('delivery.addWeight')}
+          </Button>
+        )}
+      </FormSection>
       <Problems problems={problems} />
       {saved && <Alert tone="success">{t('settings.saved')}</Alert>}
       <Button type="submit" busy={save.isPending} className="self-start">
@@ -349,8 +470,8 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
 
 /**
  * What the shop charges to deliver an order (CHK-22, ADR-043): one charge for everywhere, zones
- * of cities with their own, free above a subtotal, and how many working days delivery takes,
- * which the storefront and checkout tell shoppers.
+ * of cities with their own, more for heavier orders (ADR-703), free above a subtotal, and how many
+ * working days delivery takes, which the storefront and checkout tell shoppers.
  */
 export function DeliveryPage() {
   const { t } = useLocale();

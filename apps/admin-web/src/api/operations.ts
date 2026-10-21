@@ -2532,6 +2532,12 @@ const DELIVERY_SETTINGS = /* GraphQL */ `
         max
       }
     }
+    weights {
+      aboveGrams
+      charge {
+        ...Money
+      }
+    }
     updatedAt
   }
 `;
