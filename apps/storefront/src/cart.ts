@@ -101,6 +101,57 @@ export function permalinkItems(path: string): Required<CartItemInput>[] | null {
   return items;
 }
 
+/** The checkout's fields a cart permalink may fill in, each with the most it takes. */
+export const PREFILL_FIELDS = {
+  name: 200,
+  phone: 40,
+  email: 254,
+  city: 100,
+  address1: 200,
+  address2: 200,
+} as const;
+
+export type Prefill = Partial<Record<keyof typeof PREFILL_FIELDS, string>>;
+
+/** Shopify's names for a permalink's `checkout[...]` parameters, by the field each fills in. */
+const PREFILL_NAMES: Record<string, keyof typeof PREFILL_FIELDS> = {
+  'checkout[email]': 'email',
+  'checkout[phone]': 'phone',
+  'checkout[shipping_address][phone]': 'phone',
+  'checkout[shipping_address][city]': 'city',
+  'checkout[shipping_address][address1]': 'address1',
+  'checkout[shipping_address][address2]': 'address2',
+};
+
+/**
+ * What a cart permalink's query fills in of its checkout (ADR-709), as Shopify's
+ * `checkout[email]` and `checkout[shipping_address][...]` do: the name from its first and last,
+ * each field trimmed to what it takes; empty for none.
+ */
+export function permalinkPrefill(query: URLSearchParams): Prefill {
+  const prefill: Prefill = {};
+  const name = ['first_name', 'last_name']
+    .map((part) => query.get(`checkout[shipping_address][${part}]`)?.trim() ?? '')
+    .filter(Boolean)
+    .join(' ');
+  if (name) prefill.name = name.slice(0, PREFILL_FIELDS.name);
+  for (const [key, field] of Object.entries(PREFILL_NAMES)) {
+    const value = query.get(key)?.trim();
+    if (value && !prefill[field]) prefill[field] = value.slice(0, PREFILL_FIELDS[field]);
+  }
+  return prefill;
+}
+
+/** A query without what a permalink fills in of its checkout, as visits keep it. */
+export function withoutPrefill(search: string): string {
+  const query = new URLSearchParams(search);
+  for (const key of [...query.keys()]) {
+    if (key.startsWith('checkout[')) query.delete(key);
+  }
+  const rest = query.toString();
+  return rest ? `?${rest}` : '';
+}
+
 /**
  * Parameters as Rails and Shopify read them from a form: `items[][id]` and `items[0][id]` build
  * a list of items, `properties[Name]` an object, `updates[]` a list.

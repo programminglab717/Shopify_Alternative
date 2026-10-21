@@ -1308,6 +1308,50 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await formOf(token)).toMatchObject({ name: '', phone: '' });
   });
 
+  it("fills a checkout from what its cart permalink gives, over a signed-in shopper's address (ADR-709)", async () => {
+    const formOf = async (prefill: Record<string, string>, account: string | null = null) => {
+      const { secret } = await checkout();
+      const view = await f.checkouts.view(secret, f.a.shopId, { account, prefill });
+      if (view.kind !== 'open') throw new Error(`Expected an open checkout, got ${view.kind}`);
+      return view.form;
+    };
+    expect(
+      await formOf({
+        name: ' Ayesha Khan ',
+        phone: '0300 1234567',
+        email: 'ayesha@example.pk',
+        city: 'Lahore',
+        address1: 'House 12, Street 4',
+        address2: 'Gulberg',
+        // Nothing else of the form is a link's to give.
+        payment: 'bank_transfer',
+        code: '123456',
+      } as Record<string, string>),
+    ).toMatchObject({
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      email: 'ayesha@example.pk',
+      city: 'Lahore',
+      address1: 'House 12, Street 4',
+      address2: 'Gulberg',
+      payment: '',
+      code: '',
+    });
+    // Each within what its field takes; a blank one gives nothing.
+    const long = await formOf({ name: 'A'.repeat(300), city: '  ' });
+    expect([long.name.length, long.city]).toEqual([200, '']);
+
+    // Over a signed-in shopper's own address, field by field.
+    const token = await signIn(JAZZ);
+    await order(JAZZ);
+    await saved(token, typed('Office', { city: 'Karachi', default: true }));
+    expect(await formOf({ city: 'Lahore' }, token)).toMatchObject({
+      name: 'Office',
+      city: 'Lahore',
+      address1: "Office's house, Street 4",
+    });
+  });
+
   it('takes a session signed in to the account as proof of its number when placing (ADR-586)', async () => {
     unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }));
     const token = await signIn(JAZZ);

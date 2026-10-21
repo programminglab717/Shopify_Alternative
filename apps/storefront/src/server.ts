@@ -61,6 +61,8 @@ import {
   parseForm,
   parseMultipartForm,
   permalinkItems,
+  permalinkPrefill,
+  withoutPrefill,
   type CoreBackend,
 } from './cart.js';
 import {
@@ -1251,10 +1253,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     token: string | null,
     urdu: boolean,
     landed = false,
+    /** What a permalink fills in of the checkout, its `checkout[...]` query (ADR-709). */
+    filled = '',
   ) => {
     if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
     const started = await core.startCheckout(shopId, token, checkoutVisits(request, reply, landed));
-    return reply.redirect(started.ok ? started.path : `${urdu ? '/ur' : ''}/cart`, 303);
+    return reply.redirect(
+      started.ok ? `${started.path}${filled}` : `${urdu ? '/ur' : ''}/cart`,
+      303,
+    );
   };
 
   /**
@@ -1266,7 +1273,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const host = request.headers.host ?? '';
     const url = new URL(request.url, 'http://storefront');
     const kept = keptVisits(cookieOf(request.headers.cookie, VISITS_COOKIE), now);
-    const path = `${url.pathname}${url.search}`;
+    // Without the shopper's details a permalink fills in, which visits do not keep (ADR-709).
+    const path = `${url.pathname}${withoutPrefill(url.search)}`;
     const after = visitsAfter(kept, { path, host, referrer: request.headers.referer, landed }, now);
     if (after) reply.header('set-cookie', visitsCookie(after, { secure }));
     return storefrontVisits(after ?? kept, `${secure ? 'https' : 'http'}://${host}`);
@@ -1567,7 +1575,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         };
         return await sendPage(reply, page, found, cartErrorStatus(added.error));
       }
-      const query = parseForm(new URL(request.url, 'http://storefront').search.slice(1));
+      const search = new URL(request.url, 'http://storefront').search;
+      const query = parseForm(search.slice(1));
       const { body } = cartBody('update', {
         note: query.note,
         attributes: query.attributes,
@@ -1575,7 +1584,20 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       });
       // What the link adds to its items; the items go to checkout even if the core refuses it.
       if (Object.keys(body).length > 0) await core.act(found.shopId, added.token, 'update', body);
-      return await toCheckout(request, reply, found.shopId, added.token, urdu, true);
+      // The shopper's details it gives, as Shopify's `checkout[...]`, carried to the checkout's
+      // page to fill it in (ADR-709).
+      const filled = new URLSearchParams(
+        [...new URLSearchParams(search)].filter(([key]) => key.startsWith('checkout[')),
+      ).toString();
+      return await toCheckout(
+        request,
+        reply,
+        found.shopId,
+        added.token,
+        urdu,
+        true,
+        filled ? `?${filled}` : '',
+      );
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
@@ -1795,14 +1817,19 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         ...(proof && { proof }),
         ...(signedIn && { account: signedIn }),
       };
-      // Opened by a shopper signed in to their account, filled in from it (ADR-585).
+      // Opened by a shopper signed in to their account, filled in from it (ADR-585), and with
+      // what the cart permalink that began it gives (ADR-709).
       const account = posted ? null : signedIn;
+      const prefill = posted
+        ? undefined
+        : permalinkPrefill(new URL(request.url, 'http://storefront').searchParams);
       const page = await core.checkoutPage(
         found.shopId,
         token,
         form,
         posted ? client : undefined,
         account,
+        prefill,
       );
       // Its session reached checkout, and, once it is placed, converted (ADR-180).
       if (!posted && 'html' in page && page.status === 200) {

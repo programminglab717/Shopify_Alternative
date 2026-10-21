@@ -332,6 +332,13 @@ describe.skipIf(!server)('Checkouts', () => {
       baseUrl: await app.getUrl(),
       key: TEST_STOREFRONT_KEY,
     });
+    // Filled in with what the cart permalink that began it gives (ADR-709).
+    const filled = (await client.checkoutPage(shopA, secret, null, undefined, null, {
+      name: 'Ayesha Khan',
+      city: 'Lahore',
+    })) as Extract<CheckoutPageResponse, { html: string }>;
+    expect(filled.html).toContain('value="Ayesha Khan"');
+    expect(filled.html).toContain('value="Lahore"');
     const stale = await client.checkoutPage(shopA, secret, { ...FORM, shown: 'x'.repeat(22) });
     expect(stale).toMatchObject({ placed: false, status: 409 });
     const shown = shownIn(page.html);

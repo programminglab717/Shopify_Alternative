@@ -41,9 +41,11 @@ import { PaymentLinkService } from './payment-link.service.js';
 import {
   CHECKOUT_PATH,
   CheckoutService,
+  PREFILL_FIELDS,
   paidNoticeOf,
   type CheckoutClient,
   type CheckoutForm,
+  type CheckoutPrefill,
   type CheckoutView,
 } from './checkout.service.js';
 
@@ -203,10 +205,15 @@ export class StorefrontCheckoutController {
     @Param('shopId') shopId: string,
     @Param('token') token: string,
     @Headers(ACCOUNT_TOKEN_HEADER) account: string | undefined,
+    @Query() query: unknown,
   ): Promise<CheckoutPageResponse> {
     if (!UUID.test(shopId)) throw new NotFoundException();
-    // Filled in for a shopper signed in to their account on the shop (ADR-585).
-    const view = await this.checkouts.view(token, shopId, { account: account ?? null });
+    // Filled in for a shopper signed in to their account on the shop (ADR-585), and with what
+    // the cart permalink that began it gives (ADR-709).
+    const view = await this.checkouts.view(token, shopId, {
+      account: account ?? null,
+      prefill: prefillOf(query),
+    });
     return responseOf(await withBook(this.checkouts, view, shopId, account), false);
   }
 
@@ -341,6 +348,13 @@ export class ReminderLinkController {
     }
     await reply.code(302).headers(PRIVATE_PAGE_HEADERS).header('location', target).send();
   }
+}
+
+/** What a cart permalink fills in of a checkout (ADR-709), as the page's address gives it. */
+function prefillOf(query: unknown): CheckoutPrefill {
+  return Object.fromEntries(
+    Object.keys(PREFILL_FIELDS).map((name) => [name, field(query, name)]),
+  ) as CheckoutPrefill;
 }
 
 /** The name and number a contact's body carries; blank for those it lacks. */

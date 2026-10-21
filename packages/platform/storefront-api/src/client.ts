@@ -236,7 +236,8 @@ export class StorefrontApiClient {
   /**
    * The page of the checkout `checkoutToken` names, if it is the shop's; with `form`, the fields
    * the shopper posted, which place the order, and `client`, where they posted them from; opened
-   * with the secret of the shopper's `account` session, filled in from their account (ADR-585).
+   * with the secret of the shopper's `account` session, filled in from their account (ADR-585),
+   * and with `prefill`, what the cart permalink that began it gives of the shopper (ADR-709).
    */
   async checkoutPage(
     shopId: string,
@@ -244,8 +245,11 @@ export class StorefrontApiClient {
     form: Record<string, string> | null,
     client?: CheckoutClient,
     account?: string | null,
+    prefill?: Record<string, string>,
   ): Promise<CheckoutPageResponse> {
-    const path = checkoutsPath(shopId, encodeURIComponent(checkoutToken));
+    const page = checkoutsPath(shopId, encodeURIComponent(checkoutToken));
+    const given = new URLSearchParams(form ? {} : (prefill ?? {})).toString();
+    const path = given ? `${page}?${given}` : page;
     const from: Record<string, string> = {};
     if (client) from[CLIENT_IP_HEADER] = client.ip;
     if (client?.userAgent) from[CLIENT_USER_AGENT_HEADER] = client.userAgent;

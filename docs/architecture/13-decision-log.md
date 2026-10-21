@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-708 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-709 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -716,6 +716,7 @@
 | 706 | The admin's theme editor adds sections to a page from the theme's presets, as Shopify's does, opened to be set up, 25 at most, and gives a video_url setting its box | Accepted |
 | 707 | Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme Check refusing anything else, and Hatti Base's FAQ answers are rich text | Accepted |
 | 708 | The theme editor's preview shows the theme's settings as they change, every section of the page rendered again with them, the few around the sections once saved | Accepted |
+| 709 | A cart permalink fills in its checkout with the shopper's details as Shopify's checkout[...] gives them: name, number, email, city and address, never kept with visits | Accepted |
 
 ---
 
@@ -24317,3 +24318,26 @@
   have to follow every snippet a section renders to know, for little saved. **The whole page
   loaded again:** it loses the shopper's scroll and the merchant's place, as Shopify's editor
   does not.
+
+## ADR-709 · A cart permalink fills in its checkout with the shopper's details as Shopify's checkout[...] gives them: name, number, email, city and address, never kept with visits
+
+* **Context:** Shops send a customer a cart permalink after taking the order in a chat
+  ([ADR-065](#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)), and the customer then types again what they already gave: their name,
+  number and address. Shopify's permalinks carry them, as `checkout[email]` and
+  `checkout[shipping_address][...]`, and the tools that make such links write them so.
+* **Decision:**
+  * **The permalink's `checkout[...]` parameters go on to its checkout's page**, which is filled
+    in with them: the name from the first and last, the number, the email, the city, and the
+    house and street and the area. Nothing else of the form is a link's to give: not the way to
+    pay, a code or a box ticked.
+  * **They fill in over a signed-in shopper's address** ([ADR-585](#adr-585--a-signed-in-shoppers-checkout-opens-filled-in-from-their-default-address-or-with-the-number-they-signed-in-with)), field by field:
+    the link was made for this order. Each is trimmed to what its field takes; the shopper
+    changes any before placing it, and the page checks them as it checks what they type.
+  * **Visits never keep them**: the landing page the order's attribution keeps
+    ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)) is the permalink's address without them.
+* **Consequences:** A customer the shop already spoke to opens the link and places the order,
+  their number proved by a code where the shop's rules ask ([ADR-148](#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)), as anyone's.
+* **Alternatives:** **Kept with the checkout as it starts:** a column of what the shopper did
+  not yet agree to give; the page's address already holds it, as Shopify's does. **The
+  abandoned checkout's reminder filling in its link too:** a link forwarded would show the
+  number to whoever it reached.

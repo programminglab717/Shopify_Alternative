@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Permalinks that fill in their checkout
+
+* **A cart permalink fills in its checkout with the shopper's details as Shopify's
+  `checkout[...]` gives them: name, number, email, city and address, never kept with visits**
+  ([ADR-709](../architecture/13-decision-log.md#adr-709--a-cart-permalink-fills-in-its-checkout-with-the-shoppers-details-as-shopifys-checkout-gives-them-name-number-email-city-and-address-never-kept-with-visits)): the last of shortcut 39's permalink target, and its row brought up to date.
+* 3965 tests, two more: the storefront's and the checkout module's; the core's checkout
+  page test asks for a filled-in page too.
+
 ### a0b6c12 · The theme's settings in the preview
 
 * **The theme editor's preview shows the theme's settings as they change, every section of the

@@ -258,6 +258,16 @@ export function formForPickup(form: CheckoutForm, at: PickupPoint | null): Check
   };
 }
 
+/** A permalink's fields that give something, each within what it takes. */
+function givenOf(prefill: CheckoutPrefill | undefined): CheckoutPrefill {
+  const given: CheckoutPrefill = {};
+  for (const [name, most] of Object.entries(PREFILL_FIELDS)) {
+    const value = prefill?.[name as keyof CheckoutPrefill]?.trim().slice(0, most);
+    if (value) given[name as keyof CheckoutPrefill] = value;
+  }
+  return given;
+}
+
 export const EMPTY_FORM: CheckoutForm = {
   name: '',
   phone: '',
@@ -278,6 +288,19 @@ export const EMPTY_FORM: CheckoutForm = {
   pickup: '',
   giftMessage: '',
 };
+
+/** The checkout's fields a cart permalink may fill in (ADR-709), each with the most it takes. */
+export const PREFILL_FIELDS = {
+  name: 200,
+  phone: 40,
+  email: 254,
+  city: 100,
+  address1: 200,
+  address2: 200,
+} as const;
+
+/** What a cart permalink gives of the shopper, to fill in their checkout's form (ADR-709). */
+export type CheckoutPrefill = Partial<Record<keyof typeof PREFILL_FIELDS, string>>;
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
 export type CodUnavailable = { reason: 'law' } | CodRefusal;
@@ -626,12 +649,14 @@ export class CheckoutService {
   /**
    * What the checkout's page shows; with `shopId`, only for that shop's checkouts. With the
    * secret of a shopper's session signed in to their account on the shop (ADR-585), its form is
-   * filled in from the default address of their book, or with the number they signed in with.
+   * filled in from the default address of their book, or with the number they signed in with;
+   * with `prefill`, what the cart permalink that began it gives of the shopper fills in those
+   * fields over it (ADR-709).
    */
   async view(
     token: string,
     shopId?: string,
-    options: { account?: string | null } = {},
+    options: { account?: string | null; prefill?: CheckoutPrefill } = {},
   ): Promise<CheckoutView> {
     const found = await this.#resolve(token, shopId);
     if (!found) return { kind: 'not_found' };
@@ -639,7 +664,7 @@ export class CheckoutService {
       const form = options.account
         ? await accountFormIn(tx, found.shopId, options.account)
         : EMPTY_FORM;
-      return this.#view(tx, found, false, form);
+      return this.#view(tx, found, false, { ...form, ...givenOf(options.prefill) });
     });
   }
 

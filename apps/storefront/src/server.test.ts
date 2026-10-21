@@ -305,6 +305,7 @@ class FakeCore {
     token: string;
     form: Record<string, string> | null;
     client?: CheckoutClient;
+    prefill?: Record<string, string>;
     account?: string;
   }[] = [];
   page: CheckoutPageResponse | Error = new Error('No page');
@@ -376,8 +377,15 @@ class FakeCore {
     form: Record<string, string> | null,
     client?: CheckoutClient,
     account?: string | null,
+    prefill?: Record<string, string>,
   ): Promise<CheckoutPageResponse> {
-    this.pages.push({ token, form, ...(client && { client }), ...(account && { account }) });
+    this.pages.push({
+      token,
+      form,
+      ...(client && { client }),
+      ...(account && { account }),
+      ...(prefill && Object.keys(prefill).length > 0 && { prefill }),
+    });
     if (this.page instanceof Error) throw this.page;
     return this.page;
   }
@@ -1559,6 +1567,54 @@ describe('Carts', () => {
       headers: { host: 'localhost' },
     });
     expect(away.statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("fills in a permalink's checkout with Shopify's checkout[...] details, which visits do not keep (ADR-709)", async () => {
+    const app = server();
+    core.answer = () => ({ ok: true, cart: cartOf(1), token: 'linked-2', added: [] });
+    const details =
+      'checkout%5Bshipping_address%5D%5Bfirst_name%5D=Ayesha' +
+      '&checkout%5Bshipping_address%5D%5Blast_name%5D=Khan' +
+      '&checkout%5Bshipping_address%5D%5Bcity%5D=Lahore' +
+      '&checkout%5Bshipping_address%5D%5Bphone%5D=0300+1234567' +
+      '&checkout%5Bemail%5D=ayesha%40example.pk';
+    const followed = await app.inject({
+      method: 'GET',
+      url: `/cart/${variant.id}:1?utm_source=whatsapp&${details}`,
+      headers: { host: 'localhost' },
+    });
+    expect(followed.statusCode).toBe(303);
+    expect(followed.headers.location).toBe(`/checkouts/c-secret?${details}`);
+    // Where the shopper landed, without their details.
+    expect(core.visits.at(-1)![0]!.landingPage).toBe(
+      `http://localhost/cart/${variant.id}:1?utm_source=whatsapp`,
+    );
+
+    // The checkout's page, opened there, filled in with them.
+    await app.inject({
+      method: 'GET',
+      url: followed.headers.location!,
+      headers: { host: 'localhost' },
+    });
+    expect(core.pages.at(-1)).toMatchObject({
+      token: 'c-secret',
+      form: null,
+      prefill: {
+        name: 'Ayesha Khan',
+        city: 'Lahore',
+        phone: '0300 1234567',
+        email: 'ayesha@example.pk',
+      },
+    });
+    // Posted, the form is the shopper's own.
+    await app.inject({
+      method: 'POST',
+      url: followed.headers.location!,
+      headers: { ...FORM, 'sec-fetch-site': 'same-origin' },
+      payload: form({ shown: 'digest', name: 'Ayesha', phone: '0300 1234567' }),
+    });
+    expect(core.pages.at(-1)!.prefill).toBeUndefined();
     await app.close();
   });
 
