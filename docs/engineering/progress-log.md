@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Alerts and a dashboard
+
+* **The admin's objectives, the outbox and sign-ins are watched** ([ADR-725](../architecture/13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)): Prometheus rules in
+  `ops/prometheus/hatti.rules.yml`, multiwindow burn-rate alerts for Admin GraphQL's latency and
+  the Admin API's errors, thresholds for the outbox and failed sign-ins, and a page when the core
+  goes quiet; each alert has a runbook in `docs/engineering/runbooks.md`.
+* **The "Hatti core" dashboard** in `ops/grafana/hatti-core.json`.
+* **CI runs `scripts/check-ops.sh`**: promtool's checks and unit tests of the rules, and every
+  dashboard query parsed.
+* 4004 tests, as before; seven groups of alert tests run by promtool.
+
 ### 2fb2557 · Container images
 
 * **The core and the storefront are built into images of their own** ([ADR-724](../architecture/13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)), from one

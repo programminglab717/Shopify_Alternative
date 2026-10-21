@@ -1,0 +1,235 @@
+# Hatti's recording rules and alerts (ADR-725), over the metrics the core sends by OTLP, as
+# Prometheus names them: dots become underscores, the unit and _total are appended, and the job
+# is service.namespace/service.name, such as hatti/core-api. Each alert's runbook is a section of
+# docs/engineering/runbooks.md.
+#
+# The admin's objectives are 12 §1's: 95% of Admin GraphQL requests answered within 500 ms, and
+# 99.9% of the Admin API's requests answered without a server error, each over 30 days. Their
+# alerts burn the error budget as the SRE workbook's multiwindow, multi-burn-rate alerts do: a page
+# when an hour's burn would spend 2% of the month's budget, or six hours' 5%; a ticket when a
+# day's would spend 10%, or three days' as much as the month allows.
+groups:
+  - name: hatti-admin-slis
+    interval: 1m
+    rules:
+      - record: hatti:admin_graphql_slow:ratio_rate5m
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[5m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[5m]))
+          )
+      - record: hatti:admin_graphql_slow:ratio_rate30m
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[30m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[30m]))
+          )
+      - record: hatti:admin_graphql_slow:ratio_rate1h
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[1h]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[1h]))
+          )
+      - record: hatti:admin_graphql_slow:ratio_rate2h
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[2h]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[2h]))
+          )
+      - record: hatti:admin_graphql_slow:ratio_rate6h
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[6h]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[6h]))
+          )
+      - record: hatti:admin_graphql_slow:ratio_rate1d
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[1d]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[1d]))
+          )
+      - record: hatti:admin_graphql_slow:ratio_rate3d
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}[3d]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql"}[3d]))
+          )
+      - record: hatti:admin_api_errors:ratio_rate5m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[5m]))
+      - record: hatti:admin_api_errors:ratio_rate30m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[30m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[30m]))
+      - record: hatti:admin_api_errors:ratio_rate1h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[1h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[1h]))
+      - record: hatti:admin_api_errors:ratio_rate2h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[2h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[2h]))
+      - record: hatti:admin_api_errors:ratio_rate6h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[6h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[6h]))
+      - record: hatti:admin_api_errors:ratio_rate1d
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[1d]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[1d]))
+      - record: hatti:admin_api_errors:ratio_rate3d
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_response_status_code=~"5.."}[3d]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api"}[3d]))
+
+  - name: hatti-admin-slos
+    rules:
+      - alert: HattiAdminGraphqlLatencyBudgetBurn
+        expr: |
+          (hatti:admin_graphql_slow:ratio_rate1h > 14.4 * 0.05 and hatti:admin_graphql_slow:ratio_rate5m > 14.4 * 0.05)
+          or
+          (hatti:admin_graphql_slow:ratio_rate6h > 6 * 0.05 and hatti:admin_graphql_slow:ratio_rate30m > 6 * 0.05)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Admin GraphQL is slow fast enough to spend the month's latency budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of Admin GraphQL requests took over 500 ms; the
+            objective allows 5%.
+          runbook: docs/engineering/runbooks.md#hattiadmingraphqllatencybudgetburn
+      - alert: HattiAdminGraphqlLatencyBudgetBurnSlow
+        expr: |
+          (hatti:admin_graphql_slow:ratio_rate1d > 3 * 0.05 and hatti:admin_graphql_slow:ratio_rate2h > 3 * 0.05)
+          or
+          (hatti:admin_graphql_slow:ratio_rate3d > 0.05 and hatti:admin_graphql_slow:ratio_rate6h > 0.05)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Admin GraphQL is slow often enough to spend the month's latency budget
+          description: >-
+            {{ $value | humanizePercentage }} of Admin GraphQL requests took over 500 ms; the
+            objective allows 5%.
+          runbook: docs/engineering/runbooks.md#hattiadmingraphqllatencybudgetburn
+      - alert: HattiAdminApiErrorBudgetBurn
+        expr: |
+          (hatti:admin_api_errors:ratio_rate1h > 14.4 * 0.001 and hatti:admin_api_errors:ratio_rate5m > 14.4 * 0.001)
+          or
+          (hatti:admin_api_errors:ratio_rate6h > 6 * 0.001 and hatti:admin_api_errors:ratio_rate30m > 6 * 0.001)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: The Admin API fails fast enough to spend the month's error budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of the Admin API's requests ended in a server
+            error; the objective allows 0.1%.
+          runbook: docs/engineering/runbooks.md#hattiadminapierrorbudgetburn
+      - alert: HattiAdminApiErrorBudgetBurnSlow
+        expr: |
+          (hatti:admin_api_errors:ratio_rate1d > 3 * 0.001 and hatti:admin_api_errors:ratio_rate2h > 3 * 0.001)
+          or
+          (hatti:admin_api_errors:ratio_rate3d > 0.001 and hatti:admin_api_errors:ratio_rate6h > 0.001)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: The Admin API fails often enough to spend the month's error budget
+          description: >-
+            {{ $value | humanizePercentage }} of the Admin API's requests ended in a server
+            error; the objective allows 0.1%.
+          runbook: docs/engineering/runbooks.md#hattiadminapierrorbudgetburn
+
+  - name: hatti-events
+    rules:
+      # Order confirmations are to be sent within a minute of the order (12 §1), and every event
+      # the worker acts on waits in the outbox until the relay hands it to the queue.
+      - alert: HattiOutboxLagging
+        expr: max(hatti_outbox_lag_seconds{job="hatti/core-worker"}) > 120
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: Events wait over two minutes in the outbox
+          description: >-
+            The oldest event waiting to be published is {{ $value | humanizeDuration }} old:
+            confirmations, bookings and storefront updates wait with it.
+          runbook: docs/engineering/runbooks.md#hattioutboxlagging
+      - alert: HattiOutboxSlow
+        expr: max(hatti_outbox_lag_seconds{job="hatti/core-worker"}) > 30
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Events wait over 30 seconds in the outbox
+          description: >-
+            The oldest event waiting to be published is {{ $value | humanizeDuration }} old.
+          runbook: docs/engineering/runbooks.md#hattioutboxlagging
+      - alert: HattiOutboxEventsParked
+        expr: max(hatti_outbox_parked{job="hatti/core-worker"}) > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Events are parked in the outbox after failing ten times
+          description: >-
+            {{ $value }} events will not be published again until someone looks at them.
+          runbook: docs/engineering/runbooks.md#hattioutboxeventsparked
+      - alert: HattiOutboxRelayCannotPublish
+        expr: sum(increase(hatti_outbox_relay_outages_total{job="hatti/core-worker"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: The outbox relay has not reached the queue for ten minutes
+          description: >-
+            Batches are failing to reach Valkey's queue; events wait in the outbox meanwhile.
+          runbook: docs/engineering/runbooks.md#hattioutboxrelaycannotpublish
+
+  - name: hatti-security
+    rules:
+      # Wrong passwords, codes and passkeys, and attempts refused for coming too fast: more than
+      # one every five seconds, and most attempts, is how credential stuffing looks.
+      - alert: HattiSignInFailuresSpike
+        expr: |
+          sum(rate(hatti_auth_sign_ins_total{job="hatti/core-api",outcome=~"invalid_credentials|invalid_code|invalid_passkey|too_many_attempts|too_many_requests"}[10m])) > 0.2
+          and
+          sum(rate(hatti_auth_sign_ins_total{job="hatti/core-api",outcome=~"invalid_credentials|invalid_code|invalid_passkey|too_many_attempts|too_many_requests"}[10m]))
+            / sum(rate(hatti_auth_sign_ins_total{job="hatti/core-api"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: Most sign-in attempts are failing, many of them
+          description: >-
+            {{ $value | humanize }} failed sign-ins a second; credential stuffing looks like this.
+          runbook: docs/engineering/runbooks.md#hattisigninfailuresspike
+
+  - name: hatti-telemetry
+    rules:
+      # With metrics pushed, nothing scrapes the core: its silence is the only sign it is down
+      # or cannot reach the collector, and every alert above stays quiet meanwhile.
+      - alert: HattiCoreMetricsMissing
+        expr: absent_over_time(target_info{job="hatti/core-api"}[10m]) or absent_over_time(target_info{job="hatti/core-worker"}[10m])
+        labels:
+          severity: page
+        annotations:
+          summary: The core's API or worker has sent no metrics for ten minutes
+          description: Either it is down, or its telemetry cannot reach the collector.
+          runbook: docs/engineering/runbooks.md#hatticoremetricsmissing

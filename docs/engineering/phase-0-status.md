@@ -2356,6 +2356,10 @@ That is 4004 tests. They cover:
   and run against an empty database, set up, migrated and seeded, the API ready, the worker
   running and the seeded shop's pages served by the storefront in production; and every
   package's built code importing only what it depends on
+* Alerts (ADR-725), by `promtool test rules` in CI: each burn-rate alert fired by requests slow
+  or failing past its budget and quiet within it, the slow burn waiting its hour; the outbox's
+  lag, parked events and relay outages; a burst of failed sign-ins against a busy, mostly
+  successful morning; and the worker's metrics stopping; every dashboard query parsed
 * Reports of stores (ADR-460): kept with the shopper's mobile number as E.164 and a hash of
   their address; refused without a reason or details, or with a number not a Pakistani
   mobile; a fourth of one store from one address in a day refused; listed with the store
@@ -3614,14 +3618,15 @@ revisiting it.
 | 128 | A product asks for at most five personalisation fields, text or a choice, its page asking for those required before the drawer adds, and the cart refusing a line without them, past a length or outside the choices, however it is added ([ADR-691](../architecture/13-decision-log.md#adr-691--the-cart-refuses-a-line-its-product-asks-more-of-a-required-answer-missing-an-answer-past-its-length-or-not-among-its-choices-said-in-the-themes-words); [ADR-689](../architecture/13-decision-log.md#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)); the admin keeps them on the product's Personalisation card ([ADR-690](../architecture/13-decision-log.md#adr-690--the-admins-product-page-has-a-personalisation-card-for-those-who-change-products-each-fields-question-text-of-a-length-or-a-choice-and-whether-it-must-be-answered-saved-together)); a field may add to each unit's price when answered, which the cart and the order take and the page says ([ADR-697](../architecture/13-decision-log.md#adr-697--a-personalisation-field-may-add-to-each-units-price-when-it-is-answered-as-embroidery-costs-the-cart-prices-its-line-with-it-so-the-order-keeps-it-and-the-page-says-it), set on the admin's card ([ADR-698](../architecture/13-decision-log.md#adr-698--the-admins-personalisation-card-asks-what-each-fields-answer-adds-to-the-price-in-rupees-blank-for-nothing))) | Files the shopper uploads (CAT-15) | When shops ask |
 | 129 | A term's rule pins up to 10 products and hides up to 50, for the whole search as the search folds it alone, 200 terms a shop, through the Admin API ([ADR-692](../architecture/13-decision-log.md#adr-692--a-shop-pins-products-to-the-top-of-a-terms-search-in-its-order-and-hides-others-from-it-the-whole-search-as-the-search-folds-it-read-live-as-synonyms-are)); the admin keeps them on the online store's Search results tab, a top search opened from analytics ([ADR-693](../architecture/13-decision-log.md#adr-693--the-admins-online-store-has-a-search-results-tab-for-those-who-change-products-a-terms-products-pinned-in-order-and-hidden-and-a-top-search-opened-from-analytics)) | Boosts by weight, tag or collection, rules for searches holding the term, and rules for a while, with a search engine that ranks (SRC-04) | With Typesense |
 | 130 | The core and the storefront are container images built and run against an empty database by CI on every push, but pushed to no registry, signed or scanned; the core runs from its image in development's settings there ([ADR-724](../architecture/13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)) | Images pushed to the cell's registry with an SBOM and signatures, scanned, and deployed to staging from `main` by Argo CD (10 §4) | With the cell's infrastructure |
+| 131 | Alerts and a dashboard watch the admin's two objectives, the outbox and sign-ins, and the core's silence; they go to no one until a cell's Alertmanager routes them, and the storefront's, checkout's, webhooks', messages' and bookings' objectives have no metrics yet ([ADR-725](../architecture/13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)) | Every objective of 12 §1 with burn-rate alerts, routed to on-call | With the cell's infrastructure; as each surface sends its metrics |
 
 ## Next steps
 
 1. **Merchant admin, next:** section by section as the alpha's shops need them; the edge's
    security policy and R2's CORS rule.
-1. **Observability, remaining:** Sentry for errors; Grafana dashboards and SLO burn-rate alerts
-   (admin GraphQL p95 ≤ 500 ms, outbox lag, parked events, sign-in failures); the production
-   collector with tail sampling, set up with the infrastructure.
+1. **Observability, remaining:** Sentry for errors; the production collector with tail sampling,
+   and Alertmanager's routes for the alerts in `ops/prometheus` (ADR-725), set up with the
+   infrastructure; metrics and alerts for the storefront's and checkout's objectives.
 2. **Environments and IaC:** after the latency bake-off, write Terraform/OpenTofu for one cell
    (managed Postgres, Valkey, Kubernetes), push the images CI builds (ADR-724) to its registry,
    signed with an SBOM, and deploy staging from `main`.

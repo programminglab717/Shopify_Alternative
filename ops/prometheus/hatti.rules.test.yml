@@ -1,0 +1,212 @@
+# Unit tests of hatti.rules.yml (ADR-725): promtool test rules ops/prometheus/hatti.rules.test.yml
+rule_files:
+  - hatti.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Every Admin GraphQL request slow for 80 minutes: the fast burn pages, and the slow burn,
+  # past its hour, tickets too; at 30 minutes, only the page.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}'
+        values: '0x80'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="200"}'
+        values: '0+60x80'
+      - series: 'target_info{job="hatti/core-api"}'
+        values: '1x80'
+      - series: 'target_info{job="hatti/core-worker"}'
+        values: '1x80'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: HattiAdminGraphqlLatencyBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Admin GraphQL is slow fast enough to spend the month's latency budget in days
+              description: 100% of Admin GraphQL requests took over 500 ms; the objective allows 5%.
+              runbook: docs/engineering/runbooks.md#hattiadmingraphqllatencybudgetburn
+      - eval_time: 80m
+        alertname: HattiAdminGraphqlLatencyBudgetBurnSlow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Admin GraphQL is slow often enough to spend the month's latency budget
+              description: 100% of Admin GraphQL requests took over 500 ms; the objective allows 5%.
+              runbook: docs/engineering/runbooks.md#hattiadmingraphqllatencybudgetburn
+      - eval_time: 30m
+        alertname: HattiAdminGraphqlLatencyBudgetBurnSlow
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: HattiAdminApiErrorBudgetBurn
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: HattiCoreMetricsMissing
+        exp_alerts: []
+
+  # One request in ten slow for three hours: twice the budget's 5%, short of the fast burn's
+  # 72%, so the slow burn tickets once an hour of it has passed, and nothing pages.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}'
+        values: '0+54x180'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="200"}'
+        values: '0+60x180'
+    alert_rule_test:
+      - eval_time: 180m
+        alertname: HattiAdminGraphqlLatencyBudgetBurn
+        exp_alerts: []
+      - eval_time: 180m
+        alertname: HattiAdminGraphqlLatencyBudgetBurnSlow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Admin GraphQL is slow often enough to spend the month's latency budget
+              description: 10% of Admin GraphQL requests took over 500 ms; the objective allows 5%.
+              runbook: docs/engineering/runbooks.md#hattiadmingraphqllatencybudgetburn
+
+  # Within the objectives: every request fast, and one in 2,000 failing, half the error budget,
+  # so nothing fires.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="hatti/core-api",http_route="/graphql",le="0.5"}'
+        values: '0+2000x400'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="200"}'
+        values: '0+1999x400'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="500"}'
+        values: '0+1x400'
+    alert_rule_test:
+      - eval_time: 400m
+        alertname: HattiAdminGraphqlLatencyBudgetBurn
+        exp_alerts: []
+      - eval_time: 400m
+        alertname: HattiAdminGraphqlLatencyBudgetBurnSlow
+        exp_alerts: []
+      - eval_time: 400m
+        alertname: HattiAdminApiErrorBudgetBurn
+        exp_alerts: []
+      - eval_time: 400m
+        alertname: HattiAdminApiErrorBudgetBurnSlow
+        exp_alerts: []
+
+  # Two requests in a hundred failing, across the API's routes, for 70 minutes: 20 times the
+  # budget, which pages.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="200"}'
+        values: '0+49x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/auth/sign-in",http_response_status_code="200"}'
+        values: '0+49x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="503"}'
+        values: '0+2x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiAdminApiErrorBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: The Admin API fails fast enough to spend the month's error budget in days
+              description: 2% of the Admin API's requests ended in a server error; the objective allows 0.1%.
+              runbook: docs/engineering/runbooks.md#hattiadminapierrorbudgetburn
+
+  # The outbox: lag rising to over two minutes pages after five; over 30 seconds tickets after
+  # fifteen; parked events ticket after fifteen; a relay failing to reach the queue pages.
+  - interval: 1m
+    input_series:
+      - series: 'hatti_outbox_lag_seconds{job="hatti/core-worker"}'
+        values: '0x9 45x10 200x10'
+      - series: 'hatti_outbox_parked{job="hatti/core-worker"}'
+        values: '0x4 3x25'
+      - series: 'hatti_outbox_relay_outages_total{job="hatti/core-worker"}'
+        values: '0x9 1+1x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HattiOutboxLagging
+        exp_alerts: []
+      - eval_time: 26m
+        alertname: HattiOutboxLagging
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Events wait over two minutes in the outbox
+              description: 'The oldest event waiting to be published is 3m 20s old: confirmations, bookings and storefront updates wait with it.'
+              runbook: docs/engineering/runbooks.md#hattioutboxlagging
+      - eval_time: 26m
+        alertname: HattiOutboxSlow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Events wait over 30 seconds in the outbox
+              description: The oldest event waiting to be published is 3m 20s old.
+              runbook: docs/engineering/runbooks.md#hattioutboxlagging
+      - eval_time: 18m
+        alertname: HattiOutboxEventsParked
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HattiOutboxEventsParked
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Events are parked in the outbox after failing ten times
+              description: 3 events will not be published again until someone looks at them.
+              runbook: docs/engineering/runbooks.md#hattioutboxeventsparked
+      - eval_time: 25m
+        alertname: HattiOutboxRelayCannotPublish
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: The outbox relay has not reached the queue for ten minutes
+              description: Batches are failing to reach Valkey's queue; events wait in the outbox meanwhile.
+              runbook: docs/engineering/runbooks.md#hattioutboxrelaycannotpublish
+
+  # Sign-ins: a busy morning of mostly right passwords stays quiet; a burst of wrong ones, more
+  # than one in two at over one every five seconds, pages after ten minutes of it.
+  - interval: 1m
+    input_series:
+      - series: 'hatti_auth_sign_ins_total{job="hatti/core-api",step="password",outcome="mfa_required"}'
+        values: '0+30x60'
+      - series: 'hatti_auth_sign_ins_total{job="hatti/core-api",step="password",outcome="invalid_credentials"}'
+        values: '0+3x20 60+60x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: HattiSignInFailuresSpike
+        exp_alerts: []
+      - eval_time: 45m
+        alertname: HattiSignInFailuresSpike
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Most sign-in attempts are failing, many of them
+              description: 1 failed sign-ins a second; credential stuffing looks like this.
+              runbook: docs/engineering/runbooks.md#hattisigninfailuresspike
+
+  # The worker silent while the API reports.
+  - interval: 1m
+    input_series:
+      - series: 'target_info{job="hatti/core-api"}'
+        values: '1x30'
+      - series: 'target_info{job="hatti/core-worker"}'
+        values: '1x5'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HattiCoreMetricsMissing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HattiCoreMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: hatti/core-worker
+            exp_annotations:
+              summary: The core's API or worker has sent no metrics for ten minutes
+              description: Either it is down, or its telemetry cannot reach the collector.
+              runbook: docs/engineering/runbooks.md#hatticoremetricsmissing

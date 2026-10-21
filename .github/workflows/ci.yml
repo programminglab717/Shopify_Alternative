@@ -92,6 +92,9 @@ jobs:
       - name: Feature catalog summary
         run: python3 scripts/update_feature_summary.py --check
 
+      - name: Alerts and dashboards
+        run: scripts/check-ops.sh
+
       - name: Build, typecheck, test
         run: pnpm turbo run build typecheck test
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-724 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-725 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -732,6 +732,7 @@
 | 722 | The admin's delivery settings take rates by the order's value: each a subtotal and the most such an order pays, added and removed as weights are | Accepted |
 | 723 | Hatti Base says what larger orders pay at most to deliver: each rate on product pages, and the largest a cart reaches on the cart page, from the rates in the shop's document | Accepted |
 | 724 | The core and the storefront are built into container images of their own from one Dockerfile, each holding its app's built code and production dependencies alone, and CI builds both and runs them against an empty database on every push | Accepted |
+| 725 | The admin's objectives, the outbox and sign-ins are watched by Prometheus rules kept in the repository, burn-rate alerts with unit tests and a runbook each, and a Grafana dashboard whose queries CI parses | Accepted |
 
 ---
 
@@ -24734,3 +24735,42 @@
   cell's infrastructure and its staging deploy. The core runs from the image in development's
   settings in CI, its files in a directory; production's R2 and providers are configured with
   the cell.
+
+## ADR-725 · The admin's objectives, the outbox and sign-ins are watched by Prometheus rules kept in the repository, burn-rate alerts with unit tests and a runbook each, and a Grafana dashboard whose queries CI parses
+
+* **Context:** The core sends traces and metrics by OTLP ([ADR-724](#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push) runs it in
+  images), but nothing turned them into alerts: the admin's objectives in
+  [12 §1](./12-scalability-and-reliability.md#1-service-level-objectives) (Admin GraphQL p95 at most
+  500 ms; 99.9% of Admin API calls successful), the outbox's lag and parked events, and sign-in
+  failures were next steps with no rules.
+* **Decision:**
+  * **Rules as code**, in `ops/prometheus/hatti.rules.yml`, over the metrics as Prometheus names
+    OTLP's: `http_server_request_duration_seconds` by `http_route` and status from the HTTP
+    instrumentation, `hatti_outbox_lag_seconds`, `hatti_outbox_parked`,
+    `hatti_outbox_relay_outages_total`, `hatti_auth_sign_ins_total`, and `target_info`, the job
+    being `hatti/core-api` or `hatti/core-worker`.
+  * **The two admin objectives as error budgets.** The latency objective is read as 95% of Admin
+    GraphQL requests within 500 ms over 30 days, the histogram having a bucket there; the
+    availability one as 0.1% of the Admin API's requests ending in a server error. Recording rules
+    keep each ratio over 5 minutes to 3 days, and the SRE workbook's multiwindow, multi-burn-rate
+    alerts page at a burn of 14.4 over an hour (and five minutes) or 6 over six hours (and half an
+    hour), and ticket at 3 over a day or 1 over three days.
+  * **The outbox and sign-ins by thresholds:** a page when the oldest unpublished event is over
+    two minutes old for five minutes, a ticket over 30 seconds for fifteen; a ticket for any parked
+    event; a page when the relay cannot reach the queue for ten minutes; a page when sign-ins fail
+    more than once every five seconds and more often than not, for ten minutes.
+  * **Silence alerts too:** pushed metrics have no scrape to fail, so a page fires when the API's
+    or the worker's `target_info` has been absent for ten minutes.
+  * **Each alert is unit-tested** with `promtool test rules` (series that must fire it, and
+    series within the objectives that must not), and **each names its section of
+    `docs/engineering/runbooks.md`**.
+  * **One dashboard, "Hatti core"** (`ops/grafana/hatti-core.json`): the p95 and statuses, the
+    budgets left over 30 days and the burn rates, the outbox, events' handling time by type, and
+    sign-ins by outcome, on a Prometheus data source chosen when it is imported.
+  * **CI runs `scripts/check-ops.sh`**: promtool checks and tests the rules, and parses every
+    dashboard query as a rule, so a renamed metric's typo or a broken query fails the build.
+* **Consequences:** Alerts exist before anything routes them: Alertmanager's receivers and the
+  on-call tool come with the cell, as do Sentry and the production collector. The storefront,
+  checkout, webhook, message and booking objectives have no metrics yet; each gets its burn-rate
+  alerts in these files when its metric is sent. A route with few requests can page on a handful
+  of slow ones; if that is noisy, the alerts gain a minimum rate.

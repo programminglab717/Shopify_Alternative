@@ -173,6 +173,11 @@ flowchart LR
 | On-call | Alertmanager → paging tool; runbooks linked from every alert |
 | Status | Public status page per component (storefront, checkout, admin, each courier and messaging integration) |
 
+The alerts and dashboards are code ([ADR-725](./13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)): Prometheus rules in
+`ops/prometheus`, unit-tested by promtool, each alert with a section in
+[the runbooks](../engineering/runbooks.md), and Grafana dashboards in `ops/grafana`, whose
+queries CI parses.
+
 ---
 
 ## 6. Cost model (planning estimates)
