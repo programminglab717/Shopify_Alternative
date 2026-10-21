@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Rates by value in the admin
+### bbd7b7a · Rates by value in the admin
 
 * **The admin's delivery settings take rates by the order's value** ([ADR-722](../architecture/13-decision-log.md#adr-722--the-admins-delivery-settings-take-rates-by-the-orders-value-each-a-subtotal-and-the-most-such-an-order-pays-added-and-removed-as-weights-are)): a "Larger orders"
   section, each rate a subtotal and the most such an order pays.
