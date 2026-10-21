@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Heavier orders in the admin
+### 3e1614e · Heavier orders in the admin
 
 * **The admin's delivery settings take heavier orders' charges: weights typed in kilograms, sent
   in grams, each with what it costs more, added and removed as zones are** ([ADR-703](../architecture/13-decision-log.md#adr-703--the-admins-delivery-settings-take-heavier-orders-charges-weights-typed-in-kilograms-sent-in-grams-each-with-what-it-costs-more-added-and-removed-as-zones-are)).
