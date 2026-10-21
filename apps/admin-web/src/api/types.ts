@@ -3723,12 +3723,26 @@ export interface OnlineStoreTheme {
   role: 'MAIN' | 'UNPUBLISHED';
   base: string;
   previewUrl: string;
+  /** When the worker publishes it (ADR-695); null when it is not to be. */
+  publishAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ThemesData {
   themes: { nodes: OnlineStoreTheme[] };
+}
+
+/** One change a theme keeps (ADR-694). */
+export interface ThemeVersion {
+  version: number;
+  cause: 'SAVED' | 'DELETED' | 'ROLLED_BACK';
+  changedFiles: string[];
+  createdAt: string;
+}
+
+export interface ThemeVersionsData {
+  theme: { id: string; version: number; versions: ThemeVersion[] } | null;
 }
 
 /** A theme as its editor needs it (ADR-323); schemas and files are JSON in strings. */

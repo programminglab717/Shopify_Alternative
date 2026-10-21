@@ -7901,6 +7901,7 @@ const THEME = /* GraphQL */ `
     role
     base
     previewUrl
+    publishAt
     createdAt
     updatedAt
   }
@@ -8047,6 +8048,54 @@ export const ThemeCreateMutation = /* GraphQL */ `
 export const ThemePublishMutation = /* GraphQL */ `
   mutation ThemePublish($id: ID!) {
     themePublish(id: $id) {
+      theme {
+        ...Theme
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME}
+  ${USER_ERRORS}
+`;
+
+/** The changes a theme keeps, the newest first, the newest the theme as it is (OS-03, ADR-694). */
+export const ThemeVersionsQuery = /* GraphQL */ `
+  query ThemeVersions($id: ID!) {
+    theme(id: $id) {
+      id
+      version
+      versions {
+        version
+        cause
+        changedFiles
+        createdAt
+      }
+    }
+  }
+`;
+
+/** A theme taken back to a version it keeps, as a change of its own (ADR-694). */
+export const ThemeRollbackMutation = /* GraphQL */ `
+  mutation ThemeRollback($id: ID!, $version: Int!) {
+    themeRollback(id: $id, version: $version) {
+      theme {
+        id
+        version
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A theme published by the worker at a time ahead, or the time taken away (ADR-695). */
+export const ThemeSchedulePublishMutation = /* GraphQL */ `
+  mutation ThemeSchedulePublish($id: ID!, $publishAt: DateTime) {
+    themeSchedulePublish(id: $id, publishAt: $publishAt) {
       theme {
         ...Theme
       }

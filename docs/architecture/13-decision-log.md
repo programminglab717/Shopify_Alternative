@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-695 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-696 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -703,6 +703,7 @@
 | 693 | The admin's online store has a Search results tab, for those who change products: a term's products pinned in order and hidden, and a top search opened from analytics | Accepted |
 | 694 | A theme keeps its last 30 changes, each with the files it touched as they were, and is taken back to the version one made as a change of its own | Accepted |
 | 695 | A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of what is due, as a merchant would publish it then | Accepted |
+| 696 | The admin's themes tab shows each theme's versions to take it back to, and publishes a theme at a time set ahead or calls it off | Accepted |
 
 ---
 
@@ -24016,3 +24017,24 @@
   each minute, so a theme is published within a minute of its time.
 * **Alternatives:** **A job queued for the time:** a job kept apart from the theme is lost or
   doubled when the time is changed; a time on the theme, swept, is changed and cleared with it.
+
+## ADR-696 · The admin's themes tab shows each theme's versions to take it back to, and publishes a theme at a time set ahead or calls it off
+
+* **Context:** A theme keeps its last 30 changes and is taken back to one
+  ([ADR-694](#adr-694--a-theme-keeps-its-last-30-changes-each-with-the-files-it-touched-as-they-were-and-is-taken-back-to-the-version-one-made-as-a-change-of-its-own)), and is published at a time set ahead ([ADR-695](#adr-695--a-theme-is-published-at-a-time-set-ahead-a-minute-to-a-year-off-by-the-workers-sweep-of-what-is-due-as-a-merchant-would-publish-it-then)), but only
+  through the API.
+* **Decision:**
+  * **Versions under each theme's row** on the themes tab, opened by a button: the newest first,
+    the newest marked as the theme now, each with its number, what made it (saved, files removed
+    or taken back), how long ago and the files it touched. Any other is gone back to once asked,
+    the changes since undone; the taking back shows as the newest, to undo in turn.
+  * **A theme other than the live one is scheduled:** a time typed in the phone's own time, as a
+    product's is, and said back in the shop's on the theme's row until it is published, with a
+    button that calls it off. What the core refuses, too soon or too far, shows on the row.
+  * For owners and managers, who see the tab; English and Urdu.
+* **Consequences:** A merchant undoes a bad save, or the Eid look after Eid, and sets the Eid
+  look to go live at midnight, from a phone.
+* **Alternatives:** **Versions on the theme editor's page:** the editor holds unsaved changes,
+  and taking a theme back under them would lose them; the list is where themes are published.
+  **Showing each version's files as they were:** the files a change touched say what it was;
+  the preview shows the theme as it is after.

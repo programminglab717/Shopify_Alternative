@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A theme's versions and publishing time in the admin
+
+* **The admin's themes tab shows each theme's versions to take it back to, and publishes a
+  theme at a time set ahead or calls it off** ([ADR-696](../architecture/13-decision-log.md#adr-696--the-admins-themes-tab-shows-each-themes-versions-to-take-it-back-to-and-publishes-a-theme-at-a-time-set-ahead-or-calls-it-off)): OS-03 for merchants.
+* 3940 tests, five more: the admin's.
+
 ### 60c8b90 · A theme published at a time set ahead
 
 * **A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of

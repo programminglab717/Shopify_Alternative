@@ -1,5 +1,14 @@
 import { Link } from '@tanstack/react-router';
-import { Copy, ExternalLink, Paintbrush, Palette, Plus, Trash2, Upload } from 'lucide-react';
+import {
+  CalendarClock,
+  Copy,
+  ExternalLink,
+  Paintbrush,
+  Palette,
+  Plus,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -19,6 +28,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { ScheduledNote, ThemeSchedule, ThemeVersions, VersionsButton } from './theme-versions';
 
 /** Those who change the shop's themes: its owner and managers, as the core allows. */
 export const EDITS_THEMES = gate(['owner', 'manager'], 'write_themes');
@@ -49,7 +59,10 @@ function useChange() {
   return { problem, change };
 }
 
-/** One theme: customised, looked at through its preview link, published, or deleted once asked. */
+/**
+ * One theme: customised, looked at through its preview link, published now or at a time ahead,
+ * or deleted once asked; its versions opened beneath it, to take it back to one.
+ */
 function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
   const { t, locale } = useLocale();
   const { id: shopId } = useShop();
@@ -61,8 +74,10 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
     ThemeDeleteMutation,
   );
   const { problem, change } = useChange();
-  const [asking, setAsking] = useState<'publish' | 'delete' | null>(null);
+  const [asking, setAsking] = useState<'publish' | 'delete' | 'schedule' | null>(null);
+  const [versions, setVersions] = useState(false);
   const main = theme.role === 'MAIN';
+  const publishAt = theme.publishAt;
 
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
@@ -86,7 +101,10 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
       <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
         {t('themes.base', { base: theme.base })}
       </span>
-      {asking ? (
+      {!main && publishAt && <ScheduledNote theme={{ ...theme, publishAt }} change={change} />}
+      {asking === 'schedule' ? (
+        <ThemeSchedule theme={theme} change={change} onDone={() => setAsking(null)} />
+      ) : asking ? (
         <Alert tone="warning">
           <p>
             {asking === 'publish'
@@ -133,6 +151,11 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
             <ExternalLink aria-hidden className="size-5" />
             {t('themes.preview')}
           </a>
+          <VersionsButton
+            theme={theme}
+            open={versions}
+            onToggle={() => setVersions((open) => !open)}
+          />
           {!main && (
             <>
               <Button
@@ -142,6 +165,14 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
                 onClick={() => setAsking('publish')}
               >
                 {t('themes.publish')}
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<CalendarClock aria-hidden className="size-5" />}
+                aria-label={t('themes.scheduleOf', { name: theme.name })}
+                onClick={() => setAsking('schedule')}
+              >
+                {t('themes.schedule')}
               </Button>
               <Button
                 variant="danger"
@@ -154,6 +185,7 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
         </div>
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
+      {versions && <ThemeVersions theme={theme} change={change} />}
     </li>
   );
 }
@@ -222,7 +254,8 @@ function AddTheme({ themes }: { themes: OnlineStoreTheme[] }) {
  * The online store's themes (OS-02): the one the storefront shows, and those being prepared,
  * each looked at through a link that shows it on the storefront, published once asked, or
  * deleted; a theme added as a copy of one the shop has, to change without touching the live one,
- * or on the platform theme afresh. Its files are changed in the theme editor, to come.
+ * or on the platform theme afresh. Its files are changed in the theme editor, each change kept
+ * to take it back to (OS-03); a theme is published at a time ahead, for the Eid look at midnight.
  */
 export function ThemesTab() {
   const { t } = useLocale();
