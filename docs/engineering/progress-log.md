@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The total as the city is typed
+
+* **The checkout's page shows its total as the city is typed: a script posts the form to the
+  page's own address to show it, placing nothing, and puts the summary it answers with in place**
+  ([ADR-713](../architecture/13-decision-log.md#adr-713--the-checkouts-page-shows-its-total-as-the-city-is-typed-a-script-posts-the-form-to-the-pages-own-address-to-show-it-placing-nothing-and-puts-the-summary-it-answers-with-in-place)): `action=totals` on the page's posts, and a third script on the page.
+* 3976 tests, two more: the checkout module's and the core's.
+
 ### 1e59e5c · An advance on the tagged products alone
 
 * **An advance naming products' tags may be counted on those products alone, a share of what they

@@ -218,6 +218,23 @@ describe.skipIf(!server)('Checkouts', () => {
     expect(unknown.statusCode).toBe(404);
   });
 
+  it('shows the page with the form as typed for its total, placing nothing (ADR-713)', async () => {
+    const path = await checkout();
+    const page = await app.inject({ method: 'GET', url: path });
+    const typed = await post(path, {
+      action: 'totals',
+      shown: shownIn(page.body),
+      city: 'Karachi',
+      phone: '03',
+    });
+    expect(typed.statusCode).toBe(200);
+    expect(typed.body).toContain('<section class="section" id="summary" data-totals>');
+    expect(typed.body).toMatch(/name="city"[^>]*value="Karachi"/);
+    // Nothing said of what is missing, and nothing placed.
+    expect(typed.body).not.toContain('Enter a Pakistani mobile number');
+    expect(await orders()).toEqual([]);
+  });
+
   it('takes a discount code on the page, and places the order with it', async () => {
     const adminApi = (query: string) =>
       app.inject({

@@ -471,7 +471,9 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       link(`${shop.storefront}/cart`, LABELS.backToCart),
       policyLinks(shop),
     ],
-    orderable ? { scripts: [LOCATION_SCRIPT, CONTACT_SCRIPT], connectsHome: true } : {},
+    orderable
+      ? { scripts: [LOCATION_SCRIPT, CONTACT_SCRIPT, TOTALS_SCRIPT], connectsHome: true }
+      : {},
   );
 }
 
@@ -501,6 +503,51 @@ export const CONTACT_SCRIPT = `(function () {
   }
   phone.addEventListener('change', send);
   if (name) name.addEventListener('change', send);
+})();`;
+
+/**
+ * Shows what the order comes to as the city is typed (ADR-713): once the city changes, posts the
+ * form to the page's own address with `action=totals`, which places nothing, and puts the page's
+ * summary and the city's areas from the answer in place of its own. The same text on every page,
+ * which their policy allows by its hash; without it, the page shows the total once posted.
+ */
+export const TOTALS_SCRIPT = `(function () {
+  var city = document.getElementById('city');
+  var form = city && city.form;
+  if (!form || !window.fetch || !window.FormData || !window.DOMParser || !window.URLSearchParams) {
+    return;
+  }
+  var asked = city.value.trim();
+  function show() {
+    var typed = city.value.trim();
+    if (typed === asked) return;
+    asked = typed;
+    var body = new URLSearchParams();
+    new FormData(form).forEach(function (value, key) {
+      if (typeof value === 'string') body.append(key, value);
+    });
+    body.set('action', 'totals');
+    fetch(location.pathname, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      credentials: 'same-origin'
+    })
+      .then(function (response) {
+        return response.ok ? response.text() : null;
+      })
+      .then(function (text) {
+        if (text === null || asked !== typed) return;
+        var page = new DOMParser().parseFromString(text, 'text/html');
+        var olds = document.querySelectorAll('[data-totals]');
+        for (var i = 0; i < olds.length; i++) {
+          var fresh = olds[i].id && page.getElementById(olds[i].id);
+          if (fresh) olds[i].parentNode.replaceChild(document.importNode(fresh, true), olds[i]);
+        }
+      })
+      .catch(function () {});
+  }
+  city.addEventListener('change', show);
 })();`;
 
 /** What delivery costs an order the shopper picks up: nothing (ADR-391). */
@@ -1186,7 +1233,7 @@ function cartSummary(
   // The automatic discount off the items, by the shop's title for it (ADR-515).
   const automatic = discounts.automatic.find((discount) => discount.kind !== 'free_shipping');
   const automaticLabel = automatic && { en: automatic.title, ur: LABELS.discount.ur };
-  return html`<section class="section">
+  return html`<section class="section" id="summary" data-totals>
     <h2 class="label">${say('bilingual', LABELS.yourOrder)}</h2>
     <table>
       ${cart.items.map((item) =>
@@ -2150,7 +2197,7 @@ function areaList(city: string): Html {
       ? html`<option value="${area.value}" label="${area.city}"></option>`
       : html`<option value="${area.value}"></option>`,
   );
-  return html`<datalist id="areas">${options}</datalist>`;
+  return html`<datalist id="areas" data-totals>${options}</datalist>`;
 }
 
 /** The province to pick, or none, to take it from the city. */

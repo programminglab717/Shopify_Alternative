@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-712 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-713 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -720,6 +720,7 @@
 | 710 | The checkout says first among its badges what Hatti verified of the shop, its seller's identity or a registered business, whatever badges the shop chose | Accepted |
 | 711 | A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than one saying something else each, shown as written in English or Urdu | Accepted |
 | 712 | An advance naming products' tags may be counted on those products alone, a share of what they come to after the code's share of them, or an amount up to it | Accepted |
+| 713 | The checkout's page shows its total as the city is typed: a script posts the form to the page's own address to show it, placing nothing, and puts the summary it answers with in place | Accepted |
 
 ---
 
@@ -24411,3 +24412,28 @@
 * **Alternatives:** **An advance set on each product:** the catalog has no field for it, and tags
   already mark what is made to order. **The code taken off the tagged products first:** a code
   is the order's, and shares it out across the items as refunds do.
+
+## ADR-713 · The checkout's page shows its total as the city is typed: a script posts the form to the page's own address to show it, placing nothing, and puts the summary it answers with in place
+
+* **Context:** The checkout's page knows the delivery charge, and so the total and an advance of
+  the delivery charge, only once a city is typed, where a shop charges cities differently
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). Until the shopper posted the form, the page showed the shop's charges by
+  city; the total they would pay came only with the order's confirmation, or a problem.
+* **Decision:**
+  * **A post with `action=totals` shows the page with the form as typed**, its summary counted
+    for the city, placing nothing and saying nothing of fields missing or wrong. The page it
+    shows is the one the shopper sees, so its digest stays the same, and placing works as before.
+  * **A script on the page asks for it once the city changes**: it posts the form's fields to
+    the page's own address, as the contact script does ([ADR-393](#adr-393--abandoned-checkouts-the-number-a-shopper-types-is-kept-as-they-type-it-the-shop-sees-who-left-and-may-remind-them-once-on-whatsapp-after-the-delay-it-sets-with-a-link-back-to-their-items-an-order-the-number-places-then-recovers-it)), and puts the
+    answer's summary and the city's areas in place of the page's own, leaving what the shopper
+    typed and chose alone. An answer for a city typed since is dropped. The page's policy allows
+    it by its hash and lets it reach the page's own site alone.
+  * Without the script, or with it failing, the page works as it did: the charges by city, and
+    the total once posted.
+* **Consequences:** Shoppers see what they pay before they place the order. Each change of city
+  is a request through the storefront, which counts it among the cart's changes from that
+  address, as other posts to the page are.
+* **Alternatives:** **The charges by city in the page, counted by the script:** the total also
+  turns on codes, automatic discounts, weights, free delivery and advances, which the core counts;
+  a second count in the browser would drift from it. **A JSON endpoint:** the page's own HTML is
+  the one thing both paths render.

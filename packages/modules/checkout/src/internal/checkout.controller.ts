@@ -370,7 +370,8 @@ function contactOf(body: unknown): { name: string; phone: string } {
  * shop's gateway to pay the order placed online (`action=pay`, ADR-152), fills in a returning
  * shopper's saved address once their number is proved, sending the code (`action=recall`, with
  * `channel=sms` for one by SMS) or checking it (`action=recall_code`, ADR-447), fills in
- * another address of a signed-in shopper's book (`action=use_address`, ADR-587), or places the
+ * another address of a signed-in shopper's book (`action=use_address`, ADR-587), shows the page
+ * with the form as typed for its total, placing nothing (`action=totals`, ADR-713), or places the
  * order.
  */
 async function posted(
@@ -380,6 +381,8 @@ async function posted(
   options: { shopId?: string; client: CheckoutClient },
 ): Promise<CheckoutView | { url: string }> {
   switch (field(body, 'action')) {
+    case 'totals':
+      return checkouts.typed(token, formOf(body), options);
     case 'discount':
       return checkouts.applyDiscount(token, field(body, 'discount'), options);
     case 'remove_discount':

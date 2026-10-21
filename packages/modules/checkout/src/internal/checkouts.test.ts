@@ -315,6 +315,32 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await f.checkouts.view('not a secret')).toEqual({ kind: 'not_found' });
   });
 
+  it('shows the page with the form as typed, its total for the city, placing nothing (ADR-713)', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '250',
+        zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '150' }],
+      }),
+    );
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    expect(checkoutPage(view).html).toContain('Delivery is Rs 250; Rs 150 in Karachi.');
+    const typed = open(
+      await f.checkouts.typed(secret, { ...EMPTY_FORM, city: 'khi', phone: '0300' }),
+    );
+    // The form as typed, nothing said of what is missing or wrong, and the same page to place.
+    expect(typed.form).toMatchObject({ city: 'khi', phone: '0300' });
+    expect(typed.problem).toBeNull();
+    expect(typed.shown).toBe(view.shown);
+    const page = checkoutPage(typed).html;
+    expect(page).toMatch(/<section class="section" id="summary" data-totals>[\s\S]*Rs 13,650/);
+    expect(page).not.toContain('Delivery is Rs 250');
+    expect(await orderCount()).toBe(0);
+    expect(await f.checkouts.typed(secret, EMPTY_FORM, { shopId: f.b.shopId })).toEqual({
+      kind: 'not_found',
+    });
+  });
+
   it('places a cash-on-delivery order with the charge for the city, and empties the cart', async () => {
     unwrap(
       await f.delivery.update(f.a, {

@@ -770,6 +770,21 @@ export class CheckoutService {
   }
 
   /**
+   * The page with the form as the shopper typed it, placing nothing and saying nothing of what is
+   * missing (ADR-713): what its script asks for as the city is typed, for the delivery charge and
+   * total there. With `shopId`, only for that shop's checkouts.
+   */
+  async typed(
+    token: string,
+    form: CheckoutForm,
+    options: { shopId?: string } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    return this.db.tenant(found.shopId, (tx) => this.#view(tx, found, false, form));
+  }
+
+  /**
    * Keeps the name and number the shopper typed on the checkout's page, as its script sends them
    * once a number is whole (ADR-393), with the cart's items: nothing placed or shown. Whether it
    * kept them: not for a checkout placed, gone or expired, or a number that is no mobile.

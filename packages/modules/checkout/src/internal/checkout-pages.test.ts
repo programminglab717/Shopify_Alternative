@@ -3,7 +3,7 @@ import { chooseDiscounts, type DiscountCodeRecord } from '@hatti/pricing/public'
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX } from '@hatti/tax/public';
 import { describe, expect, it } from 'vitest';
-import { CONTACT_SCRIPT, checkoutPage } from './checkout-pages.js';
+import { CONTACT_SCRIPT, TOTALS_SCRIPT, checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutShop, type CheckoutView } from './checkout.service.js';
 import { NO_COD_RULES, type CodAdvanceValue } from './cod-rules.js';
 import type { DeliverySettingsRecord } from './delivery.js';
@@ -213,10 +213,14 @@ describe('checkoutPage', () => {
     expect(page.html).toContain('<a href="https://zari.hatti.test/cart">');
     // Its scripts, each allowed by its hash: one finds where the phone is for the address's pin
     // (ADR-259), showing nothing until it runs; the other sends the number typed back to the
-    // page's own site, for the shop's abandoned checkouts (ADR-393).
-    expect(page.html.match(/<script>/g)).toHaveLength(2);
+    // page's own site, for the shop's abandoned checkouts (ADR-393); the third asks the page's own
+    // site for the summary as the city is typed, which it and the areas are marked for (ADR-713).
+    expect(page.html.match(/<script>/g)).toHaveLength(3);
     expect(page.html).toContain(`<script>${LOCATION_SCRIPT}</script>`);
     expect(page.html).toContain(`<script>${CONTACT_SCRIPT}</script>`);
+    expect(page.html).toContain(`<script>${TOTALS_SCRIPT}</script>`);
+    expect(page.html).toContain('<section class="section" id="summary" data-totals>');
+    expect(page.html).toContain('<datalist id="areas" data-totals>');
     expect(page.contentSecurityPolicy).toContain("script-src 'sha256-");
     expect(page.contentSecurityPolicy).toContain("connect-src 'self'");
     expect(page.html).toMatch(/<div class="field" data-location aria-live="polite" hidden>/);
