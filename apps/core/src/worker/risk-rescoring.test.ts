@@ -7,7 +7,7 @@ import type { DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { createLogger } from '@hatti/logger';
-import { FulfillmentService } from '@hatti/orders/public';
+import { FulfillmentService, OrderSettingsService } from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RiskRescoring } from './risk-rescoring.js';
@@ -142,6 +142,91 @@ describe.skipIf(!server)("Scoring orders again as their customer's history chang
       [waiting.id, ['risk']],
       [later.id, ['risk']],
     ]);
+  });
+
+  it("holds a customer's confirmed orders yet to ship once a parcel of theirs turns back, where the shop says so (ADR-674)", async () => {
+    const product = unwrap(
+      await new ProductService(database).create(tenant, {
+        title: 'Shawl',
+        status: 'active',
+        variants: [{ price: '3,000' }],
+      }),
+    );
+    const variantId = product.variants[0]!.id;
+    const location = await new LocationService(database).primary(tenant);
+    unwrap(
+      await new InventoryService(database, new VariantService(database)).setQuantities(tenant, {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: [{ inventoryItemId: variantId, locationId: location.id, quantity: 10 }],
+      }),
+    );
+    const orders = workerOrders(database);
+    const fulfillments = new FulfillmentService(database, new StockService());
+    const handlers = eventHandlers(createLogger({ name: 'worker', level: 'silent' }), {
+      rescoring: new RiskRescoring(orders),
+    });
+    // A customer of their own, whose history no other test made.
+    const place = async () =>
+      unwrap(
+        await orders.create(tenant, {
+          lineItems: [{ variantId, quantity: 1 }],
+          shippingAddress: {
+            name: 'Bilal Ahmed',
+            phone: '0321 7776665',
+            address1: 'House 3, Street 9',
+            city: 'Multan',
+          },
+        }),
+      );
+    /** A confirmed order of theirs, shipped and turned back, its events handled. */
+    const refused = async () => {
+      const order = await place();
+      unwrap(await orders.confirm(tenant, order.id));
+      const { fulfillmentId } = unwrap(await fulfillments.fulfill(tenant, order.id, {}));
+      for (const event of await recorded()) await handlers.dispatch(event);
+      unwrap(await fulfillments.markReturning(tenant, fulfillmentId));
+      return order;
+    };
+    const toPack = await place();
+    unwrap(await orders.confirm(tenant, toPack.id));
+    for (const event of await recorded()) await handlers.dispatch(event);
+
+    // The shop has not said so: the order goes on to be packed.
+    await refused();
+    for (const event of await recorded()) await handlers.dispatch(event);
+    expect(await orders.get(tenant, toPack.id)).toMatchObject({ stage: 'to_pack' });
+
+    unwrap(await new OrderSettingsService(database).update(tenant, { holdWhenRefused: true }));
+    const toBook = await place();
+    unwrap(await orders.confirm(tenant, toBook.id));
+    unwrap(await orders.markPacked(tenant, toBook.id));
+    const waiting = await place();
+    const back = await refused();
+    const events = await recorded();
+    for (const event of events) await handlers.dispatch(event);
+    // Confirmed and not yet shipped: held for review, saying why. One still to confirm is called
+    // as it is, scored again alone.
+    expect(await orders.get(tenant, toPack.id)).toMatchObject({ stage: 'needs_review' });
+    expect(await orders.get(tenant, toBook.id)).toMatchObject({ stage: 'needs_review' });
+    const { rows } = await admin.query<{ message: string }>(
+      `SELECT message FROM orders.order_events WHERE order_id = $1 AND kind = 'held'`,
+      [toPack.id],
+    );
+    expect(rows.map((row) => row.message)).toEqual([
+      `Held for review: its customer refused the parcel of #${back.number}`,
+    ]);
+    const held = (await recorded()).filter((event) => event.payload.changed?.toString() === 'held');
+    expect(held.map((event) => event.aggregateId).sort()).toEqual([toPack.id, toBook.id].sort());
+    expect(held.map((event) => event.aggregateId)).not.toContain(waiting.id);
+    // Handled again, as a queue may: held already, nothing more.
+    for (const event of events) await handlers.dispatch(event);
+    expect(
+      (await recorded()).filter((event) => event.payload.changed?.toString() === 'held'),
+    ).toEqual([]);
+    // Reviewed and confirmed, the order goes on to be packed.
+    unwrap(await orders.confirm(tenant, toPack.id));
+    expect(await orders.get(tenant, toPack.id)).toMatchObject({ stage: 'to_pack' });
   });
 
   it('reads only the events that change a history', () => {

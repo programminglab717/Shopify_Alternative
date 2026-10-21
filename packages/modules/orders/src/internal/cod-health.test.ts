@@ -346,6 +346,20 @@ describe.skipIf(!server)('CodHealthService', () => {
         { id: toBook.id, number: toBook.number },
       ],
     });
+    // Held for review where the shop says so (ADR-674), each once: still theirs to call about.
+    unwrap(await f.orderSettings.update(f.a, { holdWhenRefused: true }));
+    expect(await f.orders.holdForRefusal(f.a.shopId, refused.id)).toBe(2);
+    expect(await f.orders.holdForRefusal(f.a.shopId, refused.id)).toBe(0);
+    expect(await f.orders.get(f.a, toBook.id)).toMatchObject({ stage: 'needs_review' });
+    expect((await toShip(refused.id))!.toShip).toEqual([
+      { id: toPack.id, number: toPack.number },
+      { id: toBook.id, number: toBook.number },
+    ]);
+    // Reviewed and confirmed, each goes on where it was.
+    unwrap(await f.orders.confirm(f.a, toPack.id));
+    unwrap(await f.orders.confirm(f.a, toBook.id));
+    expect(await f.orders.get(f.a, toBook.id)).toMatchObject({ stage: 'to_book' });
+    unwrap(await f.orderSettings.update(f.a, { holdWhenRefused: false }));
     // None to call about once they ship; nothing of another shop's.
     unwrap(await f.orders.markPacked(f.a, toPack.id));
     await shipped(toPack);

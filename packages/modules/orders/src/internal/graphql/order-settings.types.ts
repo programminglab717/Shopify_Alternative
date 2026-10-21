@@ -133,6 +133,14 @@ export class OrderSettings {
   })
   creditBackOnReturn!: boolean;
 
+  @Field({
+    description:
+      "Whether a customer's other cash-on-delivery orders confirmed and waiting to be packed or " +
+      'booked are held for review once a parcel of theirs turns back, refused or not delivered ' +
+      '(COD-07, ADR-674), for staff to call them before it ships.',
+  })
+  holdWhenRefused!: boolean;
+
   @Field(() => ConfirmationCalls)
   confirmationCalls!: ConfirmationCalls;
 
@@ -197,6 +205,9 @@ export class OrderSettingsInput {
 
   @Field(() => Boolean, { nullable: true })
   creditBackOnReturn?: boolean | null;
+
+  @Field(() => Boolean, { nullable: true })
+  holdWhenRefused?: boolean | null;
 
   @Field(() => ConfirmationCalls, { nullable: true })
   confirmationCalls?: ConfirmationCalls | null;

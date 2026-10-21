@@ -60,6 +60,8 @@ export class OrderSettingsResolver {
       ...(input.upsellPercentOff !== undefined && { upsellPercentOff: input.upsellPercentOff }),
       ...(input.creditBackOnReturn !== undefined &&
         input.creditBackOnReturn !== null && { creditBackOnReturn: input.creditBackOnReturn }),
+      ...(input.holdWhenRefused !== undefined &&
+        input.holdWhenRefused !== null && { holdWhenRefused: input.holdWhenRefused }),
       ...(input.confirmationCalls && {
         confirmationCalls: input.confirmationCalls.toLowerCase() as ConfirmationCallsValue,
       }),
@@ -91,6 +93,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     cancelUnpaidAfterHours: record.cancelUnpaidAfterHours,
     upsellPercentOff: record.upsellPercentOff,
     creditBackOnReturn: record.creditBackOnReturn,
+    holdWhenRefused: record.holdWhenRefused,
     confirmationCalls: record.confirmationCalls.toUpperCase() as ConfirmationCalls,
     staffDiscountPercent: record.staffDiscountPercent,
     shareNewOrders: record.shareNewOrders,

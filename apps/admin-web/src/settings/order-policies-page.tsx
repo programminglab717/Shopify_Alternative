@@ -78,6 +78,7 @@ function orderInputOf(state: {
   upsell: boolean;
   upsellPercent: string;
   creditBack: boolean;
+  holdRefused: boolean;
   calls: ConfirmationCalls;
   staffDiscount: string;
 }) {
@@ -93,6 +94,7 @@ function orderInputOf(state: {
     // Offered at no percentage given is offered at its price (ADR-438).
     upsellPercentOff: state.upsell ? (wholeOrNone(state.upsellPercent) ?? 0) : null,
     creditBackOnReturn: state.creditBack,
+    holdWhenRefused: state.holdRefused,
     confirmationCalls: state.calls,
     staffDiscountPercent: wholeOrNone(state.staffDiscount),
   };
@@ -119,6 +121,7 @@ function stateOf(settings: OrderSettings) {
     upsell: upsell !== null,
     upsellPercent: upsell === null ? '' : String(upsell),
     creditBack: settings.creditBackOnReturn ?? false,
+    holdRefused: settings.holdWhenRefused ?? false,
     calls: settings.confirmationCalls ?? 'OFF',
     staffDiscount:
       settings.staffDiscountPercent === null || settings.staffDiscountPercent === undefined
@@ -335,6 +338,12 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
           hint={t('orderPolicies.creditBackHint')}
           checked={state.creditBack}
           onChange={(creditBack) => set({ creditBack })}
+        />
+        <CheckField
+          label={t('orderPolicies.holdRefused')}
+          hint={t('orderPolicies.holdRefusedHint')}
+          checked={state.holdRefused}
+          onChange={(holdRefused) => set({ holdRefused })}
         />
         <TextField
           label={t('orderPolicies.staffDiscount')}

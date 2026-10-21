@@ -3317,6 +3317,11 @@ export interface OrderSettings {
    * absent where a fake core leaves it out.
    */
   creditBackOnReturn?: boolean;
+  /**
+   * Whether a refused parcel holds its customer's orders yet to ship for review (ADR-674);
+   * absent where a fake core leaves it out.
+   */
+  holdWhenRefused?: boolean;
   /** Absent where a fake core leaves it out (ADR-611). */
   confirmationCalls?: ConfirmationCalls;
   /**

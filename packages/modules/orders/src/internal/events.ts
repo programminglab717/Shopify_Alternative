@@ -295,6 +295,8 @@ export interface OrderSettingsUpdatedPayload {
   /** The post-purchase offer's percentage off (ADR-438); null for no offer. */
   upsellPercentOff: number | null;
   creditBackOnReturn: boolean;
+  /** Whether a refused parcel holds its customer's orders yet to ship for review (ADR-674). */
+  holdWhenRefused: boolean;
   /** Which orders' customers are called to confirm them (ADR-611). */
   confirmationCalls: 'off' | 'high_value' | 'all';
   /** The most staff without `give_any_discount` take off an order (ADR-651); null for any. */

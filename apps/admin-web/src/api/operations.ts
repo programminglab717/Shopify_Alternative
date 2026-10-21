@@ -6960,6 +6960,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     customerCancellation
     upsellPercentOff
     creditBackOnReturn
+    holdWhenRefused
     confirmationCalls
     staffDiscountPercent
     shareNewOrders

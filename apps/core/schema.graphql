@@ -10847,6 +10847,11 @@ type OrderSettings {
   firstCallMinutes: Int
 
   """
+  Whether a customer's other cash-on-delivery orders confirmed and waiting to be packed or booked are held for review once a parcel of theirs turns back, refused or not delivered (COD-07, ADR-674), for staff to call them before it ships.
+  """
+  holdWhenRefused: Boolean!
+
+  """
   Whether each order placed that needs a call is given to an agent on duty at the Confirmation Desk (confirmationDeskDutyStart), the one with the fewest waiting, then the one given one longest ago (ADR-654).
   """
   shareNewOrders: Boolean!
@@ -10885,6 +10890,7 @@ input OrderSettingsInput {
 
   """5 to 1440; null for no target."""
   firstCallMinutes: Int
+  holdWhenRefused: Boolean
   shareNewOrders: Boolean
 
   """0 to 100; null for no limit."""

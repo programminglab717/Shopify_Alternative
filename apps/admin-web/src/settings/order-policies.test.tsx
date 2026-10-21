@@ -186,6 +186,28 @@ describe('Order policies', () => {
     ).toBe(true);
   });
 
+  it("holds a customer's next orders when they refuse a parcel, where the shop says so (ADR-674)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    const hold = (await screen.findByLabelText(
+      /^Hold a customer's next orders when they refuse a parcel/,
+    )) as HTMLInputElement;
+    expect(hold.checked).toBe(false);
+    fireEvent.click(hold);
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([{ input: { holdWhenRefused: true } }]);
+    expect(
+      (
+        screen.getByLabelText(
+          /^Hold a customer's next orders when they refuse a parcel/,
+        ) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+  });
+
   it('calls in Urdu the customers of high-value orders who leave the reminder unanswered (ADR-611)', async () => {
     const fake = core('owner');
     vi.stubGlobal('fetch', fake.fetcher);

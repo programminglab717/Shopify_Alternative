@@ -2163,6 +2163,60 @@ export class OrderService {
   }
 
   /**
+   * Holds for review a customer's other cash-on-delivery orders confirmed and waiting to be packed
+   * or booked, once a parcel of `orderId`'s turns back, refused or not delivered, where the shop
+   * says so (COD-07, ADR-674): staff call them, then confirm it to let it go ahead, as for an
+   * order held for its risk. Each held says why on its timeline, by the system; held already,
+   * packed since or shipped, an order is left as it is. How many it held.
+   */
+  async holdForRefusal(shopId: string, orderId: string): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      if (!(await orderSettingsIn(tx, shopId)).holdWhenRefused) return 0;
+      const [refused] = await tx
+        .select({ customerId: orders.customerId, number: orders.number })
+        .from(orders)
+        .where(and(eq(orders.shopId, shopId), eq(orders.id, orderId)));
+      if (!refused?.customerId) return 0;
+      // Locked in one order, as re-scoring locks them, so the two take turns.
+      const toShip = await tx
+        .select()
+        .from(orders)
+        .where(
+          and(
+            eq(orders.shopId, shopId),
+            eq(orders.customerId, refused.customerId),
+            eq(orders.status, 'open'),
+            eq(orders.paymentMethod, 'cash_on_delivery'),
+            inArray(orders.stage, ['to_pack', 'to_book']),
+            sql`${orders.id} <> ${orderId}`,
+          ),
+        )
+        .orderBy(asc(orders.id))
+        .for('update');
+      for (const order of toShip) {
+        const updated = await updateOrder(tx, shopId, order, {
+          confirmationStatus: 'needs_review',
+        });
+        await addTimelineEntry(
+          tx,
+          shopId,
+          order.id,
+          'system',
+          'held',
+          `Held for review: its customer refused the parcel of ${orderName(Number(refused.number))}`,
+        );
+        await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+          type: OrderEvents.OrderUpdated,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: { changed: ['held'], stage: updated.stage, version: updated.version },
+        });
+      }
+      return toShip.length;
+    });
+  }
+
+  /**
    * Marks a confirmed or paid order as packed, ready to hand to a courier: it moves from To pack to
    * To book. Shipping does not need it; it is for shops that pack and book in separate steps.
    */

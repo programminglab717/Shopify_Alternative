@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-673 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-674 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -681,6 +681,7 @@
 | 671 | A comment from an email address the shop's spam holds a comment of, from the last 90 days, is kept as spam too, until the shop marks that one not spam | Accepted |
 | 672 | A parcel its customer refused pushes who confirms orders of each other order of theirs confirmed and not yet shipped, to call them before it ships | Accepted |
 | 673 | A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship is given to, else who confirms orders | Accepted |
+| 674 | A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to ship for review, where the shop says so | Accepted |
 
 ---
 
@@ -23444,3 +23445,24 @@
 * **Alternatives:** **To the shop's alerts number:** that number is the owner's, for the shop's
   news; this is a call for whoever has the order, as a receipt is. **Holding the orders by
   themselves:** still the shop's to choose; a call settles a refusal for the courier's lateness.
+
+## ADR-674 · A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to ship for review, where the shop says so
+
+* **Context:** ADR-672 and ADR-673 tell staff to call a customer who refused a parcel before
+  their next order ships, but the order goes on to be packed and booked all the same; a shop
+  that wants no parcel to leave before the call has no way to stop it (status shortcut 25).
+* **Decision:** An order setting, `holdWhenRefused` (migration 0298, off by default), in the
+  admin's order policies in English and Urdu. When a parcel turns back, refused or not delivered,
+  the worker's risk re-scoring (ADR-112), which hears it already, asks the orders module
+  (`holdForRefusal`) to move each of the customer's other cash-on-delivery orders confirmed and
+  waiting to be packed or booked to review, locked in one order as re-scoring locks them, each
+  saying on its timeline, by the system, whose parcel was refused. Staff confirm a held order to
+  let it go on where it was; its customer is not told it was confirmed again. The orders to call
+  about (`ordersToShipOfCustomerIn`) count those held since they were confirmed, so the push and
+  the WhatsApp alert still name them, whichever of the worker's handlers runs first.
+* **Consequences:** A refusal stops the next parcel where the shop asks it to; one held already,
+  packed since or shipped is left as it is, and the event heard twice holds nothing more.
+* **Alternatives:** **Holding in the parcel's own transaction:** it would lock the customer's
+  other orders while the courier's update holds its own, and two refusals at once could wait on
+  each other. **Holding every order of theirs, prepaid too:** money already paid ships no risk of
+  a refusal's cost.

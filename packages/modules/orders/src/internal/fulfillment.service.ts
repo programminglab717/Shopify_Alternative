@@ -1486,9 +1486,9 @@ export interface RefusedOrders {
 
 /**
  * Order `orderId`, and its customer's other orders confirmed and waiting to be packed or booked,
- * not yet handed to a courier, the oldest first, in the caller's transaction: for staff to call
- * before they ship, its customer having refused its parcel (ADR-672). Null where the order is not
- * the shop's.
+ * not yet handed to a courier, or held for review since they were confirmed (ADR-674), the oldest
+ * first, in the caller's transaction: for staff to call before they ship, its customer having
+ * refused its parcel (ADR-672). Null where the order is not the shop's.
  */
 export async function ordersToShipOfCustomerIn(
   tx: Tx,
@@ -1504,7 +1504,10 @@ export async function ordersToShipOfCustomerIn(
       FROM orders.orders refused
       LEFT JOIN orders.orders o
         ON o.shop_id = refused.shop_id AND o.customer_id = refused.customer_id
-       AND o.id <> refused.id AND o.stage IN ('to_pack', 'to_book')
+       AND o.id <> refused.id
+       AND (o.stage IN ('to_pack', 'to_book')
+            -- Confirmed, then held for this refusal where the shop says so (ADR-674).
+            OR (o.stage = 'needs_review' AND o.confirmed_at IS NOT NULL))
      WHERE refused.shop_id = ${shopId} AND refused.id = ${orderId}
      ORDER BY o.created_at, o.id`);
   const [first] = rows;

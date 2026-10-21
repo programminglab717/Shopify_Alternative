@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A refusal holds the customer's next orders
+
+* **A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to
+  ship for review, where the shop says so** ([ADR-674](../architecture/13-decision-log.md#adr-674--a-parcel-its-customer-refused-holds-their-other-cash-on-delivery-orders-confirmed-and-yet-to-ship-for-review-where-the-shop-says-so)): a new order policy in the admin, in
+  English and Urdu (migration 0298); staff confirm a held order to let it go on.
+* 3834 tests, two more: the worker's and the admin's.
+
 ### 1d131dd · A customer's refusal told on WhatsApp
 
 * **A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship

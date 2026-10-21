@@ -2732,6 +2732,9 @@ const en = {
   'orderPolicies.creditBack': 'Give store credit back when a parcel comes back',
   'orderPolicies.creditBackHint':
     'Store credit that paid an order goes back to its customer once its every parcel came back unaccepted, as it does when the order is cancelled. Off, it stays spent, as an advance does.',
+  'orderPolicies.holdRefused': "Hold a customer's next orders when they refuse a parcel",
+  'orderPolicies.holdRefusedHint':
+    'Their other cash-on-delivery orders confirmed and not yet shipped wait for review once a parcel of theirs comes back, for you to call them first. Off, staff are told and the orders go on.',
   'orderPolicies.staffDiscount': 'Most staff take off an order, in %',
   'orderPolicies.staffDiscountHint':
     'Of what its items cost; blank for any. Owners, managers and roles that give any discount take off more.',
@@ -8056,6 +8059,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.creditBack': 'پارسل واپس آنے پر اسٹور کریڈٹ واپس کریں',
   'orderPolicies.creditBackHint':
     'جس اسٹور کریڈٹ سے آرڈر کی ادائیگی ہوئی، وہ اس کے سارے پارسل قبول کیے بغیر واپس آنے پر گاہک کو واپس مل جاتا ہے، جیسے آرڈر منسوخ ہونے پر ملتا ہے۔ بند ہو تو ایڈوانس کی طرح خرچ شدہ رہتا ہے۔',
+  'orderPolicies.holdRefused': 'پارسل واپس کرنے پر گاہک کے اگلے آرڈرز روکیں',
+  'orderPolicies.holdRefusedHint':
+    'ان کا کوئی پارسل واپس آنے پر ان کے باقی کنفرم شدہ کیش آن ڈیلیوری آرڈرز، جو ابھی بھیجے نہیں گئے، جائزے کے لیے رک جاتے ہیں تاکہ آپ پہلے انہیں کال کریں۔ بند ہو تو اسٹاف کو بتایا جاتا ہے اور آرڈرز آگے بڑھتے ہیں۔',
   'orderPolicies.staffDiscount': 'عملہ آرڈر پر زیادہ سے زیادہ کتنی رعایت دے (%)',
   'orderPolicies.staffDiscountHint':
     'آئٹمز کی قیمت کا فیصد، بغیر حد کے لیے خالی چھوڑیں۔ مالک، مینیجر اور وہ رول جو کوئی بھی رعایت دے سکتے ہیں، زیادہ دے سکتے ہیں۔',
