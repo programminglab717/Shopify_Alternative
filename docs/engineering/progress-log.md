@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Lines' properties on orders
+### 13bedfe · Lines' properties on orders
 
 * **An order's lines keep the properties their cart lines had, Shopify's customAttributes, and
   packing slips and invoices print those not apps' under each item** ([ADR-687](../architecture/13-decision-log.md#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item)): CAT-15's
