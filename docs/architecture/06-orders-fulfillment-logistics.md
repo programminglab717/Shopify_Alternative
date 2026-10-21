@@ -152,6 +152,13 @@ confirmation:
   An order waiting in it is scored again when its customer's history changes, such as a parcel
   of theirs refused, and held if that makes it risky
   ([ADR-112](./13-decision-log.md#adr-112--an-order-waiting-to-be-confirmed-is-scored-again-when-its-customers-history-changes-by-the-worker-a-score-that-makes-it-risky-holds-it-and-a-held-order-stays-held)).
+  A confirmed order not yet shipped keeps its score, but when its customer refuses another
+  parcel, staff who confirm orders are pushed to call them before it ships
+  ([ADR-672](./13-decision-log.md#adr-672--a-parcel-its-customer-refused-pushes-who-confirms-orders-of-each-other-order-of-theirs-confirmed-and-not-yet-shipped-to-call-them-before-it-ships)),
+  and told on WhatsApp, the order's own member first
+  ([ADR-673](./13-decision-log.md#adr-673--a-parcel-its-customer-refused-tells-on-whatsapp-whom-each-other-order-of-theirs-yet-to-ship-is-given-to-else-who-confirms-orders));
+  where the shop says so, such orders are held for review until someone confirms them again
+  ([ADR-674](./13-decision-log.md#adr-674--a-parcel-its-customer-refused-holds-their-other-cash-on-delivery-orders-confirmed-and-yet-to-ship-for-review-where-the-shop-says-so)).
 * One tap to **call** (`tel:`), **WhatsApp** (pre-filled), or record the outcome: `confirmed`,
   `no answer (retry in 2 h)`, `wrong number`, `cancelled: reason`, `address updated`.
 * Scripts in Urdu and English, customer history (orders, refusals across this shop, network risk
