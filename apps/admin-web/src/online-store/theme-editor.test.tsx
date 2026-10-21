@@ -351,6 +351,7 @@ interface Render {
   id: number;
   sections: string[];
   files: Record<string, string>;
+  styles?: boolean;
 }
 
 /** What the page in the preview says when it has loaded: its path and template. */
@@ -664,17 +665,26 @@ describe("A theme's editor", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open the page again' }));
     expect(src()).toBe(`${STOREFRONT}/?preview=v1.k1.preview-token`);
 
-    // The theme's settings show once saved: the page opened again with them.
+    // The theme's colours show as they change, the layout's CSS rendered again with them, and
+    // the rest of its settings once saved: the page opened again with them (ADR-700).
     frame = await preview();
     frame.tell(ready('/', 'templates/index.json'));
     fireEvent.click(screen.getByRole('button', { name: 'Colours' }));
     type('Buttons and links: colour code', '#B45309');
-    expect(screen.getByText('Theme settings show in the preview once you save them.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Colours and the page’s width show as you change them; the theme’s other settings once you save them.',
+      ),
+    ).toBeTruthy();
+    await waitFor(() => expect(frame.renders()).toHaveLength(1));
+    const [styled] = frame.renders();
+    expect(styled).toMatchObject({ sections: [], styles: true });
+    expect(styled!.files['config/settings_data.json']).toContain('#B45309');
     const shown = frame.element;
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('Saved. Your store shows it in a moment.');
     expect(screen.getByTitle('Hatti Base on your store')).not.toBe(shown);
-    expect(frame.renders()).toEqual([]);
+    expect(frame.renders()).toHaveLength(1);
     // With the link the editor opened with, though the theme read again came with another.
     expect(src()).toBe(`${STOREFRONT}/?preview=v1.k1.preview-token`);
   });

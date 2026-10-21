@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The theme's colours in the editor's preview
+
+* **The theme editor's preview shows the theme's colours and widths as they change: the
+  layout's `{% style %}` CSS rendered again with the unsaved settings and put in the page**
+  ([ADR-700](../architecture/13-decision-log.md#adr-700--the-theme-editors-preview-shows-the-themes-colours-and-widths-as-they-change-the-layouts--style--css-rendered-again-with-the-unsaved-settings-and-put-in-the-page)): OS-02's settings before saving.
+* 3947 tests, one more: the storefront's.
+
 ### 93ae446 · Theme preview links taken back
 
 * **A theme's preview links made so far are ended at once by raising its links' generation,

@@ -2214,6 +2214,26 @@ describe('Carts', () => {
       /templates\/index\.json.*layout\/theme\.liquid|layout\/theme\.liquid.*templates\/index\.json/s,
     );
 
+    // The layout's CSS, marked in design mode alone, with the theme's settings the editor has
+    // not saved: no section needed (ADR-700).
+    expect(framed.body).toContain('<style data-hatti data-hatti-layout>');
+    expect(opened.body).not.toContain('data-hatti-layout');
+    const settings = JSON.stringify({ current: { color_accent: '#B91C1C', page_width: 1400 } });
+    const styled = await ask({
+      page: '/',
+      sections: [],
+      files: { 'config/settings_data.json': settings },
+      styles: true,
+    });
+    expect(styled.statusCode).toBe(200);
+    const css = (styled.json() as { sections: object; styles: string[] }).styles;
+    expect(css).toHaveLength(1);
+    expect(css[0]).toContain('--color-accent: #B91C1C;');
+    expect(css[0]).toContain('--page-width: 1400px;');
+    expect(css[0]).not.toContain('<style');
+    // Asked for sections alone, none.
+    expect((rendered.json() as { styles?: unknown }).styles).toBeUndefined();
+
     // Only the editor's script asks: with its header, from the page, in a preview.
     const good = { page: '/', sections: ['banner'], files: unsaved };
     expect((await ask(good, { 'x-hatti-editor': '' })).statusCode).toBe(403);
@@ -2225,6 +2245,8 @@ describe('Carts', () => {
       { ...good, sections: ['a', 'b', 'c', 'd', 'e', 'f'] },
       { ...good, sections: ['<script>'] },
       { ...good, files: { 'templates/index.json': 1 } },
+      { ...good, styles: 'yes' },
+      { ...good, sections: [], styles: false },
     ]) {
       expect((await ask(bad)).statusCode, JSON.stringify(bad)).toBe(400);
     }

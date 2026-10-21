@@ -45,7 +45,7 @@ afterEach(async () => {
  * renders it asks the storefront for, answered with `rendered`, and the theme editor events the
  * page's sections hear.
  */
-function framed(body: string, rendered: Record<string, string | null> = {}) {
+function framed(body: string, rendered: Record<string, string | null> = {}, styles?: string[]) {
   const window = new Window({
     url: 'https://zari.hatti.pk/',
     settings: {
@@ -56,7 +56,7 @@ function framed(body: string, rendered: Record<string, string | null> = {}) {
   opened = window;
   const { document } = window;
   const told: Record<string, unknown>[] = [];
-  const asked: { sections: string[]; files: Record<string, string> }[] = [];
+  const asked: { sections: string[]; files: Record<string, string>; styles: boolean }[] = [];
   const heard: string[] = [];
   // Framed, the editor is the page's parent; on its own, the page is its own.
   window.postMessage = ((message: Record<string, unknown>) => {
@@ -64,7 +64,10 @@ function framed(body: string, rendered: Record<string, string | null> = {}) {
   }) as typeof window.postMessage;
   window.fetch = (async (_url: string, init: { body: string }) => {
     asked.push(JSON.parse(init.body) as (typeof asked)[number]);
-    return { ok: true, json: async () => ({ sections: rendered, problems: [] }) };
+    return {
+      ok: true,
+      json: async () => ({ sections: rendered, problems: [], ...(styles && { styles }) }),
+    };
   }) as unknown as typeof window.fetch;
   document.body.innerHTML = body;
   for (const name of ['load', 'unload', 'reorder']) {
@@ -199,5 +202,27 @@ describe("The theme editor's script in the preview", () => {
     expect(page.ids()).toEqual(['header-group__header', 'b', 'a', 'c', 'footer-group__links']);
     expect(page.document.getElementById('hatti-section-a')!.textContent).toBe('New words');
     expect(page.heard).toEqual(['unload a', 'load a', 'reorder b', 'reorder a']);
+  });
+
+  it("puts the layout's CSS the theme's settings fill in, as the editor has them (ADR-700)", async () => {
+    const style = (css: string) => `<style data-hatti data-hatti-layout>${css}</style>`;
+    const page = framed(
+      style(':root { --color-accent: #0F766E; }') + PAGE + '<style data-hatti>.a {}</style>',
+      {},
+      [':root { --color-accent: #B91C1C; }'],
+    );
+    const files = { 'config/settings_data.json': '{"current":{"color_accent":"#B91C1C"}}' };
+    page.tell({ type: 'hatti:render', id: 3, sections: [], files, styles: true });
+    await expect.poll(() => page.told.at(-1)?.type).toBe('hatti:rendered');
+    expect(page.asked).toEqual([{ page: '/', sections: [], files, styles: true }]);
+    const css = [...page.document.querySelectorAll('style')].map((each) => each.textContent);
+    // A section's own CSS is the section's to render again.
+    expect(css).toEqual([':root { --color-accent: #B91C1C; }', '.a {}']);
+    expect(page.ids()).toEqual(['header-group__header', 'a', 'b', 'c', 'footer-group__links']);
+
+    // Nothing asked of the storefront for no sections and no CSS.
+    page.tell({ type: 'hatti:render', id: 4, sections: [], files: {} });
+    await expect.poll(() => page.told.at(-1)?.id).toBe(4);
+    expect(page.asked).toHaveLength(1);
   });
 });

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-699 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-700 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -707,6 +707,7 @@
 | 697 | A personalisation field may add to each unit's price when it is answered, as embroidery costs: the cart prices its line with it, so the order keeps it, and the page says it | Accepted |
 | 698 | The admin's Personalisation card asks what each field's answer adds to the price, in rupees, blank for nothing | Accepted |
 | 699 | A theme's preview links made so far are ended at once by raising its links' generation, which each link holds; the admin's themes tab ends them once asked | Accepted |
+| 700 | The theme editor's preview shows the theme's colours and widths as they change: the layout's {% style %} CSS rendered again with the unsaved settings and put in the page | Accepted |
 
 ---
 
@@ -24101,3 +24102,28 @@
 * **Alternatives:** **Each link kept, to end one alone:** a link is sent to a few people at
   once; ending them all and sending a new one is what a merchant does. **A new sealing key:**
   it would end every shop's links.
+
+## ADR-700 · The theme editor's preview shows the theme's colours and widths as they change: the layout's {% style %} CSS rendered again with the unsaved settings and put in the page
+
+* **Context:** The editor's preview shows a page's sections as the merchant changes them
+  ([ADR-325](#adr-325--the-theme-editors-preview-frames-the-storefront-beside-the-editor-and-shows-changes-as-they-are-made-the-pages-sections-following-the-editors-files-the-themes-settings-show-once-saved)), but the theme's settings, such as its colours, are in the layout's head,
+  which no section's render reaches: the preview said they show once saved, and opened the page
+  again then. Choosing a brand's colour is the change a merchant most wants to see before saving.
+* **Decision:**
+  * **The layout's CSS is marked in design mode.** A `{% style %}` outside a section, in the
+    editor's frame, renders as `<style data-hatti data-hatti-layout>`; elsewhere, and a
+    section's, as before.
+  * **The editor asks for it with a render** ([ADR-050](#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)): `hatti:render` with
+    `styles` has the storefront render the whole page in design mode with the unsaved files,
+    and answer the CSS of the layout's `{% style %}` elements in order beside the sections, a
+    render of no sections taking it alone. The page's script puts each in place of its own when
+    as many came as the page has, so a page whose layout changed waits for its reload.
+  * **The admin's preview sends the theme's settings** unsaved with every render, so sections
+    rendered again use them too, and asks for the CSS when they change. What the layout shows
+    other than its CSS, such as breadcrumbs, still shows once saved, and the preview says so.
+* **Consequences:** Hatti Base's colours and page width follow the editor at once; a theme of
+  Shopify's whose settings fill its `{% style %}` does too. A whole page is rendered for each
+  pause in a colour's change, in a preview alone.
+* **Alternatives:** **CSS variables set by the editor's script from the settings:** the script
+  would have to know how each theme turns settings into CSS. **The page reloaded on each
+  change:** it loses the place the merchant scrolled to, and flickers.

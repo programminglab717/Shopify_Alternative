@@ -8,14 +8,16 @@ import { escapeHtml } from './liquid.js';
 //   hatti:hello                       answered with hatti:ready
 //   hatti:select { section, block? }  scrolls to it, and tells the theme's scripts
 //   hatti:deselect
-//   hatti:render { id?, sections, files }
+//   hatti:render { id?, sections, files, styles? }
 //                                     renders those sections of the page again, up to five, with
 //                                     the theme's files the editor has not saved yet over the
 //                                     saved ones; then the page's sections from each template
 //                                     or section group among the files are as it has them: in
 //                                     its order, those it hides or no longer has gone, and those
 //                                     rendered that were not on the page in their places. With
-//                                     no sections, it only puts them in order (ADR-325)
+//                                     no sections, it only puts them in order (ADR-325). With
+//                                     styles, the CSS the layout's settings fill in follows them
+//                                     too, as the theme's colours change (ADR-700)
 // To the editor:
 //   hatti:ready { page, sections }    what the page is: its path, locale and template file, and
 //                                     each section's ID, type, file and key, with its blocks
@@ -203,16 +205,25 @@ const BRIDGE = `(function () {
     });
   }
 
-  function render(ids, files) {
-    var asked = ids.length === 0 ? Promise.resolve({}) : fetch('/editor/sections', {
+  function render(ids, files, styles) {
+    var body = { page: location.pathname + location.search, sections: ids, files: files };
+    if (styles) body.styles = true;
+    var asked = ids.length === 0 && !styles ? Promise.resolve({}) : fetch('/editor/sections', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-hatti-editor': '1' },
-      body: JSON.stringify({ page: location.pathname + location.search, sections: ids, files: files }),
+      body: JSON.stringify(body),
     }).then(function (response) {
       if (!response.ok) throw new Error('The preview could not render: ' + response.status);
       return response.json();
     });
     return asked.then(function (answer) {
+      // The layout's CSS, in the order the page has it.
+      if (Array.isArray(answer.styles)) {
+        var kept = document.querySelectorAll('style[data-hatti-layout]');
+        if (kept.length === answer.styles.length) {
+          answer.styles.forEach(function (css, index) { kept[index].textContent = css; });
+        }
+      }
       var fresh = [];
       ids.forEach(function (id) {
         var holder = document.createElement('div');
@@ -269,7 +280,7 @@ const BRIDGE = `(function () {
       var ids = Array.isArray(message.sections) ? message.sections.map(String) : [];
       var files = message.files && typeof message.files === 'object' ? message.files : {};
       var asked = message.id;
-      render(ids, files).then(
+      render(ids, files, message.styles === true).then(
         function (problems) {
           send({ type: 'hatti:rendered', id: asked, sections: ids, problems: problems });
         },

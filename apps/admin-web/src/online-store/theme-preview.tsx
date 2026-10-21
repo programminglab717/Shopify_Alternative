@@ -4,6 +4,7 @@ import { useLocale } from '../i18n/locale';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { previewRender, renderGroups } from './preview-plan';
+import { SETTINGS_FILE } from './theme-files';
 
 /** A section of the page in the preview, as the storefront's script there tells it. */
 export interface FramedSection {
@@ -35,7 +36,9 @@ const QUIET_MS = 250;
 /**
  * The theme editor's preview (ADR-325): a page of the storefront in a frame, in design mode, its
  * sections rendered again with the editor's changes as the merchant makes them, and the section
- * chosen in either chosen in both. What it shows only once saved, it says.
+ * chosen in either chosen in both. The theme's settings go with every render, and the CSS they
+ * fill in on the page's layout follows them as they change (ADR-700); what the preview shows only
+ * once saved, it says.
  */
 export function LivePreview({
   src,
@@ -71,7 +74,7 @@ export function LivePreview({
   onPage: (page: FramedPage) => void;
   onSelected: (selection: Selection) => void;
   onReload: () => void;
-  /** Whether the theme's settings have changes, which the preview shows once saved. */
+  /** Whether the theme's settings have changes, some of which the preview shows once saved. */
   settingsUnsaved: boolean;
   /** Whether no page of the shop's shows the editor's template, so the preview shows another. */
   missing: boolean;
@@ -112,15 +115,29 @@ export function LivePreview({
       nowOf,
       savedOf,
     );
-    if (plan.changed.length === 0) return;
+    // The theme's settings, unsaved, with every render; changed, the layout's CSS too.
+    const settings = nowOf(SETTINGS_FILE);
+    const styles = settings !== (shown.current[SETTINGS_FILE] ?? savedOf(SETTINGS_FILE));
+    if (plan.changed.length === 0 && !styles) return;
+    const files =
+      settings === savedOf(SETTINGS_FILE)
+        ? plan.files
+        : { ...plan.files, [SETTINGS_FILE]: settings };
     heard.current = [];
     setFailure(null);
-    for (const sections of renderGroups(plan.sections)) {
+    renderGroups(plan.sections).forEach((sections, at) => {
       asked.current += 1;
       pending.current.add(asked.current);
-      post({ type: 'hatti:render', id: asked.current, sections, files: plan.files });
-    }
+      post({
+        type: 'hatti:render',
+        id: asked.current,
+        sections,
+        files,
+        ...(styles && at === 0 && { styles: true }),
+      });
+    });
     for (const filename of plan.changed) shown.current[filename] = nowOf(filename);
+    shown.current[SETTINGS_FILE] = settings;
     setUpdating(true);
   });
 

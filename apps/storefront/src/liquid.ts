@@ -830,7 +830,11 @@ class NestedIncludeTag extends IncludeTag {
   }
 }
 
-/** `{% style %}`: CSS a section's settings can fill in, as a `<style>` element. */
+/**
+ * `{% style %}`: CSS a section's or the theme's settings can fill in, as a `<style>` element. In
+ * the theme editor's frame, the layout's are marked, for the editor to show the theme's settings
+ * as they change (ADR-700).
+ */
 class StyleTag extends Tag {
   readonly templates: Template[] = [];
 
@@ -842,10 +846,22 @@ class StyleTag extends Tag {
   }
 
   *render(ctx: Context, emitter: Emitter): Generator<unknown, void, unknown> {
-    emitter.write('<style data-hatti>');
+    const layout =
+      ctx.getSync(['request', 'design_mode']) === true && ctx.getSync(['section']) === undefined;
+    emitter.write(layout ? `<style data-hatti ${LAYOUT_STYLE}>` : '<style data-hatti>');
     yield this.liquid.renderer.renderTemplates(this.templates, ctx, emitter);
     emitter.write('</style>');
   }
+}
+
+/** What marks the layout's `{% style %}` elements in the theme editor's frame (ADR-700). */
+export const LAYOUT_STYLE = 'data-hatti-layout';
+
+/** The CSS of the layout's `{% style %}` elements in a page rendered in design mode, in order. */
+export function layoutStyles(html: string): string[] {
+  return [...html.matchAll(/<style data-hatti data-hatti-layout>([\s\S]*?)<\/style>/g)].map(
+    (match) => match[1]!,
+  );
 }
 
 /** `{% section 'header' %}` and `{% sections 'header-group' %}`, in a layout. */

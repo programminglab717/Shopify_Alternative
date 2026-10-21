@@ -89,7 +89,7 @@ import { blogFeed, collectionFeed, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
 import { browserIdsOf } from './pixels.js';
-import { translation } from './liquid.js';
+import { layoutStyles, translation } from './liquid.js';
 import type { SearchFound } from './objects.js';
 import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
 import {
@@ -431,18 +431,29 @@ const EDITOR_FILES_MAX = 50;
  */
 function editorAsk(
   body: unknown,
-): { page: string; sections: string[]; files: Record<string, string> } | null {
+): { page: string; sections: string[]; files: Record<string, string>; styles: boolean } | null {
   if (typeof body !== 'object' || body === null) return null;
-  const { page, sections, files } = body as Record<string, unknown>;
+  const { page, sections, files, styles } = body as Record<string, unknown>;
   if (typeof page !== 'string' || !/^\/(?!\/)/.test(page) || page.length > 2_000) return null;
-  if (!Array.isArray(sections) || sections.length === 0 || sections.length > EDITOR_SECTIONS_MAX)
+  if (styles !== undefined && typeof styles !== 'boolean') return null;
+  // Sections, or the layout's CSS alone (ADR-700).
+  if (
+    !Array.isArray(sections) ||
+    (sections.length === 0 && styles !== true) ||
+    sections.length > EDITOR_SECTIONS_MAX
+  )
     return null;
   if (!sections.every((id) => typeof id === 'string' && SECTION_ID.test(id))) return null;
   if (typeof files !== 'object' || files === null || Array.isArray(files)) return null;
   const entries = Object.entries(files);
   if (entries.length > EDITOR_FILES_MAX) return null;
   if (!entries.every(([, source]) => typeof source === 'string')) return null;
-  return { page, sections, files: Object.fromEntries(entries) as Record<string, string> };
+  return {
+    page,
+    sections,
+    files: Object.fromEntries(entries) as Record<string, string>,
+    styles: styles === true,
+  };
 }
 
 /**
@@ -1349,8 +1360,34 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     editing?: { theme: Theme },
   ): Promise<Record<string, string | null>> => {
     if (ids.length === 0) return {};
+    const theme = editing ? () => editing.theme : themeFor(shop);
+    const request = pageRequestOf(page, cart, Boolean(editing));
+    const rendered = await renderer.sections(request, shop.store, ids, theme);
+    return Object.fromEntries(ids.map((id) => [id, rendered.get(id) ?? null]));
+  };
+
+  /**
+   * The CSS the theme's settings fill in on a page's layout, its `{% style %}` elements in order,
+   * with the theme the editor has unsaved (ADR-700): the whole page rendered in design mode.
+   */
+  const layoutStylesOf = async (
+    shop: Found,
+    page: URL,
+    cart: CartJson | null,
+    theme: Theme,
+  ): Promise<string[]> => {
+    const rendered = await renderer.render(
+      pageRequestOf(page, cart, true),
+      shop.store,
+      () => theme,
+    );
+    return layoutStyles(rendered.html);
+  };
+
+  /** A page of the shop's, at `page`, as sections and the editor render it. */
+  const pageRequestOf = (page: URL, cart: CartJson | null, editing: boolean): PageRequest => {
     const urdu = page.pathname === '/ur' || page.pathname.startsWith('/ur/');
-    const request: PageRequest = {
+    return {
       path: urdu ? page.pathname.slice(3) || '/' : page.pathname,
       query: Object.fromEntries(page.searchParams),
       // A collection's filters, each as often as given (ADR-478).
@@ -1359,16 +1396,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       cart,
       editor: editing ? { origins: editorOrigins } : null,
     };
-    const theme = editing ? () => editing.theme : themeFor(shop);
-    const rendered = await renderer.sections(request, shop.store, ids, theme);
-    return Object.fromEntries(ids.map((id) => [id, rendered.get(id) ?? null]));
   };
 
   /**
    * Sections rendered for the theme editor (ADR-050): `POST /editor/sections` with
-   * `{ page, sections, files }` renders those sections of that page in design mode, with the
-   * theme's files the editor has not saved over the previewed theme's, and says what in them the
-   * storefront could not use. Only the editor's script asks: a preview of the shop's, its own
+   * `{ page, sections, files, styles? }` renders those sections of that page in design mode, with
+   * the theme's files the editor has not saved over the previewed theme's, and says what in them
+   * the storefront could not use; with `styles`, the CSS of the layout's `{% style %}` elements
+   * too, in order (ADR-700). Only the editor's script asks: a preview of the shop's, its own
    * header, and a request from the page itself.
    */
   app.post('/editor/sections', async (request, reply) => {
@@ -1402,7 +1437,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const cart = token && core ? await core.read(found.shopId, token) : null;
       const page = new URL(asked.page, 'http://storefront');
       const sections = await sectionsOf(found, page, asked.sections, cart, { theme: edited });
-      return await reply.send({ sections, problems });
+      // The layout's CSS too, as the theme's settings change (ADR-700).
+      const styles = asked.styles ? await layoutStylesOf(found, page, cart, edited) : undefined;
+      return await reply.send({ sections, problems, ...(styles && { styles }) });
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       if (!unreachable(request, error)) throw error;
