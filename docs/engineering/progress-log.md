@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The total as the city is typed
+### 95d5491 · The total as the city is typed
 
 * **The checkout's page shows its total as the city is typed: a script posts the form to the
   page's own address to show it, placing nothing, and puts the summary it answers with in place**
