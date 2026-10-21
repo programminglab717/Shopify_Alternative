@@ -58,6 +58,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   holdAt: 'orderPolicies.holdAt',
   upsellPercentOff: 'orderPolicies.upsellPercent',
   staffDiscountPercent: 'orderPolicies.staffDiscount',
+  returnWindowDays: 'orderPolicies.returnWindow',
 };
 
 /** A number of whole units as typed, or blank for none; what is not one stays NaN. */
@@ -79,6 +80,7 @@ function orderInputOf(state: {
   upsellPercent: string;
   creditBack: boolean;
   holdRefused: boolean;
+  returnWindow: string;
   calls: ConfirmationCalls;
   staffDiscount: string;
 }) {
@@ -95,6 +97,7 @@ function orderInputOf(state: {
     upsellPercentOff: state.upsell ? (wholeOrNone(state.upsellPercent) ?? 0) : null,
     creditBackOnReturn: state.creditBack,
     holdWhenRefused: state.holdRefused,
+    returnWindowDays: wholeOrNone(state.returnWindow),
     confirmationCalls: state.calls,
     staffDiscountPercent: wholeOrNone(state.staffDiscount),
   };
@@ -122,6 +125,10 @@ function stateOf(settings: OrderSettings) {
     upsellPercent: upsell === null ? '' : String(upsell),
     creditBack: settings.creditBackOnReturn ?? false,
     holdRefused: settings.holdWhenRefused ?? false,
+    returnWindow:
+      settings.returnWindowDays === null || settings.returnWindowDays === undefined
+        ? ''
+        : String(settings.returnWindowDays),
     calls: settings.confirmationCalls ?? 'OFF',
     staffDiscount:
       settings.staffDiscountPercent === null || settings.staffDiscountPercent === undefined
@@ -344,6 +351,14 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
           hint={t('orderPolicies.holdRefusedHint')}
           checked={state.holdRefused}
           onChange={(holdRefused) => set({ holdRefused })}
+        />
+        <TextField
+          label={t('orderPolicies.returnWindow')}
+          hint={t('orderPolicies.returnWindowHint')}
+          inputMode="numeric"
+          ltr
+          value={state.returnWindow}
+          onChange={(event) => set({ returnWindow: event.target.value })}
         />
         <TextField
           label={t('orderPolicies.staffDiscount')}

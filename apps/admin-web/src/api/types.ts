@@ -216,6 +216,41 @@ export interface OpenReturnsData {
   };
 }
 
+/** What a shopper would like for what they send back (ADR-675). */
+export type ReturnPreference = 'EXCHANGE' | 'STORE_CREDIT' | 'REFUND';
+
+export interface ReturnRequestsData {
+  returnRequests: {
+    nodes: {
+      id: string;
+      orderId: string;
+      orderName: string;
+      preference: ReturnPreference;
+      note: string;
+      createdAt: string;
+      lineItems: {
+        lineItemId: string;
+        title: string;
+        variantTitle: string;
+        quantity: number;
+        returnReason: ReturnReason;
+      }[];
+    }[];
+    pageInfo: { hasNextPage: boolean };
+  };
+}
+
+export interface ReturnRequestApproveData {
+  returnRequestApprove: {
+    return: { id: string; name: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface ReturnRequestDeclineData {
+  returnRequestDecline: { returnRequest: { id: string } | null; userErrors: UserError[] };
+}
+
 export interface ReturnCreateData {
   returnCreate: {
     return: { id: string; name: string; exchangeOrder: { id: string; name: string } | null } | null;
@@ -3322,6 +3357,11 @@ export interface OrderSettings {
    * absent where a fake core leaves it out.
    */
   holdWhenRefused?: boolean;
+  /**
+   * The days after delivery shoppers may ask for a return from the order's page (ADR-675), 1 to
+   * 30; null for none, absent where a fake core leaves it out.
+   */
+  returnWindowDays?: number | null;
   /** Absent where a fake core leaves it out (ADR-611). */
   confirmationCalls?: ConfirmationCalls;
   /**

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Returns asked online, answered in the admin
+
+* **The admin lists the returns customers asked for online under Returns, to approve or decline
+  with the reason they are told, and sets the days the shop takes them in its order policies**
+  ([ADR-677](../architecture/13-decision-log.md#adr-677--the-admin-lists-the-returns-customers-asked-for-online-under-returns-to-approve-or-decline-with-the-reason-they-are-told-and-sets-the-days-the-shop-takes-them-in-its-order-policies)): the last part of the return portal (ORD-08), in English and Urdu.
+* 3846 tests, six more: the admin's.
+
 ### 5936909 · The return form, and the shop's answer told
 
 * **A delivered order's page asks what to send back, how many of each and why, and says how

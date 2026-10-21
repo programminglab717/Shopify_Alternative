@@ -1283,6 +1283,21 @@ const en = {
   'parcels.checkIn.writtenOff.one': '1 item will be written off as damaged.',
   'parcels.checkIn.save': 'Check in',
   'returns.tab.customer': 'Customer returns',
+  'returns.tab.asked': 'Asked online',
+  'askedReturns.none': 'No returns waiting for an answer',
+  'askedReturns.noneHint':
+    "Customers ask from their order's page, within the days you take returns in order policies.",
+  'askedReturns.wants.EXCHANGE': 'Would like another size or item',
+  'askedReturns.wants.STORE_CREDIT': 'Would like store credit',
+  'askedReturns.wants.REFUND': 'Would like their money back',
+  'askedReturns.approve': 'Approve',
+  'askedReturns.decline': 'Decline',
+  'askedReturns.why': 'Why you are declining it',
+  'askedReturns.whyHint': 'The customer is told this on WhatsApp.',
+  'askedReturns.declineSend': 'Decline and tell them',
+  'askedReturns.keep': 'Keep it waiting',
+  'askedReturns.approved': 'Approved as {name}: check it in on its order when it comes.',
+  'askedReturns.openOrder': 'Open the order',
   'parcels.damage.claim': 'Claim the damage from the courier',
   'parcels.damage.amountHint': 'Leave it empty to claim what was written off.',
   'orderReturns.title': 'Returns',
@@ -2739,6 +2754,9 @@ const en = {
   'orderPolicies.holdRefused': "Hold a customer's next orders when they refuse a parcel",
   'orderPolicies.holdRefusedHint':
     'Their other cash-on-delivery orders confirmed and not yet shipped wait for review once a parcel of theirs comes back, for you to call them first. Off, staff are told and the orders go on.',
+  'orderPolicies.returnWindow': 'Days after delivery customers may ask for a return',
+  'orderPolicies.returnWindowHint':
+    "1 to 30; leave it empty to take none online. They ask from their order's page, and you approve or decline under Returns.",
   'orderPolicies.staffDiscount': 'Most staff take off an order, in %',
   'orderPolicies.staffDiscountHint':
     'Of what its items cost; blank for any. Owners, managers and roles that give any discount take off more.',
@@ -6608,6 +6626,21 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'parcels.checkIn.writtenOff.one': '1 چیز خراب شمار ہو کر ختم ہو گی۔',
   'parcels.checkIn.save': 'وصول کریں',
   'returns.tab.customer': 'گاہکوں کی واپسیاں',
+  'returns.tab.asked': 'آن لائن درخواستیں',
+  'askedReturns.none': 'کوئی واپسی جواب کی منتظر نہیں',
+  'askedReturns.noneHint':
+    'گاہک اپنے آرڈر کے صفحے سے درخواست کرتے ہیں، ان دنوں کے اندر جو آپ نے آرڈر پالیسیوں میں رکھے ہیں۔',
+  'askedReturns.wants.EXCHANGE': 'دوسرا سائز یا کوئی اور چیز چاہتے ہیں',
+  'askedReturns.wants.STORE_CREDIT': 'اسٹور کریڈٹ چاہتے ہیں',
+  'askedReturns.wants.REFUND': 'اپنی رقم واپس چاہتے ہیں',
+  'askedReturns.approve': 'منظور کریں',
+  'askedReturns.decline': 'نامنظور کریں',
+  'askedReturns.why': 'نامنظور کرنے کی وجہ',
+  'askedReturns.whyHint': 'یہ گاہک کو واٹس ایپ پر بتایا جائے گا۔',
+  'askedReturns.declineSend': 'نامنظور کریں اور انہیں بتائیں',
+  'askedReturns.keep': 'ابھی رہنے دیں',
+  'askedReturns.approved': '{name} کے طور پر منظور ہو گئی: آنے پر اسے اس کے آرڈر میں وصول کریں۔',
+  'askedReturns.openOrder': 'آرڈر کھولیں',
   'parcels.damage.claim': 'نقصان کا کلیم کوریئر سے کریں',
   'parcels.damage.amountHint': 'خالی چھوڑیں تو جو ختم شمار ہوا اس کا کلیم ہو گا۔',
   'orderReturns.title': 'واپسیاں',
@@ -8070,6 +8103,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.holdRefused': 'پارسل واپس کرنے پر گاہک کے اگلے آرڈرز روکیں',
   'orderPolicies.holdRefusedHint':
     'ان کا کوئی پارسل واپس آنے پر ان کے باقی کنفرم شدہ کیش آن ڈیلیوری آرڈرز، جو ابھی بھیجے نہیں گئے، جائزے کے لیے رک جاتے ہیں تاکہ آپ پہلے انہیں کال کریں۔ بند ہو تو اسٹاف کو بتایا جاتا ہے اور آرڈرز آگے بڑھتے ہیں۔',
+  'orderPolicies.returnWindow': 'ڈیلیوری کے بعد کتنے دن گاہک واپسی کی درخواست کر سکتے ہیں',
+  'orderPolicies.returnWindowHint':
+    '1 سے 30؛ آن لائن کوئی واپسی نہ لینی ہو تو خالی چھوڑیں۔ وہ اپنے آرڈر کے صفحے سے درخواست کرتے ہیں، اور آپ واپسیوں میں منظور یا نامنظور کرتے ہیں۔',
   'orderPolicies.staffDiscount': 'عملہ آرڈر پر زیادہ سے زیادہ کتنی رعایت دے (%)',
   'orderPolicies.staffDiscountHint':
     'آئٹمز کی قیمت کا فیصد، بغیر حد کے لیے خالی چھوڑیں۔ مالک، مینیجر اور وہ رول جو کوئی بھی رعایت دے سکتے ہیں، زیادہ دے سکتے ہیں۔',

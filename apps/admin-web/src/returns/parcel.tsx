@@ -21,9 +21,9 @@ export const SLOW_RETURN_DAYS = 14;
 
 /**
  * The section's tabs: parcels coming back, deliveries that failed (ADR-388), customers' returns,
- * lost, and claims on couriers.
+ * those they asked for online (ADR-677), lost, and claims on couriers.
  */
-export const RETURNS_TABS = ['back', 'rescue', 'customer', 'lost', 'claims'] as const;
+export const RETURNS_TABS = ['back', 'rescue', 'customer', 'asked', 'lost', 'claims'] as const;
 export type ReturnsTab = (typeof RETURNS_TABS)[number];
 
 /** A parcel's courier and tracking number, as its label has them. */

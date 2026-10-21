@@ -4406,6 +4406,65 @@ export const OpenReturnsQuery = /* GraphQL */ `
   }
 `;
 
+/** Returns shoppers asked for from their order's page, waiting for staff (ADR-675), oldest first. */
+export const ReturnRequestsQuery = /* GraphQL */ `
+  query ReturnRequests {
+    returnRequests(status: REQUESTED, first: 100) {
+      nodes {
+        id
+        orderId
+        orderName
+        preference
+        note
+        createdAt
+        lineItems {
+          lineItemId
+          title
+          variantTitle
+          quantity
+          returnReason
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+/** A return a shopper asked for, approved into a return of what they asked (ADR-675). */
+export const ReturnRequestApproveMutation = /* GraphQL */ `
+  mutation ReturnRequestApprove($id: ID!) {
+    returnRequestApprove(id: $id) {
+      return {
+        id
+        name
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
+/** A return a shopper asked for, declined with the reason they are told (ADR-675, ADR-676). */
+export const ReturnRequestDeclineMutation = /* GraphQL */ `
+  mutation ReturnRequestDecline($id: ID!, $reason: String!) {
+    returnRequestDecline(id: $id, reason: $reason) {
+      returnRequest {
+        id
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
 /** A customer's return of delivered items recorded, with another size sent at once if asked. */
 export const ReturnCreateMutation = /* GraphQL */ `
   mutation ReturnCreate($input: ReturnCreateInput!) {
@@ -6961,6 +7020,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     upsellPercentOff
     creditBackOnReturn
     holdWhenRefused
+    returnWindowDays
     confirmationCalls
     staffDiscountPercent
     shareNewOrders

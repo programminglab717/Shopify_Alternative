@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-676 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-677 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -684,6 +684,7 @@
 | 674 | A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to ship for review, where the shop says so | Accepted |
 | 675 | Shoppers ask for a return from their order's page, within the days the shop takes returns after delivery, one waiting at a time; staff approve it into a return or decline it saying why | Accepted |
 | 676 | A delivered order's page asks what to send back, how many of each and why, and says how the latest request stands; the shopper hears on WhatsApp once the shop decides | Accepted |
+| 677 | The admin lists the returns customers asked for online under Returns, to approve or decline with the reason they are told, and sets the days the shop takes them in its order policies | Accepted |
 
 ---
 
@@ -23520,3 +23521,22 @@
 * **Alternatives:** **Telling the shopper their request was taken:** they just saw the page say
   so. **The reason as a template's free text:** Meta's templates take parameters, not free text,
   so the reason is one, its line breaks folded.
+
+## ADR-677 · The admin lists the returns customers asked for online under Returns, to approve or decline with the reason they are told, and sets the days the shop takes them in its order policies
+
+* **Context:** ADR-675 and ADR-676 take returns from the order's page and tell the shopper the
+  shop's answer, but staff can answer only through the Admin API, and the days the shop takes
+  returns have no field in the admin (status shortcut 18).
+* **Decision:** The admin's Returns section gets a tab, "Asked online", listing the requests
+  waiting, the oldest first: each order linked, what the customer would send back and why, what
+  they would like instead and their words. Those who check returns in (`write_orders`) approve one,
+  which records its return on the order to check in when it comes, the order a tap away, or
+  decline it with a reason, the button kept off until there is one, as the customer is told it on
+  WhatsApp. The order policies take the days after delivery customers may ask (1 to 30, empty for
+  none), in English and Urdu.
+* **Consequences:** A shop turns returns online on and answers them from its phone, with no app
+  of its own. A request is answered from the list; the order's page shows it on its timeline.
+* **Alternatives:** **A card on the order's page to approve from:** staff answer requests in a
+  batch, like the other lists under Returns, and the timeline already names a waiting one.
+  **Approving with a location to choose:** the return comes back to the location the order
+  shipped from, as one staff record does unless they name another (ADR-136).

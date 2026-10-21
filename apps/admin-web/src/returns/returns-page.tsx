@@ -18,6 +18,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { AskedReturns } from './asked-returns';
 import { Claims, Lost } from './claims';
 import { CustomerReturns } from './customer-returns';
 import { Rescue } from './rescue';
@@ -255,6 +256,8 @@ export function ReturnsPage() {
         <Rescue />
       ) : showing === 'customer' ? (
         <CustomerReturns />
+      ) : showing === 'asked' ? (
+        <AskedReturns />
       ) : showing === 'lost' ? (
         <Lost />
       ) : (

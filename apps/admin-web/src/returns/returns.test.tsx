@@ -441,4 +441,96 @@ describe('Parcels coming back, in the admin', () => {
       }),
     );
   });
+
+  it('lists returns customers asked for online, approved into a return or declined saying why (ADR-677)', async () => {
+    let waiting = [
+      {
+        id: 'retq_1',
+        orderId: 'ord_7',
+        orderName: '#1007',
+        preference: 'EXCHANGE',
+        note: 'Size 9 please',
+        createdAt: LATER,
+        lineItems: [
+          {
+            lineItemId: 'li_1',
+            title: 'Peshawari Chappal',
+            variantTitle: '8',
+            quantity: 2,
+            returnReason: 'SIZE_TOO_SMALL',
+          },
+        ],
+      },
+      {
+        id: 'retq_2',
+        orderId: 'ord_9',
+        orderName: '#1009',
+        preference: 'REFUND',
+        note: '',
+        createdAt: LATER,
+        lineItems: [
+          {
+            lineItemId: 'li_2',
+            title: 'Multani Khussa',
+            variantTitle: 'Default Title',
+            quantity: 1,
+            returnReason: 'DEFECTIVE',
+          },
+        ],
+      },
+    ];
+    const fake = fakeCore('packer', (operation, variables) => {
+      switch (operation) {
+        case 'ReturnRequests':
+          return { returnRequests: { nodes: waiting, pageInfo: { hasNextPage: false } } };
+        case 'ReturnRequestApprove':
+          waiting = waiting.filter((each) => each.id !== variables?.id);
+          return {
+            returnRequestApprove: { return: { id: 'ret_1', name: '#1007-R1' }, userErrors: [] },
+          };
+        case 'ReturnRequestDecline':
+          waiting = waiting.filter((each) => each.id !== variables?.id);
+          return { returnRequestDecline: { returnRequest: { id: 'retq_2' }, userErrors: [] } };
+        default:
+          throw new Error(`unexpected ${operation}`);
+      }
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/returns?tab=asked');
+
+    expect((await screen.findByRole('link', { name: '#1007' })).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_7',
+    );
+    expect(screen.getByText(/Peshawari Chappal · 8/)).toBeTruthy();
+    expect(screen.getByText(/· Too small/)).toBeTruthy();
+    expect(screen.getByText('Would like another size or item')).toBeTruthy();
+    expect(screen.getByText('Size 9 please')).toBeTruthy();
+    // A product without variants is named alone.
+    expect(screen.getByText(/^Multani Khussa/).textContent).not.toContain('Default Title');
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
+    expect(
+      await screen.findByText(/Approved as #1007-R1: check it in on its order when it comes./),
+    ).toBeTruthy();
+    expect(fake.sent.find((each) => each.operation === 'ReturnRequestApprove')?.variables).toEqual({
+      id: 'retq_1',
+    });
+
+    // Declining asks why, which the customer is told.
+    fireEvent.click(await screen.findByRole('button', { name: 'Decline' }));
+    const send = screen.getByRole('button', { name: 'Decline and tell them' }) as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    type('Why you are declining it', '  Worn shoes are not taken back ');
+    fireEvent.click(send);
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'ReturnRequestDecline')?.variables,
+      ).toEqual({ id: 'retq_2', reason: 'Worn shoes are not taken back' }),
+    );
+    expect(await screen.findByText('No returns waiting for an answer')).toBeTruthy();
+  });
+
+  it('shows the asked-online tab to those who handle returns', () => {
+    expect(validateReturnsSearch({ tab: 'asked' })).toEqual({ tab: 'asked' });
+  });
 });

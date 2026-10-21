@@ -541,7 +541,9 @@ flowchart TB
   The page asks it with a form, how many of each item and why, and says how the latest
   request stands; the shopper hears the shop's answer on WhatsApp, its reason if it declined
   ([ADR-676](./13-decision-log.md#adr-676--a-delivered-orders-page-asks-what-to-send-back-how-many-of-each-and-why-and-says-how-the-latest-request-stands-the-shopper-hears-on-whatsapp-once-the-shop-decides)).
-  The admin's requests page, reverse pickups and return rules beyond a window come later.
+  The admin answers them under Returns and sets the days in its order policies
+  ([ADR-677](./13-decision-log.md#adr-677--the-admin-lists-the-returns-customers-asked-for-online-under-returns-to-approve-or-decline-with-the-reason-they-are-told-and-sets-the-days-the-shop-takes-them-in-its-order-policies)).
+  Reverse pickups and return rules beyond a window come later.
 
 ---
 

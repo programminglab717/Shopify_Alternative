@@ -186,6 +186,29 @@ describe('Order policies', () => {
     ).toBe(true);
   });
 
+  it('takes returns asked online for the days the shop gives, or none (ADR-677)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    const days = (await screen.findByLabelText(
+      'Days after delivery customers may ask for a return',
+    )) as HTMLInputElement;
+    expect(days.value).toBe('');
+    type('Days after delivery customers may ask for a return', '7');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([{ input: { returnWindowDays: 7 } }]);
+    // Emptied, none are taken online.
+    type('Days after delivery customers may ask for a return', '');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'OrderSettingsUpdate').at(-1)).toEqual({
+        input: { returnWindowDays: null },
+      }),
+    );
+  });
+
   it("holds a customer's next orders when they refuse a parcel, where the shop says so (ADR-674)", async () => {
     const fake = core('owner');
     vi.stubGlobal('fetch', fake.fetcher);
