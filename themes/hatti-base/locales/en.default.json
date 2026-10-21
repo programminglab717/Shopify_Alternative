@@ -60,6 +60,10 @@
       "bundle": {
         "title": "In this set"
       },
+      "personalisation": {
+        "optional": "(optional)",
+        "choose": "Choose"
+      },
       "size_chart": {
         "title": "Size chart",
         "size": "Size",

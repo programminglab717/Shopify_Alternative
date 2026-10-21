@@ -9077,6 +9077,11 @@ type Mutation {
   productOptionsDelete(options: [ID!]!, productId: ID!): ProductOptionsDeletePayload!
 
   """
+  Sets what a product's page asks the shopper for, in order, in place of what it asked; none, and it asks for nothing.
+  """
+  productPersonalisationSet(fields: [PersonalisationFieldInput!]!, productId: ID!): ProductPersonalisationSetPayload!
+
+  """
   Puts a product on pre-order, shipping by a day from today to a year ahead, or takes it off with a null day. On pre-order it sells whatever its stock.
   """
   productPreorderSet(productId: ID!, shipsOn: String): ProductPreorderSetPayload!
@@ -11959,6 +11964,47 @@ type PayoutsReport {
   withholdings: [PayoutStatement!]!
 }
 
+"""
+What a product's page asks the shopper for when it is made to order (CAT-15, ADR-689): the answer goes with the cart line as a property of the field's name, which the order's line keeps as a custom attribute.
+"""
+type PersonalisationField {
+  """What a choice offers, in order; none for text."""
+  choices: [String!]!
+  kind: PersonalisationFieldKind!
+
+  """The longest answer a text field takes; null for a choice."""
+  maxLength: Int
+
+  """What the page calls it, and the property's name."""
+  name: String!
+
+  """Whether the page asks for an answer before adding to the cart."""
+  required: Boolean!
+}
+
+input PersonalisationFieldInput {
+  """A choice's options, two to 20, each at most 40 characters, each once."""
+  choices: [String!]
+  kind: PersonalisationFieldKind!
+
+  """A text field's longest answer, from 1 to 250; 50 unless given."""
+  maxLength: Int
+
+  """At most 40 characters, not beginning "_", each field named once."""
+  name: String!
+
+  """False unless given."""
+  required: Boolean
+}
+
+"""
+What a personalisation field asks for: words the shopper writes, or a choice.
+"""
+enum PersonalisationFieldKind {
+  CHOICE
+  TEXT
+}
+
 """Hatti's parts, as its status page lists them."""
 enum PlatformComponent {
   ADMIN
@@ -12159,6 +12205,11 @@ type Product {
   """
   metafields(namespace: String): [Metafield!]!
   options: [ProductOption!]!
+
+  """
+  What its page asks the shopper for, in order, at most 5: each answer a property of the cart line (ADR-689).
+  """
+  personalisationFields: [PersonalisationField!]!
 
   """
   Whether it is on pre-order, and the day it ships by; null when it is not.
@@ -12573,6 +12624,14 @@ type ProductOptionsDeletePayload {
 
 type ProductPayload {
   product: Product
+  userErrors: [UserError!]!
+}
+
+type ProductPersonalisationSetPayload {
+  """
+  The fields its page asks for now, in order; null when they could not be set.
+  """
+  personalisationFields: [PersonalisationField!]
   userErrors: [UserError!]!
 }
 

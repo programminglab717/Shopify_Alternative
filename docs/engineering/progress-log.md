@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Personalisation fields
+
+* **A product made to order asks the shopper for up to five fields, text or a choice, each answer
+  a property of the cart line its page adds** ([ADR-689](../architecture/13-decision-log.md#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)): CAT-15's embroidered names and engravings,
+  asked for without touching the theme.
+* 3907 tests, six more: the catalog's, the core's and the storefront's.
+
 ### 872a216 · Lines' properties shown
 
 * **The admin's order page and the customer's order page show what the shopper wrote on each

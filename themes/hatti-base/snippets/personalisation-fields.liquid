@@ -1,0 +1,30 @@
+{%- comment -%}
+  What a product made to order asks the shopper for (ADR-689): each answer goes with the cart line
+  as a property named as its field is, which the order's line keeps. A required field is asked for
+  before the drawer adds to the cart.
+{%- endcomment -%}
+{%- for field in fields -%}
+  <label class="product__personalisation">
+    <span>
+      {{- field.name | escape -}}
+      {%- unless field.required %} {{ 'products.product.personalisation.optional' | t }}{% endunless -%}
+    </span>
+    {%- if field.type == 'choice' -%}
+      <select name="{{ field.input_name | escape }}" {% if field.required %}required{% endif %}>
+        <option value="">{{ 'products.product.personalisation.choose' | t }}</option>
+        {%- for choice in field.choices -%}
+          <option value="{{ choice | escape }}">{{ choice | escape }}</option>
+        {%- endfor -%}
+      </select>
+    {%- else -%}
+      <input
+        type="text"
+        name="{{ field.input_name | escape }}"
+        maxlength="{{ field.max_length }}"
+        dir="auto"
+        autocomplete="off"
+        {% if field.required %}required{% endif %}
+      >
+    {%- endif -%}
+  </label>
+{%- endfor -%}

@@ -367,6 +367,11 @@ from checkout ([ADR-206](./13-decision-log.md#adr-206--each-product-a-shops-link
   *Built so far:* Hatti Base's newsletter section, Shopify's customer form taking a mobile number
   for the shop's news and offers on WhatsApp, which the core keeps as consent
   ([ADR-189](./13-decision-log.md#adr-189--shoppers-sign-up-for-a-shops-news-and-offers-on-whatsapp-through-its-online-stores-form-as-shopifys-customer-form-posts-it-the-storefront-sends-the-number-on-to-the-core-which-keeps-it-as-consent-from-the-storefront-in-the-words-the-form-showed-for-the-customers-main-number-and-the-form-comes-back-to-its-page-saying-how-it-went)).
+* **Personalisation:** a product made to order asks the shopper for up to five fields, text or a
+  choice, which the catalog keeps with the product and its document carries as
+  `product.personalisation_fields`; Hatti Base's product form asks for each as the line's
+  property of its name, which the order's line keeps
+  ([ADR-687](./13-decision-log.md#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item), [ADR-689](./13-decision-log.md#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)).
 
 ### 3.5 Free theme line-up (launch)
 

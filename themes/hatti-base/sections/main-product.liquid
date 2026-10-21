@@ -111,6 +111,7 @@
                 {%- endfor -%}
               </select>
             </label>
+            {% render 'personalisation-fields', fields: product.personalisation_fields %}
             <label class="product__quantity">
               <span>{{ 'products.product.quantity' | t }}</span>
               <input type="number" name="quantity" value="1" min="1" max="10" inputmode="numeric">
@@ -364,7 +365,7 @@
   .pill span { display: inline-block; min-inline-size: 2.75rem; padding: 0.625rem 0.875rem; border: 1px solid var(--color-border); border-radius: 2rem; text-align: center; }
   .pill input:checked + span { border-color: var(--color-text); background: var(--color-text); color: var(--color-background); }
   .pill input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-  .product__variants, .product__quantity { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .product__variants, .product__quantity, .product__personalisation { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
   .product__promises { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
   .product__promises li::before { content: "✓ "; color: var(--color-accent); }
   .product__verified { font-weight: 600; }

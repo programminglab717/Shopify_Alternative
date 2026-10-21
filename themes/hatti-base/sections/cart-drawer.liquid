@@ -102,6 +102,8 @@
           const form = event.target;
           if (!form.matches?.('form[action$="/cart/add"]')) return;
           event.preventDefault();
+          // What a product made to order asks for first (ADR-689), its form being novalidate.
+          if (!form.reportValidity()) return;
           this.add(form, event.submitter);
         },
         { signal },

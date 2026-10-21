@@ -12,6 +12,8 @@ import { BundleService } from './bundles.js';
 import { ComplementService } from './complements.js';
 import { PriceSaleService } from './price-sales.js';
 import { ComplementResolver } from './graphql/complement.resolver.js';
+import { PersonalisationResolver } from './graphql/personalisation.resolver.js';
+import { PersonalisationService } from './personalisation.js';
 import { PriceSaleResolver } from './graphql/price-sale.resolver.js';
 import { ProductScheduleResolver } from './graphql/schedule.resolver.js';
 import { MediaService } from './media.service.js';
@@ -54,6 +56,7 @@ import { MetafieldService } from './metafields.js';
     SearchSynonymService,
     BundleService,
     ComplementService,
+    PersonalisationService,
     PriceSaleService,
     ProductResolver,
     ProductPartsResolver,
@@ -64,6 +67,7 @@ import { MetafieldService } from './metafields.js';
     SearchSynonymResolver,
     BundleResolver,
     ComplementResolver,
+    PersonalisationResolver,
     ProductScheduleResolver,
     PriceSaleResolver,
     CopyDraftService,
@@ -88,6 +92,7 @@ import { MetafieldService } from './metafields.js';
     SizeChartService,
     BundleService,
     ComplementService,
+    PersonalisationService,
     PriceSaleService,
     MetafieldService,
   ],

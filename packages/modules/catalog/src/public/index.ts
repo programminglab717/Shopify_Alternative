@@ -215,6 +215,16 @@ export {
   complementsIn,
 } from '../internal/complements.js';
 export {
+  PERSONALISATION_KINDS,
+  PERSONALISATION_LIMITS,
+  PersonalisationEvents,
+  PersonalisationService,
+  personalisationIn,
+  type PersonalisationField,
+  type PersonalisationFieldInput,
+  type PersonalisationKindValue,
+} from '../internal/personalisation.js';
+export {
   PRICE_SALE_LIMITS,
   PriceSaleEvents,
   PriceSaleService,

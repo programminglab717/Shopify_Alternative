@@ -7,6 +7,7 @@ import {
   ComplementEvents,
   ReviewEvents,
   SizeChartEvents,
+  PersonalisationEvents,
   MetafieldEvents,
   shownMetafieldsIn,
   type MetafieldOwnerType,
@@ -23,9 +24,11 @@ import {
   imagePathOf,
   shownReviewsIn,
   shownSizeChartsIn,
+  personalisationIn,
   videoPathOf,
   type BundleRecord,
   type CollectionRecord,
+  type PersonalisationField,
   type ProductRecord,
   type ProductReviewChangedPayload,
   type ProductUpdatedPayload,
@@ -260,9 +263,10 @@ export function itemsFor(event: DomainEvent): string[] {
       return [Items.product(productId), Items.bundlesWith(productId)];
     }
     // Its bundle's parts, or the products the shop pairs with it, which its page and the cart
-    // recommend (ADR-435).
+    // recommend (ADR-435), or what its page asks the shopper for (ADR-689).
     case BundleEvents.Updated:
     case ComplementEvents.Updated:
+    case PersonalisationEvents.Updated:
       return [Items.product(id)];
     case ReviewEvents.Written:
     case ReviewEvents.Published:
@@ -454,6 +458,7 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Hidden,
   BundleEvents.Updated,
   ComplementEvents.Updated,
+  PersonalisationEvents.Updated,
   SizeChartEvents.Updated,
   SizeChartEvents.Deleted,
   SizeChartEvents.ProductsUpdated,
@@ -596,6 +601,14 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, Date>>;
+  };
+  /** What each product's page asks the shopper for (ADR-689). */
+  personalisation: {
+    personalisationOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, PersonalisationField[]>>;
   };
   /** The products on pre-order, and the day each ships by (ADR-403). */
   preorders: {
@@ -1128,6 +1141,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const personalisation = await this.services.personalisation.personalisationOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const productFields = await this.services.metafields.shownMetafieldsOf(
       tx,
       shopId,
@@ -1195,6 +1213,7 @@ export class StorefrontPublisher {
           complements.get(record.id) ?? boughtTogether.get(record.id),
           sales.get(record.id),
           left,
+          personalisation.get(record.id),
         ),
         productFields,
         variantFields,
@@ -1446,6 +1465,7 @@ export function createStorefrontPublisher(
         boughtTogetherOf: boughtTogetherIn,
       },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
+      personalisation: { personalisationOf: personalisationIn },
       metafields: { shownMetafieldsOf: shownMetafieldsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),

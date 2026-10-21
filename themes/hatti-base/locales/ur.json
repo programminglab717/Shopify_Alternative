@@ -60,6 +60,10 @@
       "bundle": {
         "title": "اس سیٹ میں"
       },
+      "personalisation": {
+        "optional": "(اختیاری)",
+        "choose": "منتخب کریں"
+      },
       "size_chart": {
         "title": "سائز چارٹ",
         "size": "سائز",

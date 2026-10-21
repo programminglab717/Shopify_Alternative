@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 15;
+export const DOCUMENTS_VERSION = 16;
 
 /**
  * What search engines and link previews are told of a product, collection, page, blog or article
@@ -113,6 +113,20 @@ export interface VariantDoc {
  * A product's size chart (CAT-10, ADR-407): measurements a row for each size, in the unit the shop
  * wrote them in, `values` a measurement for each column or null.
  */
+/**
+ * What a product's page asks the shopper for when it is made to order (CAT-15, ADR-689): each
+ * answer goes in the cart line's property of the field's name.
+ */
+export interface PersonalisationDoc {
+  name: string;
+  kind: 'text' | 'choice';
+  required: boolean;
+  /** The longest answer a text field takes; absent for a choice. */
+  maxLength?: number;
+  /** What a choice offers, in order; absent for text. */
+  choices?: string[];
+}
+
 export interface SizeChartDoc {
   name: string;
   unit: 'in' | 'cm';
@@ -170,6 +184,8 @@ export interface ProductDoc {
   bundle?: BundleDoc;
   /** The size chart its page shows, if any (ADR-407). */
   sizeChart?: SizeChartDoc;
+  /** What its page asks the shopper for, in order (ADR-689); absent where it asks for nothing. */
+  personalisation?: PersonalisationDoc[];
   /** Its metafields (ADR-489); absent where it has none. */
   metafields?: MetafieldsDoc;
   /**

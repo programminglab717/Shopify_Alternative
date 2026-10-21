@@ -7,6 +7,7 @@ import {
   ProductReviewService,
   BundleService,
   ComplementService,
+  PersonalisationService,
   PriceSaleService,
   ProductService,
   SizeChartService,
@@ -20,6 +21,7 @@ import {
   VariantService,
   shownReviewsIn,
   shownSizeChartsIn,
+  personalisationIn,
   shownMetafieldsIn,
   writeReviewsIn,
 } from '@hatti/catalog/public';
@@ -163,6 +165,8 @@ describe('What storefront documents an event makes stale', () => {
     ]);
     // The products the shop pairs with one, which its page recommends (ADR-435).
     expect(itemsFor(event('product_complements.updated'))).toEqual(['product:a1']);
+    // What its page asks the shopper for (ADR-689).
+    expect(itemsFor(event('product_personalisation.updated'))).toEqual(['product:a1']);
     expect(itemsFor(event('product.deleted'))).toContain('every-bundle');
     expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual([]);
     // A size chart changed or given: the products whose pages show it (ADR-407).
@@ -490,6 +494,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
             ),
         },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
+        personalisation: { personalisationOf: personalisationIn },
         metafields: { shownMetafieldsOf: shownMetafieldsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
@@ -1487,6 +1492,29 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().productByHandle(kurta.handle))?.complements).toBeUndefined();
     for (const each of [kurta, dupatta, khussa]) unwrap(await products.delete(tenant, each.id));
+    await deliver();
+  });
+
+  it('publishes what a product asks the shopper for, as it changes, and nothing once taken away (ADR-689)', async () => {
+    const personalisation = new PersonalisationService(database);
+    const kurta = unwrap(await products.create(tenant, { title: 'Named kurta', status: 'active' }));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.personalisation).toBeUndefined();
+    unwrap(
+      await personalisation.set(tenant, kurta.id, [
+        { name: 'Name', kind: 'text', required: true, maxLength: 12 },
+        { name: 'Thread', kind: 'choice', choices: ['Gold', 'Silver'] },
+      ]),
+    );
+    expect(await deliver()).toEqual(['product_personalisation.updated']);
+    expect((await store().productByHandle(kurta.handle))?.personalisation).toEqual([
+      { name: 'Name', kind: 'text', required: true, maxLength: 12 },
+      { name: 'Thread', kind: 'choice', required: false, choices: ['Gold', 'Silver'] },
+    ]);
+    unwrap(await personalisation.set(tenant, kurta.id, []));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.personalisation).toBeUndefined();
+    unwrap(await products.delete(tenant, kurta.id));
     await deliver();
   });
 

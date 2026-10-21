@@ -385,6 +385,17 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // Its size chart (ADR-407), each measurement in inches and centimetres; nil when it has none.
     // Hatti's own.
     size_chart: sizeChartObject(doc),
+    // What its page asks the shopper for when it is made to order (ADR-689), in order, each with
+    // the name its answer goes in on the product form, properties[Name]; empty when it asks for
+    // nothing. Hatti's own.
+    personalisation_fields: (doc.personalisation ?? []).map((field) => ({
+      name: field.name,
+      type: field.kind,
+      required: field.required,
+      max_length: field.maxLength ?? null,
+      choices: field.choices ?? [],
+      input_name: `properties[${field.name}]`,
+    })),
     // What it holds, where it is a bundle (ADR-411): each part's title, variant, how many one set
     // has, and a link to it while it is for sale; nil for a product that is no bundle. Hatti's own.
     bundle: doc.bundle

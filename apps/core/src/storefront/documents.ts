@@ -13,6 +13,7 @@ import {
   EASTERN_WEAR_WORDS,
   piecesWords,
   type EasternWear,
+  type PersonalisationField,
 } from '@hatti/catalog/public';
 import {
   commentHtml,
@@ -104,6 +105,8 @@ export function productDoc(
   saleEndsAt?: Date,
   /** How many of each variant are left to sell, where 5 or fewer are (ADR-445). */
   left: ReadonlyMap<string, number> = new Map(),
+  /** What its page asks the shopper for, in order (ADR-689). */
+  personalisation: readonly PersonalisationField[] = [],
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -198,6 +201,18 @@ export function productDoc(
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
     ...(sizeChart && { sizeChart }),
+    ...(personalisation.length > 0 && {
+      personalisation: personalisation.map((field) =>
+        field.kind === 'choice'
+          ? { name: field.name, kind: field.kind, required: field.required, choices: field.choices }
+          : {
+              name: field.name,
+              kind: field.kind,
+              required: field.required,
+              maxLength: field.maxLength ?? undefined,
+            },
+      ),
+    }),
     ...(bundle && { bundle }),
     ...(related && related.length > 0 && { related: [...related] }),
     ...(complements && complements.length > 0 && { complements: [...complements] }),

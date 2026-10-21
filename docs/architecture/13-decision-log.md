@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-688 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-689 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -696,6 +696,7 @@
 | 686 | The admin's online store has a Search synonyms tab, for those who change products: each group a line of words between commas, saved whole, and a group begun from a search that found nothing | Accepted |
 | 687 | An order's lines keep the properties their cart lines had, Shopify's customAttributes, and packing slips and invoices print those not apps' under each item | Accepted |
 | 688 | The admin's order page and the customer's order page show what the shopper wrote on each line, and checkout no longer copies it into the order's note | Accepted |
+| 689 | A product made to order asks the shopper for up to five fields, text or a choice, each answer a property of the cart line its page adds | Accepted |
 
 ---
 
@@ -23835,3 +23836,29 @@
   the item wherever an order is read.
 * **Alternatives:** **Keeping them in the note too:** the same words twice, and the note cut
   sooner for orders of many personalised items.
+
+## ADR-689 · A product made to order asks the shopper for up to five fields, text or a choice, each answer a property of the cart line its page adds
+
+* **Context:** An order's lines keep the properties their cart lines had and every page shows
+  them ([ADR-687](#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item)), but a shop could ask for them only by editing its theme's product
+  form. Embroidered kurtas, engraved rings and named mugs sell from Pakistani shops every day
+  (CAT-15): the shop must say on the product what it asks for.
+* **Decision:**
+  * **The catalog keeps a product's personalisation fields** (migration 0303), in the order its
+    page asks for them, at most five: each a name (40 characters, not beginning "_", which is
+    an app's, each once), text of at most 1 to 250 characters (50 unless the shop says), or a
+    choice of two to 20 options, and whether it is required. They are replaced together and
+    go with the product, as its paired products do ([ADR-435](#adr-435--complementary-products-the-products-a-shop-pairs-with-one-kept-by-the-catalog-in-its-order-and-recommended-where-a-theme-asks-for-complementary-ones)); an event names the
+    product, whose document is published again.
+  * **The Admin API** gives them as `Product.personalisationFields` and sets them with
+    `productPersonalisationSet`, under the products' scopes.
+  * **The storefront document and Liquid** carry them as `product.personalisation_fields`, each
+    with its `input_name`, `properties[Name]`, Hatti's own.
+  * **Hatti Base's product form** asks for each, a text box of its length or a list of its
+    choices, those not required saying so, in English and Urdu. Its answer goes with the line as
+    the property of the field's name. The cart drawer asks for those required before it adds.
+* **Consequences:** A shop makes a product to order without touching its theme, and each
+  answer reaches the packing slip on its line.
+* **Alternatives:** **Metafields the theme reads:** a shop would have to define them and its
+  theme to know them. **Files the shopper uploads:** they need storage the storefront can take
+  from shoppers, and come later.

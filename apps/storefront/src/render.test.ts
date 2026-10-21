@@ -1659,6 +1659,43 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('صرف 3 باقی');
   });
 
+  it('asks for what a product made to order needs, as properties of the line it adds (ADR-689)', async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const named = {
+      ...first!,
+      personalisation: [
+        { name: 'Name to embroider', kind: 'text' as const, required: true, maxLength: 12 },
+        {
+          name: 'Thread "colour"',
+          kind: 'choice' as const,
+          required: false,
+          choices: ['Gold', 'Silver'],
+        },
+      ],
+    };
+    const shop = new MemoryStore({ ...sample, products: [named, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${named.handle}` }, shop.fresh());
+    expect(page.html).toMatch(
+      /<input\s+type="text"\s+name="properties\[Name to embroider\]"\s+maxlength="12"\s+dir="auto"\s+autocomplete="off"\s+required\s*>/,
+    );
+    expect(page.html).toContain('<span>Name to embroider</span>');
+    // Its name escaped where it names the property, and said to be optional.
+    expect(page.html).toContain('<select name="properties[Thread &#34;colour&#34;]" >');
+    expect(page.html).toContain('<span>Thread &#34;colour&#34; (optional)</span>');
+    expect(page.html).toContain('<option value="Silver">Silver</option>');
+    const urdu = await renderer.render(
+      { path: `/products/${named.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('(اختیاری)');
+    expect(urdu.html).toContain('<option value="">منتخب کریں</option>');
+    // A product that asks for nothing has no such fields.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('<label class="product__personalisation">');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;
