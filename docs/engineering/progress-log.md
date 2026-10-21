@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Permalinks that fill in their checkout
+### 6990e4e · Permalinks that fill in their checkout
 
 * **A cart permalink fills in its checkout with the shopper's details as Shopify's
   `checkout[...]` gives them: name, number, email, city and address, never kept with visits**
