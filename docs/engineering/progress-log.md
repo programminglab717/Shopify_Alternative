@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Vague addresses asked about at checkout
+### f9192e0 · Vague addresses asked about at checkout
 
 * **Checkout asks once for more of an address that leaves out a house number or the street,
   saying what riders look for, and places it as it is when the shopper posts it again**
