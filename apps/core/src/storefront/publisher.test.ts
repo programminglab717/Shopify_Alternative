@@ -2464,8 +2464,30 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       { aboveGrams: 2_000, charge: 10_000 },
       { aboveGrams: 5_000, charge: 30_000 },
     ]);
+    // What larger orders pay at most (ADR-723), the smallest first.
+    unwrap(
+      await delivery.update(tenant, {
+        valueRates: [
+          { fromSubtotal: '5,000', charge: '0' },
+          { fromSubtotal: '3,000', charge: '150' },
+        ],
+      }),
+    );
+    await deliver();
+    expect((await store().shop()).delivery?.valueRates).toEqual([
+      { fromSubtotal: 300_000, charge: 15_000 },
+      { fromSubtotal: 500_000, charge: 0 },
+    ]);
     // Left out while there are none, as before shops could.
-    unwrap(await delivery.update(tenant, { freeAbove: null, days: null, zones: [], weights: [] }));
+    unwrap(
+      await delivery.update(tenant, {
+        freeAbove: null,
+        days: null,
+        zones: [],
+        weights: [],
+        valueRates: [],
+      }),
+    );
     await deliver();
     expect((await store().shop()).delivery).toEqual({
       charge: 25_000,

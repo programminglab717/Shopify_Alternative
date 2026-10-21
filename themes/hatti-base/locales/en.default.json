@@ -89,6 +89,8 @@
       "delivery_from": "Delivery from {{ amount }}",
       "delivery_by_city": "Delivery to your city",
       "heavier": "Orders over {{ weight }} kg: {{ amount }} more for delivery",
+      "larger": "Orders of {{ from }} or more: delivery at most {{ amount }}",
+      "larger_free": "Orders of {{ from }} or more: free delivery",
       "elsewhere": "Everywhere else",
       "free": "Free",
       "returns": "Returns and exchanges: see our policy",
@@ -168,6 +170,8 @@
       "free_delivery": "Your order is delivered free.",
       "free_delivery_more": "Add {{ amount }} more for free delivery.",
       "heavier": "Your order is over {{ weight }} kg: delivery costs {{ amount }} more.",
+      "larger": "Your order pays at most {{ amount }} for delivery.",
+      "larger_free": "Your order's value makes its delivery free.",
       "cash_limit": "By law, cash on delivery collects at most {{ amount }} an order: checkout asks the rest in advance, or another way to pay."
     },
     "cart_drawer": {

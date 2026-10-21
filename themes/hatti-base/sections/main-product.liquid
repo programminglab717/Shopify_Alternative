@@ -264,6 +264,16 @@
               {%- assign more = weight.charge | money -%}
               <li>{{ 'products.product.heavier' | t: weight: weight.above_kg, amount: more }}</li>
             {%- endfor -%}
+            {%- comment -%} What larger orders pay at most to deliver (ADR-723). {%- endcomment -%}
+            {%- for rate in delivery.value_rates -%}
+              {%- assign from = rate.from_subtotal | money -%}
+              {%- if rate.charge > 0 -%}
+                {%- assign most = rate.charge | money -%}
+                <li>{{ 'products.product.larger' | t: from: from, amount: most }}</li>
+              {%- else -%}
+                <li>{{ 'products.product.larger_free' | t: from: from }}</li>
+              {%- endif -%}
+            {%- endfor -%}
             {%- comment -%}
               What delivery to their own city costs and takes (OS-11, ADR-454): each of the shop's
               zones, with its cities, then everywhere else. Shown once a shopper asks.

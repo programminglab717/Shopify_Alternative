@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-722 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-723 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -730,6 +730,7 @@
 | 720 | Customers' links offer the same map to move the pin on where they fill in or correct the delivery address, from the platform's tiles | Accepted |
 | 721 | Larger orders pay at most a rate the shop sets by the order's value: the largest value an order reaches caps its city's charge, before what its weight adds | Accepted |
 | 722 | The admin's delivery settings take rates by the order's value: each a subtotal and the most such an order pays, added and removed as weights are | Accepted |
+| 723 | Hatti Base says what larger orders pay at most to deliver: each rate on product pages, and the largest a cart reaches on the cart page, from the rates in the shop's document | Accepted |
 
 ---
 
@@ -24668,3 +24669,22 @@
   the core's problems name the rate they are in: "Rate 2 · Orders from (Rs): …".
 * **Consequences:** Shops set the rates without the API. Hatti Base's product and cart pages do
   not show them yet; that comes next.
+
+## ADR-723 · Hatti Base says what larger orders pay at most to deliver: each rate on product pages, and the largest a cart reaches on the cart page, from the rates in the shop's document
+
+* **Context:** Larger orders pay at most a rate the shop sets by their value
+  ([ADR-721](#adr-721--larger-orders-pay-at-most-a-rate-the-shop-sets-by-the-orders-value-the-largest-value-an-order-reaches-caps-its-citys-charge-before-what-its-weight-adds)). Hatti Base says what heavier orders cost more, from the weights in the
+  shop's storefront document ([ADR-704](#adr-704--hatti-base-says-what-heavier-orders-cost-more-each-weight-on-product-pages-and-the-heaviest-a-cart-passes-on-the-cart-page-from-the-weights-in-the-shops-document)); shoppers should learn of the rates before
+  checkout too.
+* **Decision:**
+  * **The shop's storefront document keeps its rates by value** (`delivery.valueRates`, in
+    minor units), left out while there are none, so documents stay as they were. Liquid's
+    `delivery.value_rates` gives each rate's `from_subtotal` and `charge`.
+  * **Hatti Base's product page lists each rate** beside the charges and weights: "Orders of
+    Rs 3,000 or more: delivery at most Rs 150", or "free delivery" for a rate of nothing.
+  * **Its cart, where delivery is not free, names the largest rate the cart reaches** by its
+    total after discounts, as checkout counts it: "Your order pays at most Rs 150 for delivery."
+    A rate of nothing says the order's value makes its delivery free. What the cart's weight
+    adds is said after it, as before.
+* **Consequences:** Shoppers see the rates before checkout. The cart cannot know the city, so it
+  says "at most": the shop's own city may cost less.

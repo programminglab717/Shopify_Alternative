@@ -3224,6 +3224,82 @@ describe('Storefront rendering', () => {
     expect(await cartPage(6_000, 600_000)).not.toContain('Your order is over');
   });
 
+  it('says what larger orders pay at most to deliver, on product pages and for a cart reaching a rate (ADR-723)', async () => {
+    const sample = sampleStore();
+    const lawn = sample.products[0]!;
+    const variant = lawn.variants[0]!;
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const store = (valueRates?: { fromSubtotal: number; charge: number }[]) =>
+      new MemoryStore({
+        ...sample,
+        shop: {
+          ...sample.shop,
+          delivery: {
+            ...sample.shop.delivery!,
+            charge: 25_000,
+            freeAbove: 1_000_000,
+            ...(valueRates && { valueRates }),
+          },
+        },
+      }).fresh();
+    const rated = store([
+      { fromSubtotal: 300_000, charge: 15_000 },
+      { fromSubtotal: 500_000, charge: 0 },
+    ]);
+    const path = `/products/${lawn.handle}`;
+    const product = (await renderer.render({ path }, rated)).html;
+    expect(product).toContain('<li>Orders of Rs 3,000 or more: delivery at most Rs 150</li>');
+    expect(product).toContain('<li>Orders of Rs 5,000 or more: free delivery</li>');
+    expect((await renderer.render({ path, locale: 'ur' }, rated)).html).toContain(
+      '<li>Rs 3,000 یا زیادہ کے آرڈر: ڈیلیوری زیادہ سے زیادہ Rs 150</li>',
+    );
+    // A shop setting none says nothing of them.
+    expect((await renderer.render({ path }, store())).html).not.toContain(
+      'or more: delivery at most',
+    );
+
+    const cartOf = (price: number): CartJson => ({
+      note: '',
+      attributes: {},
+      items: [
+        {
+          key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+          variantId: variant.id,
+          productId: lawn.id,
+          quantity: 1,
+          properties: {},
+          price,
+          linePrice: price,
+          title: lawn.title,
+          variantTitle: variant.title,
+          sku: null,
+          grams: 0,
+          taxable: true,
+          taxCode: null,
+          maxQuantity: null,
+        },
+      ],
+      itemCount: 1,
+      subtotal: price,
+      totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
+    });
+    const cartPage = async (price: number, locale?: string) =>
+      (
+        await renderer.render(
+          { path: '/cart', cart: cartOf(price), ...(locale && { locale }) },
+          rated,
+        )
+      ).html;
+    expect(await cartPage(200_000)).not.toContain('Your order pays at most');
+    expect(await cartPage(400_000)).toContain('Your order pays at most Rs 150 for delivery.');
+    expect(await cartPage(400_000, 'ur')).toContain(
+      'آپ کے آرڈر کی ڈیلیوری زیادہ سے زیادہ Rs 150 ہے۔',
+    );
+    expect(await cartPage(600_000)).toContain('Your order&#39;s value makes its delivery free.');
+  });
+
   it("says on a product's page what delivery costs and takes to each city, and links the shop's returns (OS-11, ADR-454)", async () => {
     const sample = sampleStore();
     const [lawn] = sample.products;

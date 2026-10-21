@@ -3,7 +3,8 @@
   total after them (ADR-515); and what delivery will add: nothing with a free-delivery code or
   automatic discount, or above the shop's free delivery subtotal, which
   the items must reach after their discount, as at checkout; else what is left to reach it, and
-  what the cart's weight adds, the heaviest of the shop's weights it passes (ADR-704). How
+  what the cart's weight adds, the heaviest of the shop's weights it passes (ADR-704), and the most
+  the largest of the shop's rates by value it reaches lets delivery cost (ADR-723). How
   many working days delivery takes, wherever it goes, where the shop says (ADR-235): checkout says
   it for the shopper's city. A code that does not apply yet is named: checkout says why. Past the
   law's cap on cash on delivery, Rs 200,000 an order in paisa as the orders module's
@@ -50,6 +51,18 @@
   {%- if delivery.free_above -%}
     {%- assign more = delivery.free_above | minus: cart.total_price | money -%}
     <p class="cart__delivery">{{ 'sections.cart.free_delivery_more' | t: amount: more }}</p>
+  {%- endif -%}
+  {%- assign rate = nil -%}
+  {%- for each in delivery.value_rates -%}
+    {%- if cart.total_price >= each.from_subtotal -%}
+      {%- assign rate = each -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if rate and rate.charge > 0 -%}
+    {%- assign most = rate.charge | money -%}
+    <p class="cart__delivery">{{ 'sections.cart.larger' | t: amount: most }}</p>
+  {%- elsif rate -%}
+    <p class="cart__delivery">{{ 'sections.cart.larger_free' | t }}</p>
   {%- endif -%}
   {%- assign heavier = nil -%}
   {%- for weight in delivery.weights -%}

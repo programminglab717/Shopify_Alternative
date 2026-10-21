@@ -656,6 +656,13 @@ export function shopDoc(
           charge: Number(weight.charge),
         })),
       }),
+      // As weights are, what larger orders pay at most (ADR-723).
+      ...((delivery.valueRates?.length ?? 0) > 0 && {
+        valueRates: delivery.valueRates!.map((rate) => ({
+          fromSubtotal: Number(rate.fromSubtotal),
+          charge: Number(rate.charge),
+        })),
+      }),
     },
     theme: theme
       ? {

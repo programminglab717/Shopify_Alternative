@@ -707,6 +707,11 @@ export interface DeliveryDoc {
    * while the shop charges none, as in documents written before shops could.
    */
   weights?: { aboveGrams: number; charge: number }[];
+  /**
+   * What orders of at least `fromSubtotal` pay at most (ADR-721), the smallest first; absent while
+   * the shop sets none, as in documents written before shops could.
+   */
+  valueRates?: { fromSubtotal: number; charge: number }[];
 }
 
 /** From `min` to `max` working days, 0 the same day. */
