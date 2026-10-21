@@ -28,6 +28,7 @@ import {
   type PaymentLinkRecord,
 } from './payment-links.js';
 import { checkouts, paymentLinks, type PaymentLinkRow } from './schema.js';
+import { storefrontUrlIn } from './storefront-url.js';
 
 /** 128 random bits in base64url, as checkouts' secrets. */
 const TOKEN_BYTES = 16;
@@ -291,7 +292,12 @@ export class PaymentLinkService {
     rows: readonly PaymentLinkRow[],
   ): Promise<PaymentLinkRecord[]> {
     if (rows.length === 0) return [];
-    const storefront = this.storefronts.url((await shopProfile(tx, shopId)).handle);
+    const storefront = await storefrontUrlIn(
+      tx,
+      this.storefronts,
+      shopId,
+      (await shopProfile(tx, shopId)).handle,
+    );
     const snapshots = await this.variants.snapshotsOf(
       tx,
       shopId,

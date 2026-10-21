@@ -38,6 +38,7 @@ import {
 } from './abandoned.js';
 import { CheckoutEvents, type RecoverySettingsUpdatedPayload } from './events.js';
 import { recoverySettings } from './schema.js';
+import { storefrontUrlIn } from './storefront-url.js';
 
 /** A checkout its shopper left after typing their number (CHK-12, ADR-393). */
 export interface AbandonedCheckoutRecord {
@@ -564,7 +565,12 @@ export class AbandonedCheckoutService {
         SELECT contact_lines FROM checkout.checkouts
          WHERE shop_id = ${found.shop_id} AND id = ${found.checkout_id}`);
       if (lines.length === 0) return null;
-      const storefront = this.storefronts.url((await shopProfile(tx, found.shop_id)).handle);
+      const storefront = await storefrontUrlIn(
+        tx,
+        this.storefronts,
+        found.shop_id,
+        (await shopProfile(tx, found.shop_id)).handle,
+      );
       return `${storefront}${permalinkOf(lines[0]!.contact_lines ?? [], found.offer_code)}`;
     });
   }

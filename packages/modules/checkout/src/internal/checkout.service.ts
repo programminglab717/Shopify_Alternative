@@ -110,6 +110,7 @@ import { countLinkOrderIn, linkIsOpen, paymentLinkIn } from './payment-links.js'
 import { checkouts } from './schema.js';
 import { orderItemsIn } from './discount-items.js';
 import { checkoutTotals } from './totals.js';
+import { storefrontUrlIn } from './storefront-url.js';
 import { trustBadgesIn } from './trust-badge.service.js';
 import type { TrustBadgeValue } from './trust-badges.js';
 
@@ -1655,7 +1656,7 @@ export class CheckoutService {
     const badges = await trustBadgesIn(tx, shopId);
     return {
       name: profile.name,
-      storefront: this.storefronts.url(profile.handle),
+      storefront: await storefrontUrlIn(tx, this.storefronts, shopId, profile.handle),
       policies: await shopPolicyVersionsOf(tx, shopId),
       accent: await shopAccentOf(tx, shopId),
       logo: logo && this.storage.signDownload(logo.key, LOGO_URL_SECONDS),

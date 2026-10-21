@@ -62,6 +62,7 @@ export {
   DOMAIN_CHECK_HOURS,
   DOMAIN_GRACE_HOURS,
   DomainService,
+  primaryHostIn,
   shopDomainsOf,
   type DomainCheck,
 } from '../internal/domain.service.js';

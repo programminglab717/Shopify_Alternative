@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Checkout's links at the shop's own domain
+
+* **Checkout's links back to the shop go to its primary domain while DNS points it at the
+  platform, its platform subdomain otherwise** ([ADR-714](../architecture/13-decision-log.md#adr-714--checkouts-links-back-to-the-shop-go-to-its-primary-domain-while-dns-points-it-at-the-platform-its-platform-subdomain-otherwise)): the checkout's page, the abandoned
+  checkout's reminder and payment links, through the online-store module's `primaryHostIn`.
+* 3977 tests, one more: the checkout module's.
+
 ### 95d5491 · The total as the city is typed
 
 * **The checkout's page shows its total as the city is typed: a script posts the form to the

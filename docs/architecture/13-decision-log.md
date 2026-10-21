@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-713 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-714 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -721,6 +721,7 @@
 | 711 | A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than one saying something else each, shown as written in English or Urdu | Accepted |
 | 712 | An advance naming products' tags may be counted on those products alone, a share of what they come to after the code's share of them, or an amount up to it | Accepted |
 | 713 | The checkout's page shows its total as the city is typed: a script posts the form to the page's own address to show it, placing nothing, and puts the summary it answers with in place | Accepted |
+| 714 | Checkout's links back to the shop go to its primary domain while DNS points it at the platform, its platform subdomain otherwise | Accepted |
 
 ---
 
@@ -24437,3 +24438,24 @@
   turns on codes, automatic discounts, weights, free delivery and advances, which the core counts;
   a second count in the browser would drift from it. **A JSON endpoint:** the page's own HTML is
   the one thing both paths render.
+
+## ADR-714 · Checkout's links back to the shop go to its primary domain while DNS points it at the platform, its platform subdomain otherwise
+
+* **Context:** A shop may serve its storefront at a domain of its own and make it primary
+  ([ADR-048](#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)). The checkout's page is served on whichever address the shopper came by,
+  but its links back to the shop (the cart, the shop's policies), the abandoned checkout's
+  reminder and payment links all went to the shop's platform subdomain, sending a shopper who
+  came by the shop's own name to another.
+* **Decision:**
+  * **The online-store module says where a shop's storefront is from beyond it**
+    (`primaryHostIn`, on its facade): the primary domain's host while it is verified and DNS
+    points it at the platform; none once the worker finds DNS pointing elsewhere
+    ([ADR-262](#adr-262--shops-verified-domains-are-checked-again-every-six-hours-by-the-worker-one-dns-points-elsewhere-is-noted-and-its-shop-told-once-at-its-alerts-number-and-its-owners-email-and-three-days-on-it-is-disconnected-verified-no-more-nor-primary-the-shops-address-on-the-platforms-domain-primary-in-its-place)).
+  * **Checkout builds its links to the shop from it**: the checkout's page and thank-you page,
+    the abandoned checkout's reminder, and payment links, at the primary domain where there is
+    one, at the subdomain otherwise.
+* **Consequences:** Shoppers stay on the shop's own name from the cart to the policies they agree
+  to. A domain that stops pointing at the platform stops being linked to at once, without
+  waiting for the shop to change its primary.
+* **Alternatives:** **Linking relative to the page's address:** messages and payment links have
+  no page to be relative to, and the core's own address serves the page too.

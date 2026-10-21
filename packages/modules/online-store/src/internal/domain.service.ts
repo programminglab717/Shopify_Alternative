@@ -407,6 +407,26 @@ export class DomainService {
 }
 
 /**
+ * The host of the shop's primary domain while DNS points it at the platform, in the caller's
+ * transaction `tx`: where links to its storefront from beyond it go, such as checkout's (ADR-714);
+ * null for none, or one DNS has pointed elsewhere since.
+ */
+export async function primaryHostIn(tx: Tx, shopId: string): Promise<string | null> {
+  const [row] = await tx
+    .select({ host: domains.host })
+    .from(domains)
+    .where(
+      and(
+        eq(domains.shopId, shopId),
+        eq(domains.isPrimary, true),
+        isNotNull(domains.verifiedAt),
+        isNull(domains.unpointedSince),
+      ),
+    );
+  return row?.host ?? null;
+}
+
+/**
  * The shop's domains, the primary first, in the caller's transaction `tx`: what
  * {@link DomainService.domainsOf} gives, for read models built where DNS is not asked.
  */

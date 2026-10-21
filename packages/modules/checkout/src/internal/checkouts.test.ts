@@ -315,6 +315,31 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await f.checkouts.view('not a secret')).toEqual({ kind: 'not_found' });
   });
 
+  it("links the shop's storefront at its primary domain, while DNS points it here (ADR-714)", async () => {
+    await policy('refund_policy', '<p>7 days.</p>');
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    const subdomain = `https://${await handleOf(f.a)}.hatti.test`;
+    expect(view.shop.storefront).toBe(subdomain);
+    // A domain not yet primary changes nothing; once primary, the page's links go there.
+    await f.admin.query(
+      `INSERT INTO online_store.domains (shop_id, host, verified_at) VALUES ($1, 'www.zari.pk', now())`,
+      [f.a.shopId],
+    );
+    expect(open(await f.checkouts.view(secret)).shop.storefront).toBe(subdomain);
+    await f.admin.query('UPDATE online_store.domains SET is_primary = true');
+    const primary = open(await f.checkouts.view(secret));
+    expect(primary.shop.storefront).toBe('https://www.zari.pk');
+    const page = checkoutPage(primary).html;
+    expect(page).toContain('<a href="https://www.zari.pk/cart">');
+    expect(page).toContain('href="https://www.zari.pk/policies/refund-policy"');
+    // Pointed elsewhere, its links go back to the platform's address.
+    await f.admin.query(
+      "UPDATE online_store.domains SET unpointed_since = now() - interval '1 hour'",
+    );
+    expect(open(await f.checkouts.view(secret)).shop.storefront).toBe(subdomain);
+  });
+
   it('shows the page with the form as typed, its total for the city, placing nothing (ADR-713)', async () => {
     unwrap(
       await f.delivery.update(f.a, {
