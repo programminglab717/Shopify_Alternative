@@ -3453,17 +3453,14 @@ revisiting it.
    and its status API once PayFast turns it on; Bank Alfalah's pages and status tried against its
    sandbox; HBL's session and return tried against its sandbox; reconciliation against the
    gateways' settlements (05 §4.2).
-   **Billing, next:** AI credits with AI's features
-   (BIL-03); then reminders once a period ends unpaid and retries (BIL-04), tax-compliant
-   invoices and local payment methods with partners (BIL-02, V1), transfers into Hatti's account
-   matched from its bank's statements then.
-   **Couriers, next:** TCS and Trax (SHP-01), once their API documents come with merchants'
+   **Billing, next:** transfers into Hatti's account matched from its bank's statements, and
+   cards and wallets for Hatti's invoices with payment partners (V1).
+   **Couriers, next:** TCS's and Trax's adapters tried against their live APIs with merchants'
    accounts, with their airway bills where they insist on them; Leopards checked against its
    staging API, and its slip, load sheets and remittances through its API; PostEx's list of cities
    tried against its live API, and each courier's serviceability and lead times by city
-   (SHP-03); couriers' own histories with their times, and a message when a delivery was
-   tried, with Deliver tomorrow and Change address (SHP-05, COD-09); then remittances
-   through couriers' APIs, and pickups tried against PostEx's and Leopards' live APIs.
+   (SHP-03); then remittances through couriers' APIs, reverse pickups for returns customers ask
+   for (ORD-08), and pickups tried against PostEx's and Leopards' live APIs.
 7. **Spikes 3–4** (WhatsApp confirmation, checkout sandboxes) build on these packages, and
    spike 2's contract tests on the courier adapters; they need partners' sandboxes (Phase 0's
    partnerships track).
@@ -3476,8 +3473,7 @@ revisiting it.
    **Marketing, next:** Google Ads' spend pulled from its API, as Meta's and TikTok's are
    (MKT-12); the storefronts' domain on the Public Suffix List, before shops use a pixel at
    the platform's subdomains, with the infrastructure.
-   **Messaging, next:** a voice gateway chosen and tried for the calls to confirm (COD-03); shops' own WhatsApp accounts
-   (MSG-02).
+   **Messaging, next:** a voice gateway chosen and tried for the calls to confirm (COD-03).
    **Analytics, next:** sessions by where they came from, their landing pages and devices, with the storefront's events in ClickHouse (ANL-02, ADR-180).
-   **Tax, later:** the rest of the merchant's tax profile and a series of invoices of their own, with credit
-   notes, with V1 (TAX-02, TAX-05); FBR's digital invoicing with Growth (TAX-04).
+   **Tax, next:** FBR's POS integration and digital invoicing tried against FBR's sandbox with a
+   registered shop's credentials (TAX-04).
