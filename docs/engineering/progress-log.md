@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### What shoppers search for
+### 8cd7f6f · What shoppers search for
 
 * **What shoppers search a shop for is reported by the search's own page, counted by its words a
   day at a time in Valkey with those that found nothing, and read through storeSearches**
