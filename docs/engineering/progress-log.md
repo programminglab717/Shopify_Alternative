@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Rates by the order's value
+### 268b9bc · Rates by the order's value
 
 * **Larger orders pay at most a rate the shop sets by their value** ([ADR-721](../architecture/13-decision-log.md#adr-721--larger-orders-pay-at-most-a-rate-the-shop-sets-by-the-orders-value-the-largest-value-an-order-reaches-caps-its-citys-charge-before-what-its-weight-adds)): up to ten
   `valueRates` in the delivery settings, the largest an order reaches capping its city's charge
