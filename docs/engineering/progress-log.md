@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A refusal holds the customer's next orders
+### 33f36c9 · A refusal holds the customer's next orders
 
 * **A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to
   ship for review, where the shop says so** ([ADR-674](../architecture/13-decision-log.md#adr-674--a-parcel-its-customer-refused-holds-their-other-cash-on-delivery-orders-confirmed-and-yet-to-ship-for-review-where-the-shop-says-so)): a new order policy in the admin, in
