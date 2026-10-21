@@ -41,6 +41,28 @@ export class DeliveryZone {
 }
 
 @ObjectType({
+  description:
+    'What an order weighing more than `aboveGrams` costs more to deliver (CHK-04, ADR-702): ' +
+    "the heaviest weight an order passes adds its charge to its city's.",
+})
+export class DeliveryWeight {
+  @Field(() => Int, { description: 'In grams: 2000 for orders over 2 kg.' })
+  aboveGrams!: number;
+
+  @Field(() => Money)
+  charge!: Money;
+}
+
+@InputType()
+export class DeliveryWeightInput {
+  @Field(() => Int, { description: 'Whole grams, 1 to 1,000,000: 2000 for orders over 2 kg.' })
+  aboveGrams!: number;
+
+  @Field(() => String, { description: 'Decimal, more than nothing, e.g. "150".' })
+  charge!: string;
+}
+
+@ObjectType({
   description: 'What the shop charges to deliver an order, which checkout adds for its city.',
 })
 export class DeliverySettings {
@@ -72,6 +94,13 @@ export class DeliverySettings {
       'days from the next day, as they ship the day after (ADR-597); null for none.',
   })
   cutoffHour!: number | null;
+
+  @Field(() => [DeliveryWeight], {
+    description:
+      'What heavier orders cost more, the lightest first: an order weighing more than one ' +
+      "costs its charge more, the heaviest it passes alone, by its products' weights.",
+  })
+  weights!: DeliveryWeight[];
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
@@ -131,6 +160,12 @@ export class DeliverySettingsUpdateInput {
     description: "The day's cut-off hour, 1 to 23 in Pakistan's time; null for none.",
   })
   cutoffHour?: number | null;
+
+  @Field(() => [DeliveryWeightInput], {
+    nullable: true,
+    description: 'Replaces every weight, in any order; an empty list for none. Up to 10.',
+  })
+  weights?: DeliveryWeightInput[] | null;
 }
 
 @ObjectType()

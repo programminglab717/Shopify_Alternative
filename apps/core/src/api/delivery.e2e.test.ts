@@ -139,6 +139,35 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
         message: 'The most days delivery takes must be no fewer than the fewest',
       },
     ]);
+    // What heavier orders cost more (ADR-702), by weight in grams, kept the lightest first.
+    const WEIGHTS = `mutation ($input: DeliverySettingsUpdateInput!) {
+      deliverySettingsUpdate(input: $input) {
+        deliverySettings { weights { aboveGrams charge { amount } } } userErrors { field code }
+      }
+    }`;
+    const weighed = await gql(tokens.a, WEIGHTS, {
+      input: {
+        weights: [
+          { aboveGrams: 5000, charge: '300' },
+          { aboveGrams: 2000, charge: '100' },
+        ],
+      },
+    });
+    expect(weighed.data?.deliverySettingsUpdate).toEqual({
+      deliverySettings: {
+        weights: [
+          { aboveGrams: 2000, charge: { amount: '100.00' } },
+          { aboveGrams: 5000, charge: { amount: '300.00' } },
+        ],
+      },
+      userErrors: [],
+    });
+    const light = await gql(tokens.a, WEIGHTS, {
+      input: { weights: [{ aboveGrams: 0, charge: '100' }] },
+    });
+    expect(light.data?.deliverySettingsUpdate.userErrors).toEqual([
+      { field: ['weights', '0', 'aboveGrams'], code: 'INVALID' },
+    ]);
     // Another shop's are its own.
     expect((await read(tokens.b)).zones).toEqual([]);
 

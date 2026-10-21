@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-701 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-702 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -709,6 +709,7 @@
 | 699 | A theme's preview links made so far are ended at once by raising its links' generation, which each link holds; the admin's themes tab ends them once asked | Accepted |
 | 700 | The theme editor's preview shows the theme's colours and widths as they change: the layout's {% style %} CSS rendered again with the unsaved settings and put in the page | Accepted |
 | 701 | The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as forms in an address are; one carrying a file is refused, as nothing would keep it | Accepted |
+| 702 | Heavier orders cost more to deliver: a shop names weights, each with what an order over it costs more, and checkout adds the heaviest the cart passes to the city's charge | Accepted |
 
 ---
 
@@ -24151,3 +24152,27 @@
 * **Alternatives:** **The file's name kept as the property:** the order would name a photo no one
   can see. **Busboy, as the core reads receipts:** another dependency for what Node reads itself
   within 64 KB.
+
+## ADR-702 · Heavier orders cost more to deliver: a shop names weights, each with what an order over it costs more, and checkout adds the heaviest the cart passes to the city's charge
+
+* **Context:** A shop charges for delivery once for everywhere, by zones of cities, and nothing
+  from a subtotal ([ADR-043](#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)). Couriers charge by weight, so a shop selling heavy goods,
+  a winter quilt or a set of pans, pays more to send some orders than its charge covers, and
+  raises the charge for everyone or loses on those orders. CHK-04 asks for rates by weight.
+* **Decision:**
+  * **Weights with charges, beside the zones.** A shop names up to 10 weights in grams, each with
+    what an order weighing more costs more, kept the lightest first; `deliverySettingsUpdate`
+    takes `weights`, replacing them all, and `deliverySettings` gives them.
+  * **The heaviest passed alone is added** to the charge of the city's zone, or everywhere's, by
+    the cart's weight from its variants' weights, so an order over 2 and 5 kg pays the 5 kg
+    charge and not both. A free subtotal still makes delivery free, whatever it weighs.
+  * **Checkout uses it everywhere it uses the charge** ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the totals, the
+    order placed, the most delivery may cost against the cash cap, and the page's words before a
+    city is typed, which say what an order of its weight costs more. What the page showed holds
+    the weights and the cart's weight, so a change of them sends the shopper back to look again.
+* **Consequences:** A variant with no weight weighs nothing, so a shop charging by weight must
+  weigh its products. Product and cart pages still say the charge without the weight's, as checkout
+  says it with.
+* **Alternatives:** **Shopify's rates by weight replacing the charge:** a shop with zones would
+  need a rate for each weight in each zone. **A charge per kilogram:** couriers charge by bands,
+  and a shop knows its bands.

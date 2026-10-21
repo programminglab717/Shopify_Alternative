@@ -20,13 +20,15 @@ export interface CheckoutTotals {
 /**
  * What `subtotal` of items comes to with the shop's delivery `settings` to `city`, the
  * `discounts` chosen applied: they first, then delivery, whose free threshold the discounted
- * items must reach, as Shopify's free shipping does.
+ * items must reach, as Shopify's free shipping does. Items of `grams` cost what their weight adds
+ * to deliver (ADR-702).
  */
 export function checkoutTotals(
   subtotal: bigint,
   settings: DeliverySettingsRecord,
   city: string | null,
   discounts: Pick<ChosenDiscounts, 'items' | 'freeDelivery'> | null,
+  grams = 0,
 ): CheckoutTotals {
   const discount = discounts?.items ?? 0n;
   const items = subtotal - discount;
@@ -34,7 +36,7 @@ export function checkoutTotals(
   const free = settings.freeAbove !== null && items >= settings.freeAbove;
   const delivery =
     free || settings.zones.length === 0 || typed !== null
-      ? deliveryCharge(settings, typed, items)
+      ? deliveryCharge(settings, typed, items, grams)
       : null;
   const freeDelivery = discounts?.freeDelivery ?? false;
   if (freeDelivery) return { subtotal, discount, delivery, freeDelivery, total: items };

@@ -16,8 +16,20 @@ export interface DeliverySettingsRecord {
    * from the next day (ADR-597); null or left out for none.
    */
   cutoffHour?: number | null;
+  /**
+   * What heavier orders cost more to deliver (CHK-04, ADR-702), the lightest first: an order
+   * weighing more than one's `aboveGrams` costs its `charge` more, the heaviest it passes alone.
+   * Left out for none.
+   */
+  weights?: DeliveryWeightRecord[];
   /** Null while the shop has set none. */
   updatedAt: Date | null;
+}
+
+/** What an order weighing more than `aboveGrams` costs more to deliver, in minor units. */
+export interface DeliveryWeightRecord {
+  aboveGrams: number;
+  charge: bigint;
 }
 
 /** Cities with a charge of their own, such as the shop's own city. */
@@ -43,10 +55,19 @@ export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   days: null,
   zones: [],
   cutoffHour: null,
+  weights: [],
   updatedAt: null,
 };
 
-export const DELIVERY_LIMITS = { zones: 20, cities: 200, name: 100, days: 30 } as const;
+export const DELIVERY_LIMITS = {
+  zones: 20,
+  cities: 200,
+  name: 100,
+  days: 30,
+  weights: 10,
+  /** 1,000 kg: more than any courier takes as a parcel. */
+  grams: 1_000_000,
+} as const;
 
 /** Those left out stay as they are; `zones`, when given, replaces them all. */
 export interface DeliverySettingsInput {
@@ -59,6 +80,15 @@ export interface DeliverySettingsInput {
   zones?: DeliveryZoneInput[] | null;
   /** 1 to 23; null for none. */
   cutoffHour?: number | null;
+  /** Replaces them all, in any order; an empty list for none. */
+  weights?: DeliveryWeightInput[] | null;
+}
+
+export interface DeliveryWeightInput {
+  /** Whole grams, more than 0: 2000 for orders over 2 kg. */
+  aboveGrams: number;
+  /** Decimal, in major units, more than nothing. */
+  charge: string;
 }
 
 export interface DeliveryZoneInput {
@@ -73,17 +103,31 @@ export interface DeliveryZoneInput {
 
 /**
  * The charge to deliver an order with `subtotal` to `city`: nothing from the subtotal delivery is
- * free from, else the charge of the zone naming the city, else the charge for everywhere.
+ * free from, else the charge of the zone naming the city, else the charge for everywhere; and
+ * what an order of `grams` costs more for its weight (ADR-702).
  */
 export function deliveryCharge(
   settings: DeliverySettingsRecord,
   city: string | null,
   subtotal: bigint,
+  grams = 0,
 ): bigint {
   if (settings.freeAbove !== null && subtotal >= settings.freeAbove) return 0n;
   const name = city ? (findCity(city)?.name ?? null) : null;
   const zone = name ? settings.zones.find((each) => each.cities.includes(name)) : undefined;
-  return zone ? zone.charge : settings.charge;
+  return (zone ? zone.charge : settings.charge) + weightCharge(settings, grams);
+}
+
+/**
+ * What an order of `grams` costs more to deliver for its weight (ADR-702): the charge of the
+ * heaviest weight it is more than, else nothing.
+ */
+export function weightCharge(settings: DeliverySettingsRecord, grams: number): bigint {
+  let charge = 0n;
+  for (const weight of settings.weights ?? []) {
+    if (grams > weight.aboveGrams) charge = weight.charge;
+  }
+  return charge;
 }
 
 /**
@@ -145,15 +189,21 @@ export function deliveryDaysRange(settings: DeliverySettingsRecord): DeliveryDay
 }
 
 /**
- * The most delivery of `subtotal` of items may cost, wherever it goes: the dearest of the charge
- * for everywhere and the zones', or nothing from the free threshold.
+ * The most delivery of `subtotal` of items weighing `grams` may cost, wherever it goes: the
+ * dearest of the charge for everywhere and the zones', with what the weight adds, or nothing from
+ * the free threshold.
  */
-export function highestDeliveryCharge(settings: DeliverySettingsRecord, subtotal: bigint): bigint {
+export function highestDeliveryCharge(
+  settings: DeliverySettingsRecord,
+  subtotal: bigint,
+  grams = 0,
+): bigint {
   if (settings.freeAbove !== null && subtotal >= settings.freeAbove) return 0n;
-  return settings.zones.reduce(
-    (highest, zone) => (zone.charge > highest ? zone.charge : highest),
+  const highest = settings.zones.reduce(
+    (most, zone) => (zone.charge > most ? zone.charge : most),
     settings.charge,
   );
+  return highest + weightCharge(settings, grams);
 }
 
 /**
@@ -192,7 +242,50 @@ export function checkDeliverySettings(
       check.addMessage(['cutoffHour'], 'INVALID', 'The cut-off is an hour from 1 to 23');
     }
   }
-  return check.errors.length > before ? null : { charge, freeAbove, days, zones, cutoffHour };
+  let weights = current.weights ?? [];
+  if (input.weights !== undefined) {
+    weights = checkWeights(check, input.weights ?? [], currency);
+  }
+  return check.errors.length > before
+    ? null
+    : { charge, freeAbove, days, zones, cutoffHour, weights };
+}
+
+/** Whole grams up to {@link DELIVERY_LIMITS.grams}, each once, kept the lightest first. */
+function checkWeights(
+  check: InputChecker,
+  inputs: readonly DeliveryWeightInput[],
+  currency: CurrencyCode,
+): DeliveryWeightRecord[] {
+  if (inputs.length > DELIVERY_LIMITS.weights) {
+    check.addMessage(
+      ['weights'],
+      'INVALID',
+      `A shop charges for at most ${DELIVERY_LIMITS.weights} weights`,
+    );
+    return [];
+  }
+  const seen = new Set<number>();
+  const weights = inputs.map((input, index) => {
+    const at = ['weights', String(index)];
+    const grams = input.aboveGrams;
+    if (!Number.isInteger(grams) || grams < 1 || grams > DELIVERY_LIMITS.grams) {
+      check.addMessage(
+        [...at, 'aboveGrams'],
+        'INVALID',
+        `A weight is whole grams from 1 to ${DELIVERY_LIMITS.grams}`,
+      );
+    } else if (seen.has(grams)) {
+      check.addMessage([...at, 'aboveGrams'], 'TAKEN', 'This weight has a charge already');
+    }
+    seen.add(grams);
+    const charge = check.price([...at, 'charge'], input.charge, currency, { required: true });
+    if (charge === 0n) {
+      check.addMessage([...at, 'charge'], 'INVALID', 'A heavier order must cost more than Rs 0');
+    }
+    return { aboveGrams: grams, charge: charge ?? 0n };
+  });
+  return weights.sort((a, b) => a.aboveGrams - b.aboveGrams);
 }
 
 /** Whole working days, 0 to {@link DELIVERY_LIMITS.days}, the fewest first. */

@@ -166,7 +166,8 @@ export interface CheckoutFixture {
   variantsOf(
     tenant: TenantContext,
     title: string,
-    options?: { sizes?: string[]; price?: string; tags?: string[] },
+    /** `grams` each variant weighs, none unless given. */
+    options?: { sizes?: string[]; price?: string; tags?: string[]; grams?: number },
   ): Promise<string[]>;
   /** Sets on-hand stock of a variant at the shop's primary location, which tracks it. */
   stock(tenant: TenantContext, variantId: string, quantity: number): Promise<void>;
@@ -289,6 +290,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     brands: new BrandService(db),
     async variantsOf(owner, title, options = {}) {
       const price = options.price ?? '1,000';
+      const weight = options.grams === undefined ? {} : { weightGrams: options.grams };
       const created = await products.create(owner, {
         title,
         status: 'active',
@@ -296,9 +298,9 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         ...(options.sizes
           ? {
               options: [{ name: 'Size', values: options.sizes }],
-              variants: options.sizes.map((size) => ({ optionValues: [size], price })),
+              variants: options.sizes.map((size) => ({ optionValues: [size], price, ...weight })),
             }
-          : { variants: [{ price }] }),
+          : { variants: [{ price, ...weight }] }),
       });
       return unwrap(created).variants.map((variant) => variant.id);
     },

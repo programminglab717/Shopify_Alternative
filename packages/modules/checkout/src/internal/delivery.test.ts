@@ -6,6 +6,8 @@ import {
   NO_DELIVERY_SETTINGS,
   checkDeliverySettings,
   deliveryCharge,
+  highestDeliveryCharge,
+  weightCharge,
   deliveryCountsFrom,
   deliveryDays,
   deliveryDaysRange,
@@ -44,6 +46,76 @@ describe('Delivery charges', () => {
     expect(deliveryCharge(SETTINGS, null, 1_000_00n)).toBe(250_00n);
     expect(deliveryCharge(SETTINGS, 'Karachi', 5_000_00n)).toBe(0n);
     expect(deliveryCharge(NO_DELIVERY_SETTINGS, 'Lahore', 1n)).toBe(0n);
+  });
+
+  it('charges heavier orders more, the heaviest weight they pass alone (ADR-702)', () => {
+    const heavy: DeliverySettingsRecord = {
+      ...SETTINGS,
+      weights: [
+        { aboveGrams: 2_000, charge: 100_00n },
+        { aboveGrams: 5_000, charge: 300_00n },
+      ],
+    };
+    expect([0, 2_000, 2_001, 5_000, 5_001, 90_000].map((g) => weightCharge(heavy, g))).toEqual([
+      0n,
+      0n,
+      100_00n,
+      100_00n,
+      300_00n,
+      300_00n,
+    ]);
+    // Added to the city's charge, and nothing from the free subtotal, whatever it weighs.
+    expect(deliveryCharge(heavy, 'Karachi', 1_000_00n, 3_000)).toBe(250_00n);
+    expect(deliveryCharge(heavy, 'Multan', 1_000_00n, 6_000)).toBe(550_00n);
+    expect(deliveryCharge(heavy, 'Multan', 1_000_00n)).toBe(250_00n);
+    expect(deliveryCharge(heavy, 'Karachi', 5_000_00n, 6_000)).toBe(0n);
+    expect(highestDeliveryCharge(heavy, 1_000_00n, 6_000)).toBe(550_00n);
+    expect(highestDeliveryCharge(heavy, 5_000_00n, 6_000)).toBe(0n);
+    // Settings from before weights charge none.
+    expect(weightCharge(SETTINGS, 90_000)).toBe(0n);
+  });
+
+  it('takes weights in grams with charges in rupees, kept the lightest first (ADR-702)', () => {
+    expect(
+      checked({
+        weights: [
+          { aboveGrams: 5_000, charge: '300' },
+          { aboveGrams: 2_000, charge: '100' },
+        ],
+      }),
+    ).toMatchObject({
+      weights: [
+        { aboveGrams: 2_000, charge: 100_00n },
+        { aboveGrams: 5_000, charge: 300_00n },
+      ],
+    });
+    // Kept when left out; none with an empty list or null.
+    const heavy = { ...SETTINGS, weights: [{ aboveGrams: 2_000, charge: 100_00n }] };
+    expect(checked({ charge: '200' }, heavy)).toMatchObject({ weights: heavy.weights });
+    expect(checked({ weights: [] }, heavy)).toMatchObject({ weights: [] });
+    expect(checked({ weights: null }, heavy)).toMatchObject({ weights: [] });
+    expect(
+      checked({
+        weights: [
+          { aboveGrams: 0, charge: '100' },
+          { aboveGrams: 1.5, charge: '100' },
+          { aboveGrams: 2_000, charge: '0' },
+          { aboveGrams: 2_000, charge: '' },
+          { aboveGrams: 1_000_001, charge: '100' },
+        ],
+      }),
+    ).toEqual([
+      ['weights.0.aboveGrams', 'A weight is whole grams from 1 to 1000000'],
+      ['weights.1.aboveGrams', 'A weight is whole grams from 1 to 1000000'],
+      ['weights.2.charge', 'A heavier order must cost more than Rs 0'],
+      ['weights.3.aboveGrams', 'This weight has a charge already'],
+      ['weights.3.charge', "Charge can't be blank"],
+      ['weights.4.aboveGrams', 'A weight is whole grams from 1 to 1000000'],
+    ]);
+    const many = Array.from({ length: 11 }, (_, i) => ({ aboveGrams: i + 1, charge: '10' }));
+    expect(checked({ weights: many })).toEqual([
+      ['weights', 'A shop charges for at most 10 weights'],
+    ]);
   });
 
   it("says how many working days delivery takes: the city's zone's, else everywhere's (ADR-235)", () => {
@@ -91,6 +163,7 @@ describe('Delivery charges', () => {
         },
       ],
       cutoffHour: null,
+      weights: [],
     });
     // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
@@ -99,6 +172,7 @@ describe('Delivery charges', () => {
       days: { min: 2, max: 5 },
       zones: SETTINGS.zones,
       cutoffHour: null,
+      weights: [],
     });
     expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
     expect(
@@ -226,6 +300,34 @@ describe.skipIf(!server)('DeliveryService', () => {
     ).rejects.toThrow(/delivery_settings_days_check/);
   });
 
+  it('keeps what heavier orders cost more, recording a change of them (ADR-702)', async () => {
+    expect((await f.delivery.get(f.a)).weights).toEqual([]);
+    const saved = unwrap(
+      await f.delivery.update(f.a, {
+        weights: [
+          { aboveGrams: 5_000, charge: '300' },
+          { aboveGrams: 2_000, charge: '100' },
+        ],
+      }),
+    );
+    const weights = [
+      { aboveGrams: 2_000, charge: 100_00n },
+      { aboveGrams: 5_000, charge: 300_00n },
+    ];
+    expect(saved.weights).toEqual(weights);
+    expect((await f.delivery.get(f.a)).weights).toEqual(weights);
+    // The same again changes nothing; kept when the rest changes; none with an empty list.
+    unwrap(await f.delivery.update(f.a, { weights: [...saved.weights!].reverse().map(input) }));
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    expect((await f.delivery.get(f.a)).weights).toEqual(weights);
+    unwrap(await f.delivery.update(f.a, { weights: [] }));
+    expect((await f.delivery.get(f.a)).weights).toEqual([]);
+    expect(
+      (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([['weights'], ['charge'], ['weights']]);
+    expect(await f.delivery.get(f.b)).toEqual(NO_DELIVERY_SETTINGS);
+  });
+
   it("keeps the shop's cut-off hour, from which orders count from the next day (ADR-597)", async () => {
     expect((await f.delivery.get(f.a)).cutoffHour).toBeNull();
     const saved = unwrap(await f.delivery.update(f.a, { cutoffHour: 15 }));
@@ -269,3 +371,8 @@ describe('Where delivery days count from (ADR-597)', () => {
     expect(expectedDeliveryOn(cutoff, 'Karachi', after, [])).toBe('2026-10-23');
   });
 });
+
+/** A weight as the API takes it. */
+function input(weight: { aboveGrams: number; charge: bigint }) {
+  return { aboveGrams: weight.aboveGrams, charge: (Number(weight.charge) / 100).toString() };
+}

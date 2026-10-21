@@ -133,6 +133,12 @@ export interface StoredZone {
   days?: { min: number; max: number } | null;
 }
 
+/** What an order over a weight costs more to deliver, as kept: its charge as text. */
+export interface StoredWeight {
+  aboveGrams: number;
+  charge: string;
+}
+
 export const deliverySettings = checkoutSchema.table('delivery_settings', {
   shopId: uuid('shop_id').primaryKey(),
   charge: bigint('charge', { mode: 'bigint' }).notNull().default(0n),
@@ -142,6 +148,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   /** The hour, in Pakistan's time, from which orders count from the next day (ADR-597). */
   cutoffHour: smallint('cutoff_hour'),
   zones: jsonb('zones').$type<StoredZone[]>().notNull().default([]),
+  /** What heavier orders cost more (ADR-702), the lightest first. */
+  weights: jsonb('weights').$type<StoredWeight[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

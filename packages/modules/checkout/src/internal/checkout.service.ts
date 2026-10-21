@@ -1049,6 +1049,7 @@ export class CheckoutService {
         view.delivery,
         address.city,
         discounts,
+        view.cart.totalWeightGrams,
       );
       // Known once the city is; nothing for an order picked up.
       const delivery = pickupAt ? 0n : totals.delivery!;
@@ -1421,7 +1422,13 @@ export class CheckoutService {
     const lines = await orderItemsIn(tx, shopId, priced, [record, ...automatics]);
     const discount = typed === undefined ? null : discountOn(typed, record, lines);
     const discounts = chooseDiscounts(lines, discount?.record ?? null, automatics);
-    const totals = checkoutTotals(BigInt(priced.subtotal), delivery, null, discounts);
+    const totals = checkoutTotals(
+      BigInt(priced.subtotal),
+      delivery,
+      null,
+      discounts,
+      priced.totalWeightGrams,
+    );
     // Items that alone come to more than cash on delivery may collect, by law or by the shop's
     // rules, or hold a product the shop takes it for none of, are paid by transfer, or cannot be
     // ordered here.
@@ -1440,7 +1447,9 @@ export class CheckoutService {
         currency: profile.currency,
         total:
           items +
-          (totals.freeDelivery ? 0n : highestDeliveryCharge(delivery, items)) +
+          (totals.freeDelivery
+            ? 0n
+            : highestDeliveryCharge(delivery, items, priced.totalWeightGrams)) +
           codRules.fee,
       }) > 0n;
     // The cart's products, by their tags, where the shop keeps cash on delivery from some, or asks
@@ -1844,6 +1853,13 @@ export function shownOf(
       discount.record ? [discount.record.id, discount.record.version] : discount.refusal.reason,
     ],
     // Each left out while there is none, so that what pages without it showed stays as it was.
+    // What heavier orders cost more (ADR-702), and what the cart weighs.
+    ...((delivery.weights?.length ?? 0) > 0 && {
+      weights: [
+        cart.totalWeightGrams,
+        delivery.weights!.map((weight) => [weight.aboveGrams, weight.charge.toString()]),
+      ],
+    }),
     // The automatic discounts the order takes (ADR-515), as they were.
     ...(discounts.automatic.length > 0 && {
       automatic: discounts.automatic.map((automatic) => [automatic.id, automatic.version]),

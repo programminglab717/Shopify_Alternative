@@ -376,6 +376,36 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await orderCount()).toBe(1);
   });
 
+  it('places a heavier order with what its weight adds to the charge for the city (ADR-702)', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '250',
+        zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '150' }],
+        weights: [
+          { aboveGrams: 2_000, charge: '100' },
+          { aboveGrams: 5_000, charge: '300' },
+        ],
+      }),
+    );
+    // Three suits of 1.2 kg: 3.6 kg, over 2 kg and not 5.
+    const [suit] = await f.variantsOf(f.a, 'Winter suit', { price: '3,000', grams: 1_200 });
+    await f.stock(f.a, suit!, 10);
+    const token = await act(f.a, null, 'add', { items: [{ variantId: suit, quantity: 3 }] });
+    const { secret, view } = await started(token);
+    expect(view.cart.totalWeightGrams).toBe(3_600);
+    // Before a city, the page says what such an order costs more.
+    expect(checkoutPage(view).html).toContain('Orders over 2 kg cost Rs 100 more.');
+    const order = placedOrder(await f.checkouts.place(secret, view.shown, FORM));
+    expect(order).toMatchObject({ subtotal: 9_000_00n, shipping: 250_00n, total: 9_250_00n });
+
+    // What the shop charged for weights then is part of what the page showed.
+    const other = await act(f.a, null, 'add', { items: [{ variantId: suit, quantity: 5 }] });
+    const next = await started(other);
+    unwrap(await f.delivery.update(f.a, { weights: [{ aboveGrams: 5_000, charge: '400' }] }));
+    const stale = open(await f.checkouts.place(next.secret, next.view.shown, FORM));
+    expect(stale.problem).toEqual({ kind: 'changed' });
+  });
+
   it('asks once for more of an address a rider could not find, and places it as it is when posted again (ADR-682)', async () => {
     const { token } = await lawnCart();
     const { secret, view } = await started(token);

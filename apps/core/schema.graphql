@@ -4097,6 +4097,11 @@ type DeliverySettings {
 
   """null while the shop has set none."""
   updatedAt: DateTime
+
+  """
+  What heavier orders cost more, the lightest first: an order weighing more than one costs its charge more, the heaviest it passes alone, by its products' weights.
+  """
+  weights: [DeliveryWeight!]!
   zones: [DeliveryZone!]!
 }
 
@@ -4115,6 +4120,9 @@ input DeliverySettingsUpdateInput {
 
   """Decimal, e.g. "5,000"; null or blank for no free delivery."""
   freeAbove: String
+
+  """Replaces every weight, in any order; an empty list for none. Up to 10."""
+  weights: [DeliveryWeightInput!]
 
   """Replaces every zone; an empty list for none. Up to 20."""
   zones: [DeliveryZoneInput!]
@@ -4157,6 +4165,23 @@ type DeliveryToRescue {
   """What the courier said of it: "Customer not available"."""
   reason: String
   trackingInfo: TrackingInfo!
+}
+
+"""
+What an order weighing more than `aboveGrams` costs more to deliver (CHK-04, ADR-702): the heaviest weight an order passes adds its charge to its city's.
+"""
+type DeliveryWeight {
+  """In grams: 2000 for orders over 2 kg."""
+  aboveGrams: Int!
+  charge: Money!
+}
+
+input DeliveryWeightInput {
+  """Whole grams, 1 to 1,000,000: 2000 for orders over 2 kg."""
+  aboveGrams: Int!
+
+  """Decimal, more than nothing, e.g. "150"."""
+  charge: String!
 }
 
 """Cities with a delivery charge of their own, such as the shop's own."""

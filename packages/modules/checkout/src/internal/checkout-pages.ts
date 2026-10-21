@@ -315,7 +315,13 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   // Picked up where the shopper chose (ADR-391): nothing to deliver.
   const pickupAt = view.pickup.find((point) => point.id === form.pickup) ?? null;
   const charges = pickupAt ? NO_DELIVERY : delivery;
-  const totals = checkoutTotals(BigInt(cart.subtotal), charges, form.city, discounts);
+  const totals = checkoutTotals(
+    BigInt(cart.subtotal),
+    charges,
+    form.city,
+    discounts,
+    cart.totalWeightGrams,
+  );
   // What paying by transfer takes off the items, after the code (ADR-077), and paying online
   // (ADR-222).
   const transferOff = payments.bankTransfer
@@ -1116,7 +1122,13 @@ function cartSummary(
   tax: TaxRates,
   today: string | null,
 ): Html {
-  const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, discounts);
+  const totals = checkoutTotals(
+    BigInt(cart.subtotal),
+    delivery,
+    city,
+    discounts,
+    cart.totalWeightGrams,
+  );
   const charge = totals.delivery;
   // How long delivery takes to the city typed, or wherever it goes until one is (ADR-235).
   const days = deliveryDays(delivery, city.trim() === '' ? null : city);
@@ -1224,7 +1236,7 @@ function cartSummary(
         )
       }
     </table>
-    ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}
+    ${totals.total === null && paragraphs(chargesWords(delivery, cart.totalWeightGrams), 'small muted')}
     ${days && paragraphs(deliveryDaysWords(days), 'small muted')}
     ${expected && paragraphs(expectedByWords(expected), 'small')}
     ${
@@ -1261,8 +1273,11 @@ function expectedByWords(day: string): Sentence {
   return { en: `Expected by ${words}.`, ur: `${words} تک پہنچنے کی توقع۔` };
 }
 
-/** What delivery costs where, for a shopper who has not typed their city yet. */
-function chargesWords(delivery: DeliverySettingsRecord): Sentence {
+/**
+ * What delivery costs where, for a shopper who has not typed their city yet; and what an order of
+ * `grams` costs more for its weight (ADR-702).
+ */
+function chargesWords(delivery: DeliverySettingsRecord, grams: number): Sentence {
   const zones = delivery.zones.map((zone) => {
     const cities = zone.cities.slice(0, 5).join(', ') + (zone.cities.length > 5 ? '…' : '');
     return { cities, charge: amount(zone.charge) };
@@ -1271,14 +1286,20 @@ function chargesWords(delivery: DeliverySettingsRecord): Sentence {
   const freeFrom = delivery.freeAbove === null ? null : amount(delivery.freeAbove);
   const zoneWords = zones.map((zone) => html`؛ ${ltr(zone.cities)} میں ${ltr(zone.charge)}`);
   const freeWords = freeFrom && html` ${ltr(freeFrom)} یا زیادہ کے آرڈر پر ڈیلیوری مفت۔`;
+  // The heaviest weight the order passes, and what it adds.
+  const heavier = [...(delivery.weights ?? [])].reverse().find((each) => grams > each.aboveGrams);
+  const kg = heavier && `${heavier.aboveGrams / 1000} kg`;
+  const more = heavier && amount(heavier.charge);
+  const weightWords = heavier && html` ${ltr(kg!)} سے زیادہ وزن پر ${ltr(more!)} اضافی۔`;
   return {
     en:
       `Delivery is ${everywhere}` +
       zones.map((zone) => `; ${zone.charge} in ${zone.cities}`).join('') +
       '.' +
+      (heavier ? ` Orders over ${kg} cost ${more} more.` : '') +
       (freeFrom ? ` Free on orders of ${freeFrom} or more.` : ''),
     // One line: a line break would put a space before each "؛" and "۔".
-    ur: html`ڈیلیوری ${ltr(everywhere)}${zoneWords}۔${freeWords}`,
+    ur: html`ڈیلیوری ${ltr(everywhere)}${zoneWords}۔${weightWords}${freeWords}`,
   };
 }
 

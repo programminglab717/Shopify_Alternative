@@ -8,6 +8,7 @@ import {
   DeliverySettings,
   DeliverySettingsUpdateInput,
   DeliverySettingsUpdatePayload,
+  DeliveryWeight,
   DeliveryZone,
 } from './delivery.types.js';
 
@@ -59,6 +60,12 @@ function toDeliverySettings(
       }),
     ),
     cutoffHour: record.cutoffHour ?? null,
+    weights: (record.weights ?? []).map((weight) =>
+      Object.assign(new DeliveryWeight(), {
+        aboveGrams: weight.aboveGrams,
+        charge: amount(weight.charge),
+      }),
+    ),
     updatedAt: record.updatedAt,
   });
 }

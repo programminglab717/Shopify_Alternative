@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Heavier orders' delivery
+
+* **Heavier orders cost more to deliver: a shop names weights, each with what an order over it
+  costs more, and checkout adds the heaviest the cart passes to the city's charge** ([ADR-702](../architecture/13-decision-log.md#adr-702--heavier-orders-cost-more-to-deliver-a-shop-names-weights-each-with-what-an-order-over-it-costs-more-and-checkout-adds-the-heaviest-the-cart-passes-to-the-citys-charge)):
+  CHK-04's rates by weight, with migration 0308; shortcut 38 brought up to date.
+* 3953 tests, four more: the checkout module's.
+
 ### fcbde52 · The Ajax cart's multipart forms
 
 * **The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as
