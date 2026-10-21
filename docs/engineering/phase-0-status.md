@@ -3434,7 +3434,7 @@ revisiting it.
    Hatti's own console for its support, with single sign-on, and writes an owner allows it.
 5. **Catalog and stock, remaining:** push alerts with the merchant app; smaller sizes of
    products' videos, and their images and videos served from the edge (CAT-02).
-6. **Orders, next:** alerts for overdue orders (COD-05); push for staff's alerts, with the merchant app (ADR-191).
+6. **Orders, next:** overdue orders' alerts on WhatsApp too, at a rate shops' credit can bear (COD-05, ADR-627); push for staff's alerts, with the merchant app (ADR-191).
    **Payments, next:** Safepay's refund call tried against its sandbox, then its partial refunds
    (spike 4), and its reporter; JazzCash's inquiry and refunds tried against its sandbox, then its partial refunds;
    Easypaisa's pages and inquiry tried against its sandbox, and its IPN; Baadmay's page and status
