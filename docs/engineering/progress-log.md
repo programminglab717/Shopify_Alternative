@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Returns shoppers ask for
+### 225ab72 · Returns shoppers ask for
 
 * **Shoppers ask for a return from their order's page, within the days the shop takes returns
   after delivery; staff approve it into a return or decline it saying why** ([ADR-675](../architecture/13-decision-log.md#adr-675--shoppers-ask-for-a-return-from-their-orders-page-within-the-days-the-shop-takes-returns-after-delivery-one-waiting-at-a-time-staff-approve-it-into-a-return-or-decline-it-saying-why)): the
