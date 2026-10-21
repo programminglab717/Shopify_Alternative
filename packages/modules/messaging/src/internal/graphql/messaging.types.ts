@@ -44,6 +44,7 @@ export enum MessageKind {
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
   DAILY_SUMMARY = 'DAILY_SUMMARY',
+  ORDERS_OVERDUE = 'ORDERS_OVERDUE',
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
   ORDER_MENTIONED = 'ORDER_MENTIONED',
   ORDER_RECEIPT_SENT = 'ORDER_RECEIPT_SENT',
@@ -229,6 +230,11 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, at its alerts number each morning: the day before's orders and sales, " +
         'parcels delivered and turned back, and cash on delivery still to come (ANL-07, ADR-386).',
+    },
+    ORDERS_OVERDUE: {
+      description:
+        'For the shop, at its alerts number: orders have waited for their first call longer than ' +
+        'its target, at most once every three hours within its calling hours (COD-05, ADR-680).',
     },
     ORDER_ASSIGNED: {
       description:

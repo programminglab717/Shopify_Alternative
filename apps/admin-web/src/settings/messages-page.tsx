@@ -62,6 +62,7 @@ const TO_THE_SHOP = [
   'STOCK_LOW',
   'STOCK_OUT',
   'DAILY_SUMMARY',
+  'ORDERS_OVERDUE',
 ] as const;
 
 const ROUTINGS: readonly MessageRouting[] = ['RICH', 'ECONOMY'];

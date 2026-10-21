@@ -166,6 +166,18 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('tells the shop of orders waiting too long for their first call, at its alerts number (ADR-680)', () => {
+    const overdue = { shop: 'Zari Fashions', orders: '3' };
+    expect(messageText('orders_overdue', 'en', overdue)).toBe(
+      'Zari Fashions: orders waiting longer than your first-call target: 3. Call them from the ' +
+        'Confirmation Desk in Hatti.',
+    );
+    expect(templateParameters('orders_overdue', overdue)).toEqual(['Zari Fashions', '3']);
+    expect(messageText('orders_overdue', 'ur', overdue)).toMatch(
+      /^Zari Fashions: \p{Script=Arabic}.*3/u,
+    );
+  });
+
   it('tells a customer their order is ready to pick up, and where (ADR-389)', () => {
     const ready = {
       name: 'Ayesha',

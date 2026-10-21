@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Overdue orders told on WhatsApp
+
+* **Orders waiting for their first call longer than the shop's target are told at its alerts
+  number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within
+  its calling hours** ([ADR-680](../architecture/13-decision-log.md#adr-680--orders-waiting-for-their-first-call-longer-than-the-shops-target-are-told-at-its-alerts-number-on-whatsapp-too-as-the-new-kind-orders_overdue-at-most-once-every-three-hours-within-its-calling-hours)): the shop's alert beside the hourly push (COD-05), turned off on
+  the Messages page as the others.
+* 3867 tests, two more: one of messaging's and one of the core's.
+
 ### dd0f42b · Google Ads connected from the admin
 
 * **The admin's ad spend page connects the shop's Google Ads account through Google's consent

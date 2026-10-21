@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-679 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-680 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -687,6 +687,7 @@
 | 677 | The admin lists the returns customers asked for online under Returns, to approve or decline with the reason they are told, and sets the days the shop takes them in its order policies | Accepted |
 | 678 | A shop's owner grants Hatti the reading of their Google Ads account on Google's consent screen, and the same worker pulls its spend by campaign, with an access token from the grant each time | Accepted |
 | 679 | The admin's ad spend page connects the shop's Google Ads account through Google's consent screen, coming back to one address of the admin's that hands the code to the shop that asked | Accepted |
+| 680 | Orders waiting for their first call longer than the shop's target are told at its alerts number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within its calling hours | Accepted |
 
 ---
 
@@ -23610,3 +23611,25 @@
   storage:** `state` would no longer prove the return answers a request this tab made.
   **A pop-up window for the consent screen:** pop-ups are blocked or awkward on phones, where most
   owners work.
+
+## ADR-680 · Orders waiting for their first call longer than the shop's target are told at its alerts number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within its calling hours
+
+* **Context:** [ADR-627](#adr-627--orders-waiting-for-their-first-call-longer-than-the-shops-target-are-pushed-to-its-owners-managers-and-confirmation-agents-as-the-new-kind-orders_overdue-at-most-once-an-hour-within-its-calling-hours-alone-opening-the-confirmation-desk) pushes the shop's staff when orders wait for their first call
+  longer than its target, and keeps WhatsApp out of it as it costs a message each time. An owner
+  without the admin open on a phone that takes pushes, or away from the shop, hears nothing,
+  while a desk falling behind is where cash on delivery leaks first (status shortcut 54).
+* **Decision:** A new kind, `orders_overdue`, of the shop's alerts (beside stock running low and
+  the morning's summary), sent from Hatti's shared WhatsApp number to the shop's alerts number:
+  "Zari: orders waiting longer than your first-call target: 3. Call them from the Confirmation
+  Desk in Hatti.", in the shop's language. The worker sweeps the shops with a first-call target,
+  counts the overdue orders as the desk and the push do, and queues one only within the shop's
+  calling hours, at most once in each three hours (its key the three hours), so that a day's
+  backlog costs three or four messages of the shop's credit. Nothing while the shop gives no
+  alerts number, or turns the kind off on its Messages page, as it does the others.
+* **Consequences:** An owner hears of a backlog on the phone they already read, whether or not
+  the admin pushes to it; the push still goes hourly to those who call. A shop that wants
+  neither turns it off.
+* **Alternatives:** **Hourly, as the push:** ten messages a busy day, most saying what the last
+  did. **Only when the count grows:** an owner who ignored a backlog would hear nothing while it
+  stood still. **To each confirmation agent's own number:** the push reaches them, and the alert
+  is the owner's to act on.

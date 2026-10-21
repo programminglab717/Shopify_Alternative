@@ -7372,6 +7372,11 @@ enum MessageKind {
   """
   ORDERS_LIMIT_REACHED
 
+  """
+  For the shop, at its alerts number: orders have waited for their first call longer than its target, at most once every three hours within its calling hours (COD-05, ADR-680).
+  """
+  ORDERS_OVERDUE
+
   """They asked to change their order's address: its page, where they can."""
   ORDER_ADDRESS
 

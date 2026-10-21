@@ -46,6 +46,7 @@ export const MESSAGE_KINDS = [
   'stock_low',
   'stock_out',
   'daily_summary',
+  'orders_overdue',
   'order_assigned',
   'order_mentioned',
   'order_receipt_sent',
@@ -176,6 +177,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'stock_low',
   'stock_out',
   'daily_summary',
+  'orders_overdue',
   'order_assigned',
   'order_mentioned',
   'order_receipt_sent',
@@ -938,6 +940,15 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}, {date}: {orders} orders for {sales}; {delivered} parcels delivered and {returned} turned back. Cash on delivery still to come: {cash}. More in Hatti.',
       ur: '{shop}، {date}: {sales} کے {orders} آرڈرز؛ {delivered} پارسل ڈیلیور ہوئے اور {returned} واپس ہوئے۔ کیش آن ڈیلیوری کی ابھی آنے والی رقم: {cash}۔ مزید ہٹی میں۔',
+    },
+  },
+  orders_overdue: {
+    whatsapp: 'hatti_orders_overdue',
+    category: 'utility',
+    parameters: ['shop', 'orders'],
+    text: {
+      en: '{shop}: orders waiting longer than your first-call target: {orders}. Call them from the Confirmation Desk in Hatti.',
+      ur: '{shop}: آپ کے پہلی کال کے ہدف سے زیادہ دیر سے منتظر آرڈرز: {orders}۔ ہٹی میں کنفرمیشن ڈیسک سے انہیں کال کریں۔',
     },
   },
   order_assigned: {

@@ -99,6 +99,7 @@ import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { PartnerEarnings } from './partner-earnings.js';
+import { OverdueOrderMessages } from './overdue-order-messages.js';
 import { OverdueOrderPushes, PushNotices } from './push-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { AutomationTriggers, WinBacks } from './automations.js';
@@ -494,6 +495,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => overdue.stop());
+    // And told at the shop's alerts number on WhatsApp, at most every three hours (ADR-680).
+    const overdueMessages = new OverdueOrderMessages(
+      database,
+      new MessagesService(database),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => overdueMessages.stop());
     // Carts, checkouts and browsers' proofs of a number past their time deleted (ADR-230).
     const expired = new ExpiredCheckouts(new CheckoutExpiry(database), logger).start(
       config.SWEEP_INTERVAL_MS,
