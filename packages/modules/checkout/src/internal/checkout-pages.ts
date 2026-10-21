@@ -45,6 +45,7 @@ import type { CartJson } from '@hatti/storefront-api';
 import { orderTaxOf, taxIncludedWords, taxesByRate, type TaxRates } from '@hatti/tax/public';
 import {
   advanceAmountOf,
+  advanceItemsOf,
   advanceOf,
   type CodAdvanceValue,
   type CodRefusal,
@@ -335,8 +336,9 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   // where it is the delivery charge or the shop names cities, or while the shop asks it of
   // customers who refused parcels or are new to it, whom the page doesn't look up (ADR-089),
   // or by the order's risk, scored as it is placed (ADR-094).
+  // Counted on the products it tags alone, where it says so (ADR-712).
   const order = {
-    items: totals.subtotal - totals.discount,
+    items: advanceItemsOf(totals.subtotal - totals.discount, totals.subtotal, payments.advanceOn),
     delivery: totals.freeDelivery ? 0n : totals.delivery,
   };
   const askedAhead = advanceAmountOf(payments.advance, order, 'PKR');

@@ -76,5 +76,6 @@ function toAdvance(advance: CodAdvanceValue, currency: CurrencyCode): CashOnDeli
     newCustomers: advance.newCustomers,
     riskScore: advance.riskScore === null ? null : advance.riskScore / 100,
     productTags: advance.productTags,
+    onTaggedProducts: advance.onTagged,
   });
 }

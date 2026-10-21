@@ -170,8 +170,9 @@ export class CartService {
   }
 
   /**
-   * The products of `cart`'s items, by their titles and with their tags as they are now, in the
-   * caller's transaction `tx`: for the shop's rules for cash on delivery.
+   * The products of `cart`'s items, by their titles and with their tags as they are now, and what
+   * their lines come to, in the caller's transaction `tx`: for the shop's rules for cash on
+   * delivery.
    */
   async productsIn(tx: Tx, shopId: string, cart: CartJson): Promise<CodProduct[]> {
     const snapshots = await this.variants.snapshotsOf(
@@ -181,7 +182,15 @@ export class CartService {
     );
     return cart.items.flatMap((item) => {
       const snapshot = snapshots.get(item.variantId);
-      return snapshot ? [{ title: snapshot.productTitle, tags: snapshot.productTags }] : [];
+      return snapshot
+        ? [
+            {
+              title: snapshot.productTitle,
+              tags: snapshot.productTags,
+              amount: BigInt(item.linePrice),
+            },
+          ]
+        : [];
     });
   }
 

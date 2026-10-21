@@ -1237,6 +1237,8 @@ export interface CashOnDeliverySettingsValue {
     above: MoneyValue | null;
     cities: string[];
     productTags: string[];
+    /** Counted on the products it tags alone (ADR-712); absent where a fake core leaves it out. */
+    onTaggedProducts?: boolean;
     newCustomers: boolean;
     refusedDeliveries: number | null;
     riskScore: number | null;

@@ -99,6 +99,14 @@ export class CashOnDeliveryAdvance {
       'Checkout names the product beside the option.',
   })
   productTags!: string[];
+
+  @Field(() => Boolean, {
+    description:
+      'True where an amount or a percentage is counted on the products tagged with productTags ' +
+      "alone, what they come to after the code's share of them, rather than on all the order's " +
+      'items: a share of the suits stitched to measure, the ready-made kurtas paid at the door.',
+  })
+  onTaggedProducts!: boolean;
 }
 
 @ObjectType({
@@ -241,6 +249,14 @@ export class CashOnDeliveryAdvanceInput {
       'products, each once in any letter case. Empty or null for every order. Up to 50.',
   })
   productTags?: string[] | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'True to count the amount or the percentage on the products with productTags alone, which ' +
+      'it needs; not with the delivery charge.',
+  })
+  onTaggedProducts?: boolean | null;
 }
 
 @InputType({ description: 'Those not given stay as they are.' })

@@ -43,6 +43,8 @@ interface AdvanceState {
   above: string;
   cities: string;
   productTags: string;
+  /** Counted on those products alone (ADR-712). */
+  onTagged: boolean;
   newCustomers: boolean;
   refusedDeliveries: string;
   riskScore: string;
@@ -76,6 +78,7 @@ function stateOf(settings: CashOnDeliverySettingsValue): CodState {
       above: priceText(advance?.above?.amount),
       cities: advance?.cities.join(', ') ?? '',
       productTags: advance?.productTags.join(', ') ?? '',
+      onTagged: advance?.onTaggedProducts ?? false,
       newCustomers: advance?.newCustomers ?? false,
       refusedDeliveries: advance?.refusedDeliveries?.toString() ?? '',
       riskScore: percentText(advance?.riskScore),
@@ -96,9 +99,21 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   above: 'cod.advanceAbove',
   cities: 'cod.advanceCities',
   productTags: 'cod.advanceProductTags',
+  onTaggedProducts: 'cod.advanceOnTagged',
   refusedDeliveries: 'cod.advanceRefused',
   riskScore: 'cod.advanceRiskScore',
 };
+
+/**
+ * Whether the advance may be counted on the products it tags alone (ADR-712): an amount or a
+ * share, naming some tags.
+ */
+function countsOnTagged(advance: AdvanceState): boolean {
+  return (
+    (advance.kind === 'FIXED_AMOUNT' || advance.kind === 'PERCENTAGE') &&
+    parseList(advance.productTags).length > 0
+  );
+}
 
 /** "Advance" before a problem with one of its fields. */
 function advanceOf(t: Translate) {
@@ -146,6 +161,7 @@ function inputOf(state: CodState, t: Translate): Record<string, unknown> | strin
             above: amountInput(advance.above),
             cities: parseList(advance.cities),
             productTags: parseList(advance.productTags),
+            onTaggedProducts: countsOnTagged(advance) && advance.onTagged,
             newCustomers: advance.newCustomers,
             refusedDeliveries: whole(advance.refusedDeliveries, 'cod.advanceRefused'),
             riskScore: score(advance.riskScore, 'cod.advanceRiskScore'),
@@ -247,6 +263,14 @@ function AdvanceFields({
             value={advance.productTags}
             onChange={(event) => onChange({ ...advance, productTags: event.target.value })}
           />
+          {countsOnTagged(advance) && (
+            <CheckField
+              label={t('cod.advanceOnTagged')}
+              hint={t('cod.advanceOnTaggedHint')}
+              checked={advance.onTagged}
+              onChange={(onTagged) => onChange({ ...advance, onTagged })}
+            />
+          )}
           <TextField
             label={t('cod.advanceRiskScore')}
             hint={t('cod.advanceRiskScoreHint')}

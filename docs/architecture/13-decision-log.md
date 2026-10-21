@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-711 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-712 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -719,6 +719,7 @@
 | 709 | A cart permalink fills in its checkout with the shopper's details as Shopify's checkout[...] gives them: name, number, email, city and address, never kept with visits | Accepted |
 | 710 | The checkout says first among its badges what Hatti verified of the shop, its seller's identity or a registered business, whatever badges the shop chose | Accepted |
 | 711 | A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than one saying something else each, shown as written in English or Urdu | Accepted |
+| 712 | An advance naming products' tags may be counted on those products alone, a share of what they come to after the code's share of them, or an amount up to it | Accepted |
 
 ---
 
@@ -24384,3 +24385,29 @@
 * **Alternatives:** **One text per badge, in English and in Urdu:** most shops write one or the
   other, and a second field left blank shows nothing. **More platform badges:** they would never
   cover what each shop has to say.
+
+## ADR-712 · An advance naming products' tags may be counted on those products alone, a share of what they come to after the code's share of them, or an amount up to it
+
+* **Context:** A shop's advance may be asked only of orders holding a product it tags
+  ([ADR-224](#adr-224--a-shops-advance-may-be-asked-only-of-orders-holding-a-product-it-tags-checkout-knows-the-carts-products-before-anything-is-typed-names-the-product-beside-cash-on-delivery-and-asks-a-cart-holding-none-for-nothing)), but was counted on the whole order by its kind
+  ([ADR-084](#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)): a share of all the items. A shop selling ready-made kurtas beside suits
+  stitched to measure wants half of the suit ahead, not half of the kurtas too; with a fixed
+  amount it could not follow carts of one suit and of three.
+* **Decision:**
+  * **The advance may say it is counted on the products it tags alone** (migration 0309,
+    `onTaggedProducts` in the Admin API): only an amount or a percentage, and only naming tags;
+    the delivery charge is the whole order's.
+  * **What it is counted on is what the tagged lines come to**, read with the cart's products
+    before anything is typed, after the code's share of them: the items after any code, times the
+    tagged lines' part of the items before it, rounded down. A share is of that; an amount is at
+    most that; a total it is asked above is compared with that.
+  * **The page and placing count it the same way**: the checkout's payments carry what the tagged
+    lines come to, which the page's digest holds, so a page shown before a tag changed is shown
+    again.
+  * The admin's cash-on-delivery page offers it as a box once tags are named and the advance is
+    an amount or a percentage.
+* **Consequences:** ADR-224's "counted on the whole order" holds for advances that don't say
+  otherwise, which keep their keys in pages' digests. Drafts' advances stay staff's call.
+* **Alternatives:** **An advance set on each product:** the catalog has no field for it, and tags
+  already mark what is made to order. **The code taken off the tagged products first:** a code
+  is the order's, and shares it out across the items as refunds do.

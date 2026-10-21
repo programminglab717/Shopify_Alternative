@@ -660,6 +660,9 @@ const en = {
   'cod.advanceCitiesHint': 'Commas between them: "Quetta, Turbat".',
   'cod.advanceProductTags': 'Holding products tagged',
   'cod.advanceProductTagsHint': 'Such as "custom-stitching".',
+  'cod.advanceOnTagged': 'Counted on those products alone',
+  'cod.advanceOnTaggedHint':
+    'A share of what they come to, or an amount up to that. The rest of the order is paid at the door.',
   'cod.advanceRiskScore': 'Scored at least',
   'cod.advanceRiskScoreHint': 'Out of 100. Such orders are asked it instead of waiting for review.',
   'cod.advanceNewCustomers': 'From new customers alone',
@@ -6170,6 +6173,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'cod.advanceCitiesHint': 'کاما کے ساتھ: "Quetta, Turbat"۔',
   'cod.advanceProductTags': 'ان ٹیگز والی پراڈکٹس ہوں',
   'cod.advanceProductTagsHint': 'جیسے "custom-stitching"۔',
+  'cod.advanceOnTagged': 'صرف انہی پراڈکٹس پر حساب',
+  'cod.advanceOnTaggedHint':
+    'ان کی قیمت کا حصہ، یا اس تک کی رقم۔ آرڈر کا باقی حصہ ڈیلیوری پر ادا ہوتا ہے۔',
   'cod.advanceRiskScore': 'کم از کم اسکور',
   'cod.advanceRiskScoreHint':
     '100 میں سے۔ ایسے آرڈرز سے ریویو کے انتظار کے بجائے یہ مانگا جاتا ہے۔',

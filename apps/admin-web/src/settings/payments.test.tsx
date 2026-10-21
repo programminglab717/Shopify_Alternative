@@ -249,12 +249,51 @@ describe('Delivery and payment settings in the admin', () => {
           above: null,
           cities: [],
           productTags: [],
+          onTaggedProducts: false,
           newCustomers: true,
           refusedDeliveries: null,
           riskScore: null,
         },
       },
     });
+  });
+
+  it('counts an amount or a share on the products it tags alone, where the shop says (ADR-712)', async () => {
+    const core = fakeCore('manager', (operation) => {
+      if (operation === 'CashOnDeliverySettings') {
+        return {
+          cashOnDeliverySettings: COD,
+          bankTransferSettings: { enabled: false, account: null },
+        };
+      }
+      if (operation === 'CashOnDeliverySettingsUpdate') {
+        return { cashOnDeliverySettingsUpdate: saved };
+      }
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/cash-on-delivery');
+
+    await screen.findByText('An advance is paid into your bank account: give it first.');
+    fireEvent.change(screen.getByLabelText('Ask for'), { target: { value: 'PERCENTAGE' } });
+    type('Percentage', '50');
+    const alone = /Counted on those products alone/;
+    // Offered once it names tags, and for an amount or a share alone.
+    expect(screen.queryByRole('checkbox', { name: alone })).toBeNull();
+    type('Holding products tagged', 'custom-stitching');
+    fireEvent.click(screen.getByRole('checkbox', { name: alone }));
+    await press('Save');
+
+    await screen.findByText('Saved. Checkout uses it from now on.');
+    expect(
+      core.sent.find((each) => each.operation === 'CashOnDeliverySettingsUpdate')?.variables,
+    ).toMatchObject({
+      input: {
+        advance: { percentage: 50, productTags: ['custom-stitching'], onTaggedProducts: true },
+      },
+    });
+    fireEvent.change(screen.getByLabelText('Ask for'), { target: { value: 'DELIVERY_CHARGE' } });
+    expect(screen.queryByRole('checkbox', { name: alone })).toBeNull();
   });
 
   it('gives the bank account once the owner confirms who they are, naming what the core refused', async () => {

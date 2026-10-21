@@ -8,7 +8,10 @@ import { checkoutPage } from './checkout-pages.js';
 import type { CheckoutForm, CheckoutView } from './checkout.service.js';
 import {
   NO_COD_RULES,
+  advanceAmountOf,
   advanceForCart,
+  advanceItemsOf,
+  advanceKeyOf,
   advanceOf,
   advanceTakes,
   checkCodRules,
@@ -28,6 +31,7 @@ const EVERY_ORDER = {
   newCustomers: false,
   riskScore: null,
   productTags: [],
+  onTagged: false,
 };
 
 describe('advanceOf', () => {
@@ -145,15 +149,56 @@ describe('advanceOf', () => {
     const lehnga = { title: 'Bridal lehnga', tags: ['bridal', 'Pre-Order'] };
     const sherwani = { title: 'Sherwani', tags: ['stitching'] };
     // Naming none, it asks every cart, naming no product.
-    expect(advanceForCart(fiveHundred, [kurta])).toEqual({ advance: fiveHundred, product: null });
+    expect(advanceForCart(fiveHundred, [kurta])).toEqual({
+      advance: fiveHundred,
+      product: null,
+      on: null,
+    });
     expect(advanceForCart(null, [lehnga])).toBeNull();
     const preOrders: CodAdvanceValue = { ...fiveHundred, productTags: ['pre-order', 'stitching'] };
     expect(advanceForCart(preOrders, [kurta, lehnga, sherwani])).toEqual({
       advance: preOrders,
       product: 'Bridal lehnga',
+      on: null,
     });
     expect(advanceForCart(preOrders, [kurta])).toBeNull();
     expect(advanceForCart(preOrders, [])).toBeNull();
+  });
+
+  it('counts it on the products it tags alone, where it says so (ADR-712)', () => {
+    const half: CodAdvanceValue = {
+      kind: 'percentage',
+      percentageBps: 5000,
+      ...EVERY_ORDER,
+      productTags: ['stitching'],
+      onTagged: true,
+    };
+    const kurta = { title: 'Kurta', tags: ['summer'], amount: 1_000_00n };
+    const suit = { title: 'Suit', tags: ['Stitching'], amount: 4_000_00n };
+    const sherwani = { title: 'Sherwani', tags: ['stitching'], amount: 6_000_00n };
+    expect(advanceForCart(half, [kurta, suit, sherwani])).toEqual({
+      advance: half,
+      product: 'Suit',
+      on: 10_000_00n,
+    });
+    expect(advanceForCart(half, [kurta])).toBeNull();
+    // What they come to of the items after a code, the code's share of them taken off.
+    expect(advanceItemsOf(11_000_00n, 11_000_00n, null)).toBe(11_000_00n);
+    expect(advanceItemsOf(9_900_00n, 11_000_00n, 10_000_00n)).toBe(9_000_00n);
+    expect(advanceItemsOf(9_900_00n, 11_000_00n, 11_000_00n)).toBe(9_900_00n);
+    expect(advanceItemsOf(1_000n, 3_000n, 1_000n)).toBe(333n);
+    expect(advanceAmountOf(half, { items: 9_000_00n, delivery: 250_00n }, 'PKR')).toBe(4_500_00n);
+    // An amount is at most what they come to.
+    const fiveThousand = { ...half, kind: 'fixed_amount', amount: 5_000_00n } as const;
+    expect(
+      advanceAmountOf(
+        fiveThousand,
+        { items: advanceItemsOf(5_000_00n, 5_000_00n, 4_000_00n), delivery: 0n },
+        'PKR',
+      ),
+    ).toBe(4_000_00n);
+    // Counted so, it is another advance.
+    expect(advanceKeyOf(half)).not.toBe(advanceKeyOf({ ...half, onTagged: false }));
   });
 });
 
@@ -263,6 +308,30 @@ describe('checkCodRules', () => {
       ['input.advance.productTags', 'TOO_MANY'],
     ]);
     expect(messages({ amount: '500', productTags: many })).toEqual(['At most 50 tags']);
+  });
+
+  it('counts an amount or a share on the products it tags alone, which it names (ADR-712)', () => {
+    expect(advance({ percentage: 50, productTags: ['stitching'], onTaggedProducts: true })).toEqual(
+      {
+        kind: 'percentage',
+        percentageBps: 5000,
+        ...EVERY_ORDER,
+        productTags: ['stitching'],
+        onTagged: true,
+      },
+    );
+    expect(advance({ amount: '500', onTaggedProducts: true })).toEqual([
+      ['input.advance.onTaggedProducts', 'INVALID'],
+    ]);
+    expect(messages({ amount: '500', onTaggedProducts: true })).toEqual([
+      "Name products' tags to count the advance on those products alone",
+    ]);
+    expect(
+      messages({ deliveryCharge: true, productTags: ['stitching'], onTaggedProducts: true }),
+    ).toEqual([
+      "The delivery charge is the whole order's: ask an amount or a percentage of the products",
+    ]);
+    expect(advance({ amount: '500', onTaggedProducts: null })).toMatchObject({ onTagged: false });
   });
 
   it('takes new customers alone, and a risk score from 0.01 to 1, in hundredths', () => {
@@ -704,6 +773,7 @@ describe.skipIf(!server)('An advance at checkout', () => {
     expect(asked.payments).toMatchObject({
       advance: saved.advance,
       advanceProduct: 'Bridal lehnga',
+      advanceOn: null,
     });
     const page = checkoutPage(asked).html;
     expect(page).toContain(
@@ -717,6 +787,46 @@ describe.skipIf(!server)('An advance at checkout', () => {
       total: 5_250_00n,
       advanceDue: 500_00n,
       codAmount: 4_750_00n,
+      stage: 'awaiting_payment',
+    });
+  });
+
+  it('counts it on the products it tags alone, on the page and as it places (ADR-712)', async () => {
+    unwrap(await giveAccount());
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    const saved = unwrap(
+      await f.codRules.update(f.a, {
+        advance: { percentage: 50, productTags: ['stitching'], onTaggedProducts: true },
+      }),
+    );
+    expect(saved.advance).toMatchObject({ productTags: ['stitching'], onTagged: true });
+    const [suit] = await f.variantsOf(f.a, 'Suit to measure', {
+      price: '4,000',
+      tags: ['Stitching'],
+    });
+    await f.stock(f.a, suit!, 5);
+    const [kurta] = await f.variantsOf(f.a, 'Kurta', { price: '1,000' });
+    await f.stock(f.a, kurta!, 5);
+    const token = await act(null, 'add', {
+      items: [
+        { variantId: kurta, quantity: 1 },
+        { variantId: suit, quantity: 1 },
+      ],
+    });
+    const secret = (await f.checkouts.start(f.a.shopId, token))!;
+    const view = open(await f.checkouts.view(secret));
+    expect(view.payments).toMatchObject({
+      advanceProduct: 'Suit to measure',
+      advanceOn: 4_000_00n,
+    });
+    // Half of the suit, not of the kurta too.
+    expect(checkoutPage(view).html).toContain(
+      'With Suit to measure in your cart, you pay Rs 2,000 in advance by bank transfer.',
+    );
+    expect(placed(await f.checkouts.place(secret, view.shown, FORM))).toMatchObject({
+      total: 5_250_00n,
+      advanceDue: 2_000_00n,
+      codAmount: 3_250_00n,
       stage: 'awaiting_payment',
     });
   });

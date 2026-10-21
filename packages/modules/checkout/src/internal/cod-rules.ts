@@ -58,7 +58,8 @@ export const NO_COD_RULES: CodRulesRecord = {
  * order's delivery charge; on every order, or only on those that meet each of its conditions:
  * items that come to more than `above`, a city of its `cities`, a customer who refused
  * `refusedDeliveries` parcels before (ADR-089), a customer new to the shop, a risk score of
- * `riskScore` or more (ADR-094), a product tagged with one of its `productTags` (ADR-224).
+ * `riskScore` or more (ADR-094), a product tagged with one of its `productTags` (ADR-224); counted
+ * on those products alone where it says so (ADR-712).
  */
 export type CodAdvanceValue = (
   | { kind: 'fixed_amount'; amount: bigint }
@@ -85,6 +86,11 @@ export type CodAdvanceValue = (
    * empty for every order.
    */
   productTags: string[];
+  /**
+   * Counted on the products tagged with its `productTags` alone, an amount or a share of what
+   * they come to, rather than on all the order's items (ADR-712).
+   */
+  onTagged: boolean;
 };
 
 /** An amount, a percentage or the delivery charge: one of the three. */
@@ -107,6 +113,8 @@ export interface CodAdvanceInput {
   riskScore?: number | null;
   /** Products' tags, as the shop writes them on its products: "pre-order"; empty for all. */
   productTags?: string[] | null;
+  /** True to count an amount or a percentage on the products it tags alone. */
+  onTaggedProducts?: boolean | null;
 }
 
 export const COD_RULE_LIMITS = {
@@ -162,6 +170,8 @@ export type CodRefusal =
 export interface CodProduct {
   title: string;
   tags: readonly string[];
+  /** What its line comes to before any code, in minor units: for an advance counted on it. */
+  amount?: bigint;
 }
 
 /**
@@ -208,15 +218,34 @@ function taggedProductOf(
  * `advance` as a cart holding `products` is asked it, its products known before the shopper types
  * anything (ADR-224): with the first tagged with one of its tags, which the page names; with none,
  * where it names no tags; null where the cart holds none of them, as it isn't asked of the cart.
+ * `on` is what the tagged products come to before any code, where it is counted on them alone
+ * (ADR-712); null where it is counted on all the items.
  */
 export function advanceForCart(
   advance: CodAdvanceValue | null,
   products: readonly CodProduct[],
-): { advance: CodAdvanceValue; product: string | null } | null {
+): { advance: CodAdvanceValue; product: string | null; on: bigint | null } | null {
   if (!advance) return null;
-  if (advance.productTags.length === 0) return { advance, product: null };
+  if (advance.productTags.length === 0) return { advance, product: null, on: null };
   const product = taggedProductOf(products, advance.productTags);
-  return product && { advance, product: product.title };
+  if (!product) return null;
+  const lower = new Set(advance.productTags.map((tag) => tag.toLowerCase()));
+  const on = advance.onTagged
+    ? products
+        .filter((each) => each.tags.some((tag) => lower.has(tag.toLowerCase())))
+        .reduce((sum, each) => sum + (each.amount ?? 0n), 0n)
+    : null;
+  return { advance, product: product.title, on };
+}
+
+/**
+ * The items an advance is counted on (ADR-712): all of them, `items` after any code, where `on`
+ * is null; otherwise the products it tags, `on` of the `subtotal` before the code, the code's
+ * share of them taken off as it is of the rest, rounded down.
+ */
+export function advanceItemsOf(items: bigint, subtotal: bigint, on: bigint | null): bigint {
+  if (on === null || on >= subtotal) return items;
+  return (items * on) / subtotal;
 }
 
 /**
@@ -341,7 +370,9 @@ export function advanceKeyOf(advance: CodAdvanceValue | null): string {
   const whom = `${advance.refusedDeliveries ?? ''}:${advance.newCustomers}:${advance.riskScore ?? ''}`;
   // Its products' tags, where it names any: without, the key is what it was before them.
   const tags = advance.productTags.length > 0 ? `:${advance.productTags.join('|')}` : '';
-  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${whom}${tags}`;
+  // And counted on them alone (ADR-712): without, the key is what it was before.
+  const on = advance.onTagged ? ':tagged' : '';
+  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${whom}${tags}${on}`;
 }
 
 /**
@@ -487,7 +518,22 @@ function checkAdvance(
     newCustomers: input.newCustomers ?? false,
     riskScore: checkRiskScore(check, [...field, 'riskScore'], input.riskScore),
     productTags: checkProductTags(check, [...field, 'productTags'], input.productTags),
+    onTagged: input.onTaggedProducts ?? false,
   };
+  // Counted on the products it tags (ADR-712): it names some, and is an amount or a share.
+  if (conditions.onTagged && conditions.productTags.length === 0) {
+    check.addMessage(
+      [...field, 'onTaggedProducts'],
+      'INVALID',
+      "Name products' tags to count the advance on those products alone",
+    );
+  } else if (conditions.onTagged && input.deliveryCharge === true) {
+    check.addMessage(
+      [...field, 'onTaggedProducts'],
+      'INVALID',
+      "The delivery charge is the whole order's: ask an amount or a percentage of the products",
+    );
+  }
   if (amountGiven) {
     const amount = check.price([...field, 'amount'], input.amount, currency);
     if (amount === 0n) check.add([...field, 'amount'], 'INVALID', 'must be more than zero');

@@ -192,6 +192,8 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   advanceRisk: smallint('advance_risk'),
   /** Only on orders holding a product tagged with any of these, in any letter case (ADR-224). */
   advanceProductTags: text('advance_product_tags').array().notNull().default([]),
+  /** Counted on the products it tags alone, not on all the order's items (ADR-712). */
+  advanceOnTagged: boolean('advance_on_tagged').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

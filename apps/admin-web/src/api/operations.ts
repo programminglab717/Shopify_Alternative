@@ -2594,6 +2594,7 @@ const COD_SETTINGS = /* GraphQL */ `
       }
       cities
       productTags
+      onTaggedProducts
       newCustomers
       refusedDeliveries
       riskScore

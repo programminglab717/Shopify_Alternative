@@ -79,6 +79,7 @@ import {
   NO_COD_RULES,
   advanceAsksOfCustomers,
   advanceForCart,
+  advanceItemsOf,
   advanceKeyOf,
   codRefusalOf,
   placedAdvanceOf,
@@ -333,6 +334,11 @@ export interface CheckoutPayments {
    * products it tags (ADR-224): its title, which the page names; null where it asks every order.
    */
   advanceProduct: string | null;
+  /**
+   * What the products the advance is counted on come to before any code, where it is counted on
+   * the products it tags alone (ADR-712); null where it is counted on all the items.
+   */
+  advanceOn: bigint | null;
   /**
    * Whether cash on delivery asks in advance, by transfer into the shop's account, what an order
    * comes to past the law's cap (TAX-07, ADR-188): where the cart may come to more, wherever it
@@ -1181,7 +1187,12 @@ export class CheckoutService {
           ? placedAdvanceOf(
               view.payments.advance,
               {
-                items: totals.subtotal - totals.discount,
+                // Counted on the products it tags alone, where it says so (ADR-712).
+                items: advanceItemsOf(
+                  totals.subtotal - totals.discount,
+                  totals.subtotal,
+                  view.payments.advanceOn,
+                ),
                 delivery: shipping,
                 city: address.city,
                 refused: customer?.refused,
@@ -1519,6 +1530,7 @@ export class CheckoutService {
       transferDiscount: transfer?.discount ?? null,
       advance: account ? (ownAdvance?.advance ?? null) : null,
       advanceProduct: account ? (ownAdvance?.product ?? null) : null,
+      advanceOn: account ? (ownAdvance?.on ?? null) : null,
       capAdvance: mayPassLimit && account !== null,
       online,
       onlineDiscount,
@@ -1860,7 +1872,9 @@ export function shownOf(
   policies: readonly PolicyVersionRef[],
   discount: CheckoutDiscount | null = null,
   payments: Pick<CheckoutPayments, 'codRules' | 'bankTransfer' | 'transferDiscount'> &
-    Partial<Pick<CheckoutPayments, 'advance' | 'capAdvance' | 'online' | 'onlineDiscount'>> = {
+    Partial<
+      Pick<CheckoutPayments, 'advance' | 'advanceOn' | 'capAdvance' | 'online' | 'onlineDiscount'>
+    > = {
     codRules: NO_COD_RULES,
     bankTransfer: null,
     transferDiscount: null,
@@ -1903,6 +1917,9 @@ export function shownOf(
     }),
     ...(fee > 0n && { codFee: fee.toString() }),
     ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
+    // What the products it is counted on come to, where it is counted on them alone (ADR-712).
+    ...(payments.advanceOn !== undefined &&
+      payments.advanceOn !== null && { codAdvanceOn: payments.advanceOn.toString() }),
     ...(payments.capAdvance && { codCapAdvance: true }),
     // Through which gateways the page offers to pay online (ADR-152, ADR-219): one by its name
     // alone, as pages offering one showed it.

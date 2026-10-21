@@ -48,6 +48,7 @@ function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | n
     newCustomers: row.advanceNewCustomers,
     riskScore: row.advanceRisk,
     productTags: row.advanceProductTags,
+    onTagged: row.advanceOnTagged,
   };
   switch (row.advanceKind) {
     case 'fixed_amount':
@@ -138,6 +139,7 @@ export class CodRulesService {
         advanceNewCustomers: advance?.newCustomers ?? false,
         advanceRisk: advance?.riskScore ?? null,
         advanceProductTags: advance?.productTags ?? [],
+        advanceOnTagged: advance?.onTagged ?? false,
       };
       await tx
         .insert(codSettings)

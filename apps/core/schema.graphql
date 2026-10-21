@@ -1356,6 +1356,11 @@ type CashOnDeliveryAdvance {
   """
   newCustomers: Boolean!
 
+  """
+  True where an amount or a percentage is counted on the products tagged with productTags alone, what they come to after the code's share of them, rather than on all the order's items: a share of the suits stitched to measure, the ready-made kurtas paid at the door.
+  """
+  onTaggedProducts: Boolean!
+
   """Percent of the order's items, for PERCENTAGE: 20 is 20%."""
   percentage: Float
 
@@ -1399,6 +1404,11 @@ input CashOnDeliveryAdvanceInput {
   True for customers new to the shop alone: none of their orders delivered.
   """
   newCustomers: Boolean
+
+  """
+  True to count the amount or the percentage on the products with productTags alone, which it needs; not with the delivery charge.
+  """
+  onTaggedProducts: Boolean
 
   """
   Percent of the order's items after any discount code, 0.01 to 100, with two decimals at most.

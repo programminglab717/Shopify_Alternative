@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### An advance on the tagged products alone
+
+* **An advance naming products' tags may be counted on those products alone, a share of what they
+  come to after the code's share of them, or an amount up to it** ([ADR-712](../architecture/13-decision-log.md#adr-712--an-advance-naming-products-tags-may-be-counted-on-those-products-alone-a-share-of-what-they-come-to-after-the-codes-share-of-them-or-an-amount-up-to-it)): CHK-10's suits
+  stitched to measure beside ready-made kurtas, with migration 0309; the Admin API's
+  `onTaggedProducts` and the admin's cash-on-delivery page.
+* 3974 tests, four more: three of the checkout module's and one of the admin's.
+
 ### bfd1906 · Badges in the shop's own words
 
 * **A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than
