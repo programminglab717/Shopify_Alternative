@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Rich-text theme settings
+### a822403 · Rich-text theme settings
 
 * **Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme
   Check refusing anything else, and Hatti Base's FAQ answers are rich text** ([ADR-707](../architecture/13-decision-log.md#adr-707--theme-settings-take-shopifys-rich-text-its-tags-alone-and-links-a-theme-may-print-theme-check-refusing-anything-else-and-hatti-bases-faq-answers-are-rich-text)): the
