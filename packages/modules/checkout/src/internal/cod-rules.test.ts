@@ -340,6 +340,8 @@ describe.skipIf(!server)('Cash on delivery rules at checkout', () => {
       ...FORM,
       phone: '0321-5556677',
       address1: 'Bazaar',
+      // Placed as it is after the page asked for more of the address (ADR-682).
+      addressChecked: 'Bazaar',
       payment: 'cash_on_delivery',
     };
     const first = await checkout(1);

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-681 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-682 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -689,6 +689,7 @@
 | 679 | The admin's ad spend page connects the shop's Google Ads account through Google's consent screen, coming back to one address of the admin's that hands the code to the shop that asked | Accepted |
 | 680 | Orders waiting for their first call longer than the shop's target are told at its alerts number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within its calling hours | Accepted |
 | 681 | The admin's web client keeps a random ID for its browser and sends it with each request to /auth, so that a sign-in from the browser its owner uses is known as theirs | Accepted |
+| 682 | Checkout asks once for more of an address that leaves out a house number or the street, saying what riders look for, and places it as it is when the shopper posts it again | Accepted |
 
 ---
 
@@ -23658,3 +23659,28 @@
   tokens going in JSON (ADR-265). **Browser fingerprinting:** it tells browsers apart by what
   they cannot help showing, which Hatti does not want to read of its users, and it changes with
   each update. **The ID with the Admin API's requests too:** they are no sign-ins.
+
+## ADR-682 · Checkout asks once for more of an address that leaves out a house number or the street, saying what riders look for, and places it as it is when the shopper posts it again
+
+* **Context:** Checkout asks for the house and street, the area and a landmark, each in a box of
+  its own ([ADR-070](#adr-070--an-address-keeps-its-area-in-its-second-line-and-its-landmark-in-a-field-of-its-own-checkout-and-customers-links-ask-for-each-suggesting-the-areas-of-the-larger-cities)), and couriers find a house by its number, its street or block and
+  a landmark near it. A shopper who types "Bazaar" or "House 12" places an order a rider cannot
+  find, the commonest reason a parcel comes back undelivered; the risk rules already score such
+  an address higher, but the shopper is never asked (CHK-02, 05 §2.1).
+* **Decision:** Before an order to be delivered is placed, checkout looks at its house-and-street
+  line: no digit in it, in Latin, Arabic-Indic or Urdu script, is no house number; fewer than
+  eight letters, or a single word, is no street; and where the area and the landmark are both
+  blank too, it lacks a landmark. For no number or no street, the page comes back once (422),
+  with what typed is kept, saying in English and Urdu what riders look for that is missing ("a
+  house, flat or shop number, the street or block and a landmark near it") and that pressing the
+  button again places the order as it is. The page keeps the line it asked about in a hidden
+  field: posted again unchanged, the order is placed; changed, the new line is looked at again.
+  A missing landmark alone stops nothing. An order picked up is never asked.
+* **Consequences:** Most shoppers add the number or street when asked, and none is kept from
+  ordering: a village with no house numbers places its order on the second press. The risk rules
+  still score what was placed as they did.
+* **Alternatives:** **Refusing the address:** many real addresses in Pakistan have no number.
+  **A score from a model:** there are no delivered and failed addresses to learn from yet; the
+  heuristics are the start the architecture names. **Asking as the shopper types, by the page's
+  script:** the page works without a script, and its one script is the pin's
+  ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)).

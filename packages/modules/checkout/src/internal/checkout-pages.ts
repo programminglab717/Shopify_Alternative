@@ -73,6 +73,7 @@ import {
   type DeliveryDays,
   type DeliverySettingsRecord,
 } from './delivery.js';
+import type { AddressGap } from './address-quality.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
 import { checkoutTotals } from './totals.js';
 
@@ -282,7 +283,10 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const { codRules } = payments;
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status =
-    problem?.kind === 'address' || problem?.kind === 'discount' || problem?.kind === 'gift_card'
+    problem?.kind === 'address' ||
+    problem?.kind === 'vague_address' ||
+    problem?.kind === 'discount' ||
+    problem?.kind === 'gift_card'
       ? 422
       : problem?.kind === 'too_many'
         ? 429
@@ -385,6 +389,10 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       orderable &&
         html`<form method="post">
           <input type="hidden" name="shown" value="${view.shown}" />
+          ${
+            problem?.kind === 'vague_address' &&
+            html`<input type="hidden" name="address_checked" value="${form.address1}" />`
+          }
           ${field('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
           ${field('phone', LABELS.mobile, form, errors, {
             autocomplete: 'tel',
@@ -1454,6 +1462,40 @@ function codeAgain(channel: 'whatsapp' | 'sms'): Html {
     }`;
 }
 
+/** What riders look for that the address leaves out, in the shopper's words (ADR-682). */
+const GAP_WORDS: Record<AddressGap, { en: string; ur: string }> = {
+  number: { en: 'a house, flat or shop number', ur: 'مکان، فلیٹ یا دکان نمبر' },
+  street: { en: 'the street or block', ur: 'گلی یا بلاک' },
+  landmark: { en: 'a landmark near it', ur: 'قریب کی کوئی نشانی' },
+};
+
+/** "a, b and c", in English or Urdu, as plain words. */
+function wordsList(parts: readonly string[], and: string, comma: string): string {
+  return parts.length < 2
+    ? (parts[0] ?? '')
+    : `${parts.slice(0, -1).join(comma)} ${and} ${parts.at(-1)}`;
+}
+
+/** The address a rider could not find the house by: what to add, or to place it as it is. */
+function vagueAddressWords(gaps: readonly AddressGap[]): Sentence {
+  const en = wordsList(
+    gaps.map((gap) => GAP_WORDS[gap].en),
+    'and',
+    ', ',
+  );
+  const ur = wordsList(
+    gaps.map((gap) => GAP_WORDS[gap].ur),
+    'اور',
+    '، ',
+  );
+  return {
+    en:
+      `Riders find a house quicker with ${en}. Add them below if you can, or press the button ` +
+      'again to place your order as it is.',
+    ur: `رائیڈر ${ur} سے گھر جلدی ڈھونڈ لیتے ہیں۔ ہو سکے تو نیچے لکھ دیں، یا اپنا آرڈر ایسے ہی دینے کے لیے بٹن دوبارہ دبائیں۔`,
+  };
+}
+
 function codeWords(problem: Extract<CheckoutProblem, { kind: 'code' }>): Sentence {
   const phone = problem.phone;
   const where =
@@ -1655,6 +1697,8 @@ function problemWords(
         en: 'Some of your details are missing or not right. See below.',
         ur: 'آپ کی معلومات میں کچھ کمی یا غلطی ہے۔ نیچے دیکھیں۔',
       };
+    case 'vague_address':
+      return vagueAddressWords(problem.gaps);
     case 'unavailable':
       return {
         en: 'Some of your cart is no longer available. Go back to your cart to change it.',

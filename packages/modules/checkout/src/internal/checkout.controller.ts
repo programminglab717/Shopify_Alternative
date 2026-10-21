@@ -464,6 +464,8 @@ function formOf(body: unknown): CheckoutForm {
     pickup: field(body, 'pickup').slice(0, 40),
     // A message to go with it as a gift, where the page asked for one (ADR-413).
     giftMessage: field(body, 'gift_message').slice(0, 250),
+    // The house and street the page asked more of, posted again (ADR-682).
+    addressChecked: field(body, 'address_checked').slice(0, 500),
   };
 }
 

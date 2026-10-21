@@ -69,6 +69,7 @@ import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { addressGaps, isVague, type AddressGap } from './address-quality.js';
 import { keepContactIn, recoverIn } from './abandoned.service.js';
 import { addressesIn } from './account-addresses.js';
 import { sessionIn } from './account.service.js';
@@ -200,6 +201,11 @@ export interface CheckoutForm {
   pickup?: string;
   /** A message to go with the order as a gift, where the page asks for one (ADR-413). */
   giftMessage?: string;
+  /**
+   * The house and street the page asked more of (ADR-682), as it was then: posted again
+   * unchanged, the order is placed as it is; blank, or absent, while the page asked nothing.
+   */
+  addressChecked?: string;
 }
 
 /**
@@ -328,6 +334,11 @@ export type CheckoutProblem =
   | { kind: 'changed' }
   /** The address or number does not check out. */
   | { kind: 'address'; errors: FieldError[] }
+  /**
+   * The address leaves out what riders look for (CHK-02, ADR-682): the page asks once for more,
+   * and places it as it is when posted again unchanged.
+   */
+  | { kind: 'vague_address'; gaps: AddressGap[] }
   /** Some of the cart cannot be bought now, as when it sold out. */
   | { kind: 'unavailable' }
   /** It would collect more cash on delivery than the law allows an order (TAX-07). */
@@ -1012,6 +1023,12 @@ export class CheckoutService {
       }
       if (view.cart.items.some((item) => item.maxQuantity !== null)) {
         return { ...view, problem: { kind: 'unavailable' } };
+      }
+      // An address a rider could not find the house by is asked about once (ADR-682): posted
+      // again as it was, it is placed as it is. Nothing for an order picked up.
+      if (!pickupAt && (form.addressChecked ?? '').trim() !== form.address1.trim()) {
+        const gaps = addressGaps(form);
+        if (isVague(gaps)) return { ...view, problem: { kind: 'vague_address', gaps } };
       }
       // Not more orders lately from the number, or the internet address, than checkout takes.
       const recent = await this.orders.checkoutOrdersFrom(tx, found.shopId, {

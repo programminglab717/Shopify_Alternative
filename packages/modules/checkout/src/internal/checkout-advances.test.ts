@@ -619,7 +619,8 @@ describe.skipIf(!server)('An advance at checkout', () => {
         'transfer.',
     );
     // A first order with a short address and no house number: 0.35.
-    const vague = { ...FORM, phone: '0321-5556677', address1: 'Bazaar' };
+    // Placed as it is after the page asked for more of the address (ADR-682).
+    const vague = { ...FORM, phone: '0321-5556677', address1: 'Bazaar', addressChecked: 'Bazaar' };
     const risky = placed(await f.checkouts.place(page.secret, page.view.shown, vague));
     expect(risky).toMatchObject({
       advanceDue: 500_00n,

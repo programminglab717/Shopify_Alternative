@@ -6,6 +6,7 @@ import { addPkWorkingDays, pkDayOf } from '@hatti/pk';
 import { checkoutPagePath, type CartActionName, type CartJson } from '@hatti/storefront-api';
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { addressGaps, isVague } from './address-quality.js';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
 import {
@@ -95,6 +96,29 @@ describe('orderNoteOf', () => {
 
   it('is at the path storefronts send shoppers to', () => {
     expect(checkoutPagePath('secret')).toBe(`/${CHECKOUT_PATH}/secret`);
+  });
+});
+
+describe('addressGaps (ADR-682)', () => {
+  const gaps = (address1: string, address2 = '', landmark = '') =>
+    addressGaps({ address1, address2, landmark });
+
+  it('asks for a number, a street, and a landmark where there is no area either', () => {
+    expect(gaps('House 12, Street 4, Block 5', 'Gulshan-e-Iqbal')).toEqual([]);
+    expect(gaps('Shop 4, Liberty Market')).toEqual(['landmark']);
+    expect(gaps('Bazaar')).toEqual(['number', 'street', 'landmark']);
+    expect(gaps('House 12', 'DHA Phase 5')).toEqual(['street']);
+    expect(gaps('Near Jamia Masjid, Saddar', '', 'Opposite the bank')).toEqual(['number']);
+    // Urdu, with its own digits, is an address as much as English is.
+    expect(gaps('مکان نمبر ۱۲، گلی ۴', 'گلشن اقبال')).toEqual([]);
+    expect(gaps('بازار کے پاس')).toEqual(['number', 'landmark']);
+  });
+
+  it('stops the shopper for no number or no street, never for a landmark alone', () => {
+    expect(isVague(['landmark'])).toBe(false);
+    expect(isVague(['number'])).toBe(true);
+    expect(isVague(['street', 'landmark'])).toBe(true);
+    expect(isVague([])).toBe(false);
   });
 });
 
@@ -353,6 +377,47 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(placedOrder(await f.checkouts.place(secret, view.shown, FORM)).id).toBe(order.id);
     expect(placedOrder(await f.checkouts.place(secret, 'stale', EMPTY_FORM)).id).toBe(order.id);
     expect(await orderCount()).toBe(1);
+  });
+
+  it('asks once for more of an address a rider could not find, and places it as it is when posted again (ADR-682)', async () => {
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    const vague = { ...FORM, address1: 'Bazaar', address2: '', landmark: '' };
+    const asked = open(await f.checkouts.place(secret, view.shown, vague));
+    expect(asked.problem).toEqual({
+      kind: 'vague_address',
+      gaps: ['number', 'street', 'landmark'],
+    });
+    const page = checkoutPage(asked);
+    expect(page.status).toBe(422);
+    expect(page.html).toContain(
+      'Riders find a house quicker with a house, flat or shop number, the street or block and a ' +
+        'landmark near it. Add them below if you can, or press the button again to place your ' +
+        'order as it is.',
+    );
+    expect(page.html).toContain(
+      'رائیڈر مکان، فلیٹ یا دکان نمبر، گلی یا بلاک اور قریب کی کوئی نشانی',
+    );
+    expect(page.html).toContain('<input type="hidden" name="address_checked" value="Bazaar" />');
+    expect(await orderCount()).toBe(0);
+
+    // Changed, but still with no number: asked again, of the new one.
+    const changed = { ...vague, address1: 'Main Bazaar Road', addressChecked: 'Bazaar' };
+    const again = open(await f.checkouts.place(secret, view.shown, changed));
+    expect(again.problem).toEqual({ kind: 'vague_address', gaps: ['number', 'landmark'] });
+    expect(checkoutPage(again).html).toContain('value="Main Bazaar Road"');
+    expect(await orderCount()).toBe(0);
+
+    // Posted again as it was: placed as it is.
+    const order = placedOrder(
+      await f.checkouts.place(secret, view.shown, {
+        ...changed,
+        addressChecked: 'Main Bazaar Road',
+      }),
+    );
+    expect(order.shippingAddress).toMatchObject({ address1: 'Main Bazaar Road', landmark: null });
+    // An address with all a rider needs is never asked about.
+    expect(addressGaps(FORM)).toEqual([]);
   });
 
   it("keeps the pin the shopper's phone added at the address, and refuses one far from it (ADR-259)", async () => {
