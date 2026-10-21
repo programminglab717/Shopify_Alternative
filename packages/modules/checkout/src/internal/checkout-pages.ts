@@ -878,11 +878,20 @@ function advanceTermsWords(
  * The badges the shop chose, under the button (ADR-086): cash on delivery and opening the parcel
  * only where the page offers cash on delivery for the cart (`codOffered`); an exchange or
  * returns linked to the refund policy where the shop has one; help on WhatsApp where it has a
- * number. Nothing when none is left.
+ * number. First, what Hatti verified of the shop, whatever it chose (ADR-710). Nothing when none
+ * is left.
  */
 function badgeList(shop: CheckoutShop, codOffered: boolean): Html | false {
   const refund = shop.policies.some((policy) => policy.type === 'refund_policy');
-  const items = shop.badges.flatMap((badge) => {
+  const level = shop.verified ? VERIFIED[shop.verified] : null;
+  const verified = level
+    ? [
+        html`<span class="both verified"
+          ><span lang="en">${level.en}</span> <span lang="ur" dir="rtl">${level.ur}</span></span
+        >`,
+      ]
+    : [];
+  const chosen = shop.badges.flatMap((badge) => {
     const words = badgeWords(badge);
     switch (badge.kind) {
       case 'cash_on_delivery':
@@ -903,6 +912,7 @@ function badgeList(shop: CheckoutShop, codOffered: boolean): Html | false {
         return [words];
     }
   });
+  const items = [...verified, ...chosen];
   return (
     items.length > 0 &&
     html`<ul class="badges stack">
@@ -910,6 +920,18 @@ function badgeList(shop: CheckoutShop, codOffered: boolean): Html | false {
     </ul>`
   );
 }
+
+/** What Hatti verified of the shop, in Hatti Base's words (ADR-466). */
+const VERIFIED = {
+  identity: {
+    en: "Verified by Hatti: the seller's identity is checked",
+    ur: 'ہٹی سے تصدیق شدہ: بیچنے والے کی شناخت جانچی گئی ہے',
+  },
+  business: {
+    en: 'Verified by Hatti: a registered business',
+    ur: 'ہٹی سے تصدیق شدہ: رجسٹرڈ کاروبار',
+  },
+} as const;
 
 /** A badge in English and Urdu: "7-day exchange". */
 function badgeWords(badge: TrustBadgeValue): Html {

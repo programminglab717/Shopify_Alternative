@@ -294,6 +294,7 @@ describe.skipIf(!server)('CheckoutService', () => {
       logo: expect.stringMatching(`^https://hatti.test/storage/${key}\\?`),
       badges: [],
       whatsapp: null,
+      verified: null,
     });
     // Its URL shows the logo for an hour.
     const shown = new URL(view.shop.logo!);
@@ -1293,8 +1294,27 @@ describe.skipIf(!server)('CheckoutService', () => {
       logo: null,
       badges: [],
       whatsapp: null,
+      verified: null,
     };
     expect(await f.checkouts.view(secret)).toEqual({ kind: 'empty', shop });
+    // What Hatti verified of the shop, once it does (ADR-710).
+    const verify = (level: 'identity' | 'business') =>
+      f.admin.query(
+        `INSERT INTO trust.verifications (shop_id, level, name, cnic_last4, ntn, status, asked_by,
+           decided_at)
+         VALUES ($1, $2, 'Ayesha Khan', $3, $4, 'approved', $1, now())`,
+        [
+          f.a.shopId,
+          level,
+          level === 'identity' ? '4567' : null,
+          level === 'business' ? '1234567-8' : null,
+        ],
+      );
+    await verify('identity');
+    expect(await f.checkouts.view(secret)).toMatchObject({ shop: { verified: 'identity' } });
+    await verify('business');
+    expect(await f.checkouts.view(secret)).toMatchObject({ shop: { verified: 'business' } });
+    await f.admin.query('DELETE FROM trust.verifications');
     await f.admin.query('DELETE FROM checkout.carts');
     expect(await f.checkouts.place(secret, 'x', FORM)).toEqual({ kind: 'empty', shop });
   });

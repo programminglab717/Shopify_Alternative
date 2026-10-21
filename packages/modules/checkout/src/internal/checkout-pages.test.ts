@@ -1261,6 +1261,26 @@ describe('checkoutPage', () => {
     ).not.toContain('class="badges');
   });
 
+  it('says first among the badges what Hatti verified of the shop, whatever it chose (ADR-710)', () => {
+    const list = (shop: CheckoutShop) =>
+      /<ul class="badges stack">([\s\S]*?)<\/ul>/.exec(checkoutPage(openView({ shop })).html)?.[1];
+    const alone = list({ ...SHOP, verified: 'identity' })!;
+    expect(alone.match(/<span lang="en">[^<]*/g)).toEqual([
+      '<span lang="en">Verified by Hatti: the seller&#39;s identity is checked',
+    ]);
+    expect(alone).toContain('ہٹی سے تصدیق شدہ: بیچنے والے کی شناخت جانچی گئی ہے');
+    const business = list({
+      ...SHOP,
+      verified: 'business',
+      badges: [{ kind: 'original', days: null }],
+    })!;
+    expect(business.match(/<span lang="en">[^<]*/g)).toEqual([
+      '<span lang="en">Verified by Hatti: a registered business',
+      '<span lang="en">100% original products',
+    ]);
+    expect(list({ ...SHOP, verified: null })).toBeUndefined();
+  });
+
   it("links the shop's policies at the foot of the page, each opening beside the checkout", () => {
     const shop = {
       ...SHOP,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-709 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-710 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -717,6 +717,7 @@
 | 707 | Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme Check refusing anything else, and Hatti Base's FAQ answers are rich text | Accepted |
 | 708 | The theme editor's preview shows the theme's settings as they change, every section of the page rendered again with them, the few around the sections once saved | Accepted |
 | 709 | A cart permalink fills in its checkout with the shopper's details as Shopify's checkout[...] gives them: name, number, email, city and address, never kept with visits | Accepted |
+| 710 | The checkout says first among its badges what Hatti verified of the shop, its seller's identity or a registered business, whatever badges the shop chose | Accepted |
 
 ---
 
@@ -24341,3 +24342,21 @@
   not yet agree to give; the page's address already holds it, as Shopify's does. **The
   abandoned checkout's reminder filling in its link too:** a link forwarded would show the
   number to whoever it reached.
+
+## ADR-710 · The checkout says first among its badges what Hatti verified of the shop, its seller's identity or a registered business, whatever badges the shop chose
+
+* **Context:** Hatti verifies a shop's owner and then its business ([ADR-465](#adr-465--hatti-verifies-a-shops-owner-by-their-cnic-then-its-business-by-its-ntn-from-photos-its-owner-sends-hattis-people-decide-the-photos-are-deleted-once-they-do-and-the-storefronts-document-says-what-is-verified)), and
+  Hatti Base says so on product pages and in its footer ([ADR-466](#adr-466--hatti-base-says-beside-a-products-promises-and-in-its-footer-that-hatti-verified-the-shop-its-sellers-identity-or-a-registered-business)). The checkout, where
+  a shopper decides to trust the shop with their money and address, said nothing of it: its
+  badges are the shop's own choice from the platform's set ([ADR-086](#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)).
+* **Decision:**
+  * **The checkout's page reads what Hatti stands by** for the shop as it is made, through the
+    trust module's facade: the identity verified, or a registered business too.
+  * **It says so first among the badges under the button**, in English and Urdu, in Hatti Base's
+    words, whatever badges the shop chose, and with none chosen too. A shop cannot turn it off,
+    nor show it without Hatti's say; taken back, it goes with the next page.
+* **Consequences:** A shopper new to a shop sees the platform vouch for it where it matters most.
+  The checkout module depends on the trust module's public facade.
+* **Alternatives:** **A badge the shop picks:** one it could pick unverified, or leave off when
+  it would help. **Beside the shop's name at the page's head:** the badges are where shoppers
+  look for reasons to trust it.

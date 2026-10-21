@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Verified shops at checkout
+
+* **The checkout says first among its badges what Hatti verified of the shop, its seller's
+  identity or a registered business, whatever badges the shop chose** ([ADR-710](../architecture/13-decision-log.md#adr-710--the-checkout-says-first-among-its-badges-what-hatti-verified-of-the-shop-its-sellers-identity-or-a-registered-business-whatever-badges-the-shop-chose)): CHK-14's
+  verified store's badge.
+* 3966 tests, one more: the checkout module's; its checkout test reads the level as Hatti
+  verifies the shop.
+
 ### 6990e4e · Permalinks that fill in their checkout
 
 * **A cart permalink fills in its checkout with the shopper's details as Shopify's

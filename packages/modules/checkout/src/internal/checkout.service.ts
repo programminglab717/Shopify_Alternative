@@ -67,6 +67,7 @@ import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
+import { verifiedLevelIn, type VerificationLevel } from '@hatti/trust/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { addressGaps, isVague, type AddressGap } from './address-quality.js';
@@ -446,6 +447,11 @@ export interface CheckoutShop {
   badges: readonly TrustBadgeValue[];
   /** Its WhatsApp number in E.164, for the badge offering help there; null without one. */
   whatsapp: string | null;
+  /**
+   * What Hatti verified of it (ONB-11, ADR-710): its seller's identity, or a registered business;
+   * null, or absent, for neither.
+   */
+  verified?: VerificationLevel | null;
 }
 
 /**
@@ -1630,6 +1636,7 @@ export class CheckoutService {
       whatsapp: badges.some((badge) => badge.kind === 'whatsapp')
         ? (await shopPreferencesOf(tx, shopId)).whatsappNumber
         : null,
+      verified: await verifiedLevelIn(tx, shopId),
     };
   }
 

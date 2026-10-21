@@ -114,7 +114,7 @@ product beside the option, and asks a cart holding none for nothing
 The shop chooses up to four trust badges from the platform's set, which the page shows under its
 button in English and Urdu, each only where it holds: cash on delivery where the page offers it,
 an exchange or returns linked to the refund policy, help on its WhatsApp number
-([ADR-086](./13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)).
+([ADR-086](./13-decision-log.md#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)). First among them is what Hatti verified of the shop, which no shop chooses ([ADR-710](./13-decision-log.md#adr-710--the-checkout-says-first-among-its-badges-what-hatti-verified-of-the-shop-its-sellers-identity-or-a-registered-business-whatever-badges-the-shop-chose)).
 Checkout takes at most three orders a day from one mobile number and twenty an hour from one
 internet address, counting the orders it placed one at a time; past a limit, the page says why
 ([ADR-087](./13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)).
