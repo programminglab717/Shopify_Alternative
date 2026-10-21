@@ -14,7 +14,19 @@ import { loadTheme, readThemeDir } from '@hatti/themes';
 // /ur/. Images under /images/ are placeholders drawn to size. Carts are the core's, at
 // CORE_API_URL (http://localhost:4000 unless set), reached with STOREFRONT_SERVICE_KEY. The theme
 // editor may frame previews from STOREFRONT_EDITOR_ORIGINS, a comma-separated list of origins.
+//
+// With NODE_ENV=production, as its container runs it (ADR-724), it serves published shops alone:
+// no sample shop or placeholder images; STOREFRONT_URL, REDIS_URL, CORE_API_URL and
+// STOREFRONT_SERVICE_KEY must be set; TRUST_PROXY=true takes shoppers' addresses from the edge's
+// X-Forwarded-For; and SIGTERM lets the requests in flight finish before it exits.
 
+const production = process.env.NODE_ENV === 'production';
+if (production) {
+  const missing = ['STOREFRONT_URL', 'REDIS_URL', 'CORE_API_URL', 'STOREFRONT_SERVICE_KEY'].filter(
+    (name) => !process.env[name],
+  );
+  if (missing.length > 0) throw new Error(`Set ${missing.join(', ')} to serve in production`);
+}
 const themeDir = fileURLToPath(new URL('../../../../themes/hatti-base', import.meta.url));
 const theme = loadTheme(await readThemeDir(themeDir));
 const site = new URL(process.env.STOREFRONT_URL ?? 'http://localhost:4100');
@@ -49,8 +61,9 @@ const app = createStorefrontServer({
   redis,
   core: core || undefined,
   secureCookies: site.protocol === 'https:',
-  sample: new MemoryStore(sampleStore()),
-  placeholders: true,
+  trustProxy: process.env.TRUST_PROXY === 'true',
+  sample: production ? undefined : new MemoryStore(sampleStore()),
+  placeholders: !production,
   onThemeFileRejected: (shopId, error) =>
     console.error(`Shop ${shopId}'s theme file left out:`, error.message),
   editorOrigins,
@@ -58,6 +71,28 @@ const app = createStorefrontServer({
 
 const port = Number(process.env.STOREFRONT_PORT ?? (site.port || 4100));
 await app.listen({ port, host: '0.0.0.0' });
-const at = (handle?: string) =>
-  `${site.protocol}//${handle ? `${handle}.` : ''}${site.hostname}:${port}/`;
-console.log(`The sample shop at ${at()} (Urdu: /ur/), and published shops at ${at('<handle>')}`);
+
+// Kubernetes sends SIGTERM and waits for its grace period; a second signal exits at once.
+let closing = false;
+const stop = () => {
+  if (closing) process.exit(1);
+  closing = true;
+  app
+    .close()
+    .then(() => redis.quit())
+    .then(() => process.exit(0))
+    .catch((error: unknown) => {
+      console.error('Shutdown failed:', (error as Error).message);
+      process.exit(1);
+    });
+};
+process.on('SIGTERM', stop);
+process.on('SIGINT', stop);
+
+if (production) {
+  console.log(`Serving published shops on port ${port}, at their handles under ${site.hostname}`);
+} else {
+  const at = (handle?: string) =>
+    `${site.protocol}//${handle ? `${handle}.` : ''}${site.hostname}:${port}/`;
+  console.log(`The sample shop at ${at()} (Urdu: /ur/), and published shops at ${at('<handle>')}`);
+}

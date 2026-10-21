@@ -215,6 +215,37 @@ describe('Starting a storefront', () => {
     parse.mockRestore();
     await app.close();
   });
+
+  it("answers Kubernetes' probes at any host, Valkey's answering or not (ADR-724)", async () => {
+    const theme = loadTheme(await readThemeDir(THEME_DIR));
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    // Nothing listens on port 1: each ask fails at once.
+    const down = new Redis('redis://127.0.0.1:1', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 0,
+      enableOfflineQueue: false,
+    });
+    const shops = new Map<string, Redis | undefined>([
+      ['none', undefined],
+      ['down', down],
+    ]);
+    if (redisUrl) shops.set('up', new Redis(redisUrl, { lazyConnect: true }));
+    for (const [kind, redis] of shops) {
+      const app = createStorefrontServer({ theme, renderer, domain: 'hatti.test', redis });
+      // A pod's address, as the kubelet asks it, and a shop's.
+      for (const host of ['10.0.3.7:4100', 'zari.hatti.test']) {
+        const live = await app.inject({ method: 'GET', url: '/healthz', headers: { host } });
+        expect(live.statusCode, `${kind} ${host}`).toBe(200);
+        expect(live.json()).toEqual({ status: 'ok' });
+        expect(live.headers['cache-control']).toBe('no-store');
+        const ready = await app.inject({ method: 'GET', url: '/readyz?x=1', headers: { host } });
+        expect(ready.statusCode, `${kind} ${host}`).toBe(kind === 'down' ? 503 : 200);
+        expect(ready.json().status).toBe(kind === 'down' ? 'unavailable' : 'ok');
+      }
+      await app.close();
+      redis?.disconnect();
+    }
+  });
 });
 
 describe("Shops' themes", () => {

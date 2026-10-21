@@ -22,6 +22,7 @@
     "@hatti/api": "workspace:*",
     "@hatti/catalog": "workspace:*",
     "@hatti/crypto": "workspace:*",
+    "@hatti/customers": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
@@ -48,7 +49,6 @@
     "reflect-metadata": "catalog:"
   },
   "devDependencies": {
-    "@hatti/customers": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",

@@ -949,6 +949,25 @@ are placeholders drawn to size. `STOREFRONT_URL` (`http://localhost:4100` unless
 storefronts answer, for the seed, the API and the server; `STOREFRONT_PORT` changes the port the
 server listens on.
 
+## Build and run the images
+
+The core and the storefront are built into container images ([ADR-724](../architecture/13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)), from the repository's
+root, with Docker:
+
+```bash
+docker build --target core -t hatti-core:ci .
+docker build --target storefront -t hatti-storefront:ci .
+scripts/image-smoke.sh   # sets up, migrates and seeds the database in .env.example, then runs both
+```
+
+The core's image runs the API; the worker is
+`docker run hatti-core:ci node --import ./dist/instrumentation.js dist/worker.js`, and migrations
+`docker run hatti-core:ci node /app/packages/platform/db/dist/cli/migrate.js`. The storefront's
+runs with `NODE_ENV=production`: published shops alone, no sample shop, and `STOREFRONT_URL`,
+`REDIS_URL`, `CORE_API_URL` and `STOREFRONT_SERVICE_KEY` set. After a build,
+`python3 scripts/check_runtime_dependencies.py` says whether any package imports what it lists only
+among its devDependencies, which the images would not have.
+
 ## Everyday commands
 
 | Command | What it does |

@@ -324,6 +324,30 @@ const PAUSE_OPEN_ROUTES = new Set([
   '/ur/report/rights',
 ]);
 
+/**
+ * Where Kubernetes asks whether the storefront is up and may take traffic (ADR-724): no shop's
+ * page answers at these, on its handle or its own domain.
+ */
+export const HEALTH_PATHS = { live: '/healthz', ready: '/readyz' } as const;
+
+/** Whether `probe` answers within two seconds. */
+async function answers(probe: () => Promise<unknown>, timeoutMs = 2_000): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      probe(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** What a previewed page is: the shopper's own, never kept, and not for search engines. */
 const PREVIEWED = 'private, no-store';
 
@@ -643,6 +667,18 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const previewed = (reply: FastifyReply) => previewedAnswer(reply, editorOrigins);
   const app = Fastify({ trustProxy: options.trustProxy ?? false });
   app.addHook('onReady', () => warmUp(renderer));
+  // Kubernetes' probes (ADR-724), answered before any shop is looked for, whatever the host: the
+  // process is up, and Valkey, where shops are found, answers.
+  app.addHook('onRequest', async (request, reply) => {
+    const path = request.url.split('?', 1)[0];
+    if (path !== HEALTH_PATHS.live && path !== HEALTH_PATHS.ready) return;
+    reply.header('cache-control', 'no-store');
+    if (path === HEALTH_PATHS.live || !redis) return reply.send({ status: 'ok' });
+    const ok = await answers(() => redis.ping());
+    return reply
+      .code(ok ? 200 : 503)
+      .send({ status: ok ? 'ok' : 'unavailable', checks: { redis: ok ? 'ok' : 'failed' } });
+  });
   // An answer that sets a cookie is the shopper's own, whatever its handler said: never kept.
   app.addHook('onSend', async (request, reply, payload) => {
     if (reply.hasHeader('set-cookie') && /^public/.test(String(reply.getHeader('cache-control')))) {

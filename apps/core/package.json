@@ -55,6 +55,7 @@
     "@hatti/tax": "workspace:*",
     "@hatti/telemetry": "workspace:*",
     "@hatti/trust": "workspace:*",
+    "@hatti/xlsx": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",
@@ -71,7 +72,6 @@
     "rxjs": "catalog:"
   },
   "devDependencies": {
-    "@hatti/xlsx": "workspace:*",
     "@nestjs/testing": "catalog:",
     "@types/busboy": "catalog:",
     "@types/node": "catalog:",

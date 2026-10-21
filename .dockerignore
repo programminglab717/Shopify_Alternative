@@ -1,0 +1,15 @@
+# What the image build never reads (ADR-724): installs and build output are made afresh inside it,
+# and local settings and data stay on the machine they belong to.
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+**/*.log
+.git
+.env
+.env.*
+!.env.example
+.storage
+*.rdb
+docs

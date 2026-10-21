@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-723 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-724 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -731,6 +731,7 @@
 | 721 | Larger orders pay at most a rate the shop sets by the order's value: the largest value an order reaches caps its city's charge, before what its weight adds | Accepted |
 | 722 | The admin's delivery settings take rates by the order's value: each a subtotal and the most such an order pays, added and removed as weights are | Accepted |
 | 723 | Hatti Base says what larger orders pay at most to deliver: each rate on product pages, and the largest a cart reaches on the cart page, from the rates in the shop's document | Accepted |
+| 724 | The core and the storefront are built into container images of their own from one Dockerfile, each holding its app's built code and production dependencies alone, and CI builds both and runs them against an empty database on every push | Accepted |
 
 ---
 
@@ -24688,3 +24689,48 @@
     adds is said after it, as before.
 * **Consequences:** Shoppers see the rates before checkout. The cart cannot know the city, so it
   says "at most": the shop's own city may cost less.
+
+## ADR-724 · The core and the storefront are built into container images of their own from one Dockerfile, each holding its app's built code and production dependencies alone, and CI builds both and runs them against an empty database on every push
+
+* **Context:** The platform runs on Kubernetes in cells ([ADR-015](#adr-015--primary-hosting-in-singapore-pakistan-data-centre-cell-later-no-gulf-primary-proposed)), and its delivery
+  pipeline builds images from `main` ([10 §4](./10-infrastructure-and-devops.md#4-delivery-pipeline)).
+  Until now the apps ran only from the workspace, where every package's devDependencies are
+  installed: two packages imported others they listed only as devDependencies (the core
+  `@hatti/xlsx`, checkout `@hatti/customers`), which an install of production dependencies alone
+  would have broken. The storefront's server served the sample shop and placeholder images
+  wherever it ran, answered no probes, and ignored SIGTERM.
+* **Decision:**
+  * **One `Dockerfile`, two images.** A build stage fetches the lockfile's packages into pnpm's
+    store, cached between builds, installs the workspace offline and builds the core's and the
+    storefront's packages, each after those it depends on. `scripts/image-tree.sh` then lays out each app's tree:
+    the manifests and `dist/` of the app and the workspace packages it depends on, at the paths
+    they have in the repository, so that migrations and themes, found by path, are found; and
+    its production dependencies alone, installed offline from the lockfile and hoisted to the
+    root, where workspace packages find the peer dependencies (Nest's) they take from the app.
+    Each image is `node:24-bookworm-slim` with that tree, `NODE_ENV=production`, run as the
+    unprivileged `node` user: about 205 MB of dependencies for the core, 24 MB for the
+    storefront.
+  * **The core's image runs the API by default**; the worker, `migrate`, `setup`, the seed and
+    the core's command-line tools are other commands of the same image, so a release's
+    migrations job and pods run the same build.
+  * **The storefront in production** (`NODE_ENV=production`) serves published shops alone, with
+    no sample shop or placeholder images; it refuses to start without `STOREFRONT_URL`,
+    `REDIS_URL`, `CORE_API_URL` and `STOREFRONT_SERVICE_KEY`, takes shoppers' addresses from the
+    edge with `TRUST_PROXY=true`, and on SIGTERM finishes the requests in flight before it
+    exits. It answers `/healthz` and `/readyz` (Valkey within two seconds) at any host, before
+    any shop is looked for, never kept, as the core's API does; no shop's page answers there.
+  * **A package imports only what it depends on.** `scripts/check_runtime_dependencies.py` reads
+    each built package's `dist/`, tests and test helpers aside, and fails CI when its code
+    imports a package that is neither a dependency nor a peer dependency.
+  * **CI builds both images on every push** with Buildx, its layers cached in GitHub's cache,
+    and `scripts/image-smoke.sh` runs them against CI's empty Postgres and Valkey: the core's
+    image sets up and migrates the database and seeds a shop, then serves the API and runs the
+    worker; the storefront's, in production, must serve the seeded shop's home page in English
+    and Urdu.
+  * **The admin is not an image**: its build is static files served from the edge
+    ([ADR-513](#adr-513--the-merchant-admins-edge-headers-a-content-security-policy-that-runs-only-the-admins-own-scripts-and-googles-and-facebooks-sign-in-written-to-_headers-by-each-build-with-hsts-framing-refused-and-the-camera-alone-allowed)).
+* **Consequences:** Images are built and proven to start from every commit, but pushed to no
+  registry, signed or scanned yet: which registry, and the SBOM and signing, come with the
+  cell's infrastructure and its staging deploy. The core runs from the image in development's
+  settings in CI, its files in a directory; production's R2 and providers are configured with
+  the cell.

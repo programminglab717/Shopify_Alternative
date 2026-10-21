@@ -144,6 +144,12 @@ flowchart LR
     CAN --> ALL["Progressive rollout to all cells"]
 ```
 
+* **Images** ([ADR-724](./13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)): one `Dockerfile` builds the core's
+  image, whose API, worker and migrations job are commands of one build, and the storefront's,
+  each `node:24-bookworm-slim` with its app's built code and production dependencies alone, run
+  as an unprivileged user. Both answer `/healthz` and `/readyz` and finish their requests on
+  SIGTERM. CI builds them on every push and runs them against an empty database; pushing,
+  signing and scanning come with the cell's registry. The admin is static files at the edge.
 * **Database migrations:** expand → deploy → migrate data (resumable jobs) → contract. Migrations
   run as a separate job per cell before app rollout. Destructive changes need two releases.
 * **Feature flags** decouple deploy from release: per shop, per plan, per cell, percentage rollouts.

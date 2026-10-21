@@ -16,6 +16,19 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Container images
+
+* **The core and the storefront are built into images of their own** ([ADR-724](../architecture/13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)), from one
+  `Dockerfile`: each app's built code and production dependencies alone, laid out by
+  `scripts/image-tree.sh` as in the repository; the core's image runs the API, worker and
+  migrations. CI builds both on every push and `scripts/image-smoke.sh` runs them against an empty
+  database, seeding a shop the storefront then serves.
+* **The storefront in production** serves published shops alone, needs its settings, finishes its
+  requests on SIGTERM, and answers `/healthz` and `/readyz`.
+* **Two runtime imports were declared only as devDependencies** (the core's `@hatti/xlsx`,
+  checkout's `@hatti/customers`), and are now dependencies; CI checks every package's built code.
+* 4004 tests, one more: the storefront's.
+
 ### f27d78e · Rates by value on Hatti Base
 
 * **Hatti Base says what larger orders pay at most to deliver** ([ADR-723](../architecture/13-decision-log.md#adr-723--hatti-base-says-what-larger-orders-pay-at-most-to-deliver-each-rate-on-product-pages-and-the-largest-a-cart-reaches-on-the-cart-page-from-the-rates-in-the-shops-document)): each rate on product
