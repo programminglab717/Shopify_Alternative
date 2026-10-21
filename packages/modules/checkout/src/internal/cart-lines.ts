@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { PersonalisationField } from '@hatti/catalog/public';
 import { typedCode } from '@hatti/pricing/public';
 import type {
   CartActionName,
@@ -371,6 +372,59 @@ function findLine(lines: readonly StoredLine[], ref: LineRef): number {
   if ('index' in ref) return ref.index <= lines.length ? ref.index - 1 : -1;
   if ('key' in ref) return lines.findIndex((line) => lineKey(line) === ref.key);
   return lines.findIndex((line) => line.variantId === ref.variantId);
+}
+
+/**
+ * The answers `action` gives to what products made to order ask for (ADR-691): the properties of
+ * each line it adds, or the new properties of the line it changes. Quantities alone answer
+ * nothing, so a line kept from before a shop asked for more is not refused for it.
+ */
+export function answersOf(
+  cart: CartContent,
+  action: CartAction,
+  facts: ReadonlyMap<string, VariantFacts>,
+): { variantId: string; properties: Record<string, string> }[] {
+  if (action.kind === 'add') {
+    return action.items.map(({ variantId, properties }) => ({ variantId, properties }));
+  }
+  // A line changed to none is taken out, whatever it says.
+  if (action.kind === 'change' && action.properties !== null && action.quantity !== 0) {
+    const lines = cart.lines.filter((line) => facts.get(line.variantId)?.forSale);
+    const line = lines[findLine(lines, action.line)];
+    return line ? [{ variantId: line.variantId, properties: action.properties }] : [];
+  }
+  return [];
+}
+
+/**
+ * What is wrong with a line of `variantId`, of `title`, with `properties` for the `fields` its product asks for
+ * (ADR-691): a required field left unanswered, an answer past its length, or one not among its
+ * choices; null when nothing is. Blank answers are none, as the cart keeps them.
+ */
+export function personalisationProblem(
+  variantId: string,
+  title: string,
+  fields: readonly PersonalisationField[],
+  properties: Record<string, string>,
+): CartError | null {
+  for (const field of fields) {
+    const answer = properties[field.name];
+    const refused = (problem: 'missing' | 'too_long' | 'not_a_choice'): CartError => ({
+      code: 'PERSONALISATION',
+      variantId,
+      title,
+      field: field.name,
+      problem,
+    });
+    if (answer === undefined || answer.trim() === '') {
+      if (field.required) return refused('missing');
+    } else if (field.kind === 'choice' && !field.choices.includes(answer)) {
+      return refused('not_a_choice');
+    } else if (field.kind === 'text' && [...answer].length > (field.maxLength ?? Infinity)) {
+      return refused('too_long');
+    }
+  }
+  return null;
 }
 
 /** Units of each variant, across its lines. */

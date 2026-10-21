@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CART_LIMITS,
   EMPTY_CART,
+  answersOf,
   applyAction,
   cartJson,
   lineKey,
   parseAction,
+  personalisationProblem,
   type Applied,
   type CartAction,
   type CartContent,
@@ -335,5 +337,59 @@ describe('cart lines', () => {
     ]);
     const action: CartAction = { kind: 'clear' };
     expect(cartJson(applied(applyAction(cart, action, FACTS)), FACTS).items).toEqual([]);
+  });
+
+  it('takes the answers an add or a change of properties gives, and none from quantities (ADR-691)', () => {
+    const cart: CartContent = {
+      ...EMPTY_CART,
+      lines: [line(LAWN, 1), line(KURTA, 1, { Name: 'A' })],
+    };
+    const answers = (name: 'add' | 'change' | 'update', body: unknown) => {
+      const action = parseAction(name, body);
+      if ('code' in action) throw new Error(`Refused: ${JSON.stringify(action)}`);
+      return answersOf(cart, action, FACTS);
+    };
+    expect(
+      answers('add', { items: [{ variantId: SHAWL, properties: { Name: 'Sana', Note: ' ' } }] }),
+    ).toEqual([{ variantId: SHAWL, properties: { Name: 'Sana' } }]);
+    expect(answers('change', { line: { index: 2 }, properties: { Name: 'B' } })).toEqual([
+      { variantId: KURTA, properties: { Name: 'B' } },
+    ]);
+    expect(answers('change', { line: { index: 2 }, quantity: 3 })).toEqual([]);
+    expect(answers('change', { line: { index: 2 }, quantity: 0, properties: {} })).toEqual([]);
+    expect(answers('change', { line: { index: 3 }, properties: {} })).toEqual([]);
+    expect(answers('update', { updates: [{ line: { variantId: LAWN }, quantity: 2 }] })).toEqual(
+      [],
+    );
+  });
+
+  it('refuses an answer missing, too long or not among the choices (ADR-691)', () => {
+    const fields = [
+      { name: 'Name', kind: 'text' as const, required: true, maxLength: 5, choices: [] },
+      {
+        name: 'Thread',
+        kind: 'choice' as const,
+        required: false,
+        maxLength: null,
+        choices: ['Gold', 'Silver'],
+      },
+    ];
+    const problem = (properties: Record<string, string>) =>
+      personalisationProblem(KURTA, 'Kurta', fields, properties);
+    expect(problem({ Name: 'عائشہ', Thread: 'Gold' })).toBeNull();
+    expect(problem({ Name: 'Sana' })).toBeNull();
+    expect(problem({ Thread: 'Gold' })).toEqual({
+      code: 'PERSONALISATION',
+      variantId: KURTA,
+      title: 'Kurta',
+      field: 'Name',
+      problem: 'missing',
+    });
+    expect(problem({ Name: '  ' })).toMatchObject({ field: 'Name', problem: 'missing' });
+    expect(problem({ Name: 'Ayesha' })).toMatchObject({ field: 'Name', problem: 'too_long' });
+    expect(problem({ Name: 'Sana', Thread: 'gold' })).toMatchObject({
+      field: 'Thread',
+      problem: 'not_a_choice',
+    });
   });
 });

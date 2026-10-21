@@ -370,8 +370,9 @@ from checkout ([ADR-206](./13-decision-log.md#adr-206--each-product-a-shops-link
 * **Personalisation:** a product made to order asks the shopper for up to five fields, text or a
   choice, which the catalog keeps with the product and its document carries as
   `product.personalisation_fields`; Hatti Base's product form asks for each as the line's
-  property of its name, which the order's line keeps
-  ([ADR-687](./13-decision-log.md#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item), [ADR-689](./13-decision-log.md#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)).
+  property of its name, which the order's line keeps, and the cart refuses a line without
+  those required, past a length or outside the choices, however it is added
+  ([ADR-687](./13-decision-log.md#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item), [ADR-689](./13-decision-log.md#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds), [ADR-691](./13-decision-log.md#adr-691--the-cart-refuses-a-line-its-product-asks-more-of-a-required-answer-missing-an-answer-past-its-length-or-not-among-its-choices-said-in-the-themes-words)).
 
 ### 3.5 Free theme line-up (launch)
 

@@ -398,7 +398,10 @@
       "changed": "Your cart has changed. Please check it again.",
       "max_lines": "Your cart is full: it holds up to {{ max }} products.",
       "invalid": "That did not work. Please try again.",
-      "empty": "Your cart is empty."
+      "empty": "Your cart is empty.",
+      "personalisation_missing": "Please fill in {{ field }} for {{ title }}.",
+      "personalisation_too_long": "{{ field }} for {{ title }} is too long.",
+      "personalisation_not_a_choice": "Please choose {{ field }} for {{ title }} from its list."
     },
     "reorder": {
       "partial": "Not everything from your order could go in your cart: some of it is sold out, has fewer left, or is no longer for sale.",

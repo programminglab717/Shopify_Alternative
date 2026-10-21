@@ -334,6 +334,17 @@ export type CartError =
   | { code: 'MAX_QUANTITY'; variantId: string; title: string; max: number }
   /** A cart has at most `max` lines. */
   | { code: 'MAX_LINES'; max: number }
+  /**
+   * What a product made to order asks for (ADR-689, ADR-691): `field` left unanswered, answered
+   * past its length, or with what is not among its choices, on a line of `title`.
+   */
+  | {
+      code: 'PERSONALISATION';
+      variantId: string;
+      title: string;
+      field: string;
+      problem: 'missing' | 'too_long' | 'not_a_choice';
+    }
   /** No checkout for a cart with nothing that can be ordered, or none at all. */
   | { code: 'EMPTY' };
 

@@ -390,11 +390,11 @@ export function reorderItems(lines: readonly AccountOrderLineJson[]): Required<C
 
 /**
  * Puts `items` in the cart through `add`, as `/cart/add` does: all at once, or, should the cart
- * refuse them, as many as it takes. A variant it no longer sells is left out; one it has too few
- * of goes in with as many as it has left, besides what the cart has of it, `inCart`. Asks the
- * cart once more for each it refuses, and gives up on a refusal of any other kind, as when it is
- * full. The cart as `add` left it, and whether any were left out or fewer; null when none went
- * in.
+ * refuse them, as many as it takes. A variant it no longer sells is left out, as is one whose
+ * product now asks for what the order did not say (ADR-691); one it has too few of goes in with
+ * as many as it has left, besides what the cart has of it, `inCart`. Asks the cart once more for
+ * each it refuses, and gives up on a refusal of any other kind, as when it is full. The cart as
+ * `add` left it, and whether any were left out or fewer; null when none went in.
  */
 export async function addAgain(
   items: readonly Required<CartItemInput>[],
@@ -409,7 +409,9 @@ export async function addAgain(
     short = true;
     const { error } = result;
     const at =
-      error.code === 'MAX_QUANTITY' || error.code === 'NOT_FOUND'
+      error.code === 'MAX_QUANTITY' ||
+      error.code === 'NOT_FOUND' ||
+      error.code === 'PERSONALISATION'
         ? left.findIndex((item) => item.variantId === error.variantId)
         : -1;
     if (at < 0) break;

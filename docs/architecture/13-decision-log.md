@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-690 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-691 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -698,6 +698,7 @@
 | 688 | The admin's order page and the customer's order page show what the shopper wrote on each line, and checkout no longer copies it into the order's note | Accepted |
 | 689 | A product made to order asks the shopper for up to five fields, text or a choice, each answer a property of the cart line its page adds | Accepted |
 | 690 | The admin's product page has a Personalisation card, for those who change products: each field's question, text of a length or a choice, and whether it must be answered, saved together | Accepted |
+| 691 | The cart refuses a line its product asks more of: a required answer missing, an answer past its length or not among its choices, said in the theme's words | Accepted |
 
 ---
 
@@ -23882,3 +23883,32 @@
 * **Alternatives:** **A field's choices one box each:** commas are how merchants write lists, as
   the search synonyms take them. **A card of the shop's own fields for every product:** fields
   belong to what is made to order, product by product.
+
+## ADR-691 · The cart refuses a line its product asks more of: a required answer missing, an answer past its length or not among its choices, said in the theme's words
+
+* **Context:** A product made to order asks for its fields on its page
+  ([ADR-689](#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)), and the drawer asks for those required before it adds, but a form posted
+  without its script, a cart permalink or a call to the cart took a line without them, and
+  answers past their length or outside their choices.
+* **Decision:**
+  * **The cart checks the answers an action gives:** each line an add brings, and the new
+    properties of a line a change gives them, against the fields its product asks for now, in
+    the action's transaction. A field required and unanswered, or answered with blanks, is
+    `missing`; a text answer of more characters than its length, counted as the shopper sees
+    them, is `too_long`; a choice not among those offered, as they are written, is
+    `not_a_choice`. The first is refused as `PERSONALISATION` with the variant, its title and
+    the field.
+  * **Quantities answer nothing:** a line kept from before the shop asked, or asked for more,
+    keeps its quantity changed and is taken out as before; only giving it new properties asks
+    for the answers.
+  * **The storefront says it** in the theme's words, `cart.errors.personalisation_*`, with the
+    product and the field, in English and Urdu, on the cart page, the Ajax cart's 422 and a
+    permalink's cart page.
+  * **Buying an order again** ([ADR-574](#adr-574--a-shopper-buys-an-order-again-from-their-account-what-can-still-be-sold-goes-into-their-cart-at-the-orders-quantities-and-the-cart-says-what-could-not)) leaves out an item so refused, the rest
+    going in, as it leaves out one no longer sold.
+* **Consequences:** An order made to order carries what its product asks for, however the line
+  came to the cart.
+* **Alternatives:** **Checking at checkout as well:** the lines were checked when they took their
+  answers, and a shop asking for more of lines already in carts would strand them. **Refusing
+  answers to fields the product does not ask for:** they are the line's own properties, which
+  themes and apps add as Shopify's do.

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import type { TenantContext } from '@hatti/api';
-import { BundleService } from '@hatti/catalog/public';
+import { BundleService, PersonalisationService } from '@hatti/catalog/public';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -185,6 +185,47 @@ describe.skipIf(!server)('CartService', () => {
     const cart = await f.carts.cart(f.a.shopId, token!);
     expect(cart!.items.map((item) => [item.quantity, item.maxQuantity, item.price])).toEqual([
       [2, 1, 600_000],
+    ]);
+  });
+
+  it('refuses a line its product asks more of, but keeps one it asked less of (ADR-691)', async () => {
+    const [kurta] = await f.variantsOf(f.a, 'Embroidered kurta');
+    const snapshots = await f.db.tenant(f.a.shopId, (tx) =>
+      f.variants.snapshotsOf(tx, f.a.shopId, [kurta!]),
+    );
+    const productId = snapshots.get(kurta!)!.productId;
+    const { token } = done(await act(f.a, null, 'add', { items: [{ variantId: kurta }] }));
+    unwrap(
+      await new PersonalisationService(f.db).set(f.a, productId, [
+        { name: 'Name', kind: 'text', required: true, maxLength: 10 },
+        { name: 'Thread', kind: 'choice', choices: ['Gold', 'Silver'] },
+      ]),
+    );
+    const refused = (field: string, problem: string) => ({
+      ok: false,
+      error: {
+        code: 'PERSONALISATION',
+        variantId: kurta,
+        title: 'Embroidered kurta',
+        field,
+        problem,
+      },
+    });
+    const add = (properties: Record<string, string>) =>
+      act(f.a, token, 'add', { items: [{ variantId: kurta, properties }] });
+    expect(await add({ Thread: 'Gold' })).toEqual(refused('Name', 'missing'));
+    expect(await add({ Name: 'Ayesha Siddiqui' })).toEqual(refused('Name', 'too_long'));
+    expect(await add({ Name: 'Ayesha', Thread: 'Red' })).toEqual(refused('Thread', 'not_a_choice'));
+    // The line added before the shop asked keeps its quantity changed, but not new properties.
+    done(await act(f.a, token, 'change', { line: { index: 1 }, quantity: 2 }));
+    expect(
+      await act(f.a, token, 'change', { line: { index: 1 }, properties: { Thread: 'Gold' } }),
+    ).toEqual(refused('Name', 'missing'));
+    done(await add({ Name: 'Ayesha', Thread: 'Gold' }));
+    const cart = await f.carts.cart(f.a.shopId, token!);
+    expect(cart!.items.map((item) => [item.quantity, item.properties])).toEqual([
+      [1, { Name: 'Ayesha', Thread: 'Gold' }],
+      [2, {}],
     ]);
   });
 

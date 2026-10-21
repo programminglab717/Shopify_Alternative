@@ -1,4 +1,9 @@
-import { VariantService, bundleSellable, bundlesOfVariantsIn } from '@hatti/catalog/public';
+import {
+  VariantService,
+  bundleSellable,
+  bundlesOfVariantsIn,
+  personalisationIn,
+} from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, runPrepared, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
@@ -28,6 +33,8 @@ import {
   type CartContent,
   type StoredLine,
   type VariantFacts,
+  answersOf,
+  personalisationProblem,
 } from './cart-lines.js';
 import type { CodProduct } from './cod-rules.js';
 import { orderItemsIn } from './discount-items.js';
@@ -91,6 +98,21 @@ export class CartService {
       ]);
       const applied = applyAction(current, action, facts);
       if ('code' in applied) return { ok: false, error: applied };
+      // What products made to order ask for, answered as their pages ask (ADR-691).
+      const answers = answersOf(current, action, facts);
+      if (answers.length > 0) {
+        const asked = await personalisationIn(tx, shopId, [
+          ...new Set(answers.flatMap((answer) => facts.get(answer.variantId)?.productId ?? [])),
+        ]);
+        for (const answer of answers) {
+          const fact = facts.get(answer.variantId);
+          const fields = fact && asked.get(fact.productId);
+          const problem =
+            fields &&
+            personalisationProblem(answer.variantId, fact.title, fields, answer.properties);
+          if (problem) return { ok: false, error: problem };
+        }
+      }
       const { added, ...content } = applied;
       const discountCodes =
         action.kind === 'update' && action.discountCodes !== null

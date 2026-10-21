@@ -1,5 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cartBody, cartCookies, cartRoute, cookieOf, parseForm, permalinkItems } from './cart.js';
+import { addAgain } from './accounts.js';
+import {
+  cartBody,
+  cartCookies,
+  cartErrorMessage,
+  cartRoute,
+  cookieOf,
+  parseForm,
+  permalinkItems,
+} from './cart.js';
 import { sampleStore } from './fixtures.js';
 import { shopObject } from './objects.js';
 
@@ -91,5 +101,58 @@ describe('Cart requests', () => {
 
   it("says prices include any sales tax, as Pakistan's consumer laws ask them to be shown", () => {
     expect(shopObject(sampleStore().shop).taxes_included).toBe(true);
+  });
+
+  it("says what a product made to order still asks for, in the theme's words (ADR-691)", () => {
+    const urdu = JSON.parse(
+      readFileSync(new URL('../../../themes/hatti-base/locales/ur.json', import.meta.url), 'utf8'),
+    ) as { cart: { errors: Record<string, string> } };
+    const inUrdu = (key: string, values: Record<string, unknown>) => {
+      const words = urdu.cart.errors[key.replace('cart.errors.', '')];
+      return words?.replace(/\{\{ (\w+) \}\}/g, (_, name: string) => String(values[name])) ?? null;
+    };
+    const refused = (problem: 'missing' | 'too_long' | 'not_a_choice') =>
+      ({
+        code: 'PERSONALISATION',
+        variantId: 'v',
+        title: 'Kurta',
+        field: 'Name',
+        problem,
+      }) as const;
+    expect(cartErrorMessage(refused('missing'), () => null)).toBe('Please fill in Name for Kurta.');
+    expect(cartErrorMessage(refused('too_long'), () => null)).toBe('Name for Kurta is too long.');
+    expect(cartErrorMessage(refused('not_a_choice'), () => null)).toBe(
+      'Please choose Name for Kurta from its list.',
+    );
+    expect(cartErrorMessage(refused('missing'), inUrdu)).toBe('براہ کرم Kurta کے لیے Name لکھیں۔');
+  });
+
+  it('buys again without what a product now asks for, the rest going in (ADR-691)', async () => {
+    const asked: string[][] = [];
+    const items = [
+      { variantId: 'kurta', quantity: 1, properties: {} },
+      { variantId: 'lawn', quantity: 2, properties: {} },
+    ];
+    const result = await addAgain(
+      items,
+      async (left) => {
+        asked.push(left.map((item) => item.variantId));
+        return left.some((item) => item.variantId === 'kurta')
+          ? {
+              ok: false,
+              error: {
+                code: 'PERSONALISATION',
+                variantId: 'kurta',
+                title: 'Kurta',
+                field: 'Name',
+                problem: 'missing',
+              },
+            }
+          : ({ ok: true } as never);
+      },
+      async () => 0,
+    );
+    expect(asked).toEqual([['kurta', 'lawn'], ['lawn']]);
+    expect(result).toEqual({ added: { ok: true }, short: true });
   });
 });

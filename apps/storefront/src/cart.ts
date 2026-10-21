@@ -456,6 +456,30 @@ export function cartErrorMessage(
       return say('invalid', {}, 'That did not work. Please try again.');
     case 'EMPTY':
       return say('empty', {}, 'Your cart is empty.');
+    case 'PERSONALISATION': {
+      // What a product made to order asks for (ADR-691), in the words of the shop's own field.
+      const values = { title: error.title, field: error.field };
+      switch (error.problem) {
+        case 'missing':
+          return say(
+            'personalisation_missing',
+            values,
+            `Please fill in ${error.field} for ${error.title}.`,
+          );
+        case 'too_long':
+          return say(
+            'personalisation_too_long',
+            values,
+            `${error.field} for ${error.title} is too long.`,
+          );
+        case 'not_a_choice':
+          return say(
+            'personalisation_not_a_choice',
+            values,
+            `Please choose ${error.field} for ${error.title} from its list.`,
+          );
+      }
+    }
   }
 }
 
