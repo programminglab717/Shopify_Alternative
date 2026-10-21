@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-697 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-698 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -705,6 +705,7 @@
 | 695 | A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of what is due, as a merchant would publish it then | Accepted |
 | 696 | The admin's themes tab shows each theme's versions to take it back to, and publishes a theme at a time set ahead or calls it off | Accepted |
 | 697 | A personalisation field may add to each unit's price when it is answered, as embroidery costs: the cart prices its line with it, so the order keeps it, and the page says it | Accepted |
+| 698 | The admin's Personalisation card asks what each field's answer adds to the price, in rupees, blank for nothing | Accepted |
 
 ---
 
@@ -24062,3 +24063,17 @@
   second line to keep in step with the first, shown in the cart and on the order as an item.
   **A price for each choice:** one price for the field covers embroidery and thread; a choice
   that costs more is a variant.
+
+## ADR-698 · The admin's Personalisation card asks what each field's answer adds to the price, in rupees, blank for nothing
+
+* **Context:** A personalisation field may add to each unit's price when it is answered
+  ([ADR-697](#adr-697--a-personalisation-field-may-add-to-each-units-price-when-it-is-answered-as-embroidery-costs-the-cart-prices-its-line-with-it-so-the-order-keeps-it-and-the-page-says-it)), but only through the API; the product page's Personalisation card
+  ([ADR-690](#adr-690--the-admins-product-page-has-a-personalisation-card-for-those-who-change-products-each-fields-question-text-of-a-length-or-a-choice-and-whether-it-must-be-answered-saved-together)) asked for each field's question, length or choices and whether it must
+  be answered.
+* **Decision:** Each field on the card asks what an answer adds to the price, in rupees for each
+  one, commas allowed, blank for nothing; saved with the rest, the core's refusal shown under
+  it, and the price shown back as the core keeps it, whole rupees without their paisa, as the
+  variants' prices are. English and Urdu.
+* **Consequences:** A merchant sets "Name to embroider, Rs 500" where they set the question.
+* **Alternatives:** **A switch for whether a field costs, then its price:** a blank price says
+  it costs nothing in one field fewer.

@@ -4977,6 +4977,8 @@ export interface PersonalisationFieldValue {
   required: boolean;
   maxLength: number | null;
   choices: string[];
+  /** What an answer adds to each unit's price (ADR-697); absent where a fake core leaves it out. */
+  price?: MoneyValue | null;
 }
 
 export interface ProductPersonalisationSetData {

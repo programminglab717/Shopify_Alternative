@@ -14,7 +14,7 @@ import { useAdminMutation } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { FormSection } from './product-form';
+import { FormSection, priceText } from './product-form';
 
 /** As many fields as the core asks for on a product (ADR-689). */
 const MAX_FIELDS = 5;
@@ -30,29 +30,43 @@ interface FieldDraft {
   maxLength: string;
   /** A choice's options, as typed, commas between. */
   choices: string;
+  /** What an answer adds to each unit's price, in rupees as typed; blank for nothing. */
+  price: string;
 }
 
-/** What the core takes for each field: a text field's length, or a choice's options. */
+/**
+ * What the core takes for each field: a text field's length, or a choice's options, and what an
+ * answer adds to the price where one is typed (ADR-697).
+ */
 export function fieldsInput(drafts: readonly FieldDraft[]) {
-  return drafts.map((draft) =>
-    draft.kind === 'CHOICE'
-      ? {
-          name: draft.name,
-          kind: draft.kind,
-          required: draft.required,
-          choices: parseList(draft.choices),
-        }
-      : {
-          name: draft.name,
-          kind: draft.kind,
-          required: draft.required,
-          maxLength: draft.maxLength.trim() === '' ? null : Number(draft.maxLength),
-        },
-  );
+  return drafts.map((draft) => {
+    const price = draft.price.replace(/,/g, '').trim();
+    return {
+      ...fieldInput(draft),
+      ...(price !== '' && { price }),
+    };
+  });
+}
+
+/** A field's own parts: a text field's length, or a choice's options. */
+function fieldInput(draft: FieldDraft) {
+  return draft.kind === 'CHOICE'
+    ? {
+        name: draft.name,
+        kind: draft.kind,
+        required: draft.required,
+        choices: parseList(draft.choices),
+      }
+    : {
+        name: draft.name,
+        kind: draft.kind,
+        required: draft.required,
+        maxLength: draft.maxLength.trim() === '' ? null : Number(draft.maxLength),
+      };
 }
 
 /** A draft's problems, by the part of it each is about, from what the core said of `fields`. */
-type DraftErrors = Partial<Record<'name' | 'maxLength' | 'choices', string>>;
+type DraftErrors = Partial<Record<'name' | 'maxLength' | 'choices' | 'price', string>>;
 
 /**
  * What a product made to order asks the shopper for on its page (CAT-15, ADR-690): up to five
@@ -74,6 +88,7 @@ export function ProductPersonalisationCard({ product }: { product: ProductDetail
       required: field.required,
       maxLength: field.maxLength === null ? '' : String(field.maxLength),
       choices: field.choices.join(', '),
+      price: priceText(field.price?.amount),
     }));
   const [kept, setKept] = useState(() => draftsOf(product.personalisationFields ?? []));
   const [drafts, setDrafts] = useState(kept);
@@ -101,7 +116,10 @@ export function ProductPersonalisationCard({ product }: { product: ProductDetail
         for (const error of result.userErrors) {
           const [list, at, part] = error.field ?? [];
           const draft = list === 'fields' && at !== undefined ? drafts[Number(at)] : undefined;
-          if (draft && (part === 'name' || part === 'maxLength' || part === 'choices')) {
+          if (
+            draft &&
+            (part === 'name' || part === 'maxLength' || part === 'choices' || part === 'price')
+          ) {
             const mine = (byDraft[draft.key] ??= {});
             mine[part] = mine[part] ? `${mine[part]} ${error.message}` : error.message;
           } else {
@@ -181,6 +199,15 @@ export function ProductPersonalisationCard({ product }: { product: ProductDetail
                         onChange={(event) => change(draft.key, { choices: event.target.value })}
                       />
                     )}
+                    <TextField
+                      label={t('personalisation.price')}
+                      hint={t('personalisation.priceHint')}
+                      inputMode="decimal"
+                      ltr
+                      value={draft.price}
+                      error={mine.price}
+                      onChange={(event) => change(draft.key, { price: event.target.value })}
+                    />
                     <CheckField
                       label={t('personalisation.required')}
                       hint={t('personalisation.requiredHint')}
@@ -219,6 +246,7 @@ export function ProductPersonalisationCard({ product }: { product: ProductDetail
                 required: true,
                 maxLength: '',
                 choices: '',
+                price: '',
               },
             ])
           }

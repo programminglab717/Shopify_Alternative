@@ -65,7 +65,25 @@ function core(role: StaffRole, fields: PersonalisationFieldValue[]) {
           required: boolean;
           maxLength?: number | null;
           choices?: string[];
+          price?: string;
         }[];
+        const unpriced = given.findIndex(
+          (field) => field.price && !/^\d+(\.\d+)?$/.test(field.price),
+        );
+        if (unpriced >= 0) {
+          return {
+            productPersonalisationSet: {
+              personalisationFields: null,
+              userErrors: [
+                {
+                  field: ['fields', String(unpriced), 'price'],
+                  code: 'INVALID',
+                  message: 'must be an amount of zero or more, like 2499 or 2499.50',
+                },
+              ],
+            },
+          };
+        }
         const bad = given.findIndex(
           (field) => field.kind === 'CHOICE' && (field.choices ?? []).length < 2,
         );
@@ -89,6 +107,9 @@ function core(role: StaffRole, fields: PersonalisationFieldValue[]) {
           required: field.required,
           maxLength: field.kind === 'TEXT' ? (field.maxLength ?? 50) : null,
           choices: field.kind === 'CHOICE' ? (field.choices ?? []) : [],
+          price: field.price
+            ? { amount: Number(field.price).toFixed(2), currencyCode: 'PKR' }
+            : null,
         }));
         return { productPersonalisationSet: { personalisationFields: current, userErrors: [] } };
       }
@@ -117,7 +138,15 @@ describe("A product's personalisation fields on its page (CAT-15, ADR-690)", () 
   it('sends a text field its length, blank as none, and a choice its options', () => {
     expect(
       fieldsInput([
-        { key: 1, name: 'Name', kind: 'TEXT', required: true, maxLength: '', choices: 'x' },
+        {
+          key: 1,
+          name: 'Name',
+          kind: 'TEXT',
+          required: true,
+          maxLength: '',
+          choices: 'x',
+          price: ' ',
+        },
         {
           key: 2,
           name: 'Thread',
@@ -125,11 +154,19 @@ describe("A product's personalisation fields on its page (CAT-15, ADR-690)", () 
           required: false,
           maxLength: '9',
           choices: 'Gold، Silver, Gold',
+          price: ' 1,500 ',
         },
       ]),
     ).toEqual([
       { name: 'Name', kind: 'TEXT', required: true, maxLength: null },
-      { name: 'Thread', kind: 'CHOICE', required: false, choices: ['Gold', 'Silver'] },
+      // What an answer adds to the price, where one is typed (ADR-697).
+      {
+        name: 'Thread',
+        kind: 'CHOICE',
+        required: false,
+        choices: ['Gold', 'Silver'],
+        price: '1500',
+      },
     ]);
   });
 
@@ -169,6 +206,49 @@ describe("A product's personalisation fields on its page (CAT-15, ADR-690)", () 
         { name: 'Thread', kind: 'CHOICE', required: false, choices: ['Gold', 'Silver'] },
       ],
     });
+  });
+
+  it('adds to the price what an answer costs, after a price the core refused (ADR-698)', async () => {
+    const fake = core('owner', [EMBROIDERY]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+
+    const card = await screen.findByRole('region', { name: 'Personalisation' });
+    const first = within(card).getByRole('group', { name: 'Field 1' });
+    const price = within(first).getByLabelText(/Adds to the price/) as HTMLInputElement;
+    expect(price.value).toBe('');
+    fireEvent.change(price, { target: { value: 'free' } });
+    const save = within(card).getByRole('button', { name: 'Save personalisation' });
+    fireEvent.click(save);
+    expect(
+      await within(first).findByText('must be an amount of zero or more, like 2499 or 2499.50'),
+    ).toBeTruthy();
+
+    fireEvent.change(price, { target: { value: '500' } });
+    fireEvent.click(save);
+    expect(
+      await within(card).findByText('Saved. Its page asks for these in a moment.'),
+    ).toBeTruthy();
+    expect(sentOf(fake).at(-1)).toEqual({
+      productId: 'prod_1',
+      fields: [
+        { name: 'Name to embroider', kind: 'TEXT', required: true, maxLength: 12, price: '500' },
+      ],
+    });
+    // The price as the core keeps it, whole rupees without their paisa, in the fields saved.
+    const kept = within(card).getByLabelText(/Adds to the price/) as HTMLInputElement;
+    expect(kept.value).toBe('500');
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+
+    // Blank takes it away.
+    fireEvent.change(kept, { target: { value: '' } });
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sentOf(fake).at(-1)).toEqual({
+        productId: 'prod_1',
+        fields: [{ name: 'Name to embroider', kind: 'TEXT', required: true, maxLength: 12 }],
+      }),
+    );
   });
 
   it('takes a field away, at most five being asked for', async () => {

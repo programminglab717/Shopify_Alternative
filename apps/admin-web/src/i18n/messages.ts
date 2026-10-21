@@ -5159,6 +5159,9 @@ const en = {
   'personalisation.maxLengthHint': 'From 1 to 250; 50 if left blank.',
   'personalisation.choices': 'Choices',
   'personalisation.choicesHint': 'Two to 20, with commas between: Gold, Silver, Maroon.',
+  'personalisation.price': 'Adds to the price',
+  'personalisation.priceHint':
+    'Rupees for each one, when the shopper answers, like 500 for embroidery. Blank for nothing.',
   'personalisation.required': 'The shopper must answer',
   'personalisation.requiredHint': 'Its page asks for it before adding to the cart.',
   'personalisation.remove': 'Remove field {number}',
@@ -10634,6 +10637,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'personalisation.maxLengthHint': '1 سے 250 تک؛ خالی چھوڑیں تو 50۔',
   'personalisation.choices': 'انتخاب',
   'personalisation.choicesHint': 'دو سے 20، درمیان میں کوما کے ساتھ: سنہری، چاندی، میرون۔',
+  'personalisation.price': 'قیمت میں اضافہ',
+  'personalisation.priceHint':
+    'ہر ایک کے روپے، جب خریدار جواب دے، جیسے کڑھائی کے 500۔ کچھ نہیں تو خالی چھوڑیں۔',
   'personalisation.required': 'خریدار کو جواب دینا ہوگا',
   'personalisation.requiredHint': 'اس کا صفحہ کارٹ میں ڈالنے سے پہلے یہ پوچھتا ہے۔',
   'personalisation.remove': 'خانہ {number} ہٹائیں',

@@ -1020,6 +1020,10 @@ const PRODUCT = /* GraphQL */ `
       required
       maxLength
       choices
+      price {
+        amount
+        currencyCode
+      }
     }
     sizeChart {
       id
@@ -8959,6 +8963,10 @@ export const ProductPersonalisationSetMutation = /* GraphQL */ `
         required
         maxLength
         choices
+        price {
+          amount
+          currencyCode
+        }
       }
       userErrors {
         ...Problems
