@@ -1,7 +1,14 @@
 export { checkShopFile } from './check.js';
 export { editorSchemas, type EditorSchemas } from './editor.js';
 export { platformTheme, platformThemeDir } from './platform.js';
-export { imageValue, isSafeLink, ofType, settingProblem, settingValue } from './settings.js';
+export {
+  imageValue,
+  isSafeLink,
+  ofType,
+  settingProblem,
+  settingValue,
+  videoUrlOf,
+} from './settings.js';
 export {
   ThemeError,
   jsonTemplate,

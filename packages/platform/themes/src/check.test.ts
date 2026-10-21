@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { checkShopFile, platformTheme, type Theme } from './index.js';
+import { checkShopFile, platformTheme, settingValue, videoUrlOf, type Theme } from './index.js';
 
 describe('Theme Check', () => {
   let base: Theme;
@@ -91,5 +91,39 @@ describe('Theme Check', () => {
       'the theme has no setting "font"',
       'the theme has no section "gone" to set',
     ]);
+  });
+
+  it("takes a video section's YouTube or Vimeo address as people copy it, and nothing else (ADR-705)", () => {
+    for (const [url, video] of [
+      ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', { type: 'youtube', id: 'dQw4w9WgXcQ' }],
+      [
+        'https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ',
+        { type: 'youtube', id: 'dQw4w9WgXcQ' },
+      ],
+      ['https://youtu.be/dQw4w9WgXcQ?si=abc', { type: 'youtube', id: 'dQw4w9WgXcQ' }],
+      ['https://youtube.com/shorts/dQw4w9WgXcQ', { type: 'youtube', id: 'dQw4w9WgXcQ' }],
+      ['https://vimeo.com/76979871', { type: 'vimeo', id: '76979871' }],
+      ['https://player.vimeo.com/video/76979871', { type: 'vimeo', id: '76979871' }],
+      ['https://evil.example/watch?v=dQw4w9WgXcQ', null],
+      ['https://youtu.be/dQw4w9WgXcQ"onload="x', null],
+      ['javascript:alert(1)', null],
+    ] as const) {
+      expect(videoUrlOf(url), url).toEqual(video);
+    }
+    expect(
+      check('templates/index.json', {
+        sections: {
+          film: { type: 'video', settings: { video: 'https://vimeo.com/76979871' } },
+          clip: { type: 'video', settings: { video: 'https://example.com/clip.mp4' } },
+        },
+        order: ['film', 'clip'],
+      }),
+    ).toEqual([`section "clip"'s "video" must be the address of a YouTube or Vimeo video`]);
+    // A setting taking one host alone refuses the other's.
+    const youtube = { type: 'video_url', id: 'v', accept: ['youtube'] };
+    expect(settingValue(youtube, 'https://vimeo.com/76979871')).toBeNull();
+    expect(settingValue(youtube, ' https://youtu.be/dQw4w9WgXcQ ')).toBe(
+      'https://youtu.be/dQw4w9WgXcQ',
+    );
   });
 });

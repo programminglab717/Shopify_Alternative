@@ -24,6 +24,7 @@ import type { AddressForm, LoginForm } from './accounts.js';
 import type { WorkLimiter } from './limits.js';
 import {
   ExternalVideoDrop,
+  VideoUrlDrop,
   ImageDrop,
   PAGINATE,
   VideoDrop,
@@ -591,19 +592,27 @@ function videoTag(video: unknown, options: Record<string, unknown>): string {
   return `<video ${markupOf(attributes)}>${sources}${fallback}</video>`;
 }
 
+/** A product's YouTube or Vimeo video, or a `video_url` setting's (ADR-705): its host and ID. */
+function externalOf(video: unknown): { host: 'youtube' | 'vimeo'; id: string } | null {
+  if (video instanceof ExternalVideoDrop) return { host: video.host, id: video.external_id };
+  if (video instanceof VideoUrlDrop) return { host: video.type, id: video.id };
+  return null;
+}
+
 /**
  * Where a YouTube or Vimeo video plays in a page (ADR-258), as Shopify's external_video_url: its
  * host's player, YouTube's inline and without others' videos after it, and the parameters named.
  */
 function externalVideoUrl(video: unknown, options: Record<string, unknown>): string {
-  if (!(video instanceof ExternalVideoDrop)) return '';
-  const id = encodeURIComponent(video.external_id);
+  const external = externalOf(video);
+  if (!external) return '';
+  const id = encodeURIComponent(external.id);
   const base =
-    video.host === 'youtube'
+    external.host === 'youtube'
       ? `https://www.youtube.com/embed/${id}`
       : `https://player.vimeo.com/video/${id}`;
   const params = new URLSearchParams(
-    video.host === 'youtube' ? { enablejsapi: '1', playsinline: '1', rel: '0' } : {},
+    external.host === 'youtube' ? { enablejsapi: '1', playsinline: '1', rel: '0' } : {},
   );
   for (const [name, value] of Object.entries(options)) {
     params.set(name, value === true ? '1' : value === false ? '0' : String(value));
@@ -618,7 +627,7 @@ function externalVideoUrl(video: unknown, options: Record<string, unknown>): str
  */
 function externalVideoTag(video: unknown, options: Record<string, unknown>): string {
   const src =
-    video instanceof ExternalVideoDrop
+    externalOf(video) !== null
       ? externalVideoUrl(video, {})
       : typeof video === 'string' &&
           /^https:\/\/(?:www\.youtube\.com\/embed|player\.vimeo\.com\/video)\//.test(video)

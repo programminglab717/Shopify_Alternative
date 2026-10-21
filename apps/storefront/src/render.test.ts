@@ -667,6 +667,57 @@ describe('Storefront rendering', () => {
     expect(await trailOf({ path: '/collections/eid-lawn' }, off)).toBeNull();
   });
 
+  it('plays a YouTube or Vimeo video the shop chose in a section of its own (OS-08, ADR-705)', async () => {
+    const sample = sampleStore();
+    const pages = sample.pages ?? [];
+    const store = new MemoryStore({
+      ...sample,
+      pages: [
+        ...pages,
+        {
+          ...pages[0]!,
+          id: 'pg-story',
+          handle: 'story',
+          title: 'Our story',
+          templateSuffix: 'story',
+        },
+      ],
+    });
+    const render = async (sections: Record<string, Record<string, unknown>>) => {
+      const template = { sections, order: Object.keys(sections) };
+      const theme = { ...files, 'templates/page.story.json': JSON.stringify(template) };
+      const renderer = new PageRenderer(loadTheme(theme), { limits: { timeMs: 10_000 } });
+      return renderer.render({ path: '/pages/story' }, store.fresh());
+    };
+    const page = await render({
+      film: {
+        type: 'video',
+        settings: {
+          heading: 'How our lawn is made',
+          video: 'https://youtu.be/dQw4w9WgXcQ?si=share',
+          text: 'From the loom\nto your door',
+        },
+      },
+      vimeo: { type: 'video', settings: { video: 'https://vimeo.com/76979871' } },
+      // An address that plays nothing shows nothing.
+      clip: { type: 'video', settings: { heading: 'Gone', video: 'https://example.com/a.mp4' } },
+    });
+    expect(page.status).toBe(200);
+    const frames = [...page.html.matchAll(/<iframe ([^>]*)><\/iframe>/g)].map(([, at]) => at);
+    expect(frames).toEqual([
+      'src="https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1&amp;playsinline=1&amp;rel=0" ' +
+        'title="How our lawn is made" loading="lazy" frameborder="0" ' +
+        'allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" ' +
+        'allowfullscreen="allowfullscreen"',
+      expect.stringMatching(/^src="https:\/\/player\.vimeo\.com\/video\/76979871" title=""/),
+    ]);
+    expect(page.html).toContain('<h2 dir="auto">How our lawn is made</h2>');
+    expect(page.html).toContain(
+      '<p class="video-section__text" dir="auto">From the loom<br />\nto your door</p>',
+    );
+    expect(page.html).not.toContain('Gone');
+  });
+
   it("answers shoppers' questions on a page, and tells search engines as an FAQPage (ADR-615)", async () => {
     const sample = sampleStore();
     const pages = sample.pages ?? [];

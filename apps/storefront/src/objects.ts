@@ -23,7 +23,13 @@ import type {
   CartJson,
   CartLineJson,
 } from '@hatti/storefront-api';
-import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
+import {
+  imageValue,
+  isSafeLink,
+  settingValue,
+  videoUrlOf,
+  type SettingSchema,
+} from '@hatti/themes';
 import { isOnlyDefault, itemsDiscounted, lineTitle } from './cart.js';
 import type { FilteredListing, FilterRequest } from './filters.js';
 import { POLICIES, policyTitle } from './policies.js';
@@ -273,6 +279,29 @@ export class ExternalVideoDrop extends Drop {
 
   override valueOf(): string {
     return this.preview_image.src;
+  }
+}
+
+/**
+ * A `video_url` setting's video (ADR-705), as Shopify gives it: its host's `type`, "youtube" or
+ * "vimeo", and its `id` there, for external_video_url and external_video_tag; printed, the
+ * address the setting holds.
+ */
+export class VideoUrlDrop extends Drop {
+  readonly type: 'youtube' | 'vimeo';
+  readonly id: string;
+
+  constructor(
+    readonly url: string,
+    video: { type: 'youtube' | 'vimeo'; id: string },
+  ) {
+    super();
+    this.type = video.type;
+    this.id = video.id;
+  }
+
+  override valueOf(): string {
+    return this.url;
   }
 }
 
@@ -1273,6 +1302,11 @@ export function resolveSettings(
       case 'image_picker':
         settings[id] = imageSetting(value, ctx.pictures);
         break;
+      case 'video_url': {
+        const video = videoUrlOf(value);
+        settings[id] = video ? new VideoUrlDrop(value as string, video) : null;
+        break;
+      }
       default:
         settings[id] = value;
     }

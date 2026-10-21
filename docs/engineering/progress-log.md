@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Video sections
+
+* **A theme's sections play YouTube and Vimeo videos from Shopify's `video_url` setting, the
+  address checked as it is saved, and Hatti Base has a video section** ([ADR-705](../architecture/13-decision-log.md#adr-705--a-themes-sections-play-youtube-and-vimeo-videos-from-shopifys-video_url-setting-the-address-checked-as-it-is-saved-and-hatti-base-has-a-video-section)): OS-08's videos.
+* 3957 tests, two more: the storefront's and the themes package's.
+
 ### 8bfefe0 · Heavier orders on Hatti Base
 
 * **Hatti Base says what heavier orders cost more: each weight on product pages, and the

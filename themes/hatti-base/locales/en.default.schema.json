@@ -164,6 +164,21 @@
         }
       }
     },
+    "video": {
+      "name": "Video",
+      "settings": {
+        "heading": {
+          "label": "Heading"
+        },
+        "video": {
+          "label": "Video",
+          "info": "A YouTube or Vimeo video's address, such as https://www.youtube.com/watch?v=…"
+        },
+        "text": {
+          "label": "Text beneath it"
+        }
+      }
+    },
     "faq": {
       "name": "Questions and answers",
       "settings": {

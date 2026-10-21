@@ -164,6 +164,21 @@
         }
       }
     },
+    "video": {
+      "name": "ویڈیو",
+      "settings": {
+        "heading": {
+          "label": "عنوان"
+        },
+        "video": {
+          "label": "ویڈیو",
+          "info": "یوٹیوب یا ویمیو ویڈیو کا ایڈریس، جیسے https://www.youtube.com/watch?v=…"
+        },
+        "text": {
+          "label": "نیچے کا متن"
+        }
+      }
+    },
     "faq": {
       "name": "سوال و جواب",
       "settings": {

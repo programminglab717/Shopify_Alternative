@@ -7,6 +7,24 @@ const COLOR =
   /^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\(\s*\d{1,3}(\s*,\s*\d{1,3}){2}(\s*,\s*(0|1|0?\.\d+))?\s*\))$/i;
 const LINK = /^(\/(?![/\\])|https?:\/\/|mailto:|tel:)[^\s"'<>\\`]*$/i;
 const IMAGE_SRC = /^(\/(?![/\\])|https:\/\/)[^\s"'<>\\`]*$/i;
+// A YouTube or Vimeo video's address as people copy it: a watch page, a short link, a Short or
+// the player's own; its ID, with nothing after it that could end an attribute.
+const YOUTUBE =
+  /^https?:\/\/(?:(?:www\.|m\.)?youtube\.com\/(?:watch\?(?:[^#\s"'<>\\`]*&)?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?:[?&#/][^\s"'<>\\`]*)?$/;
+const VIMEO =
+  /^https?:\/\/(?:www\.|player\.)?vimeo\.com\/(?:video\/)?(\d{1,12})(?:[?#/][^\s"'<>\\`]*)?$/;
+
+/**
+ * The video a `video_url` setting's address plays, as Shopify gives it (ADR-705): its host's
+ * name, "youtube" or "vimeo", and its ID there; null for any other address.
+ */
+export function videoUrlOf(value: unknown): { type: 'youtube' | 'vimeo'; id: string } | null {
+  if (typeof value !== 'string') return null;
+  const youtube = YOUTUBE.exec(value.trim());
+  if (youtube) return { type: 'youtube', id: youtube[1]! };
+  const vimeo = VIMEO.exec(value.trim());
+  return vimeo ? { type: 'vimeo', id: vimeo[1]! } : null;
+}
 
 /** A link a theme may print as it is: a path on the storefront, or a web, mail or phone address. */
 export function isSafeLink(url: string): boolean {
@@ -42,6 +60,11 @@ export function ofType(setting: SettingSchema, value: unknown): unknown {
       return typeof value === 'string' && LINK.test(value) ? value : undefined;
     case 'image_picker':
       return imageValue(value) ? value : undefined;
+    case 'video_url': {
+      const video = videoUrlOf(value);
+      const accepted = !setting.accept || (video && setting.accept.includes(video.type));
+      return video && accepted ? (value as string).trim() : undefined;
+    }
     case 'text':
     case 'textarea':
     case 'richtext':
@@ -110,6 +133,12 @@ export function settingProblem(setting: SettingSchema, value: unknown): string |
       );
     case 'image_picker':
       return 'must be an image at a path on the storefront or an https address';
+    case 'video_url': {
+      const hosts = (setting.accept ?? ['youtube', 'vimeo']).map((host) =>
+        host === 'youtube' ? 'YouTube' : host === 'vimeo' ? 'Vimeo' : host,
+      );
+      return `must be the address of a ${hosts.join(' or ')} video`;
+    }
     case 'collection':
     case 'product':
     case 'page':

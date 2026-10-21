@@ -16,6 +16,8 @@ export interface SettingSchema {
   max?: number;
   /** A select's or radio's choices. */
   options?: { value: unknown; label?: string }[];
+  /** The hosts a `video_url` takes, of "youtube" and "vimeo" (ADR-705); both when left out. */
+  accept?: string[];
 }
 
 /** A kind of block a section takes. */

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-704 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-705 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -712,6 +712,7 @@
 | 702 | Heavier orders cost more to deliver: a shop names weights, each with what an order over it costs more, and checkout adds the heaviest the cart passes to the city's charge | Accepted |
 | 703 | The admin's delivery settings take heavier orders' charges: weights typed in kilograms, sent in grams, each with what it costs more, added and removed as zones are | Accepted |
 | 704 | Hatti Base says what heavier orders cost more: each weight on product pages, and the heaviest a cart passes on the cart page, from the weights in the shop's document | Accepted |
+| 705 | A theme's sections play YouTube and Vimeo videos from Shopify's video_url setting, the address checked as it is saved, and Hatti Base has a video section | Accepted |
 
 ---
 
@@ -24215,3 +24216,24 @@
   The cart's weight is its variants' weights, as checkout counts it.
 * **Alternatives:** **The cart's delivery charge worked out on the cart page:** the city is not
   known until checkout, so the cart says what the weight adds alone.
+
+## ADR-705 · A theme's sections play YouTube and Vimeo videos from Shopify's video_url setting, the address checked as it is saved, and Hatti Base has a video section
+
+* **Context:** A page's body keeps nothing that frames another site ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)), so a
+  shop could show a video only as a product's ([ADR-258](#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)): not the film of how its lawn
+  is printed on its home or About page. Shopify's themes do it with a `video_url` setting, which
+  our settings did not know, passing any value through unchecked.
+* **Decision:**
+  * **`video_url` is a setting type**, as Shopify's: its value is a YouTube or Vimeo address as
+    people copy it, a watch page, a short link, a Short or the player's own, and Theme Check
+    refuses any other, or the host its `accept` leaves out, as it refuses other settings' wrong
+    values. Nothing after the video's ID may end an attribute.
+  * **Liquid gives it as Shopify does**: the setting's `type`, "youtube" or "vimeo", and its
+    `id`, printed as the address; `external_video_url` and `external_video_tag` take it as they
+    take a product's video, so the iframe is the one products' videos already play in, lazy, and
+    on the two hosts alone.
+  * **Hatti Base's video section**: a heading, the video in a 16:9 frame and a few words beneath;
+    nothing at all without a video that plays.
+* **Consequences:** Shops add a video to any page through their theme's files.
+* **Alternatives:** **Embeds in a page's body:** a body that frames other sites is one that can
+  frame anything. **An `html` setting:** the same.
