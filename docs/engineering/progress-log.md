@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The admin's browser known by its own ID
+### 4ee1b28 · The admin's browser known by its own ID
 
 * **The admin's web client keeps a random ID for its browser and sends it with each request to
   /auth, so that a sign-in from the browser its owner uses is known as theirs** ([ADR-681](../architecture/13-decision-log.md#adr-681--the-admins-web-client-keeps-a-random-id-for-its-browser-and-sends-it-with-each-request-to-auth-so-that-a-sign-in-from-the-browser-its-owner-uses-is-known-as-theirs)): the
