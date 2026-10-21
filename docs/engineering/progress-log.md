@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Search synonyms in the admin
+### 7c68dcc · Search synonyms in the admin
 
 * **The admin's online store has a Search synonyms tab, for those who change products: each group
   a line of words between commas, saved whole, and a group begun from a search that found
