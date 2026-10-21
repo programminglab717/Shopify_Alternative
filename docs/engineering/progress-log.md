@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Personalisation in the admin
+### 6c4f72d · Personalisation in the admin
 
 * **The admin's product page has a Personalisation card, for those who change products: each
   field's question, text of a length or a choice, and whether it must be answered, saved
