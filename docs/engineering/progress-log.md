@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Badges in the shop's own words
+### bfd1906 · Badges in the shop's own words
 
 * **A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than
   one saying something else each, shown as written in English or Urdu** ([ADR-711](../architecture/13-decision-log.md#adr-711--a-checkouts-badges-may-be-in-the-shops-own-words-up-to-60-characters-on-a-line-more-than-one-saying-something-else-each-shown-as-written-in-english-or-urdu)): CHK-14's last
