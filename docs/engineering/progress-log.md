@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### What a search shows first
+### bfa9a09 · What a search shows first
 
 * **A shop pins products to the top of a term's search, in its order, and hides others from it:
   the whole search as the search folds it, read live as synonyms are** ([ADR-692](../architecture/13-decision-log.md#adr-692--a-shop-pins-products-to-the-top-of-a-terms-search-in-its-order-and-hides-others-from-it-the-whole-search-as-the-search-folds-it-read-live-as-synonyms-are)): SRC-04's
