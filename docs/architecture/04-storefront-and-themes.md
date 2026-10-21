@@ -262,6 +262,8 @@ typo or two from it, the fewest typos first ([ADR-234](./13-decision-log.md#adr-
 A product is found by words that mean the same, Hatti's in English, Roman Urdu and Urdu
 ([ADR-481](./13-decision-log.md#adr-481--a-commerce-lexicon-a-storefronts-search-finds-what-a-word-means-in-english-roman-urdu-or-urdu-juta-the-shops-shoes-after-what-holds-the-word-as-typed)) and the shop's own, kept on the admin's Search
 synonyms tab ([ADR-685](./13-decision-log.md#adr-685--a-shop-keeps-groups-of-its-own-words-that-mean-the-same-which-its-storefronts-search-reads-beside-hattis-commerce-lexicon-each-word-a-whole-word-as-the-shop-wrote-it), [ADR-686](./13-decision-log.md#adr-686--the-admins-online-store-has-a-search-synonyms-tab-for-those-who-change-products-each-group-a-line-of-words-between-commas-saved-whole-and-a-group-begun-from-a-search-that-found-nothing)).
+What the shop pins for the whole search comes first, in its order, and what it hides is left
+out ([ADR-692](./13-decision-log.md#adr-692--a-shop-pins-products-to-the-top-of-a-terms-search-in-its-order-and-hides-others-from-it-the-whole-search-as-the-search-folds-it-read-live-as-synonyms-are)).
 Each is found by the shop's Urdu for it as by its own words
 ([ADR-240](./13-decision-log.md#adr-240--a-storefronts-search-finds-products-pages-and-articles-by-the-shops-urdu-for-them-as-by-its-own-words-from-words-of-each-translation-kept-folded-beside-its-own-as-its-translations-change-its-own-words-first)).
 Hatti Base's header suggests products, pages and articles as a shopper types, the last word taken

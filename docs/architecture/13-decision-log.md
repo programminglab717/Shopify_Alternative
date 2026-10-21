@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-691 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-692 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -699,6 +699,7 @@
 | 689 | A product made to order asks the shopper for up to five fields, text or a choice, each answer a property of the cart line its page adds | Accepted |
 | 690 | The admin's product page has a Personalisation card, for those who change products: each field's question, text of a length or a choice, and whether it must be answered, saved together | Accepted |
 | 691 | The cart refuses a line its product asks more of: a required answer missing, an answer past its length or not among its choices, said in the theme's words | Accepted |
+| 692 | A shop pins products to the top of a term's search, in its order, and hides others from it: the whole search as the search folds it, read live as synonyms are | Accepted |
 
 ---
 
@@ -23912,3 +23913,35 @@
   answers, and a shop asking for more of lines already in carts would strand them. **Refusing
   answers to fields the product does not ask for:** they are the line's own properties, which
   themes and apps add as Shopify's do.
+
+## ADR-692 · A shop pins products to the top of a term's search, in its order, and hides others from it: the whole search as the search folds it, read live as synonyms are
+
+* **Context:** A storefront's search finds a shop's products by their words, Hatti's synonyms
+  and the shop's own ([ADR-685](#adr-685--a-shop-keeps-groups-of-its-own-words-that-mean-the-same-which-its-storefronts-search-reads-beside-hattis-commerce-lexicon-each-word-a-whole-word-as-the-shop-wrote-it)), best first by where the words are
+  ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)). A shop that wants its Eid edit first for "eid", or last season's left
+  out, could not say so (SRC-04).
+* **Decision:**
+  * **A rule for a term** (`catalog.search_rules`): the term as the shop wrote it and as the
+    search folds it, its words each folded and between single spaces; up to 10 products pinned,
+    in order, and up to 50 hidden; 200 terms a shop. A term written as another's folds is the
+    same term, its rule changed. Each product the shop's, none both pinned and hidden.
+  * **The search reads the rule of the whole search**, folded as its words are and cut to the
+    ten words it reads, in the same transaction as it finds: the pinned products the shop has
+    active come first, in their order, whether they hold the words or not; then what it finds,
+    without the pinned or the hidden; at most as many as asked. Predictive search reads it too,
+    once the shopper has typed the term to its end. A search with more words than the term is
+    another search.
+  * **Products deleted since** are passed over, by the search and by the rule as the API shows
+    it; drafts pinned are not shown.
+  * **Admin API:** `searchRules`, `searchRuleSet(query, pinnedProductIds, hiddenProductIds)`
+    and `searchRuleDelete(id)`, read with `read_products` and changed with `write_products`,
+    each with the products as `Product`s; `search_rule.updated` and `search_rule.deleted` events
+    with counts alone. Search rules' IDs are `srch_`.
+* **Consequences:** A shop merchandises its busiest searches as Shopify's Search & Discovery app
+  lets one, at once, without the edge's pages waiting for a rebuild, the search being read
+  live.
+* **Alternatives:** **Boosts by weight, a tag or a collection:** pins say what comes first
+  without a score a merchant can't see; they wait for a search engine that ranks
+  (Typesense). **Rules for searches holding the term:** "eid" would pin to "eid lawn" too, where
+  the shopper asked for less; a whole search is what Shopify matches. **Pins kept in storefront
+  documents:** the search is read from the core already, so its rules are read with it.

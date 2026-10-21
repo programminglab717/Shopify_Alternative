@@ -6,6 +6,7 @@ import { ProductPartsResolver } from './graphql/product-parts.resolver.js';
 import { ProductResolver } from './graphql/product.resolver.js';
 import { ProductReviewResolver } from './graphql/reviews.resolver.js';
 import { SizeChartResolver } from './graphql/size-chart.resolver.js';
+import { SearchRuleResolver } from './graphql/search-rule.resolver.js';
 import { SearchSynonymResolver } from './graphql/search-synonym.resolver.js';
 import { BundleResolver } from './graphql/bundle.resolver.js';
 import { BundleService } from './bundles.js';
@@ -25,6 +26,7 @@ import { ProductService } from './product.service.js';
 import { ProductReviewService } from './review.service.js';
 import { StorefrontSearchController } from './search.controller.js';
 import { SizeChartService } from './size-charts.js';
+import { SearchRuleService } from './search-rules.js';
 import { SearchSynonymService } from './search-synonyms.js';
 import { VariantService } from './variant.service.js';
 import { CopyDraftService } from './copy-drafts.service.js';
@@ -53,6 +55,7 @@ import { MetafieldService } from './metafields.js';
     StockFileService,
     ProductReviewService,
     SizeChartService,
+    SearchRuleService,
     SearchSynonymService,
     BundleService,
     ComplementService,
@@ -64,6 +67,7 @@ import { MetafieldService } from './metafields.js';
     CollectionResolver,
     ProductReviewResolver,
     SizeChartResolver,
+    SearchRuleResolver,
     SearchSynonymResolver,
     BundleResolver,
     ComplementResolver,

@@ -128,6 +128,8 @@ export const ID_PREFIXES = {
   accountAddress: 'addr',
   // A message through the online store's contact form (ADR-589).
   contactMessage: 'cform',
+  // What a storefront's search shows first, or leaves out, for a term (ADR-692).
+  searchRule: 'srch',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

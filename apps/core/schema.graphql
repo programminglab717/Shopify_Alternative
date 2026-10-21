@@ -9204,6 +9204,14 @@ type Mutation {
   """
   savedSearchUpdate(input: SavedSearchUpdateInput!): SavedSearchUpdatePayload!
 
+  """Takes a term's rule away: its search shows what it finds."""
+  searchRuleDelete(id: ID!): SearchRuleDeletePayload!
+
+  """
+  Pins up to 10 products to the top of a term's search, in their order, and hides up to 50 from it, in place of what its rule said; a shop keeps rules for 200 terms. Searches show them at once; pages the edge keeps for a minute show them after it.
+  """
+  searchRuleSet(hiddenProductIds: [ID!]!, pinnedProductIds: [ID!]!, query: String!): SearchRuleSetPayload!
+
   """
   Replaces the shop's groups of words that mean the same, 100 at most; none takes them all away. Searches find by them at once; pages the edge keeps for a minute show them after it.
   """
@@ -14291,6 +14299,9 @@ type Query {
     topProducts: Int
   ): SalesReport!
 
+  """The shop's search rules, by their terms (ADR-692)."""
+  searchRules: [SearchRule!]!
+
   """
   The shop's own groups of words that mean the same, in its order (ADR-685).
   """
@@ -15238,6 +15249,35 @@ enum SearchResultType {
   DRAFT_ORDER
   ORDER
   PRODUCT
+}
+
+"""
+What a storefront's search shows first, or leaves out, for a term (SRC-04, ADR-692): a search whose words fold to the same as the term shows its pinned products first, in their order, whether they hold the words or not, and none of its hidden products.
+"""
+type SearchRule {
+  """Left out: those the shop still has."""
+  hiddenProducts: [Product!]!
+  id: ID!
+
+  """
+  Shown first, in this order: those the shop still has. Drafts are not shown.
+  """
+  pinnedProducts: [Product!]!
+
+  """The term as the shop wrote it."""
+  query: String!
+  updatedAt: DateTime!
+}
+
+type SearchRuleDeletePayload {
+  deletedSearchRuleId: ID
+  userErrors: [UserError!]!
+}
+
+type SearchRuleSetPayload {
+  """The rule now; null when refused."""
+  searchRule: SearchRule
+  userErrors: [UserError!]!
 }
 
 """

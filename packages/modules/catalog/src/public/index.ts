@@ -180,6 +180,11 @@ export {
   type SearchSynonymsUpdatedPayload,
 } from '../internal/search-synonyms.js';
 export {
+  SEARCH_RULE_LIMITS,
+  SearchRuleEvents,
+  type SearchRuleUpdatedPayload,
+} from '../internal/search-rules.js';
+export {
   SIZE_CHART_LIMITS,
   SizeChartEvents,
   SizeChartService,

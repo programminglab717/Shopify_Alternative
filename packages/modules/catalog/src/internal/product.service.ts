@@ -36,6 +36,7 @@ import {
 } from './taxonomy.js';
 import { CopiedVariantStock, copyMedia, joinManualCollections } from './product-copy.js';
 import { copySizeChartIn } from './size-charts.js';
+import { searchRuleIn } from './search-rules.js';
 import { shopSynonymsIn } from './search-synonyms.js';
 import { productSearchConditions } from './product-filter.js';
 import { screen, screeningDigest, screeningMessage, type ScreenedWords } from './prohibited.js';
@@ -1150,7 +1151,9 @@ export class ProductService {
    * matches them (Roman Urdu spellings folded), or a word meaning the same in English, Roman Urdu
    * or Urdu (ADR-481) or by the shop's own synonyms (ADR-685), best first: those with the first
    * word as typed earliest,
-   * which puts titles before vendors, types and tags, then the newest. At most `limit`. With
+   * which puts titles before vendors, types and tags, then the newest. What the shop pins for
+   * the whole term comes first, in its order, whether it holds the words or not, and what it
+   * hides is left out (ADR-692). At most `limit`. With
    * `prefix`, the last word may be cut short, as it is while a shopper types. Where none has
    * every word as typed, the words none of the shop's products holds are read as the shop's own
    * words a typo or two from them, and those with the fewest typos come first (ADR-234). In the
@@ -1165,6 +1168,31 @@ export class ProductService {
   ): Promise<string[]> {
     const tokens = searchKey(terms).split(' ').filter(Boolean).slice(0, SEARCH_WORDS);
     if (tokens.length === 0) return [];
+    const rule = await searchRuleIn(tx, shopId, tokens.join(' '));
+    if (rule) {
+      const found = await this.foundIdsOf(
+        tx,
+        shopId,
+        tokens,
+        limit + rule.pinned.length + rule.hidden.length,
+        options,
+      );
+      const pinned = await activeInOrder(tx, shopId, rule.pinned);
+      const left = new Set([...pinned, ...rule.hidden]);
+      return [...pinned, ...found.filter((id) => !left.has(id))].slice(0, limit);
+    }
+    return this.foundIdsOf(tx, shopId, tokens, limit, options);
+  }
+
+  /** What {@link searchIdsOf} finds of `tokens` before the shop's rule for them. */
+  private async foundIdsOf(
+    tx: Tx,
+    shopId: string,
+    words: readonly string[],
+    limit: number,
+    options: { prefix?: boolean },
+  ): Promise<string[]> {
+    const tokens = [...words];
     // Words that mean the same in English, Roman Urdu and Urdu, each a whole word (ADR-481), and
     // those the shop says mean the same (ADR-685).
     const own = await shopSynonymsIn(tx, shopId);
@@ -1290,6 +1318,16 @@ export class ProductService {
  * ProductService.searchIdsOf} orders them. None where a word has no correction, or every word
  * was there as typed, if never together.
  */
+/** Those of `ids` the shop has active now, in their order. */
+async function activeInOrder(tx: Tx, shopId: string, ids: readonly string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM catalog.products
+     WHERE shop_id = ${shopId} AND status = 'active' AND id = ANY(${sql.param([...ids])}::uuid[])`);
+  const active = new Set(rows.map((row) => row.id));
+  return ids.filter((id) => active.has(id));
+}
+
 async function searchCorrectedIn(
   tx: Tx,
   shopId: string,

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### What a search shows first
+
+* **A shop pins products to the top of a term's search, in its order, and hides others from it:
+  the whole search as the search folds it, read live as synonyms are** ([ADR-692](../architecture/13-decision-log.md#adr-692--a-shop-pins-products-to-the-top-of-a-terms-search-in-its-order-and-hides-others-from-it-the-whole-search-as-the-search-folds-it-read-live-as-synonyms-are)): SRC-04's
+  merchandising through the Admin API.
+* 3920 tests, three more: the catalog's and the core's.
+
 ### 896bd39 · The cart asks what the product asks
 
 * **The cart refuses a line its product asks more of: a required answer missing, an answer past
