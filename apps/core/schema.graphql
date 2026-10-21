@@ -7250,6 +7250,11 @@ enum MessageKind {
   CREDIT_LOW
 
   """
+  For staff, at their own numbers: a customer refused a parcel while another order of theirs waits to ship; told to whom that order is given, else to the owners, managers and confirmation agents, to call them first (COD-07, ADR-673).
+  """
+  CUSTOMER_REFUSED
+
+  """
   For the shop, at its alerts number each morning: the day before's orders and sales, parcels delivered and turned back, and cash on delivery still to come (ANL-07, ADR-386).
   """
   DAILY_SUMMARY

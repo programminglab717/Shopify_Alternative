@@ -2385,6 +2385,81 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await dispatch(2);
     expect(await receipts()).toHaveLength(3);
   });
+  it('tells staff a customer refused a parcel while another order of theirs waits to ship: to whom it is given, else those who call (ADR-673)', async () => {
+    // An owner in Urdu, a manager, a confirmation agent, a manager without a number and a packer.
+    const [hina, omar, sana, faraz, danish] = [newId(), newId(), newId(), newId(), newId()];
+    const [HINA, OMAR, SANA, DANISH] = [
+      '+923451110021',
+      '+923451110022',
+      '+923451110023',
+      '+923451110024',
+    ];
+    await admin.query('DELETE FROM identity.memberships WHERE shop_id = $1', [shopId]);
+    await admin.query(
+      `INSERT INTO identity.users (id, name, email, phone_e164, phone_verified_at, language)
+       VALUES ($1, 'Hina Butt', NULL, $6, now(), 'ur'),
+              ($2, 'Omar Sheikh', NULL, $7, now(), 'en'),
+              ($3, 'Sana', NULL, $8, now(), 'en'),
+              ($4, 'Faraz', 'faraz.k@example.pk', '+923451110025', NULL, 'en'),
+              ($5, 'Danish', NULL, $9, now(), 'en')`,
+      [hina, omar, sana, faraz, danish, HINA, OMAR, SANA, DANISH],
+    );
+    await admin.query(
+      `INSERT INTO identity.memberships (user_id, shop_id, role)
+       VALUES ($1, $6, 'owner'), ($2, $6, 'manager'), ($3, $6, 'confirmation_agent'),
+              ($4, $6, 'manager'), ($5, $6, 'packer')`,
+      [hina, omar, sana, faraz, danish, shopId],
+    );
+    const refusals = async () =>
+      (await queued())
+        .filter((message) => message.kind === 'customer_refused')
+        .map((message) => [message.recipient, message.variables])
+        .sort(([a], [b]) => String(a).localeCompare(String(b)));
+    // A customer of their own, whose orders no other test placed.
+    const bilal = { address: { ...addressOf('Bilal Ahmed'), phone: '+923217776665' } };
+    /** A confirmed order of Bilal's, shipped and then refused. */
+    const refused = async () => {
+      const order = await placeOnline(bilal);
+      unwrap(await orders().confirm(tenant, order.id));
+      const { fulfillmentId } = unwrap(await fulfillments().fulfill(tenant, order.id, {}));
+      unwrap(await fulfillments().markReturning(tenant, fulfillmentId));
+      return order;
+    };
+    // His next order, confirmed and waiting to be packed.
+    const next = await placeOnline(bilal);
+    unwrap(await orders().confirm(tenant, next.id));
+    const first = await refused();
+    await dispatch(2);
+    const said = { shop: 'Zari Fashions', order: `#${next.number}`, refused: `#${first.number}` };
+    // No one has it: the owners, managers and confirmation agents with numbers, once each.
+    expect(await refusals()).toEqual([
+      [HINA, said],
+      [OMAR, said],
+      [SANA, said],
+    ]);
+    // Given to Danish: the next refusal is his alone, whoever he is.
+    unwrap(
+      await orders().assign(
+        tenant,
+        next.id,
+        { staffMemberId: danish, name: 'Danish' },
+        { fromOthers: true },
+      ),
+    );
+    const second = await refused();
+    await dispatch(2);
+    expect(await refusals()).toEqual([
+      [HINA, said],
+      [OMAR, said],
+      [SANA, said],
+      [DANISH, { ...said, refused: `#${second.number}` }],
+    ]);
+    // Shipped since: nothing left to call about.
+    unwrap(await fulfillments().fulfill(tenant, next.id, {}));
+    await refused();
+    await dispatch(2);
+    expect(await refusals()).toHaveLength(4);
+  });
   it("tells the shop as its month's orders near its plan's limit and reach it, and frees those past it on a plan without one (ADR-263)", async () => {
     const OWNER = '+923335550009';
     unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));

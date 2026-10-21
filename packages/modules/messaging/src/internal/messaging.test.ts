@@ -298,6 +298,21 @@ describe("Messages' words", () => {
       // Not the news of an order for its customer: no email carries it.
       expect(messageEmail(kind, 'en', work)).toBeNull();
     }
+    // A parcel its customer refused, for those who call before their next order ships (ADR-673).
+    const refused = { ...work, refused: '#1040' };
+    expect(messageText('customer_refused', 'en', refused)).toBe(
+      'Zari Fashions: the customer of order #1043 refused their parcel for #1040. Call them ' +
+        'before #1043 ships.',
+    );
+    expect(messageText('customer_refused', 'ur', refused)).toMatch(
+      /^Zari Fashions: .*#1043.*#1040/u,
+    );
+    expect(templateParameters('customer_refused', refused)).toEqual([
+      'Zari Fashions',
+      '#1043',
+      '#1040',
+    ]);
+    expect(messageEmail('customer_refused', 'en', refused)).toBeNull();
   });
 
   it('asks once more, with the same answers and link, those who have not answered (ADR-175)', () => {

@@ -47,6 +47,7 @@ export const MESSAGE_KINDS = [
   'order_assigned',
   'order_mentioned',
   'order_receipt_sent',
+  'customer_refused',
   'invoice_due',
   'payment_overdue',
   'plan_ended',
@@ -176,6 +177,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'order_assigned',
   'order_mentioned',
   'order_receipt_sent',
+  'customer_refused',
   'invoice_due',
   'payment_overdue',
   'plan_ended',
@@ -309,6 +311,11 @@ export interface MessageVariables {
   note?: string;
   /** For the shop's own SMS sender (ADR-469): the name its customers' SMS go from, "ZARI". */
   sender?: string;
+  /**
+   * For staff told of a parcel its customer refused (ADR-673): that parcel's order, "#1040", as
+   * `order` is the one of theirs still to ship.
+   */
+  refused?: string;
   /**
    * For listings taken off sale after a rights complaint (ADR-475): the complainant's email, as
    * the store may answer them; `name` says who complains, `reference` the complaint's number and
@@ -918,6 +925,19 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         '{shop}: گاہک نے آرڈر {order} کے لیے اپنی ٹرانسفر کی رسید بھیجی ہے۔ دیکھیں کہ رقم آ گئی ' +
         'ہے، پھر ہٹی میں اسے ادا شدہ کریں۔',
+    },
+  },
+  customer_refused: {
+    whatsapp: 'hatti_customer_refused',
+    category: 'utility',
+    parameters: ['shop', 'order', 'refused'],
+    text: {
+      en:
+        '{shop}: the customer of order {order} refused their parcel for {refused}. Call them ' +
+        'before {order} ships.',
+      ur:
+        '{shop}: آرڈر {order} کے خریدار نے {refused} کا پارسل واپس کر دیا۔ {order} بھیجنے سے ' +
+        'پہلے انہیں کال کریں۔',
     },
   },
   order_cancelled: {

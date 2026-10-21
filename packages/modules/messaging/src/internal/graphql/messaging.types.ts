@@ -45,6 +45,7 @@ export enum MessageKind {
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
   ORDER_MENTIONED = 'ORDER_MENTIONED',
   ORDER_RECEIPT_SENT = 'ORDER_RECEIPT_SENT',
+  CUSTOMER_REFUSED = 'CUSTOMER_REFUSED',
   INVOICE_DUE = 'INVOICE_DUE',
   PAYMENT_OVERDUE = 'PAYMENT_OVERDUE',
   PLAN_ENDED = 'PLAN_ENDED',
@@ -232,6 +233,12 @@ registerEnumType(MessageKind, {
         'For staff, at their own numbers: a customer sent the receipt of their transfer for an ' +
         'order still waiting for it; told to whom the order is given, else to the owners and ' +
         'managers (PAY-02, ADR-247).',
+    },
+    CUSTOMER_REFUSED: {
+      description:
+        'For staff, at their own numbers: a customer refused a parcel while another order of ' +
+        'theirs waits to ship; told to whom that order is given, else to the owners, managers ' +
+        'and confirmation agents, to call them first (COD-07, ADR-673).',
     },
     INVOICE_DUE: {
       description:

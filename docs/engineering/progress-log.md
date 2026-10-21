@@ -14,6 +14,15 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-21
+
+### A customer's refusal told on WhatsApp
+
+* **A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship
+  is given to, else who confirms orders** ([ADR-673](../architecture/13-decision-log.md#adr-673--a-parcel-its-customer-refused-tells-on-whatsapp-whom-each-other-order-of-theirs-yet-to-ship-is-given-to-else-who-confirms-orders)): the `customer_refused` message, in English
+  and Urdu, which the shop may turn off in Settings → Messages.
+* 3832 tests, one more: the worker's.
+
 ## 2026-10-20
 
 ### b761ef0 · A customer's refusal pushed before their next parcel ships

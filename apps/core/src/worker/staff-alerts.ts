@@ -1,5 +1,5 @@
 import { scopeWithin, shopProfile } from '@hatti/api';
-import type { Database } from '@hatti/db';
+import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import { staffPhonesIn } from '@hatti/identity/public';
 import { toPublicId } from '@hatti/ids';
@@ -15,15 +15,18 @@ import {
   OrderEvents,
   mentionsIn,
   orderName,
+  ordersToShipOfCustomerIn,
   staffAlertFactsIn,
+  type FulfillmentUpdatedPayload,
   type OrderAssignedPayload,
   type OrderCommentPayload,
   type OrderUpdatedPayload,
+  type RefusedOrders,
 } from '@hatti/orders/public';
 
 /**
- * What an event tells staff of: an order given to one of them, a comment that may name some, or
- * a receipt its customer sent for its transfer.
+ * What an event tells staff of: an order given to one of them, a comment that may name some, a
+ * receipt its customer sent for its transfer, or a parcel its customer refused.
  */
 type Alert =
   | {
@@ -34,7 +37,8 @@ type Alert =
       batch: { id: string; size: number } | null;
     }
   | { kind: 'order_mentioned'; orderId: string; commentId: string }
-  | { kind: 'order_receipt_sent'; orderId: string };
+  | { kind: 'order_receipt_sent'; orderId: string }
+  | { kind: 'customer_refused'; orderId: string; fulfillmentId: string };
 
 /**
  * Who looks for a transfer's money in the shop's bank when no one has its order (ADR-247): owners
@@ -42,6 +46,12 @@ type Alert =
  * (ADR-581).
  */
 const PAYMENT_ROLES: readonly StaffRole[] = ['owner', 'manager'];
+
+/**
+ * Who calls a customer before their next order ships when no one has it (ADR-673): as its push
+ * (ADR-672), owners, managers and confirmation agents who may change orders.
+ */
+const CALLING_ROLES: readonly StaffRole[] = ['owner', 'manager', 'confirmation_agent'];
 
 /**
  * Tells members of staff on WhatsApp of their own work (ORD-10, ORD-02, ADR-191), at the number
@@ -54,7 +64,10 @@ const PAYMENT_ROLES: readonly StaffRole[] = ['owner', 'manager'];
  * left the shop or proved no number, nor what the shop turned off; each is the shop's message,
  * paid from its credit as its other alerts are. An order given to a member, and a comment naming
  * them, are pushed to their browsers too (ADR-633), number or none, once each, in their language,
- * opening the order, saying neither its customer nor the comment's words.
+ * opening the order, saying neither its customer nor the comment's words. And a parcel its
+ * customer refused (ADR-673), of each other order of theirs confirmed and not yet shipped: told to
+ * whom that order is given, else to the owners, managers and confirmation agents who may change
+ * orders, once a parcel and order, to call them before it ships; pushed apart (ADR-672).
  */
 export class StaffAlerts {
   /** The events {@link handle} reads. */
@@ -63,12 +76,19 @@ export class StaffAlerts {
     OrderEvents.OrderCommentCreated,
     OrderEvents.OrderCommentUpdated,
     OrderEvents.OrderUpdated,
+    OrderEvents.FulfillmentUpdated,
   ];
 
   constructor(
     private readonly database: Database,
     private readonly messages: MessagesService,
     private readonly push: PushService | null = null,
+    /** The orders to call before they ship, their customer having refused `orderId`'s parcel. */
+    private readonly toShip: (
+      tx: Tx,
+      shopId: string,
+      orderId: string,
+    ) => Promise<RefusedOrders | null> = ordersToShipOfCustomerIn,
   ) {}
 
   async handle(event: DomainEvent): Promise<void> {
@@ -78,6 +98,11 @@ export class StaffAlerts {
     const pushes = await this.database.tenant(shopId, async (tx): Promise<StaffPush[]> => {
       // Through identity's function for the shop of the transaction, never its tables (ADR-193).
       const staff = await staffPhonesIn(tx, shopId);
+      if (alert.kind === 'customer_refused') {
+        await this.#refused(tx, event, alert, staff);
+        // Pushed by the shop's push notices already (ADR-672).
+        return [];
+      }
       const facts = await staffAlertFactsIn(
         tx,
         shopId,
@@ -175,6 +200,48 @@ export class StaffAlerts {
       await push.push(shopId, each.kind, each.dedupeKey, [each.recipient], each.message);
     }
   }
+
+  /** Each order of the customer's still to ship, to whom it is given, else those who call. */
+  async #refused(
+    tx: Tx,
+    event: DomainEvent,
+    alert: Extract<Alert, { kind: 'customer_refused' }>,
+    staff: Awaited<ReturnType<typeof staffPhonesIn>>,
+  ): Promise<void> {
+    const { shopId } = event;
+    const orders = await this.toShip(tx, shopId, alert.orderId);
+    if (!orders || orders.toShip.length === 0) return;
+    const shop = (await shopProfile(tx, shopId)).name;
+    const callers = staff
+      .filter(
+        (member) =>
+          CALLING_ROLES.includes(member.role) && scopeWithin('write_orders', member.scopes),
+      )
+      .map((member) => member.userId);
+    for (const order of orders.toShip) {
+      const facts = await staffAlertFactsIn(tx, shopId, order.id, null);
+      if (!facts) continue;
+      const assignee = staff.find((member) => member.userId === facts.assigneeId);
+      const told = assignee ? [assignee.userId] : callers;
+      for (const userId of told) {
+        const member = staff.find((each) => each.userId === userId);
+        if (!member?.phone) continue;
+        await this.messages.queueIn(tx, shopId, {
+          kind: alert.kind satisfies MessageKind,
+          recipient: member.phone,
+          language: member.language,
+          // Once a parcel and order for each member told, however often the parcel is heard of.
+          dedupeKey: `customer_refused:${alert.fulfillmentId}:${order.id}:${userId}`,
+          variables: {
+            shop,
+            order: orderName(order.number),
+            refused: orderName(orders.refused.number),
+          },
+          channel: 'whatsapp',
+        });
+      }
+    }
+  }
 }
 
 /** A push to one member of their own work (ADR-633). */
@@ -244,6 +311,17 @@ function alertOf(event: DomainEvent): Alert | null {
       const { changed } = event.payload as Partial<OrderUpdatedPayload>;
       if (!changed?.includes('transferReceipt')) return null;
       return { kind: 'order_receipt_sent', orderId: event.aggregateId };
+    }
+    case OrderEvents.FulfillmentUpdated: {
+      // Refused, or not delivered, as it turns back alone (ADR-672).
+      const parcel = event.payload as Partial<FulfillmentUpdatedPayload>;
+      if (parcel.status !== 'returning' || !parcel.changed?.includes('status')) return null;
+      if (!parcel.orderId) return null;
+      return {
+        kind: 'customer_refused',
+        orderId: parcel.orderId,
+        fulfillmentId: event.aggregateId,
+      };
     }
     default:
       return null;

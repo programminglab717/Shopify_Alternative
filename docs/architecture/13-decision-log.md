@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-672 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-673 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -680,6 +680,7 @@
 | 670 | A theme's picture's address carries what its file holds, from the shop's document, so a file replaced is fetched afresh | Accepted |
 | 671 | A comment from an email address the shop's spam holds a comment of, from the last 90 days, is kept as spam too, until the shop marks that one not spam | Accepted |
 | 672 | A parcel its customer refused pushes who confirms orders of each other order of theirs confirmed and not yet shipped, to call them before it ships | Accepted |
+| 673 | A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship is given to, else who confirms orders | Accepted |
 
 ---
 
@@ -23422,3 +23423,24 @@
 * **Alternatives:** **Holding those orders by themselves:** the customer may have refused for
   the courier's lateness, and a call settles it; holding is the shop's to choose. **WhatsApp
   too:** pushes come first; the WhatsApp alert can follow as ADR-633's did.
+
+## ADR-673 · A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship is given to, else who confirms orders
+
+* **Context:** ADR-672 pushes a customer's refusal to the browsers of staff who confirm orders,
+  for each other order of theirs confirmed and not yet shipped; but staff on the floor live on
+  WhatsApp, as their other alerts do (ADR-191, ADR-247), and a push is missed on a phone whose
+  browser was never subscribed (status shortcut 25).
+* **Decision:** The staff alerts (`StaffAlerts`) hear `fulfillment.updated` with `returning` too,
+  ask the orders module for the customer's orders yet to ship (`ordersToShipOfCustomerIn`), and
+  for each queue a new message kind, `customer_refused` (template `hatti_customer_refused`: the
+  shop, the order to call about and the one refused, in English and Urdu), at members' own
+  numbers in their own languages: to whom that order is given, as for a receipt (ADR-247), else
+  to the owners, managers and confirmation agents who may change orders (ADR-581). Once a parcel,
+  order and member; pushed apart, by ADR-672's notices. A shop may turn it off with its other
+  staff alerts in Settings → Messages, in English and Urdu; it is paid from the shop's message
+  credit as they are.
+* **Consequences:** The member with the order hears of the refusal where they work; without one,
+  those who call do.
+* **Alternatives:** **To the shop's alerts number:** that number is the owner's, for the shop's
+  news; this is a call for whoever has the order, as a receipt is. **Holding the orders by
+  themselves:** still the shop's to choose; a call settles a refusal for the courier's lateness.

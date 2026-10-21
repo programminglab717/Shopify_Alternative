@@ -2619,6 +2619,7 @@ const en = {
   'messages.kind.ORDER_ASSIGNED': 'Order given to them',
   'messages.kind.ORDER_MENTIONED': 'Named in a comment',
   'messages.kind.ORDER_RECEIPT_SENT': 'Transfer receipt sent',
+  'messages.kind.CUSTOMER_REFUSED': 'Customer refused a parcel',
   'messages.kind.STOCK_LOW': 'Stock running low',
   'messages.kind.STOCK_OUT': 'Out of stock',
   'messages.kind.ONE_TIME_CODE': 'Checkout code',
@@ -2655,6 +2656,8 @@ const en = {
   'messages.hint.ORDER_MENTIONED': 'To a member of staff, when a comment names them.',
   'messages.hint.ORDER_RECEIPT_SENT':
     'To whoever has the order, or owners and managers, when a customer sends their transfer receipt.',
+  'messages.hint.CUSTOMER_REFUSED':
+    'To whoever has their next order, or those who confirm orders, when a customer refuses a parcel.',
   'messages.hint.STOCK_LOW': 'To the alerts number, when a variant falls to its threshold.',
   'messages.hint.STOCK_OUT': 'To the alerts number, when a variant runs out.',
   'messages.sent': 'Messages sent',
@@ -7941,6 +7944,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.ORDER_ASSIGNED': 'آرڈر انہیں دیا گیا',
   'messages.kind.ORDER_MENTIONED': 'کمنٹ میں نام',
   'messages.kind.ORDER_RECEIPT_SENT': 'ٹرانسفر کی رسید بھیجی گئی',
+  'messages.kind.CUSTOMER_REFUSED': 'کسٹمر نے پارسل واپس کر دیا',
   'messages.kind.STOCK_LOW': 'اسٹاک کم ہو رہا ہے',
   'messages.kind.STOCK_OUT': 'اسٹاک ختم',
   'messages.kind.ONE_TIME_CODE': 'چیک آؤٹ کوڈ',
@@ -7976,6 +7980,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.hint.ORDER_MENTIONED': 'اسٹاف ممبر کو، جب کسی کمنٹ میں ان کا نام ہو۔',
   'messages.hint.ORDER_RECEIPT_SENT':
     'جس کے پاس آرڈر ہے، یا مالکان اور مینیجرز کو، جب کسٹمر ٹرانسفر کی رسید بھیجے۔',
+  'messages.hint.CUSTOMER_REFUSED':
+    'جس کے پاس ان کا اگلا آرڈر ہے، یا آرڈرز کنفرم کرنے والوں کو، جب کسٹمر پارسل واپس کر دے۔',
   'messages.hint.STOCK_LOW': 'الرٹس نمبر پر، جب کوئی قسم اپنی حد تک گر جائے۔',
   'messages.hint.STOCK_OUT': 'الرٹس نمبر پر، جب کوئی قسم ختم ہو جائے۔',
   'messages.sent': 'بھیجے گئے میسجز',
