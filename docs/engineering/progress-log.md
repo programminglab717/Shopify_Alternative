@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A customer's refusal told on WhatsApp
+### 1d131dd · A customer's refusal told on WhatsApp
 
 * **A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship
   is given to, else who confirms orders** ([ADR-673](../architecture/13-decision-log.md#adr-673--a-parcel-its-customer-refused-tells-on-whatsapp-whom-each-other-order-of-theirs-yet-to-ship-is-given-to-else-who-confirms-orders)): the `customer_refused` message, in English
