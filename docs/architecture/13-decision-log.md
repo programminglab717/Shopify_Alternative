@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-677 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-678 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -685,6 +685,7 @@
 | 675 | Shoppers ask for a return from their order's page, within the days the shop takes returns after delivery, one waiting at a time; staff approve it into a return or decline it saying why | Accepted |
 | 676 | A delivered order's page asks what to send back, how many of each and why, and says how the latest request stands; the shopper hears on WhatsApp once the shop decides | Accepted |
 | 677 | The admin lists the returns customers asked for online under Returns, to approve or decline with the reason they are told, and sets the days the shop takes them in its order policies | Accepted |
+| 678 | A shop's owner grants Hatti the reading of their Google Ads account on Google's consent screen, and the same worker pulls its spend by campaign, with an access token from the grant each time | Accepted |
 
 ---
 
@@ -23540,3 +23541,42 @@
   batch, like the other lists under Returns, and the timeline already names a waiting one.
   **Approving with a location to choose:** the return comes back to the location the order
   shipped from, as one staff record does unless they name another (ADR-136).
+
+## ADR-678 · A shop's owner grants Hatti the reading of their Google Ads account on Google's consent screen, and the same worker pulls its spend by campaign, with an access token from the grant each time
+
+* **Context:** Meta's and TikTok's ad spend is pulled for each shop that connects an account
+  ([ADR-564](#adr-564--a-shop-connects-its-meta-ad-account-and-the-worker-pulls-each-days-spend-by-campaign-what-the-shop-typed-by-hand-kept-over-what-meta-says), [ADR-566](#adr-566--a-shop-connects-its-tiktok-advertiser-account-and-the-same-worker-pulls-its-spend-by-campaign-under-metas-rules-shared-between-the-two)), but Google's, where many Pakistani shops spend on
+  search, Shopping and YouTube, must still be typed by hand. Unlike Meta and TikTok, the Google
+  Ads API takes no long-lived token a shop can paste: each request needs a developer token of
+  the app's, approved by Google, and an OAuth access token for an hour, from a grant the account's
+  owner gives on Google's consent screen.
+* **Decision:** Hatti holds one developer token and one OAuth client (a web application) for the
+  Google Ads API, in its environment, all three values or none (`GOOGLE_ADS_DEVELOPER_TOKEN`,
+  `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`); without them no Google Ads account
+  connects, and the API says so. The admin asks `googleAdsConsentUrl` for Google's consent screen,
+  coming back to an https address of its own (or http on localhost) with the `state` it gave; the
+  grant is asked offline, with consent each time, so that Google gives a refresh token. The admin
+  then sends `googleAdsAccountConnect` the account's customer ID as Google Ads shows it
+  ("123-456-7890"), the code and the address. The core exchanges the code for the grant's refresh
+  token, asks Google Ads for the account (`customer`, by GAQL through `searchStream`) and keeps it
+  only when Google reads it, it is not a manager account, and it bills in the shop's currency: the
+  refresh token sealed for Google Ads alone in `marketing.google_ads_accounts`, its last four
+  characters shown as `grantHint`, audited, never shown or logged. The plan is asked before Google
+  is, so a plan without true profit spends no code. The same worker round as Meta's and TikTok's
+  pulls each shop's last week (the first time, 30 days) by campaign and day, `metrics.cost_micros`
+  turned into rupees to the paisa, with a fresh access token from the grant each time, never kept;
+  the shared rules of [ADR-564](#adr-564--a-shop-connects-its-meta-ad-account-and-the-worker-pulls-each-days-spend-by-campaign-what-the-shop-typed-by-hand-kept-over-what-meta-says) keep what the shop typed and replace what was pulled. A
+  grant Google refuses (`invalid_grant`: revoked, expired) is kept as the account's last error for
+  the admin to show, and tried again the next round. The spend's source is `google_api`, on the
+  `google` platform alone.
+* **Consequences:** A shop's Google spend comes in by itself once its owner allows it, beside Meta's
+  and TikTok's, in true profit and ROAS. Hatti must get its developer token approved for Basic
+  access before shops other than test accounts connect; until then Google refuses, and the API
+  says "Google Ads refused Hatti". Connecting a new account, or the same one again, asks for a new
+  grant each time.
+* **Alternatives:** **Manager (MCC) accounts, with `login-customer-id`:** an agency's shops would
+  connect through their manager account, but the owner can name the account that runs the ads,
+  which their grant reads; a manager account is refused with that advice. **A refresh token the
+  shop pastes, as Meta's and TikTok's tokens are:** Google gives refresh tokens only to the OAuth
+  client that asked, so the shop cannot make one for Hatti's. **Google Ads' own reports by email
+  or a spreadsheet:** the shop can still type its spend by hand.

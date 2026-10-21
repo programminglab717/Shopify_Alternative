@@ -41,6 +41,8 @@ import {
   MetaAdsClient,
   MetaConversionsClient,
   MetaConversionsService,
+  GoogleAdsAccountService,
+  GoogleAdsClient,
   TikTokAdAccountService,
   TikTokAdsClient,
   TikTokEventsClient,
@@ -82,7 +84,7 @@ import {
 } from '@hatti/orders/public';
 import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
-import { vapidKeysOf, type WorkerConfig } from '../config.js';
+import { googleAdsOptions, vapidKeysOf, type WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { exportEmailsOf, hattiEmailsOf } from '../emails.js';
 import { messageProvidersOf, ownNumbersOf, shopNumbersOf } from '../messaging.js';
@@ -677,8 +679,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);
       closers.push(() => conversions.stop());
-      // Shops' ad spend pulled from the Meta ad accounts (ADR-564) and TikTok advertiser
-      // accounts (ADR-566) they connected.
+      // Shops' ad spend pulled from the Meta ad accounts (ADR-564), TikTok advertiser accounts
+      // (ADR-566) and Google Ads accounts (ADR-678) they connected.
       const adSpend = new AdSpendSync(
         {
           meta: new MetaAdAccountService(
@@ -693,6 +695,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
             database,
             config.ENCRYPTION_KEYS,
             new TikTokAdsClient({ baseUrl: config.TIKTOK_API_URL }),
+          ),
+          google: new GoogleAdsAccountService(
+            database,
+            config.ENCRYPTION_KEYS,
+            new GoogleAdsClient(googleAdsOptions(config)),
           ),
         },
         logger,

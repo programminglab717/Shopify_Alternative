@@ -1,5 +1,9 @@
 import type { Logger } from '@hatti/logger';
-import type { MetaAdAccountService, TikTokAdAccountService } from '@hatti/marketing/public';
+import type {
+  GoogleAdsAccountService,
+  MetaAdAccountService,
+  TikTokAdAccountService,
+} from '@hatti/marketing/public';
 import { repeat } from './repeat.js';
 
 /** Shops pulled in a round on each platform, those asked longest ago first: the rest wait. */
@@ -7,13 +11,13 @@ const BATCH = 500;
 
 /** A platform's accounts shops connected, whose spend is pulled. */
 export type AdSpendAccounts = Pick<
-  MetaAdAccountService | TikTokAdAccountService,
+  MetaAdAccountService | TikTokAdAccountService | GoogleAdsAccountService,
   'dueShops' | 'sync'
 >;
 
 /**
- * Pulls shops' ad spend from the Meta ad accounts (MKT-12, ADR-564) and TikTok advertiser
- * accounts (ADR-566) they connected: each round, every shop's last week on each, by day and
+ * Pulls shops' ad spend from the Meta ad accounts (MKT-12, ADR-564), TikTok advertiser accounts
+ * (ADR-566) and Google Ads accounts (ADR-678) they connected: each round, every shop's last week on each, by day and
  * campaign, as the platforms revise their recent days, in the place of what was pulled of it
  * before; what the shop typed by hand stays. A shop the platform refuses keeps why, for the admin
  * to show, and is tried again the next round.

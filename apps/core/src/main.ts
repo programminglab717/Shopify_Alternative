@@ -6,7 +6,13 @@ import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
 import { createLogger } from '@hatti/logger';
 import { LeakyBuckets, RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
-import { loadApiConfig, passkeysOf, queryCostLimitsOf, vapidKeysOf } from './config.js';
+import {
+  googleAdsOptions,
+  loadApiConfig,
+  passkeysOf,
+  queryCostLimitsOf,
+  vapidKeysOf,
+} from './config.js';
 import { couriersOf } from './couriers.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
@@ -100,6 +106,7 @@ const app = await createApi({
   },
   metaGraph: { baseUrl: config.META_GRAPH_URL, version: config.META_GRAPH_VERSION },
   tiktokApi: { baseUrl: config.TIKTOK_API_URL },
+  googleAds: googleAdsOptions(config),
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
   couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),

@@ -1,6 +1,6 @@
 // A shop's ad account on a platform its spend is pulled from, as Hatti keeps it, and the pull:
-// Meta's ad accounts (ADR-564) and TikTok's advertiser accounts (ADR-566) alike, each platform's in
-// a table of its own of the same columns. What a platform is asked, and how it answers, is its
+// Meta's ad accounts (ADR-564), TikTok's advertiser accounts (ADR-566) and Google Ads accounts
+// (ADR-678) alike, each platform's in a table of its own of the same columns. What a platform is asked, and how it answers, is its
 // own client's.
 import { shopProfile } from '@hatti/api';
 import type { SecretBox } from '@hatti/crypto';
@@ -26,15 +26,15 @@ export const AD_SPEND_PULL_GAP_MS = 60_000;
 
 /** A platform whose spend is pulled, and where its shops' accounts are kept. */
 export interface AdAccountTable {
-  platform: 'meta' | 'tiktok';
+  platform: 'meta' | 'tiktok' | 'google';
   source: Exclude<AdSpendSourceValue, 'manual'>;
   /** In the marketing schema. */
-  table: 'meta_ad_accounts' | 'tiktok_ad_accounts';
+  table: 'meta_ad_accounts' | 'tiktok_ad_accounts' | 'google_ads_accounts';
   /** Its column of the account's ID, and what a change of it is called in events and audits. */
-  idColumn: 'ad_account_id' | 'advertiser_id';
-  idField: 'adAccountId' | 'advertiserId';
+  idColumn: 'ad_account_id' | 'advertiser_id' | 'customer_id';
+  idField: 'adAccountId' | 'advertiserId' | 'customerId';
   /** What shops' sealed tokens are bound to, with the shop's ID: each opens for its shop alone. */
-  sealing: 'meta-ads' | 'tiktok-ads';
+  sealing: 'meta-ads' | 'tiktok-ads' | 'google-ads';
 }
 
 /** An account as the platform shows it. */

@@ -345,4 +345,11 @@ The sales report and COD health break orders down by the source and the campaign
 visit from elsewhere: what each sold, and how its orders were confirmed and delivered
 ([ADR-140](./13-decision-log.md#adr-140--sales-and-cod-health-are-broken-down-by-where-orders-came-from-the-source-and-the-campaign-of-each-orders-last-visit-from-elsewhere-orders-without-one-together)). Not yet: ClickHouse, reports by first visit, medium
 or ad, every visit rather than the first and last, the consent banner the cookie should wait for
-where the law asks, and ad spend.
+where the law asks.
+
+Ad spend is recorded by day, platform and campaign, typed by the shop or pulled by the worker from
+the accounts it connects, every few hours, the last week's again each time: Meta's ad accounts
+([ADR-564](./13-decision-log.md#adr-564--a-shop-connects-its-meta-ad-account-and-the-worker-pulls-each-days-spend-by-campaign-what-the-shop-typed-by-hand-kept-over-what-meta-says)), TikTok's
+advertiser accounts ([ADR-566](./13-decision-log.md#adr-566--a-shop-connects-its-tiktok-advertiser-account-and-the-same-worker-pulls-its-spend-by-campaign-under-metas-rules-shared-between-the-two)) and Google Ads accounts, which the
+owner grants Hatti the reading of on Google's consent screen
+([ADR-678](./13-decision-log.md#adr-678--a-shops-owner-grants-hatti-the-reading-of-their-google-ads-account-on-googles-consent-screen-and-the-same-worker-pulls-its-spend-by-campaign-with-an-access-token-from-the-grant-each-time)). What the shop typed stays its own.

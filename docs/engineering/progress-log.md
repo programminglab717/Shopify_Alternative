@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Google Ads' spend pulled through the owner's grant
+
+* **A shop's owner grants Hatti the reading of their Google Ads account on Google's consent
+  screen, and the same worker pulls its spend by campaign, with an access token from the grant
+  each time** ([ADR-678](../architecture/13-decision-log.md#adr-678--a-shops-owner-grants-hatti-the-reading-of-their-google-ads-account-on-googles-consent-screen-and-the-same-worker-pulls-its-spend-by-campaign-with-an-access-token-from-the-grant-each-time)): the last of the three ad platforms' spend (MKT-12), through the Admin API;
+  migration 0300 adds `marketing.google_ads_accounts` and the `google_api` source. Hatti's
+  developer token and OAuth client come from `GOOGLE_ADS_*` settings, all or none.
+* 3856 tests, ten more: seven of marketing's, three of the core's.
+
 ### 1dcc7bc · Returns asked online, answered in the admin
 
 * **The admin lists the returns customers asked for online under Returns, to approve or decline

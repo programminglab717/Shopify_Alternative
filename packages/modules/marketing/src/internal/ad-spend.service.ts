@@ -9,9 +9,10 @@ export type AdSpendPlatformValue = (typeof AD_SPEND_PLATFORMS)[number];
 
 /**
  * Where a day's spend came from: typed by the shop, or pulled from Meta's Marketing API (ADR-564)
- * or TikTok's Business API (ADR-566), each for its own platform's spend alone.
+ * TikTok's Business API (ADR-566) or the Google Ads API (ADR-678), each for its own platform's
+ * spend alone.
  */
-export const AD_SPEND_SOURCES = ['manual', 'meta_api', 'tiktok_api'] as const;
+export const AD_SPEND_SOURCES = ['manual', 'meta_api', 'tiktok_api', 'google_api'] as const;
 export type AdSpendSourceValue = (typeof AD_SPEND_SOURCES)[number];
 
 export const AD_SPEND_LIMITS = {

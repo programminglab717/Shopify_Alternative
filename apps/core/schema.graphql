@@ -144,8 +144,13 @@ type AdSpendSetPayload {
   userErrors: [UserError!]!
 }
 
-"""Where a day's ad spend came from (ADR-564, ADR-566)."""
+"""Where a day's ad spend came from (ADR-564, ADR-566, ADR-678)."""
 enum AdSpendSource {
+  """
+  Pulled from the Google Ads API, from the Google Ads account the shop connected: typing over it makes it MANUAL.
+  """
+  GOOGLE
+
   """The shop typed it."""
   MANUAL
 
@@ -5418,6 +5423,69 @@ input GiftCardUpdateInput {
 }
 
 """
+The shop's Google Ads account, whose spend the worker pulls from the Google Ads API every few hours, by day and campaign, for the sales report (MKT-12, ADR-678).
+"""
+type GoogleAdsAccount {
+  """What it bills in: the shop's currency."""
+  currency: String!
+
+  """Its customer ID: ten digits, as Google Ads shows them without dashes."""
+  customerId: String!
+
+  """
+  The last four characters of the grant's refresh token, given on Google's consent screen and never shown again.
+  """
+  grantHint: String!
+
+  """
+  Why the last pull failed, as Google said: the worker tries again next time. Null when it went through.
+  """
+  lastError: String
+
+  """When its spend was last pulled; null before the first time."""
+  lastSyncedAt: DateTime
+
+  """Its name at Google when it was connected."""
+  name: String!
+
+  """
+  The time zone Google reports its days in, as Asia/Karachi: each is kept as the shop's day of that date.
+  """
+  timezone: String
+  updatedAt: DateTime!
+}
+
+input GoogleAdsAccountConnectInput {
+  """
+  The code Google's consent screen came back with, from googleAdsConsentUrl: exchanged for the grant, kept sealed and never shown again.
+  """
+  code: String!
+
+  """Its customer ID, from Google Ads: "123-456-7890"."""
+  customerId: String!
+
+  """The address the consent screen was asked to come back to, as asked."""
+  redirectUri: String!
+}
+
+type GoogleAdsAccountConnectPayload {
+  googleAdsAccount: GoogleAdsAccount
+  userErrors: [UserError!]!
+}
+
+type GoogleAdsAccountDisconnectPayload {
+  """The Google Ads account's ID that was connected; null when none was."""
+  deletedCustomerId: String
+  userErrors: [UserError!]!
+}
+
+type GoogleAdsSpendSyncPayload {
+  """The Google Ads account after the pull: lastError says if it failed."""
+  googleAdsAccount: GoogleAdsAccount
+  userErrors: [UserError!]!
+}
+
+"""
 The shop's Google Analytics web stream, which its orders placed through checkout go to through the Measurement Protocol as they are placed, confirmed and delivered, for Google Ads to import its purchase as a conversion (MKT-10, ADR-547).
 """
 type GoogleAnalytics {
@@ -8417,6 +8485,21 @@ type Mutation {
   Changes a gift card's expiry, customer or note, as Shopify's giftCardUpdate.
   """
   giftCardUpdate(id: ID!, input: GiftCardUpdateInput!): GiftCardPayload!
+
+  """
+  Connects the shop's Google Ads account, in place of any it had, or gives it another grant (ADR-678): the consent screen's code is exchanged for the grant, once Google says it reads the account and that it bills in the shop's currency. From then on, the worker pulls its spend by day and campaign every few hours, the last week's again each time, and the last 30 days' at once, as a Meta ad account's. What the shop typed by hand stays its own. On plans with true profit. Audited, the grant never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  googleAdsAccountConnect(input: GoogleAdsAccountConnectInput!): GoogleAdsAccountConnectPayload!
+
+  """
+  Disconnects the shop's Google Ads account: its grant is forgotten, and no more spend is pulled. What was pulled stays. The owner takes the grant back in their Google account's settings.
+  """
+  googleAdsAccountDisconnect: GoogleAdsAccountDisconnectPayload!
+
+  """
+  Pulls the shop's spend from its Google Ads account now, as the worker does every few hours (ADR-678): at most once a minute.
+  """
+  googleAdsSpendSync: GoogleAdsSpendSyncPayload!
 
   """
   Disconnects the shop's Google Analytics web stream: its secret is forgotten, and moments still waiting are not sent.
@@ -13573,6 +13656,21 @@ type Query {
     """
     query: String
   ): GiftCardConnection!
+
+  """
+  The shop's Google Ads account its spend is pulled from (ADR-678); null until it connects one.
+  """
+  googleAdsAccount: GoogleAdsAccount
+
+  """
+  Google's consent screen, where the shop's owner grants Hatti the reading of their Google Ads accounts (ADR-678): it comes back to `redirectUri` with a code and `state` as given, for googleAdsAccountConnect. Null where Hatti has not set Google Ads up, or the address is not https.
+  """
+  googleAdsConsentUrl(
+    redirectUri: String!
+
+    """Given back as it is, for the admin to check."""
+    state: String!
+  ): String
 
   """
   The shop's Google Analytics web stream its orders go to (MKT-10); null until it connects one.

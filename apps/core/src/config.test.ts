@@ -9,6 +9,7 @@ import {
   supportSenderOf,
 } from './billing.js';
 import {
+  googleAdsOptions,
   loadApiConfig,
   loadBillingTransfersConfig,
   loadSupportRequestsConfig,
@@ -639,6 +640,46 @@ describe('Worker configuration', () => {
     );
     expect(() => loadWorkerConfig({ ...worker, ...vapid, VAPID_PUBLIC_KEY: 'short' })).toThrow(
       'VAPID_PUBLIC_KEY',
+    );
+  });
+  it("reads the Google Ads API, Google's OAuth and Hatti's credentials for them, whole or not at all (ADR-678)", () => {
+    const defaults = {
+      baseUrl: 'https://googleads.googleapis.com',
+      version: 'v21',
+      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+    };
+    expect(googleAdsOptions(loadApiConfig(env))).toEqual({
+      ...defaults,
+      developerToken: undefined,
+      clientId: undefined,
+      clientSecret: undefined,
+    });
+    const google = {
+      GOOGLE_ADS_DEVELOPER_TOKEN: 'd'.repeat(22),
+      GOOGLE_ADS_CLIENT_ID: '123-abc.apps.googleusercontent.com',
+      GOOGLE_ADS_CLIENT_SECRET: 'GOCSPX-' + 's'.repeat(28),
+    };
+    expect(
+      googleAdsOptions(loadWorkerConfig({ ...worker, ...google, GOOGLE_ADS_API_VERSION: 'v22' })),
+    ).toEqual({
+      ...defaults,
+      version: 'v22',
+      developerToken: google.GOOGLE_ADS_DEVELOPER_TOKEN,
+      clientId: google.GOOGLE_ADS_CLIENT_ID,
+      clientSecret: google.GOOGLE_ADS_CLIENT_SECRET,
+    });
+    const message =
+      'GOOGLE_ADS_CLIENT_SECRET: Set GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID and ' +
+      'GOOGLE_ADS_CLIENT_SECRET together, or none';
+    const partial = { ...google, GOOGLE_ADS_DEVELOPER_TOKEN: undefined };
+    expect(() => loadApiConfig({ ...env, ...partial })).toThrow(message);
+    expect(() => loadWorkerConfig({ ...worker, ...partial })).toThrow(message);
+    expect(() => loadApiConfig({ ...env, ...google, GOOGLE_ADS_CLIENT_ID: 'hatti' })).toThrow(
+      'GOOGLE_ADS_CLIENT_ID',
+    );
+    expect(() => loadApiConfig({ ...env, GOOGLE_ADS_API_VERSION: '21' })).toThrow(
+      'GOOGLE_ADS_API_VERSION',
     );
   });
 });

@@ -34,6 +34,8 @@ export {
   type MetaAdAccountDisconnectedPayload,
   type TikTokAdAccountConnectedPayload,
   type TikTokAdAccountDisconnectedPayload,
+  type GoogleAdsAccountConnectedPayload,
+  type GoogleAdsAccountDisconnectedPayload,
   type MetaConversionsDeletedPayload,
   type MetaConversionsUpdatedPayload,
   type GoogleAnalyticsDeletedPayload,
@@ -113,6 +115,23 @@ export {
   type MetaActionSource,
   type MetaServerEvent,
 } from '../internal/meta.js';
+export {
+  GoogleAdsAccountService,
+  type GoogleAdsAccountInput,
+  type GoogleAdsAccountRecord,
+  type GoogleAdsSpendPull,
+} from '../internal/google-ads-account.service.js';
+export {
+  GOOGLE_ADS_SCOPE,
+  GoogleAdsClient,
+  customerIdOf,
+  customerIdShown,
+  microsToSpend,
+  type GoogleAdsCampaignDay,
+  type GoogleAdsCustomerFacts,
+  type GoogleAdsOptions,
+  type GoogleAdsResult,
+} from '../internal/google-ads-spend.js';
 export {
   TikTokAdAccountService,
   type TikTokAdAccountInput,

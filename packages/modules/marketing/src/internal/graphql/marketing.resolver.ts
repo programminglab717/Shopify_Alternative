@@ -36,6 +36,10 @@ import {
 import { TikTokEventsService, type TikTokEventsRecord } from '../tiktok-settings.service.js';
 import { GoogleAnalyticsService, type GoogleAnalyticsRecord } from '../google-settings.service.js';
 import {
+  GoogleAdsAccountService,
+  type GoogleAdsAccountRecord,
+} from '../google-ads-account.service.js';
+import {
   AdSpendEntry,
   AdSpendInput,
   AdSpendPlatform,
@@ -63,6 +67,11 @@ import {
   MetaConversionsUpdatePayload,
   MarketingDate,
   MarketingMoment,
+  GoogleAdsAccount,
+  GoogleAdsAccountConnectInput,
+  GoogleAdsAccountConnectPayload,
+  GoogleAdsAccountDisconnectPayload,
+  GoogleAdsSpendSyncPayload,
   TikTokAdAccount,
   TikTokAdAccountConnectInput,
   TikTokAdAccountConnectPayload,
@@ -79,6 +88,7 @@ const SOURCES: Record<AdSpendSourceValue, AdSpendSource> = {
   manual: AdSpendSource.MANUAL,
   meta_api: AdSpendSource.META,
   tiktok_api: AdSpendSource.TIKTOK,
+  google_api: AdSpendSource.GOOGLE,
 };
 
 @Resolver()
@@ -92,6 +102,7 @@ export class MarketingResolver {
     private readonly adSpend: AdSpendService,
     private readonly adAccounts: MetaAdAccountService,
     private readonly advertisers: TikTokAdAccountService,
+    private readonly googleAds: GoogleAdsAccountService,
   ) {}
 
   @Query(() => [AdSpendEntry], {
@@ -274,6 +285,93 @@ export class MarketingResolver {
     const result = await this.advertisers.pull(tenant);
     return Object.assign(new TikTokAdSpendSyncPayload(), {
       tiktokAdAccount: result.ok ? toTikTokAdAccount(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Query(() => GoogleAdsAccount, {
+    nullable: true,
+    description:
+      "The shop's Google Ads account its spend is pulled from (ADR-678); null until it connects " +
+      'one.',
+  })
+  @RequireScopes('read_pixels')
+  async googleAdsAccount(@CurrentTenant() tenant: TenantContext): Promise<GoogleAdsAccount | null> {
+    const record = await this.googleAds.get(tenant);
+    return record && toGoogleAdsAccount(record);
+  }
+
+  @Query(() => String, {
+    nullable: true,
+    description:
+      "Google's consent screen, where the shop's owner grants Hatti the reading of their Google " +
+      'Ads accounts (ADR-678): it comes back to `redirectUri` with a code and `state` as given, for ' +
+      'googleAdsAccountConnect. Null where Hatti has not set Google Ads up, or the address is not ' +
+      'https.',
+  })
+  @RequireScopes('write_pixels')
+  googleAdsConsentUrl(
+    @Args('redirectUri') redirectUri: string,
+    @Args('state', { description: 'Given back as it is, for the admin to check.' }) state: string,
+  ): string | null {
+    return this.googleAds.consentUrl(redirectUri, state);
+  }
+
+  @Mutation(() => GoogleAdsAccountConnectPayload, {
+    description:
+      "Connects the shop's Google Ads account, in place of any it had, or gives it another grant " +
+      "(ADR-678): the consent screen's code is exchanged for the grant, once Google says it reads " +
+      "the account and that it bills in the shop's currency. From then on, the worker pulls its " +
+      "spend by day and campaign every few hours, the last week's again each time, and the last " +
+      "30 days' at once, as a Meta ad account's. What the shop typed by hand stays its own. On " +
+      'plans with true profit. Audited, the grant never. Staff confirm who they are first when ' +
+      'they signed in over 15 minutes ago.',
+  })
+  @RequireScopes('write_pixels')
+  @RequireRecentAuthentication()
+  async googleAdsAccountConnect(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: GoogleAdsAccountConnectInput,
+  ): Promise<GoogleAdsAccountConnectPayload> {
+    const result = await this.googleAds.connect(tenant, {
+      customerId: input.customerId,
+      code: input.code,
+      redirectUri: input.redirectUri,
+    });
+    return Object.assign(new GoogleAdsAccountConnectPayload(), {
+      googleAdsAccount: result.ok ? toGoogleAdsAccount(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => GoogleAdsAccountDisconnectPayload, {
+    description:
+      "Disconnects the shop's Google Ads account: its grant is forgotten, and no more spend is " +
+      "pulled. What was pulled stays. The owner takes the grant back in their Google account's " +
+      'settings.',
+  })
+  @RequireScopes('write_pixels')
+  async googleAdsAccountDisconnect(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<GoogleAdsAccountDisconnectPayload> {
+    return Object.assign(new GoogleAdsAccountDisconnectPayload(), {
+      deletedCustomerId: await this.googleAds.disconnect(tenant),
+      userErrors: [],
+    });
+  }
+
+  @Mutation(() => GoogleAdsSpendSyncPayload, {
+    description:
+      "Pulls the shop's spend from its Google Ads account now, as the worker does every few " +
+      'hours (ADR-678): at most once a minute.',
+  })
+  @RequireScopes('write_pixels')
+  async googleAdsSpendSync(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<GoogleAdsSpendSyncPayload> {
+    const result = await this.googleAds.pull(tenant);
+    return Object.assign(new GoogleAdsSpendSyncPayload(), {
+      googleAdsAccount: result.ok ? toGoogleAdsAccount(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
@@ -521,6 +619,19 @@ function toMetaAdAccount(record: MetaAdAccountRecord): MetaAdAccount {
     currency: record.currency,
     timezone: record.timezone,
     accessTokenHint: record.tokenHint,
+    lastSyncedAt: record.lastSyncedAt,
+    lastError: record.lastError,
+    updatedAt: record.updatedAt,
+  });
+}
+
+function toGoogleAdsAccount(record: GoogleAdsAccountRecord): GoogleAdsAccount {
+  return Object.assign(new GoogleAdsAccount(), {
+    customerId: record.customerId,
+    name: record.name,
+    currency: record.currency,
+    timezone: record.timezone,
+    grantHint: record.tokenHint,
     lastSyncedAt: record.lastSyncedAt,
     lastError: record.lastError,
     updatedAt: record.updatedAt,

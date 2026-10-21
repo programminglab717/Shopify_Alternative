@@ -107,6 +107,28 @@ export const tiktokAdAccounts = marketingSchema.table('tiktok_ad_accounts', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** The shop's Google Ads account, whose spend is pulled from the Google Ads API (ADR-678). */
+export const googleAdsAccounts = marketingSchema.table('google_ads_accounts', {
+  shopId: uuid('shop_id').primaryKey(),
+  /** Its ten digits, as Google Ads shows them without their dashes. */
+  customerId: text('customer_id').notNull(),
+  name: text('name').notNull(),
+  currency: text('currency').notNull(),
+  /** The time zone Google reports its days in. */
+  timezone: text('timezone'),
+  /** The grant's refresh token, sealed for the shop alone, and never shown again. */
+  accessToken: text('access_token').notNull(),
+  /** Its last four characters. */
+  tokenHint: text('token_hint').notNull(),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  /** Why the last pull failed. */
+  lastError: text('last_error'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Each moment of an order to send to an ad platform, and how sending it went. */
 export const conversions = marketingSchema.table(
   'conversions',

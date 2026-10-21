@@ -12,6 +12,8 @@ export const MarketingEvents = {
   MetaAdAccountDisconnected: 'meta_ad_account.disconnected',
   TikTokAdAccountConnected: 'tiktok_ad_account.connected',
   TikTokAdAccountDisconnected: 'tiktok_ad_account.disconnected',
+  GoogleAdsAccountConnected: 'google_ads_account.connected',
+  GoogleAdsAccountDisconnected: 'google_ads_account.disconnected',
 } as const;
 
 /** The shop connected its Meta dataset, or changed how its orders go to it. */
@@ -93,6 +95,25 @@ export interface TikTokAdAccountConnectedPayload {
 /** The shop disconnected its TikTok advertiser account: the spend pulled stays, and no more is. */
 export interface TikTokAdAccountDisconnectedPayload {
   advertiserId: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/**
+ * The shop connected its Google Ads account, whose spend is pulled from Google from then on, or
+ * gave it another grant (ADR-678).
+ */
+export interface GoogleAdsAccountConnectedPayload {
+  customerId: string;
+  /** What changed: "customerId", "accessToken". */
+  changed: string[];
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop disconnected its Google Ads account: the spend pulled stays, and no more is. */
+export interface GoogleAdsAccountDisconnectedPayload {
+  customerId: string;
   actorKind: 'app' | 'staff';
   actorId: string;
 }

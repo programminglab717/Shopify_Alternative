@@ -508,11 +508,12 @@ export enum AdSpendSource {
   MANUAL = 'MANUAL',
   META = 'META',
   TIKTOK = 'TIKTOK',
+  GOOGLE = 'GOOGLE',
 }
 
 registerEnumType(AdSpendSource, {
   name: 'AdSpendSource',
-  description: "Where a day's ad spend came from (ADR-564, ADR-566).",
+  description: "Where a day's ad spend came from (ADR-564, ADR-566, ADR-678).",
   valuesMap: {
     MANUAL: { description: 'The shop typed it.' },
     META: {
@@ -524,6 +525,11 @@ registerEnumType(AdSpendSource, {
       description:
         "Pulled from TikTok's Business API, from the advertiser account the shop connected: " +
         'typing over it makes it MANUAL.',
+    },
+    GOOGLE: {
+      description:
+        'Pulled from the Google Ads API, from the Google Ads account the shop connected: typing ' +
+        'over it makes it MANUAL.',
     },
   },
 });
@@ -757,6 +763,103 @@ export class TikTokAdSpendSyncPayload {
     description: 'The advertiser account after the pull: lastError says if it failed.',
   })
   tiktokAdAccount!: TikTokAdAccount | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    "The shop's Google Ads account, whose spend the worker pulls from the Google Ads API every " +
+    'few hours, by day and campaign, for the sales report (MKT-12, ADR-678).',
+})
+export class GoogleAdsAccount {
+  @Field({ description: 'Its customer ID: ten digits, as Google Ads shows them without dashes.' })
+  customerId!: string;
+
+  @Field({ description: 'Its name at Google when it was connected.' })
+  name!: string;
+
+  @Field({ description: "What it bills in: the shop's currency." })
+  currency!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The time zone Google reports its days in, as Asia/Karachi: each is kept as the shop's day " +
+      'of that date.',
+  })
+  timezone!: string | null;
+
+  @Field({
+    description:
+      "The last four characters of the grant's refresh token, given on Google's consent screen " +
+      'and never shown again.',
+  })
+  grantHint!: string;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When its spend was last pulled; null before the first time.',
+  })
+  lastSyncedAt!: Date | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Why the last pull failed, as Google said: the worker tries again next time. Null when it ' +
+      'went through.',
+  })
+  lastError!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class GoogleAdsAccountConnectInput {
+  @Field({ description: 'Its customer ID, from Google Ads: "123-456-7890".' })
+  customerId!: string;
+
+  @Field({
+    description:
+      "The code Google's consent screen came back with, from googleAdsConsentUrl: exchanged for " +
+      'the grant, kept sealed and never shown again.',
+  })
+  code!: string;
+
+  @Field({ description: 'The address the consent screen was asked to come back to, as asked.' })
+  redirectUri!: string;
+}
+
+@ObjectType()
+export class GoogleAdsAccountConnectPayload {
+  @Field(() => GoogleAdsAccount, { nullable: true })
+  googleAdsAccount!: GoogleAdsAccount | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class GoogleAdsAccountDisconnectPayload {
+  @Field(() => String, {
+    nullable: true,
+    description: "The Google Ads account's ID that was connected; null when none was.",
+  })
+  deletedCustomerId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class GoogleAdsSpendSyncPayload {
+  @Field(() => GoogleAdsAccount, {
+    nullable: true,
+    description: 'The Google Ads account after the pull: lastError says if it failed.',
+  })
+  googleAdsAccount!: GoogleAdsAccount | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

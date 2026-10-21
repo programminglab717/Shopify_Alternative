@@ -29,6 +29,7 @@ import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
 import {
   MarketingModule,
   type MetaGraphOptions,
+  type GoogleAdsOptions,
   type TikTokApiOptions,
 } from '@hatti/marketing/public';
 import {
@@ -91,6 +92,14 @@ import {
 } from './custom-roles.resolver.js';
 import { SupportAccessResolver } from './support.resolver.js';
 
+/** Google's own addresses for Google Ads, with no credentials: no account connects. */
+const GOOGLE_ADS_DEFAULTS: GoogleAdsOptions = {
+  baseUrl: 'https://googleads.googleapis.com',
+  version: 'v21',
+  authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+};
+
 export interface ApiModuleOptions {
   database: Database;
   /** Staff sign-in (/auth/*). */
@@ -140,6 +149,11 @@ export interface ApiModuleOptions {
    * from (ADR-566); https://business-api.tiktok.com unless given.
    */
   tiktokApi?: TikTokApiOptions;
+  /**
+   * The Google Ads API and Google's OAuth, which shops' Google Ads accounts are granted through
+   * and their spend pulled from (ADR-678); Google's, with no credentials, unless given.
+   */
+  googleAds?: GoogleAdsOptions;
   /** Hatti's VAPID keys (ADR-506); without them, nothing is pushed to staff's browsers. */
   push?: VapidKeys | null;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
@@ -305,6 +319,7 @@ export class ApiModule {
             version: 'v26.0',
           },
           tiktokApi: options.tiktokApi ?? { baseUrl: 'https://business-api.tiktok.com' },
+          googleAds: options.googleAds ?? GOOGLE_ADS_DEFAULTS,
         }),
         AppsModule,
         MessagingModule.forRoot({

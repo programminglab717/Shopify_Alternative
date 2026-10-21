@@ -1,5 +1,6 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
+import type { GoogleAdsOptions } from '@hatti/marketing/public';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
 import { FBR_DI_URLS } from '@hatti/tax/public';
 import { STATUS_COMPONENTS, type StatusComponent } from '@hatti/trust/public';
@@ -166,6 +167,61 @@ const messageSending = {
 const tiktokApi = {
   TIKTOK_API_URL: env.httpUrl().default('https://business-api.tiktok.com'),
 };
+
+/**
+ * The Google Ads API and Google's OAuth, as the worker and the API read them: shops grant Hatti
+ * the reading of their Google Ads accounts on Google's consent screen, through Hatti's own OAuth
+ * client, and their spend is pulled with Hatti's developer token (ADR-678). The developer token
+ * and the client's ID and secret together, or none: without them, no Google Ads account connects.
+ */
+const googleAds = {
+  GOOGLE_ADS_API_URL: env.httpUrl().default('https://googleads.googleapis.com'),
+  GOOGLE_ADS_API_VERSION: z
+    .string()
+    .regex(/^v\d{1,3}$/, 'Expected a Google Ads API version, like v21')
+    .default('v21'),
+  GOOGLE_OAUTH_AUTHORIZE_URL: env.httpUrl().default('https://accounts.google.com/o/oauth2/v2/auth'),
+  GOOGLE_OAUTH_TOKEN_URL: env.httpUrl().default('https://oauth2.googleapis.com/token'),
+  GOOGLE_ADS_DEVELOPER_TOKEN: env.secret(16).optional(),
+  GOOGLE_ADS_CLIENT_ID: z
+    .string()
+    .regex(/^[\w.-]+\.apps\.googleusercontent\.com$/, 'Expected an OAuth client ID of Google')
+    .optional(),
+  GOOGLE_ADS_CLIENT_SECRET: env.secret(16).optional(),
+};
+const googleAdsComplete = (config: {
+  GOOGLE_ADS_DEVELOPER_TOKEN?: string;
+  GOOGLE_ADS_CLIENT_ID?: string;
+  GOOGLE_ADS_CLIENT_SECRET?: string;
+}) => {
+  const set = [
+    config.GOOGLE_ADS_DEVELOPER_TOKEN,
+    config.GOOGLE_ADS_CLIENT_ID,
+    config.GOOGLE_ADS_CLIENT_SECRET,
+  ].filter((value) => value !== undefined);
+  return set.length === 0 || set.length === 3;
+};
+const GOOGLE_ADS_COMPLETE = {
+  path: ['GOOGLE_ADS_CLIENT_SECRET'],
+  message:
+    'Set GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET together, ' +
+    'or none',
+};
+
+/** The Google Ads API and Google's OAuth as Hatti is set up with them, for its Google Ads client. */
+export function googleAdsOptions(
+  config: z.output<z.ZodObject<typeof googleAds>>,
+): GoogleAdsOptions {
+  return {
+    baseUrl: config.GOOGLE_ADS_API_URL,
+    version: config.GOOGLE_ADS_API_VERSION,
+    authorizeUrl: config.GOOGLE_OAUTH_AUTHORIZE_URL,
+    tokenUrl: config.GOOGLE_OAUTH_TOKEN_URL,
+    developerToken: config.GOOGLE_ADS_DEVELOPER_TOKEN,
+    clientId: config.GOOGLE_ADS_CLIENT_ID,
+    clientSecret: config.GOOGLE_ADS_CLIENT_SECRET,
+  };
+}
 
 /** The message-sending settings, as both processes read them, with the environment's name. */
 export type MessageSendingConfig = z.output<z.ZodObject<typeof messageSending>> & {
@@ -453,6 +509,7 @@ const apiSchema = z
     AI_BASE_URL: env.httpUrl().optional(),
     ...messageSending,
     ...tiktokApi,
+    ...googleAds,
     ...storage,
     ...webPush,
   })
@@ -513,6 +570,7 @@ const apiSchema = z
     },
   )
   .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED)
+  .refine(googleAdsComplete, GOOGLE_ADS_COMPLETE)
   .refine(
     (config) =>
       config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID === undefined ||
@@ -704,6 +762,7 @@ const workerSchema = z
      */
     PUBLIC_URL: env.httpUrl().optional(),
     ...tiktokApi,
+    ...googleAds,
     /** Google Analytics, which shops' orders go to through its Measurement Protocol (ADR-547). */
     GOOGLE_ANALYTICS_URL: env.httpUrl().default('https://www.google-analytics.com'),
     /** How often the moments of orders due go to the ad platforms. */
@@ -782,6 +841,7 @@ const workerSchema = z
   .refine(smsPaired, SMS_PAIRED)
   .refine(voiceComplete, VOICE_COMPLETE)
   .refine(sesComplete, SES_COMPLETE)
+  .refine(googleAdsComplete, GOOGLE_ADS_COMPLETE)
   .refine(
     (config) =>
       (config.CLOUDFLARE_ZONE_ID === undefined) === (config.CLOUDFLARE_API_TOKEN === undefined),
