@@ -27,13 +27,14 @@ RUN npm install --global pnpm@${PNPM_VERSION} \
 WORKDIR /app
 
 # The workspace, installed and built, each package after those it depends on. The lockfile alone
-# decides what is fetched, so a change to the code fetches nothing again.
+# decides what is fetched, so a change to the code fetches nothing again. The store is kept in the
+# fetch's layer, not a cache mount: a layer cache restored elsewhere, as CI's is, brings the
+# layer's files but none of a mount's, and every install after it is offline.
 FROM base AS build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+RUN pnpm fetch
 COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --offline --frozen-lockfile \
+RUN pnpm install --offline --frozen-lockfile \
     && pnpm --filter "@hatti/core..." --filter "@hatti/storefront..." run build \
     && scripts/image-tree.sh @hatti/core /out/core \
     && scripts/image-tree.sh @hatti/storefront /out/storefront
