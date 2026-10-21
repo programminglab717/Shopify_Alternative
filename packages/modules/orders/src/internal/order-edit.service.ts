@@ -102,6 +102,8 @@ interface EditedLine {
   bundleKey?: string | null;
   bundleTitle?: string | null;
   bundleQuantity?: number | null;
+  /** What the shopper wrote or chose for a kept line, as its row has them (ADR-687). */
+  properties?: Record<string, string>;
   /** Where the edit names it, for errors; null for a kept line the edit leaves as it is. */
   field: string[] | null;
 }
@@ -1282,6 +1284,7 @@ function lineValues(
     bundleKey: line.bundleKey ?? null,
     bundleTitle: line.bundleTitle ?? null,
     bundleQuantity: line.bundleQuantity ?? null,
+    properties: line.properties ?? {},
     ...(line.createdAt && { createdAt: line.createdAt }),
   }));
 }

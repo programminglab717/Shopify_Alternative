@@ -1,12 +1,14 @@
 import 'reflect-metadata';
-import type { TenantContext } from '@hatti/api';
+import { InputChecker, type TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { formatDay, qrCode, toMarkup } from '@hatti/documents';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { checkAddress } from './address.js';
+import { shownLineProperties } from './documents.js';
 import { creditNoteName, invoiceName, taxYearOf } from './invoice-series.js';
 import { mapUrlOf } from './location.js';
-import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
+import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
 
@@ -631,6 +633,60 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     const erased = await slip('english');
     expect(erased).not.toContain('Gift message');
     expect(erased).not.toContain('Ammi');
+  });
+
+  it("keeps a line's properties, and prints those not apps' on the packing slip and invoice (ADR-687)", async () => {
+    const address = checkAddress(new InputChecker(), [], ADDRESS)!;
+    const order = unwrap(
+      await f.db.tenant(f.a.shopId, (tx) =>
+        f.orders.placeIn(
+          tx,
+          {
+            shopId: f.a.shopId,
+            currency: 'PKR',
+            actor: 'system',
+            source: 'online_store',
+            how: 'from the online store',
+          },
+          {
+            field: [],
+            lines: [
+              {
+                variantId: kurta,
+                quantity: 1,
+                price: null,
+                properties: { Engraving: 'Ayesha <3', _bundle_ref: 'x1' },
+              },
+              { variantId: size8, quantity: 1, price: null },
+            ],
+            address,
+            email: null,
+            paymentMethod: 'cash_on_delivery',
+            shipping: 0n,
+            discount: 0n,
+            advance: 0n,
+            locationId: null,
+            note: '',
+            tags: [],
+          },
+        ),
+      ),
+    );
+    const kept = (await f.orders.get(f.a, order.id))!;
+    expect(kept.lines.map((line) => line.properties)).toEqual([
+      { Engraving: 'Ayesha <3', _bundle_ref: 'x1' },
+      {},
+    ]);
+    expect(shownLineProperties(kept.lines[0]!)).toEqual([['Engraving', 'Ayesha <3']]);
+
+    for (const kind of ['packing_slip', 'invoice'] as const) {
+      const { html } = unwrap(
+        await f.documents.render(f.a, [order.id], { kind, paper: 'a4', language: 'english' }),
+      );
+      // Under its item, escaped; the name and value each isolated for right-to-left pages.
+      expect(wordsOf(html)).toContain('Kurta Engraving : Ayesha &lt;3');
+      expect(html).not.toContain('_bundle_ref');
+    }
   });
 
   it('prints up to 250 orders at a time', async () => {

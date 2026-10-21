@@ -1192,6 +1192,8 @@ export class CheckoutService {
             variantId: item.variantId,
             quantity: item.quantity,
             price: BigInt(item.price),
+            // What the shopper wrote or chose for it, kept on its order line (ADR-687).
+            properties: item.properties,
           })),
           address,
           email,
@@ -2013,8 +2015,8 @@ export function shownProperties(properties: Record<string, string>): [string, st
 }
 
 /**
- * The order's note: the cart's, then each line's properties, which orders keep no other way, cut
- * to what an order's note holds.
+ * The order's note: the cart's, then each line's properties, which the order's lines keep too
+ * (ADR-687) though its page does not show them yet, cut to what an order's note holds.
  */
 export function orderNoteOf(cart: CartJson): string {
   const lines = cart.items.flatMap((item) => {

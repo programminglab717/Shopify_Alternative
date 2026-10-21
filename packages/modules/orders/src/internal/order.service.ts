@@ -167,6 +167,8 @@ interface PlacingLine {
   variantId: string;
   quantity: number;
   price: bigint | null;
+  /** As the order names them; a bundle's parts each keep the bundle's (ADR-687). */
+  properties?: Record<string, string>;
   /** Where the order names it, for errors: a part's is its bundle's. */
   field: string[];
   bundle: { key: string; title: string; quantity: number } | null;
@@ -181,6 +183,8 @@ export interface OrderToPlace {
     quantity: number;
     /** Replaces the variant's price; minor units. */
     price: bigint | null;
+    /** What the shopper wrote or chose for it, as its cart's line had them (ADR-687). */
+    properties?: Record<string, string>;
   }[];
   address: AddressValue;
   email: string | null;
@@ -848,6 +852,7 @@ export class OrderService {
         bundleKey: line.bundle?.key ?? null,
         bundleTitle: line.bundle?.title ?? null,
         bundleQuantity: line.bundle?.quantity ?? null,
+        properties: line.properties ?? {},
       })),
     );
     await addTimelineEntry(
@@ -3091,6 +3096,7 @@ export class OrderService {
           variantId: part.variantId,
           quantity: part.quantity,
           price: part.unitPrice,
+          properties: line.properties,
           field,
           bundle: sold,
         });

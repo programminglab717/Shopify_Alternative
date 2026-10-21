@@ -455,7 +455,15 @@ function recipient(order: OrderRecord, context: DocumentContext): Html {
   `;
 }
 
-/** A line's product, then its variant and SKU. */
+/**
+ * A line's properties the shopper gave, such as an engraving's text (ADR-687); those whose names
+ * begin "_" are apps', not shown, as on Shopify.
+ */
+export function shownLineProperties(line: Pick<OrderLineRecord, 'properties'>): [string, string][] {
+  return Object.entries(line.properties).filter(([name]) => !name.startsWith('_'));
+}
+
+/** A line's product, then its variant and SKU, then what the shopper asked for on it. */
 function item(line: OrderLineRecord): Html {
   const details = [
     line.variantTitle === DEFAULT_VARIANT_TITLE ? null : line.variantTitle,
@@ -467,7 +475,10 @@ function item(line: OrderLineRecord): Html {
       html`<p class="small muted">
         ${details.map((detail, index) => html`${index > 0 && ' · '}${text(detail)}`)}
       </p>`
-    }`;
+    }
+    ${shownLineProperties(line).map(
+      ([name, value]) => html`<p class="small">${text(name)}: ${text(value)}</p>`,
+    )}`;
 }
 
 /**

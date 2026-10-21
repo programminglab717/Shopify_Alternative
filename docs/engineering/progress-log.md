@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Lines' properties on orders
+
+* **An order's lines keep the properties their cart lines had, Shopify's customAttributes, and
+  packing slips and invoices print those not apps' under each item** ([ADR-687](../architecture/13-decision-log.md#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item)): CAT-15's
+  personalised items reach the packer line by line.
+* 3898 tests, two more: the orders module's and checkout's.
+
 ### 7c68dcc · Search synonyms in the admin
 
 * **The admin's online store has a Search synonyms tab, for those who change products: each group

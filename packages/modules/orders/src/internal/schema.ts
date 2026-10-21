@@ -550,6 +550,11 @@ export const lines = ordersSchema.table(
     bundleTitle: text('bundle_title'),
     /** How many of the bundle were ordered. */
     bundleQuantity: integer('bundle_quantity'),
+    /**
+     * What the shopper wrote or chose for it, by name, as its cart's line had them (ADR-687):
+     * Shopify's customAttributes; those whose names begin "_" are apps', not shown.
+     */
+    properties: jsonb('properties').$type<Record<string, string>>().notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],

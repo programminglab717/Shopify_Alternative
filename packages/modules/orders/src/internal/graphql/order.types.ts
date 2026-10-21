@@ -548,6 +548,15 @@ export class LineItemBundle {
   quantity!: number;
 }
 
+@ObjectType({ description: "A name and its value, as Shopify keeps a line's custom attributes." })
+export class Attribute {
+  @Field()
+  key!: string;
+
+  @Field()
+  value!: string;
+}
+
 @ObjectType({ description: 'A line of an order: what was sold, as it was then.' })
 export class OrderLineItem {
   @Field(() => ID)
@@ -612,6 +621,13 @@ export class OrderLineItem {
       'key. Null for a line sold alone.',
   })
   bundle!: LineItemBundle | null;
+
+  @Field(() => [Attribute], {
+    description:
+      "Its cart line's properties, such as an engraving's text (CAT-15, ADR-687), in the order " +
+      'the shopper gave them. Those whose keys begin "_" are apps\', not shown to the shopper.',
+  })
+  customAttributes!: Attribute[];
 }
 
 @ObjectType({ description: "A parcel's courier and tracking number." })

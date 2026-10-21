@@ -128,6 +128,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     bundle_key: string | null;
     bundle_title: string | null;
     bundle_quantity: number | null;
+    properties: Record<string, string>;
   }[];
   fulfillments: {
     id: string;
@@ -334,6 +335,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       bundle: line.bundle_key
         ? { key: line.bundle_key, title: line.bundle_title!, quantity: line.bundle_quantity! }
         : null,
+      properties: line.properties,
     })),
     fulfillments: row.fulfillments.map((parcel): FulfillmentRecord => ({
       id: parcel.id,
@@ -484,7 +486,8 @@ export async function loadOrders(
                       'fulfilled_quantity', l.fulfilled_quantity, 'taxable', l.taxable,
                       'tax_rate', l.tax_rate, 'tax', l.tax::text,
                       'preorder_ships_on', l.preorder_ships_on, 'bundle_key', l.bundle_key,
-                      'bundle_title', l.bundle_title, 'bundle_quantity', l.bundle_quantity)
+                      'bundle_title', l.bundle_title, 'bundle_quantity', l.bundle_quantity,
+                      'properties', l.properties)
                     ORDER BY l.position)
                FROM orders.lines l
               WHERE l.shop_id = o.shop_id AND l.order_id = o.id), '[]') AS lines,

@@ -355,6 +355,12 @@ type ArticleUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""A name and its value, as Shopify keeps a line's custom attributes."""
+type Attribute {
+  key: String!
+  value: String!
+}
+
 """
 Who did something: an app, by its access token, a staff member, Hatti's support agent, or a customer, asking for themselves from their account.
 """
@@ -10649,6 +10655,11 @@ type OrderLineItem {
   The bundle it was sold as a part of (CAT-11, ADR-410): the lines of its parts share its key. Null for a line sold alone.
   """
   bundle: LineItemBundle
+
+  """
+  Its cart line's properties, such as an engraving's text (CAT-15, ADR-687), in the order the shopper gave them. Those whose keys begin "_" are apps', not shown to the shopper.
+  """
+  customAttributes: [Attribute!]!
 
   """Units still to ship; none once the order is closed or cancelled."""
   fulfillableQuantity: Int!

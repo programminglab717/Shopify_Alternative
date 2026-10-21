@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-686 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-687 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -694,6 +694,7 @@
 | 684 | The admin's analytics show what shoppers searched for over the period the page shows, the most searched and those that found nothing, each opening the products list searched for its words | Accepted |
 | 685 | A shop keeps groups of its own words that mean the same, which its storefront's search reads beside Hatti's commerce lexicon, each word a whole word as the shop wrote it | Accepted |
 | 686 | The admin's online store has a Search synonyms tab, for those who change products: each group a line of words between commas, saved whole, and a group begun from a search that found nothing | Accepted |
+| 687 | An order's lines keep the properties their cart lines had, Shopify's customAttributes, and packing slips and invoices print those not apps' under each item | Accepted |
 
 ---
 
@@ -23790,3 +23791,28 @@
 * **Alternatives:** **A field for each word:** commas are how merchants write lists of words, as
   products' tags take them. **Adding the synonym from analytics in place:** a synonym needs the
   shop's word for the thing, which the tab asks for with the other groups in view.
+
+## ADR-687 · An order's lines keep the properties their cart lines had, Shopify's customAttributes, and packing slips and invoices print those not apps' under each item
+
+* **Context:** A cart's lines carry properties, Shopify's line item properties: the name to
+  embroider on a kurta, the engraving on a ring (CAT-15). Checkout wrote those the shopper sees
+  into the order's note, as its orders kept them no other way ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): one text
+  for the whole order, cut at its length, that apps could not read line by line and packers
+  had to match to the items themselves.
+* **Decision:**
+  * **Each order line keeps its properties**, a JSON object of names and values in the order the
+    shopper gave them, empty for none (migration 0302). Placing takes them from the lines given,
+    a bundle's parts each keeping the bundle line's; editing, splitting and merging keep a
+    line's own.
+  * **The Admin API** gives them as Shopify's `customAttributes` on `OrderLineItem`, a list of
+    `Attribute { key, value }`, all of them, apps' too.
+  * **Packing slips and invoices** print each property the shopper sees under its item, "Name:
+    value", escaped and each part isolated for right-to-left pages ([ADR-028](#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)). Those
+    whose names begin "_" are apps', not printed, as on Shopify.
+  * **Checkout** places each line with its cart line's properties. The note still says them,
+    until the order's page shows them.
+* **Consequences:** Personalised items are packed from the slip, line by line; apps read what the
+  shopper asked for from the API as they do on Shopify. The note says them twice over for now.
+* **Alternatives:** **Only the note:** what was asked of each item is lost to apps and cut with
+  the note. **A table of a line's properties:** they are read and written whole with the line,
+  never searched.

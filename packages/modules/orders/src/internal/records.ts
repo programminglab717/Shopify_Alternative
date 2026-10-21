@@ -58,6 +58,11 @@ export interface OrderLineRecord {
   preorderShipsOn: string | null;
   /** The bundle it was sold as a part of (CAT-11, ADR-410); null when it was sold alone. */
   bundle: LineBundle | null;
+  /**
+   * What the shopper wrote or chose for it, by name, as its cart's line had them (ADR-687);
+   * those whose names begin "_" are apps'.
+   */
+  properties: Record<string, string>;
 }
 
 /** A bundle an order's lines were sold as: the lines of its parts share its key. */

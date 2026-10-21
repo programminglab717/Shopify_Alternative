@@ -224,6 +224,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       taxLines: line.taxRate === null ? [] : [toTaxLine(line.taxRate, line.tax, currency)],
       preorderShipsOn: line.preorderShipsOn,
       bundle: line.bundle,
+      customAttributes: Object.entries(line.properties).map(([key, value]) => ({ key, value })),
     }),
   );
   const lineItemsById = new Map(record.lines.map((line, index) => [line.id, lineItems[index]!]));
