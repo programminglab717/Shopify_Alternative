@@ -100,6 +100,8 @@ export {
 } from '../internal/delivery-rescue.service.js';
 // Areas riders struggle to find houses in, learned from the shop's parcels (ADR-717).
 export { HARD_TO_FIND, hardToFindIn } from '../internal/hard-to-find.js';
+// A pin from a map's link or coordinates (ADR-718).
+export { MAP_LINK_LIMITS, pointInText, pointOfMapLink } from '../internal/map-links.js';
 export {
   REVIEW_REQUEST_LIMITS,
   markReviewRequestedIn,

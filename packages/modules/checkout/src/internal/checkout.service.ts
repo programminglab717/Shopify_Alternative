@@ -44,6 +44,7 @@ import {
   chosenGateway,
   codLimitError,
   hardToFindIn,
+  pointOfMapLink,
   offeredBankTransferIn,
   prepaidDiscountOf,
   savedAddressIn,
@@ -206,6 +207,11 @@ export interface CheckoutForm {
    */
   latitude?: string;
   longitude?: string;
+  /**
+   * A Google Maps link to the address, or its coordinates, for its pin where the shopper is not at
+   * it (ADR-718); read when the order is placed, blank, or absent, for none.
+   */
+  mapLink?: string;
   /**
    * The location the shopper picks the order up at, of those the page offered (ADR-391); blank,
    * or absent, for delivered to their address.
@@ -785,6 +791,17 @@ export class CheckoutService {
   ): Promise<CheckoutView> {
     const found = await this.#resolve(token, options.shopId);
     if (!found) return { kind: 'not_found' };
+    // A map's link pins the address (ADR-718), read before any transaction: a short link is
+    // followed over the network. One read is the pin, and is gone from the form.
+    const point = form.mapLink?.trim() ? await pointOfMapLink(form.mapLink) : null;
+    if (point) {
+      form = {
+        ...form,
+        latitude: point.latitude.toFixed(6),
+        longitude: point.longitude.toFixed(6),
+        mapLink: '',
+      };
+    }
     const view = await this.#placeOrShow(found, shown, form, options.client);
     // Not placed: the name and number typed are kept, for the shop to see who left and, as it
     // chooses, remind them (ADR-393).
@@ -1097,6 +1114,10 @@ export class CheckoutService {
       const check = new InputChecker();
       const address = checkAddress(check, [], { ...formForPickup(form, pickupAt), zip: null });
       const email = check.email(['email'], form.email)?.toLowerCase() ?? null;
+      // A map's link that named no place, nor led to one (ADR-718).
+      if (!pickupAt && form.mapLink?.trim()) {
+        check.addMessage(['mapLink'], 'INVALID', 'The link names no place on the map');
+      }
       if (!address || !check.ok) {
         return { ...view, problem: { kind: 'address', errors: check.errors } };
       }

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-717 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-718 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -725,6 +725,7 @@
 | 715 | Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, at the location the order would ship from; the holder's cart counts it as theirs, and the order, another checkout of the cart or the sweep gives it back | Accepted |
 | 716 | The admin's checkout settings choose how long a checkout holds its cart's stock, from a few minutes or not at all, offering minutes set through the API too | Accepted |
 | 717 | Checkout asks once for a landmark or the pin where the shop's couriers lately could not find houses, the area learned from its own parcels' failed deliveries | Accepted |
+| 718 | Checkout pins the address from a Google Maps link or coordinates the shopper pastes, its short links followed on Google's own hosts, where they are not at the address | Accepted |
 
 ---
 
@@ -24535,3 +24536,37 @@
   * **Learning across all shops:** more parcels to learn from, but each shop's customers' addresses
     are theirs. A shared table of areas alone may come later.
   * **Counting every failed delivery:** refusals and unanswered calls are not the address's fault.
+
+## ADR-718 · Checkout pins the address from a Google Maps link or coordinates the shopper pastes, its short links followed on Google's own hosts, where they are not at the address
+
+* **Context:** An address's pin is where the shopper's phone is, added when they say they are at
+  the address ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)), and checkout asks for it where couriers could not find houses
+  ([ADR-717](#adr-717--checkout-asks-once-for-a-landmark-or-the-pin-where-the-shops-couriers-lately-could-not-find-houses-the-area-learned-from-its-own-parcels-failed-deliveries)). Shoppers often order from work or elsewhere. In Pakistan, people tell
+  others where they live by sending a Google Maps link, or its coordinates, on WhatsApp. A map to
+  move the pin on needs a map tile provider, and that choice, with its key and terms, is the
+  operator's.
+* **Decision:**
+  * **The checkout page has a field for a Google Maps link to the address, or its coordinates**
+    (`map_link`, up to 500 characters), in English and Urdu, saying to find the address in Google
+    Maps, tap Share and paste the link.
+  * **The orders module reads the place from it** (`pointOfMapLink`, on its facade). It tries the
+    most precise first: a place's own `!3d…!4d…`, a query's `q`, `query`, `ll`, `destination` or
+    `daddr`, the map's centre after `@`, then coordinates typed as "24.8607, 67.0011".
+  * **The app's short links are followed.** Links on `maps.app.goo.gl` or `goo.gl` say nothing
+    until followed. They are followed over https only, through at most three redirects, three
+    seconds each, and each redirect is read for a place. A redirect off those hosts without a
+    place in it stops there. The link is followed before the checkout's transaction begins.
+  * **The place found becomes the pin**, as the page's script would have set it. It is then kept
+    only in Pakistan and near the city typed, as ADR-259 keeps every pin. A link that names no
+    place is refused with the field's error: copy it again from Share, type the coordinates, or
+    leave it blank. A pickup order ignores it.
+* **Consequences:** A shopper who is not at the address can still pin it. The order keeps the pin
+  alone, not the link. Following a short link sends Google a request from the core with the
+  link's code in it, nothing of the shopper's. Following stays on Google's short hosts, so a link
+  cannot make the core fetch an address of the shopper's choosing. A map to move the pin on
+  still waits for a tile provider.
+* **Alternatives:**
+  * **A map from OpenStreetMap's public tiles:** their use policy does not allow an app's traffic
+    like this. A commercial provider needs the operator's key.
+  * **Keeping the link with the order for the courier:** the pin already says where, in the form
+    couriers' bookings take.

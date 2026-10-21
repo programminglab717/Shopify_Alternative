@@ -477,6 +477,8 @@ function formOf(body: unknown): CheckoutForm {
     // The pin, where the shopper added their location (ADR-259).
     latitude: field(body, 'latitude').slice(0, 20),
     longitude: field(body, 'longitude').slice(0, 20),
+    // A Google Maps link to the address, or its coordinates, for its pin (ADR-718).
+    mapLink: field(body, 'map_link').slice(0, 500),
     // The location the shopper picks the order up at, where the page offered one (ADR-391).
     pickup: field(body, 'pickup').slice(0, 40),
     // A message to go with it as a gift, where the page asked for one (ADR-413).

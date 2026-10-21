@@ -145,8 +145,10 @@ once one is typed, every listed city's, by its city, before. The order keeps the
 address's second line, where apps built for Shopify read it, and the landmark in a field of its
 own, which `formatted`, slips and the customer's pages print. The address's pin is where the
 customer's phone is, added by the page's one script when they say they are at the address, and
-kept in Pakistan and near the city typed ([ADR-259](./13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)). Not yet: a map to move
-the pin on, and couriers' own area lists. An address whose house-and-street line has no
+kept in Pakistan and near the city typed ([ADR-259](./13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)). A shopper who is not at the address may paste a Google Maps link to it, or its
+coordinates, which pin it instead; the app's short links are followed on Google's own hosts
+([ADR-718](./13-decision-log.md#adr-718--checkout-pins-the-address-from-a-google-maps-link-or-coordinates-the-shopper-pastes-its-short-links-followed-on-googles-own-hosts-where-they-are-not-at-the-address)). Not yet: a map to move the pin on, which needs a
+map tile provider, and couriers' own area lists. An address whose house-and-street line has no
 number or no street is asked about once, saying what riders look for, and placed as it is when
 posted again ([ADR-682](./13-decision-log.md#adr-682--checkout-asks-once-for-more-of-an-address-that-leaves-out-a-house-number-or-the-street-saying-what-riders-look-for-and-places-it-as-it-is-when-the-shopper-posts-it-again)). Where the shop's couriers lately could not find houses in the area typed, it asks once for a landmark or the pin too ([ADR-717](./13-decision-log.md#adr-717--checkout-asks-once-for-a-landmark-or-the-pin-where-the-shops-couriers-lately-could-not-find-houses-the-area-learned-from-its-own-parcels-failed-deliveries)).
 * **Address quality score:** heuristics and later ML flag vague addresses ("near market") and

@@ -453,7 +453,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             errors,
             form.city,
           )}
-          ${giftMessageField(view.gift, form)}
+          ${mapLinkField(form.mapLink ?? '', errors)} ${giftMessageField(view.gift, form)}
           ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
           ${
             view.storeCredit &&
@@ -2130,6 +2130,55 @@ function refusalWords(code: string, refusal: DiscountRefusal | { reason: 'attemp
         ur: 'یہ چیک آؤٹ مزید ڈسکاؤنٹ کوڈ نہیں لے سکتا۔',
       };
   }
+}
+
+/**
+ * A Google Maps link to the address, or its coordinates, for its pin where the shopper is not at
+ * it now (ADR-718), as Pakistanis share where they live; and why one was not read.
+ */
+function mapLinkField(value: string, errors: readonly FieldError[]): Html {
+  const error = errors.some((each) => each.field[0] === 'mapLink');
+  return html`<div class="field">
+    <label class="label" for="map_link"
+      >${say('bilingual', {
+        en: 'Or a Google Maps link to the address (optional)',
+        ur: 'یا پتے کا گوگل میپس لنک (اختیاری)',
+      })}</label
+    >
+    <input
+      id="map_link"
+      name="map_link"
+      type="text"
+      inputmode="url"
+      dir="ltr"
+      value="${value}"
+      aria-describedby="map_link-hint${error ? ' map_link-error' : ''}"
+      ${error && html`aria-invalid="true"`}
+    />
+    <div id="map_link-hint">
+      ${paragraphs(
+        {
+          en: 'Not at the address now? Find it in Google Maps, tap Share, and paste the link here.',
+          ur: 'ابھی پتے پر نہیں ہیں؟ گوگل میپس میں اسے ڈھونڈیں، شیئر دبائیں اور لنک یہاں پیسٹ کریں۔',
+        },
+        'small muted',
+      )}
+    </div>
+    ${
+      error &&
+      html`<div id="map_link-error">
+        ${paragraphs(
+          {
+            en:
+              "This link didn't lead to a place on the map. Copy it again from Share in Google " +
+              'Maps, type the coordinates like 24.8607, 67.0011, or leave it blank.',
+            ur: 'یہ لنک نقشے پر کسی جگہ تک نہیں پہنچا۔ گوگل میپس میں شیئر سے دوبارہ کاپی کریں، کوآرڈینیٹس لکھیں جیسے 24.8607, 67.0011، یا خالی چھوڑ دیں۔',
+          },
+          'error',
+        )}
+      </div>`
+    }
+  </div>`;
 }
 
 /** That the cart's stock is held for the shopper (ADR-715), and until when, in Pakistan's time. */

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A pin from a Google Maps link
+
+* **Checkout pins the address from a Google Maps link or coordinates the shopper pastes**
+  ([ADR-718](../architecture/13-decision-log.md#adr-718--checkout-pins-the-address-from-a-google-maps-link-or-coordinates-the-shopper-pastes-its-short-links-followed-on-googles-own-hosts-where-they-are-not-at-the-address)): the orders module's `pointOfMapLink` reads the place from the link, following the
+  app's short links on Google's own hosts, and the pin is kept near the city typed as ever. A map
+  to move the pin on still needs a map tile provider, which is the operator's choice.
+* 3992 tests, three more: two of the orders module's, one of checkout's.
+
 ### 59a7052 · A landmark asked for where riders could not find houses
 
 * **Checkout asks once for a landmark or the pin where the shop's couriers lately could not find

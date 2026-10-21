@@ -5,7 +5,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { addPkWorkingDays, pkDayOf } from '@hatti/pk';
 import { checkoutPagePath, type CartActionName, type CartJson } from '@hatti/storefront-api';
 import { TaxSettingsService } from '@hatti/tax/public';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addressGaps, isVague } from './address-quality.js';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
@@ -560,6 +560,57 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect((await ask({ ...bare, phone: '0300-6666666', address2: 'Clifton' })).asked.kind).toBe(
       'placed',
     );
+  });
+
+  it('pins the address from a Google Maps link or coordinates, a short link followed (ADR-718)', async () => {
+    const KARACHI = { latitude: 24.860735, longitude: 67.001137 };
+    const placedWith = async (mapLink: string, phone: string) => {
+      const { token } = await lawnCart();
+      const { secret, view } = await started(token);
+      return f.checkouts.place(secret, view.shown, { ...FORM, phone, mapLink });
+    };
+    // A link that names its place.
+    const named = placedOrder(
+      await placedWith(
+        'https://www.google.com/maps/place/Jamia+Masjid/data=!3d24.860735!4d67.001137',
+        '0300-1111111',
+      ),
+    );
+    expect(named.shippingAddress.location).toEqual(KARACHI);
+    // The app's short link, followed to where it leads.
+    const fetcher = vi.fn<typeof fetch>(
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://www.google.com/maps/@24.860735,67.001137,17z' },
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      const short = placedOrder(
+        await placedWith('https://maps.app.goo.gl/AbCdEf123', '0300-2222222'),
+      );
+      expect(short.shippingAddress.location).toEqual(KARACHI);
+      expect(String(fetcher.mock.calls[0]![0])).toBe('https://maps.app.goo.gl/AbCdEf123');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    // A link that leads nowhere: the page says so, keeping it, and places nothing.
+    const before = await orderCount();
+    const unread = open(await placedWith('my house near the masjid', '0300-3333333'));
+    expect(unread.problem).toEqual({
+      kind: 'address',
+      errors: [
+        { field: ['mapLink'], code: 'INVALID', message: 'The link names no place on the map' },
+      ],
+    });
+    const page = checkoutPage(unread).html;
+    expect(page).toContain('This link didn&#39;t lead to a place on the map.');
+    expect(page).toContain('value="my house near the masjid"');
+    // Coordinates in Lahore for an address in Karachi: refused as the phone's pin would be.
+    const far = open(await placedWith('31.520400, 74.358700', '0300-4444444'));
+    expect(far.problem).toMatchObject({ kind: 'address', errors: [{ field: ['latitude'] }] });
+    expect(await orderCount()).toBe(before);
   });
 
   it("keeps the pin the shopper's phone added at the address, and refuses one far from it (ADR-259)", async () => {
