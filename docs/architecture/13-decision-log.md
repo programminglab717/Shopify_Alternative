@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-689 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-690 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -697,6 +697,7 @@
 | 687 | An order's lines keep the properties their cart lines had, Shopify's customAttributes, and packing slips and invoices print those not apps' under each item | Accepted |
 | 688 | The admin's order page and the customer's order page show what the shopper wrote on each line, and checkout no longer copies it into the order's note | Accepted |
 | 689 | A product made to order asks the shopper for up to five fields, text or a choice, each answer a property of the cart line its page adds | Accepted |
+| 690 | The admin's product page has a Personalisation card, for those who change products: each field's question, text of a length or a choice, and whether it must be answered, saved together | Accepted |
 
 ---
 
@@ -23862,3 +23863,22 @@
 * **Alternatives:** **Metafields the theme reads:** a shop would have to define them and its
   theme to know them. **Files the shopper uploads:** they need storage the storefront can take
   from shoppers, and come later.
+
+## ADR-690 · The admin's product page has a Personalisation card, for those who change products: each field's question, text of a length or a choice, and whether it must be answered, saved together
+
+* **Context:** A product may ask the shopper for up to five personalisation fields
+  ([ADR-689](#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)), but only through the API.
+* **Decision:**
+  * **A Personalisation card** on the product's page, after its pre-order, for owners and
+    managers, who change products (`write_products`). Each field is a box of its own: what to
+    ask, as its page shows it; the answer, words the shopper writes or a choice; the longest
+    answer for words, blank for 50; the choices between commas, Urdu's comma among them, for a
+    choice; and whether the shopper must answer, which a new field begins with.
+  * Fields are added up to five and removed, and saved together. What the core refuses shows
+    under the field and its part, the rest above the button.
+  * English and Urdu.
+* **Consequences:** A merchant makes a product to order from its page in the admin, without the
+  API or the theme.
+* **Alternatives:** **A field's choices one box each:** commas are how merchants write lists, as
+  the search synonyms take them. **A card of the shop's own fields for every product:** fields
+  belong to what is made to order, product by product.

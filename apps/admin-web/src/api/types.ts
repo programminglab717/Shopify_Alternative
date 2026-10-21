@@ -593,6 +593,11 @@ export interface ProductDetail {
   easternWear?: EasternWear | null;
   /** Its pre-order, if it is on one (ADR-403); absent where a fake core leaves it out. */
   preorder?: { shipsOn: string } | null;
+  /**
+   * What its page asks the shopper for when it is made to order (ADR-689); absent where a fake
+   * core leaves it out.
+   */
+  personalisationFields?: PersonalisationFieldValue[];
   /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */
   sizeChart?: { id: string; name: string } | null;
   /** What it is made of, where it is a bundle (ADR-409); absent where a fake core leaves it out. */
@@ -4929,4 +4934,20 @@ export interface SeoListed {
 export interface SeoListingsData {
   shop: { url: string } | null;
   listed: { nodes: SeoListed[]; pageInfo: { hasNextPage: boolean } };
+}
+
+/** A field a product made to order asks the shopper for (ADR-689). */
+export interface PersonalisationFieldValue {
+  name: string;
+  kind: 'TEXT' | 'CHOICE';
+  required: boolean;
+  maxLength: number | null;
+  choices: string[];
+}
+
+export interface ProductPersonalisationSetData {
+  productPersonalisationSet: {
+    personalisationFields: PersonalisationFieldValue[] | null;
+    userErrors: UserError[];
+  };
 }

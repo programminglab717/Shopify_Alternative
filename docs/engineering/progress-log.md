@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Personalisation in the admin
+
+* **The admin's product page has a Personalisation card, for those who change products: each
+  field's question, text of a length or a choice, and whether it must be answered, saved
+  together** ([ADR-690](../architecture/13-decision-log.md#adr-690--the-admins-product-page-has-a-personalisation-card-for-those-who-change-products-each-fields-question-text-of-a-length-or-a-choice-and-whether-it-must-be-answered-saved-together)): CAT-15 for merchants.
+* 3912 tests, five more: the admin's.
+
 ### 957841c · Personalisation fields
 
 * **A product made to order asks the shopper for up to five fields, text or a choice, each answer

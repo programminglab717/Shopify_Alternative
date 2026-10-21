@@ -55,6 +55,7 @@ import { CategoryCard } from './category';
 import { EasternWearCard } from './eastern-wear';
 import { ProductMetafieldsCard } from './metafields';
 import { GiftCardProduct } from './gift-card-product';
+import { ProductPersonalisationCard } from './personalisation';
 import { ProductPreorder } from './preorder';
 import { ProductSizeChart } from './size-charts';
 import { StockRules } from './stock-rules';
@@ -625,6 +626,7 @@ function ProductView() {
       {edits && <StockRules product={product} />}
       {/* Shown afresh when the core's day changes. */}
       {edits && <ProductPreorder product={product} />}
+      {edits && <ProductPersonalisationCard product={product} />}
       {edits && <CategoryCard product={product} />}
       {edits && <ProductSearchListing product={product} storefront={storefront?.url ?? ''} />}
       {edits && <EasternWearCard product={product} />}

@@ -1014,6 +1014,13 @@ const PRODUCT = /* GraphQL */ `
     preorder {
       shipsOn
     }
+    personalisationFields {
+      name
+      kind
+      required
+      maxLength
+      choices
+    }
     sizeChart {
       id
       name
@@ -8838,6 +8845,24 @@ export const ReviewSettingsUpdateMutation = /* GraphQL */ `
  * Puts a product on pre-order, shipping by a day (YYYY-MM-DD), or takes it off with null
  * (CAT-14, ADR-403).
  */
+export const ProductPersonalisationSetMutation = /* GraphQL */ `
+  mutation ProductPersonalisationSet($productId: ID!, $fields: [PersonalisationFieldInput!]!) {
+    productPersonalisationSet(productId: $productId, fields: $fields) {
+      personalisationFields {
+        name
+        kind
+        required
+        maxLength
+        choices
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const ProductPreorderSetMutation = /* GraphQL */ `
   mutation ProductPreorderSet($productId: ID!, $shipsOn: String) {
     productPreorderSet(productId: $productId, shipsOn: $shipsOn) {
