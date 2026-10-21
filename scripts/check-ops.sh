@@ -21,6 +21,8 @@ promtool test rules ops/prometheus/hatti.rules.test.yml
 # parse: a rule file in JSON is YAML.
 queries=$(mktemp "${TMPDIR:-/tmp}/dashboards.XXXXXX")
 trap 'rm -f "$queries"' EXIT
+# mktemp's file is its owner's alone; Prometheus's image reads it as nobody.
+chmod 644 "$queries"
 python3 - "$queries" ops/grafana/*.json <<'PY'
 import json, sys
 out, paths = sys.argv[1], sys.argv[2:]
