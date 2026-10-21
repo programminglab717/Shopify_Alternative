@@ -28,8 +28,10 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import {
+  MOST_SECTIONS,
   SETTINGS_FILE,
   addedBlock,
+  addedSection,
   blockOrderOf,
   blockTypesLeft,
   currentSettings,
@@ -38,6 +40,8 @@ import {
   pageFilesOf,
   removedBlock,
   removedSection,
+  sectionsToAdd,
+  idFor,
   summaryOf,
   templatesOf,
   toggled,
@@ -49,6 +53,7 @@ import {
   type EditorFile,
   type SectionList,
   type SectionSchema,
+  type SectionToAdd,
   type SettingsData,
   type SettingsGroup,
 } from './theme-files';
@@ -434,9 +439,9 @@ function SectionItem({
 }
 
 /**
- * One file's part of the page: a section group's or the template's sections. A file that is the
- * shop's own may be started again from the platform theme's; one the storefront leaves out says
- * why.
+ * One file's part of the page: a section group's or the template's sections, and the template's
+ * sections added from the theme's presets (ADR-706). A file that is the shop's own may be started
+ * again from the platform theme's; one the storefront leaves out says why.
  */
 function FileCard({
   title,
@@ -452,6 +457,7 @@ function FileCard({
   onRestore,
   choices,
   storefront,
+  addable = [],
 }: {
   title: string;
   filename: string;
@@ -466,10 +472,19 @@ function FileCard({
   onRestore: () => void;
   choices: Choices;
   storefront: string;
+  /** The sections that may be added here: none but to a template. */
+  addable?: readonly SectionToAdd[];
 }) {
   const { t } = useLocale();
   if (!list) return null;
   const order = list.order.filter((id) => id in list.sections);
+  const full = Object.keys(list.sections).length >= MOST_SECTIONS;
+  // The new section opened, to set what it shows straight away.
+  const add = (each: SectionToAdd) => {
+    const id = idFor(each.type);
+    change((all) => addedSection(all, each, id));
+    setOpen(`${filename}#${id}`);
+  };
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -520,6 +535,28 @@ function FileCard({
             );
           })}
         </ul>
+      )}
+      {addable.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
+          <h3 className="font-semibold">{t('editor.addSection')}</h3>
+          {full ? (
+            <p className="text-secondary">{t('editor.sectionsFull', { count: MOST_SECTIONS })}</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {addable.map((each) => (
+                <Button
+                  key={`${each.type}/${each.preset.name}`}
+                  variant="secondary"
+                  icon={<Plus aria-hidden className="size-5" />}
+                  aria-label={t('editor.addSectionTo', { section: each.preset.name, name: title })}
+                  onClick={() => add(each)}
+                >
+                  {each.preset.name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </Card>
   );
@@ -804,7 +841,8 @@ function Editor({
     if (group?.type === 'footer') return t('editor.group.footer');
     return group?.name ?? filename;
   };
-  const card = (filename: string, title: string) => (
+  const addable = sectionsToAdd(data.schemas);
+  const card = (filename: string, title: string, adding = false) => (
     <FileCard
       key={filename}
       title={title}
@@ -823,6 +861,7 @@ function Editor({
       onRestore={() => setRestoring(filename)}
       choices={choices}
       storefront={storefront}
+      addable={adding ? addable : undefined}
     />
   );
 
@@ -885,7 +924,7 @@ function Editor({
             </Alert>
           )}
           {page.above.map((filename) => card(filename, groupTitle(filename)))}
-          {card(page.template, templateName(template))}
+          {card(page.template, templateName(template), true)}
           {page.below.map((filename) => card(filename, groupTitle(filename)))}
           <ThemeSettings
             data={data}

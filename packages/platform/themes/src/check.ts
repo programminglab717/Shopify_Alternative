@@ -13,11 +13,17 @@ export function checkShopFile(base: Theme, filename: string, source: string): st
   if (problems.length > 0) return problems;
   const json = JSON.parse(source) as Record<string, unknown>;
   if (filename.startsWith('config/')) return settingsDataProblems(base, json);
-  for (const [id, placement] of Object.entries(json.sections as Record<string, Placement>)) {
+  const sections = Object.entries(json.sections as Record<string, Placement>);
+  // Shopify's limit for a template or a section group (ADR-706).
+  if (sections.length > MOST_SECTIONS) problems.push(`holds at most ${MOST_SECTIONS} sections`);
+  for (const [id, placement] of sections) {
     problems.push(...placementProblems(base, id, placement));
   }
   return problems;
 }
+
+/** The most sections a template or a section group holds. */
+export const MOST_SECTIONS = 25;
 
 interface Placement {
   type: string;

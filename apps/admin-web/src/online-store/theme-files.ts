@@ -26,11 +26,19 @@ export interface BlockSchema {
   settings?: Setting[];
 }
 
+/** A section as the theme offers it to be added, with settings and blocks to begin with. */
+export interface SectionPreset {
+  name: string;
+  settings?: Record<string, unknown>;
+  blocks?: { type: string; settings?: Record<string, unknown> }[];
+}
+
 export interface SectionSchema {
   name?: string;
   settings?: Setting[];
   blocks?: BlockSchema[];
   max_blocks?: number;
+  presets?: SectionPreset[];
 }
 
 export interface BlockPlacement {
@@ -260,7 +268,7 @@ export function addedBlock(
   list: SectionList,
   section: string,
   type: string,
-  id: string = blockIdFor(type),
+  id: string = idFor(type),
 ): SectionList {
   return withSection(list, section, (placement) => ({
     ...placement,
@@ -269,8 +277,48 @@ export function addedBlock(
   }));
 }
 
-/** An ID for a new block, as Shopify's IDs may be: letters, digits, "_" and "-". */
-function blockIdFor(type: string): string {
+/** The most sections a template or a section group holds, as Shopify's (ADR-706). */
+export const MOST_SECTIONS = 25;
+
+/** A theme's section that a merchant may add: one of its presets, as Shopify's editor offers. */
+export interface SectionToAdd {
+  type: string;
+  preset: SectionPreset;
+}
+
+/**
+ * The sections a template may take one more of: each preset of the theme's sections, but for
+ * the pages' own, as each page has its one.
+ */
+export function sectionsToAdd(schemas: ReadonlyMap<string, SectionSchema>): SectionToAdd[] {
+  return [...schemas]
+    .filter(([type]) => !type.startsWith('main-'))
+    .flatMap(([type, schema]) => (schema.presets ?? []).map((preset) => ({ type, preset })))
+    .sort((a, b) => a.preset.name.localeCompare(b.preset.name));
+}
+
+/** A section added at the end of the page, as its preset begins it. */
+export function addedSection(
+  list: SectionList,
+  { type, preset }: SectionToAdd,
+  id: string = idFor(type),
+): SectionList {
+  const blocks = (preset.blocks ?? []).map((block) => [idFor(block.type), block] as const);
+  const placement: Placement = { type, settings: { ...preset.settings } };
+  if (blocks.length > 0) {
+    placement.blocks = Object.fromEntries(
+      blocks.map(([blockId, block]) => [
+        blockId,
+        { type: block.type, settings: { ...block.settings } },
+      ]),
+    );
+    placement.block_order = blocks.map(([blockId]) => blockId);
+  }
+  return { ...list, sections: { ...list.sections, [id]: placement }, order: [...list.order, id] };
+}
+
+/** An ID for a new section or block, as Shopify's IDs may be: letters, digits, "_" and "-". */
+export function idFor(type: string): string {
   const name = type.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'block';
   return `${name}_${Math.random().toString(36).slice(2, 8)}`;
 }

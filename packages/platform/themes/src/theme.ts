@@ -28,12 +28,21 @@ export interface BlockSchema {
   settings?: SettingSchema[];
 }
 
-/** A section's `{% schema %}`: its settings and the blocks it takes. */
+/** A section as the theme offers it to be added, with settings and blocks to begin with. */
+export interface SectionPreset {
+  name: string;
+  settings?: Record<string, unknown>;
+  blocks?: { type: string; settings?: Record<string, unknown> }[];
+}
+
+/** A section's `{% schema %}`: its settings, the blocks it takes and how it is added. */
 export interface SectionSchema {
   name?: string;
   settings?: SettingSchema[];
   blocks?: BlockSchema[];
   max_blocks?: number;
+  /** Shopify's presets: a section without any is not one a merchant adds (ADR-706). */
+  presets?: SectionPreset[];
 }
 
 /** A section as a JSON template or a section group places it. */

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Sections added in the theme editor
+
+* **The admin's theme editor adds sections to a page from the theme's presets, as Shopify's
+  does, opened to be set up, 25 at most, and gives a `video_url` setting its box** ([ADR-706](../architecture/13-decision-log.md#adr-706--the-admins-theme-editor-adds-sections-to-a-page-from-the-themes-presets-as-shopifys-does-opened-to-be-set-up-25-at-most-and-gives-a-video_url-setting-its-box)):
+  OS-02's sections added, and the video section of ADR-705 without touching a file.
+* 3959 tests, two more: the admin's and the themes package's.
+
 ### 3d37a6b · Video sections
 
 * **A theme's sections play YouTube and Vimeo videos from Shopify's `video_url` setting, the

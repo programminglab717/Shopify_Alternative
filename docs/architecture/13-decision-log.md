@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-705 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-706 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -713,6 +713,7 @@
 | 703 | The admin's delivery settings take heavier orders' charges: weights typed in kilograms, sent in grams, each with what it costs more, added and removed as zones are | Accepted |
 | 704 | Hatti Base says what heavier orders cost more: each weight on product pages, and the heaviest a cart passes on the cart page, from the weights in the shop's document | Accepted |
 | 705 | A theme's sections play YouTube and Vimeo videos from Shopify's video_url setting, the address checked as it is saved, and Hatti Base has a video section | Accepted |
+| 706 | The admin's theme editor adds sections to a page from the theme's presets, as Shopify's does, opened to be set up, 25 at most, and gives a video_url setting its box | Accepted |
 
 ---
 
@@ -24237,3 +24238,29 @@
 * **Consequences:** Shops add a video to any page through their theme's files.
 * **Alternatives:** **Embeds in a page's body:** a body that frames other sites is one that can
   frame anything. **An `html` setting:** the same.
+
+## ADR-706 · The admin's theme editor adds sections to a page from the theme's presets, as Shopify's does, opened to be set up, 25 at most, and gives a video_url setting its box
+
+* **Context:** The admin's editor changed, moved, hid and removed a page's sections
+  ([ADR-324](#adr-324--the-admins-theme-editor-changes-a-pages-sections-and-blocks-and-the-themes-settings-in-place-kept-until-saved-together-as-theme-check-passes-them-pictures-wait-for-an-address-of-their-own)) but added none, so a section a page lacked, such as the video section
+  ([ADR-705](#adr-705--a-themes-sections-play-youtube-and-vimeo-videos-from-shopifys-video_url-setting-the-address-checked-as-it-is-saved-and-hatti-base-has-a-video-section)), was a shop's only by writing its template's JSON. Shopify's editor adds
+  them from each section's `presets`, which Hatti Base's schemas did not have.
+* **Decision:**
+  * **Hatti Base's sections give presets**, as Shopify's do: the banner with a heading, words and
+    a button, a question for the FAQ, and the featured collection, video, newsletter, WhatsApp,
+    contact form and recently viewed as they are. A page's own `main-` sections give none: each
+    page has its one.
+  * **The editor offers each preset under the page's template**, by its name in the merchant's
+    language, never in the header's or footer's groups. One tapped is added at the end of the
+    page, its preset's settings and blocks each under a new ID, and opened to be set up; the
+    preview renders it there as it renders a changed one ([ADR-325](#adr-325--the-theme-editors-preview-frames-the-storefront-beside-the-editor-and-shows-changes-as-they-are-made-the-pages-sections-following-the-editors-files-the-themes-settings-show-once-saved)). It is saved with
+    the rest and taken away as any other.
+  * **25 sections at most**, Shopify's limit: the editor offers no more past it and says so, and
+    Theme Check refuses a template or a group holding more.
+  * **A `video_url` setting gets a box of its own**, left to right, for the address as people
+    copy it, saying which hosts it takes; Theme Check refuses others as it saves.
+* **Consequences:** A shop puts a video, an FAQ or a sign-up box on any page without touching a
+  file. Sections whose schema names no preset are not offered, as on Shopify.
+* **Alternatives:** **Any of the theme's sections offered:** one without a preset may need
+  settings or blocks a page cannot show without. **Sections added in the groups too:**
+  Shopify's `enabled_on` rules decide which; none of Hatti Base's sections needs it yet.

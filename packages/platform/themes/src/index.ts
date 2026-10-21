@@ -1,4 +1,4 @@
-export { checkShopFile } from './check.js';
+export { checkShopFile, MOST_SECTIONS } from './check.js';
 export { editorSchemas, type EditorSchemas } from './editor.js';
 export { platformTheme, platformThemeDir } from './platform.js';
 export {
@@ -22,6 +22,7 @@ export {
   type BlockSchema,
   type SectionList,
   type SectionPlacement,
+  type SectionPreset,
   type SectionSchema,
   type SettingSchema,
   type Theme,

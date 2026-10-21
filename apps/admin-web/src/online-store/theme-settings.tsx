@@ -420,6 +420,19 @@ export function SettingField({
           onChange={(event) => onChange(event.target.value.trim())}
         />
       );
+    case 'video_url':
+      return (
+        <TextField
+          label={label}
+          hint={setting.info ?? t('editor.videoHint')}
+          ltr
+          inputMode="url"
+          autoCapitalize="none"
+          placeholder="https://www.youtube.com/watch?v=…"
+          value={text}
+          onChange={(event) => onChange(event.target.value.trim())}
+        />
+      );
     case 'link_list':
       return (
         <SelectField

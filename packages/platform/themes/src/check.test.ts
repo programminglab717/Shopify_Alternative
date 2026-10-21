@@ -1,5 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { checkShopFile, platformTheme, settingValue, videoUrlOf, type Theme } from './index.js';
+import {
+  checkShopFile,
+  MOST_SECTIONS,
+  platformTheme,
+  settingValue,
+  videoUrlOf,
+  type Theme,
+} from './index.js';
 
 describe('Theme Check', () => {
   let base: Theme;
@@ -90,6 +97,34 @@ describe('Theme Check', () => {
       `the theme's "whatsapp_orders" must be true or false`,
       'the theme has no setting "font"',
       'the theme has no section "gone" to set',
+    ]);
+  });
+
+  it("places Hatti Base's presets as sections the check passes, and no more than 25 (ADR-706)", () => {
+    const presets = [...base.schemas].flatMap(([type, schema]) =>
+      (schema.presets ?? []).map((preset) => ({ type, preset })),
+    );
+    expect(presets.map(({ type }) => type)).toEqual(
+      expect.arrayContaining(['image-banner', 'faq', 'video', 'featured-collection']),
+    );
+    // The page's own sections are never added: each page has its one.
+    expect(presets.some(({ type }) => type.startsWith('main-'))).toBe(false);
+    const sections = Object.fromEntries(
+      presets.map(({ type, preset }, index) => [
+        `${type}_${index}`,
+        {
+          type,
+          settings: preset.settings ?? {},
+          blocks: Object.fromEntries((preset.blocks ?? []).map((block, at) => [`b${at}`, block])),
+        },
+      ]),
+    );
+    expect(check('templates/index.json', { sections, order: Object.keys(sections) })).toEqual([]);
+    const many = Object.fromEntries(
+      Array.from({ length: MOST_SECTIONS + 1 }, (_, index) => [`v${index}`, { type: 'video' }]),
+    );
+    expect(check('templates/index.json', { sections: many, order: Object.keys(many) })).toEqual([
+      'holds at most 25 sections',
     ]);
   });
 

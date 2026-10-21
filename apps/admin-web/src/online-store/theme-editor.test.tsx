@@ -75,6 +75,20 @@ const SECTIONS: Record<string, object> = {
         ],
       },
     ],
+    presets: [
+      {
+        name: 'Image banner',
+        blocks: [{ type: 'heading' }, { type: 'button', settings: { label: 'Shop lawn' } }],
+      },
+    ],
+  },
+  video: {
+    name: 'Video',
+    settings: [
+      { type: 'text', id: 'heading', label: 'Heading' },
+      { type: 'video_url', id: 'video', label: 'Video', accept: ['youtube', 'vimeo'] },
+    ],
+    presets: [{ name: 'Video' }],
   },
   'featured-collection': {
     name: 'Featured collection',
@@ -528,6 +542,49 @@ describe("A theme's editor", () => {
     fireEvent.change(screen.getByLabelText('Page'), { target: { value: 'password' } });
     const headings = screen.getAllByRole('heading', { level: 2 }).map((each) => each.textContent);
     expect(headings).toEqual(['Password page', 'Theme settings', 'Preview']);
+  });
+
+  it("adds a section from the theme's presets to a page, opened to set it up (ADR-706)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/themes/thm_1');
+
+    expect(await screen.findByRole('heading', { name: 'Add a section' })).toBeTruthy();
+    // To the template alone: the header's and footer's groups take none.
+    expect(screen.getAllByRole('heading', { name: 'Add a section' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Add Product to/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Video to Home page' }));
+    type('Heading', 'Our Eid lookbook');
+    const address = screen.getByLabelText('Video') as HTMLInputElement;
+    expect(address.dir).toBe('ltr');
+    expect(
+      screen.getByText("A YouTube or Vimeo video's address, as you copy it from the video's page."),
+    ).toBeTruthy();
+    fireEvent.change(address, { target: { value: ' https://youtu.be/dQw4w9WgXcQ ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Image banner to Home page' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Saved. Your store shows it in a moment.')).toBeTruthy();
+    const [index] = savedFiles(fake);
+    const json = index!.json as {
+      order: string[];
+      sections: Record<string, { type: string; settings: object; blocks?: object }>;
+    };
+    expect(json.order.slice(0, 3)).toEqual(['banner', 'lawn', 'khussa']);
+    expect(json.order).toHaveLength(5);
+    const [video, banner] = json.order.slice(3).map((id) => json.sections[id]!);
+    expect(json.order[3]).toMatch(/^video_[a-z0-9]+$/);
+    expect(video).toEqual({
+      type: 'video',
+      settings: { heading: 'Our Eid lookbook', video: 'https://youtu.be/dQw4w9WgXcQ' },
+    });
+    // A preset's blocks come with it, in its order.
+    expect(banner!.type).toBe('image-banner');
+    expect(Object.values(banner!.blocks!)).toEqual([
+      { type: 'heading', settings: {} },
+      { type: 'button', settings: { label: 'Shop lawn' } },
+    ]);
   });
 
   it('discards changes, and is linked from the themes tab', async () => {
