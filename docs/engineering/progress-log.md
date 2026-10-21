@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A map to move the pin on
+
+* **Checkout offers a map to move the address's pin on, once the platform has map tiles**
+  ([ADR-719](../architecture/13-decision-log.md#adr-719--checkout-offers-a-map-to-move-the-addresss-pin-on-drawn-by-the-pages-own-script-from-the-map-tiles-the-platform-is-configured-with-and-none-without-them)): `MAP_TILES_URL` and `MAP_TILES_ATTRIBUTION` name a provider's tiles, and the page's
+  own script draws them under a pin at the map's centre, with no library. The map waits for the
+  operator to choose the provider.
+* 3997 tests, five more: three of the orders module's, one of checkout's and one of the core's.
+
 ### 0ff9241 · A pin from a Google Maps link
 
 * **Checkout pins the address from a Google Maps link or coordinates the shopper pastes**

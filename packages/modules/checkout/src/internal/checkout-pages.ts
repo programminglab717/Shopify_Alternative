@@ -17,6 +17,7 @@ import {
   COD_CASH_LIMIT,
   cashPastLimitOf,
   LOCATION_SCRIPT,
+  MAP_SCRIPT,
   gatewayForm,
   gatewayNames,
   gatewayOrigins,
@@ -452,6 +453,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             { latitude: form.latitude ?? '', longitude: form.longitude ?? '' },
             errors,
             form.city,
+            view.map,
           )}
           ${mapLinkField(form.mapLink ?? '', errors)} ${giftMessageField(view.gift, form)}
           ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
@@ -474,7 +476,17 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       policyLinks(shop),
     ],
     orderable
-      ? { scripts: [LOCATION_SCRIPT, CONTACT_SCRIPT, TOTALS_SCRIPT], connectsHome: true }
+      ? {
+          scripts: [
+            LOCATION_SCRIPT,
+            ...(view.map ? [MAP_SCRIPT] : []),
+            CONTACT_SCRIPT,
+            TOTALS_SCRIPT,
+          ],
+          connectsHome: true,
+          // The map's tiles (ADR-719).
+          images: view.map ? [view.map.source] : [],
+        }
       : {},
   );
 }
@@ -2360,6 +2372,7 @@ function page(
     formTargets?: readonly string[];
     scripts?: readonly string[];
     connectsHome?: boolean;
+    images?: readonly string[];
   } = {},
 ): CheckoutPage {
   return {
@@ -2368,7 +2381,7 @@ function page(
       title,
       body: html`${body}`,
       accent: shop?.accent,
-      images: shop?.logo ? [shop.logo] : [],
+      images: [...(shop?.logo ? [shop.logo] : []), ...(options.images ?? [])],
       formTargets: options.formTargets ?? [],
       scripts: options.scripts ?? [],
       connectsHome: options.connectsHome ?? false,

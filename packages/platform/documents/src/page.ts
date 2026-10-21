@@ -137,6 +137,34 @@ td { padding: 4px 0; vertical-align: baseline; }
   line-height: 56px;
   text-align: center;
 }
+/* A map to move an address's pin on (ADR-719): tiles a script draws, under a pin at its centre. */
+.map {
+  position: relative;
+  height: 256px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #E2E8F0;
+  touch-action: none;
+  cursor: grab;
+}
+.map:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 2px; }
+.map img { position: absolute; max-width: none; user-select: none; }
+.map-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  background: #DC2626;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.zoom { display: flex; gap: 8px; }
+.zoom .button { width: 48px; }
 .button {
   display: block;
   width: 100%;

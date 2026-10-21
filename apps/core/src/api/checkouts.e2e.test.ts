@@ -5,7 +5,7 @@ import { AbandonedCheckoutService } from '@hatti/checkout/public';
 import { Database } from '@hatti/db';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { MessagesService } from '@hatti/messaging/public';
-import { OrderService } from '@hatti/orders/public';
+import { MapTiles, OrderService } from '@hatti/orders/public';
 import { addPkWorkingDays, pkDayOf } from '@hatti/pk';
 import {
   StorefrontApiClient,
@@ -107,7 +107,10 @@ describe.skipIf(!server)('Checkouts', () => {
        VALUES ($1, 'test', $2, $3, $4)`,
       [shopA, hash, hint, ['write_products', 'read_orders', 'write_discounts']],
     );
-    api = await startTestApi(testDb);
+    // A map to move the pin on, from the platform's tiles (ADR-719).
+    api = await startTestApi(testDb, {
+      mapTiles: new MapTiles('https://tiles.example.com/{z}/{x}/{y}.png', '© Tiles'),
+    });
     app = api.app;
     const created = await app.inject({
       method: 'POST',
@@ -322,7 +325,7 @@ describe.skipIf(!server)('Checkouts', () => {
       new RegExp(`^http://localhost:4000/storage/${key}\\?expires=\\d+&signature=`),
     );
     expect(page.headers['content-security-policy']).toContain(
-      `; img-src http://localhost:4000/storage/${key};`,
+      `; img-src http://localhost:4000/storage/${key} https://tiles.example.com/;`,
     );
     await admin.query('DELETE FROM files.brands; DELETE FROM files.files');
   });
@@ -383,6 +386,9 @@ describe.skipIf(!server)('Checkouts', () => {
     // Its page's policy lets its script send it to the page's own site alone.
     const page = await app.inject({ method: 'GET', url: path });
     expect(page.headers['content-security-policy']).toContain("connect-src 'self'");
+    // And its map's tiles, which the platform's map provider serves (ADR-719).
+    expect(page.headers['content-security-policy']).toContain('img-src https://tiles.example.com/');
+    expect(page.body).toContain('data-tiles="https://tiles.example.com/{z}/{x}/{y}.png"');
 
     const gql = (token: string, query: string, variables: Record<string, unknown> = {}) =>
       app.inject({

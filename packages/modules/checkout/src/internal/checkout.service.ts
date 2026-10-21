@@ -44,6 +44,7 @@ import {
   chosenGateway,
   codLimitError,
   hardToFindIn,
+  MapTiles,
   pointOfMapLink,
   offeredBankTransferIn,
   prepaidDiscountOf,
@@ -77,7 +78,7 @@ import { ObjectStorage } from '@hatti/storage';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
 import { verifiedLevelIn, type VerificationLevel } from '@hatti/trust/public';
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { addressGaps, isVague, type AddressGap } from './address-quality.js';
 import { keepContactIn, recoverIn } from './abandoned.service.js';
@@ -594,6 +595,8 @@ export type CheckoutView =
        * the shop holds none, or the hold ran out.
        */
       heldUntil?: Date;
+      /** The tiles of a map to move the address's pin on (ADR-719); absent for none. */
+      map?: MapTiles;
     }
   | {
       kind: 'placed';
@@ -650,6 +653,8 @@ export class CheckoutService {
     @Optional() private readonly payments?: OnlinePayments,
     /** Where shoppers come back to from the gateway: the core's own address. */
     @Optional() private readonly site?: PublicSite,
+    /** The tiles of a map to move the pin on (ADR-719); without them, no map. */
+    @Optional() @Inject(MapTiles) private readonly mapTiles?: MapTiles | null,
   ) {}
 
   /** Stock held while shoppers check out (ADR-715). */
@@ -1667,6 +1672,7 @@ export class CheckoutService {
       countsFrom: deliveryCountsFrom(delivery, new Date()),
       ...(checkout.heldUntil &&
         checkout.heldUntil > new Date() && { heldUntil: checkout.heldUntil }),
+      ...(this.mapTiles && { map: this.mapTiles }),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null

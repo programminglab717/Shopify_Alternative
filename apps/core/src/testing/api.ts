@@ -22,6 +22,7 @@ import type {
   WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
 import type { GoogleAdsOptions, MetaGraphOptions, TikTokApiOptions } from '@hatti/marketing/public';
+import type { MapTiles } from '@hatti/orders/public';
 import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -106,6 +107,8 @@ export async function startTestApi(
     push?: VapidKeys;
     /** How queries are costed and throttled (ADR-576); without it, none is. */
     queryCost?: QueryCostOptions;
+    /** The tiles of checkout's map to move the pin on (ADR-719); without them, no map. */
+    mapTiles?: MapTiles;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -124,6 +127,7 @@ export async function startTestApi(
     storage,
     redis: options.redis ?? null,
     ai: options.ai ?? null,
+    mapTiles: options.mapTiles ?? null,
     logger: createLogger({ name: 'api-test', level: 'silent' }),
     identity: {
       db: identityDatabase.app,

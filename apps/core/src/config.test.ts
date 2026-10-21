@@ -340,6 +340,25 @@ describe('API configuration', () => {
     );
   });
 
+  it("takes the map's tiles with the words their terms ask for, or neither (ADR-719)", () => {
+    const tiles = {
+      MAP_TILES_URL: 'https://tiles.example.com/{z}/{x}/{y}.png?key=abc',
+      MAP_TILES_ATTRIBUTION: '© OpenStreetMap contributors',
+    };
+    expect(loadApiConfig({ ...env, ...tiles })).toMatchObject(tiles);
+    expect(loadApiConfig(env).MAP_TILES_URL).toBeUndefined();
+    expect(() => loadApiConfig({ ...env, MAP_TILES_URL: tiles.MAP_TILES_URL })).toThrow(
+      'MAP_TILES_ATTRIBUTION: Set both MAP_TILES_URL and MAP_TILES_ATTRIBUTION, or neither',
+    );
+    expect(() =>
+      loadApiConfig({
+        ...env,
+        ...tiles,
+        MAP_TILES_URL: 'http://tiles.example.com/{z}/{x}/{y}.png',
+      }),
+    ).toThrow(/MAP_TILES_URL/);
+  });
+
   it("reads TikTok's Business API, which shops' advertiser accounts are checked on (ADR-566)", () => {
     expect(loadApiConfig(env).TIKTOK_API_URL).toBe('https://business-api.tiktok.com');
     expect(loadApiConfig({ ...env, TIKTOK_API_URL: 'http://localhost:4900' }).TIKTOK_API_URL).toBe(

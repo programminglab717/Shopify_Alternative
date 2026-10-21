@@ -85,12 +85,213 @@ export const LOCATION_SCRIPT = `(function () {
   block.hidden = false;
 })();`;
 
+/**
+ * The map tiles a page's map to move the pin on is drawn from (ADR-719): a provider's raster
+ * tiles, 256 pixels square in Web Mercator, by a template such as
+ * "https://tiles.example.com/{z}/{x}/{y}.png?key=…", and the words its terms ask the map to show.
+ * Provided by the host application from its configuration; without it, no map is drawn.
+ */
+export class MapTiles {
+  readonly template: string;
+  readonly attribution: string;
+  /** Where the tiles are, for a page's policy: the template's address up to its first placeholder. */
+  readonly source: string;
+
+  constructor(template: string, attribution: string) {
+    const placeholders: string[] = template.match(/\{[^}]*\}/g) ?? [];
+    if (!['{z}', '{x}', '{y}'].every((each) => placeholders.includes(each))) {
+      throw new Error('Map tiles need {z}, {x} and {y} in their template');
+    }
+    if (placeholders.some((each) => !['{z}', '{x}', '{y}'].includes(each))) {
+      throw new Error('Map tiles take no placeholders but {z}, {x} and {y}');
+    }
+    const prefix = template.slice(0, template.indexOf('{'));
+    const source = prefix.slice(0, prefix.lastIndexOf('/') + 1);
+    let url: URL;
+    try {
+      url = new URL(source);
+    } catch {
+      throw new Error(`Map tiles must be at an https URL: ${template}`);
+    }
+    if (url.protocol !== 'https:' || !source.startsWith(`${url.origin}/`)) {
+      throw new Error(
+        `Map tiles must be at an https URL, their placeholders after its host: ${template}`,
+      );
+    }
+    const words = attribution.trim();
+    if (words.length === 0 || words.length > 200) {
+      throw new Error(
+        'Map tiles need the words their terms ask maps to show, up to 200 characters',
+      );
+    }
+    this.template = template;
+    this.attribution = words;
+    this.source = source;
+  }
+}
+
+/** How close the map opens, on the pin, on the city typed, or on Pakistan. */
+const MAP_ZOOM = { pin: 17, city: 13, country: 5 } as const;
+
+/** Where the map opens without a pin or a city it knows: Pakistan, whole. */
+const PAKISTAN: MapPoint = { latitude: 30.0, longitude: 70.0 };
+
+/**
+ * Draws the map {@link locationField} lays out when given {@link MapTiles} (ADR-719), once the
+ * customer asks for it: its tiles under a pin that stays at its centre, moved by dragging, or by
+ * the arrow keys, and zoomed by its buttons or the + and - keys. Moving it puts the pin where it
+ * now points, in the form's hidden fields as {@link LOCATION_SCRIPT} would; opening it or zooming
+ * alone puts none. The same text on every page, which their policy allows by its hash, with the
+ * tiles' source among its images. Without it, the map stays hidden.
+ */
+export const MAP_SCRIPT = `(function () {
+  var block = document.querySelector('[data-location]');
+  var frame = block && block.querySelector('[data-tiles]');
+  if (!frame || !navigator.geolocation) return;
+  var SIZE = 256, MIN = 5, MAX = 19, STEP = 64;
+  var view = block.querySelector('[data-map-view]');
+  var open = block.querySelector('[data-open-map]');
+  var latitude = block.querySelector('input[name="latitude"]');
+  var longitude = block.querySelector('input[name="longitude"]');
+  var template = frame.getAttribute('data-tiles');
+  var zoom = Number(frame.getAttribute('data-zoom'));
+  var centre = project(Number(frame.getAttribute('data-latitude')),
+    Number(frame.getAttribute('data-longitude')));
+  var layer = document.createElement('div');
+  var tiles = {};
+  frame.insertBefore(layer, frame.firstChild);
+  function world() { return SIZE * Math.pow(2, zoom); }
+  function project(lat, lng) {
+    var sin = Math.sin(lat * Math.PI / 180);
+    return { x: (lng + 180) / 360 * world(),
+      y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * world() };
+  }
+  function unproject(point) {
+    var n = Math.PI - 2 * Math.PI * point.y / world();
+    return { latitude: 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))),
+      longitude: point.x / world() * 360 - 180 };
+  }
+  function draw() {
+    var width = frame.clientWidth, height = frame.clientHeight, count = Math.pow(2, zoom);
+    centre.y = Math.max(height / 2, Math.min(world() - height / 2, centre.y));
+    var left = centre.x - width / 2, top = centre.y - height / 2, kept = {};
+    for (var x = Math.floor(left / SIZE); x <= Math.floor((left + width) / SIZE); x++) {
+      for (var y = Math.max(0, Math.floor(top / SIZE));
+        y <= Math.min(count - 1, Math.floor((top + height) / SIZE)); y++) {
+        var key = zoom + '/' + x + '/' + y;
+        var tile = tiles[key];
+        if (!tile) {
+          tile = document.createElement('img');
+          tile.alt = '';
+          tile.draggable = false;
+          tile.width = SIZE;
+          tile.height = SIZE;
+          tile.src = template.split('{z}').join(zoom)
+            .split('{x}').join(((x % count) + count) % count).split('{y}').join(y);
+          layer.appendChild(tile);
+          tiles[key] = tile;
+        }
+        tile.style.left = (x * SIZE - left) + 'px';
+        tile.style.top = (y * SIZE - top) + 'px';
+        kept[key] = true;
+      }
+    }
+    for (var each in tiles) {
+      if (!kept[each]) { layer.removeChild(tiles[each]); delete tiles[each]; }
+    }
+  }
+  function show(state) {
+    var parts = block.querySelectorAll('[data-show]');
+    for (var i = 0; i < parts.length; i++) {
+      parts[i].hidden = parts[i].getAttribute('data-show').split(' ').indexOf(state) < 0;
+    }
+  }
+  function pin() {
+    var point = unproject(centre);
+    latitude.value = point.latitude.toFixed(6);
+    longitude.value = point.longitude.toFixed(6);
+    var links = block.querySelectorAll('[data-map]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].href = 'https://www.google.com/maps/search/?api=1&query=' +
+        latitude.value + ',' + longitude.value;
+    }
+    show('added');
+  }
+  function move(dx, dy) {
+    centre.x += dx;
+    centre.y += dy;
+    draw();
+  }
+  function zoomBy(step) {
+    var point = unproject(centre);
+    zoom = Math.max(MIN, Math.min(MAX, zoom + step));
+    centre = project(point.latitude, point.longitude);
+    draw();
+  }
+  var from = null, moved = 0;
+  frame.addEventListener('pointerdown', function (event) {
+    from = { x: event.clientX, y: event.clientY };
+    moved = 0;
+    frame.setPointerCapture(event.pointerId);
+  });
+  frame.addEventListener('pointermove', function (event) {
+    if (!from) return;
+    var dx = event.clientX - from.x, dy = event.clientY - from.y;
+    moved += Math.abs(dx) + Math.abs(dy);
+    from = { x: event.clientX, y: event.clientY };
+    move(-dx, -dy);
+  });
+  function end() {
+    if (!from) return;
+    from = null;
+    if (moved > 3) pin();
+  }
+  frame.addEventListener('pointerup', end);
+  frame.addEventListener('pointercancel', end);
+  frame.addEventListener('keydown', function (event) {
+    var keys = { ArrowLeft: [-STEP, 0], ArrowRight: [STEP, 0], ArrowUp: [0, -STEP],
+      ArrowDown: [0, STEP] };
+    if (keys[event.key]) {
+      move(keys[event.key][0], keys[event.key][1]);
+      pin();
+    } else if (event.key === '+' || event.key === '=') {
+      zoomBy(1);
+    } else if (event.key === '-') {
+      zoomBy(-1);
+    } else {
+      return;
+    }
+    event.preventDefault();
+  });
+  var buttons = view.querySelectorAll('[data-zoom]');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener('click', function () {
+      zoomBy(Number(this.getAttribute('data-zoom')));
+    });
+  }
+  open.addEventListener('click', function () {
+    open.removeAttribute('data-show');
+    open.hidden = true;
+    view.hidden = false;
+    draw();
+    frame.focus();
+  });
+  open.hidden = false;
+})();`;
+
 const WORDS = {
   label: { en: 'Location pin (optional)', ur: 'لوکیشن پن (اختیاری)' },
   add: { en: 'Add my location', ur: 'میری لوکیشن شامل کریں' },
   remove: { en: 'Remove the pin', ur: 'پن ہٹائیں' },
   onTheMap: { en: 'See it on the map', ur: 'نقشے پر دیکھیں' },
   pin: { en: 'Location pin', ur: 'لوکیشن پن' },
+  openMap: { en: 'Put the pin on a map', ur: 'نقشے پر پن لگائیں' },
+  zoomIn: { en: 'Zoom in', ur: 'زوم اِن' },
+  zoomOut: { en: 'Zoom out', ur: 'زوم آؤٹ' },
+  map: {
+    en: 'Map of the delivery address: drag it, or use the arrow keys, to put the pin on the door',
+    ur: 'ڈیلیوری کے پتے کا نقشہ: پن کو دروازے پر لانے کے لیے اسے کھینچیں، یا تیر والی کلیدیں استعمال کریں',
+  },
   scan: {
     en: "Scan it for the way to the customer's door",
     ur: 'گاہک کے دروازے تک راستے کے لیے اسکین کریں',
@@ -119,6 +320,10 @@ const SAY = {
     en: "Your location couldn't be found closely enough. Turn on your phone's location, then try again.",
     ur: 'آپ کی لوکیشن ٹھیک سے معلوم نہیں ہو سکی۔ فون کی لوکیشن آن کریں، پھر دوبارہ کوشش کریں۔',
   },
+  onMap: {
+    en: 'Move the map until the pin is on your door. Zoom in to see your street.',
+    ur: 'نقشے کو سرکائیں یہاں تک کہ پن آپ کے دروازے پر آ جائے۔ اپنی گلی دیکھنے کے لیے زوم اِن کریں۔',
+  },
   failed: {
     en: "Your location couldn't be found. Try again, or leave it out.",
     ur: 'آپ کی لوکیشن معلوم نہیں ہو سکی۔ دوبارہ کوشش کریں، یا اسے چھوڑ دیں۔',
@@ -143,6 +348,7 @@ export function locationField(
   form: LocationForm,
   errors: readonly FieldError[],
   city: string,
+  tiles?: MapTiles | null,
 ): Html {
   const error = errors.find((each) => ['latitude', 'longitude'].includes(each.field[0] ?? ''));
   const latitude = form.latitude.trim() === '' ? null : parseDegrees(form.latitude);
@@ -194,7 +400,58 @@ export function locationField(
     >
       ${say('bilingual', WORDS.remove)}
     </button>
+    ${tiles && mapView(tiles, point, city)}
   </div>`;
+}
+
+/**
+ * The map to move the pin on (ADR-719), as {@link MAP_SCRIPT} draws it: hidden, with the button
+ * that opens it, until it runs. It opens on the pin, else on the city typed, else on Pakistan.
+ */
+function mapView(tiles: MapTiles, point: MapPoint | null, city: string): Html {
+  const known = point ? null : findCity(city);
+  const [centre, zoom] = point
+    ? [point, MAP_ZOOM.pin]
+    : known
+      ? [known.centre, MAP_ZOOM.city]
+      : [PAKISTAN, MAP_ZOOM.country];
+  return html`<button class="button secondary" type="button" data-open-map hidden>
+      ${say('bilingual', WORDS.openMap)}
+    </button>
+    <div data-map-view hidden>
+      ${paragraphs(SAY.onMap, 'small muted')}
+      <div
+        class="map"
+        data-tiles="${tiles.template}"
+        data-latitude="${centre.latitude.toFixed(6)}"
+        data-longitude="${centre.longitude.toFixed(6)}"
+        data-zoom="${zoom}"
+        tabindex="0"
+        role="application"
+        aria-label="${`${WORDS.map.en} / ${WORDS.map.ur}`}"
+      >
+        <span class="map-pin" aria-hidden="true"></span>
+      </div>
+      <div class="zoom">
+        <button
+          class="button secondary"
+          type="button"
+          data-zoom="1"
+          aria-label="${WORDS.zoomIn.en}"
+        >
+          +
+        </button>
+        <button
+          class="button secondary"
+          type="button"
+          data-zoom="-1"
+          aria-label="${WORDS.zoomOut.en}"
+        >
+          −
+        </button>
+      </div>
+      <p class="small muted" dir="ltr">${tiles.attribution}</p>
+    </div>`;
 }
 
 /**

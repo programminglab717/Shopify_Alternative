@@ -42,7 +42,7 @@ import {
   type WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
-import { OrdersModule } from '@hatti/orders/public';
+import { MapTiles, OrdersModule } from '@hatti/orders/public';
 import { type PaymentGateways, PaymentsModule } from '@hatti/payments/public';
 import { PricingModule } from '@hatti/pricing/public';
 import { TaxModule } from '@hatti/tax/public';
@@ -163,6 +163,8 @@ export interface ApiModuleOptions {
   storage: ObjectStorage;
   /** The AI gateway (ADR-463), where configured; without it, nothing is drafted with AI. */
   ai?: AiGateway | null;
+  /** The tiles of checkout's map to move the pin on (ADR-719), where configured; without them, no map. */
+  mapTiles?: MapTiles | null;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
   couriers?: Couriers;
   /**
@@ -217,6 +219,7 @@ class InfrastructureModule {
         { provide: DnsLookup, useValue: options.dnsLookup ?? new SystemDnsLookup() },
         { provide: ObjectStorage, useValue: options.storage },
         { provide: AiGateway, useValue: options.ai ?? null },
+        { provide: MapTiles, useValue: options.mapTiles ?? null },
         // The keys staff sign-in encrypts with; theme previews' links are sealed with them too.
         { provide: SecretBox, useValue: options.identity.secretBox },
         // A duplicated product's stock settings, which the catalog asks the inventory for (ADR-343).
@@ -232,6 +235,7 @@ class InfrastructureModule {
         SecretBox,
         ObjectStorage,
         AiGateway,
+        MapTiles,
         CopiedVariantStock,
       ],
     };

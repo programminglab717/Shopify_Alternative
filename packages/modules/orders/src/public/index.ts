@@ -2,6 +2,8 @@
 export { checkAddress, type AddressInput } from '../internal/address.js';
 export {
   LOCATION_SCRIPT,
+  MAP_SCRIPT,
+  MapTiles,
   locationField,
   locationFormOf,
   mapUrlOf,

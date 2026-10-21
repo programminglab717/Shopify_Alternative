@@ -507,6 +507,20 @@ const apiSchema = z
     AI_API_KEY: env.secret(16).optional(),
     AI_MODEL: z.string().trim().min(1).max(200).optional(),
     AI_BASE_URL: env.httpUrl().optional(),
+    /**
+     * The map tiles checkout's map to move the address's pin on is drawn from (ADR-719): a
+     * provider's raster tiles by a template with {z}, {x} and {y} after its host, such as
+     * "https://tiles.example.com/{z}/{x}/{y}.png?key=…", and the words its terms ask maps to show,
+     * such as "© OpenStreetMap contributors". Both or neither; without them, no map.
+     */
+    MAP_TILES_URL: z
+      .string()
+      .regex(
+        /^https:\/\/[^/{}]+\/.*\{z\}/,
+        'Expected an https URL with {z}, {x} and {y} after its host',
+      )
+      .optional(),
+    MAP_TILES_ATTRIBUTION: z.string().trim().min(1).max(200).optional(),
     ...messageSending,
     ...tiktokApi,
     ...googleAds,
@@ -518,6 +532,14 @@ const apiSchema = z
     path: ['AI_MODEL'],
     message: 'Set both AI_API_KEY and AI_MODEL, or neither',
   })
+  .refine(
+    (config) =>
+      (config.MAP_TILES_URL === undefined) === (config.MAP_TILES_ATTRIBUTION === undefined),
+    {
+      path: ['MAP_TILES_ATTRIBUTION'],
+      message: 'Set both MAP_TILES_URL and MAP_TILES_ATTRIBUTION, or neither',
+    },
+  )
   .refine(
     (config) =>
       (config.WHATSAPP_APP_SECRET === undefined) === (config.WHATSAPP_VERIFY_TOKEN === undefined),

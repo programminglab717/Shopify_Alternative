@@ -1,4 +1,10 @@
-import { LOCATION_SCRIPT, type AddressValue, type OrderRecord } from '@hatti/orders/public';
+import {
+  LOCATION_SCRIPT,
+  MAP_SCRIPT,
+  MapTiles,
+  type AddressValue,
+  type OrderRecord,
+} from '@hatti/orders/public';
 import { chooseDiscounts, type DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX } from '@hatti/tax/public';
@@ -226,6 +232,20 @@ describe('checkoutPage', () => {
     expect(page.html).toMatch(/<div class="field" data-location aria-live="polite" hidden>/);
     expect(page.html).toContain('<input type="hidden" name="latitude" value="" />');
     expect(page.contentSecurityPolicy).toContain("form-action 'self'");
+  });
+
+  it('offers a map to move the pin on where the platform has map tiles, their source allowed (ADR-719)', () => {
+    const map = new MapTiles('https://tiles.example.com/{z}/{x}/{y}.png', '© Tiles');
+    const page = checkoutPage(openView({ map, form: { ...EMPTY_FORM, city: 'Karachi' } }));
+    expect(page.html.match(/<script>/g)).toHaveLength(4);
+    expect(page.html).toContain(`<script>${MAP_SCRIPT}</script>`);
+    expect(page.html).toContain('data-tiles="https://tiles.example.com/{z}/{x}/{y}.png"');
+    expect(page.html).toMatch(/data-zoom="13"/);
+    expect(page.contentSecurityPolicy).toContain('img-src https://tiles.example.com/');
+    // None without them.
+    const plain = checkoutPage(openView());
+    expect(plain.html).not.toContain('data-tiles');
+    expect(plain.contentSecurityPolicy).not.toContain('img-src');
   });
 
   it('shows what the shopper pays once delivery is known', () => {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-718 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-719 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -726,6 +726,7 @@
 | 716 | The admin's checkout settings choose how long a checkout holds its cart's stock, from a few minutes or not at all, offering minutes set through the API too | Accepted |
 | 717 | Checkout asks once for a landmark or the pin where the shop's couriers lately could not find houses, the area learned from its own parcels' failed deliveries | Accepted |
 | 718 | Checkout pins the address from a Google Maps link or coordinates the shopper pastes, its short links followed on Google's own hosts, where they are not at the address | Accepted |
+| 719 | Checkout offers a map to move the address's pin on, drawn by the page's own script from the map tiles the platform is configured with, and none without them | Accepted |
 
 ---
 
@@ -24570,3 +24571,39 @@
     like this. A commercial provider needs the operator's key.
   * **Keeping the link with the order for the courier:** the pin already says where, in the form
     couriers' bookings take.
+
+## ADR-719 · Checkout offers a map to move the address's pin on, drawn by the page's own script from the map tiles the platform is configured with, and none without them
+
+* **Context:** An address's pin comes from where the shopper's phone is ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)), or
+  from a Google Maps link or coordinates they paste ([ADR-718](#adr-718--checkout-pins-the-address-from-a-google-maps-link-or-coordinates-the-shopper-pastes-its-short-links-followed-on-googles-own-hosts-where-they-are-not-at-the-address)). A shopper who is neither
+  at the address nor has a link has no way to set it, and a pin from the phone a street away
+  cannot be nudged. A map needs a tile provider, chosen with its price, key and terms, which is
+  the operator's choice. The checkout page runs only its own scripts, allowed by their hashes,
+  and loads no libraries.
+* **Decision:**
+  * **The platform is configured with its map tiles** (`MAP_TILES_URL` and
+    `MAP_TILES_ATTRIBUTION`, both or neither). The URL is a template of 256-pixel raster tiles in
+    Web Mercator, with `{z}`, `{x}` and `{y}` after its host and over https. The attribution
+    is the text the provider's terms ask maps to show. The orders module's `MapTiles` checks both
+    as the core starts; the core gives them to the checkout module.
+  * **The pin's field offers "Put the pin on a map"** once its script runs, in English and Urdu.
+    The map opens on the pin, else on the centre of the city typed, else on Pakistan. It says to
+    move the map until the pin is on the door, and shows the provider's words under it.
+  * **The page's own script draws it** (`MAP_SCRIPT`, about 130 lines, no library). It lays the
+    tiles under a pin fixed at the map's centre. Dragging moves the map, and so do the arrow keys.
+    Its buttons and the + and - keys zoom, from 5 to 19. Moving the map sets the pin's hidden
+    fields to the centre, as the phone's location would. Opening or zooming alone sets nothing.
+  * **The page's policy allows the tiles' source**, the template's address up to its first
+    placeholder, among its images, with the script's hash. Without tiles, the page has no map,
+    no script for it, and no such source.
+  * **The pin is checked as every pin is**: in Pakistan and near the city typed.
+* **Consequences:** A shopper anywhere can put the pin on their door, on a phone, with no library
+  loaded. Each tile is a request to the provider from the shopper's browser, without a referrer,
+  as the page sends none. The map waits for the operator to choose a provider and set the two
+  values. Customers' links' address forms do not offer the map yet; they share the same field
+  and script, so it is a small step.
+* **Alternatives:**
+  * **Leaflet or MapLibre:** tried and tested, but a library of 40 to 200 KB to load and allow on
+    a page that is otherwise a few kilobytes. The map needs only to pan and zoom under a pin.
+  * **OpenStreetMap's public tiles:** their policy forbids an app's heavy use.
+  * **Google's Maps JavaScript API:** a key, a library from Google, and a price for each load.

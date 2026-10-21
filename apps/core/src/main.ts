@@ -4,6 +4,7 @@ import { Database } from '@hatti/db';
 import { createRedis } from '@hatti/events';
 import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
 import { createLogger } from '@hatti/logger';
+import { MapTiles } from '@hatti/orders/public';
 import { LeakyBuckets, RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import {
@@ -79,6 +80,10 @@ const app = await createApi({
   localStoragePath: LOCAL_STORAGE_PATH,
   storefrontUrl: config.STOREFRONT_URL,
   storefrontDnsTarget: config.STOREFRONT_DNS_TARGET,
+  mapTiles:
+    config.MAP_TILES_URL && config.MAP_TILES_ATTRIBUTION
+      ? new MapTiles(config.MAP_TILES_URL, config.MAP_TILES_ATTRIBUTION)
+      : null,
   whatsapp:
     config.WHATSAPP_APP_SECRET && config.WHATSAPP_VERIFY_TOKEN
       ? { appSecret: config.WHATSAPP_APP_SECRET, verifyToken: config.WHATSAPP_VERIFY_TOKEN }
