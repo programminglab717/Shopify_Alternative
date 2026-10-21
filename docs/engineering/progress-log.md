@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Waiting on the owner
+### e793ede · Waiting on the owner
 
 * **One register of what only Hatti's owner can do**, in
   [owner-actions.md](./owner-actions.md): decisions (name, hosting, registry, on-call, map tiles,
