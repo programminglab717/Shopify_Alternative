@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The map on customers' links
+### f51f167 · The map on customers' links
 
 * **Customers' links offer the same map where they fill in or correct the delivery address**
   ([ADR-720](../architecture/13-decision-log.md#adr-720--customers-links-offer-the-same-map-to-move-the-pin-on-where-they-fill-in-or-correct-the-delivery-address-from-the-platforms-tiles)), from the platform's tiles.
