@@ -2538,6 +2538,14 @@ const DELIVERY_SETTINGS = /* GraphQL */ `
         ...Money
       }
     }
+    valueRates {
+      fromSubtotal {
+        ...Money
+      }
+      charge {
+        ...Money
+      }
+    }
     updatedAt
   }
 `;

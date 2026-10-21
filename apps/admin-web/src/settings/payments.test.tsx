@@ -78,6 +78,7 @@ describe('Delivery and payment settings in the admin', () => {
         zones: [{ name: 'Lahore', charge: '150', cities: ['Lahore', 'kasur'], days: null }],
         cutoffHour: null,
         weights: [],
+        valueRates: [],
       },
     });
   });
@@ -158,6 +159,59 @@ describe('Delivery and payment settings in the admin', () => {
     };
     await press('Save');
     await screen.findByText('Weight 2 · Over (kg): This weight has a charge already');
+  });
+
+  it('saves what larger orders pay at most to deliver, naming the rate a problem is in (ADR-722)', async () => {
+    let answer: unknown = saved;
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'DeliverySettings') {
+        return {
+          deliverySettings: {
+            ...DELIVERY,
+            valueRates: [{ fromSubtotal: rupees('3000.00'), charge: rupees('150.00') }],
+          },
+        };
+      }
+      if (operation === 'DeliverySettingsUpdate') return { deliverySettingsUpdate: answer };
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/delivery');
+
+    expect(((await screen.findByLabelText('Orders from (Rs)')) as HTMLInputElement).value).toBe(
+      '3000',
+    );
+    expect((screen.getByLabelText('Pay at most') as HTMLInputElement).value).toBe('150');
+    await press('Add a rate');
+    fireEvent.change(screen.getAllByLabelText('Orders from (Rs)')[1]!, {
+      target: { value: '5,000' },
+    });
+    fireEvent.change(screen.getAllByLabelText('Pay at most')[1]!, { target: { value: '0' } });
+    await press('Save');
+    await screen.findByText('Saved. Checkout uses it from now on.');
+    expect(
+      core.sent.find((each) => each.operation === 'DeliverySettingsUpdate')?.variables,
+    ).toMatchObject({
+      input: {
+        valueRates: [
+          { fromSubtotal: '3000', charge: '150' },
+          { fromSubtotal: '5,000', charge: '0' },
+        ],
+      },
+    });
+
+    // The core's problems name the rate.
+    answer = {
+      userErrors: [
+        {
+          field: ['input', 'valueRates', '1', 'fromSubtotal'],
+          code: 'TAKEN',
+          message: 'This value has a rate already',
+        },
+      ],
+    };
+    await press('Save');
+    await screen.findByText('Rate 2 · Orders from (Rs): This value has a rate already');
   });
 
   it("names the zone a problem is in, and keeps days that aren't numbers from the core", async () => {

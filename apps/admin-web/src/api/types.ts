@@ -1213,6 +1213,8 @@ export interface DeliverySettingsValue {
   cutoffHour?: number | null;
   /** What heavier orders cost more, the lightest first (ADR-702); absent in old fakes. */
   weights?: { aboveGrams: number; charge: MoneyValue }[];
+  /** What larger orders pay at most, the smallest first (ADR-721); absent in old fakes. */
+  valueRates?: { fromSubtotal: MoneyValue; charge: MoneyValue }[];
   updatedAt: string | null;
 }
 

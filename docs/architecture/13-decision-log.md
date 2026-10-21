@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-721 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-722 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -729,6 +729,7 @@
 | 719 | Checkout offers a map to move the address's pin on, drawn by the page's own script from the map tiles the platform is configured with, and none without them | Accepted |
 | 720 | Customers' links offer the same map to move the pin on where they fill in or correct the delivery address, from the platform's tiles | Accepted |
 | 721 | Larger orders pay at most a rate the shop sets by the order's value: the largest value an order reaches caps its city's charge, before what its weight adds | Accepted |
+| 722 | The admin's delivery settings take rates by the order's value: each a subtotal and the most such an order pays, added and removed as weights are | Accepted |
 
 ---
 
@@ -24653,3 +24654,17 @@
     the shop's own city's charge.
   * **Rates per zone, as Shopify's:** more to set and to show for little gain at Pakistani
     shops' scale; one list serves the common case.
+
+## ADR-722 · The admin's delivery settings take rates by the order's value: each a subtotal and the most such an order pays, added and removed as weights are
+
+* **Context:** The core caps larger orders' delivery charge at rates the shop sets by their value
+  ([ADR-721](#adr-721--larger-orders-pay-at-most-a-rate-the-shop-sets-by-the-orders-value-the-largest-value-an-order-reaches-caps-its-citys-charge-before-what-its-weight-adds)). The admin's delivery settings already take heavier orders' charges as
+  rows added and removed ([ADR-703](#adr-703--the-admins-delivery-settings-take-heavier-orders-charges-weights-typed-in-kilograms-sent-in-grams-each-with-what-it-costs-more-added-and-removed-as-zones-are)).
+* **Decision:** **A "Larger orders" section under heavier orders** in Settings → Delivery, in
+  English and Urdu. Each rate is a row with the subtotal it applies from and the most such an
+  order pays, added and removed as weights are, up to ten. The hint says that an order pays the
+  rate of the largest value it reaches, or its city's charge where that is less, with heavier
+  orders' charges added after. The amounts are sent as typed with the rest of the settings, and
+  the core's problems name the rate they are in: "Rate 2 · Orders from (Rs): …".
+* **Consequences:** Shops set the rates without the API. Hatti Base's product and cart pages do
+  not show them yet; that comes next.

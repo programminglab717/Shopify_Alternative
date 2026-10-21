@@ -34,6 +34,9 @@ const MOST_ZONES = 20;
 /** The most weights a shop charges for (the core's DELIVERY_LIMITS). */
 const MOST_WEIGHTS = 10;
 
+/** The most rates by the order's value a shop sets (the core's DELIVERY_LIMITS). */
+const MOST_RATES = 10;
+
 interface DaysState {
   min: string;
   max: string;
@@ -54,6 +57,13 @@ interface WeightState {
   charge: string;
 }
 
+/** What larger orders pay at most (ADR-721): from what subtotal, and the most, as typed. */
+interface RateState {
+  key: number;
+  from: string;
+  charge: string;
+}
+
 interface DeliveryState {
   charge: string;
   freeAbove: string;
@@ -62,6 +72,7 @@ interface DeliveryState {
   /** The cut-off hour, "1" to "23", or "" for none (ADR-597). */
   cutoffHour: string;
   weights: WeightState[];
+  rates: RateState[];
 }
 
 function daysState(days: DeliveryDaysValue | null): DaysState {
@@ -88,6 +99,11 @@ function stateOf(settings: DeliverySettingsValue): DeliveryState {
       key,
       kg: String(weight.aboveGrams / 1000),
       charge: priceText(weight.charge.amount),
+    })),
+    rates: (settings.valueRates ?? []).map((rate, key) => ({
+      key,
+      from: priceText(rate.fromSubtotal.amount),
+      charge: priceText(rate.charge.amount),
     })),
   };
 }
@@ -122,17 +138,26 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   name: 'delivery.zoneName',
   cities: 'delivery.zoneCities',
   aboveGrams: 'delivery.weightOver',
+  fromSubtotal: 'delivery.rateFrom',
 };
 
-/** "Zone 2" for a problem with the second zone, "Weight 1" with the first weight. */
+/**
+ * "Zone 2" for a problem with the second zone, "Weight 1" with the first weight, "Rate 1" with the
+ * first rate by value.
+ */
 function zoneOf(t: Translate) {
+  const lists = [
+    ['zones', 'delivery.zoneNumber'],
+    ['weights', 'delivery.weightNumber'],
+    ['valueRates', 'delivery.rateNumber'],
+  ] as const;
   return (field: string[]) => {
-    const zone = field.indexOf('zones');
-    const weight = field.indexOf('weights');
-    const at = zone >= 0 ? zone : weight;
-    const index = Number(field[at + 1]);
-    if (at < 0 || !Number.isInteger(index)) return null;
-    return t(zone >= 0 ? 'delivery.zoneNumber' : 'delivery.weightNumber', { n: index + 1 });
+    for (const [list, words] of lists) {
+      const at = field.indexOf(list);
+      const index = Number(field[at + 1]);
+      if (at >= 0 && Number.isInteger(index)) return t(words, { n: index + 1 });
+    }
+    return null;
   };
 }
 
@@ -274,6 +299,52 @@ function WeightFields({
   );
 }
 
+function RateFields({
+  rate,
+  number,
+  onChange,
+  onRemove,
+}: {
+  rate: RateState;
+  number: number;
+  onChange: (rate: RateState) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <li className="flex flex-col gap-2 rounded-control border border-line p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold">{t('delivery.rateNumber', { n: number })}</h3>
+        <Button
+          variant="danger"
+          icon={<Trash2 aria-hidden className="size-5" />}
+          onClick={onRemove}
+        >
+          {t('delivery.removeZone')}
+        </Button>
+      </div>
+      <Pair>
+        <TextField
+          label={t('delivery.rateFrom')}
+          required
+          inputMode="decimal"
+          ltr
+          value={rate.from}
+          onChange={(event) => onChange({ ...rate, from: event.target.value })}
+        />
+        <TextField
+          label={t('delivery.rateCharge')}
+          required
+          inputMode="decimal"
+          ltr
+          value={rate.charge}
+          onChange={(event) => onChange({ ...rate, charge: event.target.value })}
+        />
+      </Pair>
+    </li>
+  );
+}
+
 function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
   const { t } = useLocale();
   const save = useAdminMutation<
@@ -281,7 +352,9 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
     { input: Record<string, unknown> }
   >(DeliverySettingsUpdateMutation);
   const [state, setState] = useState(() => stateOf(settings));
-  const [nextKey, setNextKey] = useState(settings.zones.length + (settings.weights?.length ?? 0));
+  const [nextKey, setNextKey] = useState(
+    settings.zones.length + (settings.weights?.length ?? 0) + (settings.valueRates?.length ?? 0),
+  );
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
@@ -326,6 +399,10 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
             aboveGrams: grams,
             charge: weight.charge.trim(),
           })),
+          valueRates: state.rates.map((rate) => ({
+            fromSubtotal: rate.from.trim(),
+            charge: rate.charge.trim(),
+          })),
         },
       });
       if (deliverySettingsUpdate.userErrors.length > 0) {
@@ -342,6 +419,8 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
 
   const setZone = (key: number, zone: ZoneState) =>
     setState({ ...state, zones: state.zones.map((each) => (each.key === key ? zone : each)) });
+  const setRate = (key: number, rate: RateState) =>
+    setState({ ...state, rates: state.rates.map((each) => (each.key === key ? rate : each)) });
   const setWeight = (key: number, weight: WeightState) =>
     setState({
       ...state,
@@ -459,6 +538,39 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           </Button>
         )}
       </FormSection>
+      <FormSection title={t('delivery.rates')} hint={t('delivery.ratesHint')}>
+        {state.rates.length > 0 && (
+          <ul className="flex flex-col gap-4">
+            {state.rates.map((rate, index) => (
+              <RateFields
+                key={rate.key}
+                rate={rate}
+                number={index + 1}
+                onChange={(next) => setRate(rate.key, next)}
+                onRemove={() =>
+                  setState({ ...state, rates: state.rates.filter((each) => each !== rate) })
+                }
+              />
+            ))}
+          </ul>
+        )}
+        {state.rates.length < MOST_RATES && (
+          <Button
+            variant="secondary"
+            className="self-start"
+            icon={<Plus aria-hidden className="size-5" />}
+            onClick={() => {
+              setState({
+                ...state,
+                rates: [...state.rates, { key: nextKey, from: '', charge: '' }],
+              });
+              setNextKey(nextKey + 1);
+            }}
+          >
+            {t('delivery.addRate')}
+          </Button>
+        )}
+      </FormSection>
       <Problems problems={problems} />
       {saved && <Alert tone="success">{t('settings.saved')}</Alert>}
       <Button type="submit" busy={save.isPending} className="self-start">
@@ -470,7 +582,8 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
 
 /**
  * What the shop charges to deliver an order (CHK-22, ADR-043): one charge for everywhere, zones
- * of cities with their own, more for heavier orders (ADR-703), free above a subtotal, and how many
+ * of cities with their own, more for heavier orders (ADR-703), at most a rate for larger ones
+ * (ADR-722), free above a subtotal, and how many
  * working days delivery takes, which the storefront and checkout tell shoppers.
  */
 export function DeliveryPage() {
