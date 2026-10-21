@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Overdue orders told on WhatsApp
+### 8855495 · Overdue orders told on WhatsApp
 
 * **Orders waiting for their first call longer than the shop's target are told at its alerts
   number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within
