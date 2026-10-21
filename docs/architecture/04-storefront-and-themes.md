@@ -131,7 +131,7 @@ cart's secret; Hatti Base's header shows the count from it, with no request. Hat
 opens in a drawer when a product is added or the header's cart is chosen. Pages come with the
 drawer empty, and its script fills it through Shopify's section rendering API, which renders a
 page's sections with the shopper's cart, uncached: on the Ajax cart's answers (`sections`) and
-on any page (`?section_id=`, `?sections=`). Checkout's pages,
+on any page (`?section_id=`, `?sections=`). Its forms come encoded in their address, as JSON or as a script's FormData, whose files the cart refuses ([ADR-701](./13-decision-log.md#adr-701--the-ajax-cart-takes-the-forms-scripts-post-as-formdata-as-dawns-product-form-does-read-as-forms-in-an-address-are-one-carrying-a-file-is-refused-as-nothing-would-keep-it)). Checkout's pages,
 `/checkout` and `/checkouts/{secret}`, go to the storefront too, uncached: it serves the page the
 core renders on the shop's address, and sets the count to 0 once the order is placed
 ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). So do discount links,

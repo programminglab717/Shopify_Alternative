@@ -59,6 +59,7 @@ import {
   cartRoute,
   cookieOf,
   parseForm,
+  parseMultipartForm,
   permalinkItems,
   type CoreBackend,
 } from './cart.js';
@@ -270,6 +271,9 @@ const ACCOUNT_WISHLISTS = { name: 'account-wishlists', limit: 60, windowMs: 60_0
  * address or two, and corrects one; room for many behind one mobile network's address.
  */
 const ACCOUNT_ADDRESS_CHANGES = { name: 'account-address-changes', limit: 30, windowMs: 60_000 };
+
+/** Forms posted as `multipart/form-data` that carried a file, which the cart refuses (ADR-701). */
+const withFiles = new WeakSet<object>();
 
 /** The longest handle a wishlist's script is asked of, as catalog's handles are at most. */
 const HANDLE_MAX = 255;
@@ -657,6 +661,20 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     'application/x-www-form-urlencoded',
     { parseAs: 'string', bodyLimit: 64 * 1024 },
     (_request, body, done) => done(null, parseForm(body as string)),
+  );
+  // A script's FormData (ADR-701): its fields as a form's, its files kept by nothing.
+  app.addContentTypeParser(
+    'multipart/form-data',
+    { parseAs: 'buffer', bodyLimit: 64 * 1024 },
+    (request, body, done) => {
+      parseMultipartForm(String(request.headers['content-type']), body as Buffer).then(
+        ({ params, files }) => {
+          if (files > 0) withFiles.add(params);
+          done(null, params);
+        },
+        () => done(Object.assign(new Error('The form could not be read'), { statusCode: 400 })),
+      );
+    },
   );
 
   /**
@@ -1625,6 +1643,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       }
       const action = route.action === 'show' ? 'update' : route.action;
       const params = method === 'GET' ? parseForm(url.search.slice(1)) : paramsOf(request);
+      // Shopify keeps a file a line's property names; nothing here would (ADR-701).
+      if (withFiles.has(params)) return await refuse(422, "This shop's cart takes no files.");
       const { body, single } = cartBody(action, params);
       const result = await core.act(found.shopId, token, action, body);
       if (!result.ok) {

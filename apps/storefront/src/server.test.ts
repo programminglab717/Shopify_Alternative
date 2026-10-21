@@ -1027,6 +1027,92 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("adds from a script's FormData as Dawn's product form sends it, and keeps no files (ADR-701)", async () => {
+    const app = server();
+    core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-9', added: [line(2).key] });
+    /** A form as `fetch(url, { body: new FormData(form) })` sends it. */
+    const multipart = async (fields: [string, string | Blob, string?][]) => {
+      const data = new FormData();
+      for (const [name, value, filename] of fields) {
+        if (typeof value === 'string') data.append(name, value);
+        else data.append(name, value, filename);
+      }
+      const request = new Request('http://localhost/', { method: 'POST', body: data });
+      return {
+        type: request.headers.get('content-type')!,
+        body: Buffer.from(await request.arrayBuffer()),
+      };
+    };
+    const post = async (fields: [string, string | Blob, string?][]) => {
+      const { type, body } = await multipart(fields);
+      return app.inject({
+        method: 'POST',
+        url: '/cart/add',
+        headers: {
+          host: 'localhost',
+          'content-type': type,
+          accept: 'application/javascript',
+          'x-requested-with': 'XMLHttpRequest',
+        },
+        payload: body,
+      });
+    };
+    const added = await post([
+      ['form_type', 'product'],
+      ['id', variant.id],
+      ['quantity', '2'],
+      ['properties[Name]', 'Ayesha'],
+      // A file input left empty is an empty field, as in a form encoded in its address.
+      ['properties[Photo]', new Blob([]), ''],
+      ['sections', 'cart-drawer'],
+      ['sections_url', `/products/${lawn.handle}`],
+    ]);
+    expect(added.statusCode).toBe(200);
+    const answer = added.json() as { key: string; sections: Record<string, string | null> };
+    expect(answer.key).toBe(line(2).key);
+    expect(answer.sections['cart-drawer']).toContain(`>${lawn.title}</a>`);
+    expect(core.actions).toEqual([
+      {
+        token: null,
+        action: 'add',
+        body: {
+          items: [
+            { variantId: variant.id, quantity: 2, properties: { Name: 'Ayesha', Photo: '' } },
+          ],
+        },
+      },
+    ]);
+
+    // A file, which Shopify would keep for the line, is refused, the cart as it was.
+    const photo = await post([
+      ['id', variant.id],
+      ['properties[Photo]', new Blob(['not really a photo'], { type: 'image/jpeg' }), 'me.jpg'],
+    ]);
+    expect(photo.statusCode).toBe(422);
+    expect(photo.json()).toEqual({
+      status: 422,
+      message: 'Cart Error',
+      description: "This shop's cart takes no files.",
+    });
+    expect(core.actions).toHaveLength(1);
+
+    // Nor is a body that is not the form it says, or one past a form's 64 KB.
+    const broken = await app.inject({
+      method: 'POST',
+      url: '/cart/add.js',
+      headers: { host: 'localhost', 'content-type': 'multipart/form-data; boundary=nothing' },
+      payload: 'id=1',
+    });
+    expect(broken.statusCode).toBe(400);
+    const large = await post([
+      ['id', variant.id],
+      ['properties[Note]', 'x'.repeat(70 * 1024)],
+    ]);
+    expect(large.statusCode).toBe(413);
+    expect(core.actions).toHaveLength(1);
+    await app.close();
+  });
+
   it("renders the sections a cart change asks for, and a page's, with the shopper's cart", async () => {
     const app = server();
     core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-3', added: [line(2).key] });

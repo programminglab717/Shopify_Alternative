@@ -8,6 +8,7 @@ import {
   cartRoute,
   cookieOf,
   parseForm,
+  parseMultipartForm,
   permalinkItems,
 } from './cart.js';
 import { sampleStore } from './fixtures.js';
@@ -34,6 +35,46 @@ describe('Cart requests', () => {
         { variantId: 'v2', quantity: 1, properties: {} },
       ],
     });
+  });
+
+  it("reads a script's FormData as it reads a form, counting the files it carries (ADR-701)", async () => {
+    const data = new FormData();
+    data.append('items[][id]', 'v1');
+    data.append('items[][quantity]', '2');
+    data.append('properties[Gift note]', 'Eid Mubarak');
+    data.append('__proto__[polluted]', '1');
+    data.append('empty', new Blob([]), '');
+    const request = new Request('http://localhost/', { method: 'POST', body: data });
+    const type = request.headers.get('content-type')!;
+    const body = Buffer.from(await request.arrayBuffer());
+    expect(await parseMultipartForm(type, body)).toEqual({
+      params: {
+        items: [{ id: 'v1', quantity: '2' }],
+        properties: { 'Gift note': 'Eid Mubarak' },
+        empty: '',
+      },
+      files: 0,
+    });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+
+    data.append('properties[Photo]', new Blob(['jpeg'], { type: 'image/jpeg' }), 'me.jpg');
+    const withFile = new Request('http://localhost/', { method: 'POST', body: data });
+    expect(
+      await parseMultipartForm(
+        withFile.headers.get('content-type')!,
+        Buffer.from(await withFile.arrayBuffer()),
+      ),
+    ).toMatchObject({ files: 1 });
+    // An empty file input as a browser sends it: a file of nothing, without a name.
+    const empty =
+      '--x\r\nContent-Disposition: form-data; name="properties[Photo]"; filename=""\r\n' +
+      'Content-Type: application/octet-stream\r\n\r\n\r\n--x--\r\n';
+    expect(await parseMultipartForm('multipart/form-data; boundary=x', Buffer.from(empty))).toEqual(
+      { params: { properties: { Photo: '' } }, files: 0 },
+    );
+    await expect(
+      parseMultipartForm('multipart/form-data; boundary=x', Buffer.from('id=1')),
+    ).rejects.toThrow();
   });
 
   it("turns Shopify's parameters into the core's actions", () => {

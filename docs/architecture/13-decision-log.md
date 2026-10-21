@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-700 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-701 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -708,6 +708,7 @@
 | 698 | The admin's Personalisation card asks what each field's answer adds to the price, in rupees, blank for nothing | Accepted |
 | 699 | A theme's preview links made so far are ended at once by raising its links' generation, which each link holds; the admin's themes tab ends them once asked | Accepted |
 | 700 | The theme editor's preview shows the theme's colours and widths as they change: the layout's {% style %} CSS rendered again with the unsaved settings and put in the page | Accepted |
+| 701 | The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as forms in an address are; one carrying a file is refused, as nothing would keep it | Accepted |
 
 ---
 
@@ -24127,3 +24128,26 @@
 * **Alternatives:** **CSS variables set by the editor's script from the settings:** the script
   would have to know how each theme turns settings into CSS. **The page reloaded on each
   change:** it loses the place the merchant scrolled to, and flickers.
+
+## ADR-701 · The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as forms in an address are; one carrying a file is refused, as nothing would keep it
+
+* **Context:** The storefront read forms encoded in their address and JSON
+  ([ADR-042](#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)), and answered 415 to `multipart/form-data`. Dawn's product form, and the
+  many themes built from it, add to the cart with `fetch('/cart/add', { body: new FormData(form) })`,
+  which sends that type: their Add to cart did nothing. Shopify takes it, and keeps a file a
+  line's property names, a photo to print on a mug, say, with the shop's files.
+* **Decision:**
+  * **A multipart form is read as a form**, on every path that takes forms: its fields become the
+    same parameters `items[][id]` and `properties[Name]` make of a form in an address, within the
+    same 64 KB, by Node's own reader of forms; a body that is not the form its type says is 400.
+  * **A file input left empty is an empty field**, a file of nothing without a name, as it is in
+    a form encoded in its address.
+  * **The cart refuses a form carrying a file** with 422 and Shopify's cart error, saying it takes
+    no files, the cart as it was; other forms read their fields and leave the file. Nothing keeps
+    shoppers' files yet, and a line without the photo its shopper chose would be made wrong.
+* **Consequences:** Dawn's Add to cart, with the sections it asks for back, works on Hatti's
+  storefront. Such a form can come from another site as a form in an address can: the cart's
+  check of where changes come from covers both.
+* **Alternatives:** **The file's name kept as the property:** the order would name a photo no one
+  can see. **Busboy, as the core reads receipts:** another dependency for what Node reads itself
+  within 64 KB.

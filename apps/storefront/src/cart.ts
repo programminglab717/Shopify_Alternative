@@ -106,8 +106,36 @@ export function permalinkItems(path: string): Required<CartItemInput>[] | null {
  * a list of items, `properties[Name]` an object, `updates[]` a list.
  */
 export function parseForm(body: string): Record<string, unknown> {
+  return parseFields(new URLSearchParams(body));
+}
+
+/**
+ * A form posted as `multipart/form-data`, as a script's `new FormData(form)` sends it (Dawn's
+ * product form does), read as {@link parseForm} reads one encoded in its address. `files` counts
+ * the files it carried, which nothing here keeps; a file input left empty is an empty field, as
+ * in a form encoded in its address. Throws when the body is not the form its type says.
+ */
+export async function parseMultipartForm(
+  contentType: string,
+  body: Buffer,
+): Promise<{ params: Record<string, unknown>; files: number }> {
+  const form = await new Response(new Uint8Array(body), {
+    headers: { 'content-type': contentType },
+  }).formData();
+  const fields: [string, string][] = [];
+  let files = 0;
+  for (const [name, value] of form) {
+    if (typeof value === 'string') fields.push([name, value]);
+    // A file input left empty sends a file of nothing without a name.
+    else if (value.size === 0 && value.name === '') fields.push([name, '']);
+    else files += 1;
+  }
+  return { params: parseFields(fields), files };
+}
+
+function parseFields(fields: Iterable<[string, string]>): Record<string, unknown> {
   const root: Record<string, unknown> = {};
-  for (const [name, value] of new URLSearchParams(body)) {
+  for (const [name, value] of fields) {
     const path = keyPath(name);
     if (!path) continue;
     assign(root, path, value);

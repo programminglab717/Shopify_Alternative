@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The Ajax cart's multipart forms
+
+* **The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as
+  forms in an address are; one carrying a file is refused, as nothing would keep it** ([ADR-701](../architecture/13-decision-log.md#adr-701--the-ajax-cart-takes-the-forms-scripts-post-as-formdata-as-dawns-product-form-does-read-as-forms-in-an-address-are-one-carrying-a-file-is-refused-as-nothing-would-keep-it)):
+  shortcut 37's multipart forms.
+* 3949 tests, two more: the storefront's.
+
 ### 51bfa59 · The theme's colours in the editor's preview
 
 * **The theme editor's preview shows the theme's colours and widths as they change: the
