@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The theme's settings in the preview
+### a0b6c12 · The theme's settings in the preview
 
 * **The theme editor's preview shows the theme's settings as they change, every section of the
   page rendered again with them, the few around the sections once saved** ([ADR-708](../architecture/13-decision-log.md#adr-708--the-theme-editors-preview-shows-the-themes-settings-as-they-change-every-section-of-the-page-rendered-again-with-them-the-few-around-the-sections-once-saved)): OS-02's
