@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-680 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-681 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -688,6 +688,7 @@
 | 678 | A shop's owner grants Hatti the reading of their Google Ads account on Google's consent screen, and the same worker pulls its spend by campaign, with an access token from the grant each time | Accepted |
 | 679 | The admin's ad spend page connects the shop's Google Ads account through Google's consent screen, coming back to one address of the admin's that hands the code to the shop that asked | Accepted |
 | 680 | Orders waiting for their first call longer than the shop's target are told at its alerts number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within its calling hours | Accepted |
+| 681 | The admin's web client keeps a random ID for its browser and sends it with each request to /auth, so that a sign-in from the browser its owner uses is known as theirs | Accepted |
 
 ---
 
@@ -23633,3 +23634,27 @@
   did. **Only when the count grows:** an owner who ignored a backlog would hear nothing while it
   stood still. **To each confirmation agent's own number:** the push reaches them, and the alert
   is the owner's to act on.
+
+## ADR-681 · The admin's web client keeps a random ID for its browser and sends it with each request to /auth, so that a sign-in from the browser its owner uses is known as theirs
+
+* **Context:** [ADR-179](#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in) tells an account's owner of a sign-in from a device none of its
+  sessions was used from in 90 days, a device being the random ID its client sends in
+  `X-Hatti-Device`, else its user agent with its version numbers aside. The admin sent none, so a
+  sign-in was told apart by its user agent alone: another Chrome on Android, a stranger's, passed
+  for the owner's own (status shortcut 94).
+* **Decision:** The admin makes 24 random bytes the first time it asks `/auth` for anything,
+  as base64url (32 characters), keeps them in the browser's storage (`hatti.device`) and sends
+  them in `X-Hatti-Device` with every request to `/auth`: signing in by password, code, Google or
+  passkey, the second step, confirming who they are, and the rest, which the core ignores it for.
+  The ID outlives signing out, as the browser is the same device, and goes with the browser's
+  data. A browser that keeps nothing, as a private window or blocked storage may, sends none,
+  never an ID made anew for each request, so it is known by its user agent as before, among the
+  sessions that sent none either.
+* **Consequences:** A sign-in from another browser of the owner's make and system now tells them;
+  one from their own browser, whatever version it has reached or address its network gives it,
+  tells no one. Clearing the browser's data, or a new browser, is a new device, and the next
+  sign-in from it tells its owner once.
+* **Alternatives:** **A cookie the core sets:** the admin keeps no cookies with the core, its
+  tokens going in JSON (ADR-265). **Browser fingerprinting:** it tells browsers apart by what
+  they cannot help showing, which Hatti does not want to read of its users, and it changes with
+  each update. **The ID with the Admin API's requests too:** they are no sign-ins.

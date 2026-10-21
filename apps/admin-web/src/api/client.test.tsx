@@ -5,6 +5,7 @@ import { LocaleProvider, translate } from '../i18n/locale';
 import { AppNotices } from '../offline/notices';
 import {
   ApiError,
+  authRequest,
   busyUntil,
   graphqlRequest,
   isCostRefusal,
@@ -219,5 +220,43 @@ describe("The Admin API's query cost (ADR-577)", () => {
     await act(() => vi.advanceTimersByTimeAsync(3000));
     await sent;
     expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe("The browser's own ID, sent with each sign-in (ADR-179, ADR-681)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('makes one the first time, keeps it, and sends the same with every request to /auth', async () => {
+    const fake = core(
+      () => json({ accessToken: 'a' }),
+      () => json({ accessToken: 'b' }),
+    );
+    await authRequest(fake.fetcher, '/auth/sign-in', { body: { email: 'a@zari.pk' } });
+    await authRequest(fake.fetcher, '/auth/sessions', { accessToken: 'hsa_1' });
+    const [first, second] = fake.calls.map((each) => each.headers['x-hatti-device']);
+    expect(first).toMatch(/^[\w-]{32}$/);
+    expect(second).toBe(first);
+    expect(window.localStorage.getItem('hatti.device')).toBe(first);
+
+    // Another browser, or this one with its data cleared, is another device.
+    window.localStorage.clear();
+    await authRequest(fake.fetcher, '/auth/sign-in', { body: {} });
+    expect(fake.calls[2]!.headers['x-hatti-device']).toMatch(/^[\w-]{32}$/);
+    expect(fake.calls[2]!.headers['x-hatti-device']).not.toBe(first);
+  });
+
+  it('sends none where the browser keeps nothing, never an ID made anew for each request', async () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Access is denied for this document.', 'SecurityError');
+    });
+    const fake = core(() => json({}));
+    await authRequest(fake.fetcher, '/auth/sign-in', { body: {} });
+    expect(fake.calls[0]!.headers['x-hatti-device']).toBeUndefined();
   });
 });

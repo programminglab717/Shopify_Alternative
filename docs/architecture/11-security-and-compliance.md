@@ -66,6 +66,8 @@ an attacker, but it affects availability in the same way.
   day at most: a device is the random ID its client keeps, or, for a client that keeps none, its
   user agent, version numbers aside, and the device list names each session's browser and system
   ([ADR-179](./13-decision-log.md#adr-179--a-sign-in-from-a-device-none-of-an-accounts-sessions-was-used-from-in-90-days-tells-its-owner-what-signed-in-when-and-from-where-a-device-is-the-random-id-its-client-keeps-or-for-a-client-that-keeps-none-its-user-agent-version-numbers-aside-by-email-where-the-accounts-email-is-proved-else-on-whatsapp-or-by-sms-to-its-proved-number-five-a-day-at-most-never-failing-the-sign-in)).
+  The admin's web client keeps a random ID for its browser and sends it with each request to
+  `/auth` ([ADR-681](./13-decision-log.md#adr-681--the-admins-web-client-keeps-a-random-id-for-its-browser-and-sends-it-with-each-request-to-auth-so-that-a-sign-in-from-the-browser-its-owner-uses-is-known-as-theirs)).
 * **Authorisation:** RBAC with granular permissions and custom roles. Typical local roles ship as
   presets: *Owner*, *Manager*, *Confirmation Agent* (sees phones and addresses, can confirm or
   cancel), *Packer* (sees items and shipping labels, **not** customer phone numbers), *Marketer*

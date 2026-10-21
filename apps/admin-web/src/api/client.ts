@@ -2,6 +2,8 @@
 // GraphQL for the shop, both on the admin's own origin (Vite's proxy in development, the edge in
 // production). Tokens are opaque bearer tokens in JSON bodies, never cookies (ADR-265).
 
+import { DEVICE_HEADER, deviceId } from './device';
+
 /** The Admin API's GraphQL endpoint, by version (apps/core/src/api/constants.ts). */
 export const ADMIN_GRAPHQL_PATH = '/admin/api/2026-10/graphql';
 
@@ -73,7 +75,8 @@ async function send(fetcher: Fetch, path: string, init: RequestInit): Promise<Re
 
 /**
  * A call to `/auth`: its JSON answer, or an {@link ApiError} from the body the identity module
- * gives, `{ error: { code, message, fields? } }`.
+ * gives, `{ error: { code, message, fields? } }`. It carries this browser's device ID, which
+ * tells a sign-in from it from one elsewhere (ADR-681).
  */
 export async function authRequest<T>(
   fetcher: Fetch,
@@ -83,6 +86,8 @@ export async function authRequest<T>(
   const headers: Record<string, string> = { accept: 'application/json' };
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   if (options.accessToken) headers.authorization = `Bearer ${options.accessToken}`;
+  const device = deviceId();
+  if (device) headers[DEVICE_HEADER] = device;
   const response = await send(fetcher, path, {
     method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
     headers,
