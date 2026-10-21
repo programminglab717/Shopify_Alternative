@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { InputChecker, PublicSite, StorefrontSite, shopProfile, type FieldError } from '@hatti/api';
+import {
+  InputChecker,
+  PublicSite,
+  StorefrontSite,
+  shopProfile,
+  type FieldError,
+  type MutationResult,
+} from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import {
   giftCardByCodeIn,
@@ -110,6 +117,7 @@ import { countLinkOrderIn, linkIsOpen, paymentLinkIn } from './payment-links.js'
 import { checkouts } from './schema.js';
 import { orderItemsIn } from './discount-items.js';
 import { checkoutTotals } from './totals.js';
+import { StockHolds } from './stock-holds.js';
 import { storefrontUrlIn } from './storefront-url.js';
 import { trustBadgesIn } from './trust-badge.service.js';
 import type { TrustBadgeValue } from './trust-badges.js';
@@ -573,6 +581,11 @@ export type CheckoutView =
        * in Pakistan, or the next past the shop's cut-off; absent where the page says none.
        */
       countsFrom?: string;
+      /**
+       * Until when the cart's stock is held for the shopper (ADR-715), while it is; absent where
+       * the shop holds none, or the hold ran out.
+       */
+      heldUntil?: Date;
     }
   | {
       kind: 'placed';
@@ -614,6 +627,8 @@ export type CheckoutView =
  */
 @Injectable()
 export class CheckoutService {
+  #stockHolds: StockHolds | undefined;
+
   constructor(
     private readonly db: Database,
     private readonly carts: CartService,
@@ -628,6 +643,11 @@ export class CheckoutService {
     /** Where shoppers come back to from the gateway: the core's own address. */
     @Optional() private readonly site?: PublicSite,
   ) {}
+
+  /** Stock held while shoppers check out (ADR-715). */
+  get #holds(): StockHolds {
+    return (this.#stockHolds ??= new StockHolds(this.db));
+  }
 
   /**
    * Starts a checkout for the cart `cartToken` names: the secret its page's address carries; null
@@ -644,17 +664,21 @@ export class CheckoutService {
     const attribution = attributionOf(visits, new Date());
     return this.db.tenant(shopId, async (tx) => {
       const cart = await this.carts.findIn(tx, shopId, cartToken);
-      if (!cart || (await this.carts.priceIn(tx, shopId, cart)).items.length === 0) return null;
+      const priced = cart && (await this.carts.priceIn(tx, shopId, cart));
+      if (!cart || !priced || priced.items.length === 0) return null;
       const secret = secretToken('', TOKEN_BYTES);
+      const id = newId();
       await tx.insert(checkouts).values({
         shopId,
-        id: newId(),
+        id,
         tokenHash: sha256(secret),
         cartId: cart.id,
         attribution,
         paymentLinkId: paymentLinkId ?? null,
         expiresAt: sql`now() + ${`${CHECKOUT_HOURS} hours`}::interval`,
       });
+      // Its stock held for the shopper meanwhile, where the shop holds it (ADR-715).
+      await this.#holds.holdIn(tx, shopId, { id, cartId: cart.id }, priced.items);
       return secret;
     });
   }
@@ -1231,70 +1255,72 @@ export class CheckoutService {
         pastLimit > 0n
           ? { due: advance.due > pastLimit ? advance.due : pastLimit, ifRisky: null }
           : advance;
-      const placed = await this.orders.placeIn(
-        tx,
-        {
-          shopId: found.shopId,
-          currency: profile.currency as CurrencyCode,
-          actor: 'system',
-          source: 'online_store',
-          how:
-            (verifiedAt
-              ? 'from the online store, its number proved with a code'
-              : 'from the online store') +
-            (view.paymentLink ? ` through the payment link "${view.paymentLink.title}"` : ''),
-        },
-        {
-          field: [],
-          // At the prices the page showed, which its digest says are the catalog's now.
-          lines: view.cart.items.map((item) => ({
-            variantId: item.variantId,
-            quantity: item.quantity,
-            price: BigInt(item.price),
-            // What the shopper wrote or chose for it, kept on its order line (ADR-687).
-            properties: item.properties,
-          })),
-          address,
-          email,
-          paymentMethod,
-          shipping,
-          discount: totals.discount + transferDiscount + onlineDiscount,
-          transferDiscount,
-          onlineDiscount,
-          discountCodes: code ? [code.code] : [],
-          automaticDiscounts: discounts.automatic.map((automatic) => automatic.title),
-          advance: 0n,
-          // The shop's fee for paying at the door, which the page stated (CHK-08).
-          codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
-          // And what it asks for in advance, which the page stated too (ADR-084), where and of
-          // whom the shop asks it (ADR-089); or, by the order's risk, only if placing scores it
-          // that high, instead of holding it for review (ADR-094).
-          advanceDue: asked.due,
-          riskAdvance: asked.ifRisky,
-          deliveryMethod: pickupAt ? 'pickup' : 'shipping',
-          locationId: pickupAt?.id ?? null,
-          note: orderNoteOf(view.cart),
-          // A message to go with it as a gift, where the page asked for one (ADR-413).
-          giftMessage: view.gift?.messages ? (form.giftMessage ?? null) : null,
-          // The day the page said to expect delivery by (ADR-595); none to collect it.
-          deliveryExpectedOn: pickupAt
-            ? null
-            : expectedDeliveryOn(
-                view.delivery,
-                address.city,
-                deliveryCountsFrom(view.delivery, new Date()),
-                view.cart.items,
-              ),
-          tags: [],
-          agreement: {
-            policyVersions: view.shop.policies.map((policy) => policy.versionId),
-            ip: client?.ip ?? null,
-            userAgent: client?.userAgent ?? null,
+      const placed = await this.#placeHeld(tx, found, (savepoint) =>
+        this.orders.placeIn(
+          savepoint,
+          {
+            shopId: found.shopId,
+            currency: profile.currency as CurrencyCode,
+            actor: 'system',
+            source: 'online_store',
+            how:
+              (verifiedAt
+                ? 'from the online store, its number proved with a code'
+                : 'from the online store') +
+              (view.paymentLink ? ` through the payment link "${view.paymentLink.title}"` : ''),
           },
-          attribution: view.attribution,
-          browserIds: client?.browserIds ?? null,
-          phoneVerifiedAt: verifiedAt,
-        },
+          {
+            field: [],
+            // At the prices the page showed, which its digest says are the catalog's now.
+            lines: view.cart.items.map((item) => ({
+              variantId: item.variantId,
+              quantity: item.quantity,
+              price: BigInt(item.price),
+              // What the shopper wrote or chose for it, kept on its order line (ADR-687).
+              properties: item.properties,
+            })),
+            address,
+            email,
+            paymentMethod,
+            shipping,
+            discount: totals.discount + transferDiscount + onlineDiscount,
+            transferDiscount,
+            onlineDiscount,
+            discountCodes: code ? [code.code] : [],
+            automaticDiscounts: discounts.automatic.map((automatic) => automatic.title),
+            advance: 0n,
+            // The shop's fee for paying at the door, which the page stated (CHK-08).
+            codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
+            // And what it asks for in advance, which the page stated too (ADR-084), where and of
+            // whom the shop asks it (ADR-089); or, by the order's risk, only if placing scores it
+            // that high, instead of holding it for review (ADR-094).
+            advanceDue: asked.due,
+            riskAdvance: asked.ifRisky,
+            deliveryMethod: pickupAt ? 'pickup' : 'shipping',
+            locationId: pickupAt?.id ?? null,
+            note: orderNoteOf(view.cart),
+            // A message to go with it as a gift, where the page asked for one (ADR-413).
+            giftMessage: view.gift?.messages ? (form.giftMessage ?? null) : null,
+            // The day the page said to expect delivery by (ADR-595); none to collect it.
+            deliveryExpectedOn: pickupAt
+              ? null
+              : expectedDeliveryOn(
+                  view.delivery,
+                  address.city,
+                  deliveryCountsFrom(view.delivery, new Date()),
+                  view.cart.items,
+                ),
+            tags: [],
+            agreement: {
+              policyVersions: view.shop.policies.map((policy) => policy.versionId),
+              ip: client?.ip ?? null,
+              userAgent: client?.userAgent ?? null,
+            },
+            attribution: view.attribution,
+            browserIds: client?.browserIds ?? null,
+            phoneVerifiedAt: verifiedAt,
+          },
+        ),
       );
       if (!placed.ok) {
         const codes = new Set(placed.errors.map((error) => error.code));
@@ -1402,6 +1428,29 @@ export class CheckoutService {
         ...(proof && { proof }),
       };
     });
+  }
+
+  /**
+   * The order `place` places in a savepoint of `tx`, the stock the checkout holds (ADR-715) given
+   * back first so that placing takes it; held still when placing refuses it, as for stock short
+   * elsewhere in the cart.
+   */
+  async #placeHeld<T extends MutationResult<unknown>>(
+    tx: Tx,
+    found: { shopId: string; checkoutId: string },
+    place: (savepoint: Tx) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await tx.transaction(async (savepoint) => {
+        await this.#holds.releaseIn(savepoint, found.shopId, found.checkoutId);
+        const placed = await place(savepoint);
+        if (!placed.ok) throw new NotPlaced(placed);
+        return placed;
+      });
+    } catch (error) {
+      if (error instanceof NotPlaced) return error.refused as T;
+      throw error;
+    }
   }
 
   async #view(
@@ -1579,6 +1628,8 @@ export class CheckoutService {
       gift: await this.#gift(tx, shopId, cart),
       giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
       countsFrom: deliveryCountsFrom(delivery, new Date()),
+      ...(checkout.heldUntil &&
+        checkout.heldUntil > new Date() && { heldUntil: checkout.heldUntil }),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null
@@ -2018,6 +2069,14 @@ export function paidNoticeOf(view: CheckoutView, outcome: 'paid' | 'test' | null
 }
 
 /** An order paid on delivery whose number the shop asks to be proved with a code first. */
+/** Placing refused the order: its savepoint is undone, the checkout's hold with it (ADR-715). */
+class NotPlaced extends Error {
+  constructor(readonly refused: MutationResult<unknown>) {
+    super('The order was not placed');
+    this.name = 'NotPlaced';
+  }
+}
+
 class NeedsCode extends Error {
   constructor() {
     super("The shop asks for a code sent to the order's number first");

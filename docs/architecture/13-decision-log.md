@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-714 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-715 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -722,6 +722,7 @@
 | 712 | An advance naming products' tags may be counted on those products alone, a share of what they come to after the code's share of them, or an amount up to it | Accepted |
 | 713 | The checkout's page shows its total as the city is typed: a script posts the form to the page's own address to show it, placing nothing, and puts the summary it answers with in place | Accepted |
 | 714 | Checkout's links back to the shop go to its primary domain while DNS points it at the platform, its platform subdomain otherwise | Accepted |
+| 715 | Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, at the location the order would ship from; the holder's cart counts it as theirs, and the order, another checkout of the cart or the sweep gives it back | Accepted |
 
 ---
 
@@ -24459,3 +24460,34 @@
   waiting for the shop to change its primary.
 * **Alternatives:** **Linking relative to the page's address:** messages and payment links have
   no page to be relative to, and the core's own address serves the page too.
+
+## ADR-715 · Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, at the location the order would ship from; the holder's cart counts it as theirs, and the order, another checkout of the cart or the sweep gives it back
+
+* **Context:** In a drop, a few pieces sell to many shoppers at once. Stock was taken only when
+  the order was placed, so a shopper who had filled in the whole form could be told at the last
+  step that the piece had gone to someone faster. Inventory already had reservations
+  (`reserve` and `releaseReservation`), but nothing used them, and nothing gave them back.
+* **Decision:**
+  * **The shop chooses minutes, from 5 to 60, or none** (`checkoutStockHoldUpdate`, read with
+    `checkoutStockHold`, recording `stock_hold.updated`). With none, nothing is held, as before.
+  * **A checkout begun reserves its cart's units**, a bundle's as its parts
+    ([ADR-410](#adr-410--an-order-of-a-bundle-holds-its-parts-lines-the-bundles-price-shared-among-them-by-what-each-costs-alone-to-the-paisa-each-keeping-the-bundle-it-was-sold-as-a-bundle-sells-as-many-as-its-parts-stock-makes)), at the location the order would ship from. It first gives back what
+    the cart's other checkouts hold, so a cart holds once however often its shopper begins
+    again. Stock too short to hold it all holds none: placing checks it again, as it always did.
+  * **The holder's cart counts the held units as theirs**: inventory's `sellableOf` adds them
+    back before it takes the floor of none, so their cart and page offer what they hold while
+    others find it gone. The page says until when it is held.
+  * **Placing gives the hold back first, in a savepoint with the order**, so the order commits
+    the units. A refused order undoes the savepoint, and the hold stays.
+  * **The expiry sweep gives back holds whose minutes ran out** ([ADR-230](#adr-230--carts-checkouts-and-browsers-proofs-of-a-number-are-deleted-once-past-their-time-by-a-sweep-in-the-worker-across-shops-and-the-longest-expired-first-each-shops-in-its-own-transaction-rather-than-by-shoppers-requests-as-their-shop-gets-new-ones)), before it
+    deletes checkouts, and deletes none that holds stock.
+  * **Low-stock alerts count held units as the shop's** ([ADR-157](#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)): a hold neither
+    begins a spell nor ends one.
+* **Consequences:** The last pieces go to whoever reached checkout first, for as long as the shop
+  says. A hold outlasts its minutes until the next sweep (every ten minutes), and every hold and
+  release is a line of the variant's stock history.
+* **Alternatives:**
+  * **Holding when the form is first posted:** this is shorter, but the shopper has already
+    typed everything by then.
+  * **A hold kept outside inventory's levels:** other shoppers' carts, the storefront and the
+    reports would each have to subtract it.

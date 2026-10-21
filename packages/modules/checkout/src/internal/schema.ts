@@ -20,6 +20,7 @@ import type { StoredLine } from './cart-lines.js';
 import type { ContactLineValue } from './abandoned.js';
 import type { CodAdvanceValue } from './cod-rules.js';
 import type { PaymentLinkItemValue } from './payment-links.js';
+import type { HeldLineValue } from './stock-holds.js';
 import type { TrustBadgeValue } from './trust-badges.js';
 
 export const checkoutSchema = pgSchema('checkout');
@@ -88,6 +89,9 @@ export const checkouts = checkoutSchema.table(
     reminderTokenHash: bytea('reminder_token_hash'),
     /** The order the same number placed after the reminder (ADR-393). */
     recoveredOrderId: uuid('recovered_order_id'),
+    /** The units it holds for its shopper (ADR-715), and until when; null for none. */
+    held: jsonb('held').$type<HeldLineValue[]>(),
+    heldUntil: timestamp('held_until', { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
@@ -235,5 +239,15 @@ export const giftOptions = checkoutSchema.table('gift_options', {
   shopId: uuid('shop_id').primaryKey(),
   wrapVariantId: uuid('wrap_variant_id'),
   messages: boolean('messages').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * How long a checkout holds its cart's stock (CHK-02, ADR-715): minutes from 5 to 60, null for
+ * none. Shops without a row hold none.
+ */
+export const holdSettings = checkoutSchema.table('hold_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  minutes: smallint('minutes'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

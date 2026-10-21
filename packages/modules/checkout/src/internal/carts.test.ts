@@ -255,6 +255,7 @@ describe.skipIf(!server)('CartService', () => {
       codes: 0,
       sessions: 0,
       wishlists: 0,
+      holds: 0,
     });
     const { rows } = await f.admin.query<{ count: string }>(`SELECT count(*) FROM checkout.carts`);
     expect(rows[0]!.count).toBe('1');
@@ -331,6 +332,7 @@ describe.skipIf(!server)('CartService', () => {
       codes: 0,
       sessions: 0,
       wishlists: 0,
+      holds: 0,
     });
     expect(await left()).toEqual({
       carts: [ids.oldA, ids.staleA, ids.liveA],
@@ -347,6 +349,7 @@ describe.skipIf(!server)('CartService', () => {
       codes: 0,
       sessions: 0,
       wishlists: 0,
+      holds: 0,
     });
     expect(await left()).toEqual({
       carts: [ids.liveA],
@@ -368,6 +371,7 @@ describe.skipIf(!server)('CartService', () => {
       codes: 0,
       sessions: 0,
       wishlists: 0,
+      holds: 0,
     });
   });
 

@@ -366,8 +366,10 @@ export class LowStockService {
  * online orders, none where it was never stocked; null for a variant not tracked.
  */
 async function availableIn(tx: Tx, shopId: string, variantId: string): Promise<number | null> {
+  // Units checkouts hold (ADR-715) are the shop's still: a hold neither begins a spell nor ends
+  // one, as a drop's shoppers come and go.
   const { rows } = await tx.execute<{ available: number }>(sql`
-    SELECT coalesce(sum(l.available) FILTER (WHERE loc.fulfills_online_orders), 0)::int
+    SELECT coalesce(sum(l.available + l.reserved) FILTER (WHERE loc.fulfills_online_orders), 0)::int
              AS available
       FROM inventory.items i
       LEFT JOIN (inventory.levels l

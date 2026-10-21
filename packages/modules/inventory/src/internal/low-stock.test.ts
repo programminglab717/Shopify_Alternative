@@ -256,4 +256,24 @@ describe.skipIf(!server)('Low stock', () => {
     unwrap(await set(shawl!, 0));
     expect(await alertOf(shawl)).toBeNull();
   });
+
+  it("counts units checkouts hold as the shop's still: a hold begins no spell (ADR-715)", async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const [small] = await sold('Lawn Kurta', ['S']);
+    unwrap(
+      await f.inventory.setQuantities(f.a, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: small!, locationId: warehouse.id, quantity: 8 }],
+      }),
+    );
+    const held = [{ variantId: small!, locationId: warehouse.id, quantity: 6 }];
+    const alertOf = () => f.db.tenant(f.a.shopId, (tx) => lowStock.alertIn(tx, f.a.shopId, small!));
+    // Two for sale to others while six are held, but none of the eight sold: no alert.
+    await f.db.tenant(f.a.shopId, (tx) => f.stock.reserve(tx, f.a, held));
+    expect(await alertOf()).toBeNull();
+    // Sold, they are gone: then it runs low.
+    await f.db.tenant(f.a.shopId, (tx) => f.stock.commit(tx, f.a, held, { fromReservation: true }));
+    expect(await alertOf()).toMatchObject({ state: 'low', available: 2 });
+  });
 });

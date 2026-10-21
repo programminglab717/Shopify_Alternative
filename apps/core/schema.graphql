@@ -1597,6 +1597,21 @@ type CheckoutRecoverySettingsUpdatePayload {
 }
 
 """
+How long a checkout holds its cart's stock once its shopper starts checking out (CHK-02, ADR-715), so that in a drop the last pieces go to who reached checkout first.
+"""
+type CheckoutStockHold {
+  """
+  Minutes, from 5 to 60; null for no holds. Units held are given back when the order takes them, when another checkout of the cart begins, or when the minutes run out.
+  """
+  minutes: Int
+}
+
+type CheckoutStockHoldUpdatePayload {
+  checkoutStockHold: CheckoutStockHold
+  userErrors: [UserError!]!
+}
+
+"""
 A badge the shop chose for its checkout's page, under the button that places the order (CHK-14).
 """
 type CheckoutTrustBadge {
@@ -8104,6 +8119,11 @@ type Mutation {
   checkoutRecoverySettingsUpdate(offerAfterHours: Int, offerDiscountCodeId: ID, reminderAfterMinutes: Int): CheckoutRecoverySettingsUpdatePayload!
 
   """
+  Sets how many minutes a checkout holds its cart's stock, from 5 to 60, or null for none. Holds already taken keep theirs.
+  """
+  checkoutStockHoldUpdate(minutes: Int): CheckoutStockHoldUpdatePayload!
+
+  """
   Replaces the badges the checkout's page shows, in the order given: up to 4, each once; CUSTOM ones once for each thing they say. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
   """
   checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
@@ -13446,6 +13466,11 @@ type Query {
   Whether, and how long after they leave, the shop reminds shoppers (ADR-393), and the code it offers them after (ADR-426).
   """
   checkoutRecoverySettings: CheckoutRecoverySettings!
+
+  """
+  How long the shop's checkouts hold their carts' stock (ADR-715): none until it chooses.
+  """
+  checkoutStockHold: CheckoutStockHold!
 
   """The badges the shop chose for its checkout's page, in their order."""
   checkoutTrustBadges: [CheckoutTrustBadge!]!

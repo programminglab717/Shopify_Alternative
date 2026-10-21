@@ -125,7 +125,10 @@ advance; its thank-you page sends the shopper to the gateway, which sends them b
 checkout's address on the core, where the page says the payment is in, was a test, or is not
 heard of yet ([ADR-152](./13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). Paying before the order is placed, the flow above's payment
 intent, waits.
-Not yet: stock held during checkout, and abandoned-checkout capture.
+Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes, from 5 to
+60, at the location the order would ship from: others find it gone, its shopper's cart and
+page offer it still and say until when, and the order, another checkout of the cart or the
+expiry sweep gives it back ([ADR-715](./13-decision-log.md#adr-715--where-the-shop-asks-a-checkout-begun-holds-its-carts-stock-for-the-shops-minutes-at-the-location-the-order-would-ship-from-the-holders-cart-counts-it-as-theirs-and-the-order-another-checkout-of-the-cart-or-the-sweep-gives-it-back)).
 
 ### 2.1 Address capture tuned for Pakistan
 

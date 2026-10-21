@@ -40,6 +40,7 @@ import {
 import type { CodProduct } from './cod-rules.js';
 import { orderItemsIn } from './discount-items.js';
 import { carts } from './schema.js';
+import { heldForCartIn } from './stock-holds.js';
 
 /** A cart's secret: 128 random bits in base64url, as customers' links have. */
 const TOKEN_BYTES = 16;
@@ -77,6 +78,7 @@ export class CartService {
         tx,
         shopId,
         found.lines.map((line) => line.variantId),
+        found.id,
       );
       return withDiscount(tx, shopId, await priced(tx, shopId, found, facts), found.discountCodes);
     });
@@ -93,10 +95,12 @@ export class CartService {
       const hash = token === null ? null : hashOf(token);
       const found = hash ? await this.#find(tx, shopId, hash, true) : null;
       const current = found ?? EMPTY_CART;
-      const facts = await this.#facts(tx, shopId, [
-        ...current.lines.map((line) => line.variantId),
-        ...variantsNamed(action),
-      ]);
+      const facts = await this.#facts(
+        tx,
+        shopId,
+        [...current.lines.map((line) => line.variantId), ...variantsNamed(action)],
+        found?.id,
+      );
       const applied = applyAction(current, action, facts);
       if ('code' in applied) return { ok: false, error: applied };
       // What products made to order ask for, answered as their pages ask (ADR-691), and what
@@ -165,6 +169,7 @@ export class CartService {
       tx,
       shopId,
       cart.lines.map((line) => line.variantId),
+      cart.id,
     );
     return withDiscount(tx, shopId, await priced(tx, shopId, cart, facts), cart.discountCodes);
   }
@@ -248,19 +253,30 @@ export class CartService {
     return row ?? null;
   }
 
-  /** What the catalog and inventory say of each variant now; those not found are left out. */
+  /**
+   * What the catalog and inventory say of each variant now; those not found are left out. Of
+   * cart `cartId`, its stock counts what its checkouts hold as its own (ADR-715).
+   */
   async #facts(
     tx: Tx,
     shopId: string,
     variantIds: readonly string[],
+    cartId?: string,
   ): Promise<Map<string, VariantFacts>> {
     const snapshots = await this.variants.snapshotsOf(tx, shopId, [...new Set(variantIds)]);
     // A bundle sells as many as its parts' stock makes (ADR-410).
     const bundles = await bundlesOfVariantsIn(tx, shopId, [...snapshots.keys()]);
-    const sellable = await this.inventory.sellableOf(tx, shopId, [
-      ...snapshots.keys(),
-      ...[...bundles.values()].flatMap((bundle) => bundle.components.map((part) => part.variantId)),
-    ]);
+    const sellable = await this.inventory.sellableOf(
+      tx,
+      shopId,
+      [
+        ...snapshots.keys(),
+        ...[...bundles.values()].flatMap((bundle) =>
+          bundle.components.map((part) => part.variantId),
+        ),
+      ],
+      cartId ? await heldForCartIn(tx, shopId, cartId) : undefined,
+    );
     for (const [id, bundle] of bundles) sellable.set(id, bundleSellable(bundle, sellable));
     const preorders = await preordersIn(
       tx,

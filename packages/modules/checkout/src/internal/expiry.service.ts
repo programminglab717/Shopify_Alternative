@@ -1,5 +1,6 @@
 import { Database } from '@hatti/db';
 import { sql, type SQL } from 'drizzle-orm';
+import { StockHolds } from './stock-holds.js';
 
 /** What expires, each in its table: checkouts first, so carts going after them update none. */
 const EXPIRING = {
@@ -18,16 +19,18 @@ const EXPIRING = {
  * is sent in a day.
  */
 const KEPT: Partial<Record<keyof typeof EXPIRING, (at: string) => SQL>> = {
-  checkouts: (at) => sql`AND (kept_until IS NULL OR kept_until <= ${at})`,
+  // And holds none (ADR-715): its hold is given back first, for its stock to sell again.
+  checkouts: (at) => sql`AND (kept_until IS NULL OR kept_until <= ${at}) AND held IS NULL`,
   codes: (at) =>
     sql`AND purpose = 'sign_in' AND created_at <= ${at}::timestamptz - interval '1 day'`,
 };
 
 /**
- * How many of each kind a sweep deleted; and of `wishlists`, the items of numbers' own wishlists
- * (ADR-575) left with no session.
+ * How many of each kind a sweep deleted; of `wishlists`, the items of numbers' own wishlists
+ * (ADR-575) left with no session; and of `holds`, the checkouts whose stock it gave back as their
+ * minutes ran out (ADR-715).
  */
-export type ExpiredCounts = Record<keyof typeof EXPIRING | 'wishlists', number>;
+export type ExpiredCounts = Record<keyof typeof EXPIRING | 'wishlists' | 'holds', number>;
 
 /** Rows of each kind found past their time at a time, across shops. */
 export const EXPIRY_BATCH = 1_000;
@@ -42,7 +45,11 @@ export const EXPIRY_BATCH = 1_000;
  * customer has (ADR-575), once the number is signed in nowhere: they go with its last session.
  */
 export class CheckoutExpiry {
-  constructor(private readonly db: Database) {}
+  readonly #holds: StockHolds;
+
+  constructor(private readonly db: Database) {
+    this.#holds = new StockHolds(db);
+  }
 
   /**
    * Deletes up to `limit` of each kind past their time at `at`, the longest expired first, across
@@ -63,7 +70,10 @@ export class CheckoutExpiry {
       codes: 0,
       sessions: 0,
       wishlists: 0,
+      holds: 0,
     };
+    // Holds whose minutes ran out first: a checkout past its day is deleted once it holds none.
+    deleted.holds = await this.#holds.releaseLapsed(at, limit, failed);
     for (const kind of Object.keys(EXPIRING) as (keyof typeof EXPIRING)[]) {
       const table = EXPIRING[kind];
       const kept = KEPT[kind]?.(at.toISOString()) ?? sql``;

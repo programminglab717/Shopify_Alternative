@@ -28,6 +28,8 @@ import { CheckoutMarketingResolver } from './graphql/marketing.resolver.js';
 import { PaymentLinkResolver } from './graphql/payment-link.resolver.js';
 import { TrustBadgeResolver } from './graphql/trust-badge.resolver.js';
 import { GiftOptionsService } from './gift-options.service.js';
+import { StockHoldService } from './stock-holds.js';
+import { StockHoldResolver } from './graphql/stock-hold.resolver.js';
 import { CheckoutMarketingService } from './marketing.service.js';
 import { PaymentLinkService } from './payment-link.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
@@ -52,6 +54,9 @@ import { TrustBadgeService } from './trust-badge.service.js';
     // Gift wrap and gift messages (CHK-16, ADR-413).
     GiftOptionsService,
     GiftOptionsResolver,
+    // How long checkouts hold their carts' stock (ADR-715).
+    StockHoldService,
+    StockHoldResolver,
     CheckoutService,
     // Links many customers open, each to a checkout of their own (ADR-248).
     PaymentLinkService,
@@ -83,6 +88,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     TrustBadgeService,
     CheckoutMarketingService,
     GiftOptionsService,
+    StockHoldService,
     CheckoutService,
     PaymentLinkService,
     AbandonedCheckoutService,

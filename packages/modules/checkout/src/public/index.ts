@@ -74,6 +74,7 @@ export {
   type GiftOptionsUpdatedPayload,
   type MarketingOptionsUpdatedPayload,
   type PaymentLinkChangedPayload,
+  type StockHoldUpdatedPayload,
   type TrustBadgesUpdatedPayload,
 } from '../internal/events.js';
 export { DEFAULT_MARKETING_CHANNELS, MARKETING_FIELDS } from '../internal/marketing.js';
@@ -84,6 +85,13 @@ export {
   type GiftOptions,
   type GiftWrap,
 } from '../internal/gift-options.service.js';
+// Stock held while shoppers check out (CHK-02, ADR-715).
+export {
+  HOLD_LIMITS,
+  StockHoldService,
+  holdMinutesIn,
+  type HeldLineValue,
+} from '../internal/stock-holds.js';
 export { TrustBadgeService, trustBadgesIn } from '../internal/trust-badge.service.js';
 export {
   TRUST_BADGE_KINDS,

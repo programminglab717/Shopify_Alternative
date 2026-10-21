@@ -284,18 +284,25 @@ export class InventoryService {
   /**
    * How many of each of `variantIds` can be sold online now, in the caller's transaction `tx`:
    * for carts, kept outside inventory. Null for no limit, when stock is not tracked, the variant
-   * sells on at zero or its product is on pre-order.
+   * sells on at zero or its product is on pre-order. With `held`, the units a checkout reserved
+   * for whoever asks (ADR-715), by variant: theirs still, so counted as for sale to them.
    */
   async sellableOf(
     tx: Tx,
     shopId: string,
     variantIds: readonly string[],
+    held: ReadonlyMap<string, number> = new Map(),
   ): Promise<Map<string, number | null>> {
     const loaded = await loadItems(tx, shopId, variantIds);
     return new Map(
       variantIds.map((id) => {
         const item = loaded.get(id) ?? untrackedItem(id);
-        return [id, sellsWithoutLimit(item) ? null : Math.max(0, sellableQuantity(item))];
+        return [
+          id,
+          sellsWithoutLimit(item)
+            ? null
+            : Math.max(0, sellableQuantity(item) + (held.get(id) ?? 0)),
+        ];
       }),
     );
   }

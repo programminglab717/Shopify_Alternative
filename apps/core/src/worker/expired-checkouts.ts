@@ -27,6 +27,7 @@ export class ExpiredCheckouts {
       codes: 0,
       sessions: 0,
       wishlists: 0,
+      holds: 0,
     };
     for (;;) {
       const deleted = await this.expiry.deleteExpired(at, BATCH, (shopId, error) =>

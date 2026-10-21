@@ -364,6 +364,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         problem.kind !== 'gift_card' &&
         !(problem.kind === 'recall' && !RECALL_DONE.includes(problem.state)) &&
         banner(problemWords(problem, ways)),
+      // Its stock held for the shopper meanwhile (ADR-715).
+      view.heldUntil && heldNotice(view.heldUntil),
       cartSummary(
         cart,
         charges,
@@ -2113,6 +2115,24 @@ function refusalWords(code: string, refusal: DiscountRefusal | { reason: 'attemp
         ur: 'یہ چیک آؤٹ مزید ڈسکاؤنٹ کوڈ نہیں لے سکتا۔',
       };
   }
+}
+
+/** That the cart's stock is held for the shopper (ADR-715), and until when, in Pakistan's time. */
+function heldNotice(until: Date): Html {
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(until);
+  return paragraphs(
+    {
+      en: `Your items are held for you until ${clock}. Place your order by then to be sure of them.`,
+      ur: html`آپ کی چیزیں ${ltr(clock)} تک آپ کے لیے رکھی گئی ہیں۔ یقینی بنانے کے لیے اس سے پہلے
+      آرڈر دیں۔`,
+    },
+    'center muted',
+  );
 }
 
 /** "12 October 2026 at 9:00 am", in Pakistan's time. */

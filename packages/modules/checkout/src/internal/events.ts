@@ -11,6 +11,7 @@ export const CheckoutEvents = {
   PaymentLinkUpdated: 'payment_link.updated',
   RecoverySettingsUpdated: 'recovery_settings.updated',
   GiftOptionsUpdated: 'gift_options.updated',
+  StockHoldUpdated: 'stock_hold.updated',
 } as const;
 
 /** The shop changed what it charges for delivery. */
@@ -54,6 +55,12 @@ export interface GiftOptionsUpdatedPayload {
   /** The variant sold as gift wrap; null for none. */
   wrapVariantId: string | null;
   messages: boolean;
+}
+
+/** The shop changed how long its checkouts hold their carts' stock (ADR-715). */
+export interface StockHoldUpdatedPayload {
+  /** Null for no holds. */
+  minutes: number | null;
 }
 
 /** Staff made a payment link (ADR-248), or changed one. */
