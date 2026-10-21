@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### What shoppers search for, in the admin
+### 399c236 · What shoppers search for, in the admin
 
 * **The admin's analytics show what shoppers searched for over the period the page shows, the
   most searched and those that found nothing, each opening the products list searched for its
