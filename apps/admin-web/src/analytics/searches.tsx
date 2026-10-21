@@ -1,5 +1,6 @@
 /** What shoppers search the online store for (SRC-06, ADR-684). */
 import { Link } from '@tanstack/react-router';
+import { Plus } from 'lucide-react';
 import { StoreSearchesQuery } from '../api/operations';
 import type { StoreSearchesData, StoreSearchTermsValue } from '../api/types';
 import { errorText } from '../i18n/errors';
@@ -7,6 +8,8 @@ import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
+import { permits } from '../auth/permissions';
+import { EDITS_PRODUCTS } from '../products/status';
 import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, ErrorState, Loading } from '../ui/feedback';
@@ -31,10 +34,14 @@ function Count({ label, shown }: { label: MessageKey; shown: string }) {
 function Terms({
   rows,
   count,
+  synonym = false,
 }: {
   rows: readonly StoreSearchTermsValue[];
   count: (row: StoreSearchTermsValue) => string;
+  /** Whether each offers a synonym group begun with its words (ADR-686). */
+  synonym?: boolean;
 }) {
+  const { t } = useLocale();
   const shop = useShop();
   return (
     <ol className="flex flex-col divide-y divide-line">
@@ -50,6 +57,18 @@ function Terms({
             {row.terms}
           </Link>
           <span className="num text-secondary">{count(row)}</span>
+          {synonym && (
+            <Link
+              to="/$shopId/online-store"
+              params={{ shopId: shop.id }}
+              search={{ tab: 'synonyms', word: row.terms }}
+              aria-label={t('searches.addSynonym', { terms: row.terms })}
+              className="inline-flex min-h-10 items-center gap-1 text-primary underline-offset-4 hover:underline"
+            >
+              <Plus aria-hidden className="size-4" />
+              {t('searches.addSynonymShort')}
+            </Link>
+          )}
         </li>
       ))}
     </ol>
@@ -63,6 +82,7 @@ function Terms({
  */
 export function Searches({ days }: { days: Days }) {
   const { t } = useLocale();
+  const shop = useShop();
   const query = useAdminQuery<StoreSearchesData>(['storeSearches', days], StoreSearchesQuery, {
     days,
   });
@@ -103,6 +123,7 @@ export function Searches({ days }: { days: Days }) {
                 <Terms
                   rows={report.nothingFound}
                   count={(row) => t('searches.times', { count: formatCount(row.foundNothing) })}
+                  synonym={permits(shop, EDITS_PRODUCTS)}
                 />
               )}
             </FormSection>

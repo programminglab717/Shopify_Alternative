@@ -1620,6 +1620,17 @@ export interface StorefrontLiveViewData {
   storefrontLiveView: { visitorsNow: number; today: StorefrontSessionCounts };
 }
 
+export interface SearchSynonymsData {
+  searchSynonyms: { words: string[] }[];
+}
+
+export interface SearchSynonymsSetData {
+  searchSynonymsSet: {
+    searchSynonyms: { words: string[] }[] | null;
+    userErrors: UserError[];
+  };
+}
+
 /** A search on the online store, by its words (ADR-683). */
 export interface StoreSearchTermsValue {
   terms: string;

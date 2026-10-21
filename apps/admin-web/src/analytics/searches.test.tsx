@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StaffRole } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn } from '../test-support';
 
 /** What shoppers searched for, as the core reports it, over however many days it is asked. */
@@ -18,8 +19,8 @@ const REPORT = {
 };
 
 /** A fake core with the page's other sections quiet, and its searches as given. */
-function core(report: typeof REPORT | null) {
-  return fakeCore('marketer', (operation, variables) => {
+function core(report: typeof REPORT | null, role: StaffRole = 'marketer') {
+  return fakeCore(role, (operation, variables) => {
     if (operation === 'StoreSearches') {
       return {
         storeSearches: report
@@ -75,6 +76,20 @@ describe('What shoppers search for, in analytics (SRC-06, ADR-684)', () => {
     expect(asked()).toEqual([{ days: 30 }]);
     fireEvent.click(screen.getByRole('tab', { name: 'Last 7 days' }));
     await waitFor(() => expect(asked()).toEqual([{ days: 30 }, { days: 7 }]));
+    // A marketer changes no products, so is offered no synonyms.
+    expect(within(section).queryByRole('link', { name: /Add a synonym/ })).toBeNull();
+  });
+
+  it('offers those who change products a synonym for each search that found nothing (ADR-686)', async () => {
+    vi.stubGlobal('fetch', core(REPORT, 'manager').fetcher);
+    renderAdmin('/shop_1/analytics');
+    const section = await screen.findByRole('region', { name: 'What shoppers search for' });
+    const add = await within(section).findByRole('link', {
+      name: 'Add a synonym for velvet shawl',
+    });
+    expect(add.getAttribute('href')).toBe('/shop_1/online-store?tab=synonyms&word=velvet+shawl');
+    // The most searched found something: none offered there.
+    expect(within(section).getAllByRole('link', { name: /Add a synonym/ })).toHaveLength(2);
   });
 
   it('says so when no one searched in these days', async () => {

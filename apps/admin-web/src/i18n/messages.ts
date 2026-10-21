@@ -1972,6 +1972,20 @@ const en = {
   'storefront.robotsBlocked': '{crawler} may not crawl this address.',
   'storefront.robotsRule': 'The rule that decides:',
   'onlineStore.filters': 'Filters',
+  'onlineStore.synonyms': 'Search synonyms',
+  'synonyms.title': 'Search synonyms',
+  'synonyms.intro':
+    'Words your shoppers use for the same thing. Searching any word in a group finds products with any of them, beside the English, Roman Urdu and Urdu words Hatti already knows mean the same.',
+  'synonyms.none': 'No synonyms of your own yet.',
+  'synonyms.group': 'Group {number}',
+  'synonyms.groupHint':
+    'Two to ten single words, with commas between them: chappal, sandals, چپل. A word is found whole as you write it, so write sandal and sandals both if shoppers type both.',
+  'synonyms.add': 'Add a group',
+  'synonyms.remove': 'Remove group {number}',
+  'synonyms.removeShort': 'Remove',
+  'synonyms.save': 'Save synonyms',
+  'searches.addSynonym': 'Add a synonym for {terms}',
+  'searches.addSynonymShort': 'Add a synonym',
   'filters.title': 'Storefront filters',
   'filters.intro':
     'Shoppers narrow your collections and search results by these filters. With "Show every filter", your pages show all of Hatti\'s filters and one for each of your products\' options, in the standard order.',
@@ -5136,6 +5150,7 @@ const en = {
   'activity.subject.product_bundle': 'Bundle',
   'activity.subject.product_preorder': 'Pre-order',
   'activity.subject.size_chart': 'Size chart',
+  'activity.subject.search_synonyms': 'Search synonyms',
   'activity.subject.product_size_chart': "Products' size chart",
   'sizeCharts.title': 'Size charts',
   'sizeCharts.intro':
@@ -7368,6 +7383,20 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.robotsBlocked': '{crawler} یہ ایڈریس نہیں دیکھ سکتا۔',
   'storefront.robotsRule': 'فیصلہ کرنے والا اصول:',
   'onlineStore.filters': 'فلٹرز',
+  'onlineStore.synonyms': 'تلاش کے مترادف',
+  'synonyms.title': 'تلاش کے مترادف',
+  'synonyms.intro':
+    'وہ الفاظ جو آپ کے خریدار ایک ہی چیز کے لیے استعمال کرتے ہیں۔ کسی گروپ کا کوئی بھی لفظ تلاش کرنے پر ان میں سے کسی بھی لفظ والی پروڈکٹس ملتی ہیں، ان انگریزی، رومن اردو اور اردو الفاظ کے ساتھ جو ہٹی پہلے سے ایک جیسے جانتا ہے۔',
+  'synonyms.none': 'ابھی آپ کے اپنے کوئی مترادف نہیں۔',
+  'synonyms.group': 'گروپ {number}',
+  'synonyms.groupHint':
+    'دو سے دس اکیلے الفاظ، درمیان میں کوما کے ساتھ: chappal, sandals, چپل۔ لفظ ویسا ہی پورا ملتا ہے جیسا آپ لکھیں، اس لیے اگر خریدار sandal اور sandals دونوں لکھتے ہیں تو دونوں لکھیں۔',
+  'synonyms.add': 'گروپ شامل کریں',
+  'synonyms.remove': 'گروپ {number} ہٹائیں',
+  'synonyms.removeShort': 'ہٹائیں',
+  'synonyms.save': 'مترادف محفوظ کریں',
+  'searches.addSynonym': '{terms} کے لیے مترادف شامل کریں',
+  'searches.addSynonymShort': 'مترادف شامل کریں',
   'filters.title': 'اسٹور فرنٹ کے فلٹرز',
   'filters.intro':
     'خریدار ان فلٹرز سے آپ کی کلیکشنز اور تلاش کے نتائج محدود کرتے ہیں۔ "ہر فلٹر دکھائیں" پر آپ کے صفحات ہٹی کے تمام فلٹرز اور آپ کی پروڈکٹس کے ہر آپشن کا ایک فلٹر، معمول کی ترتیب میں دکھاتے ہیں۔',
@@ -10524,6 +10553,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'activity.subject.product_bundle': 'بنڈل',
   'activity.subject.product_preorder': 'پیشگی آرڈر',
   'activity.subject.size_chart': 'سائز چارٹ',
+  'activity.subject.search_synonyms': 'تلاش کے مترادف',
   'activity.subject.product_size_chart': 'پراڈکٹس کا سائز چارٹ',
   'sizeCharts.title': 'سائز چارٹ',
   'sizeCharts.intro':

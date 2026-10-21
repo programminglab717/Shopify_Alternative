@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Search synonyms in the admin
+
+* **The admin's online store has a Search synonyms tab, for those who change products: each group
+  a line of words between commas, saved whole, and a group begun from a search that found
+  nothing** ([ADR-686](../architecture/13-decision-log.md#adr-686--the-admins-online-store-has-a-search-synonyms-tab-for-those-who-change-products-each-group-a-line-of-words-between-commas-saved-whole-and-a-group-begun-from-a-search-that-found-nothing)): SRC-04's synonyms for merchants.
+* 3896 tests, eight more: the admin's.
+
 ### ac7ac26 · A shop's own search synonyms
 
 * **A shop keeps groups of its own words that mean the same, which its storefront's search reads

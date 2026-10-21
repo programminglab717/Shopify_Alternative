@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-685 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-686 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -693,6 +693,7 @@
 | 683 | What shoppers search a shop for is reported by the search's own page, counted by its words a day at a time in Valkey with those that found nothing, and read through storeSearches | Accepted |
 | 684 | The admin's analytics show what shoppers searched for over the period the page shows, the most searched and those that found nothing, each opening the products list searched for its words | Accepted |
 | 685 | A shop keeps groups of its own words that mean the same, which its storefront's search reads beside Hatti's commerce lexicon, each word a whole word as the shop wrote it | Accepted |
+| 686 | The admin's online store has a Search synonyms tab, for those who change products: each group a line of words between commas, saved whole, and a group begun from a search that found nothing | Accepted |
 
 ---
 
@@ -23768,3 +23769,24 @@
   later, if shops ask. **Synonyms in each product's search text:** every product rewritten
   whenever a group changes, as ADR-481 said of the lexicon. **Pins, hides and boosts for a
   search:** the rest of SRC-04, later.
+
+## ADR-686 · The admin's online store has a Search synonyms tab, for those who change products: each group a line of words between commas, saved whole, and a group begun from a search that found nothing
+
+* **Context:** A shop may keep its own search synonyms ([ADR-685](#adr-685--a-shop-keeps-groups-of-its-own-words-that-mean-the-same-which-its-storefronts-search-reads-beside-hattis-commerce-lexicon-each-word-a-whole-word-as-the-shop-wrote-it)), but only through
+  the API. The admin's analytics list the searches that found nothing
+  ([ADR-684](#adr-684--the-admins-analytics-show-what-shoppers-searched-for-over-the-period-the-page-shows-the-most-searched-and-those-that-found-nothing-each-opening-the-products-list-searched-for-its-words)), the words a shop most often needs a synonym for. The storefront's
+  filters have a tab of the online store ([ADR-569](#adr-569--the-admins-online-store-has-a-filters-tab-every-filter-as-before-or-the-shops-own-list-ordered-named-in-english-and-urdu-its-custom-fields-filters-added)).
+* **Decision:**
+  * **A Search synonyms tab** in the online store, beside Filters, for owners and managers, who
+    change products (`write_products`). Each group is one field of its words between commas,
+    Urdu's comma among them, a hint saying a word is found whole as written; groups are added
+    and removed, and saved whole. A group left blank is not sent; what the core refuses shows
+    under its group, the rest above the button.
+  * **From analytics**, each search that found nothing offers those who change products "Add a
+    synonym": the tab opens with a new group begun with its words and the cursor after them.
+  * English and Urdu.
+* **Consequences:** A merchant turns a search that found nothing into a synonym in two taps,
+  without the API.
+* **Alternatives:** **A field for each word:** commas are how merchants write lists of words, as
+  products' tags take them. **Adding the synonym from analytics in place:** a synonym needs the
+  shop's word for the thing, which the tab asks for with the other groups in view.

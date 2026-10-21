@@ -3605,6 +3605,31 @@ export const StorefrontLiveViewQuery = /* GraphQL */ `
   ${STOREFRONT_SESSION_COUNTS}
 `;
 
+/** The shop's own groups of words its storefront's search reads as the same (ADR-685). */
+export const SearchSynonymsQuery = /* GraphQL */ `
+  query SearchSynonyms {
+    searchSynonyms {
+      words
+    }
+  }
+`;
+
+/** Replaces the shop's search synonyms with those given, all of them (ADR-685). */
+export const SearchSynonymsSetMutation = /* GraphQL */ `
+  mutation SearchSynonymsSet($groups: [SearchSynonymGroupInput!]!) {
+    searchSynonymsSet(groups: $groups) {
+      searchSynonyms {
+        words
+      }
+      userErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+`;
+
 /** What shoppers searched the online store for over the last days (SRC-06, ADR-683). */
 export const StoreSearchesQuery = /* GraphQL */ `
   query StoreSearches($days: Int!) {
