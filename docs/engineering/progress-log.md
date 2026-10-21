@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A map to move the pin on
+### d707d9c · A map to move the pin on
 
 * **Checkout offers a map to move the address's pin on, once the platform has map tiles**
   ([ADR-719](../architecture/13-decision-log.md#adr-719--checkout-offers-a-map-to-move-the-addresss-pin-on-drawn-by-the-pages-own-script-from-the-map-tiles-the-platform-is-configured-with-and-none-without-them)): `MAP_TILES_URL` and `MAP_TILES_ATTRIBUTION` name a provider's tiles, and the page's
