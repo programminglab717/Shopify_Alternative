@@ -26,6 +26,68 @@ export function videoUrlOf(value: unknown): { type: 'youtube' | 'vimeo'; id: str
   return vimeo ? { type: 'vimeo', id: vimeo[1]! } : null;
 }
 
+// Rich text as Shopify's `richtext` and `inline_richtext` settings hold it (ADR-707): these tags
+// alone, a link's address one a theme may print, and nothing else in any tag. Block tags are for
+// `richtext` alone, as in Shopify's.
+const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'u', 'span', 'a', 'br']);
+const BLOCK_TAGS = new Set(['p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+const TAG = /<(\/?)([a-z][a-z0-9]*)((?:\s+[a-z-]+="[^"<>]*")*)\s*(\/?)>/giy;
+const ATTRIBUTE = /\s+([a-z-]+)="([^"<>]*)"/gi;
+const VOID = new Set(['br']);
+
+/**
+ * Whether `html` is rich text a theme may print as it is: Shopify's tags alone, each closed in
+ * order, links to an address a theme may print, and spans only for a direction. Block tags when
+ * `blocks`.
+ */
+export function isRichText(html: string, blocks: boolean): boolean {
+  const open: string[] = [];
+  let at = 0;
+  while (at < html.length) {
+    // A "<" begins markup only before a letter, "/", "!" or "?", as browsers read it; any other
+    // is text, as "&" and ">" are.
+    let next = html.indexOf('<', at);
+    while (next !== -1 && !/[a-z/!?]/i.test(html[next + 1] ?? ''))
+      next = html.indexOf('<', next + 1);
+    if (next === -1) break;
+    TAG.lastIndex = next;
+    const tag = TAG.exec(html);
+    if (!tag) return false;
+    const [whole, closing, rawName, attributes, selfClosing] = tag;
+    const name = rawName!.toLowerCase();
+    if (!INLINE_TAGS.has(name) && !(blocks && BLOCK_TAGS.has(name))) return false;
+    if (closing) {
+      if (attributes || selfClosing || open.pop() !== name) return false;
+    } else {
+      if (!attributesAllowed(name, attributes!)) return false;
+      if (!VOID.has(name)) {
+        if (selfClosing) return false;
+        open.push(name);
+      }
+    }
+    at = next + whole.length;
+  }
+  return open.length === 0;
+}
+
+function attributesAllowed(name: string, attributes: string): boolean {
+  const seen = new Set<string>();
+  for (const [, rawKey, value] of attributes.matchAll(ATTRIBUTE)) {
+    const key = rawKey!.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const allowed =
+      name === 'a'
+        ? (key === 'href' && LINK.test(value!)) ||
+          key === 'title' ||
+          (key === 'target' && value === '_blank') ||
+          (key === 'rel' && /^[a-z ]*$/.test(value!))
+        : key === 'dir' && ['ltr', 'rtl', 'auto'].includes(value!);
+    if (!allowed) return false;
+  }
+  return true;
+}
+
 /** A link a theme may print as it is: a path on the storefront, or a web, mail or phone address. */
 export function isSafeLink(url: string): boolean {
   return LINK.test(url);
@@ -65,10 +127,13 @@ export function ofType(setting: SettingSchema, value: unknown): unknown {
       const accepted = !setting.accept || (video && setting.accept.includes(video.type));
       return video && accepted ? (value as string).trim() : undefined;
     }
-    case 'text':
-    case 'textarea':
     case 'richtext':
     case 'inline_richtext':
+      return typeof value === 'string' && isRichText(value, setting.type === 'richtext')
+        ? value
+        : undefined;
+    case 'text':
+    case 'textarea':
     case 'html':
     case 'collection':
     case 'product':
@@ -133,6 +198,13 @@ export function settingProblem(setting: SettingSchema, value: unknown): string |
       );
     case 'image_picker':
       return 'must be an image at a path on the storefront or an https address';
+    case 'richtext':
+      return (
+        'must be rich text: paragraphs, headings, lists, bold, italic, underlined words and ' +
+        'links alone'
+      );
+    case 'inline_richtext':
+      return 'must be a line of rich text: bold, italic, underlined words and links alone';
     case 'video_url': {
       const hosts = (setting.accept ?? ['youtube', 'vimeo']).map((host) =>
         host === 'youtube' ? 'YouTube' : host === 'vimeo' ? 'Vimeo' : host,

@@ -753,7 +753,10 @@ describe('Storefront rendering', () => {
       {
         '@type': 'Question',
         name: 'How long does delivery take?',
-        acceptedAnswer: { '@type': 'Answer', text: 'Two to five working days across Pakistan.' },
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: '<p>Two to five working days across Pakistan.</p>',
+        },
       },
       expect.objectContaining({ name: 'Can I pay cash on delivery?' }),
       expect.objectContaining({ name: 'Can I return or exchange an item?' }),
@@ -781,6 +784,40 @@ describe('Storefront rendering', () => {
       limits: { timeMs: 10_000 },
     }).render({ path: '/pages/returns' }, store.fresh());
     expect(returns).not.toContain('FAQPage');
+  });
+
+  it("prints an FAQ's rich-text answers as they are, plain ones as their lines, and no others (ADR-707)", async () => {
+    const sample = sampleStore();
+    const store = new MemoryStore({
+      ...sample,
+      pages: [
+        { ...sample.pages![0]!, id: 'pg-faq', handle: 'faq', title: 'FAQs', templateSuffix: 'faq' },
+      ],
+    });
+    const template = JSON.parse(files['templates/page.faq.json']!) as {
+      sections: { faq: { blocks: Record<string, { settings: Record<string, string> }> } };
+    };
+    const { blocks } = template.sections.faq;
+    blocks.delivery!.settings.answer =
+      '<p>Two to five days. <a href="/pages/delivery">Where we deliver</a></p><ul><li><strong>Lahore</strong>: next day</li></ul>';
+    // An answer kept as plain text before answers were rich text.
+    blocks.payment!.settings.answer = 'Yes.\nPay the rider & keep the slip.';
+    blocks.returns!.settings.answer = '<p>Yes</p><script>alert(1)</script>';
+    const renderer = new PageRenderer(
+      loadTheme({ ...files, 'templates/page.faq.json': JSON.stringify(template) }),
+      { platformUrl: 'https://hatti.pk', limits: { timeMs: 10_000 } },
+    );
+    const { html } = await renderer.render({ path: '/pages/faq' }, store.fresh());
+    const answers = [
+      ...html.matchAll(/<div class="faq__answer" dir="auto">([\s\S]*?)<\/div>/g),
+    ].map(([, answer]) => answer!.trim());
+    expect(answers).toEqual([
+      '<p>Two to five days. <a href="/pages/delivery">Where we deliver</a></p><ul><li><strong>Lahore</strong>: next day</li></ul>',
+      'Yes.<br />\nPay the rider &amp; keep the slip.',
+    ]);
+    // An answer that is not rich text is no answer: its question is left out.
+    expect(html).not.toContain('alert(1)');
+    expect(html).not.toContain('Can I return or exchange an item?');
   });
 
   it("shows the shop's own Urdu on its Urdu pages, and its own words where it gave none (ADR-238)", async () => {

@@ -493,7 +493,7 @@ with their variants in Shopify's own namespace, for feed readers and newsletters
 ([ADR-216](./13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)).
 Hatti Base gives every product, collection, page, blog and article a `BreadcrumbList` of where
 it sits in the shop, and the sitemap index says when each of its files last changed
-([ADR-608](./13-decision-log.md#adr-608--hatti-base-tells-search-engines-where-each-page-sits-as-a-breadcrumblist-and-the-sitemap-index-says-when-each-of-its-files-last-changed)); FAQs in structured data are to come.
+([ADR-608](./13-decision-log.md#adr-608--hatti-base-tells-search-engines-where-each-page-sits-as-a-breadcrumblist-and-the-sitemap-index-says-when-each-of-its-files-last-changed)); FAQs in structured data come from Hatti Base's FAQ section ([ADR-615](./13-decision-log.md#adr-615--hatti-base-answers-shoppers-questions-on-a-page-of-the-shops-choosing-each-opened-in-place-and-tells-search-engines-the-same-as-an-faqpage-unless-the-section-says-not-to)), its answers Shopify's rich text, held to its tags as every theme's rich-text setting is ([ADR-707](./13-decision-log.md#adr-707--theme-settings-take-shopifys-rich-text-its-tags-alone-and-links-a-theme-may-print-theme-check-refusing-anything-else-and-hatti-bases-faq-answers-are-rich-text)).
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and
   recommend products; see [09](./09-ai-and-intelligence.md).

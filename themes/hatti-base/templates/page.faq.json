@@ -8,21 +8,21 @@
           "type": "question",
           "settings": {
             "question": "How long does delivery take?",
-            "answer": "Two to five working days across Pakistan."
+            "answer": "<p>Two to five working days across Pakistan.</p>"
           }
         },
         "payment": {
           "type": "question",
           "settings": {
             "question": "Can I pay cash on delivery?",
-            "answer": "Yes. Pay the rider when your parcel arrives."
+            "answer": "<p>Yes. Pay the rider when your parcel arrives.</p>"
           }
         },
         "returns": {
           "type": "question",
           "settings": {
             "question": "Can I return or exchange an item?",
-            "answer": "Yes, within 7 days of delivery, unworn and with its tags."
+            "answer": "<p>Yes, within 7 days of delivery, unworn and with its tags.</p>"
           }
         }
       },

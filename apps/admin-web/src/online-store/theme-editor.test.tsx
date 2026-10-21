@@ -87,6 +87,7 @@ const SECTIONS: Record<string, object> = {
     settings: [
       { type: 'text', id: 'heading', label: 'Heading' },
       { type: 'video_url', id: 'video', label: 'Video', accept: ['youtube', 'vimeo'] },
+      { type: 'richtext', id: 'text', label: 'Text' },
     ],
     presets: [{ name: 'Video' }],
   },
@@ -585,6 +586,37 @@ describe("A theme's editor", () => {
       { type: 'heading', settings: {} },
       { type: 'button', settings: { label: 'Shop lawn' } },
     ]);
+  });
+
+  it("writes a rich-text setting as plain text, kept as Shopify's HTML, and HTML it cannot as HTML (ADR-707)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/themes/thm_1');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Video to Home page' }));
+    expect(
+      screen.getByText(
+        'Leave a blank line between paragraphs. Start a line with ## for a heading, or with - for each item of a list. Web addresses become links.',
+      ),
+    ).toBeTruthy();
+    const text = screen.getByLabelText('Text') as HTMLTextAreaElement;
+    fireEvent.change(text, { target: { value: 'Our Eid edit & more.\n\n' } });
+    // The blank line typed stays while the next paragraph is written.
+    expect(text.value).toBe('Our Eid edit & more.\n\n');
+    fireEvent.change(text, {
+      target: { value: 'Our Eid edit & more.\n\n- Lawn\n- Khaddar\n\nhttps://wa.me/923001234567' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Saved. Your store shows it in a moment.')).toBeTruthy();
+    const json = savedFiles(fake)[0]!.json as {
+      order: string[];
+      sections: Record<string, { settings: Record<string, string> }>;
+    };
+    expect(json.sections[json.order.at(-1)!]!.settings.text).toBe(
+      '<p>Our Eid edit &amp; more.</p>\n<ul>\n<li>Lawn</li>\n<li>Khaddar</li>\n</ul>\n' +
+        '<p><a href="https://wa.me/923001234567">https://wa.me/923001234567</a></p>',
+    );
   });
 
   it('discards changes, and is linked from the themes tab', async () => {

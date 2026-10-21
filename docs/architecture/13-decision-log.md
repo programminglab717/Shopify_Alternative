@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-706 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-707 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -714,6 +714,7 @@
 | 704 | Hatti Base says what heavier orders cost more: each weight on product pages, and the heaviest a cart passes on the cart page, from the weights in the shop's document | Accepted |
 | 705 | A theme's sections play YouTube and Vimeo videos from Shopify's video_url setting, the address checked as it is saved, and Hatti Base has a video section | Accepted |
 | 706 | The admin's theme editor adds sections to a page from the theme's presets, as Shopify's does, opened to be set up, 25 at most, and gives a video_url setting its box | Accepted |
+| 707 | Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme Check refusing anything else, and Hatti Base's FAQ answers are rich text | Accepted |
 
 ---
 
@@ -24264,3 +24265,32 @@
 * **Alternatives:** **Any of the theme's sections offered:** one without a preset may need
   settings or blocks a page cannot show without. **Sections added in the groups too:**
   Shopify's `enabled_on` rules decide which; none of Hatti Base's sections needs it yet.
+
+## ADR-707 · Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme Check refusing anything else, and Hatti Base's FAQ answers are rich text
+
+* **Context:** An FAQ's answers were plain text ([ADR-615](#adr-615--hatti-base-answers-shoppers-questions-on-a-page-of-the-shops-choosing-each-opened-in-place-and-tells-search-engines-the-same-as-an-faqpage-unless-the-section-says-not-to)): no link to the delivery
+  page, no list of cities. Shopify's themes write such words in `richtext` and
+  `inline_richtext` settings, which our settings passed through as any text, unchecked, so a
+  theme printing one as it is would print whatever a shop's file held. Pages' bodies keep nothing
+  that runs ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)); settings had to hold to the same.
+* **Decision:**
+  * **Rich text is checked, not cleaned:** a `richtext` value holds Shopify's tags alone,
+    paragraphs, headings, lists, bold, italic, underline, spans and links, each closed in order;
+    an `inline_richtext` value the inline ones. A link's address is one a theme may print, a
+    path or a web, mail or phone address; a span takes a direction alone; no other attribute, no
+    comment, no other tag. Theme Check refuses a file holding any other, saying what rich text
+    may hold, and the storefront reads one that is not as unset. Words with no tags are rich
+    text too, as "&" and a "<" before no tag are.
+  * **Hatti Base's FAQ answers are rich text**, printed as they are; one kept as plain text
+    before prints as its lines, as it did, and its structured data gives the answer's HTML, as
+    Google's FAQ rich results take it.
+  * **The admin's editor writes rich text as it writes a page's body**: plain text, a blank line
+    between paragraphs, "## " headings, "- " lists and web addresses made links, sent as the
+    HTML themes print; a value with HTML plain text cannot hold is edited as its HTML, so nothing
+    of it is lost ([ADR-324](#adr-324--the-admins-theme-editor-changes-a-pages-sections-and-blocks-and-the-themes-settings-in-place-kept-until-saved-together-as-theme-check-passes-them-pictures-wait-for-an-address-of-their-own)).
+* **Consequences:** An FAQ answer links to the shop's pages and lists what it needs to; a
+  theme's rich text is safe to print as it is wherever it comes from.
+* **Alternatives:** **Cleaning values as they are saved:** a shop's file would change under it,
+  silently; refusing says what is wrong. **Cleaning as the storefront prints:** a cost on every
+  page for what is checked once. **A formatting toolbar in the editor:** the page body's plain
+  text already writes the same HTML, on a phone too.

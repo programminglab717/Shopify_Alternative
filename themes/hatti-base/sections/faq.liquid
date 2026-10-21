@@ -1,7 +1,8 @@
 {%- comment -%}
   Questions shoppers ask, each with its answer, opened in place (OS-09, ADR-615); and, where the
   section says so, the same questions told to search engines as schema.org's FAQPage. Only the
-  questions with an answer are given to either.
+  questions with an answer are given to either. An answer is rich text (ADR-707), printed as it
+  is; one kept as plain text before is printed as its lines.
 {%- endcomment -%}
 {%- liquid
   assign answered = 0
@@ -20,7 +21,13 @@
     {%- if block.settings.question != blank and block.settings.answer != blank %}
   <details class="faq__item" {{ block.shopify_attributes }}>
     <summary dir="auto">{{ block.settings.question | escape }}</summary>
-    <div class="faq__answer" dir="auto">{{ block.settings.answer | escape | newline_to_br }}</div>
+    <div class="faq__answer" dir="auto">
+      {%- if block.settings.answer contains '<' -%}
+        {{ block.settings.answer }}
+      {%- else -%}
+        {{ block.settings.answer | escape | newline_to_br }}
+      {%- endif -%}
+    </div>
   </details>
     {%- endif %}
   {%- endfor %}
@@ -43,6 +50,8 @@
   .faq__item { border-block-end: 1px solid rgb(0 0 0 / 0.1); padding-block: 0.75rem; }
   .faq__item summary { cursor: pointer; font-weight: 600; }
   .faq__answer { margin-block-start: 0.5rem; }
+  .faq__answer > :first-child { margin-block-start: 0; }
+  .faq__answer > :last-child { margin-block-end: 0; }
 {% endstylesheet %}
 
 {% schema %}
@@ -75,7 +84,7 @@
           "label": "t:sections.faq.blocks.question.settings.question.label"
         },
         {
-          "type": "textarea",
+          "type": "richtext",
           "id": "answer",
           "label": "t:sections.faq.blocks.question.settings.answer.label"
         }

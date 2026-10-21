@@ -3,6 +3,7 @@ export { editorSchemas, type EditorSchemas } from './editor.js';
 export { platformTheme, platformThemeDir } from './platform.js';
 export {
   imageValue,
+  isRichText,
   isSafeLink,
   ofType,
   settingProblem,

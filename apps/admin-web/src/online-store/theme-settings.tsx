@@ -11,6 +11,7 @@ import { useImageUpload } from '../shell/use-image-upload';
 import { Button } from '../ui/button';
 import { Alert, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { htmlFromText, textFromHtml } from './page-body';
 import { valueOf, type Setting } from './theme-files';
 
 /** What a setting may point at in the shop: its menus and collections, by handle. */
@@ -280,9 +281,94 @@ function ImageSetting({
   );
 }
 
+const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+
+/**
+ * A rich-text setting's words as staff write them (ADR-707): plain text as a page's body is,
+ * paragraphs, "## " headings, "- " lists and web addresses made links, unless it holds HTML
+ * plain text cannot, which is edited as its HTML. A line of rich text is one paragraph's words.
+ */
+function richTextOf(html: string, inline: boolean): { asHtml: boolean; value: string } {
+  // A value from before the setting was rich text, words alone.
+  if (!html.includes('<')) return { asHtml: false, value: html };
+  const text = textFromHtml(inline ? `<p>${html}</p>` : html);
+  return text === null || (inline && text.includes('\n'))
+    ? { asHtml: true, value: html }
+    : { asHtml: false, value: text };
+}
+
+function htmlOfRichText(text: string, inline: boolean): string {
+  const html = htmlFromText(text);
+  if (!inline) return html;
+  return html.startsWith('<p>') && html.endsWith('</p>') && !html.includes('</p>\n')
+    ? html.slice(3, -4)
+    : text.replace(/[&<>"]/g, (character) => ESCAPES[character]!);
+}
+
+function RichTextSetting({
+  label,
+  info,
+  inline,
+  value,
+  onChange,
+}: {
+  label: string;
+  info: string | undefined;
+  inline: boolean;
+  value: string;
+  onChange: (html: string) => void;
+}) {
+  const { t } = useLocale();
+  const id = useId();
+  // The words as typed, kept while they come to the HTML last sent; another value, such as the
+  // saved one after changes are discarded, is read again.
+  const [state, setState] = useState(() => ({ sent: value, ...richTextOf(value, inline) }));
+  if (state.sent !== value) setState({ sent: value, ...richTextOf(value, inline) });
+  const change = (typed: string) => {
+    const html = state.asHtml ? typed : htmlOfRichText(typed, inline);
+    setState({ sent: html, asHtml: state.asHtml, value: typed });
+    onChange(html);
+  };
+  const hint = state.asHtml
+    ? t('editor.richHtmlHint')
+    : inline
+      ? info
+      : (info ?? t('editor.richHint'));
+  const shown = state.asHtml ? t('pages.bodyHtmlLabel', { label }) : label;
+  if (inline) {
+    return (
+      <TextField
+        label={shown}
+        hint={hint}
+        dir={state.asHtml ? 'ltr' : 'auto'}
+        value={state.value}
+        onChange={(event) => change(event.target.value)}
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="font-medium">
+        {shown}
+      </label>
+      {hint && <p className="text-secondary">{hint}</p>}
+      <textarea
+        id={id}
+        value={state.value}
+        rows={6}
+        dir={state.asHtml ? 'ltr' : 'auto'}
+        onChange={(event) => change(event.target.value)}
+        className={`rounded-control border border-line bg-surface px-3 py-2 text-text ${
+          state.asHtml ? 'font-mono text-[length:var(--hatti-type-body-sm-size)]' : ''
+        }`}
+      />
+    </div>
+  );
+}
+
 /**
  * A setting of a theme's, its control by its type, as Shopify's theme editor offers them: words,
- * a number within its range, a choice, a tick, a colour, a link, a menu or a collection. Its
+ * rich text, a number within its range, a choice, a tick, a colour, a link, a menu or a collection. Its
  * label, notes and choices are the theme's own, in the merchant's language where it has them.
  */
 export function SettingField({
@@ -316,9 +402,18 @@ export function SettingField({
       return <h4 className="pt-2 font-semibold">{setting.content}</h4>;
     case 'paragraph':
       return <p className="text-secondary">{setting.content}</p>;
-    case 'textarea':
     case 'richtext':
     case 'inline_richtext':
+      return (
+        <RichTextSetting
+          label={label}
+          info={setting.info}
+          inline={setting.type === 'inline_richtext'}
+          value={text}
+          onChange={onChange}
+        />
+      );
+    case 'textarea':
     case 'html':
       return (
         <div className="flex flex-col gap-1">

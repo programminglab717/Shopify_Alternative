@@ -3254,6 +3254,10 @@ const en = {
   'editor.colourCode': '{label}: colour code',
   'editor.urlHint': 'A page on your store, such as /collections/all, or a web address.',
   'editor.videoHint': "A YouTube or Vimeo video's address, as you copy it from the video's page.",
+  'editor.richHint':
+    'Leave a blank line between paragraphs. Start a line with ## for a heading, or with - for each item of a list. Web addresses become links.',
+  'editor.richHtmlHint':
+    'This has formatting typed as HTML, so it is edited as HTML: paragraphs, headings, lists, bold, italic, underlined words and links alone.',
   'editor.noImage': 'No picture',
   'editor.up': 'Up',
   'editor.down': 'Down',
@@ -8757,6 +8761,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'editor.colourCode': '{label}: رنگ کا کوڈ',
   'editor.urlHint': 'آپ کے اسٹور کا کوئی صفحہ، جیسے /collections/all، یا ویب ایڈریس۔',
   'editor.videoHint': 'یوٹیوب یا ویمیو ویڈیو کا پتہ، جیسے آپ اسے ویڈیو کے صفحے سے کاپی کرتے ہیں۔',
+  'editor.richHint':
+    'پیراگراف کے درمیان ایک خالی لائن چھوڑیں۔ سرخی کے لیے لائن ## سے، اور فہرست کی ہر چیز کے لیے - سے شروع کریں۔ ویب ایڈریس لنک بن جاتے ہیں۔',
+  'editor.richHtmlHint':
+    'اس میں HTML میں لکھی فارمیٹنگ ہے، اس لیے اسے HTML میں بدلا جاتا ہے: صرف پیراگراف، سرخیاں، فہرستیں، بولڈ، اٹالک، خط کشیدہ الفاظ اور لنک۔',
   'editor.noImage': 'کوئی تصویر نہیں',
   'editor.up': 'اوپر',
   'editor.down': 'نیچے',

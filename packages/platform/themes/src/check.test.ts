@@ -128,6 +128,54 @@ describe('Theme Check', () => {
     ]);
   });
 
+  it("takes rich text as Shopify's richtext settings hold it, and nothing that could run (ADR-707)", () => {
+    const rich = { type: 'richtext', id: 'r' };
+    const line = { type: 'inline_richtext', id: 'l' };
+    for (const html of [
+      '<p>Two to five days.</p>',
+      '<p>Cash &amp; card, 3 < 5 & 7 > 2</p>',
+      '<h2>Delivery</h2><ul><li><strong>Lahore</strong>: next day</li><li><em>Karachi</em></li></ul>',
+      '<p><a href="https://wa.me/923001234567" target="_blank" rel="noopener">WhatsApp</a><br>us</p>',
+      '<p><span dir="ltr">Rs 250</span> سے اوپر مفت</p>',
+      'Plain words, as an answer was before',
+    ]) {
+      expect(settingValue(rich, html), html).toBe(html);
+    }
+    for (const html of [
+      '<p>Yes</p><script>alert(1)</script>',
+      '<p onclick="alert(1)">Yes</p>',
+      '<a href="javascript:alert(1)">Yes</a>',
+      '<img src="x" onerror="alert(1)">',
+      '<p>Unclosed',
+      '<p><strong>Crossed</p></strong>',
+      '<p><!-- hidden --></p>',
+      '<span style="color:red">Red</span>',
+      '<iframe src="https://evil.example"></iframe>',
+    ]) {
+      expect(settingValue(rich, html), html).toBeNull();
+    }
+    expect(settingValue(line, '<strong>Free</strong> delivery')).toBe(
+      '<strong>Free</strong> delivery',
+    );
+    expect(settingValue(line, '<p>Free delivery</p>')).toBeNull();
+    expect(
+      check('templates/page.faq.json', {
+        sections: {
+          faq: {
+            type: 'faq',
+            blocks: {
+              ok: { type: 'question', settings: { answer: '<p>Yes.</p>' } },
+              bad: { type: 'question', settings: { answer: '<p>Yes</p><script>x()</script>' } },
+            },
+          },
+        },
+        order: ['faq'],
+      }),
+    ).toEqual([
+      `block "bad" of section "faq"'s "answer" must be rich text: paragraphs, headings, lists, bold, italic, underlined words and links alone`,
+    ]);
+  });
+
   it("takes a video section's YouTube or Vimeo address as people copy it, and nothing else (ADR-705)", () => {
     for (const [url, video] of [
       ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', { type: 'youtube', id: 'dQw4w9WgXcQ' }],

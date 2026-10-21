@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Rich-text theme settings
+
+* **Theme settings take Shopify's rich text, its tags alone and links a theme may print, Theme
+  Check refusing anything else, and Hatti Base's FAQ answers are rich text** ([ADR-707](../architecture/13-decision-log.md#adr-707--theme-settings-take-shopifys-rich-text-its-tags-alone-and-links-a-theme-may-print-theme-check-refusing-anything-else-and-hatti-bases-faq-answers-are-rich-text)): the
+  last of OS-09's FAQ shortcut, and the admin's editor writing rich text as plain text.
+* 3962 tests, three more: the themes package's, the storefront's and the admin's.
+
 ### b0deeef · Sections added in the theme editor
 
 * **The admin's theme editor adds sections to a page from the theme's presets, as Shopify's
