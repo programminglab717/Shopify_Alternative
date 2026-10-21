@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Rates by the order's value
+
+* **Larger orders pay at most a rate the shop sets by their value** ([ADR-721](../architecture/13-decision-log.md#adr-721--larger-orders-pay-at-most-a-rate-the-shop-sets-by-the-orders-value-the-largest-value-an-order-reaches-caps-its-citys-charge-before-what-its-weight-adds)): up to ten
+  `valueRates` in the delivery settings, the largest an order reaches capping its city's charge
+  before its weight's, in checkout's totals, the order placed and the cash cap; migration 0311.
+* 4001 tests, four more: the checkout module's.
+
 ### f51f167 · The map on customers' links
 
 * **Customers' links offer the same map where they fill in or correct the delivery address**

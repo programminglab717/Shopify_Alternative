@@ -168,6 +168,36 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
     expect(light.data?.deliverySettingsUpdate.userErrors).toEqual([
       { field: ['weights', '0', 'aboveGrams'], code: 'INVALID' },
     ]);
+    // What larger orders pay at most (ADR-721), kept the smallest first.
+    const RATES = `mutation ($input: DeliverySettingsUpdateInput!) {
+      deliverySettingsUpdate(input: $input) {
+        deliverySettings { valueRates { fromSubtotal { amount } charge { amount } } }
+        userErrors { field code }
+      }
+    }`;
+    const rated = await gql(tokens.a, RATES, {
+      input: {
+        valueRates: [
+          { fromSubtotal: '5,000', charge: '0' },
+          { fromSubtotal: '3000', charge: '150' },
+        ],
+      },
+    });
+    expect(rated.data?.deliverySettingsUpdate).toEqual({
+      deliverySettings: {
+        valueRates: [
+          { fromSubtotal: { amount: '3000.00' }, charge: { amount: '150.00' } },
+          { fromSubtotal: { amount: '5000.00' }, charge: { amount: '0.00' } },
+        ],
+      },
+      userErrors: [],
+    });
+    const nothing = await gql(tokens.a, RATES, {
+      input: { valueRates: [{ fromSubtotal: '0', charge: '100' }] },
+    });
+    expect(nothing.data?.deliverySettingsUpdate.userErrors).toEqual([
+      { field: ['valueRates', '0', 'fromSubtotal'], code: 'INVALID' },
+    ]);
     // Another shop's are its own.
     expect((await read(tokens.b)).zones).toEqual([]);
 

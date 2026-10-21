@@ -16,7 +16,7 @@ import { deliverySettings } from './schema.js';
  * What a shop charges to deliver an order (ADR-043): one charge for everywhere, zones of cities
  * with charges of their own, and a subtotal from which delivery is free; and how many working
  * days delivery takes, everywhere and in each zone (ADR-235); and what heavier orders cost more
- * (ADR-702). Checkout adds the charge for the shopper's city and the cart's weight, and says how long delivery takes there; the storefront shows the charges and
+ * (ADR-702), and what larger orders pay at most (ADR-721). Checkout adds the charge for the shopper's city and the cart's weight, and says how long delivery takes there; the storefront shows the charges and
  * the days. A shop that set nothing charges nothing, and says nothing of the days.
  */
 @Injectable()
@@ -52,6 +52,10 @@ export class DeliveryService {
         JSON.stringify(storedWeights(before.weights))
           ? ['weights']
           : []),
+        ...(JSON.stringify(storedValueRates(next.valueRates)) !==
+        JSON.stringify(storedValueRates(before.valueRates))
+          ? ['valueRates']
+          : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       const values = {
@@ -62,6 +66,7 @@ export class DeliveryService {
         zones: stored(next.zones),
         cutoffHour: next.cutoffHour ?? null,
         weights: storedWeights(next.weights),
+        valueRates: storedValueRates(next.valueRates),
       };
       await tx
         .insert(deliverySettings)
@@ -110,6 +115,10 @@ export class DeliveryService {
         aboveGrams: weight.aboveGrams,
         charge: BigInt(weight.charge),
       })),
+      valueRates: row.valueRates.map((rate) => ({
+        fromSubtotal: BigInt(rate.fromSubtotal),
+        charge: BigInt(rate.charge),
+      })),
       updatedAt: row.updatedAt,
     };
   }
@@ -121,6 +130,13 @@ function stored(zones: DeliverySettingsRecord['zones']) {
     cities: zone.cities,
     charge: zone.charge.toString(),
     days: zone.days,
+  }));
+}
+
+function storedValueRates(rates: DeliverySettingsRecord['valueRates']) {
+  return (rates ?? []).map((rate) => ({
+    fromSubtotal: rate.fromSubtotal.toString(),
+    charge: rate.charge.toString(),
   }));
 }
 

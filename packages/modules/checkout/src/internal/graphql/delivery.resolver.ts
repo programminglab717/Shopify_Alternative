@@ -8,6 +8,7 @@ import {
   DeliverySettings,
   DeliverySettingsUpdateInput,
   DeliverySettingsUpdatePayload,
+  DeliveryValueRate,
   DeliveryWeight,
   DeliveryZone,
 } from './delivery.types.js';
@@ -64,6 +65,12 @@ function toDeliverySettings(
       Object.assign(new DeliveryWeight(), {
         aboveGrams: weight.aboveGrams,
         charge: amount(weight.charge),
+      }),
+    ),
+    valueRates: (record.valueRates ?? []).map((rate) =>
+      Object.assign(new DeliveryValueRate(), {
+        fromSubtotal: amount(rate.fromSubtotal),
+        charge: amount(rate.charge),
       }),
     ),
     updatedAt: record.updatedAt,

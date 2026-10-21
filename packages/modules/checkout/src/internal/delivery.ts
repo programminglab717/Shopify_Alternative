@@ -22,6 +22,12 @@ export interface DeliverySettingsRecord {
    * Left out for none.
    */
   weights?: DeliveryWeightRecord[];
+  /**
+   * What larger orders pay at most to deliver (CHK-04, ADR-721), the smallest first: an order of
+   * at least one's `fromSubtotal` pays no more than its `charge`, the largest it reaches alone,
+   * before what its weight adds. Left out for none.
+   */
+  valueRates?: DeliveryValueRateRecord[];
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -29,6 +35,12 @@ export interface DeliverySettingsRecord {
 /** What an order weighing more than `aboveGrams` costs more to deliver, in minor units. */
 export interface DeliveryWeightRecord {
   aboveGrams: number;
+  charge: bigint;
+}
+
+/** What an order of at least `fromSubtotal` pays at most to deliver, in minor units. */
+export interface DeliveryValueRateRecord {
+  fromSubtotal: bigint;
   charge: bigint;
 }
 
@@ -56,6 +68,7 @@ export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   zones: [],
   cutoffHour: null,
   weights: [],
+  valueRates: [],
   updatedAt: null,
 };
 
@@ -65,6 +78,7 @@ export const DELIVERY_LIMITS = {
   name: 100,
   days: 30,
   weights: 10,
+  valueRates: 10,
   /** 1,000 kg: more than any courier takes as a parcel. */
   grams: 1_000_000,
 } as const;
@@ -82,6 +96,15 @@ export interface DeliverySettingsInput {
   cutoffHour?: number | null;
   /** Replaces them all, in any order; an empty list for none. */
   weights?: DeliveryWeightInput[] | null;
+  /** Replaces them all, in any order; an empty list for none. */
+  valueRates?: DeliveryValueRateInput[] | null;
+}
+
+export interface DeliveryValueRateInput {
+  /** Decimal, in major units, more than nothing: "3,000" for orders of Rs 3,000 or more. */
+  fromSubtotal: string;
+  /** Decimal, in major units; "0" for free. */
+  charge: string;
 }
 
 export interface DeliveryWeightInput {
@@ -103,8 +126,9 @@ export interface DeliveryZoneInput {
 
 /**
  * The charge to deliver an order with `subtotal` to `city`: nothing from the subtotal delivery is
- * free from, else the charge of the zone naming the city, else the charge for everywhere; and
- * what an order of `grams` costs more for its weight (ADR-702).
+ * free from, else the charge of the zone naming the city, else the charge for everywhere, no more
+ * than what an order of `subtotal` pays at most (ADR-721); and what an order of `grams` costs
+ * more for its weight (ADR-702).
  */
 export function deliveryCharge(
   settings: DeliverySettingsRecord,
@@ -115,7 +139,27 @@ export function deliveryCharge(
   if (settings.freeAbove !== null && subtotal >= settings.freeAbove) return 0n;
   const name = city ? (findCity(city)?.name ?? null) : null;
   const zone = name ? settings.zones.find((each) => each.cities.includes(name)) : undefined;
-  return (zone ? zone.charge : settings.charge) + weightCharge(settings, grams);
+  return (
+    atMost(zone ? zone.charge : settings.charge, valueRateCharge(settings, subtotal)) +
+    weightCharge(settings, grams)
+  );
+}
+
+/**
+ * The most an order of `subtotal` pays to deliver (ADR-721): the charge of the largest value rate
+ * it reaches; null where it reaches none.
+ */
+export function valueRateCharge(settings: DeliverySettingsRecord, subtotal: bigint): bigint | null {
+  let charge: bigint | null = null;
+  for (const rate of settings.valueRates ?? []) {
+    if (subtotal >= rate.fromSubtotal) charge = rate.charge;
+  }
+  return charge;
+}
+
+/** `charge`, or `most` where it is less. */
+function atMost(charge: bigint, most: bigint | null): bigint {
+  return most !== null && most < charge ? most : charge;
 }
 
 /**
@@ -190,8 +234,8 @@ export function deliveryDaysRange(settings: DeliverySettingsRecord): DeliveryDay
 
 /**
  * The most delivery of `subtotal` of items weighing `grams` may cost, wherever it goes: the
- * dearest of the charge for everywhere and the zones', with what the weight adds, or nothing from
- * the free threshold.
+ * dearest of the charge for everywhere and the zones', no more than the subtotal's value rate
+ * (ADR-721), with what the weight adds, or nothing from the free threshold.
  */
 export function highestDeliveryCharge(
   settings: DeliverySettingsRecord,
@@ -203,7 +247,7 @@ export function highestDeliveryCharge(
     (most, zone) => (zone.charge > most ? zone.charge : most),
     settings.charge,
   );
-  return highest + weightCharge(settings, grams);
+  return atMost(highest, valueRateCharge(settings, subtotal)) + weightCharge(settings, grams);
 }
 
 /**
@@ -246,9 +290,47 @@ export function checkDeliverySettings(
   if (input.weights !== undefined) {
     weights = checkWeights(check, input.weights ?? [], currency);
   }
+  let valueRates = current.valueRates ?? [];
+  if (input.valueRates !== undefined) {
+    valueRates = checkValueRates(check, input.valueRates ?? [], currency);
+  }
   return check.errors.length > before
     ? null
-    : { charge, freeAbove, days, zones, cutoffHour, weights };
+    : { charge, freeAbove, days, zones, cutoffHour, weights, valueRates };
+}
+
+/** Subtotals above nothing, each once, kept the smallest first; charges of nothing or more. */
+function checkValueRates(
+  check: InputChecker,
+  inputs: readonly DeliveryValueRateInput[],
+  currency: CurrencyCode,
+): DeliveryValueRateRecord[] {
+  if (inputs.length > DELIVERY_LIMITS.valueRates) {
+    check.addMessage(
+      ['valueRates'],
+      'INVALID',
+      `A shop sets at most ${DELIVERY_LIMITS.valueRates} rates by the order's value`,
+    );
+    return [];
+  }
+  const seen = new Set<bigint>();
+  const rates = inputs.map((input, index) => {
+    const at = ['valueRates', String(index)];
+    const from = check.price([...at, 'fromSubtotal'], input.fromSubtotal, currency, {
+      required: true,
+    });
+    if (from === 0n) {
+      check.addMessage([...at, 'fromSubtotal'], 'INVALID', 'A rate must start above Rs 0');
+    } else if (from !== null && seen.has(from)) {
+      check.addMessage([...at, 'fromSubtotal'], 'TAKEN', 'This value has a rate already');
+    }
+    if (from !== null) seen.add(from);
+    const charge = check.price([...at, 'charge'], input.charge, currency, { required: true });
+    return { fromSubtotal: from ?? 0n, charge: charge ?? 0n };
+  });
+  return rates.sort((a, b) =>
+    a.fromSubtotal < b.fromSubtotal ? -1 : a.fromSubtotal > b.fromSubtotal ? 1 : 0,
+  );
 }
 
 /** Whole grams up to {@link DELIVERY_LIMITS.grams}, each once, kept the lightest first. */

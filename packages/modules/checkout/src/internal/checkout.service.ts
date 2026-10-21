@@ -2016,6 +2016,13 @@ export function shownOf(
         delivery.weights!.map((weight) => [weight.aboveGrams, weight.charge.toString()]),
       ],
     }),
+    // What larger orders pay at most to deliver (ADR-721).
+    ...((delivery.valueRates?.length ?? 0) > 0 && {
+      valueRates: delivery.valueRates!.map((rate) => [
+        rate.fromSubtotal.toString(),
+        rate.charge.toString(),
+      ]),
+    }),
     // The automatic discounts the order takes (ADR-515), as they were.
     ...(discounts.automatic.length > 0 && {
       automatic: discounts.automatic.map((automatic) => [automatic.id, automatic.version]),

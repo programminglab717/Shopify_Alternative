@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-720 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-721 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -728,6 +728,7 @@
 | 718 | Checkout pins the address from a Google Maps link or coordinates the shopper pastes, its short links followed on Google's own hosts, where they are not at the address | Accepted |
 | 719 | Checkout offers a map to move the address's pin on, drawn by the page's own script from the map tiles the platform is configured with, and none without them | Accepted |
 | 720 | Customers' links offer the same map to move the pin on where they fill in or correct the delivery address, from the platform's tiles | Accepted |
+| 721 | Larger orders pay at most a rate the shop sets by the order's value: the largest value an order reaches caps its city's charge, before what its weight adds | Accepted |
 
 ---
 
@@ -24623,3 +24624,32 @@
 * **Consequences:** Every form that asks for a delivery address has the map once the operator sets
   the tiles. Nothing else changes: the pin is checked as before, and a page without tiles is as it
   was.
+
+## ADR-721 · Larger orders pay at most a rate the shop sets by the order's value: the largest value an order reaches caps its city's charge, before what its weight adds
+
+* **Context:** A shop charges for delivery once for everywhere, by zones of cities, and nothing
+  from a subtotal ([ADR-043](#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)), and more for heavier orders ([ADR-702](#adr-702--heavier-orders-cost-more-to-deliver-a-shop-names-weights-each-with-what-an-order-over-it-costs-more-and-checkout-adds-the-heaviest-the-cart-passes-to-the-citys-charge)).
+  Pakistani shops often charge less on larger orders before delivery is free: "Rs 250 delivery,
+  Rs 150 on orders over Rs 3,000, free over Rs 5,000". Shopify calls these price-based rates.
+* **Decision:**
+  * **A shop sets up to ten rates by the order's value** (`valueRates`, migration 0311): each a
+    subtotal from which it applies and the most such an order pays to deliver, nothing for free.
+    Each value is set once, above nothing, and they are kept smallest first. The Admin API's
+    delivery settings take and give them, and changing them records
+    `delivery_settings.updated` with `valueRates`.
+  * **The largest value an order reaches caps its city's charge.** The subtotal is the items'
+    after discounts, as for free delivery. The zone's charge, or everywhere's, stands where it is
+    less, so a shop's own city stays as cheap as it set. What the order's weight adds comes after
+    the cap. The free subtotal still makes delivery free, weight and all.
+  * **Checkout uses it everywhere it charges for delivery**: its totals, the order placed, and
+    the most delivery may cost against the cash cap. Before a city is typed, its page says the
+    most this order pays. The rates are part of what the page showed, so a change makes it
+    stale.
+* **Consequences:** "Less delivery on larger orders" needs no discount code. A rate above every
+  charge does nothing, harmlessly. The admin's delivery settings and Hatti Base's pages do not
+  show the rates yet; they come next, as weights' did.
+* **Alternatives:**
+  * **Rates replacing the city's charge outright:** a rate meant for distant cities would raise
+    the shop's own city's charge.
+  * **Rates per zone, as Shopify's:** more to set and to show for little gain at Pakistani
+    shops' scale; one list serves the common case.

@@ -16,7 +16,10 @@ export const CheckoutEvents = {
 
 /** The shop changed what it charges for delivery. */
 export interface DeliverySettingsUpdatedPayload {
-  /** What changed: "charge", "freeAbove", "days", "zones", "cutoffHour" or "weights". */
+  /**
+   * What changed: "charge", "freeAbove", "days", "zones", "cutoffHour", "weights" or
+   * "valueRates".
+   */
   changed: string[];
 }
 

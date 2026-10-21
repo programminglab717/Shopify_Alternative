@@ -63,6 +63,28 @@ export class DeliveryWeightInput {
 }
 
 @ObjectType({
+  description:
+    'What an order of at least `fromSubtotal` pays at most to deliver (CHK-04, ADR-721): the ' +
+    "largest value an order reaches caps its city's charge, before what its weight adds.",
+})
+export class DeliveryValueRate {
+  @Field(() => Money, { description: "The items' value, after discounts, from which it applies." })
+  fromSubtotal!: Money;
+
+  @Field(() => Money, { description: 'The most such an order pays to deliver; nothing for free.' })
+  charge!: Money;
+}
+
+@InputType()
+export class DeliveryValueRateInput {
+  @Field(() => String, { description: 'Decimal, more than nothing, e.g. "3,000".' })
+  fromSubtotal!: string;
+
+  @Field(() => String, { description: 'Decimal, nothing or more, e.g. "150".' })
+  charge!: string;
+}
+
+@ObjectType({
   description: 'What the shop charges to deliver an order, which checkout adds for its city.',
 })
 export class DeliverySettings {
@@ -101,6 +123,13 @@ export class DeliverySettings {
       "costs its charge more, the heaviest it passes alone, by its products' weights.",
   })
   weights!: DeliveryWeight[];
+
+  @Field(() => [DeliveryValueRate], {
+    description:
+      'What larger orders pay at most to deliver, the smallest first: an order reaching one pays ' +
+      'no more than its charge, the largest it reaches alone, before what its weight adds.',
+  })
+  valueRates!: DeliveryValueRate[];
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
@@ -166,6 +195,12 @@ export class DeliverySettingsUpdateInput {
     description: 'Replaces every weight, in any order; an empty list for none. Up to 10.',
   })
   weights?: DeliveryWeightInput[] | null;
+
+  @Field(() => [DeliveryValueRateInput], {
+    nullable: true,
+    description: 'Replaces every rate by value, in any order; an empty list for none. Up to 10.',
+  })
+  valueRates?: DeliveryValueRateInput[] | null;
 }
 
 @ObjectType()

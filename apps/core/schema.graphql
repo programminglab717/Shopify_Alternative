@@ -4137,6 +4137,11 @@ type DeliverySettings {
   updatedAt: DateTime
 
   """
+  What larger orders pay at most to deliver, the smallest first: an order reaching one pays no more than its charge, the largest it reaches alone, before what its weight adds.
+  """
+  valueRates: [DeliveryValueRate!]!
+
+  """
   What heavier orders cost more, the lightest first: an order weighing more than one costs its charge more, the heaviest it passes alone, by its products' weights.
   """
   weights: [DeliveryWeight!]!
@@ -4158,6 +4163,11 @@ input DeliverySettingsUpdateInput {
 
   """Decimal, e.g. "5,000"; null or blank for no free delivery."""
   freeAbove: String
+
+  """
+  Replaces every rate by value, in any order; an empty list for none. Up to 10.
+  """
+  valueRates: [DeliveryValueRateInput!]
 
   """Replaces every weight, in any order; an empty list for none. Up to 10."""
   weights: [DeliveryWeightInput!]
@@ -4203,6 +4213,25 @@ type DeliveryToRescue {
   """What the courier said of it: "Customer not available"."""
   reason: String
   trackingInfo: TrackingInfo!
+}
+
+"""
+What an order of at least `fromSubtotal` pays at most to deliver (CHK-04, ADR-721): the largest value an order reaches caps its city's charge, before what its weight adds.
+"""
+type DeliveryValueRate {
+  """The most such an order pays to deliver; nothing for free."""
+  charge: Money!
+
+  """The items' value, after discounts, from which it applies."""
+  fromSubtotal: Money!
+}
+
+input DeliveryValueRateInput {
+  """Decimal, nothing or more, e.g. "150"."""
+  charge: String!
+
+  """Decimal, more than nothing, e.g. "3,000"."""
+  fromSubtotal: String!
 }
 
 """

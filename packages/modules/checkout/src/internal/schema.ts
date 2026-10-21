@@ -137,6 +137,12 @@ export interface StoredZone {
   days?: { min: number; max: number } | null;
 }
 
+/** What an order of at least a subtotal pays at most to deliver, as kept: amounts as text. */
+export interface StoredValueRate {
+  fromSubtotal: string;
+  charge: string;
+}
+
 /** What an order over a weight costs more to deliver, as kept: its charge as text. */
 export interface StoredWeight {
   aboveGrams: number;
@@ -154,6 +160,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   zones: jsonb('zones').$type<StoredZone[]>().notNull().default([]),
   /** What heavier orders cost more (ADR-702), the lightest first. */
   weights: jsonb('weights').$type<StoredWeight[]>().notNull().default([]),
+  /** What larger orders pay at most (ADR-721), the smallest first. */
+  valueRates: jsonb('value_rates').$type<StoredValueRate[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -72,6 +72,7 @@ import {
 import {
   deliveryDays,
   expectedDeliveryOn,
+  valueRateCharge,
   type DeliveryDays,
   type DeliverySettingsRecord,
 } from './delivery.js';
@@ -1325,7 +1326,13 @@ function cartSummary(
         )
       }
     </table>
-    ${totals.total === null && paragraphs(chargesWords(delivery, cart.totalWeightGrams), 'small muted')}
+    ${
+      totals.total === null &&
+      paragraphs(
+        chargesWords(delivery, cart.totalWeightGrams, totals.subtotal - totals.discount),
+        'small muted',
+      )
+    }
     ${days && paragraphs(deliveryDaysWords(days), 'small muted')}
     ${expected && paragraphs(expectedByWords(expected), 'small')}
     ${
@@ -1363,10 +1370,10 @@ function expectedByWords(day: string): Sentence {
 }
 
 /**
- * What delivery costs where, for a shopper who has not typed their city yet; and what an order of
- * `grams` costs more for its weight (ADR-702).
+ * What delivery costs where, for a shopper who has not typed their city yet; what an order of
+ * `grams` costs more for its weight (ADR-702); and the most an order of `items` pays (ADR-721).
  */
-function chargesWords(delivery: DeliverySettingsRecord, grams: number): Sentence {
+function chargesWords(delivery: DeliverySettingsRecord, grams: number, items: bigint): Sentence {
   const zones = delivery.zones.map((zone) => {
     const cities = zone.cities.slice(0, 5).join(', ') + (zone.cities.length > 5 ? '…' : '');
     return { cities, charge: amount(zone.charge) };
@@ -1380,15 +1387,34 @@ function chargesWords(delivery: DeliverySettingsRecord, grams: number): Sentence
   const kg = heavier && `${heavier.aboveGrams / 1000} kg`;
   const more = heavier && amount(heavier.charge);
   const weightWords = heavier && html` ${ltr(kg!)} سے زیادہ وزن پر ${ltr(more!)} اضافی۔`;
+  // The most this order pays where its value reaches a rate.
+  const rate = valueRateCharge(delivery, items);
+  const most = rate !== null && rate > 0n ? amount(rate) : null;
+  const rateEn =
+    rate === null
+      ? ''
+      : most
+        ? ` This order pays at most ${most}.`
+        : heavier
+          ? ' This order pays for its weight alone.'
+          : ' This order is delivered free.';
+  const rateWords =
+    rate !== null &&
+    (most
+      ? html` اس آرڈر پر زیادہ سے زیادہ ${ltr(most)}۔`
+      : heavier
+        ? html` اس آرڈر پر صرف وزن کا خرچ ہے۔`
+        : html` اس آرڈر کی ڈیلیوری مفت ہے۔`);
   return {
     en:
       `Delivery is ${everywhere}` +
       zones.map((zone) => `; ${zone.charge} in ${zone.cities}`).join('') +
       '.' +
+      rateEn +
       (heavier ? ` Orders over ${kg} cost ${more} more.` : '') +
       (freeFrom ? ` Free on orders of ${freeFrom} or more.` : ''),
     // One line: a line break would put a space before each "؛" and "۔".
-    ur: html`ڈیلیوری ${ltr(everywhere)}${zoneWords}۔${weightWords}${freeWords}`,
+    ur: html`ڈیلیوری ${ltr(everywhere)}${zoneWords}۔${rateWords}${weightWords}${freeWords}`,
   };
 }
 

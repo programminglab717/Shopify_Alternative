@@ -7,6 +7,7 @@ import {
   checkDeliverySettings,
   deliveryCharge,
   highestDeliveryCharge,
+  valueRateCharge,
   weightCharge,
   deliveryCountsFrom,
   deliveryDays,
@@ -73,6 +74,77 @@ describe('Delivery charges', () => {
     expect(highestDeliveryCharge(heavy, 5_000_00n, 6_000)).toBe(0n);
     // Settings from before weights charge none.
     expect(weightCharge(SETTINGS, 90_000)).toBe(0n);
+  });
+
+  it("caps larger orders' charge at the rate of the largest value they reach (ADR-721)", () => {
+    const rated: DeliverySettingsRecord = {
+      ...SETTINGS,
+      valueRates: [
+        { fromSubtotal: 2_000_00n, charge: 180_00n },
+        { fromSubtotal: 3_000_00n, charge: 100_00n },
+      ],
+      weights: [{ aboveGrams: 2_000, charge: 50_00n }],
+    };
+    expect(
+      [1_999_99n, 2_000_00n, 2_999_99n, 3_000_00n].map((s) => valueRateCharge(rated, s)),
+    ).toEqual([null, 180_00n, 180_00n, 100_00n]);
+    // Below a rate, the city's charge; from it, the rate where it is less, the zone's where not.
+    expect(deliveryCharge(rated, 'Multan', 1_000_00n)).toBe(250_00n);
+    expect(deliveryCharge(rated, 'Multan', 2_000_00n)).toBe(180_00n);
+    expect(deliveryCharge(rated, 'Karachi', 2_000_00n)).toBe(150_00n);
+    expect(deliveryCharge(rated, 'Karachi', 3_000_00n)).toBe(100_00n);
+    // Its weight adds after; nothing from the free subtotal.
+    expect(deliveryCharge(rated, 'Multan', 3_000_00n, 3_000)).toBe(150_00n);
+    expect(deliveryCharge(rated, 'Multan', 5_000_00n, 3_000)).toBe(0n);
+    expect(highestDeliveryCharge(rated, 1_000_00n)).toBe(250_00n);
+    expect(highestDeliveryCharge(rated, 2_500_00n, 3_000)).toBe(230_00n);
+    // A rate of nothing: free but for the weight.
+    const free = { ...rated, valueRates: [{ fromSubtotal: 2_000_00n, charge: 0n }] };
+    expect(deliveryCharge(free, 'Multan', 2_000_00n, 3_000)).toBe(50_00n);
+    // Settings from before rates cap nothing.
+    expect(valueRateCharge(SETTINGS, 9_000_00n)).toBeNull();
+  });
+
+  it('takes rates by value in rupees, kept the smallest first, each value once (ADR-721)', () => {
+    expect(
+      checked({
+        valueRates: [
+          { fromSubtotal: '3,000', charge: '100' },
+          { fromSubtotal: '2000', charge: '0' },
+        ],
+      }),
+    ).toMatchObject({
+      valueRates: [
+        { fromSubtotal: 2_000_00n, charge: 0n },
+        { fromSubtotal: 3_000_00n, charge: 100_00n },
+      ],
+    });
+    const rated = { ...SETTINGS, valueRates: [{ fromSubtotal: 2_000_00n, charge: 100_00n }] };
+    expect(checked({ charge: '200' }, rated)).toMatchObject({ valueRates: rated.valueRates });
+    expect(checked({ valueRates: null }, rated)).toMatchObject({ valueRates: [] });
+    expect(
+      checked({
+        valueRates: [
+          { fromSubtotal: '0', charge: '100' },
+          { fromSubtotal: '2000', charge: '' },
+          { fromSubtotal: '2,000', charge: '50' },
+          { fromSubtotal: 'lots', charge: '-5' },
+        ],
+      }),
+    ).toEqual([
+      ['valueRates.0.fromSubtotal', 'A rate must start above Rs 0'],
+      ['valueRates.1.charge', "Charge can't be blank"],
+      ['valueRates.2.fromSubtotal', 'This value has a rate already'],
+      [
+        'valueRates.3.fromSubtotal',
+        'From subtotal must be an amount of zero or more, like 2499 or 2499.50',
+      ],
+      ['valueRates.3.charge', 'Charge must be an amount of zero or more, like 2499 or 2499.50'],
+    ]);
+    const many = Array.from({ length: 11 }, (_, i) => ({ fromSubtotal: `${i + 1}`, charge: '10' }));
+    expect(checked({ valueRates: many })).toEqual([
+      ['valueRates', "A shop sets at most 10 rates by the order's value"],
+    ]);
   });
 
   it('takes weights in grams with charges in rupees, kept the lightest first (ADR-702)', () => {
@@ -164,6 +236,7 @@ describe('Delivery charges', () => {
       ],
       cutoffHour: null,
       weights: [],
+      valueRates: [],
     });
     // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
@@ -173,6 +246,7 @@ describe('Delivery charges', () => {
       zones: SETTINGS.zones,
       cutoffHour: null,
       weights: [],
+      valueRates: [],
     });
     expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
     expect(
@@ -326,6 +400,38 @@ describe.skipIf(!server)('DeliveryService', () => {
       (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
     ).toEqual([['weights'], ['charge'], ['weights']]);
     expect(await f.delivery.get(f.b)).toEqual(NO_DELIVERY_SETTINGS);
+  });
+
+  it('keeps what larger orders pay at most, recording a change of them (ADR-721)', async () => {
+    expect((await f.delivery.get(f.a)).valueRates).toEqual([]);
+    const rates = [
+      { fromSubtotal: 2_000_00n, charge: 150_00n },
+      { fromSubtotal: 4_000_00n, charge: 0n },
+    ];
+    const saved = unwrap(
+      await f.delivery.update(f.a, {
+        valueRates: [
+          { fromSubtotal: '4000', charge: '0' },
+          { fromSubtotal: '2000', charge: '150' },
+        ],
+      }),
+    );
+    expect(saved.valueRates).toEqual(rates);
+    expect((await f.delivery.get(f.a)).valueRates).toEqual(rates);
+    // The same again changes nothing; none with an empty list.
+    unwrap(
+      await f.delivery.update(f.a, {
+        valueRates: [
+          { fromSubtotal: '2,000', charge: '150' },
+          { fromSubtotal: '4,000', charge: '0' },
+        ],
+      }),
+    );
+    unwrap(await f.delivery.update(f.a, { valueRates: [] }));
+    expect((await f.delivery.get(f.a)).valueRates).toEqual([]);
+    expect(
+      (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([['valueRates'], ['valueRates']]);
   });
 
   it("keeps the shop's cut-off hour, from which orders count from the next day (ADR-597)", async () => {

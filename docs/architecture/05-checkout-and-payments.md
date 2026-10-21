@@ -195,7 +195,8 @@ everywhere, by zones of cities, more for orders over a weight
 [ADR-703](./13-decision-log.md#adr-703--the-admins-delivery-settings-take-heavier-orders-charges-weights-typed-in-kilograms-sent-in-grams-each-with-what-it-costs-more-added-and-removed-as-zones-are), and said on Hatti Base's product and cart pages,
 [ADR-704](./13-decision-log.md#adr-704--hatti-base-says-what-heavier-orders-cost-more-each-weight-on-product-pages-and-the-heaviest-a-cart-passes-on-the-cart-page-from-the-weights-in-the-shops-document)), and nothing from a subtotal
 ([ADR-043](./13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)), which the storefront shows on product and cart
-pages, and checkout adds to the order for the address's city
+pages, no more for a larger order than the rate its value reaches
+([ADR-721](./13-decision-log.md#adr-721--larger-orders-pay-at-most-a-rate-the-shop-sets-by-the-orders-value-the-largest-value-an-order-reaches-caps-its-citys-charge-before-what-its-weight-adds)), and checkout adds to the order for the address's city
 ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)), and how many working days delivery takes,
 everywhere and in each zone, which the cart and product pages say wherever it goes and checkout
 says for the city ([ADR-235](./13-decision-log.md#adr-235--a-shop-may-say-how-many-working-days-delivery-takes-everywhere-and-in-each-of-its-delivery-zones-the-cart-and-product-pages-say-it-wherever-delivery-goes-from-the-fewest-days-anywhere-to-the-most-and-checkout-says-it-for-the-shoppers-city)). Step 6 in part: the shop's fee for cash on delivery

@@ -458,6 +458,41 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(stale.problem).toEqual({ kind: 'changed' });
   });
 
+  it('places a larger order for no more than the rate its value reaches (ADR-721)', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '250',
+        zones: [{ name: 'Karachi', cities: ['Karachi'], charge: '150' }],
+        valueRates: [{ fromSubtotal: '5,000', charge: '100' }],
+      }),
+    );
+    const [suit] = await f.variantsOf(f.a, 'Lawn suit', { price: '3,000' });
+    await f.stock(f.a, suit!, 10);
+    const one = await started(
+      await act(f.a, null, 'add', { items: [{ variantId: suit, quantity: 1 }] }),
+    );
+    // Below the rate, the city's charge, and nothing said of a rate.
+    expect(checkoutPage(one.view).html).not.toContain('This order pays at most');
+    const two = await started(
+      await act(f.a, null, 'add', { items: [{ variantId: suit, quantity: 2 }] }),
+    );
+    // Before a city, the page says what such an order pays at most.
+    expect(checkoutPage(two.view).html).toContain('This order pays at most Rs 100.');
+    const order = placedOrder(await f.checkouts.place(two.secret, two.view.shown, FORM));
+    expect(order).toMatchObject({ subtotal: 6_000_00n, shipping: 100_00n, total: 6_100_00n });
+    const cheap = placedOrder(await f.checkouts.place(one.secret, one.view.shown, FORM));
+    // Karachi's own charge, for an order below the rate.
+    expect(cheap).toMatchObject({ shipping: 150_00n });
+
+    // The rates then are part of what the page showed.
+    const next = await started(
+      await act(f.a, null, 'add', { items: [{ variantId: suit, quantity: 2 }] }),
+    );
+    unwrap(await f.delivery.update(f.a, { valueRates: [{ fromSubtotal: '5,000', charge: '50' }] }));
+    const stale = open(await f.checkouts.place(next.secret, next.view.shown, FORM));
+    expect(stale.problem).toEqual({ kind: 'changed' });
+  });
+
   it('asks once for more of an address a rider could not find, and places it as it is when posted again (ADR-682)', async () => {
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
