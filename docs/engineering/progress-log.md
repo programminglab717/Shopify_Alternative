@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The map on customers' links
+
+* **Customers' links offer the same map where they fill in or correct the delivery address**
+  ([ADR-720](../architecture/13-decision-log.md#adr-720--customers-links-offer-the-same-map-to-move-the-pin-on-where-they-fill-in-or-correct-the-delivery-address-from-the-platforms-tiles)), from the platform's tiles.
+* 3997 tests, as before: the order link's address test checks the map too.
+
 ### d707d9c · A map to move the pin on
 
 * **Checkout offers a map to move the address's pin on, once the platform has map tiles**

@@ -5,7 +5,7 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { draftLinkPage, orderLinkPage } from './link-pages.js';
 import type { AddressForm } from './links.js';
-import { LOCATION_SCRIPT } from './location.js';
+import { LOCATION_SCRIPT, MAP_SCRIPT, MapTiles } from './location.js';
 import type { OrderLinkView } from './order-link.service.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -483,6 +483,14 @@ describe.skipIf(!server)('Order links', () => {
     expect(form.html).toContain('<input type="hidden" name="latitude" value="31.510000" />');
     expect(form.html).toContain(`<script>${LOCATION_SCRIPT}</script>`);
     expect(form.contentSecurityPolicy).toMatch(/; script-src 'sha256-[^']+'; style-src /);
+    // Where the platform has map tiles, a map to move it on too, opening on the pin (ADR-720).
+    const tiles = new MapTiles('https://tiles.example.com/{z}/{x}/{y}.png', '© Tiles');
+    const mapped = orderLinkPage(view, { form: 'address', map: tiles });
+    expect(mapped.html).toContain(`<script>${MAP_SCRIPT}</script>`);
+    expect(mapped.html).toMatch(/data-latitude="31.510000"\s+data-longitude="74.343500"/);
+    expect(mapped.contentSecurityPolicy).toContain('img-src https://tiles.example.com/');
+    // Not on the order's page itself.
+    expect(orderLinkPage(view, { map: tiles }).html).not.toContain('data-tiles');
 
     // A pin is part of what the customer confirms: the page they saw before it changed is stale.
     const before = view.shown;

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-719 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-720 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -727,6 +727,7 @@
 | 717 | Checkout asks once for a landmark or the pin where the shop's couriers lately could not find houses, the area learned from its own parcels' failed deliveries | Accepted |
 | 718 | Checkout pins the address from a Google Maps link or coordinates the shopper pastes, its short links followed on Google's own hosts, where they are not at the address | Accepted |
 | 719 | Checkout offers a map to move the address's pin on, drawn by the page's own script from the map tiles the platform is configured with, and none without them | Accepted |
+| 720 | Customers' links offer the same map to move the pin on where they fill in or correct the delivery address, from the platform's tiles | Accepted |
 
 ---
 
@@ -24607,3 +24608,18 @@
     a page that is otherwise a few kilobytes. The map needs only to pan and zoom under a pin.
   * **OpenStreetMap's public tiles:** their policy forbids an app's heavy use.
   * **Google's Maps JavaScript API:** a key, a library from Google, and a price for each load.
+
+## ADR-720 · Customers' links offer the same map to move the pin on where they fill in or correct the delivery address, from the platform's tiles
+
+* **Context:** Customers fill in or correct their delivery address through a draft's or an
+  order's link, whose form has the same pin field as checkout's
+  ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)). Checkout now offers a map to move the pin on where the platform has map
+  tiles ([ADR-719](#adr-719--checkout-offers-a-map-to-move-the-addresss-pin-on-drawn-by-the-pages-own-script-from-the-map-tiles-the-platform-is-configured-with-and-none-without-them)). A customer correcting an address from the confirmation message is
+  often not at the address either.
+* **Decision:** **The links' address forms offer the map** where the platform has tiles. The
+  controllers of the draft and order links are given the same `MapTiles` the checkout is, and the
+  address page adds the map's script and the tiles' source to its policy. The order's or
+  draft's own page, which shows the pin as a link to Google Maps, draws no map.
+* **Consequences:** Every form that asks for a delivery address has the map once the operator sets
+  the tiles. Nothing else changes: the pin is checked as before, and a page without tiles is as it
+  was.

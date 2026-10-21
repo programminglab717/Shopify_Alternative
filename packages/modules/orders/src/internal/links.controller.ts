@@ -5,7 +5,9 @@ import {
   Get,
   Header,
   HttpCode,
+  Inject,
   NotFoundException,
+  Optional,
   Param,
   Post,
   Query,
@@ -16,6 +18,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, trackingPage, type LinkPage } from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm, type LinkClient } from './links.js';
+import { MapTiles } from './location.js';
 import { OrderLinkService, type OrderLinkView, type ReviewForm } from './order-link.service.js';
 import type { ReturnRequestForm } from './return-request.service.js';
 import { OrderTrackingService } from './tracking.service.js';
@@ -48,7 +51,11 @@ const PRIVATE_PAGE_HEADERS = {
  */
 @Controller(DRAFT_LINK_PATH)
 export class DraftLinkController {
-  constructor(private readonly drafts: DraftOrderService) {}
+  constructor(
+    private readonly drafts: DraftOrderService,
+    /** The tiles of a map to move the address's pin on (ADR-720); without them, no map. */
+    @Optional() @Inject(MapTiles) private readonly map?: MapTiles | null,
+  ) {}
 
   @Get(':token')
   async show(
@@ -67,7 +74,12 @@ export class DraftLinkController {
     }
     await send(
       reply,
-      draftLinkPage(view, { form, saved: saved !== undefined, sent: sent !== undefined }),
+      draftLinkPage(view, {
+        form,
+        saved: saved !== undefined,
+        sent: sent !== undefined,
+        map: this.map,
+      }),
     );
   }
 
@@ -96,7 +108,7 @@ export class DraftLinkController {
       if ((view.kind === 'open' || view.kind === 'completed') && !view.problem) {
         return seeOther(reply, `${pageOf(view)}?saved`);
       }
-      await send(reply, draftLinkPage(view, { form: 'address' }));
+      await send(reply, draftLinkPage(view, { form: 'address', map: this.map }));
     } else if (action === 'receipt') {
       const view = await this.drafts.sendReceipt(token, receiptOf(body));
       if (view.kind === 'completed' && !view.problem) {
@@ -122,7 +134,11 @@ export class DraftLinkController {
  */
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
-  constructor(private readonly links: OrderLinkService) {}
+  constructor(
+    private readonly links: OrderLinkService,
+    /** The tiles of a map to move the address's pin on (ADR-720); without them, no map. */
+    @Optional() @Inject(MapTiles) private readonly map?: MapTiles | null,
+  ) {}
 
   @Get(':token')
   async show(
@@ -149,6 +165,7 @@ export class OrderLinkController {
         reviewed: reviewed !== undefined,
         added: added !== undefined,
         asked: asked !== undefined,
+        map: this.map,
       }),
     );
   }
@@ -246,7 +263,10 @@ export class OrderLinkController {
       }[action as string];
       return seeOther(reply, done ? `${token}?${done}` : token);
     }
-    await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
+    await send(
+      reply,
+      orderLinkPage(view, { form: action === 'address' ? action : undefined, map: this.map }),
+    );
   }
 }
 

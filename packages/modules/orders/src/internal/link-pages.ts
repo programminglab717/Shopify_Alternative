@@ -23,7 +23,14 @@ import {
 import { shownLineProperties } from './documents.js';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
-import { LOCATION_SCRIPT, locationField, locationFormOf, pinLine } from './location.js';
+import {
+  LOCATION_SCRIPT,
+  MAP_SCRIPT,
+  locationField,
+  locationFormOf,
+  pinLine,
+  type MapTiles,
+} from './location.js';
 import {
   gatewayForm,
   gatewayOrigins,
@@ -190,6 +197,8 @@ export interface LinkPageOptions {
   added?: boolean;
   /** The return they asked for was taken just now (ADR-675). */
   asked?: boolean;
+  /** The tiles of a map to move the address's pin on (ADR-720); none for no map. */
+  map?: MapTiles | null;
 }
 
 /**
@@ -215,6 +224,7 @@ export function draftLinkPage(view: DraftLinkView, options: LinkPageOptions = {}
           shown,
           digest: view.shown,
           problem,
+          map: options.map,
         });
       }
       return confirmPage({
@@ -318,6 +328,7 @@ function orderAddressPage(
     shown: shownOfOrder(order),
     digest: view.shown,
     problem,
+    map: options.map,
   });
 }
 
@@ -519,8 +530,10 @@ function addressPage(options: {
   shown: ShownOrder;
   digest: string;
   problem: LinkProblem | null;
+  /** The tiles of a map to move the pin on (ADR-720); none for no map. */
+  map?: MapTiles | null;
 }): LinkPage {
-  const { shop, problem, digest } = options;
+  const { shop, problem, digest, map } = options;
   const typed = problem?.kind === 'address' ? problem : null;
   const form = typed?.form ?? formOf(options.address);
   const errors = typed?.errors ?? [];
@@ -564,12 +577,15 @@ function addressPage(options: {
         })}
         ${provinceField(form.province, errors)}
         ${textField('zip', LABELS.zip, form, errors, { autocomplete: 'postal-code', kind: 'digits' })}
-        ${phoneField(options.phone, form, errors)} ${locationField(form, errors, form.city)}
+        ${phoneField(options.phone, form, errors)} ${locationField(form, errors, form.city, map)}
         <button class="button stack" type="submit">${say('bilingual', LABELS.saveAddress)}</button>
       </form>`,
       html`<p class="center"><a href="?">${say('bilingual', LABELS.backToOrder)}</a></p>`,
     ],
-    { scripts: [LOCATION_SCRIPT] },
+    // The map's script and its tiles' source where there is one (ADR-720).
+    map
+      ? { scripts: [LOCATION_SCRIPT, MAP_SCRIPT], images: [map.source] }
+      : { scripts: [LOCATION_SCRIPT] },
   );
 }
 
@@ -1181,7 +1197,11 @@ function page(
   title: string,
   shop: LinkShop | null,
   body: HtmlValue[],
-  options: { formTargets?: readonly string[]; scripts?: readonly string[] } = {},
+  options: {
+    formTargets?: readonly string[];
+    scripts?: readonly string[];
+    images?: readonly string[];
+  } = {},
 ): LinkPage {
   return {
     status,
@@ -1189,7 +1209,7 @@ function page(
       title,
       body: html`${body}`,
       accent: shop?.accent,
-      images: shop?.logo ? [shop.logo] : [],
+      images: [...(shop?.logo ? [shop.logo] : []), ...(options.images ?? [])],
       formTargets: options.formTargets ?? [],
       scripts: options.scripts ?? [],
     }),
