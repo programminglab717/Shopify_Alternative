@@ -3,6 +3,7 @@ import {
   bundleSellable,
   bundlesOfVariantsIn,
   personalisationIn,
+  type PersonalisationField,
 } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, runPrepared, type Tx } from '@hatti/db';
@@ -77,7 +78,7 @@ export class CartService {
         shopId,
         found.lines.map((line) => line.variantId),
       );
-      return withDiscount(tx, shopId, cartJson(found, facts), found.discountCodes);
+      return withDiscount(tx, shopId, await priced(tx, shopId, found, facts), found.discountCodes);
     });
   }
 
@@ -98,27 +99,23 @@ export class CartService {
       ]);
       const applied = applyAction(current, action, facts);
       if ('code' in applied) return { ok: false, error: applied };
-      // What products made to order ask for, answered as their pages ask (ADR-691).
+      // What products made to order ask for, answered as their pages ask (ADR-691), and what
+      // the answers add to the lines' prices (ADR-697).
       const answers = answersOf(current, action, facts);
-      if (answers.length > 0) {
-        const asked = await personalisationIn(tx, shopId, [
-          ...new Set(answers.flatMap((answer) => facts.get(answer.variantId)?.productId ?? [])),
-        ]);
-        for (const answer of answers) {
-          const fact = facts.get(answer.variantId);
-          const fields = fact && asked.get(fact.productId);
-          const problem =
-            fields &&
-            personalisationProblem(answer.variantId, fact.title, fields, answer.properties);
-          if (problem) return { ok: false, error: problem };
-        }
+      const asked = await askedOf(tx, shopId, facts, [...applied.lines, ...answers]);
+      for (const answer of answers) {
+        const fact = facts.get(answer.variantId);
+        const fields = fact && asked.get(fact.productId);
+        const problem =
+          fields && personalisationProblem(answer.variantId, fact.title, fields, answer.properties);
+        if (problem) return { ok: false, error: problem };
       }
       const { added, ...content } = applied;
       const discountCodes =
         action.kind === 'update' && action.discountCodes !== null
           ? action.discountCodes
           : (found?.discountCodes ?? []);
-      const cart = await withDiscount(tx, shopId, cartJson(content, facts), discountCodes);
+      const cart = await withDiscount(tx, shopId, cartJson(content, facts, asked), discountCodes);
       const expiresAt = sql`now() + ${`${CART_DAYS} days`}::interval`;
       if (found) {
         await tx
@@ -169,7 +166,7 @@ export class CartService {
       shopId,
       cart.lines.map((line) => line.variantId),
     );
-    return withDiscount(tx, shopId, cartJson(cart, facts), cart.discountCodes);
+    return withDiscount(tx, shopId, await priced(tx, shopId, cart, facts), cart.discountCodes);
   }
 
   /**
@@ -280,6 +277,28 @@ export class CartService {
       ]),
     );
   }
+}
+
+/** The personalisation fields of the products of `lines`, those `facts` knows (ADR-689). */
+function askedOf(
+  tx: Tx,
+  shopId: string,
+  facts: ReadonlyMap<string, VariantFacts>,
+  lines: readonly { variantId: string }[],
+): Promise<Map<string, PersonalisationField[]>> {
+  return personalisationIn(tx, shopId, [
+    ...new Set(lines.flatMap((line) => facts.get(line.variantId)?.productId ?? [])),
+  ]);
+}
+
+/** `cart` as the storefront shows it, its lines priced with what their answers add (ADR-697). */
+async function priced(
+  tx: Tx,
+  shopId: string,
+  cart: CartContent,
+  facts: ReadonlyMap<string, VariantFacts>,
+): Promise<CartJson> {
+  return cartJson(cart, facts, await askedOf(tx, shopId, facts, cart.lines));
 }
 
 /**

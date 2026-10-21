@@ -1503,13 +1503,20 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(
       await personalisation.set(tenant, kurta.id, [
         { name: 'Name', kind: 'text', required: true, maxLength: 12 },
-        { name: 'Thread', kind: 'choice', choices: ['Gold', 'Silver'] },
+        { name: 'Thread', kind: 'choice', choices: ['Gold', 'Silver'], price: '500' },
       ]),
     );
     expect(await deliver()).toEqual(['product_personalisation.updated']);
+    // What an answer adds to the price goes with its field, where it adds anything (ADR-697).
     expect((await store().productByHandle(kurta.handle))?.personalisation).toEqual([
       { name: 'Name', kind: 'text', required: true, maxLength: 12 },
-      { name: 'Thread', kind: 'choice', required: false, choices: ['Gold', 'Silver'] },
+      {
+        name: 'Thread',
+        kind: 'choice',
+        required: false,
+        choices: ['Gold', 'Silver'],
+        price: 500_00,
+      },
     ]);
     unwrap(await personalisation.set(tenant, kurta.id, []));
     await deliver();

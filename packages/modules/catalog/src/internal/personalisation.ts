@@ -1,5 +1,6 @@
 import { InputChecker, failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
+import type { CurrencyCode } from '@hatti/money';
 import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -7,6 +8,7 @@ import { sql } from 'drizzle-orm';
 // A product's personalisation fields (CAT-15, ADR-689): what its page asks the shopper for when it
 // is made to order, the name to embroider or a choice of thread. Each answer goes with the cart
 // line as one of its properties, named as the field is, which the order's line keeps (ADR-687).
+// A field may add to the line's price when it is answered, as embroidery costs (ADR-697).
 
 /** Events of a product's personalisation fields. Payloads are thin. */
 export const PersonalisationEvents = {
@@ -43,6 +45,8 @@ export interface PersonalisationField {
   maxLength: number | null;
   /** What a choice offers, in order; none for a text field. */
   choices: string[];
+  /** What an answer adds to the price of each unit, in minor units; 0 for nothing (ADR-697). */
+  price: number;
 }
 
 /** A field as the shop gives it. */
@@ -52,12 +56,15 @@ export interface PersonalisationFieldInput {
   required?: boolean | null;
   maxLength?: number | null;
   choices?: readonly string[] | null;
+  /** What an answer adds to each unit's price, in major units, as "500"; nothing unless given. */
+  price?: string | null;
 }
 
 /** The fields checked: each named once, not as apps' properties are, with what its kind takes. */
 function checkFields(
   check: InputChecker,
   given: readonly PersonalisationFieldInput[],
+  currency: CurrencyCode,
 ): PersonalisationField[] {
   if (given.length > PERSONALISATION_LIMITS.fields) {
     check.addMessage(
@@ -85,6 +92,7 @@ function checkFields(
       check.add([...field, 'kind'], 'INVALID', 'must be text or choice');
     }
     const required = input.required === true;
+    const price = Number(check.price([...field, 'price'], input.price, currency) ?? 0n);
     if (input.kind === 'choice') {
       const choices: string[] = [];
       const seen = new Set<string>();
@@ -113,14 +121,14 @@ function checkFields(
           `A choice offers ${PERSONALISATION_LIMITS.choices} at most`,
         );
       }
-      return { name, kind: 'choice', required, maxLength: null, choices };
+      return { name, kind: 'choice', required, maxLength: null, choices, price };
     }
     const maxLength =
       check.integer([...field, 'maxLength'], input.maxLength, {
         min: 1,
         max: PERSONALISATION_LIMITS.maxLength,
       }) ?? PERSONALISATION_LIMITS.defaultMaxLength;
-    return { name, kind: 'text', required, maxLength, choices: [] };
+    return { name, kind: 'text', required, maxLength, choices: [], price };
   });
 }
 
@@ -134,6 +142,7 @@ function sameFields(a: readonly PersonalisationField[], b: readonly Personalisat
         field.required,
         field.maxLength,
         field.choices,
+        field.price,
       ]),
     );
   return canonical(a) === canonical(b);
@@ -152,9 +161,32 @@ export async function personalisationIn(
   const { rows } = await tx.execute<{ product_id: string; fields: PersonalisationField[] }>(sql`
     SELECT product_id, fields FROM catalog.product_personalisation
      WHERE shop_id = ${shopId} AND product_id = ANY(${sql.param([...productIds])}::uuid[])`);
+  // Fields kept before a field could add to the price add nothing.
   return new Map(
-    rows.filter((row) => row.fields.length > 0).map((row) => [row.product_id, row.fields]),
+    rows
+      .filter((row) => row.fields.length > 0)
+      .map((row) => [
+        row.product_id,
+        row.fields.map((field) => ({ ...field, price: field.price ?? 0 })),
+      ]),
   );
+}
+
+/**
+ * What the answers in `properties` add to each unit's price, in minor units, for the `fields` its
+ * product asks for (ADR-697): each field answered, not blank, adds its price.
+ */
+export function personalisationPrice(
+  fields: readonly PersonalisationField[],
+  properties: Readonly<Record<string, string>>,
+): bigint {
+  let added = 0n;
+  for (const field of fields) {
+    if (field.price > 0 && (properties[field.name] ?? '').trim() !== '') {
+      added += BigInt(field.price);
+    }
+  }
+  return added;
 }
 
 /** What a shop asks shoppers for on the products it makes to order (CAT-15, ADR-689). */
@@ -180,7 +212,7 @@ export class PersonalisationService {
     fields: readonly PersonalisationFieldInput[],
   ): Promise<MutationResult<PersonalisationField[]>> {
     const check = new InputChecker();
-    const kept = checkFields(check, fields);
+    const kept = checkFields(check, fields, tenant.currency);
     if (!check.ok) return { ok: false, errors: check.errors };
     return this.db.tenant(tenant.shopId, async (tx) => {
       const shopId = tenant.shopId;

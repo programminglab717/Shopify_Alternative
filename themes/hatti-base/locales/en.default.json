@@ -62,7 +62,8 @@
       },
       "personalisation": {
         "optional": "(optional)",
-        "choose": "Choose"
+        "choose": "Choose",
+        "adds": "(+{{ price }})"
       },
       "size_chart": {
         "title": "Size chart",

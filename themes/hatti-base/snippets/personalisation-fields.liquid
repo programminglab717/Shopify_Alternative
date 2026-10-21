@@ -1,13 +1,16 @@
 {%- comment -%}
   What a product made to order asks the shopper for (ADR-689): each answer goes with the cart line
   as a property named as its field is, which the order's line keeps. A required field is asked for
-  before the drawer adds to the cart.
+  before the drawer adds to the cart. One that costs says what it adds to the price (ADR-697).
 {%- endcomment -%}
 {%- for field in fields -%}
   <label class="product__personalisation">
     <span>
       {{- field.name | escape -}}
       {%- unless field.required %} {{ 'products.product.personalisation.optional' | t }}{% endunless -%}
+      {%- if field.price > 0 -%}
+        {%- assign adds = field.price | money %} {{ 'products.product.personalisation.adds' | t: price: adds -}}
+      {%- endif -%}
     </span>
     {%- if field.type == 'choice' -%}
       <select name="{{ field.input_name | escape }}" {% if field.required %}required{% endif %}>

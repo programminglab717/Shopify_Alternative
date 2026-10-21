@@ -394,6 +394,8 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
       required: field.required,
       max_length: field.maxLength ?? null,
       choices: field.choices ?? [],
+      // What an answer adds to each unit's price, in minor units for `money` (ADR-697); 0 for none.
+      price: field.price ?? 0,
       input_name: `properties[${field.name}]`,
     })),
     // What it holds, where it is a bundle (ADR-411): each part's title, variant, how many one set

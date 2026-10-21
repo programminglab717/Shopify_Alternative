@@ -225,6 +225,7 @@ export {
   PersonalisationEvents,
   PersonalisationService,
   personalisationIn,
+  personalisationPrice,
   type PersonalisationField,
   type PersonalisationFieldInput,
   type PersonalisationKindValue,

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### What a personalisation field adds to the price
+
+* **A personalisation field may add to each unit's price when it is answered, as embroidery
+  costs: the cart prices its line with it, so the order keeps it, and the page says it**
+  ([ADR-697](../architecture/13-decision-log.md#adr-697--a-personalisation-field-may-add-to-each-units-price-when-it-is-answered-as-embroidery-costs-the-cart-prices-its-line-with-it-so-the-order-keeps-it-and-the-page-says-it)): CAT-15's fields that cost.
+* 3942 tests, two more: checkout's.
+
 ### f2c1793 · A theme's versions and publishing time in the admin
 
 * **The admin's themes tab shows each theme's versions to take it back to, and publishes a

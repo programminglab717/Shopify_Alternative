@@ -1,6 +1,7 @@
 import {
   CurrentTenant,
   Loaders,
+  Money,
   RequestLoaders,
   RequireScopes,
   UserError,
@@ -8,6 +9,7 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { tryFromPublicId } from '@hatti/ids';
+import { money } from '@hatti/money';
 import { Args, ID, Mutation, Parent, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   PersonalisationService,
@@ -23,10 +25,11 @@ import {
 } from './personalisation.types.js';
 import { Product } from './product.types.js';
 
-const toField = (value: FieldValue): PersonalisationField =>
+const toField = (value: FieldValue, tenant: TenantContext): PersonalisationField =>
   Object.assign(new PersonalisationField(), {
     ...value,
     kind: value.kind === 'choice' ? PersonalisationFieldKind.CHOICE : PersonalisationFieldKind.TEXT,
+    price: value.price > 0 ? Money.from(money(BigInt(value.price), tenant.currency)) : null,
   });
 
 /**
@@ -51,7 +54,9 @@ export class PersonalisationResolver {
     const loader = loaders.get<string, FieldValue[]>('catalog.personalisation', (ids) =>
       this.service.of(tenant, ids),
     );
-    return ((await loader.load(uuidOf('product', product.id))) ?? []).map(toField);
+    return ((await loader.load(uuidOf('product', product.id))) ?? []).map((field) =>
+      toField(field, tenant),
+    );
   }
 
   @Mutation(() => ProductPersonalisationSetPayload, {
@@ -78,7 +83,7 @@ export class PersonalisationResolver {
         )
       : failOne<FieldValue[]>(['productId'], 'NOT_FOUND', 'Product not found');
     return Object.assign(new ProductPersonalisationSetPayload(), {
-      personalisationFields: result.ok ? result.value.map(toField) : null,
+      personalisationFields: result.ok ? result.value.map((field) => toField(field, tenant)) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

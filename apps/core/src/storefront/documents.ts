@@ -202,16 +202,18 @@ export function productDoc(
     ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
     ...(sizeChart && { sizeChart }),
     ...(personalisation.length > 0 && {
-      personalisation: personalisation.map((field) =>
-        field.kind === 'choice'
+      personalisation: personalisation.map((field) => ({
+        ...(field.kind === 'choice'
           ? { name: field.name, kind: field.kind, required: field.required, choices: field.choices }
           : {
               name: field.name,
               kind: field.kind,
               required: field.required,
               maxLength: field.maxLength ?? undefined,
-            },
-      ),
+            }),
+        // What an answer adds to the price, said beside the field (ADR-697).
+        ...(field.price > 0 && { price: field.price }),
+      })),
     }),
     ...(bundle && { bundle }),
     ...(related && related.length > 0 && { related: [...related] }),

@@ -125,6 +125,8 @@ export interface PersonalisationDoc {
   maxLength?: number;
   /** What a choice offers, in order; absent for text. */
   choices?: string[];
+  /** What an answer adds to each unit's price, in minor units (ADR-697); absent for nothing. */
+  price?: number;
 }
 
 export interface SizeChartDoc {

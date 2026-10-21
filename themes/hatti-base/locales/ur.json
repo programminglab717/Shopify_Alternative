@@ -62,7 +62,8 @@
       },
       "personalisation": {
         "optional": "(اختیاری)",
-        "choose": "منتخب کریں"
+        "choose": "منتخب کریں",
+        "adds": "({{ price }} اضافی)"
       },
       "size_chart": {
         "title": "سائز چارٹ",

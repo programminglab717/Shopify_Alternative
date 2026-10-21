@@ -17,7 +17,7 @@ type Json = any;
 
 const SET = `mutation ($productId: ID!, $fields: [PersonalisationFieldInput!]!) {
   productPersonalisationSet(productId: $productId, fields: $fields) {
-    personalisationFields { name kind required maxLength choices }
+    personalisationFields { name kind required maxLength choices price { amount currencyCode } }
     userErrors { field code }
   }
 }`;
@@ -95,21 +95,39 @@ describe.skipIf(!server)('Admin GraphQL API: personalisation fields (CAT-15, ADR
         productId: kurta,
         fields: [
           { name: 'Name to embroider', kind: 'TEXT', required: true, maxLength: 12 },
-          { name: 'Thread', kind: 'CHOICE', choices: ['Gold', 'Silver'] },
+          { name: 'Thread', kind: 'CHOICE', choices: ['Gold', 'Silver'], price: '250.50' },
         ],
       }),
     ).toEqual({
       personalisationFields: [
-        { name: 'Name to embroider', kind: 'TEXT', required: true, maxLength: 12, choices: [] },
+        {
+          name: 'Name to embroider',
+          kind: 'TEXT',
+          required: true,
+          maxLength: 12,
+          choices: [],
+          price: null,
+        },
         {
           name: 'Thread',
           kind: 'CHOICE',
           required: false,
           maxLength: null,
           choices: ['Gold', 'Silver'],
+          // What an answer adds to each unit's price (ADR-697).
+          price: { amount: '250.50', currencyCode: 'PKR' },
         },
       ],
       userErrors: [],
+    });
+    expect(
+      await data(tokens.write, SET, {
+        productId: kurta,
+        fields: [{ name: 'Name', kind: 'TEXT', price: 'free' }],
+      }),
+    ).toEqual({
+      personalisationFields: null,
+      userErrors: [{ field: ['fields', '0', 'price'], code: 'INVALID' }],
     });
     const read = await data(
       tokens.read,

@@ -1671,6 +1671,7 @@ describe('Storefront rendering', () => {
           kind: 'choice' as const,
           required: false,
           choices: ['Gold', 'Silver'],
+          price: 500_00,
         },
       ],
     };
@@ -1683,13 +1684,14 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain('<span>Name to embroider</span>');
     // Its name escaped where it names the property, and said to be optional.
     expect(page.html).toContain('<select name="properties[Thread &#34;colour&#34;]" >');
-    expect(page.html).toContain('<span>Thread &#34;colour&#34; (optional)</span>');
+    // What it adds to the price is said beside it (ADR-697).
+    expect(page.html).toContain('<span>Thread &#34;colour&#34; (optional) (+Rs 500)</span>');
     expect(page.html).toContain('<option value="Silver">Silver</option>');
     const urdu = await renderer.render(
       { path: `/products/${named.handle}`, locale: 'ur' },
       shop.fresh(),
     );
-    expect(urdu.html).toContain('(اختیاری)');
+    expect(urdu.html).toContain('(اختیاری) (Rs 500 اضافی)');
     expect(urdu.html).toContain('<option value="">منتخب کریں</option>');
     // A product that asks for nothing has no such fields.
     const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());

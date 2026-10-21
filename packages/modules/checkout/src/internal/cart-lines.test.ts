@@ -365,13 +365,14 @@ describe('cart lines', () => {
 
   it('refuses an answer missing, too long or not among the choices (ADR-691)', () => {
     const fields = [
-      { name: 'Name', kind: 'text' as const, required: true, maxLength: 5, choices: [] },
+      { name: 'Name', kind: 'text' as const, required: true, maxLength: 5, choices: [], price: 0 },
       {
         name: 'Thread',
         kind: 'choice' as const,
         required: false,
         maxLength: null,
         choices: ['Gold', 'Silver'],
+        price: 0,
       },
     ];
     const problem = (properties: Record<string, string>) =>
@@ -391,5 +392,58 @@ describe('cart lines', () => {
       field: 'Thread',
       problem: 'not_a_choice',
     });
+  });
+
+  it("adds to a line's price what its answered fields cost, each unit (ADR-697)", () => {
+    const asked = new Map([
+      [
+        'product-of-Kurta',
+        [
+          {
+            name: 'Name',
+            kind: 'text' as const,
+            required: false,
+            maxLength: 20,
+            choices: [],
+            price: 500_00,
+          },
+          {
+            name: 'Thread',
+            kind: 'choice' as const,
+            required: false,
+            maxLength: null,
+            choices: ['Gold', 'Silver'],
+            price: 250_00,
+          },
+          {
+            name: 'Note',
+            kind: 'text' as const,
+            required: false,
+            maxLength: 50,
+            choices: [],
+            price: 0,
+          },
+        ],
+      ],
+    ]);
+    const facts = new Map(FACTS).set(KURTA, variant('Kurta', 2_000_00));
+    const cart = {
+      ...EMPTY_CART,
+      lines: [
+        line(KURTA, 2, { Name: 'Sana', Thread: 'Gold', Note: 'Eid' }),
+        // A blank answer is none, and adds nothing.
+        line(KURTA, 1, { Name: ' ', Note: 'Gift' }),
+        line(SHAWL, 1, { Name: 'Sana' }),
+      ],
+    };
+    const json = cartJson(cart, facts, asked);
+    expect(json.items.map((item) => [item.price, item.linePrice])).toEqual([
+      [2_750_00, 5_500_00],
+      [2_000_00, 2_000_00],
+      [3_000_00, 3_000_00],
+    ]);
+    expect(json.subtotal).toBe(10_500_00);
+    // Without what the products ask, the catalog's price alone.
+    expect(cartJson(cart, facts).items[0]!.price).toBe(2_000_00);
   });
 });

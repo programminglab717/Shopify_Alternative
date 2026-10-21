@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { PersonalisationField } from '@hatti/catalog/public';
+import { personalisationPrice, type PersonalisationField } from '@hatti/catalog/public';
 import { typedCode } from '@hatti/pricing/public';
 import type {
   CartActionName,
@@ -328,23 +328,30 @@ export function applyAction(
 
 /**
  * The cart as a storefront shows it, priced now. Lines whose product is gone or no longer for
- * sale are left out.
+ * sale are left out. A line's price adds what its answers to `asked`, the personalisation fields of
+ * its product, add to each unit (ADR-697), so the order's line keeps it.
  */
-export function cartJson(cart: CartContent, facts: ReadonlyMap<string, VariantFacts>): CartJson {
+export function cartJson(
+  cart: CartContent,
+  facts: ReadonlyMap<string, VariantFacts>,
+  asked: ReadonlyMap<string, readonly PersonalisationField[]> = new Map(),
+): CartJson {
   const lines = cart.lines.filter((line) => facts.get(line.variantId)?.forSale);
   const inCart = totals(lines);
   const items = lines.map((line): CartLineJson => {
     const variant = facts.get(line.variantId)!;
     const all = inCart.get(line.variantId)!;
     const short = variant.sellable !== null && all > variant.sellable;
+    const price =
+      variant.price + personalisationPrice(asked.get(variant.productId) ?? [], line.properties);
     return {
       key: lineKey(line),
       variantId: line.variantId,
       productId: variant.productId,
       quantity: line.quantity,
       properties: line.properties,
-      price: Number(variant.price),
-      linePrice: Number(variant.price * BigInt(line.quantity)),
+      price: Number(price),
+      linePrice: Number(price * BigInt(line.quantity)),
       title: variant.title,
       variantTitle: variant.variantTitle,
       sku: variant.sku,

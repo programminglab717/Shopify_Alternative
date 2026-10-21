@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { PersonalisationService } from '@hatti/catalog/public';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
@@ -64,5 +65,53 @@ describe.skipIf(!server)("Orders keeping their cart lines' properties (CAT-15, A
     ]);
     // Its lines say them, its note no longer (ADR-688).
     expect(placed.order.note).toBe('');
+  });
+
+  it('places a line at its price with what its answers add to each unit (ADR-697)', async () => {
+    const snapshots = await f.db.tenant(f.a.shopId, (tx) =>
+      f.variants.snapshotsOf(tx, f.a.shopId, [kurta]),
+    );
+    const fields = await new PersonalisationService(f.db).set(
+      f.a,
+      snapshots.get(kurta)!.productId,
+      [
+        { name: 'Name', kind: 'text', price: '500' },
+        { name: 'Thread', kind: 'choice', choices: ['Gold', 'Silver'], price: '250.50' },
+      ],
+    );
+    if (!fields.ok) throw new Error(`Refused: ${JSON.stringify(fields.errors)}`);
+    expect(fields.value.map((field) => field.price)).toEqual([500_00, 250_50]);
+    const action = parseAction('add', {
+      items: [
+        { variantId: kurta, quantity: 2, properties: { Name: 'Ali', Thread: 'Gold' } },
+        { variantId: kurta, quantity: 1, properties: { Thread: 'Silver' } },
+        { variantId: kurta, quantity: 1 },
+      ],
+    });
+    if ('code' in action) throw new Error(`Refused: ${JSON.stringify(action)}`);
+    const added = await f.carts.act(f.a.shopId, null, action);
+    if (!added.ok) throw new Error(`Refused: ${JSON.stringify(added.error)}`);
+    expect(added.cart.items.map((item) => [item.price, item.linePrice])).toEqual([
+      [2_750_50, 5_501_00],
+      [2_250_50, 2_250_50],
+      [2_000_00, 2_000_00],
+    ]);
+    expect(added.cart.subtotal).toBe(9_751_50);
+
+    const secret = (await f.checkouts.start(f.a.shopId, added.token!))!;
+    const view = await f.checkouts.view(secret);
+    if (view.kind !== 'open') throw new Error(`Expected an open checkout, got ${view.kind}`);
+    const placed = await f.checkouts.place(secret, view.shown, FORM);
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    expect(
+      placed.order.lines
+        .map((line) => [line.quantity, line.unitPrice, line.properties])
+        .sort(([, a], [, b]) => Number(b) - Number(a)),
+    ).toEqual([
+      [2, 2_750_50n, { Name: 'Ali', Thread: 'Gold' }],
+      [1, 2_250_50n, { Thread: 'Silver' }],
+      [1, 2_000_00n, {}],
+    ]);
+    expect(placed.order.subtotal).toBe(9_751_50n);
   });
 });

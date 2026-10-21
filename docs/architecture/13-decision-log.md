@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-696 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-697 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -704,6 +704,7 @@
 | 694 | A theme keeps its last 30 changes, each with the files it touched as they were, and is taken back to the version one made as a change of its own | Accepted |
 | 695 | A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of what is due, as a merchant would publish it then | Accepted |
 | 696 | The admin's themes tab shows each theme's versions to take it back to, and publishes a theme at a time set ahead or calls it off | Accepted |
+| 697 | A personalisation field may add to each unit's price when it is answered, as embroidery costs: the cart prices its line with it, so the order keeps it, and the page says it | Accepted |
 
 ---
 
@@ -24038,3 +24039,26 @@
   and taking a theme back under them would lose them; the list is where themes are published.
   **Showing each version's files as they were:** the files a change touched say what it was;
   the preview shows the theme as it is after.
+
+## ADR-697 · A personalisation field may add to each unit's price when it is answered, as embroidery costs: the cart prices its line with it, so the order keeps it, and the page says it
+
+* **Context:** A product made to order asks the shopper for fields ([ADR-689](#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)), and the
+  cart holds them to their rules ([ADR-691](#adr-691--the-cart-refuses-a-line-its-product-asks-more-of-a-required-answer-missing-an-answer-past-its-length-or-not-among-its-choices-said-in-the-themes-words)); but a name embroidered or a gold thread
+  costs the shop more, and a shop had to make a variant for each or take it on the phone (CAT-15).
+* **Decision:**
+  * **A field keeps what an answer adds to each unit's price**, in the shop's currency, nothing
+    unless the shop says; fields kept before cost nothing. The Admin API gives it as `price`
+    (null for nothing) and takes it as an amount, as a variant's price.
+  * **The cart prices a line with it:** the variant's price now, and each of its product's
+    fields answered on the line, not blank, adds its price. The line's price is that, its
+    total that times its quantity, so discounts, the cash cap, an advance and the order's line
+    take it as they take any price: the order keeps what was charged.
+  * **The storefront says it:** the product's document carries a field's price where it has one,
+    `field.price` in Liquid in minor units for `money`, and Hatti Base says "(+Rs 500)" beside
+    the field, in English and Urdu.
+* **Consequences:** A shop sells "name embroidered, Rs 500" as the field it asks for, and the
+  shopper sees and pays it; a price changed later reprices carts, as a variant's does.
+* **Alternatives:** **A hidden fee product added beside the line**, as Shopify's apps do: a
+  second line to keep in step with the first, shown in the cart and on the order as an item.
+  **A price for each choice:** one price for the field covers embroidery and thread; a choice
+  that costs more is a variant.

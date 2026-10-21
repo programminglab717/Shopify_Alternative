@@ -1,4 +1,4 @@
-import { UserError } from '@hatti/api';
+import { Money, UserError } from '@hatti/api';
 import { Field, InputType, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 
 export enum PersonalisationFieldKind {
@@ -35,6 +35,14 @@ export class PersonalisationField {
 
   @Field(() => [String], { description: 'What a choice offers, in order; none for text.' })
   choices!: string[];
+
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      "What an answer adds to each unit's price, as embroidery costs (ADR-697); null when it " +
+      'adds nothing.',
+  })
+  price!: Money | null;
 }
 
 @InputType()
@@ -59,6 +67,14 @@ export class PersonalisationFieldInput {
     description: "A choice's options, two to 20, each at most 40 characters, each once.",
   })
   choices?: string[] | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "What an answer adds to each unit's price, in the shop's currency, as 500 or 499.50; " +
+      'nothing unless given.',
+  })
+  price?: string | null;
 }
 
 @ObjectType()

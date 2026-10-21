@@ -12020,6 +12020,11 @@ type PersonalisationField {
   """What the page calls it, and the property's name."""
   name: String!
 
+  """
+  What an answer adds to each unit's price, as embroidery costs (ADR-697); null when it adds nothing.
+  """
+  price: Money
+
   """Whether the page asks for an answer before adding to the cart."""
   required: Boolean!
 }
@@ -12034,6 +12039,11 @@ input PersonalisationFieldInput {
 
   """At most 40 characters, not beginning "_", each field named once."""
   name: String!
+
+  """
+  What an answer adds to each unit's price, in the shop's currency, as 500 or 499.50; nothing unless given.
+  """
+  price: String
 
   """False unless given."""
   required: Boolean

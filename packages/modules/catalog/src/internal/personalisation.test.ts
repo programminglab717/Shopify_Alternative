@@ -35,21 +35,42 @@ describe.skipIf(!server)('Personalisation fields (CAT-15, ADR-689)', () => {
       unwrap(
         await personalisation.set(f.a, kurta, [
           { name: ' Name to embroider ', kind: 'text', required: true, maxLength: 12 },
-          { name: 'Thread', kind: 'choice', choices: [' Gold', 'Silver', ' ', 'Maroon'] },
-          { name: 'Note for the tailor', kind: 'text', choices: ['ignored'] },
+          {
+            name: 'Thread',
+            kind: 'choice',
+            choices: [' Gold', 'Silver', ' ', 'Maroon'],
+            price: '250.50',
+          },
+          { name: 'Note for the tailor', kind: 'text', choices: ['ignored'], price: ' ' },
         ]),
       ),
     ).toEqual([
-      { name: 'Name to embroider', kind: 'text', required: true, maxLength: 12, choices: [] },
+      {
+        name: 'Name to embroider',
+        kind: 'text',
+        required: true,
+        maxLength: 12,
+        choices: [],
+        price: 0,
+      },
       {
         name: 'Thread',
         kind: 'choice',
         required: false,
         maxLength: null,
         choices: ['Gold', 'Silver', 'Maroon'],
+        // What an answer adds to each unit's price, in minor units (ADR-697).
+        price: 250_50,
       },
       // Text takes 50 characters unless the shop says otherwise.
-      { name: 'Note for the tailor', kind: 'text', required: false, maxLength: 50, choices: [] },
+      {
+        name: 'Note for the tailor',
+        kind: 'text',
+        required: false,
+        maxLength: 50,
+        choices: [],
+        price: 0,
+      },
     ]);
     const kept = await personalisation.of(f.a, [kurta, plain]);
     expect(kept.get(kurta)?.map((field) => field.name)).toEqual([
@@ -67,7 +88,7 @@ describe.skipIf(!server)('Personalisation fields (CAT-15, ADR-689)', () => {
     unwrap(
       await personalisation.set(f.a, kurta, [
         { name: 'Name to embroider', kind: 'text', required: true, maxLength: 12 },
-        { ...thread, choices: ['Gold', 'Silver', 'Maroon'] },
+        { ...thread, choices: ['Gold', 'Silver', 'Maroon'], price: '250.5' },
         { name: 'Note for the tailor', kind: 'text' },
       ]),
     );
@@ -75,7 +96,15 @@ describe.skipIf(!server)('Personalisation fields (CAT-15, ADR-689)', () => {
     unwrap(await personalisation.set(f.a, kurta, [thread]));
     expect(
       await f.db.tenant(f.a.shopId, (tx) => personalisationIn(tx, f.a.shopId, [kurta])),
-    ).toEqual(new Map([[kurta, [{ ...thread, required: false, maxLength: null }]]]));
+    ).toEqual(new Map([[kurta, [{ ...thread, required: false, maxLength: null, price: 0 }]]]));
+    // Fields kept before a field could cost anything cost nothing.
+    await f.admin.query(
+      `UPDATE catalog.product_personalisation SET fields = $1::jsonb WHERE product_id = $2`,
+      [JSON.stringify([{ ...thread, required: false, maxLength: null }]), kurta],
+    );
+    expect(
+      (await personalisation.of(f.a, [kurta])).get(kurta)?.map((field) => field.price),
+    ).toEqual([0]);
     expect(unwrap(await personalisation.set(f.a, kurta, []))).toEqual([]);
     expect((await personalisation.of(f.a, [kurta])).has(kurta)).toBe(false);
     expect(await events()).toHaveLength(3);
@@ -102,6 +131,7 @@ describe.skipIf(!server)('Personalisation fields (CAT-15, ADR-689)', () => {
       { name: 'name', kind: 'choice', choices: ['Gold', 'gold'] },
       { name: 'Colour', kind: 'choice', choices: ['x'.repeat(41), 'Red'] },
       { name: 'Size', kind: 'choice', choices: ['Small'] },
+      { name: 'Gift wrap', kind: 'text', price: '-50' },
     ]);
     expect(errorsOf(result)).toEqual([
       ['fields', 'TOO_MANY'],
@@ -112,6 +142,7 @@ describe.skipIf(!server)('Personalisation fields (CAT-15, ADR-689)', () => {
       ['fields.3.choices.1', 'TAKEN'],
       ['fields.4.choices.0', 'TOO_LONG'],
       ['fields.5.choices', 'TOO_FEW'],
+      ['fields.6.price', 'INVALID'],
     ]);
     if (!result.ok) {
       expect(result.errors.map((error) => error.message)).toContain(
