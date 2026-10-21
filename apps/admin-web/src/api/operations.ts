@@ -9971,6 +9971,84 @@ export const TikTokAdSpendSyncMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const GOOGLE_ADS_ACCOUNT = /* GraphQL */ `
+  fragment GoogleAdsAccountParts on GoogleAdsAccount {
+    customerId
+    name
+    currency
+    timezone
+    grantHint
+    lastSyncedAt
+    lastError
+    updatedAt
+  }
+`;
+
+/** The shop's Google Ads account, its spend pulled every few hours, if it connected one. */
+export const GoogleAdsAccountQuery = /* GraphQL */ `
+  query GoogleAdsAccount {
+    googleAdsAccount {
+      ...GoogleAdsAccountParts
+    }
+  }
+  ${GOOGLE_ADS_ACCOUNT}
+`;
+
+/**
+ * Google's consent screen, coming back to `redirectUri` with a code and `state`; null where Hatti
+ * has not set Google Ads up (ADR-678).
+ */
+export const GoogleAdsConsentUrlQuery = /* GraphQL */ `
+  query GoogleAdsConsentUrl($redirectUri: String!, $state: String!) {
+    googleAdsConsentUrl(redirectUri: $redirectUri, state: $state)
+  }
+`;
+
+/** The shop's Google Ads account connected with the code its owner's grant came back with. */
+export const GoogleAdsAccountConnectMutation = /* GraphQL */ `
+  mutation GoogleAdsAccountConnect($input: GoogleAdsAccountConnectInput!) {
+    googleAdsAccountConnect(input: $input) {
+      googleAdsAccount {
+        ...GoogleAdsAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GOOGLE_ADS_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+/** The shop's Google Ads account disconnected: its grant forgotten, its spend pulled kept. */
+export const GoogleAdsAccountDisconnectMutation = /* GraphQL */ `
+  mutation GoogleAdsAccountDisconnect {
+    googleAdsAccountDisconnect {
+      deletedCustomerId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's spend pulled from its Google Ads account now: at most once a minute. */
+export const GoogleAdsSpendSyncMutation = /* GraphQL */ `
+  mutation GoogleAdsSpendSync {
+    googleAdsSpendSync {
+      googleAdsAccount {
+        ...GoogleAdsAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GOOGLE_ADS_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
 /** Each kind's search engine listings for the online store's SEO tab (OS-09, ADR-606). */
 const SEO_LISTED = /* GraphQL */ `
   id

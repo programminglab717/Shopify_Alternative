@@ -87,6 +87,12 @@ import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AdSpendPage } from './marketing/ad-spend-page';
+import {
+  GOOGLE_ADS_RETURN_PATH,
+  GoogleAdsReturnPage,
+  pendingGrant,
+  validateGrantSearch,
+} from './marketing/google-ads-account';
 import { AutomationsPage } from './marketing/automations-page';
 import { BroadcastsPage } from './marketing/broadcasts-page';
 import { CalendarPage } from './marketing/calendar-page';
@@ -792,7 +798,31 @@ const marketingCalendar = createRoute({
 const marketingAdSpend = createRoute({
   getParentRoute: () => shop,
   path: 'marketing/ad-spend',
+  validateSearch: validateGrantSearch,
   component: AdSpendPage,
+});
+
+/**
+ * Where Google's consent screen comes back to, one address for every shop (ADR-679): on to the
+ * ad spend page of the shop whose connection this tab started, with what Google gave.
+ */
+const googleAdsReturn = createRoute({
+  getParentRoute: () => root,
+  path: GOOGLE_ADS_RETURN_PATH,
+  validateSearch: validateGrantSearch,
+  beforeLoad: ({ context, search }) => {
+    requireSignedIn({ context });
+    const pending = pendingGrant(search.state);
+    if (pending) {
+      throw redirect({
+        to: '/$shopId/marketing/ad-spend',
+        params: { shopId: pending.shopId },
+        search,
+        replace: true,
+      });
+    }
+  },
+  component: GoogleAdsReturnPage,
 });
 
 const settingsTax = createRoute({
@@ -913,6 +943,7 @@ export const routeTree = root.addChildren([
   resetPassword,
   verifyEmail,
   changeEmail,
+  googleAdsReturn,
   shop.addChildren([
     home,
     orders,

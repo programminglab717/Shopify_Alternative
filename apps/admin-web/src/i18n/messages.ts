@@ -4311,6 +4311,35 @@ const en = {
   'adSpend.tiktokAccount.disconnect': 'Disconnect advertiser account',
   'adSpend.tiktokAccount.disconnectAsk':
     'Disconnect advertiser account {id}? Hatti forgets its access token and pulls no more spend. The spend already pulled stays.',
+  'adSpend.googleTyped':
+    "Typing a figure for a campaign and day pulled from Google replaces it, and Google won't overwrite it. A whole day typed for Google keeps out Google's campaigns of that day.",
+  'adSpend.fromGoogle': 'From Google',
+  'adSpend.googleAccount.title': 'Google Ads account',
+  'adSpend.googleAccount.hint':
+    "Connect your Google Ads account and Hatti pulls each day's spend by campaign from Google every few hours, the last 30 days at once. What you type by hand is kept over Google's figures.",
+  'adSpend.googleAccount.id': 'Customer ID',
+  'adSpend.googleAccount.idHint':
+    'As Google Ads shows it at the top of its pages, as 123-456-7890.',
+  'adSpend.googleAccount.idInvalid': 'Its ten digits, as 123-456-7890.',
+  'adSpend.googleAccount.consentHint':
+    "Google asks the account's owner to let Hatti read their Google Ads accounts, then brings you back here. Hatti keeps the permission sealed and never shows it.",
+  'adSpend.googleAccount.continue': 'Continue to Google',
+  'adSpend.googleAccount.unavailable': "Google Ads can't be connected on this Hatti yet.",
+  'adSpend.googleAccount.grant': 'Permission',
+  'adSpend.googleAccount.name': 'Account',
+  'adSpend.googleAccount.lastError':
+    'The last pull failed, and Hatti tries again in a few hours. Google said:',
+  'adSpend.googleAccount.pulled': 'Spend pulled from Google.',
+  'adSpend.googleAccount.disconnect': 'Disconnect Google Ads account',
+  'adSpend.googleAccount.disconnectAsk':
+    'Disconnect Google Ads account {id}? Hatti forgets its permission and pulls no more spend. The spend already pulled stays. You can take the permission back in your Google account too.',
+  'adSpend.googleAccount.connecting': 'Connecting your Google Ads account',
+  'adSpend.googleAccount.stale':
+    "This return from Google doesn't match a Google Ads connection started in this tab, so nothing was connected.",
+  'adSpend.googleAccount.denied': "Google wasn't given permission, so nothing was connected.",
+  'adSpend.googleAccount.failed': "Google didn't give permission, so nothing was connected.",
+  'adSpend.googleAccount.again': 'Connect again to try once more.',
+  'adSpend.googleAccount.toShops': 'Go to your shops',
   'onlineStore.speed': 'Speed',
   'speed.intro':
     "How fast your store was for your shoppers over the last 28 days, as their own browsers measured it: Google's Core Web Vitals, which search ranks stores by. Each is the time three in four page views were faster than.",
@@ -9651,6 +9680,34 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'adSpend.tiktokAccount.disconnect': 'ایڈورٹائزر اکاؤنٹ الگ کریں',
   'adSpend.tiktokAccount.disconnectAsk':
     'ایڈورٹائزر اکاؤنٹ {id} الگ کریں؟ ہٹی اس کا ایکسیس ٹوکن بھول جائے گا اور مزید خرچ نہیں لائے گا۔ پہلے سے لایا گیا خرچ رہے گا۔',
+  'adSpend.googleTyped':
+    'گوگل سے لائے گئے کسی مہم اور دن کا خرچ لکھنے سے وہ اس کی جگہ لے لیتا ہے، اور گوگل اسے دوبارہ نہیں بدلے گا۔ گوگل کے لیے لکھا پورا دن اس دن کی گوگل کی مہمات کو باہر رکھتا ہے۔',
+  'adSpend.fromGoogle': 'گوگل سے',
+  'adSpend.googleAccount.title': 'گوگل ایڈز اکاؤنٹ',
+  'adSpend.googleAccount.hint':
+    'اپنا گوگل ایڈز اکاؤنٹ منسلک کریں اور ہٹی ہر چند گھنٹے بعد گوگل سے ہر دن کا خرچ مہم کے حساب سے لے آتا ہے، پچھلے 30 دن ایک ساتھ۔ جو آپ خود لکھیں وہ گوگل کے اعداد کی جگہ رہتا ہے۔',
+  'adSpend.googleAccount.id': 'کسٹمر ID',
+  'adSpend.googleAccount.idHint': 'جیسے گوگل ایڈز اپنے صفحات کے اوپر دکھاتا ہے، جیسے 123-456-7890۔',
+  'adSpend.googleAccount.idInvalid': 'اس کے دس ہندسے، جیسے 123-456-7890۔',
+  'adSpend.googleAccount.consentHint':
+    'گوگل اکاؤنٹ کے مالک سے پوچھتا ہے کہ ہٹی ان کے گوگل ایڈز اکاؤنٹس پڑھ سکے، پھر آپ کو یہیں واپس لے آتا ہے۔ ہٹی یہ اجازت سربمہر رکھتا ہے اور کبھی نہیں دکھاتا۔',
+  'adSpend.googleAccount.continue': 'گوگل پر جائیں',
+  'adSpend.googleAccount.unavailable': 'اس ہٹی پر ابھی گوگل ایڈز منسلک نہیں ہو سکتا۔',
+  'adSpend.googleAccount.grant': 'اجازت',
+  'adSpend.googleAccount.name': 'اکاؤنٹ',
+  'adSpend.googleAccount.lastError':
+    'پچھلی بار خرچ نہیں لایا جا سکا، ہٹی چند گھنٹوں میں دوبارہ کوشش کرے گا۔ گوگل نے کہا:',
+  'adSpend.googleAccount.pulled': 'گوگل سے خرچ لے آیا گیا۔',
+  'adSpend.googleAccount.disconnect': 'گوگل ایڈز اکاؤنٹ الگ کریں',
+  'adSpend.googleAccount.disconnectAsk':
+    'گوگل ایڈز اکاؤنٹ {id} الگ کریں؟ ہٹی اس کی اجازت بھول جائے گا اور مزید خرچ نہیں لائے گا۔ پہلے سے لایا گیا خرچ رہے گا۔ آپ اپنے گوگل اکاؤنٹ میں بھی یہ اجازت واپس لے سکتے ہیں۔',
+  'adSpend.googleAccount.connecting': 'آپ کا گوگل ایڈز اکاؤنٹ منسلک ہو رہا ہے',
+  'adSpend.googleAccount.stale':
+    'گوگل سے یہ واپسی اس ٹیب میں شروع کیے گئے کسی گوگل ایڈز کنکشن سے نہیں ملتی، اس لیے کچھ منسلک نہیں ہوا۔',
+  'adSpend.googleAccount.denied': 'گوگل کو اجازت نہیں دی گئی، اس لیے کچھ منسلک نہیں ہوا۔',
+  'adSpend.googleAccount.failed': 'گوگل نے اجازت نہیں دی، اس لیے کچھ منسلک نہیں ہوا۔',
+  'adSpend.googleAccount.again': 'دوبارہ کوشش کے لیے پھر سے منسلک کریں۔',
+  'adSpend.googleAccount.toShops': 'اپنی دکانوں پر جائیں',
   'onlineStore.speed': 'رفتار',
   'speed.intro':
     'پچھلے 28 دنوں میں آپ کا اسٹور آپ کے خریداروں کے لیے کتنا تیز تھا، جیسا ان کے اپنے براؤزرز نے ناپا: گوگل کے کور ویب وائٹلز، جن سے سرچ اسٹورز کی درجہ بندی کرتا ہے۔ ہر ایک وہ وقت ہے جس سے چار میں سے تین صفحات تیز تھے۔',

@@ -1,6 +1,6 @@
 import { Link2, Link2Off, Pencil, RefreshCw, X } from 'lucide-react';
 import { useId, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { ComponentType, FormEvent, ReactNode } from 'react';
 import type { UserError } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText, userErrorText } from '../i18n/errors';
@@ -48,12 +48,19 @@ export interface AdPlatform<Query, Connect, Sync, Disconnect> {
   connected: (data: Connect) => AdAccountAnswer;
   synced: (data: Sync) => AdAccountAnswer;
   disconnected: (data: Disconnect) => UserError[];
+  /**
+   * The form connecting the account, for a platform not connected with an ID and a token: Google
+   * Ads', whose owner grants access on Google's own screen (ADR-679).
+   */
+  connectForm?: ComponentType<ConnectFormProps>;
   text: {
     title: MessageKey;
     hint: MessageKey;
     id: MessageKey;
     idHint: MessageKey;
     tokenHint: MessageKey;
+    /** What its token is called in its details: the access token, unless said. */
+    token?: MessageKey;
     /** The account's name, in its details. */
     name: MessageKey;
     lastError: MessageKey;
@@ -70,6 +77,12 @@ export interface AdPlatform<Query, Connect, Sync, Disconnect> {
 }
 
 type Field = 'id' | 'accessToken';
+
+/** What a platform's connect form is given: the account connected, if any, and what to do after. */
+export interface ConnectFormProps {
+  current: AdAccountView | null;
+  onConnected: () => void;
+}
 
 /**
  * Connecting the shop's account, or another in its place, or a new token for it: its ID, and a
@@ -201,7 +214,11 @@ function Connected<Q, C, S, D>({
     { label: platform.text.name, value: account.name, ltr: false },
     { label: platform.text.id, value: account.id, ltr: true },
     { label: 'adSpend.account.currency', value: account.currency, ltr: true },
-    { label: 'meta.accessToken', value: `•••• ${account.accessTokenHint}`, ltr: true },
+    {
+      label: platform.text.token ?? 'meta.accessToken',
+      value: `•••• ${account.accessTokenHint}`,
+      ltr: true,
+    },
     {
       label: 'adSpend.account.lastPulled',
       value: account.lastSyncedAt
@@ -336,6 +353,20 @@ function Disconnect<Q, C, S, D>({
  * No account connected: the connect form, or, for a platform whose form waits until asked for, a
  * button that shows it, so that a card not in use stays short on a phone.
  */
+/** The platform's own connect form, or the ID and token's. */
+function Connect<Q, C, S, D>({
+  platform,
+  current,
+  onConnected,
+}: ConnectFormProps & { platform: AdPlatform<Q, C, S, D> }) {
+  const Form = platform.connectForm;
+  return Form ? (
+    <Form current={current} onConnected={onConnected} />
+  ) : (
+    <ConnectForm platform={platform} current={current} onConnected={onConnected} />
+  );
+}
+
 function NotConnected<Q, C, S, D>({
   platform,
   onConnected,
@@ -351,7 +382,7 @@ function NotConnected<Q, C, S, D>({
     return (
       <>
         <p className="font-medium">{t('meta.notConnected')}</p>
-        <ConnectForm platform={platform} current={null} onConnected={onConnected} />
+        <Connect platform={platform} current={null} onConnected={onConnected} />
       </>
     );
   }
@@ -368,7 +399,7 @@ function NotConnected<Q, C, S, D>({
         {t(platform.text.open)}
       </Button>
       <div id={formId} className="flex flex-col gap-4">
-        {open && <ConnectForm platform={platform} current={null} onConnected={onConnected} />}
+        {open && <Connect platform={platform} current={null} onConnected={onConnected} />}
       </div>
     </>
   );
@@ -376,9 +407,16 @@ function NotConnected<Q, C, S, D>({
 
 /**
  * The shop's account on an ad platform, whose spend Hatti pulls by day and campaign every few
- * hours: connected, pulled now, given another account or token, and disconnected.
+ * hours: connected, pulled now, given another account or token, and disconnected. `children` come
+ * first, whatever the account's state: what the platform says of a connection on its way.
  */
-export function AdAccountSection<Q, C, S, D>({ platform }: { platform: AdPlatform<Q, C, S, D> }) {
+export function AdAccountSection<Q, C, S, D>({
+  platform,
+  children,
+}: {
+  platform: AdPlatform<Q, C, S, D>;
+  children?: ReactNode;
+}) {
   const { t } = useLocale();
   const query = useAdminQuery<Q>([platform.queryKey], platform.query);
   const [changing, setChanging] = useState(false);
@@ -386,6 +424,7 @@ export function AdAccountSection<Q, C, S, D>({ platform }: { platform: AdPlatfor
 
   return (
     <FormSection title={t(platform.text.title)} hint={t(platform.text.hint)}>
+      {children}
       {query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (
@@ -399,7 +438,7 @@ export function AdAccountSection<Q, C, S, D>({ platform }: { platform: AdPlatfor
           <PullNow platform={platform} />
           {changing ? (
             <>
-              <ConnectForm
+              <Connect
                 platform={platform}
                 current={current}
                 onConnected={() => setChanging(false)}

@@ -352,4 +352,7 @@ the accounts it connects, every few hours, the last week's again each time: Meta
 ([ADR-564](./13-decision-log.md#adr-564--a-shop-connects-its-meta-ad-account-and-the-worker-pulls-each-days-spend-by-campaign-what-the-shop-typed-by-hand-kept-over-what-meta-says)), TikTok's
 advertiser accounts ([ADR-566](./13-decision-log.md#adr-566--a-shop-connects-its-tiktok-advertiser-account-and-the-same-worker-pulls-its-spend-by-campaign-under-metas-rules-shared-between-the-two)) and Google Ads accounts, which the
 owner grants Hatti the reading of on Google's consent screen
-([ADR-678](./13-decision-log.md#adr-678--a-shops-owner-grants-hatti-the-reading-of-their-google-ads-account-on-googles-consent-screen-and-the-same-worker-pulls-its-spend-by-campaign-with-an-access-token-from-the-grant-each-time)). What the shop typed stays its own.
+([ADR-678](./13-decision-log.md#adr-678--a-shops-owner-grants-hatti-the-reading-of-their-google-ads-account-on-googles-consent-screen-and-the-same-worker-pulls-its-spend-by-campaign-with-an-access-token-from-the-grant-each-time)). What the shop typed stays its own. The admin's ad spend
+page connects all three; Google's consent screen comes back to one address of the admin's, which
+hands the code to the shop whose connection the tab started
+([ADR-679](./13-decision-log.md#adr-679--the-admins-ad-spend-page-connects-the-shops-google-ads-account-through-googles-consent-screen-coming-back-to-one-address-of-the-admins-that-hands-the-code-to-the-shop-that-asked)).

@@ -63,16 +63,43 @@ const PULLED_TIKTOK = {
   source: 'TIKTOK',
 };
 
+/** The shop's Google Ads account, connected through its owner's grant (ADR-678). */
+const CUSTOMER = {
+  customerId: '1234567890',
+  name: 'Zari Google',
+  currency: 'PKR',
+  timezone: 'Asia/Karachi',
+  grantHint: 'Rf12',
+  lastSyncedAt: '2026-10-18T05:00:00Z' as string | null,
+  lastError: null as string | null,
+  updatedAt: '2026-10-18T05:00:00Z',
+};
+
+/** What Google reports of a campaign yesterday, as a pull keeps it. */
+const PULLED_GOOGLE = {
+  platform: 'GOOGLE',
+  day: YESTERDAY,
+  campaign: 'Lawn Search',
+  amount: rupees('430.25'),
+  source: 'GOOGLE',
+};
+
+/** Google's consent screen, as the fake core gives it. */
+const CONSENT = 'https://accounts.google.test/o/oauth2/v2/auth?client_id=hatti';
+
 /**
  * A fake core keeping the shop's ad spend, as adSpendSet replaces and takes it away, and its Meta
- * ad account and TikTok advertiser account, connected once the member confirms who they are,
- * pulled and disconnected.
+ * ad account, TikTok advertiser account and Google Ads account, connected once the member
+ * confirms who they are, pulled and disconnected. `consent` is Google's consent screen, or null
+ * where Hatti has not set Google Ads up.
  */
 function core(
   role: StaffRole = 'marketer',
   {
     account = null as typeof ACCOUNT | null,
     advertiser = null as typeof ADVERTISER | null,
+    customer = null as typeof CUSTOMER | null,
+    consent = CONSENT as string | null,
     pulled = [] as (typeof PULLED)[],
   } = {},
 ) {
@@ -89,7 +116,9 @@ function core(
   ];
   let meta = account;
   let tiktok = advertiser;
+  let google = customer;
   let confirmed = false;
+  let googlePulls = 0;
   let pulls = 0;
   let tiktokPulls = 0;
   const answer = (operation: string, variables: Record<string, unknown>) => {
@@ -201,6 +230,55 @@ function core(
         const deletedAdvertiserId = tiktok?.advertiserId ?? null;
         tiktok = null;
         return { tiktokAdAccountDisconnect: { deletedAdvertiserId, userErrors: [] } };
+      }
+      case 'GoogleAdsAccount':
+        return { googleAdsAccount: google };
+      case 'GoogleAdsConsentUrl':
+        return { googleAdsConsentUrl: consent && `${consent}&state=${String(variables.state)}` };
+      case 'GoogleAdsAccountConnect': {
+        if (!confirmed) return REAUTHENTICATE;
+        const input = variables.input as { customerId: string; code: string };
+        if (input.code === 'dollar-code') {
+          return {
+            googleAdsAccountConnect: {
+              googleAdsAccount: null,
+              userErrors: [
+                {
+                  field: ['input', 'customerId'],
+                  code: 'INVALID',
+                  message: 'Hatti records ad spend in rupees: this Google Ads account bills in USD',
+                },
+              ],
+            },
+          };
+        }
+        google = { ...CUSTOMER, customerId: input.customerId.replace(/-/g, '') };
+        return { googleAdsAccountConnect: { googleAdsAccount: google, userErrors: [] } };
+      }
+      case 'GoogleAdsSpendSync': {
+        googlePulls += 1;
+        if (googlePulls > 1) {
+          return {
+            googleAdsSpendSync: {
+              googleAdsAccount: null,
+              userErrors: [
+                {
+                  field: ['base'],
+                  code: 'INVALID',
+                  message: 'Its spend was pulled under a minute ago: try again in a minute',
+                },
+              ],
+            },
+          };
+        }
+        google = { ...google!, lastSyncedAt: '2026-10-18T09:25:00Z', lastError: null };
+        entries = [...entries, PULLED_GOOGLE];
+        return { googleAdsSpendSync: { googleAdsAccount: google, userErrors: [] } };
+      }
+      case 'GoogleAdsAccountDisconnect': {
+        const deletedCustomerId = google?.customerId ?? null;
+        google = null;
+        return { googleAdsAccountDisconnect: { deletedCustomerId, userErrors: [] } };
       }
       case 'AdSpendSet': {
         const [entry] = variables.entries as AdSpendInput[];
@@ -527,7 +605,8 @@ describe("Meta's ad spend on the ad spend page (ADR-565)", () => {
       ),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-    expect(await screen.findByText('Not connected.')).toBeTruthy();
+    const meta = screen.getByRole('region', { name: 'Meta ad account' });
+    expect(await within(meta).findByText('Not connected.')).toBeTruthy();
     expect(sentOf(fake, 'MetaAdAccountDisconnect')).toEqual([{}]);
     expect(screen.getByText('Eid Sale')).toBeTruthy();
   });
@@ -733,7 +812,7 @@ describe("TikTok's ad spend on the ad spend page (ADR-567)", () => {
         "Typing a figure for a campaign and day pulled from TikTok replaces it, and TikTok won't overwrite it. A whole day typed for TikTok keeps out TikTok's campaigns of that day.",
       ),
     ).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'GOOGLE' } });
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'OTHER' } });
     expect(screen.queryByText(/^Typing a figure for a campaign and day pulled from/)).toBeNull();
   });
 
@@ -752,5 +831,191 @@ describe("TikTok's ad spend on the ad spend page (ADR-567)", () => {
       expect(sentOf(fake, 'TikTokAdAccount')).toEqual([]);
       cleanup();
     }
+  });
+});
+
+describe("Google's ad spend on the ad spend page (ADR-679)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    signedIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** The Google Ads account's card, once the page shows it. */
+  const card = async () =>
+    (await screen.findByRole('region', { name: 'Google Ads account' })) as HTMLElement;
+  const typeIn = (section: HTMLElement, label: string, value: string) =>
+    fireEvent.change(within(section).getByLabelText(label), { target: { value } });
+  const RETURN = `${window.location.origin}/google-ads`;
+  /** A connection this tab started, as the form keeps it on its way to Google. */
+  const pending = (state: string, shopId = 'shop_1') =>
+    window.sessionStorage.setItem(
+      'hatti.googleAdsGrant',
+      JSON.stringify({ state, shopId, customerId: '123-456-7890', redirectUri: RETURN }),
+    );
+
+  it("sends the owner to Google's consent screen, and connects the account once Google comes back", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    expect(
+      within(section).getByText(/pulls each day's spend by campaign from Google/),
+    ).toBeTruthy();
+    // One field, shown at once.
+    expect(await within(section).findByText('Not connected.')).toBeTruthy();
+    expect(
+      within(section).getByText('As Google Ads shows it at the top of its pages, as 123-456-7890.'),
+    ).toBeTruthy();
+    typeIn(section, 'Customer ID', '123-456-789');
+    fireEvent.click(within(section).getByRole('button', { name: 'Continue to Google' }));
+    expect(await within(section).findByText('Its ten digits, as 123-456-7890.')).toBeTruthy();
+    expect(sentOf(fake, 'GoogleAdsConsentUrl')).toEqual([]);
+
+    typeIn(section, 'Customer ID', ' 123 456 7890 ');
+    fireEvent.click(within(section).getByRole('button', { name: 'Continue to Google' }));
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    const [asked] = sentOf(fake, 'GoogleAdsConsentUrl') as { redirectUri: string; state: string }[];
+    expect(asked!.redirectUri).toBe(RETURN);
+    expect(asked!.state).toMatch(/^[0-9a-f-]{36}$/);
+    expect(assign).toHaveBeenCalledWith(`${CONSENT}&state=${asked!.state}`);
+    expect(JSON.parse(window.sessionStorage.getItem('hatti.googleAdsGrant')!)).toEqual({
+      state: asked!.state,
+      shopId: 'shop_1',
+      customerId: '123-456-7890',
+      redirectUri: RETURN,
+    });
+    expect(sentOf(fake, 'GoogleAdsAccountConnect')).toEqual([]);
+    cleanup();
+
+    // Google comes back to the admin's one address, which goes on to the shop's ad spend page.
+    const { router } = renderAdmin(`/google-ads?code=4%2F0AeaYSH&state=${asked!.state}&scope=x`);
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    const back = await card();
+    expect(await within(back).findByText('Connected to Zari Google.')).toBeTruthy();
+    expect(sentOf(fake, 'GoogleAdsAccountConnect')).toEqual([
+      { input: { customerId: '123-456-7890', code: '4/0AeaYSH', redirectUri: RETURN } },
+      { input: { customerId: '123-456-7890', code: '4/0AeaYSH', redirectUri: RETURN } },
+    ]);
+    // The code leaves the address, and the tab forgets the connection.
+    expect(router.state.location.pathname).toBe('/shop_1/marketing/ad-spend');
+    expect(router.state.location.search).toEqual({});
+    expect(window.sessionStorage.getItem('hatti.googleAdsGrant')).toBeNull();
+    const details = (term: string) => within(back).getByText(term).nextElementSibling?.textContent;
+    expect(details('Account')).toBe('Zari Google');
+    expect(details('Customer ID')).toBe('123-456-7890');
+    expect(details('Permission')).toBe('•••• Rf12');
+    expect(within(back).queryByText(/^This return from Google/)).toBeNull();
+  });
+
+  it("says what went wrong on the way back: no permission, a return this tab didn't start, the core's refusal", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+
+    pending('s-denied');
+    renderAdmin('/google-ads?error=access_denied&state=s-denied');
+    expect(
+      await within(await card()).findByText(
+        "Google wasn't given permission, so nothing was connected.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('Connect again to try once more.')).toBeTruthy();
+    cleanup();
+
+    // Another tab's, or one already finished: nothing to go on to.
+    renderAdmin('/google-ads?code=abc&state=s-denied');
+    expect(
+      await screen.findByText(
+        "This return from Google doesn't match a Google Ads connection started in this tab, so nothing was connected.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Go to your shops' })).toBeTruthy();
+    cleanup();
+
+    // Another shop's connection is not this shop's to finish.
+    pending('s-other', 'shop_2');
+    renderAdmin('/shop_1/marketing/ad-spend?code=abc&state=s-other');
+    expect(await within(await card()).findByText(/^This return from Google/)).toBeTruthy();
+    cleanup();
+
+    pending('s-dollar');
+    renderAdmin('/google-ads?code=dollar-code&state=s-dollar');
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    expect(
+      await within(await card()).findByText(
+        'Customer ID: Hatti records ad spend in rupees: this Google Ads account bills in USD',
+      ),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'GoogleAdsAccountConnect')).toHaveLength(2);
+  });
+
+  it('says so where Hatti has not set Google Ads up', async () => {
+    const fake = core('manager', { consent: null });
+    vi.stubGlobal('fetch', fake.fetcher);
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    await within(section).findByLabelText('Customer ID');
+    typeIn(section, 'Customer ID', '1234567890');
+    fireEvent.click(within(section).getByRole('button', { name: 'Continue to Google' }));
+    expect(
+      await within(section).findByText("Google Ads can't be connected on this Hatti yet."),
+    ).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem('hatti.googleAdsGrant')).toBeNull();
+  });
+
+  it('pulls the connected account now, disconnects it once asked, and labels what came from Google', async () => {
+    const fake = core('marketer', { customer: CUSTOMER });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    fireEvent.click(await within(section).findByRole('button', { name: 'Pull now' }));
+    expect(await within(section).findByText('Spend pulled from Google.')).toBeTruthy();
+    expect(sentOf(fake, 'GoogleAdsSpendSync')).toEqual([{}]);
+    await waitFor(() =>
+      expect(within(section).getByText('Last pulled').nextElementSibling?.textContent).toBe(
+        formatDateTime('2026-10-18T09:25:00Z', 'Asia/Karachi', 'en'),
+      ),
+    );
+    const list = await screen.findByRole('list', { name: 'The last 30 days' });
+    const row = (await within(list).findByText('Lawn Search')).closest('li')!;
+    expect(within(row).getByText('From Google')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'GOOGLE' } });
+    expect(
+      screen.getByText(
+        "Typing a figure for a campaign and day pulled from Google replaces it, and Google won't overwrite it. A whole day typed for Google keeps out Google's campaigns of that day.",
+      ),
+    ).toBeTruthy();
+
+    // Changing it goes to Google again, for the same account unless another is given.
+    fireEvent.click(within(section).getByRole('button', { name: 'Change' }));
+    expect((within(section).getByLabelText('Customer ID') as HTMLInputElement).value).toBe(
+      '123-456-7890',
+    );
+    fireEvent.click(within(section).getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(within(section).getByRole('button', { name: 'Disconnect Google Ads account' }));
+    expect(
+      within(section).getByText(
+        'Disconnect Google Ads account 123-456-7890? Hatti forgets its permission and pulls no more spend. The spend already pulled stays. You can take the permission back in your Google account too.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Disconnect' }));
+    expect(await within(section).findByText('Not connected.')).toBeTruthy();
+    expect(sentOf(fake, 'GoogleAdsAccountDisconnect')).toEqual([{}]);
+    expect(screen.getByText('Lawn Search')).toBeTruthy();
   });
 });

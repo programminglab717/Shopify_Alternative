@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-678 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-679 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -686,6 +686,7 @@
 | 676 | A delivered order's page asks what to send back, how many of each and why, and says how the latest request stands; the shopper hears on WhatsApp once the shop decides | Accepted |
 | 677 | The admin lists the returns customers asked for online under Returns, to approve or decline with the reason they are told, and sets the days the shop takes them in its order policies | Accepted |
 | 678 | A shop's owner grants Hatti the reading of their Google Ads account on Google's consent screen, and the same worker pulls its spend by campaign, with an access token from the grant each time | Accepted |
+| 679 | The admin's ad spend page connects the shop's Google Ads account through Google's consent screen, coming back to one address of the admin's that hands the code to the shop that asked | Accepted |
 
 ---
 
@@ -23580,3 +23581,32 @@
   shop pastes, as Meta's and TikTok's tokens are:** Google gives refresh tokens only to the OAuth
   client that asked, so the shop cannot make one for Hatti's. **Google Ads' own reports by email
   or a spreadsheet:** the shop can still type its spend by hand.
+
+## ADR-679 · The admin's ad spend page connects the shop's Google Ads account through Google's consent screen, coming back to one address of the admin's that hands the code to the shop that asked
+
+* **Context:** [ADR-678](#adr-678--a-shops-owner-grants-hatti-the-reading-of-their-google-ads-account-on-googles-consent-screen-and-the-same-worker-pulls-its-spend-by-campaign-with-an-access-token-from-the-grant-each-time) connects a Google Ads account with the code Google's consent
+  screen comes back with, through the Admin API only. Google sends the owner back only to an
+  address registered with Hatti's OAuth client, exactly as registered, while each shop's admin
+  pages are under its own ID.
+* **Decision:** The ad spend page gets a third card, "Google Ads account", beside Meta's and
+  TikTok's, sharing their view of the connected account, pulling now and disconnecting; its one
+  field, the customer ID as Google Ads shows it, is shown at once. "Continue to Google" checks it
+  is ten digits, asks the core for the consent screen with a random `state` and the admin's one
+  return address, `/google-ads`, keeps the connection on its way in the tab's session storage
+  (state, shop, customer ID, address) and goes to Google. `/google-ads` sends the member on to
+  the ad spend page of the shop whose connection the tab started, with what Google gave; the page
+  takes the code out of its address at once, forgets the connection, and connects the account,
+  once the member confirms who they are if it was a while ago. A return the tab did not start, or
+  started for another shop, connects nothing and says so; so does a refusal on Google's screen.
+  The core's refusals show above the card, named by field. Changing the account goes to Google
+  again. Where Hatti has not set Google Ads up, the card says it can't be connected yet. The spend
+  pulled from Google is marked "From Google", and typing over it is explained as for Meta's and
+  TikTok's.
+* **Consequences:** Hatti registers one redirect address with its OAuth client, the admin's
+  `/google-ads`, for every shop. A connection is finished in the tab that started it; a code
+  that comes back elsewhere is never used.
+* **Alternatives:** **The shop's own page as the redirect address:** Google takes no wildcards,
+  and a page per shop cannot be registered. **The shop in `state` alone, without the tab's
+  storage:** `state` would no longer prove the return answers a request this tab made.
+  **A pop-up window for the consent screen:** pop-ups are blocked or awkward on phones, where most
+  owners work.

@@ -24,6 +24,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { MetaAdAccountSection } from './meta-ad-account';
+import { GoogleAdsAccountSection } from './google-ads-account';
 import { BackToMarketing } from './templates-page';
 import { TikTokAdAccountSection } from './tiktok-ad-account';
 
@@ -33,12 +34,14 @@ const PLATFORMS: readonly AdSpendPlatform[] = ['META', 'TIKTOK', 'GOOGLE', 'OTHE
 const TYPED: Partial<Record<AdSpendPlatform, MessageKey>> = {
   META: 'adSpend.metaTyped',
   TIKTOK: 'adSpend.tiktokTyped',
+  GOOGLE: 'adSpend.googleTyped',
 };
 
 /** Where a day's spend was pulled from, for the spend not typed. */
 const PULLED_FROM: Partial<Record<AdSpendSource, MessageKey>> = {
   META: 'adSpend.fromMeta',
   TIKTOK: 'adSpend.fromTiktok',
+  GOOGLE: 'adSpend.fromGoogle',
 };
 
 /** The days the page lists, today's included. */
@@ -315,11 +318,11 @@ function RecentSpend() {
 }
 
 /**
- * Ad spend (ADR-553, ADR-554, ADR-565, ADR-567): what the shop spent on its ads, day by day, by
- * platform and, where it says, by campaign as its links' utm_campaign names it, pulled from its
- * Meta ad account and its TikTok advertiser account, recorded by hand and taken away; and the last
- * 30 days of it, with what they came to and which were pulled from where. The sales report takes
- * it off profit.
+ * Ad spend (ADR-553, ADR-554, ADR-565, ADR-567, ADR-679): what the shop spent on its ads, day by
+ * day, by platform and, where it says, by campaign as its links' utm_campaign names it, pulled
+ * from its Meta ad account, its TikTok advertiser account and its Google Ads account, recorded by
+ * hand and taken away; and the last 30 days of it, with what they came to and which were pulled
+ * from where. The sales report takes it off profit.
  */
 export function AdSpendPage() {
   const { t } = useLocale();
@@ -338,6 +341,7 @@ export function AdSpendPage() {
           <p className="text-secondary">{t('adSpend.intro')}</p>
           <MetaAdAccountSection />
           <TikTokAdAccountSection />
+          <GoogleAdsAccountSection />
           <RecordSpend />
           <RecentSpend />
         </>

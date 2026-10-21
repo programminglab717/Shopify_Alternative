@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Google Ads connected from the admin
+
+* **The admin's ad spend page connects the shop's Google Ads account through Google's consent
+  screen, coming back to one address of the admin's that hands the code to the shop that asked**
+  ([ADR-679](../architecture/13-decision-log.md#adr-679--the-admins-ad-spend-page-connects-the-shops-google-ads-account-through-googles-consent-screen-coming-back-to-one-address-of-the-admins-that-hands-the-code-to-the-shop-that-asked)): the Google Ads card beside Meta's and TikTok's, in English and Urdu, finishing
+  Google's ad spend (MKT-12).
+* 3865 tests, nine more: the admin's, four of the ad spend page and five of the new
+  documents checked against the schema.
+
 ### a694530 · Google Ads' spend pulled through the owner's grant
 
 * **A shop's owner grants Hatti the reading of their Google Ads account on Google's consent

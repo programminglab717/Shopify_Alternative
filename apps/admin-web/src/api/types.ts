@@ -4735,7 +4735,7 @@ export interface ConversationReplyData {
 export type AdSpendPlatform = 'META' | 'TIKTOK' | 'GOOGLE' | 'OTHER';
 
 /** Where a day's ad spend came from: typed, or pulled from Meta or TikTok (ADR-564, ADR-566). */
-export type AdSpendSource = 'MANUAL' | 'META' | 'TIKTOK';
+export type AdSpendSource = 'MANUAL' | 'META' | 'TIKTOK' | 'GOOGLE';
 
 /** What a shop spent on one platform's ads on a day, or on one campaign of them. */
 export interface AdSpendEntryValue {
@@ -4826,6 +4826,41 @@ export interface TikTokAdAccountDisconnectData {
 
 export interface TikTokAdSpendSyncData {
   tiktokAdSpendSync: { tiktokAdAccount: TikTokAdAccount | null; userErrors: UserError[] };
+}
+
+export interface GoogleAdsAccount {
+  /** Its ten digits, without the dashes Google Ads shows them with. */
+  customerId: string;
+  name: string;
+  currency: string;
+  timezone: string | null;
+  /** The last four characters of the grant's refresh token. */
+  grantHint: string;
+  /** Null before its spend was first pulled. */
+  lastSyncedAt: string | null;
+  /** Why the last pull failed, as Google said; null when it went through. */
+  lastError: string | null;
+  updatedAt: string;
+}
+
+export interface GoogleAdsAccountData {
+  googleAdsAccount: GoogleAdsAccount | null;
+}
+
+export interface GoogleAdsConsentUrlData {
+  googleAdsConsentUrl: string | null;
+}
+
+export interface GoogleAdsAccountConnectData {
+  googleAdsAccountConnect: { googleAdsAccount: GoogleAdsAccount | null; userErrors: UserError[] };
+}
+
+export interface GoogleAdsAccountDisconnectData {
+  googleAdsAccountDisconnect: { deletedCustomerId: string | null; userErrors: UserError[] };
+}
+
+export interface GoogleAdsSpendSyncData {
+  googleAdsSpendSync: { googleAdsAccount: GoogleAdsAccount | null; userErrors: UserError[] };
 }
 
 /** A courier's dispute sheet, as the core sends it (ADR-605): its bytes in base64. */
