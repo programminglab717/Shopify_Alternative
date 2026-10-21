@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The theme's colours in the editor's preview
+### 51bfa59 · The theme's colours in the editor's preview
 
 * **The theme editor's preview shows the theme's colours and widths as they change: the
   layout's `{% style %}` CSS rendered again with the unsaved settings and put in the page**
