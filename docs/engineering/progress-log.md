@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Container images
+### 2fb2557 · Container images
 
 * **The core and the storefront are built into images of their own** ([ADR-724](../architecture/13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)), from one
   `Dockerfile`: each app's built code and production dependencies alone, laid out by
