@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The cart asks what the product asks
+### 896bd39 · The cart asks what the product asks
 
 * **The cart refuses a line its product asks more of: a required answer missing, an answer past
   its length or not among its choices, said in the theme's words** ([ADR-691](../architecture/13-decision-log.md#adr-691--the-cart-refuses-a-line-its-product-asks-more-of-a-required-answer-missing-an-answer-past-its-length-or-not-among-its-choices-said-in-the-themes-words)): CAT-15 kept
