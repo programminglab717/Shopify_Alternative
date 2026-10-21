@@ -1,6 +1,6 @@
 /** What shoppers search the online store for (SRC-06, ADR-684). */
 import { Link } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
+import { Pin, Plus } from 'lucide-react';
 import { StoreSearchesQuery } from '../api/operations';
 import type { StoreSearchesData, StoreSearchTermsValue } from '../api/types';
 import { errorText } from '../i18n/errors';
@@ -35,11 +35,14 @@ function Terms({
   rows,
   count,
   synonym = false,
+  pin = false,
 }: {
   rows: readonly StoreSearchTermsValue[];
   count: (row: StoreSearchTermsValue) => string;
   /** Whether each offers a synonym group begun with its words (ADR-686). */
   synonym?: boolean;
+  /** Whether each offers its search's pinned products (ADR-693). */
+  pin?: boolean;
 }) {
   const { t } = useLocale();
   const shop = useShop();
@@ -67,6 +70,18 @@ function Terms({
             >
               <Plus aria-hidden className="size-4" />
               {t('searches.addSynonymShort')}
+            </Link>
+          )}
+          {pin && (
+            <Link
+              to="/$shopId/online-store"
+              params={{ shopId: shop.id }}
+              search={{ tab: 'searchRules', term: row.terms }}
+              aria-label={t('searches.pinFor', { terms: row.terms })}
+              className="inline-flex min-h-10 items-center gap-1 text-primary underline-offset-4 hover:underline"
+            >
+              <Pin aria-hidden className="size-4" />
+              {t('searches.pinShort')}
             </Link>
           )}
         </li>
@@ -114,6 +129,7 @@ export function Searches({ days }: { days: Days }) {
               <Terms
                 rows={report.top}
                 count={(row) => t('searches.times', { count: formatCount(row.searches) })}
+                pin={permits(shop, EDITS_PRODUCTS)}
               />
             </FormSection>
             <FormSection title={t('searches.nothingFound')} hint={t('searches.nothingFoundHint')}>

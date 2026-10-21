@@ -90,6 +90,9 @@ describe('What shoppers search for, in analytics (SRC-06, ADR-684)', () => {
     expect(add.getAttribute('href')).toBe('/shop_1/online-store?tab=synonyms&word=velvet+shawl');
     // The most searched found something: none offered there.
     expect(within(section).getAllByRole('link', { name: /Add a synonym/ })).toHaveLength(2);
+    // The most searched offer their products pinned instead (ADR-693).
+    const pin = within(section).getByRole('link', { name: 'Pin products for lawn' });
+    expect(pin.getAttribute('href')).toBe('/shop_1/online-store?tab=searchRules&term=lawn');
   });
 
   it('says so when no one searched in these days', async () => {

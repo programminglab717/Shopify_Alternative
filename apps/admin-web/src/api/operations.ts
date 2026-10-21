@@ -3641,6 +3641,62 @@ export const SearchSynonymsSetMutation = /* GraphQL */ `
   }
 `;
 
+const SEARCH_RULE_FIELDS = /* GraphQL */ `
+  id
+  query
+  pinnedProducts {
+    id
+    title
+  }
+  hiddenProducts {
+    id
+    title
+  }
+`;
+
+/** What the shop's search shows first, or leaves out, term by term (ADR-692). */
+export const SearchRulesQuery = /* GraphQL */ `
+  query SearchRules {
+    searchRules {
+      ${SEARCH_RULE_FIELDS}
+    }
+  }
+`;
+
+/** Pins and hides a term's products, in place of what its rule said (ADR-692). */
+export const SearchRuleSetMutation = /* GraphQL */ `
+  mutation SearchRuleSet($query: String!, $pinnedProductIds: [ID!]!, $hiddenProductIds: [ID!]!) {
+    searchRuleSet(
+      query: $query
+      pinnedProductIds: $pinnedProductIds
+      hiddenProductIds: $hiddenProductIds
+    ) {
+      searchRule {
+        ${SEARCH_RULE_FIELDS}
+      }
+      userErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+`;
+
+/** Takes a term's rule away: its search shows what it finds (ADR-692). */
+export const SearchRuleDeleteMutation = /* GraphQL */ `
+  mutation SearchRuleDelete($id: ID!) {
+    searchRuleDelete(id: $id) {
+      deletedSearchRuleId
+      userErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+`;
+
 /** What shoppers searched the online store for over the last days (SRC-06, ADR-683). */
 export const StoreSearchesQuery = /* GraphQL */ `
   query StoreSearches($days: Int!) {

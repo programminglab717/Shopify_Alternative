@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-692 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-693 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -700,6 +700,7 @@
 | 690 | The admin's product page has a Personalisation card, for those who change products: each field's question, text of a length or a choice, and whether it must be answered, saved together | Accepted |
 | 691 | The cart refuses a line its product asks more of: a required answer missing, an answer past its length or not among its choices, said in the theme's words | Accepted |
 | 692 | A shop pins products to the top of a term's search, in its order, and hides others from it: the whole search as the search folds it, read live as synonyms are | Accepted |
+| 693 | The admin's online store has a Search results tab, for those who change products: a term's products pinned in order and hidden, and a top search opened from analytics | Accepted |
 
 ---
 
@@ -23945,3 +23946,26 @@
   (Typesense). **Rules for searches holding the term:** "eid" would pin to "eid lawn" too, where
   the shopper asked for less; a whole search is what Shopify matches. **Pins kept in storefront
   documents:** the search is read from the core already, so its rules are read with it.
+
+## ADR-693 · The admin's online store has a Search results tab, for those who change products: a term's products pinned in order and hidden, and a top search opened from analytics
+
+* **Context:** A shop pins products to the top of a term's search and hides others
+  ([ADR-692](#adr-692--a-shop-pins-products-to-the-top-of-a-terms-search-in-its-order-and-hides-others-from-it-the-whole-search-as-the-search-folds-it-read-live-as-synonyms-are)), but only through the API; the analytics page shows its most searched
+  terms without a way to act on them.
+* **Decision:**
+  * **A Search results tab** in the online store, beside Search synonyms
+    ([ADR-686](#adr-686--the-admins-online-store-has-a-search-synonyms-tab-for-those-who-change-products-each-group-a-line-of-words-between-commas-saved-whole-and-a-group-begun-from-a-search-that-found-nothing)), for owners and managers, who change products (`write_products`):
+    the shop's searches by their words, each with how many products it pins and hides, changed
+    or taken away; and a search added.
+  * **A search's form:** its words; the products pinned, found by name and moved up and down,
+    up to 10; the products hidden, up to 50; a product once, pinned or hidden. Saved together.
+    What the core refuses of the words shows under them, of a product with its name above the
+    button.
+  * **From analytics:** each of the most searched terms offers "Pin products", which opens the
+    tab with its words, or with its rule where the shop keeps one.
+  * English and Urdu.
+* **Consequences:** A merchant puts what it wants first on its busiest searches from the admin,
+  seeing on the analytics page which those are.
+* **Alternatives:** **Pins on the product's page:** a product is pinned for a search, and the
+  search is what the merchant has in mind. **Ordering by dragging:** buttons that move a product
+  up or down work by keyboard and on a phone, as the pairings card's do.

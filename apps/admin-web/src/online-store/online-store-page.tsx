@@ -22,6 +22,7 @@ import { KEEPS_LISTINGS, SeoOverview } from './seo-overview';
 import { SpeedTab } from './speed';
 import { StoreBuilderTab } from './store-builder';
 import { StorefrontPreferencesTab } from './storefront';
+import { SearchRulesTab } from './search-rules';
 import { SynonymsTab } from './synonyms';
 import { EDITS_THEMES, ThemesTab } from './themes';
 import { TikTokTab } from './tiktok';
@@ -35,6 +36,7 @@ export const ONLINE_STORE_TABS = [
   'storefront',
   'filters',
   'synonyms',
+  'searchRules',
   'themes',
   'builder',
   'speed',
@@ -49,12 +51,14 @@ export const ONLINE_STORE_TABS = [
 export type OnlineStoreTab = (typeof ONLINE_STORE_TABS)[number];
 
 /**
- * The online store's tab, from its address: its pages unless it names another; and on the
- * synonyms tab, a search's words to begin a group with (ADR-686).
+ * The online store's tab, from its address: its pages unless it names another; on the
+ * synonyms tab, a search's words to begin a group with (ADR-686); and on the search results
+ * tab, a search's words to pin products for (ADR-693).
  */
 export function validateOnlineStoreSearch(search: Record<string, unknown>): {
   tab?: OnlineStoreTab;
   word?: string;
+  term?: string;
 } {
   const tab = ONLINE_STORE_TABS.includes(search.tab as OnlineStoreTab)
     ? (search.tab as OnlineStoreTab)
@@ -63,7 +67,11 @@ export function validateOnlineStoreSearch(search: Record<string, unknown>): {
     tab === 'synonyms' && typeof search.word === 'string' && search.word.trim()
       ? search.word.trim().slice(0, 100)
       : undefined;
-  return { ...(tab && { tab }), ...(word && { word }) };
+  const term =
+    tab === 'searchRules' && typeof search.term === 'string' && search.term.trim()
+      ? search.term.trim().slice(0, 100)
+      : undefined;
+  return { ...(tab && { tab }), ...(word && { word }), ...(term && { term }) };
 }
 
 /** Those who set the storefront's preferences, filters and link page (`write_settings`). */
@@ -87,6 +95,11 @@ const TABS: Record<OnlineStoreTab, { label: MessageKey; gate: Gate; body: () => 
   },
   filters: { label: 'onlineStore.filters', gate: SETS_STOREFRONT, body: () => <FiltersTab /> },
   synonyms: { label: 'onlineStore.synonyms', gate: EDITS_PRODUCTS, body: () => <SynonymsTab /> },
+  searchRules: {
+    label: 'onlineStore.searchRules',
+    gate: EDITS_PRODUCTS,
+    body: () => <SearchRulesTab />,
+  },
   themes: { label: 'onlineStore.themes', gate: EDITS_THEMES, body: () => <ThemesTab /> },
   builder: {
     label: 'onlineStore.builder',
@@ -115,7 +128,7 @@ export const OPENS_ONLINE_STORE = gate(
 
 /**
  * The online store (OS-02, OS-06, OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies,
- * its storefront's password, pause and home page for search engines, its filters (ADR-568), its search synonyms (ADR-686), its themes, its speed (OS-13), every page's
+ * its storefront's password, pause and home page for search engines, its filters (ADR-568), its search synonyms (ADR-686) and what a search shows first (ADR-693), its themes, its speed (OS-13), every page's
  * search engine listing (ADR-606), its redirects, its
  * link page, Meta and the catalog feed (MKT-10, MKT-11), TikTok (ADR-542), Google (ADR-550), and what is left to put in Urdu; a tab for
  * each part its role works in.

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Search results in the admin
+
+* **The admin's online store has a Search results tab, for those who change products: a term's
+  products pinned in order and hidden, and a top search opened from analytics** ([ADR-693](../architecture/13-decision-log.md#adr-693--the-admins-online-store-has-a-search-results-tab-for-those-who-change-products-a-terms-products-pinned-in-order-and-hidden-and-a-top-search-opened-from-analytics)):
+  SRC-04's merchandising for merchants.
+* 3928 tests, eight more: the admin's.
+
 ### bfa9a09 · What a search shows first
 
 * **A shop pins products to the top of a term's search, in its order, and hides others from it:

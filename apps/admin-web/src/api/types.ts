@@ -1641,6 +1641,26 @@ export interface SearchSynonymsSetData {
   };
 }
 
+/** What a term's search shows first, in order, and leaves out (ADR-692). */
+export interface SearchRuleValue {
+  id: string;
+  query: string;
+  pinnedProducts: { id: string; title: string }[];
+  hiddenProducts: { id: string; title: string }[];
+}
+
+export interface SearchRulesData {
+  searchRules: SearchRuleValue[];
+}
+
+export interface SearchRuleSetData {
+  searchRuleSet: { searchRule: SearchRuleValue | null; userErrors: UserError[] };
+}
+
+export interface SearchRuleDeleteData {
+  searchRuleDelete: { deletedSearchRuleId: string | null; userErrors: UserError[] };
+}
+
 /** A search on the online store, by its words (ADR-683). */
 export interface StoreSearchTermsValue {
   terms: string;
