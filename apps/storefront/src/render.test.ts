@@ -3029,6 +3029,84 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it('says what heavier orders cost more to deliver, on product pages and for a heavy cart (ADR-704)', async () => {
+    const sample = sampleStore();
+    const lawn = sample.products[0]!;
+    const variant = lawn.variants[0]!;
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const store = (weights?: { aboveGrams: number; charge: number }[]) =>
+      new MemoryStore({
+        ...sample,
+        shop: {
+          ...sample.shop,
+          delivery: {
+            ...sample.shop.delivery!,
+            charge: 25_000,
+            freeAbove: 500_000,
+            ...(weights && { weights }),
+          },
+        },
+      }).fresh();
+    const heavy = store([
+      { aboveGrams: 2_000, charge: 10_000 },
+      { aboveGrams: 5_500, charge: 30_000 },
+    ]);
+    const path = `/products/${lawn.handle}`;
+    const product = (await renderer.render({ path }, heavy)).html;
+    expect(product).toContain('<li>Orders over 2 kg: Rs 100 more for delivery</li>');
+    expect(product).toContain('<li>Orders over 5.5 kg: Rs 300 more for delivery</li>');
+    expect((await renderer.render({ path, locale: 'ur' }, heavy)).html).toContain(
+      '<li>2 کلو سے زیادہ کے آرڈر: ڈیلیوری Rs 100 زیادہ</li>',
+    );
+    // A shop charging none for weight says nothing of it.
+    expect((await renderer.render({ path }, store())).html).not.toContain('more for delivery');
+
+    // A cart of 3 kg is over the first and not the second; free delivery says nothing of weight.
+    const cartOf = (grams: number, price: number): CartJson => ({
+      note: '',
+      attributes: {},
+      items: [
+        {
+          key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+          variantId: variant.id,
+          productId: lawn.id,
+          quantity: 1,
+          properties: {},
+          price,
+          linePrice: price,
+          title: lawn.title,
+          variantTitle: variant.title,
+          sku: null,
+          grams,
+          taxable: true,
+          taxCode: null,
+          maxQuantity: null,
+        },
+      ],
+      itemCount: 1,
+      subtotal: price,
+      totalWeightGrams: grams,
+      discount: null,
+      totalDiscount: 0,
+    });
+    const cartPage = async (grams: number, price = 200_000, locale?: string) =>
+      (
+        await renderer.render(
+          { path: '/cart', cart: cartOf(grams, price), ...(locale && { locale }) },
+          heavy,
+        )
+      ).html;
+    expect(await cartPage(3_000)).toContain('Your order is over 2 kg: delivery costs Rs 100 more.');
+    expect(await cartPage(6_000)).toContain(
+      'Your order is over 5.5 kg: delivery costs Rs 300 more.',
+    );
+    expect(await cartPage(6_000, 200_000, 'ur')).toContain(
+      'آپ کا آرڈر 5.5 کلو سے زیادہ ہے: ڈیلیوری Rs 300 زیادہ ہے۔',
+    );
+    expect(await cartPage(2_000)).not.toContain('Your order is over');
+    expect(await cartPage(6_000, 600_000)).not.toContain('Your order is over');
+  });
+
   it("says on a product's page what delivery costs and takes to each city, and links the shop's returns (OS-11, ADR-454)", async () => {
     const sample = sampleStore();
     const [lawn] = sample.products;

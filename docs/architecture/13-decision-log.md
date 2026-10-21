@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-703 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-704 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -711,6 +711,7 @@
 | 701 | The Ajax cart takes the forms scripts post as FormData, as Dawn's product form does, read as forms in an address are; one carrying a file is refused, as nothing would keep it | Accepted |
 | 702 | Heavier orders cost more to deliver: a shop names weights, each with what an order over it costs more, and checkout adds the heaviest the cart passes to the city's charge | Accepted |
 | 703 | The admin's delivery settings take heavier orders' charges: weights typed in kilograms, sent in grams, each with what it costs more, added and removed as zones are | Accepted |
+| 704 | Hatti Base says what heavier orders cost more: each weight on product pages, and the heaviest a cart passes on the cart page, from the weights in the shop's document | Accepted |
 
 ---
 
@@ -24195,3 +24196,22 @@
   in English or Urdu.
 * **Alternatives:** **Weights in grams:** merchants and couriers speak of kilograms. **A page of
   their own:** a charge added to the zones' belongs beside them.
+
+## ADR-704 · Hatti Base says what heavier orders cost more: each weight on product pages, and the heaviest a cart passes on the cart page, from the weights in the shop's document
+
+* **Context:** Checkout adds what a heavy order costs more to deliver ([ADR-702](#adr-702--heavier-orders-cost-more-to-deliver-a-shop-names-weights-each-with-what-an-order-over-it-costs-more-and-checkout-adds-the-heaviest-the-cart-passes-to-the-citys-charge)), set
+  in the admin ([ADR-703](#adr-703--the-admins-delivery-settings-take-heavier-orders-charges-weights-typed-in-kilograms-sent-in-grams-each-with-what-it-costs-more-added-and-removed-as-zones-are)), but product and cart pages said the charge without it: a
+  shopper first saw the extra at checkout, the surprise that loses an order.
+* **Decision:**
+  * **The shop's document keeps the weights**, each in grams with its charge, the lightest first,
+    left out while there are none so documents stay as they were.
+  * **Liquid's `delivery.weights`** gives each `above_grams`, the same in `above_kg`, and its
+    `charge`, so a theme can say them in either.
+  * **Hatti Base's product page** says each weight under what delivery costs, "Orders over 2 kg:
+    Rs 100 more for delivery", beside the charges by city ([ADR-454](#adr-454--a-products-page-in-hatti-base-says-what-delivery-costs-and-takes-to-each-of-the-shops-cities-and-links-its-returns-as-trust-elements)); **its cart**,
+    where delivery is not free, says the heaviest weight the cart's `total_weight` passes and
+    what it adds, as checkout will.
+* **Consequences:** A shopper sees what a heavy order costs before checkout, in English or Urdu.
+  The cart's weight is its variants' weights, as checkout counts it.
+* **Alternatives:** **The cart's delivery charge worked out on the cart page:** the city is not
+  known until checkout, so the cart says what the weight adds alone.

@@ -259,6 +259,11 @@
               {%- assign from = lowest | money -%}
               <li>{{ 'products.product.delivery_from' | t: amount: from }}</li>
             {%- endif -%}
+            {%- comment -%} What heavier orders cost more to deliver (ADR-704). {%- endcomment -%}
+            {%- for weight in delivery.weights -%}
+              {%- assign more = weight.charge | money -%}
+              <li>{{ 'products.product.heavier' | t: weight: weight.above_kg, amount: more }}</li>
+            {%- endfor -%}
             {%- comment -%}
               What delivery to their own city costs and takes (OS-11, ADR-454): each of the shop's
               zones, with its cities, then everywhere else. Shown once a shopper asks.

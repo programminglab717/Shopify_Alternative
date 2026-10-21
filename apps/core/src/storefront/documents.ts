@@ -649,6 +649,13 @@ export function shopDoc(
         charge: Number(zone.charge),
         days: zone.days,
       })),
+      // Left out while there are none, so the document stays as it was (ADR-704).
+      ...((delivery.weights?.length ?? 0) > 0 && {
+        weights: delivery.weights!.map((weight) => ({
+          aboveGrams: weight.aboveGrams,
+          charge: Number(weight.charge),
+        })),
+      }),
     },
     theme: theme
       ? {

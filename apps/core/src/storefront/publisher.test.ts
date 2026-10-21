@@ -2450,7 +2450,22 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       days: { min: 2, max: 4 },
       zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 15_000, days: { min: 1, max: 1 } }],
     });
-    unwrap(await delivery.update(tenant, { freeAbove: null, days: null, zones: [] }));
+    // What heavier orders cost more (ADR-704), the lightest first.
+    unwrap(
+      await delivery.update(tenant, {
+        weights: [
+          { aboveGrams: 5_000, charge: '300' },
+          { aboveGrams: 2_000, charge: '100' },
+        ],
+      }),
+    );
+    await deliver();
+    expect((await store().shop()).delivery?.weights).toEqual([
+      { aboveGrams: 2_000, charge: 10_000 },
+      { aboveGrams: 5_000, charge: 30_000 },
+    ]);
+    // Left out while there are none, as before shops could.
+    unwrap(await delivery.update(tenant, { freeAbove: null, days: null, zones: [], weights: [] }));
     await deliver();
     expect((await store().shop()).delivery).toEqual({
       charge: 25_000,

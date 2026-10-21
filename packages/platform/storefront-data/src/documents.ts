@@ -702,6 +702,11 @@ export interface DeliveryDoc {
     /** Its own days; null or absent for everywhere's. */
     days?: DeliveryDaysDoc | null;
   }[];
+  /**
+   * What orders weighing more than `aboveGrams` cost more (ADR-702), the lightest first; absent
+   * while the shop charges none, as in documents written before shops could.
+   */
+  weights?: { aboveGrams: number; charge: number }[];
 }
 
 /** From `min` to `max` working days, 0 the same day. */

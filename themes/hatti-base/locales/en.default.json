@@ -88,6 +88,7 @@
       "free_delivery_from": "Free delivery on orders of {{ amount }} or more",
       "delivery_from": "Delivery from {{ amount }}",
       "delivery_by_city": "Delivery to your city",
+      "heavier": "Orders over {{ weight }} kg: {{ amount }} more for delivery",
       "elsewhere": "Everywhere else",
       "free": "Free",
       "returns": "Returns and exchanges: see our policy",
@@ -166,6 +167,7 @@
       "whatsapp_message": "Hi! I'd like to order {{ items }}. Total: {{ total }}.",
       "free_delivery": "Your order is delivered free.",
       "free_delivery_more": "Add {{ amount }} more for free delivery.",
+      "heavier": "Your order is over {{ weight }} kg: delivery costs {{ amount }} more.",
       "cash_limit": "By law, cash on delivery collects at most {{ amount }} an order: checkout asks the rest in advance, or another way to pay."
     },
     "cart_drawer": {
