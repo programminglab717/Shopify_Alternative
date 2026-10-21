@@ -47,7 +47,11 @@ import {
   FulfillmentService,
   OrderCommentService,
   OrderEditService,
+  OrderLinkService,
   OrderService,
+  OrderSettingsService,
+  ReturnRequestService,
+  ReturnService,
   type OnlinePayments,
   type OrderToPlace,
 } from '@hatti/orders/public';
@@ -1743,6 +1747,74 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect(await linkOf(waiting.id, told!.variables.url!)).toBe(true);
     expect((await timeline(waiting.id)).filter(([kind]) => kind === 'link')).toEqual([
       ['link', 'Sent the customer a link with the message reminding them to pay'],
+    ]);
+  });
+
+  it('tells the customer the shop agreed to take back what they asked to return, or why not (ADR-676)', async () => {
+    unwrap(await new OrderSettingsService(database).update(tenant, { returnWindowDays: 7 }));
+    const service = orders();
+    const links = new OrderLinkService(
+      database,
+      service,
+      new PublicSite('https://hatti.pk'),
+      new StorefrontSite('https://zari.hatti.pk'),
+    );
+    const requests = new ReturnRequestService(
+      database,
+      new ReturnService(
+        database,
+        new VariantService(database),
+        new LocationService(database),
+        new StockService(),
+        service,
+      ),
+    );
+    /** A delivered order whose customer asks, through its page, to send a kurta back. */
+    const asked = async () => {
+      const placed = await placeOnline();
+      unwrap(await service.confirm(tenant, placed.id));
+      const { fulfillmentId } = unwrap(await fulfillments().fulfill(tenant, placed.id, {}));
+      unwrap(await fulfillments().markDelivered(tenant, fulfillmentId));
+      const { url } = unwrap(await links.createLink(tenant, placed.id));
+      const line = (await service.get(tenant, placed.id))!.lines[0]!.id;
+      await links.requestReturn(url.split('/').pop()!, {
+        lines: new Map([[line, { quantity: '1', reason: 'size_too_small' }]]),
+        preference: 'exchange',
+        note: '',
+      });
+      const [request] = (await requests.list(tenant, { orderId: placed.id, first: 1 })).items;
+      return { order: placed, requestId: request!.id };
+    };
+    const told = async () =>
+      (await queued())
+        .filter((message) => message.kind.startsWith('return_'))
+        .map((message) => [message.kind, message.order_id, message.variables]);
+    const declined = await asked();
+    const approved = await asked();
+    await dispatch(3);
+    // Asking is no news to the customer, who just did.
+    expect(await told()).toEqual([]);
+
+    unwrap(await requests.decline(tenant, declined.requestId, 'Worn kurtas\n are not taken back'));
+    unwrap(await requests.approve(tenant, approved.requestId));
+    await dispatch(2);
+    await dispatch(2);
+    const words = (order: { number: number }) => ({
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: `#${order.number}`,
+      total: 'Rs 5,250',
+      toReturn: '1 × Kurta',
+      // Its page, where the request stands.
+      url: expect.stringMatching(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/),
+    });
+    expect(await told()).toEqual([
+      [
+        'return_declined',
+        declined.order.id,
+        { ...words(declined.order), reason: 'Worn kurtas are not taken back' },
+      ],
+      ['return_approved', approved.order.id, words(approved.order)],
     ]);
   });
 

@@ -29,6 +29,8 @@ export const MESSAGE_KINDS = [
   'order_payment_reminder',
   'order_confirmation_reminder',
   'order_confirmation_call',
+  'return_approved',
+  'return_declined',
   'store_credit_given',
   'store_credit_expiring',
   'gift_card',
@@ -316,6 +318,11 @@ export interface MessageVariables {
    * `order` is the one of theirs still to ship.
    */
   refused?: string;
+  /**
+   * For a return its customer asked for (ADR-676): what they asked to send back, "2 × Peshawari
+   * Chappal (9)"; `reason` why the shop declined it.
+   */
+  toReturn?: string;
   /**
    * For listings taken off sale after a rights complaint (ADR-475): the complainant's email, as
    * the store may answer them; `name` says who complains, `reference` the complaint's number and
@@ -736,6 +743,43 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: "Hatti: your account was signed in to from {device} on {date}. If it wasn't you, sign that device out from your sessions in Hatti's admin and contact Hatti's support at once.",
       ur: 'ہٹی: آپ کے اکاؤنٹ میں {date} کو {device} سے سائن ان ہوا۔ اگر یہ آپ نہیں تھے تو ہٹی کے ایڈمن میں اپنے سیشنز سے اس ڈیوائس کو سائن آؤٹ کریں اور فوراً ہٹی کی سپورٹ سے رابطہ کریں۔',
+    },
+  },
+  return_approved: {
+    whatsapp: 'hatti_return_approved',
+    category: 'utility',
+    parameters: ['name', 'shop', 'toReturn', 'order'],
+    // Its page, which says how the request stands.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {shop} agreed to take back {toReturn} from your order ' +
+        '{order}, and will tell you how to send it. Its page:',
+      ur:
+        'السلام علیکم {name}! {shop} آپ کے آرڈر {order} میں سے {toReturn} واپس لینے پر راضی ہے، ' +
+        'اور واپس بھیجنے کا طریقہ بتائے گی۔ آرڈر کا صفحہ:',
+    },
+    subject: {
+      en: 'Your return from order {order} is agreed',
+      ur: 'آرڈر {order} کی واپسی منظور ہو گئی ہے',
+    },
+  },
+  return_declined: {
+    whatsapp: 'hatti_return_declined',
+    category: 'utility',
+    parameters: ['name', 'shop', 'toReturn', 'order', 'reason'],
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        "Assalam-o-Alaikum {name}! Sorry, {shop} can't take back {toReturn} from your order " +
+        '{order}. They said: {reason}',
+      ur:
+        'السلام علیکم {name}! معذرت، {shop} آپ کے آرڈر {order} میں سے {toReturn} واپس نہیں لے ' +
+        'سکتی۔ ان کا کہنا ہے: {reason}',
+    },
+    subject: {
+      en: 'Your return from order {order}',
+      ur: 'آرڈر {order} کی واپسی',
     },
   },
   store_credit_given: {

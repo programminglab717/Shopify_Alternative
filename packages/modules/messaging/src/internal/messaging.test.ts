@@ -380,6 +380,36 @@ describe("Messages' words", () => {
     expect(messageText('order_part_paid', 'ur', part)).toContain('Rs 3,250');
   });
 
+  it('tells a customer the shop agreed to take back what they asked, or why not (ADR-676)', () => {
+    const asked = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      toReturn: '2 × Peshawari Chappal (9)',
+    };
+    expect(messageText('return_approved', 'en', asked)).toBe(
+      'Assalam-o-Alaikum Ayesha! Zari Fashions agreed to take back 2 × Peshawari Chappal (9) ' +
+        'from your order #1043, and will tell you how to send it. Its page:',
+    );
+    expect(templateParameters('return_approved', asked)).toEqual([
+      'Ayesha',
+      'Zari Fashions',
+      '2 × Peshawari Chappal (9)',
+      '#1043',
+    ]);
+    const declined = { ...asked, reason: 'Worn shoes are not taken back' };
+    expect(messageText('return_declined', 'en', declined)).toBe(
+      "Assalam-o-Alaikum Ayesha! Sorry, Zari Fashions can't take back 2 × Peshawari Chappal (9) " +
+        'from your order #1043. They said: Worn shoes are not taken back',
+    );
+    expect(templateParameters('return_declined', declined).at(-1)).toBe(
+      'Worn shoes are not taken back',
+    );
+    expect(messageText('return_declined', 'ur', declined)).toContain(
+      'Worn shoes are not taken back',
+    );
+  });
+
   it('reminds a customer to pay before the order is cancelled, with its page (ADR-174)', () => {
     const reminder = {
       name: 'Ayesha',
@@ -778,6 +808,8 @@ describe("Messages' words", () => {
       'order_part_paid',
       'order_payment_reminder',
       'order_confirmation_reminder',
+      'return_approved',
+      'return_declined',
       'store_credit_given',
       'store_credit_expiring',
       'invoice_due',

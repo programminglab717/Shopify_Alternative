@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { orderLinkPage } from './link-pages.js';
 import type { OrderLinkView } from './order-link.service.js';
 import type { OrderRecord } from './records.js';
 import { ReturnRequestService, type ReturnRequestForm } from './return-request.service.js';
@@ -202,5 +203,46 @@ describe.skipIf(!server)('Returns shoppers ask for (ADR-675)', () => {
         `Approved the customer's return request, as #${order.number}-R1`,
       ]),
     );
+  });
+
+  it("shows the form on the delivered order's page, and how the latest request stands (ADR-676)", async () => {
+    const { order, token } = await delivered();
+    const chappalLine = lineOf(order, chappal).id;
+    // None asked online: the page has no form.
+    expect(orderLinkPage(await f.links.viewLink(token)).html).not.toContain('value="return"');
+    unwrap(await f.orderSettings.update(f.a, { returnWindowDays: 7 }));
+    const page = orderLinkPage(await f.links.viewLink(token));
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('Send something back');
+    expect(page.html).toContain(`name="quantity_${chappalLine}"`);
+    // As many as came, or none.
+    expect(page.html).toMatch(new RegExp(`name="quantity_${chappalLine}">[\\s\\S]*?value="2"`));
+    expect(page.html).toContain(`name="reason_${chappalLine}"`);
+    expect(page.html).toContain('value="store_credit"');
+    expect(page.html).toContain('maxlength="500"');
+
+    // A request missing its reason is the shopper's to correct; one waiting already, the shop's.
+    const missing = await f.links.requestReturn(token, formOf({ [chappalLine]: ['1', ''] }));
+    expect(orderLinkPage(missing).status).toBe(422);
+    const sent = await f.links.requestReturn(
+      token,
+      formOf({ [chappalLine]: ['1', 'size_too_small'] }),
+    );
+    const asked = orderLinkPage(sent, { asked: true }).html;
+    expect(asked).toContain('has your request, and will answer it in your chat');
+    expect(asked).toContain('has your request to send back 1 × Peshawari Chappal');
+    // Waiting, nothing more is asked.
+    expect(asked).not.toContain('value="return"');
+    const again = await f.links.requestReturn(token, formOf({ [chappalLine]: ['1', 'other'] }));
+    expect(orderLinkPage(again).status).toBe(409);
+
+    const [waiting] = (await requests.list(f.a, { status: 'requested', first: 1 })).items;
+    unwrap(await requests.decline(f.a, waiting!.id, 'Worn shoes are not taken back'));
+    const declined = orderLinkPage(await f.links.viewLink(token)).html;
+    expect(declined).toContain(
+      "can&#39;t take back 1 × Peshawari Chappal: Worn shoes are not taken back",
+    );
+    // Asked again while the days last.
+    expect(declined).toContain('value="return"');
   });
 });

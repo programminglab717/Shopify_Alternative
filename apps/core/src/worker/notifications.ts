@@ -32,6 +32,7 @@ import {
   OrderEvents,
   messageLinkIn,
   orderNotificationFactsIn,
+  returnRequestNoticeIn,
   type FulfillmentCreatedPayload,
   type FulfillmentEventCreatedPayload,
   type FulfillmentUpdatedPayload,
@@ -86,6 +87,8 @@ export class OrderNotifications {
     OrderEvents.FulfillmentCreated,
     OrderEvents.FulfillmentUpdated,
     OrderEvents.FulfillmentEventCreated,
+    OrderEvents.ReturnRequestApproved,
+    OrderEvents.ReturnRequestDeclined,
     MessagingEvents.MessageReplied,
   ];
 
@@ -164,10 +167,55 @@ export class OrderNotifications {
         }
         return;
       }
+      case OrderEvents.ReturnRequestApproved:
+      case OrderEvents.ReturnRequestDeclined:
+        await this.#returnDecided(event.shopId, event.aggregateId);
+        return;
       case MessagingEvents.MessageReplied:
         await this.#answered(event);
         return;
     }
+  }
+
+  /**
+   * A return its customer asked for from the order's page, decided (ADR-676): the shop agreed to
+   * take it back, or declined it, saying why; either with the order's page, where the request
+   * stands, as long as its link lasts after the order ends.
+   */
+  async #returnDecided(shopId: string, requestId: string): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const request = await returnRequestNoticeIn(tx, shopId, requestId);
+      if (!request || request.status === 'requested') return;
+      const order = await orderNotificationFactsIn(tx, shopId, request.orderId);
+      if (!order || order.erased || !order.phone) return;
+      const kind = request.status === 'approved' ? 'return_approved' : 'return_declined';
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind,
+        recipient: order.phone,
+        email: order.email,
+        orderId: request.orderId,
+        customerId: order.customerId,
+        dedupeKey: `${kind}:${requestId}`,
+        variables: {
+          ...(await this.#variables(tx, shopId, order)),
+          toReturn: request.items,
+          // In the shop's words, on one line, as a template's parameter must be.
+          reason: request.declineReason?.replace(/\s+/g, ' ').trim() || undefined,
+        },
+      });
+      if (id) {
+        await this.#carryPage(
+          tx,
+          shopId,
+          request.orderId,
+          id,
+          `that the return asked for was ${request.status}`,
+          {
+            ended: true,
+          },
+        );
+      }
+    });
   }
 
   /**
@@ -398,12 +446,21 @@ export class OrderNotifications {
     orderId: string,
     messageId: string,
     about: string,
+    /** As for {@link messageLinkIn}: whether an order closed once delivered has one too. */
+    options: { ended?: boolean } = {},
   ): Promise<void> {
     const pages = this.site.url(`/${ORDER_LINK_PATH}/`);
     const known = (await this.messages.linksIn(tx, shopId, orderId))
       .filter((url) => url.startsWith(pages))
       .map((url) => url.slice(pages.length));
-    const path = await messageLinkIn(tx, shopId, orderId, `with the message ${about}`, known);
+    const path = await messageLinkIn(
+      tx,
+      shopId,
+      orderId,
+      `with the message ${about}`,
+      known,
+      options,
+    );
     if (path) await this.messages.linkIn(tx, shopId, messageId, this.site.url(path));
   }
 

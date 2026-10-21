@@ -27,6 +27,8 @@ export enum MessageKind {
   ORDER_PAYMENT_REMINDER = 'ORDER_PAYMENT_REMINDER',
   ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
   ORDER_CONFIRMATION_CALL = 'ORDER_CONFIRMATION_CALL',
+  RETURN_APPROVED = 'RETURN_APPROVED',
+  RETURN_DECLINED = 'RETURN_DECLINED',
   STORE_CREDIT_GIVEN = 'STORE_CREDIT_GIVEN',
   STORE_CREDIT_EXPIRING = 'STORE_CREDIT_EXPIRING',
   GIFT_CARD = 'GIFT_CARD',
@@ -141,6 +143,16 @@ registerEnumType(MessageKind, {
       description:
         'Their order still waits for its payment, a day before the shop cancels it unpaid: what ' +
         'it waits for, by when, and its page (ADR-174).',
+    },
+    RETURN_APPROVED: {
+      description:
+        'The shop agreed to take back what they asked to return from their order, and will say ' +
+        'how to send it: what, and its page (ADR-676).',
+    },
+    RETURN_DECLINED: {
+      description:
+        "The shop can't take back what they asked to return from their order: what, why, and " +
+        'its page (ADR-676).',
     },
     STORE_CREDIT_GIVEN: {
       description:

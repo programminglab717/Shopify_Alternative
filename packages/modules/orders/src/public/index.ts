@@ -195,6 +195,8 @@ export {
   ReturnRequestService,
   type ReturnOffer,
   type ReturnRequestForm,
+  returnRequestNoticeIn,
+  type ReturnRequestNotice,
   type ReturnRequestRecord,
 } from '../internal/return-request.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';

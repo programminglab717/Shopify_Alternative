@@ -698,6 +698,10 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     }`;
 
     const kept = await delivered();
+    // The delivered order's page asks what to send back, and why (ADR-676).
+    expect((await app.inject({ method: 'GET', url: kept.path })).body).toContain(
+      `name="quantity_${kept.line}"`,
+    );
     const asked = await post(
       kept.path,
       `action=return&quantity_${kept.line}=1&reason_${kept.line}=size_too_small` +
@@ -705,6 +709,9 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
     );
     expect(asked.statusCode).toBe(303);
     expect(asked.headers.location).toBe(`${kept.path.split('/').at(-1)}?asked`);
+    expect((await app.inject({ method: 'GET', url: `${kept.path}?asked` })).body).toContain(
+      'has your request, and will answer it in your chat',
+    );
     // Asking again while one waits is refused.
     const again = await post(
       kept.path,

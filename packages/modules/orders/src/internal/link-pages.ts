@@ -33,10 +33,18 @@ import {
 import type { OnlineGateway } from './online-payments.js';
 import type { OrderLinkView, ReviewableProduct } from './order-link.service.js';
 import type { PostPurchaseOffer } from './post-purchase-offer.js';
+import { RETURN_NOTE_MAX, type ReturnOffer } from './return-request.service.js';
 import type { TrackingView } from './tracking.service.js';
 import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
-import type { FulfillmentEventStatusValue, StoredAddressValue } from './schema.js';
+import {
+  RETURN_PREFERENCES,
+  RETURN_REASONS,
+  type FulfillmentEventStatusValue,
+  type ReturnPreferenceValue,
+  type ReturnReasonValue,
+  type StoredAddressValue,
+} from './schema.js';
 import {
   shownItems,
   shownOfDraft,
@@ -117,7 +125,32 @@ const LABELS = {
   reviewTitle: { en: 'Rate what you bought', ur: 'اپنی خریداری کو ریٹ کریں' },
   reviewWords: { en: 'Your words (optional)', ur: 'آپ کی رائے (اختیاری)' },
   sendReview: { en: 'Send my rating', ur: 'ریٹنگ بھیجیں' },
+  returnTitle: { en: 'Send something back', ur: 'کوئی چیز واپس بھیجیں' },
+  returnHowMany: { en: 'How many', ur: 'کتنے' },
+  returnWhy: { en: 'Why', ur: 'وجہ' },
+  chooseWhy: { en: 'Choose why', ur: 'وجہ منتخب کریں' },
+  returnInstead: { en: 'What would you like instead?', ur: 'بدلے میں آپ کیا چاہیں گے؟' },
+  returnNote: { en: 'Anything to add (optional)', ur: 'مزید کچھ کہنا ہو (اختیاری)' },
+  sendReturn: { en: 'Ask for a return', ur: 'واپسی کی درخواست بھیجیں' },
 } satisfies Record<string, Words>;
+
+/** Why an item goes back, as the order's page offers it (ADR-675). */
+const RETURN_REASON_LABELS = {
+  size_too_small: { en: 'Too small', ur: 'چھوٹا ہے' },
+  size_too_large: { en: 'Too large', ur: 'بڑا ہے' },
+  unwanted: { en: 'Not wanted any more', ur: 'اب نہیں چاہیے' },
+  not_as_described: { en: 'Not as described', ur: 'بتائے گئے کے مطابق نہیں' },
+  wrong_item: { en: 'The wrong item came', ur: 'غلط چیز آئی' },
+  defective: { en: 'Faulty or damaged', ur: 'خراب یا ٹوٹا ہوا' },
+  other: { en: 'Another reason', ur: 'کوئی اور وجہ' },
+} satisfies Record<ReturnReasonValue, Words>;
+
+/** What the shopper may ask for instead of what they send back (ADR-675). */
+const RETURN_PREFERENCE_LABELS = {
+  exchange: { en: 'Another size or item', ur: 'دوسرا سائز یا کوئی اور چیز' },
+  store_credit: { en: 'Store credit', ur: 'اسٹور کریڈٹ' },
+  refund: { en: 'My money back', ur: 'میری رقم واپس' },
+} satisfies Record<ReturnPreferenceValue, Words>;
 
 /** A parcel's steps, as its page names them (ADR-160): shipped, then each its courier told of. */
 const STEP_LABELS = {
@@ -154,6 +187,8 @@ export interface LinkPageOptions {
   reviewed?: boolean;
   /** The item offered them was added just now (ADR-438). */
   added?: boolean;
+  /** The return they asked for was taken just now (ADR-675). */
+  asked?: boolean;
 }
 
 /**
@@ -244,6 +279,8 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           offer: view.offer,
           added: Boolean(options.added) && !problem,
           storeCredit: view.storeCredit,
+          returns: view.returns,
+          asked: Boolean(options.asked) && !problem,
         });
       }
       return confirmPage({
@@ -761,6 +798,10 @@ function statusPage(
     added?: boolean;
     /** What the customer has of store credit with the shop (ADR-596), minor units; 0 for none. */
     storeCredit?: bigint;
+    /** Once delivered, what may go back, and their latest return request (ADR-675). */
+    returns?: ReturnOffer | null;
+    /** The return they asked for was taken just now. */
+    asked?: boolean;
   },
 ): LinkPage {
   const {
@@ -778,6 +819,8 @@ function statusPage(
     offer = null,
     added = false,
     storeCredit = 0n,
+    returns = null,
+    asked = false,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -794,7 +837,9 @@ function statusPage(
     page(
       !problem || (problem.kind === 'payment' && problem.reason !== 'unavailable')
         ? 200
-        : problem.kind === 'receipt' || problem.kind === 'review'
+        : problem.kind === 'receipt' ||
+            problem.kind === 'review' ||
+            (problem.kind === 'return' && problem.reason !== 'waiting')
           ? 422
           : problem.kind === 'payment'
             ? 503
@@ -809,6 +854,7 @@ function statusPage(
         paid && onlinePaidNotice(shop.name),
         reviewed && reviewedNotice(shop),
         added && addedNotice(),
+        asked && askedNotice(shop),
         mark && html`<div class="mark" aria-hidden="true">✓</div>`,
         heading(title),
         paragraphs(sentence, 'center'),
@@ -945,6 +991,7 @@ function statusPage(
         },
         true,
         reviewForm(reviewable),
+        returns && returnSection(shop, returns),
         parcels(order, steps, shop.timezone),
       );
     case 'returning':
@@ -1298,6 +1345,132 @@ ${review?.body ?? ''}</textarea>
       <button class="button stack" type="submit">${say('bilingual', LABELS.sendReview)}</button>
     </form>
   </section>`;
+}
+
+/**
+ * Where the shopper asks to send something back (ORD-08, ADR-675), within the days the shop
+ * takes returns: how many of each item and why, what they would like instead and a note; and
+ * how their latest request stands, the shop's reason if it declined. Without scripts: a list of
+ * how many for each item, 0 to leave it.
+ */
+function returnSection(shop: LinkShop, returns: ReturnOffer): Html | false {
+  const { until, lines, latest } = returns;
+  const open = until !== null && lines.length > 0;
+  if (!open && !latest) return false;
+  return html`<section class="section">
+    <h2 class="label">${say('bilingual', LABELS.returnTitle)}</h2>
+    ${latest && paragraphs(requestWords(shop, latest), 'small')}
+    ${
+      open &&
+      html`${paragraphs(returnUntilWords(until, shop.timezone), 'small')}
+        <form method="post">
+          <input type="hidden" name="action" value="return" />
+          ${lines.map(
+            ({ lineItemId, units, ...line }) =>
+              html`<fieldset class="field">
+                <legend class="label">${text(itemName(line))}</legend>
+                <label class="label" for="quantity-${lineItemId}"
+                  >${say('bilingual', LABELS.returnHowMany)}</label
+                >
+                <select id="quantity-${lineItemId}" name="quantity_${lineItemId}">
+                  ${Array.from(
+                    { length: units + 1 },
+                    (_, count) => html`<option value="${String(count)}">${String(count)}</option>`,
+                  )}
+                </select>
+                <label class="label" for="reason-${lineItemId}"
+                  >${say('bilingual', LABELS.returnWhy)}</label
+                >
+                <select id="reason-${lineItemId}" name="reason_${lineItemId}">
+                  <option value="">${LABELS.chooseWhy.en} · ${LABELS.chooseWhy.ur}</option>
+                  ${RETURN_REASONS.map(
+                    (reason) =>
+                      html`<option value="${reason}">
+                        ${RETURN_REASON_LABELS[reason].en} · ${RETURN_REASON_LABELS[reason].ur}
+                      </option>`,
+                  )}
+                </select>
+              </fieldset>`,
+          )}
+          <fieldset class="field">
+            <legend class="label">${say('bilingual', LABELS.returnInstead)}</legend>
+            ${RETURN_PREFERENCES.map(
+              (preference) =>
+                html`<label class="choice">
+                  <input type="radio" name="preference" value="${preference}" />
+                  <span
+                    ><span lang="en">${RETURN_PREFERENCE_LABELS[preference].en}</span
+                    ><span lang="ur" dir="rtl"
+                      >${RETURN_PREFERENCE_LABELS[preference].ur}</span
+                    ></span
+                  >
+                </label>`,
+            )}
+          </fieldset>
+          <div class="field">
+            <label class="label" for="return-note">${say('bilingual', LABELS.returnNote)}</label>
+            <textarea
+              id="return-note"
+              name="note"
+              maxlength="${String(RETURN_NOTE_MAX)}"
+              rows="3"
+            ></textarea>
+          </div>
+          <button class="button stack" type="submit">${say('bilingual', LABELS.sendReturn)}</button>
+        </form>`
+    }
+  </section>`;
+}
+
+/** "You can ask until 28 Oct 2026.", the last day in the shop's time zone. */
+function returnUntilWords(until: Date, timeZone: string): Sentence {
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(until);
+  return {
+    en: `You can ask to send items back until ${day}.`,
+    ur: html`آپ ${ltr(day)} تک چیزیں واپس بھیجنے کی درخواست کر سکتے ہیں۔`,
+  };
+}
+
+/** How the shopper's latest return request stands. */
+function requestWords(shop: LinkShop, latest: NonNullable<ReturnOffer['latest']>): Sentence {
+  const items = latest.lines
+    .map((line) => `${String(line.quantity)} × ${itemName(line)}`)
+    .join(', ');
+  switch (latest.status) {
+    case 'requested':
+      return {
+        en: `${shop.name} has your request to send back ${items}, and will answer it soon.`,
+        ur: html`دکان کو ${text(items)} واپس بھیجنے کی آپ کی درخواست مل گئی ہے، وہ جلد جواب دے گی۔`,
+      };
+    case 'approved':
+      return {
+        en: `${shop.name} agreed to take back ${items}. They will tell you in your chat how to send it.`,
+        ur: html`دکان ${text(items)} واپس لینے پر راضی ہے۔ واپس بھیجنے کا طریقہ آپ کو چیٹ میں بتایا
+        جائے گا۔`,
+      };
+    case 'declined':
+      return {
+        en: `${shop.name} can't take back ${items}: ${latest.declineReason ?? ''}`,
+        ur: html`دکان ${text(items)} واپس نہیں لے سکتی: ${text(latest.declineReason ?? '')}`,
+      };
+  }
+}
+
+function askedNotice(shop: LinkShop): Html {
+  return html`<div class="banner done" role="status">
+    ${paragraphs(
+      {
+        en: `Thank you: ${shop.name} has your request, and will answer it in your chat.`,
+        ur: 'شکریہ! دکان کو آپ کی درخواست مل گئی ہے، وہ آپ کی چیٹ میں جواب دے گی۔',
+      },
+      '',
+    )}
+  </div>`;
 }
 
 function reviewedNotice(shop: LinkShop): Html {

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The return form, and the shop's answer told
+
+* **A delivered order's page asks what to send back, how many of each and why, and says how
+  the latest request stands; the shopper hears on WhatsApp once the shop decides** ([ADR-676](../architecture/13-decision-log.md#adr-676--a-delivered-orders-page-asks-what-to-send-back-how-many-of-each-and-why-and-says-how-the-latest-request-stands-the-shopper-hears-on-whatsapp-once-the-shop-decides)):
+  the second part of the return portal (ORD-08), with the new templates `return_approved` and
+  `return_declined`, which the shop may turn off on its Messages page.
+* 3840 tests, three more: the orders module's, the messaging module's and the worker's.
+
 ### 225ab72 · Returns shoppers ask for
 
 * **Shoppers ask for a return from their order's page, within the days the shop takes returns

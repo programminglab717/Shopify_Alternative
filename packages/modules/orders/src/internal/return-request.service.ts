@@ -373,6 +373,31 @@ export class ReturnRequestService {
   }
 }
 
+/** A decided request as its shopper is told of it (ADR-676). */
+export interface ReturnRequestNotice {
+  orderId: string;
+  status: ReturnRequestStatusValue;
+  /** What it named: "2 × Peshawari Chappal (9), 1 × Multani Khussa". */
+  items: string;
+  declineReason: string | null;
+}
+
+/** Request `id` as its shopper's message says it; null for none. */
+export async function returnRequestNoticeIn(
+  tx: Tx,
+  shopId: string,
+  id: string,
+): Promise<ReturnRequestNotice | null> {
+  const [request] = await requestsIn(tx, shopId, { id, first: 1 });
+  if (!request) return null;
+  return {
+    orderId: request.orderId,
+    status: request.status,
+    items: request.lines.map((line) => `${String(line.quantity)} × ${itemName(line)}`).join(', '),
+    declineReason: request.declineReason,
+  };
+}
+
 /** Requests as staff and shoppers see them, the oldest first unless asked otherwise. */
 async function requestsIn(
   tx: Tx,

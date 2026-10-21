@@ -538,8 +538,10 @@ flowchart TB
   they would like another size, store credit or their money back; staff approve it into such
   a return or decline it saying why
   ([ADR-675](./13-decision-log.md#adr-675--shoppers-ask-for-a-return-from-their-orders-page-within-the-days-the-shop-takes-returns-after-delivery-one-waiting-at-a-time-staff-approve-it-into-a-return-or-decline-it-saying-why)).
-  The page's form, the shopper told the answer, reverse pickups and return rules beyond a
-  window come later.
+  The page asks it with a form, how many of each item and why, and says how the latest
+  request stands; the shopper hears the shop's answer on WhatsApp, its reason if it declined
+  ([ADR-676](./13-decision-log.md#adr-676--a-delivered-orders-page-asks-what-to-send-back-how-many-of-each-and-why-and-says-how-the-latest-request-stands-the-shopper-hears-on-whatsapp-once-the-shop-decides)).
+  The admin's requests page, reverse pickups and return rules beyond a window come later.
 
 ---
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-675 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-676 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -683,6 +683,7 @@
 | 673 | A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship is given to, else who confirms orders | Accepted |
 | 674 | A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to ship for review, where the shop says so | Accepted |
 | 675 | Shoppers ask for a return from their order's page, within the days the shop takes returns after delivery, one waiting at a time; staff approve it into a return or decline it saying why | Accepted |
+| 676 | A delivered order's page asks what to send back, how many of each and why, and says how the latest request stands; the shopper hears on WhatsApp once the shop decides | Accepted |
 
 ---
 
@@ -23496,3 +23497,26 @@
   the order's placing:** an order slow to arrive would leave the shopper no days to ask.
   **Photos with the request:** the order's page takes a transfer's receipt already, but a reason
   and a note decide most returns; photos can follow.
+
+## ADR-676 · A delivered order's page asks what to send back, how many of each and why, and says how the latest request stands; the shopper hears on WhatsApp once the shop decides
+
+* **Context:** ADR-675 takes a return a shopper asks for from their order's page, but the page
+  shows no form to ask with, and the shopper does not hear what the shop decided unless they
+  open the page again (status shortcut 18).
+* **Decision:** A delivered order's page, within the shop's days, has a section to send
+  something back, without scripts as the page has none: for each item it may still take back,
+  how many (0 to leave it, up to as many as are left) and one of Shopify's reasons in English and
+  Urdu, then what they would like instead, as choices, and a note of up to 500 characters; the
+  page after says the shop has it (`?asked`). The section says until when they may ask, and how
+  their latest request stands: waiting, agreed to, or declined with the shop's reason, the form
+  shown again while the days last. A form missing what it needs is answered 422, one asked while
+  another waits 409. Once staff decide, the worker tells the shopper, from the request's event
+  read through the orders module's `returnRequestNoticeIn`, as `return_approved` (what the shop
+  agreed to take back, and that it will say how to send it) or `return_declined` (what, and the
+  shop's reason on one line), each with the order's page, by email too where the order has one;
+  the shop may turn either off on its Messages page.
+* **Consequences:** A shopper asks for a return and hears the answer without writing to the shop.
+  How to send it back stays the shop's to say in its chat until couriers' reverse pickups come.
+* **Alternatives:** **Telling the shopper their request was taken:** they just saw the page say
+  so. **The reason as a template's free text:** Meta's templates take parameters, not free text,
+  so the reason is one, its line breaks folded.

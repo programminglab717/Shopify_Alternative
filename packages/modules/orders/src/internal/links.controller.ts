@@ -134,6 +134,7 @@ export class OrderLinkController {
     @Query('paid') paid: string | undefined,
     @Query('reviewed') reviewed: string | undefined,
     @Query('added') added: string | undefined,
+    @Query('asked') asked: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.links.viewLink(token);
@@ -147,6 +148,7 @@ export class OrderLinkController {
         paid: paid !== undefined,
         reviewed: reviewed !== undefined,
         added: added !== undefined,
+        asked: asked !== undefined,
       }),
     );
   }
