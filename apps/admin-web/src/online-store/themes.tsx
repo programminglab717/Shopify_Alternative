@@ -3,6 +3,7 @@ import {
   CalendarClock,
   Copy,
   ExternalLink,
+  Link2Off,
   Paintbrush,
   Palette,
   Plus,
@@ -14,6 +15,7 @@ import type { FormEvent } from 'react';
 import {
   ThemeCreateMutation,
   ThemeDeleteMutation,
+  ThemePreviewLinksRevokeMutation,
   ThemePublishMutation,
   ThemesQuery,
 } from '../api/operations';
@@ -61,7 +63,8 @@ function useChange() {
 
 /**
  * One theme: customised, looked at through its preview link, published now or at a time ahead,
- * or deleted once asked; its versions opened beneath it, to take it back to one.
+ * or deleted once asked; its versions opened beneath it, to take it back to one; its preview
+ * links sent so far ended once asked (ADR-699).
  */
 function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
   const { t, locale } = useLocale();
@@ -73,8 +76,13 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
   const remove = useAdminMutation<{ themeDelete: { userErrors: UserError[] } }, { id: string }>(
     ThemeDeleteMutation,
   );
+  const revoke = useAdminMutation<
+    { themePreviewLinksRevoke: { userErrors: UserError[] } },
+    { id: string }
+  >(ThemePreviewLinksRevokeMutation);
   const { problem, change } = useChange();
-  const [asking, setAsking] = useState<'publish' | 'delete' | 'schedule' | null>(null);
+  const [asking, setAsking] = useState<'publish' | 'delete' | 'revoke' | 'schedule' | null>(null);
+  const [revoked, setRevoked] = useState(false);
   const [versions, setVersions] = useState(false);
   const main = theme.role === 'MAIN';
   const publishAt = theme.publishAt;
@@ -106,24 +114,25 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
         <ThemeSchedule theme={theme} change={change} onDone={() => setAsking(null)} />
       ) : asking ? (
         <Alert tone="warning">
-          <p>
-            {asking === 'publish'
-              ? t('themes.publishAsk', { name: theme.name })
-              : t('themes.deleteAsk', { name: theme.name })}
-          </p>
+          <p>{t(`themes.${asking}Ask`, { name: theme.name })}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
               variant={asking === 'delete' ? 'destructive' : 'primary'}
-              busy={publish.isPending || remove.isPending}
+              busy={publish.isPending || remove.isPending || revoke.isPending}
               onClick={() =>
                 void change(async () =>
                   asking === 'publish'
                     ? (await publish.mutateAsync({ id: theme.id })).themePublish
-                    : (await remove.mutateAsync({ id: theme.id })).themeDelete,
-                ).then(() => setAsking(null))
+                    : asking === 'revoke'
+                      ? (await revoke.mutateAsync({ id: theme.id })).themePreviewLinksRevoke
+                      : (await remove.mutateAsync({ id: theme.id })).themeDelete,
+                ).then((ok) => {
+                  setRevoked(ok && asking === 'revoke');
+                  setAsking(null);
+                })
               }
             >
-              {asking === 'publish' ? t('themes.publishSure') : t('themes.deleteSure')}
+              {t(`themes.${asking}Sure`)}
             </Button>
             <Button variant="secondary" onClick={() => setAsking(null)}>
               {t('action.back')}
@@ -151,6 +160,17 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
             <ExternalLink aria-hidden className="size-5" />
             {t('themes.preview')}
           </a>
+          <Button
+            variant="secondary"
+            icon={<Link2Off aria-hidden className="size-5" />}
+            aria-label={t('themes.revokeOf', { name: theme.name })}
+            onClick={() => {
+              setRevoked(false);
+              setAsking('revoke');
+            }}
+          >
+            {t('themes.revoke')}
+          </Button>
           <VersionsButton
             theme={theme}
             open={versions}
@@ -184,6 +204,7 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
           )}
         </div>
       )}
+      {revoked && <Alert tone="success">{t('themes.revoked')}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
       {versions && <ThemeVersions theme={theme} change={change} />}
     </li>

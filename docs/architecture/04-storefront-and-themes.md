@@ -306,7 +306,8 @@ changed, is left out, and the platform theme's shows. A theme keeps its last 30 
 with the files it touched as they were, and is taken back to the version one made as a
 change of its own ([ADR-694](./13-decision-log.md#adr-694--a-theme-keeps-its-last-30-changes-each-with-the-files-it-touched-as-they-were-and-is-taken-back-to-the-version-one-made-as-a-change-of-its-own)), and is published at a time
 set ahead by the worker's sweep ([ADR-695](./13-decision-log.md#adr-695--a-theme-is-published-at-a-time-set-ahead-a-minute-to-a-year-off-by-the-workers-sweep-of-what-is-due-as-a-merchant-would-publish-it-then)). Any theme, published or
-not, can be seen on the storefront through a preview link the core seals, for 14 days: the
+not, can be seen on the storefront through a preview link the core seals, for 14 days, or until
+the theme's links are ended together ([ADR-699](./13-decision-log.md#adr-699--a-themes-preview-links-made-so-far-are-ended-at-once-by-raising-its-links-generation-which-each-link-holds-the-admins-themes-tab-ends-them-once-asked)): the
 storefront keeps it in a cookie, asks the core for the theme's files as saved, and shows every
 page in it, uncached, with a bar that names it and ends the preview
 ([ADR-049](./13-decision-log.md#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)).

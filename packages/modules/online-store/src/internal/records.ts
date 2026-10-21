@@ -16,6 +16,8 @@ export interface ThemeRecord {
   version: number;
   /** When the worker publishes it, set ahead (ADR-695); null when not. */
   publishAt: Date | null;
+  /** Its preview links' generation: those made before it last went up show nothing (ADR-699). */
+  previewGeneration: number;
   createdAt: Date;
   updatedAt: Date;
 }

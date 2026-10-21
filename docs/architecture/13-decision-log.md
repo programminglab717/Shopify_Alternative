@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-698 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-699 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -706,6 +706,7 @@
 | 696 | The admin's themes tab shows each theme's versions to take it back to, and publishes a theme at a time set ahead or calls it off | Accepted |
 | 697 | A personalisation field may add to each unit's price when it is answered, as embroidery costs: the cart prices its line with it, so the order keeps it, and the page says it | Accepted |
 | 698 | The admin's Personalisation card asks what each field's answer adds to the price, in rupees, blank for nothing | Accepted |
+| 699 | A theme's preview links made so far are ended at once by raising its links' generation, which each link holds; the admin's themes tab ends them once asked | Accepted |
 
 ---
 
@@ -24077,3 +24078,26 @@
 * **Consequences:** A merchant sets "Name to embroider, Rs 500" where they set the question.
 * **Alternatives:** **A switch for whether a field costs, then its price:** a blank price says
   it costs nothing in one field fewer.
+
+## ADR-699 · A theme's preview links made so far are ended at once by raising its links' generation, which each link holds; the admin's themes tab ends them once asked
+
+* **Context:** A theme's preview link shows it on the storefront for 14 days, sealed by the core
+  and kept nowhere ([ADR-049](#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)), so a link sent to the wrong person, or to a supplier
+  before a launch, could be taken back only by deleting the theme (OS-02).
+* **Decision:**
+  * **A theme keeps its preview links' generation** (`online_store.themes.preview_generation`),
+    0 to begin with, and a link seals the generation it was made at beside the theme and when it
+    ends. The core shows a theme through a link only while the theme is at that generation; a
+    link made before generations is of the first.
+  * **`themePreviewLinksRevoke(id)`** (with `write_themes`) raises it: every link made so far
+    shows nothing, and the storefront's own theme shows to whoever opens one; `previewUrl` gives
+    a link that works. Its files and version stay as they were; the change is told as
+    `theme.preview_links_revoked`.
+  * **The admin's themes tab** has an "End links" button on each theme, which asks first and says
+    once it is done that the Preview button gives a new link. English and Urdu.
+* **Consequences:** The storefront asks the core for a preview's files on every page, so a link
+  ends at once. The editor's frame, opened before, shows the live theme until it is opened
+  again.
+* **Alternatives:** **Each link kept, to end one alone:** a link is sent to a few people at
+  once; ending them all and sending a new one is what a merchant does. **A new sealing key:**
+  it would end every shop's links.

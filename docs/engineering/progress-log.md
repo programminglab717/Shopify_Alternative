@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Theme preview links taken back
+
+* **A theme's preview links made so far are ended at once by raising its links' generation,
+  which each link holds; the admin's themes tab ends them once asked** ([ADR-699](../architecture/13-decision-log.md#adr-699--a-themes-preview-links-made-so-far-are-ended-at-once-by-raising-its-links-generation-which-each-link-holds-the-admins-themes-tab-ends-them-once-asked)): OS-02's
+  links that can be taken back.
+* 3946 tests, three more: the online store's and the admin's.
+
 ### 8c836e0 · A personalisation field's price in the admin
 
 * **The admin's Personalisation card asks what each field's answer adds to the price, in rupees,

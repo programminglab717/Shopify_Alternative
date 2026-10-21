@@ -229,6 +229,22 @@ describe.skipIf(!server)('Admin GraphQL API: online store themes', () => {
     // Readers get links too.
     const read = await call(tokens.reader, `{ theme(id: "${created.theme.id}") { previewUrl } }`);
     expect(new URL(read.previewUrl).searchParams.get('preview')).toMatch(/^v1\./);
+
+    // Its links made so far ended at once, and a link made after shows it (ADR-699).
+    const revoked = await call(
+      tokens.a,
+      `mutation { themePreviewLinksRevoke(id: "${created.theme.id}") {
+        theme { id previewUrl } userErrors { code } } }`,
+    );
+    expect(revoked.userErrors).toEqual([]);
+    for (const ended of [token, new URL(read.previewUrl).searchParams.get('preview')!]) {
+      const gone = await fetchPreview(shopA, { ...asStorefront, 'x-hatti-preview': ended });
+      expect(gone.statusCode).toBe(404);
+    }
+    const fresh = new URL(revoked.theme.previewUrl).searchParams.get('preview')!;
+    expect(
+      (await fetchPreview(shopA, { ...asStorefront, 'x-hatti-preview': fresh })).statusCode,
+    ).toBe(200);
   });
 
   it("keeps a theme's changes and takes it back to one of its versions (ADR-694)", async () => {

@@ -13,6 +13,8 @@ export const OnlineStoreEvents = {
   ThemePublished: 'theme.published',
   /** A theme's publishing set ahead, moved or called off (ADR-695). */
   ThemePublishScheduled: 'theme.publish_scheduled',
+  /** The preview links made so far of a theme ended (ADR-699). */
+  ThemePreviewLinksRevoked: 'theme.preview_links_revoked',
   ThemeDeleted: 'theme.deleted',
   MenuCreated: 'menu.created',
   MenuUpdated: 'menu.updated',

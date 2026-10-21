@@ -9424,6 +9424,11 @@ type Mutation {
   themeFilesUpsert(files: [OnlineStoreThemeFilesUpsertFileInput!]!, themeId: ID!): ThemeFilesUpsertPayload!
 
   """
+  Ends every preview link of the theme made so far, as when one went to the wrong person (OS-02, ADR-699): pages opened from them show the storefront's own theme again. The theme's `previewUrl` gives a new link that works.
+  """
+  themePreviewLinksRevoke(id: ID!): ThemePreviewLinksRevokePayload!
+
+  """
   Makes the theme the main one, which the storefront shows a moment later; the main one before it is unpublished.
   """
   themePublish(id: ID!): ThemePublishPayload!
@@ -17101,6 +17106,11 @@ type ThemeFilesUpsertPayload {
 
   """The files saved."""
   upsertedThemeFiles: [OnlineStoreThemeFile!]!
+  userErrors: [UserError!]!
+}
+
+type ThemePreviewLinksRevokePayload {
+  theme: OnlineStoreTheme
   userErrors: [UserError!]!
 }
 

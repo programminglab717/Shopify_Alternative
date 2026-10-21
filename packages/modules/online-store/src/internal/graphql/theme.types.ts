@@ -271,6 +271,15 @@ export class ThemePublishPayload {
 }
 
 @ObjectType()
+export class ThemePreviewLinksRevokePayload {
+  @Field(() => OnlineStoreTheme, { nullable: true })
+  theme!: OnlineStoreTheme | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class ThemeDeletePayload {
   @Field(() => ID, { nullable: true })
   deletedThemeId!: string | null;

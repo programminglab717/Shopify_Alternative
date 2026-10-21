@@ -4,6 +4,7 @@ import { SecretBox } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { OnlineStoreEvents } from './events.js';
 import { themeFiles, themes } from './schema.js';
 import { THEME_LIMITS } from './theme-files.js';
 import { ThemePreviewService } from './theme-preview.js';
@@ -481,6 +482,46 @@ describe.skipIf(!server)('ThemeService', () => {
     // The theme deleted: its links show nothing.
     unwrap(await f.themes.delete(f.a, eid.id));
     expect(await previews.open(f.a.shopId, token, now)).toBeNull();
+  });
+
+  it("ends a theme's links made so far at once, and only those (ADR-699)", async () => {
+    const k1 = { id: 'k1', key: Buffer.alloc(32, 7) };
+    const box = new SecretBox([k1]);
+    const previews = new ThemePreviewService(
+      f.db,
+      f.themes,
+      box,
+      new StorefrontSite('https://hatti.pk'),
+    );
+    const eid = unwrap(await f.themes.create(f.a, { name: 'Eid look' }));
+    const other = unwrap(await f.themes.create(f.a, { name: 'Winter' }));
+    const now = new Date('2026-10-01T09:00:00Z');
+    const tokenOf = async (themeId: string) =>
+      new URL((await previews.link(f.a, themeId, now)).url).searchParams.get('preview')!;
+    const sent = await tokenOf(eid.id);
+    const winter = await tokenOf(other.id);
+    // A link made before links had generations is of the first.
+    const older = box.encrypt(
+      JSON.stringify({ theme: eid.id, until: Math.floor(now.getTime() / 1000) + 3600 }),
+      `theme-preview:${f.a.shopId}`,
+    );
+    expect(await previews.open(f.a.shopId, older, now)).not.toBeNull();
+
+    const revoked = unwrap(await f.themes.revokePreviewLinks(f.a, eid.id));
+    expect(revoked).toMatchObject({ id: eid.id, previewGeneration: 1, version: eid.version });
+    expect(await previews.open(f.a.shopId, sent, now)).toBeNull();
+    expect(await previews.open(f.a.shopId, older, now)).toBeNull();
+    // Another theme's links, and a link made after, show their themes.
+    expect(await previews.open(f.a.shopId, winter, now)).not.toBeNull();
+    expect((await previews.open(f.a.shopId, await tokenOf(eid.id), now))?.theme.id).toBe(eid.id);
+
+    const events = (await f.outbox()).filter(
+      (event) => event.event_type === OnlineStoreEvents.ThemePreviewLinksRevoked,
+    );
+    expect(events.map((event) => [event.aggregate_id, event.payload])).toEqual([[eid.id, {}]]);
+    expect(errorsOf(await f.themes.revokePreviewLinks(f.b, eid.id))).toEqual([
+      ['id', 'NOT_FOUND', 'Theme not found'],
+    ]);
   });
 
   it("keeps each shop's themes to itself", async () => {

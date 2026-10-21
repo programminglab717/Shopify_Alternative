@@ -39,6 +39,7 @@ import {
   ThemeDeletePayload,
   ThemeFilesDeletePayload,
   ThemeFilesUpsertPayload,
+  ThemePreviewLinksRevokePayload,
   ThemePublishPayload,
   ThemeRollbackPayload,
   ThemeSchedulePublishPayload,
@@ -221,6 +222,24 @@ export class ThemeResolver {
   ): Promise<ThemeRollbackPayload> {
     const result = await this.service.rollback(tenant, uuidOf('theme', id), version);
     return Object.assign(new ThemeRollbackPayload(), {
+      theme: result.ok ? toTheme(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => ThemePreviewLinksRevokePayload, {
+    description:
+      'Ends every preview link of the theme made so far, as when one went to the wrong person ' +
+      "(OS-02, ADR-699): pages opened from them show the storefront's own theme again. The " +
+      "theme's `previewUrl` gives a new link that works.",
+  })
+  @RequireScopes('write_themes')
+  async themePreviewLinksRevoke(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<ThemePreviewLinksRevokePayload> {
+    const result = await this.service.revokePreviewLinks(tenant, uuidOf('theme', id));
+    return Object.assign(new ThemePreviewLinksRevokePayload(), {
       theme: result.ok ? toTheme(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

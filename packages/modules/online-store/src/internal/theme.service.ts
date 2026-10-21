@@ -50,6 +50,7 @@ function toThemeRecord(row: ThemeRow): ThemeRecord {
     role: row.role,
     version: row.version,
     publishAt: row.publishAt ?? null,
+    previewGeneration: row.previewGeneration,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -292,6 +293,32 @@ export class ThemeService {
         payload: { publishAt: at?.toISOString() ?? null },
       });
       return { ok: true, value: toThemeRecord(updated!) };
+    });
+  }
+
+  /**
+   * Ends every preview link of a theme made so far (OS-02, ADR-699), as when one was sent to the
+   * wrong person: the links hold the generation they were made at, which goes up. Links made
+   * after show the theme as before.
+   */
+  async revokePreviewLinks(
+    tenant: TenantContext,
+    id: string,
+  ): Promise<MutationResult<ThemeRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [updated] = await tx
+        .update(themes)
+        .set({ previewGeneration: sql`${themes.previewGeneration} + 1` })
+        .where(and(eq(themes.shopId, tenant.shopId), eq(themes.id, id)))
+        .returning();
+      if (!updated) return failOne(['id'], 'NOT_FOUND', 'Theme not found');
+      await appendEvent(tx, tenant.shopId, {
+        type: OnlineStoreEvents.ThemePreviewLinksRevoked,
+        aggregateType: 'theme',
+        aggregateId: id,
+        payload: {},
+      });
+      return { ok: true, value: toThemeRecord(updated) };
     });
   }
 

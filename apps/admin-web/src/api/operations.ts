@@ -8112,6 +8112,22 @@ export const ThemeSchedulePublishMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Every preview link of a theme made so far ended at once (OS-02, ADR-699). */
+export const ThemePreviewLinksRevokeMutation = /* GraphQL */ `
+  mutation ThemePreviewLinksRevoke($id: ID!) {
+    themePreviewLinksRevoke(id: $id) {
+      theme {
+        ...Theme
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME}
+  ${USER_ERRORS}
+`;
+
 /** A theme other than the live one deleted. */
 export const ThemeDeleteMutation = /* GraphQL */ `
   mutation ThemeDelete($id: ID!) {

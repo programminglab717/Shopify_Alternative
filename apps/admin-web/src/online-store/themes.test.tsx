@@ -116,6 +116,18 @@ function core(role: StaffRole) {
         return {
           themePublish: { theme: themes.find((each) => each.id === variables.id), userErrors: [] },
         };
+      case 'ThemePreviewLinksRevoke':
+        themes = themes.map((each) =>
+          each.id === variables.id
+            ? { ...each, previewUrl: `https://zari.hatti.pk/?preview_theme_id=${each.id}&gen=2` }
+            : each,
+        );
+        return {
+          themePreviewLinksRevoke: {
+            theme: themes.find((each) => each.id === variables.id),
+            userErrors: [],
+          },
+        };
       case 'ThemeDelete':
         themes = themes.filter((each) => each.id !== variables.id);
         return { themeDelete: { deletedThemeId: variables.id, userErrors: [] } };
@@ -260,6 +272,35 @@ describe("The online store's themes", () => {
     expect(within(newest).getByText('Version 4')).toBeTruthy();
     expect(within(newest).getByText(/^Taken back · /)).toBeTruthy();
     expect(sentOf(fake, 'ThemeRollback')).toEqual([{ id: 'th_2', version: 1 }]);
+  });
+
+  it("ends a theme's preview links sent so far once asked, a new one in their place (ADR-699)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=themes');
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'End the preview links of Hatti Base' }),
+    );
+    expect(screen.getByText(/^End every preview link of Hatti Base sent so far\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(fake.sent.some((each) => each.operation === 'ThemePreviewLinksRevoke')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'End the preview links of Eid sale' }));
+    fireEvent.click(screen.getByRole('button', { name: 'End them' }));
+    expect(
+      await within(rowOf('Eid sale')).findByText(
+        'Links sent before no longer open. The Preview button gives a new one.',
+      ),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'ThemePreviewLinksRevoke')).toEqual([{ id: 'th_2' }]);
+    await waitFor(() =>
+      expect(
+        within(rowOf('Eid sale'))
+          .getByRole('link', { name: 'Preview Eid sale' })
+          .getAttribute('href'),
+      ).toBe('https://zari.hatti.pk/?preview_theme_id=th_2&gen=2'),
+    );
   });
 
   it('is not there for a marketer', async () => {

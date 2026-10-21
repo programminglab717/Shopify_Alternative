@@ -10,10 +10,14 @@ export const PREVIEW_DAYS = 14;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** What a preview token holds, encrypted: the theme, and when the link ends, in seconds. */
+/**
+ * What a preview token holds, encrypted: the theme, when the link ends, in seconds, and the
+ * generation of the theme's links it was made at (ADR-699), absent in links made before.
+ */
 interface PreviewClaims {
   theme: string;
   until: number;
+  gen?: number;
 }
 
 /** A theme a preview link shows, as saved now. */
@@ -27,7 +31,8 @@ export interface ThemePreview {
  * Links that show a theme of the shop's on its storefront, published or not (ADR-049), such as
  * one being prepared for Eid: to look at, or to send for a second opinion. The token in a link
  * names the theme and when the link ends, encrypted and bound to the shop, so nothing is stored;
- * the storefront hands it back for the theme's files.
+ * the storefront hands it back for the theme's files. The theme's links made so far are ended at
+ * once by raising its links' generation, which a token holds (ADR-699).
  */
 @Injectable()
 export class ThemePreviewService {
@@ -40,16 +45,23 @@ export class ThemePreviewService {
 
   /**
    * A link to one of the shop's themes on its storefront, at its handle's subdomain, for
-   * {@link PREVIEW_DAYS} from `now`.
+   * {@link PREVIEW_DAYS} from `now`, while its links are at the generation they are at now.
    */
   async link(
     tenant: TenantContext,
     themeId: string,
     now = new Date(),
   ): Promise<{ url: string; expiresAt: Date }> {
-    const { handle } = await this.db.tenant(tenant.shopId, (tx) => shopProfile(tx, tenant.shopId));
+    const { handle, gen } = await this.db.tenant(tenant.shopId, async (tx) => ({
+      handle: (await shopProfile(tx, tenant.shopId)).handle,
+      gen: (await this.themes.themeOf(tx, tenant.shopId, themeId))?.theme.previewGeneration ?? 0,
+    }));
     const expiresAt = new Date(now.getTime() + PREVIEW_DAYS * DAY_MS);
-    const claims: PreviewClaims = { theme: themeId, until: Math.floor(expiresAt.getTime() / 1000) };
+    const claims: PreviewClaims = {
+      theme: themeId,
+      until: Math.floor(expiresAt.getTime() / 1000),
+      gen,
+    };
     const url = new URL(this.storefronts.url(handle));
     url.searchParams.set(
       'preview',
@@ -60,7 +72,8 @@ export class ThemePreviewService {
 
   /**
    * The theme a preview link's `token` shows on the shop's storefront, as saved now; null for a
-   * token of another shop's, one whose link has ended, or one whose theme is gone.
+   * token of another shop's, one whose link has ended or was ended with the theme's others, or one
+   * whose theme is gone.
    */
   async open(shopId: string, token: string, now = new Date()): Promise<ThemePreview | null> {
     const claims = this.#claims(shopId, token);
@@ -68,7 +81,8 @@ export class ThemePreviewService {
     const found = await this.db.tenant(shopId, (tx) =>
       this.themes.themeOf(tx, shopId, claims.theme),
     );
-    return found && { ...found, expiresAt: new Date(claims.until * 1000) };
+    if (!found || found.theme.previewGeneration !== (claims.gen ?? 0)) return null;
+    return { ...found, expiresAt: new Date(claims.until * 1000) };
   }
 
   #claims(shopId: string, token: string): PreviewClaims | null {
@@ -79,7 +93,9 @@ export class ThemePreviewService {
       // Not one of ours, or not for this shop: the key or the shop it is bound to differs.
       return null;
     }
-    return typeof claims.theme === 'string' && Number.isInteger(claims.until)
+    return typeof claims.theme === 'string' &&
+      Number.isInteger(claims.until) &&
+      (claims.gen === undefined || Number.isInteger(claims.gen))
       ? (claims as PreviewClaims)
       : null;
   }
