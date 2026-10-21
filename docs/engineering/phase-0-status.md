@@ -3622,6 +3622,9 @@ revisiting it.
 
 ## Next steps
 
+What of these needs a decision, an account or a key from Hatti's owner is kept, with what each
+unblocks, in [Waiting on the owner](./owner-actions.md).
+
 1. **Merchant admin, next:** section by section as the alpha's shops need them; the edge's
    security policy and R2's CORS rule.
 1. **Observability, remaining:** Sentry for errors; the production collector with tail sampling,

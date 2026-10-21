@@ -4,6 +4,15 @@
 > [02 · Tech stack](../architecture/02-tech-stack.md) and
 > [03 · Multi-tenancy & data](../architecture/03-multi-tenancy-and-data.md).
 
+## What the owner must do
+
+Work that cannot be finished without a decision, an account, a key or a legal review from Hatti's
+owner is written into [Waiting on the owner](./owner-actions.md) in the same commit that finds
+it: what is asked, what it unblocks, what is already built and the settings it fills. The code is
+built to wait for it, configured by environment variables that leave the feature off until they
+are set, and the item moves to that file's Settled section, naming what was chosen, when it is
+done.
+
 ## Repository layout
 
 | Path | Contents |

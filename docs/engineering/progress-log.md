@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Waiting on the owner
+
+* **One register of what only Hatti's owner can do**, in
+  [owner-actions.md](./owner-actions.md): decisions (name, hosting, registry, on-call, map tiles,
+  paying before the order is placed, the code editor, voice, SMS and AI providers), partners'
+  accounts and keys (payment gateways, couriers, Meta, Google, TikTok, SES, Cloudflare, FBR, Apple,
+  Hatti's own billing and support details), and counsel's reviews, each with what it unblocks,
+  what is built and waiting, and its settings.
+* **A convention:** an item that comes to need the owner goes into the register in the commit that
+  finds it. The README, the conventions and phase 0's next steps link it.
+
 ### 40cc10f · Alerts and a dashboard
 
 * **The admin's objectives, the outbox and sign-ins are watched** ([ADR-725](../architecture/13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)): Prometheus rules in

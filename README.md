@@ -10,7 +10,8 @@ is built for how Pakistan actually buys: **cash on delivery, WhatsApp, local cou
 Raast, and Urdu**. Plans are priced in rupees, with **0% transaction fees**.
 
 **Start here → [Executive Summary](./docs/00-executive-summary.md)** ·
-**Developers → [Getting started](./docs/engineering/getting-started.md)**
+**Developers → [Getting started](./docs/engineering/getting-started.md)** ·
+**Owner → [Waiting on you](./docs/engineering/owner-actions.md)**
 
 ---
 
@@ -87,6 +88,7 @@ pnpm dev:storefront          # http://localhost:4100/, the sample shop in Hatti 
 |---|---|
 | [Getting started](./docs/engineering/getting-started.md) | Setup, running the API and worker, trying the API, tests, troubleshooting |
 | [Conventions](./docs/engineering/conventions.md) | Boundaries, tenancy rules, IDs, money, migrations, events, API design, testing |
+| [Waiting on the owner](./docs/engineering/owner-actions.md) | Every decision, account, key and legal review the build needs from Hatti's owner, with what each unblocks |
 | [Phase 0 status](./docs/engineering/phase-0-status.md) | What is built, deliberate simplifications and when to revisit them, next steps |
 | [Progress log](./docs/engineering/progress-log.md) | Every change as it lands, newest first, and the work in progress |
 | [Spike 1 · Liquid rendering](./docs/engineering/spikes/01-liquid-rendering.md) | What rendering a Dawn-class theme costs, how templates are held to limits, and how data reaches them |
