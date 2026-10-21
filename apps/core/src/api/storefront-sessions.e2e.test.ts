@@ -6,7 +6,9 @@ import { newId } from '@hatti/ids';
 import {
   StorefrontActivity,
   StorefrontKeys,
+  StorefrontSearches,
   StorefrontVitals,
+  localDay,
   vitalSampleOf,
 } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
@@ -274,6 +276,59 @@ describe.skipIf(!server || !redisUrl)('Admin GraphQL API: storefront sessions (A
     ]);
     // It needs the themes' scope.
     const other = await gql(tokens.products, '{ storeSpeed { pageViews } }');
+    expect(other.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
+  it('gives what shoppers searched for, the most first, and those that found nothing (ADR-683)', async () => {
+    const searches = new StorefrontSearches(redis, keys);
+    const today = localDay(new Date(), 'Asia/Karachi');
+    const [yesterday, longAgo] = [1, 40].map((back) =>
+      new Date(Date.parse(`${today}T00:00:00Z`) - back * 86_400_000).toISOString().slice(0, 10),
+    );
+    const record = (day: string, terms: string, found: boolean, times = 1) =>
+      Promise.all(
+        Array.from({ length: times }, () => searches.record(shopA, day, { terms, found })),
+      );
+    await record(today, 'lawn', true, 3);
+    await record(yesterday!, 'lawn', true);
+    await record(today, 'khussa', false, 2);
+    await record(yesterday!, 'velvet shawl', false);
+    await record(longAgo!, 'chiffon', true, 9);
+    await searches.record(shopB, today, { terms: 'shop b', found: true });
+
+    const report = await call(
+      tokens.a,
+      `{ storeSearches(days: 7) { days searches foundNothing foundNothingRate
+          top { terms searches foundNothing } nothingFound { terms foundNothing } } }`,
+    );
+    expect(report).toEqual({
+      days: 7,
+      searches: 7,
+      foundNothing: 3,
+      foundNothingRate: 0.4286,
+      top: [
+        { terms: 'lawn', searches: 4, foundNothing: 0 },
+        { terms: 'khussa', searches: 2, foundNothing: 2 },
+        { terms: 'velvet shawl', searches: 1, foundNothing: 1 },
+      ],
+      nothingFound: [
+        { terms: 'khussa', foundNothing: 2 },
+        { terms: 'velvet shawl', foundNothing: 1 },
+      ],
+    });
+    // Forty days back, by default thirty: the old search counts once asked for.
+    expect((await call(tokens.a, '{ storeSearches { days searches } }')).searches).toBe(7);
+    expect((await call(tokens.a, '{ storeSearches(days: 90) { top { terms } } }')).top[0]).toEqual({
+      terms: 'chiffon',
+    });
+    const none = await call(tokens.b, '{ storeSearches(days: 1) { searches foundNothingRate } }');
+    expect(none).toEqual({ searches: 1, foundNothingRate: 0 });
+    const tooMany = await gql(tokens.a, '{ storeSearches(days: 91) { searches } }');
+    expect(tooMany.errors?.[0]).toMatchObject({
+      message: 'days must be 1 to 90',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    const other = await gql(tokens.products, '{ storeSearches { searches } }');
     expect(other.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 });

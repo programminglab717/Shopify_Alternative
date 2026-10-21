@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### What shoppers search for
+
+* **What shoppers search a shop for is reported by the search's own page, counted by its words a
+  day at a time in Valkey with those that found nothing, and read through storeSearches**
+  ([ADR-683](../architecture/13-decision-log.md#adr-683--what-shoppers-search-a-shop-for-is-reported-by-the-searchs-own-page-counted-by-its-words-a-day-at-a-time-in-valkey-with-those-that-found-nothing-and-read-through-storesearches)): SRC-06's top searches and searches that found nothing, through the Admin API.
+* 3881 tests, nine more: three each of storefront-data's, the storefront's and the core's.
+
 ### f9192e0 · Vague addresses asked about at checkout
 
 * **Checkout asks once for more of an address that leaves out a house number or the street,

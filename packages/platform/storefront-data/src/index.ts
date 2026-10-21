@@ -62,6 +62,15 @@ export {
   type VitalSummary,
   type VitalTemplate,
 } from './vitals.js';
+export {
+  SEARCHES,
+  StorefrontSearches,
+  searchReportOf,
+  searchTermsOf,
+  type SearchCount,
+  type SearchCounts,
+  type SearchReport,
+} from './searches.js';
 export { handleTag, imageTag, pathTag, shopTag } from './cache-tags.js';
 export { ShopDirectory } from './directory.js';
 export {

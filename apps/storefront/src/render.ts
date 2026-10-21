@@ -64,6 +64,7 @@ import { suggestedProducts, type SuggestParams } from './suggest.js';
 import { SESSION_SCRIPT } from './sessions.js';
 import { VISITS_SCRIPT } from './visits.js';
 import { VITALS_SCRIPT, vitalTemplateOf } from './vitals.js';
+import { searchReportTag } from './searches.js';
 import {
   jsonTemplate,
   sectionGroup,
@@ -267,6 +268,8 @@ interface PreparedPage {
   pixel: string;
   /** The bar saying checkout alone is paused, in its head; empty while it is not (ADR-604). */
   pausedBar: string;
+  /** The script reporting a shopper's search, in its head; empty on other pages (ADR-683). */
+  searchReport: string;
   /** The file the page's template is, such as templates/product.json. */
   templateFile: string | null;
   globals: Record<string | symbol, unknown>;
@@ -535,8 +538,8 @@ export class PageRenderer {
       });
     }
     // Shoppers' pages keep the visits that brought them (ADR-139), count their sessions
-    // (ADR-180), measure how fast they were (ADR-485) and load the shop's pixel (ADR-144);
-    // staff's previews do none of it.
+    // (ADR-180), measure how fast they were (ADR-485), load the shop's pixel (ADR-144) and
+    // report a search (ADR-683); staff's previews do none of it.
     const header =
       prepared.alternates +
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
@@ -547,7 +550,8 @@ export class PageRenderer {
           : `<script data-hatti-visits>${VISITS_SCRIPT}</script>` +
             `<script data-hatti-session>${SESSION_SCRIPT}</script>` +
             `<script data-hatti-vitals data-template="${vitalTemplateOf(templateFile)}">` +
-            `${VITALS_SCRIPT}</script>${prepared.pixel}${prepared.pausedBar}`);
+            `${VITALS_SCRIPT}</script>${prepared.pixel}${prepared.pausedBar}` +
+            prepared.searchReport);
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
@@ -819,6 +823,15 @@ export class PageRenderer {
         !request.preview &&
         !request.editor
           ? checkoutPausedBar(shopDoc, shopDoc.maintenance, locale)
+          : '',
+      // A shopper's search, with how much it found (ADR-683).
+      searchReport:
+        search && search.terms !== '' && !request.preview && !request.editor
+          ? searchReportTag(
+              search.productIds.length +
+                (search.pageIds?.length ?? 0) +
+                (search.articleIds?.length ?? 0),
+            )
           : '',
       globals,
       renders,

@@ -6,6 +6,7 @@ import {
   ShopDirectory,
   StorefrontActivity,
   StorefrontKeys,
+  StorefrontSearches,
   StorefrontVitals,
   localDay,
   pathTag,
@@ -5409,6 +5410,67 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       rating: 'good',
     });
     expect((await vitals.histograms(bazaar, [today])).pageViews.size).toBe(0);
+    await served.close();
+  });
+
+  it("counts shoppers' searches by their words, and those that found nothing, as their pages report them (ADR-683)", async () => {
+    const core = new FakeCore();
+    const served = server(core);
+    const app = {
+      inject: (request: InjectOptions) =>
+        served.inject({ ...request, remoteAddress: '203.0.113.186' }),
+    };
+    const searches = new StorefrontSearches(redis, keys);
+    const today = localDay(new Date(), 'Asia/Karachi');
+    const shopper = {
+      host: 'zari.localhost',
+      cookie: 'hatti_session=AbCdEfGhIjKlMnOpQrStUv',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36',
+      'content-type': 'text/plain;charset=UTF-8',
+    };
+    // A search's page carries the script, with how much it found; other pages do not.
+    core.found = sampleStore()
+      .products.slice(0, 3)
+      .map((product) => product.id);
+    core.foundContent = { pageIds: [], articleIds: ['a-1'] };
+    const page = await app.inject({ method: 'GET', url: '/search?q=Lawn', headers: shopper });
+    expect(page.body).toContain('<script data-hatti-search data-found="4">');
+    expect(page.body).toContain(`navigator.sendBeacon('/.hatti/search'`);
+    const empty = await app.inject({ method: 'GET', url: '/search', headers: shopper });
+    expect(empty.body).not.toContain('data-hatti-search');
+    const handle = sampleStore().products[0]!.handle;
+    const product = await app.inject({
+      method: 'GET',
+      url: `/products/${handle}`,
+      headers: shopper,
+    });
+    expect(product.body).not.toContain('data-hatti-search');
+
+    const report = (payload: string, headers: Record<string, string> = shopper) =>
+      app.inject({ method: 'POST', url: '/.hatti/search', headers, payload });
+    const sent = await report(JSON.stringify({ q: 'Lawn  Suit', n: 4 }));
+    expect([sent.statusCode, sent.headers['cache-control']]).toEqual([204, 'no-store']);
+    expect((await report(JSON.stringify({ q: 'khussa', n: 0 }))).statusCode).toBe(204);
+    // Not counted for a robot or without a session; refused when it is no report, or too long.
+    const robot = { ...shopper, 'user-agent': 'Googlebot/2.1' };
+    expect((await report('{"q":"lawn","n":1}', robot)).statusCode).toBe(204);
+    expect((await report('{"q":"lawn","n":1}', { ...shopper, cookie: '' })).statusCode).toBe(204);
+    expect((await report('q=lawn')).statusCode).toBe(400);
+    expect((await report('{"q":"  ","n":1}')).statusCode).toBe(400);
+    expect((await report(JSON.stringify({ q: 'x'.repeat(600), n: 1 }))).statusCode).toBe(413);
+    expect(
+      (await report('{"q":"lawn","n":1}', { ...shopper, host: 'nobody.localhost' })).statusCode,
+    ).toBe(404);
+
+    const counted = await searches.counts(zari, [today]);
+    expect([counted.searches, counted.foundNothing]).toEqual([2, 1]);
+    expect(counted.terms).toEqual(
+      expect.arrayContaining([
+        { terms: 'lawn suit', searches: 1, foundNothing: 0 },
+        { terms: 'khussa', searches: 1, foundNothing: 1 },
+      ]),
+    );
+    expect((await searches.counts(bazaar, [today])).searches).toBe(0);
     await served.close();
   });
 

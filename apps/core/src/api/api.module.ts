@@ -68,6 +68,7 @@ import { StarterKitsResolver } from './starter-kits.resolver.js';
 import { StoreBuilderService } from './store-builder.js';
 import { StoreBuilderResolver } from './store-builder.resolver.js';
 import { PayoutsResolver } from './payouts.resolver.js';
+import { StoreSearchesResolver } from './store-searches.resolver.js';
 import { StoreSpeedResolver } from './store-speed.resolver.js';
 import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
 import { SetupChecklistService } from './setup-checklist.js';
@@ -362,6 +363,7 @@ export class ApiModule {
         HomeResolver,
         StorefrontSessionsResolver,
         PayoutsResolver,
+        StoreSearchesResolver,
         StoreSpeedResolver,
         StarterKitService,
         StarterKitsResolver,

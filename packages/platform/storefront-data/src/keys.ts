@@ -124,6 +124,14 @@ export class StorefrontKeys {
     return `${this.prefix}:{${shopId}}:an:${day}:vitals`;
   }
 
+  /**
+   * A day's searches on the shop's storefront, in its time zone, by their words, and those that
+   * found nothing: a hash (ADR-683).
+   */
+  searches(shopId: string, day: string): string {
+    return `${this.prefix}:{${shopId}}:an:${day}:searches`;
+  }
+
   /** The shop's sessions by when each was last seen, in milliseconds: a sorted set. */
   live(shopId: string): string {
     return `${this.prefix}:{${shopId}}:an:live`;

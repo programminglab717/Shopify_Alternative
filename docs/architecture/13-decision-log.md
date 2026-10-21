@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-682 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-683 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -690,6 +690,7 @@
 | 680 | Orders waiting for their first call longer than the shop's target are told at its alerts number on WhatsApp too, as the new kind orders_overdue, at most once every three hours within its calling hours | Accepted |
 | 681 | The admin's web client keeps a random ID for its browser and sends it with each request to /auth, so that a sign-in from the browser its owner uses is known as theirs | Accepted |
 | 682 | Checkout asks once for more of an address that leaves out a house number or the street, saying what riders look for, and places it as it is when the shopper posts it again | Accepted |
+| 683 | What shoppers search a shop for is reported by the search's own page, counted by its words a day at a time in Valkey with those that found nothing, and read through storeSearches | Accepted |
 
 ---
 
@@ -23684,3 +23685,37 @@
   heuristics are the start the architecture names. **Asking as the shopper types, by the page's
   script:** the page works without a script, and its one script is the pin's
   ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)).
+
+## ADR-683 · What shoppers search a shop for is reported by the search's own page, counted by its words a day at a time in Valkey with those that found nothing, and read through storeSearches
+
+* **Context:** SRC-06 asks for search analytics: what shoppers search for most, and what they
+  search for and do not find, which says what to stock or what words a shop's titles, tags and
+  translations lack. A search's page is kept at the edge for a minute and is the same for every
+  shopper who asks it ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense), [ADR-066](#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)), so the storefront does not see
+  every search; sessions and speed are counted by the page's own script for the same reason
+  ([ADR-180](#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute), [ADR-485](#adr-485--the-store-speed-score-shoppers-own-core-web-vitals-counted-by-the-storefront-in-histograms-of-28-days-scored-per-device-as-google-judges-them-with-fixes)).
+* **Decision:**
+  * **The search's page reports it.** A search page with words carries a small classic script,
+    with how many products, pages and articles the search found in its `data-found`. It reads the
+    words from the page's address and sends them, with that count, by `sendBeacon` to
+    `/.hatti/search`. A page reached from a search's page for the same words, as its next page, a
+    filter or an order is, reports nothing, so each search counts once. Staff's previews carry no
+    script.
+  * **The storefront counts it** (`StorefrontSearches`), as it counts speed: not a robot's, a
+    preview's, the sample shop's or a browser's without a session cookie, an address's reports 240
+    a minute at most, a report 512 bytes at most. Its words are folded (Unicode NFKC, lower case,
+    one space, 100 characters). Each day in the shop's time zone is a hash: each search's count,
+    and its count of finding nothing, beside the day's totals. A day keeps its first 2,000
+    different searches; later ones count in its totals alone. Days stay 90 days in Valkey;
+    nothing about who searched is kept.
+  * **`storeSearches(days)`** (with `read_orders`, as the sessions report) adds up the last 1 to
+    90 days to today: searches, those that found nothing and their share, the 25 most searched,
+    and the 25 that most often found nothing, ties by their words.
+* **Consequences:** A search is counted as shoppers' browsers report it. A browser without
+  `sendBeacon`, or one that blocks the script, is not counted; nor is a predictive search's
+  typing, only searches made. A shopper who comes back to the same words from another page is
+  counted again, as Shopify counts searches. 90 days in Valkey is the whole history, as for speed.
+* **Alternatives:** **Counting in the search's handler:** the edge answers repeated searches
+  without it. **Searches kept by the worker in Postgres, as sessions are:** a later step, once
+  shops want more than 90 days or searches beside their sessions in ClickHouse. **Which result a
+  shopper opened:** a later step, with the storefront's events.

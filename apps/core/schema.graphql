@@ -14303,6 +14303,14 @@ type Query {
   storeExports: [StoreExport!]!
 
   """
+  What shoppers searched the online store for over the last days, to today in the shop's time zone (SRC-06, ADR-683): the most searched, and those that found nothing.
+  """
+  storeSearches(
+    """The days to count, to today: 1 to 90."""
+    days: Int! = 30
+  ): StoreSearches!
+
+  """
   How fast the online store was for its shoppers over the last 28 days, to today in the shop's time zone (OS-13, ADR-485): scores on phones and computers, each metric and kind of page, and fixes.
   """
   storeSpeed: StoreSpeed!
@@ -16283,6 +16291,45 @@ enum StoreExportStatus {
   FAILED
   PENDING
   READY
+}
+
+"""A search on the online store, by its words (ADR-683)."""
+type StoreSearchTerms {
+  """Of those, the times they found nothing."""
+  foundNothing: Int!
+
+  """Times shoppers searched them."""
+  searches: Int!
+
+  """Its words, in lower case, spaces made one."""
+  terms: String!
+}
+
+"""
+What shoppers searched the online store for over the last days (SRC-06, ADR-683).
+"""
+type StoreSearches {
+  """The days counted, to today in the shop's time zone."""
+  days: Int!
+
+  """Searches that found nothing."""
+  foundNothing: Int!
+
+  """
+  The share of searches that found nothing, 0 to 1; null without searches.
+  """
+  foundNothingRate: Float
+
+  """
+  The 25 searches that most often found nothing, the most first: products to add, or words to put in titles, tags or translations.
+  """
+  nothingFound: [StoreSearchTerms!]!
+
+  """Searches in all."""
+  searches: Int!
+
+  """The 25 most searched, the most first."""
+  top: [StoreSearchTerms!]!
 }
 
 """

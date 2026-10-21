@@ -9,12 +9,15 @@ import {
   StoreMissingError,
   StorefrontActivity,
   StorefrontKeys,
+  StorefrontSearches,
   StorefrontVitals,
   TranslatedStore,
   handleTag,
   pathTag,
+  localDay,
   pausedAt,
   redirectKey,
+  searchReportOf,
   shopTag,
   vitalSampleOf,
   type ActivityStep,
@@ -113,6 +116,7 @@ import {
 } from './report-page.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
+import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
   VISITS_COOKIE,
@@ -183,6 +187,9 @@ const VISITS = { name: 'visits', limit: 600, windowMs: 60_000 };
 
 /** Pages' speed reports an address may make a minute (ADR-485), as many as the pages it saw. */
 const VITALS_REPORTS = { name: 'vitals', limit: 600, windowMs: 60_000 };
+
+/** Searches' reports an address may make a minute (ADR-683), as many as its searches. */
+const SEARCH_REPORTS = { name: 'search-reports', limit: 240, windowMs: 60_000 };
 
 /** Taps on link pages' links an address counts a minute (ADR-204); past them, it is sent on all the same. */
 const LINK_TAPS = { name: 'link-taps', limit: 120, windowMs: 60_000 };
@@ -611,6 +618,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const activity = redis ? new StorefrontActivity(redis, keys) : null;
   // How fast each shop's pages are for its shoppers (ADR-485).
   const vitals = redis ? new StorefrontVitals(redis, keys) : null;
+  // What each shop's shoppers search it for (ADR-683).
+  const searchCounts = redis ? new StorefrontSearches(redis, keys) : null;
   const core = options.core;
   const secure = options.secureCookies ?? false;
   const editorOrigins = options.editorOrigins ?? [];
@@ -781,6 +790,41 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         await vitals.record(found.shopId, timezone, sample);
       } catch {
         // A report missed is no reason to fail a shopper.
+      }
+    }
+    return reply.code(204).send();
+  });
+
+  /**
+   * A shopper's search, as its page reports it (ADR-683): counted by its words, and whether it
+   * found anything. Not a robot's, staff's previews or the sample shop's, nor a session's that
+   * has no cookie. Answered with nothing, never kept.
+   */
+  app.post(SEARCH_REPORT_PATH, { bodyLimit: SEARCH_REPORT_BODY_MAX }, async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return reply.code(404).send();
+    const allowed = limiter
+      ? await limiter.hit(SEARCH_REPORTS, request.ip).then(
+          (hit) => hit.allowed,
+          () => true,
+        )
+      : true;
+    if (!allowed) return reply.code(429).send();
+    const report = searchReportOf(searchReportBodyOf(request.body));
+    if (!report) return reply.code(400).send();
+    if (
+      searchCounts &&
+      !found.preview &&
+      found.store instanceof RedisStore &&
+      sessionOf(request.headers.cookie) &&
+      !isRobot(request.headers['user-agent'])
+    ) {
+      try {
+        const timezone = (await found.store.shop()).timezone ?? 'Asia/Karachi';
+        await searchCounts.record(found.shopId, localDay(new Date(), timezone), report);
+      } catch {
+        // A search missed is no reason to fail a shopper.
       }
     }
     return reply.code(204).send();

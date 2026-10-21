@@ -265,6 +265,9 @@ Hatti Base's header suggests products, pages and articles as a shopper types, th
 as cut short: its
 script asks for the theme's predictive-search section, which the storefront renders alone, as
 Shopify's section rendering API does, and `/search/suggest.json` gives the same as JSON.
+A search's page reports its words and how much they found to the storefront, which counts each
+search by its words a day at a time, and those that found nothing, for the admin
+([ADR-683](./13-decision-log.md#adr-683--what-shoppers-search-a-shop-for-is-reported-by-the-searchs-own-page-counted-by-its-words-a-day-at-a-time-in-valkey-with-those-that-found-nothing-and-read-through-storesearches)).
 Each shop's pages are rendered in its main theme: its own templates, section groups and settings
 over Hatti Base, fetched once per version and laid over the platform theme's files, whose parsed
 Liquid every shop shares
