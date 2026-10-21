@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Rates by value on Hatti Base
+### f27d78e · Rates by value on Hatti Base
 
 * **Hatti Base says what larger orders pay at most to deliver** ([ADR-723](../architecture/13-decision-log.md#adr-723--hatti-base-says-what-larger-orders-pay-at-most-to-deliver-each-rate-on-product-pages-and-the-largest-a-cart-reaches-on-the-cart-page-from-the-rates-in-the-shops-document)): each rate on product
   pages, and the largest a cart reaches on the cart page, from `delivery.value_rates`.
