@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { fromPublicId, newId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -646,6 +646,117 @@ describe.skipIf(!server)('Admin GraphQL API: links for customers, to drafts and 
       tokens.a,
       'mutation { orderSettingsUpdate(input: {}) { userErrors { code } } }',
     );
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
+  it('takes a return a customer asks for through their link, for staff to approve or decline', async () => {
+    const settingsToken = await issueToken(shopA, ['write_settings']);
+    const window = await mutate(
+      settingsToken,
+      `mutation {
+        orderSettingsUpdate(input: { returnWindowDays: 7 }) {
+          orderSettings { returnWindowDays } userErrors { code }
+        }
+      }`,
+    );
+    expect(window).toEqual({ orderSettings: { returnWindowDays: 7 }, userErrors: [] });
+    /** A delivered order of 2 kurtas: its ID, its line's UUID and its link's path. */
+    const delivered = async () => {
+      const placed = await mutate(
+        tokens.a,
+        `mutation ($input: OrderCreateInput!) {
+          orderCreate(input: $input) { order { id lineItems { id } } userErrors { code } }
+        }`,
+        { input: { lineItems: [{ variantId: kurta, quantity: 2 }], shippingAddress: ADDRESS } },
+      );
+      const id = placed.order.id;
+      await mutate(tokens.a, 'mutation ($id: ID!) { orderConfirm(id: $id) { order { id } } }', {
+        id,
+      });
+      const parcel = await mutate(
+        tokens.a,
+        'mutation ($id: ID!) { orderFulfill(id: $id) { fulfillment { id } } }',
+        { id },
+      );
+      await mutate(
+        tokens.a,
+        'mutation ($id: ID!) { fulfillmentMarkDelivered(id: $id) { fulfillment { id } } }',
+        { id: parcel.fulfillment.id },
+      );
+      const link = await mutate(
+        tokens.a,
+        'mutation ($id: ID!) { orderLinkCreate(id: $id) { url userErrors { code } } }',
+        { id },
+      );
+      const line = fromPublicId(placed.order.lineItems[0].id, 'lineItem')!;
+      return { id, line, path: pathOf(link.url) };
+    };
+    const REQUESTS = `query ($orderId: ID) {
+      returnRequests(orderId: $orderId, status: REQUESTED, first: 5) {
+        nodes { id orderName status preference note lineItems { quantity returnReason } }
+      }
+    }`;
+
+    const kept = await delivered();
+    const asked = await post(
+      kept.path,
+      `action=return&quantity_${kept.line}=1&reason_${kept.line}=size_too_small` +
+        `&preference=exchange&note=${encodeURIComponent('Size L please')}`,
+    );
+    expect(asked.statusCode).toBe(303);
+    expect(asked.headers.location).toBe(`${kept.path.split('/').at(-1)}?asked`);
+    // Asking again while one waits is refused.
+    const again = await post(
+      kept.path,
+      `action=return&quantity_${kept.line}=1&reason_${kept.line}=defective&preference=refund`,
+    );
+    expect(again.statusCode).toBe(409);
+    const [waiting] = (await gql(tokens.aReader, REQUESTS, { orderId: kept.id })).data
+      .returnRequests.nodes;
+    expect(waiting).toMatchObject({
+      status: 'REQUESTED',
+      preference: 'EXCHANGE',
+      note: 'Size L please',
+      lineItems: [{ quantity: 1, returnReason: 'SIZE_TOO_SMALL' }],
+    });
+    const approved = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+        returnRequestApprove(id: $id) {
+          returnRequest { status returnId } return { id name status note } userErrors { code }
+        }
+      }`,
+      { id: waiting.id },
+    );
+    expect(approved.userErrors).toEqual([]);
+    expect(approved.returnRequest).toEqual({ status: 'APPROVED', returnId: approved.return.id });
+    expect(approved.return).toMatchObject({
+      name: `${waiting.orderName}-R1`,
+      status: 'OPEN',
+      note: 'Asked by the customer, for another size or item: "Size L please"',
+    });
+
+    const refused = await delivered();
+    await post(
+      refused.path,
+      `action=return&quantity_${refused.line}=2&reason_${refused.line}=unwanted&preference=refund`,
+    );
+    const [worn] = (await gql(tokens.aReader, REQUESTS, { orderId: refused.id })).data
+      .returnRequests.nodes;
+    const DECLINE = `mutation ($id: ID!, $reason: String!) {
+      returnRequestDecline(id: $id, reason: $reason) {
+        returnRequest { status declineReason } userErrors { field code }
+      }
+    }`;
+    expect((await mutate(tokens.a, DECLINE, { id: worn.id, reason: ' ' })).userErrors).toEqual([
+      { field: ['reason'], code: 'BLANK' },
+    ]);
+    expect(
+      (await mutate(tokens.a, DECLINE, { id: worn.id, reason: 'Worn kurtas are not taken back' }))
+        .returnRequest,
+    ).toEqual({ status: 'DECLINED', declineReason: 'Worn kurtas are not taken back' });
+    // Deciding needs write_orders.
+    const denied = await gql(tokens.aReader, DECLINE, { id: worn.id, reason: 'No' });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 });

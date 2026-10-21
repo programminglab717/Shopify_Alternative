@@ -9068,6 +9068,16 @@ type Mutation {
   returnReceive(id: ID!, restock: [ReturnRestockInput!]): ReturnReceivePayload!
 
   """
+  Approves a return a shopper asked for: it becomes a return of what they asked to send back, coming back to the location given or the order's, as returnCreate records one, and the shopper is told.
+  """
+  returnRequestApprove(id: ID!, locationId: ID): ReturnRequestApprovePayload!
+
+  """
+  Declines a return a shopper asked for, saying why, as they are told (at most 500 characters).
+  """
+  returnRequestDecline(id: ID!, reason: String!): ReturnRequestDeclinePayload!
+
+  """
   Sets from how many stars, 3, 4 or 5, reviews publish by themselves, and how many days after delivery customers are asked for them. Reviews written before keep their status.
   """
   reviewSettingsUpdate(input: ReviewSettingsInput!): ReviewSettingsPayload!
@@ -10852,6 +10862,11 @@ type OrderSettings {
   holdWhenRefused: Boolean!
 
   """
+  Days after delivery a shopper may ask for a return from their order's page, staff approving or declining it (ORD-08, ADR-675); null for none.
+  """
+  returnWindowDays: Int
+
+  """
   Whether each order placed that needs a call is given to an agent on duty at the Confirmation Desk (confirmationDeskDutyStart), the one with the fewest waiting, then the one given one longest ago (ADR-654).
   """
   shareNewOrders: Boolean!
@@ -10891,6 +10906,9 @@ input OrderSettingsInput {
   """5 to 1440; null for no target."""
   firstCallMinutes: Int
   holdWhenRefused: Boolean
+
+  """1 to 30; null for no returns asked online."""
+  returnWindowDays: Int
   shareNewOrders: Boolean
 
   """0 to 100; null for no limit."""
@@ -14018,6 +14036,22 @@ type Query {
   pushNotifications(endpoint: String): PushNotifications!
 
   """
+  Returns shoppers asked for from their delivered orders' pages, the oldest first: those waiting (REQUESTED) are for staff to approve or decline.
+  """
+  returnRequests(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """One order's alone."""
+    orderId: ID
+
+    """Those of one status, as REQUESTED for those waiting; all if left out."""
+    status: ReturnRequestStatus
+  ): ReturnRequestConnection!
+
+  """
   Parcels on their way back, refused or undeliverable, the longest on its way first, with how many days each has been: those a courier is slow to bring back, to chase.
   """
   returningParcels(
@@ -14485,6 +14519,18 @@ input ReturnLineItemCreateInput {
   returnReason: ReturnReason!
 }
 
+"""What a shopper would like for what they send back (ADR-675)."""
+enum ReturnPreference {
+  """Another size, or another item."""
+  EXCHANGE
+
+  """Their money back."""
+  REFUND
+
+  """Store credit to spend with the shop."""
+  STORE_CREDIT
+}
+
 """Why a customer sends an item back, as Shopify says it."""
 enum ReturnReason {
   DEFECTIVE
@@ -14500,6 +14546,82 @@ type ReturnReceivePayload {
   order: Order
   return: Return
   userErrors: [UserError!]!
+}
+
+"""
+A return a shopper asked for from their delivered order's page (ORD-08, ADR-675), within the days the shop takes returns: staff approve it, and it becomes a return, or decline it.
+"""
+type ReturnRequest {
+  createdAt: DateTime!
+  decidedAt: DateTime
+
+  """Why it was declined, as the shopper was told."""
+  declineReason: String
+  id: ID!
+  lineItems: [ReturnRequestLineItem!]!
+
+  """The shopper's own words; empty once their data was erased."""
+  note: String!
+
+  """Its order (Order) ID."""
+  orderId: ID!
+
+  """Its order's name, such as #1001."""
+  orderName: String!
+  preference: ReturnPreference!
+
+  """The return (Return) it became, once approved."""
+  returnId: ID
+  status: ReturnRequestStatus!
+}
+
+type ReturnRequestApprovePayload {
+  order: Order
+
+  """The return it became."""
+  return: Return
+  returnRequest: ReturnRequest
+  userErrors: [UserError!]!
+}
+
+type ReturnRequestConnection {
+  edges: [ReturnRequestEdge!]!
+  nodes: [ReturnRequest!]!
+  pageInfo: PageInfo!
+}
+
+type ReturnRequestDeclinePayload {
+  returnRequest: ReturnRequest
+  userErrors: [UserError!]!
+}
+
+type ReturnRequestEdge {
+  cursor: String!
+  node: ReturnRequest!
+}
+
+"""
+Units of one of the order’s lines a shopper asked to send back, and why.
+"""
+type ReturnRequestLineItem {
+  """The line item (LineItem) ID."""
+  lineItemId: ID!
+  quantity: Int!
+  returnReason: ReturnReason!
+  title: String!
+  variantTitle: String!
+}
+
+"""Where a return a shopper asked for stands (ADR-675)."""
+enum ReturnRequestStatus {
+  """Approved: it became a return."""
+  APPROVED
+
+  """Declined, saying why, as the shopper was told."""
+  DECLINED
+
+  """Waiting for staff to approve or decline it."""
+  REQUESTED
 }
 
 input ReturnRestockInput {

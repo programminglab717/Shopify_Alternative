@@ -67,6 +67,11 @@ export interface OrderSettingsRecord {
    */
   holdWhenRefused: boolean;
   /**
+   * Days after delivery a shopper may ask for a return from their order's page (ORD-08,
+   * ADR-675), staff approving or declining it; null for none.
+   */
+  returnWindowDays: number | null;
+  /**
    * Which cash-on-delivery orders whose customers left the reminder to confirm unanswered get an
    * automated call in Urdu, pressing 1 to confirm and 2 to cancel (COD-03, ADR-611): none, those
    * of high value by the shop's risk settings, or all.
@@ -100,6 +105,7 @@ export interface OrderSettingsInput {
   upsellPercentOff?: number | null;
   creditBackOnReturn?: boolean;
   holdWhenRefused?: boolean;
+  returnWindowDays?: number | null;
   confirmationCalls?: ConfirmationCallsValue;
   staffDiscountPercent?: number | null;
   shareNewOrders?: boolean;
@@ -171,6 +177,7 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   upsellPercentOff: null,
   creditBackOnReturn: false,
   holdWhenRefused: false,
+  returnWindowDays: null,
   confirmationCalls: 'off',
   staffDiscountPercent: null,
   shareNewOrders: false,
@@ -181,6 +188,12 @@ export const STAFF_DISCOUNT_PERCENT = { min: 0, max: 100 } as const;
 
 /** The most a post-purchase offer takes off (ADR-438). */
 export const UPSELL_PERCENT = { min: 0, max: 50 } as const;
+
+/**
+ * The days after delivery a shopper may ask for a return (ADR-675): no more than an order's page
+ * lasts after the order ends.
+ */
+export const RETURN_WINDOW_DAYS = { min: 1, max: 30 } as const;
 
 /** The shop's order settings, in the caller's transaction `tx`, or the defaults. */
 export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSettingsRecord> {
@@ -196,6 +209,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     upsell_percent_off: number | null;
     credit_back_on_return: boolean;
     hold_when_refused: boolean;
+    return_window_days: number | null;
     confirmation_calls: ConfirmationCallsValue;
     staff_discount_percent: number | null;
     share_new_orders: boolean;
@@ -204,8 +218,8 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
            desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
            cancel_unpaid_after_hours, upsell_percent_off, credit_back_on_return,
-           hold_when_refused, confirmation_calls, staff_discount_percent, share_new_orders,
-           updated_at
+           hold_when_refused, return_window_days, confirmation_calls, staff_discount_percent,
+           share_new_orders, updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -223,6 +237,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     upsellPercentOff: row.upsell_percent_off,
     creditBackOnReturn: row.credit_back_on_return,
     holdWhenRefused: row.hold_when_refused,
+    returnWindowDays: row.return_window_days,
     confirmationCalls: row.confirmation_calls,
     staffDiscountPercent: row.staff_discount_percent,
     shareNewOrders: row.share_new_orders,
@@ -245,6 +260,7 @@ function checkOrderSettings(
     cancelUnpaidAfterHours,
     upsellPercentOff,
     staffDiscountPercent,
+    returnWindowDays,
   } = current;
   if (input.callingHours !== undefined) {
     callingHours = null;
@@ -320,6 +336,13 @@ function checkOrderSettings(
       UPSELL_PERCENT,
     );
   }
+  if (input.returnWindowDays !== undefined) {
+    returnWindowDays = check.integer(
+      ['input', 'returnWindowDays'],
+      input.returnWindowDays,
+      RETURN_WINDOW_DAYS,
+    );
+  }
   if (input.staffDiscountPercent !== undefined) {
     staffDiscountPercent = check.integer(
       ['input', 'staffDiscountPercent'],
@@ -339,6 +362,7 @@ function checkOrderSettings(
     upsellPercentOff,
     creditBackOnReturn: input.creditBackOnReturn ?? current.creditBackOnReturn,
     holdWhenRefused: input.holdWhenRefused ?? current.holdWhenRefused,
+    returnWindowDays,
     confirmationCalls: input.confirmationCalls ?? current.confirmationCalls,
     staffDiscountPercent,
     shareNewOrders: input.shareNewOrders ?? current.shareNewOrders,
@@ -361,6 +385,7 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
     upsellPercentOff: settings.upsellPercentOff,
     creditBackOnReturn: settings.creditBackOnReturn,
     holdWhenRefused: settings.holdWhenRefused,
+    returnWindowDays: settings.returnWindowDays,
     confirmationCalls: settings.confirmationCalls,
     staffDiscountPercent: settings.staffDiscountPercent,
     shareNewOrders: settings.shareNewOrders,
@@ -396,13 +421,15 @@ export class OrderSettingsService {
                (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes,
                 desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
                 cancel_unpaid_after_hours, upsell_percent_off, credit_back_on_return,
-                hold_when_refused, confirmation_calls, staff_discount_percent, share_new_orders)
+                hold_when_refused, return_window_days, confirmation_calls, staff_discount_percent,
+                share_new_orders)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
                 ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
                 ${next.deskWaitsForReminder}, ${next.cancelUnreachableAfterDays},
                 ${next.cancelUnpaidAfterDays}, ${next.cancelUnpaidAfterHours},
                 ${next.upsellPercentOff},
-                ${next.creditBackOnReturn}, ${next.holdWhenRefused}, ${next.confirmationCalls},
+                ${next.creditBackOnReturn}, ${next.holdWhenRefused}, ${next.returnWindowDays},
+                ${next.confirmationCalls},
                 ${next.staffDiscountPercent}, ${next.shareNewOrders})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
@@ -416,6 +443,7 @@ export class OrderSettingsService {
                        upsell_percent_off = excluded.upsell_percent_off,
                        credit_back_on_return = excluded.credit_back_on_return,
                        hold_when_refused = excluded.hold_when_refused,
+                       return_window_days = excluded.return_window_days,
                        confirmation_calls = excluded.confirmation_calls,
                        staff_discount_percent = excluded.staff_discount_percent,
                        share_new_orders = excluded.share_new_orders,

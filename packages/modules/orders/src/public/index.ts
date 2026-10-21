@@ -191,6 +191,12 @@ export {
   type ReturnRestockInput,
   type ReturnResult,
 } from '../internal/return.service.js';
+export {
+  ReturnRequestService,
+  type ReturnOffer,
+  type ReturnRequestForm,
+  type ReturnRequestRecord,
+} from '../internal/return-request.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';
 export {
@@ -251,6 +257,7 @@ export {
   type FulfillmentEventCreatedPayload,
   type FulfillmentUpdatedPayload,
   type ReturnPayload,
+  type ReturnRequestPayload,
   type OrderCancelledPayload,
   type OrderConfirmedPayload,
   type OrderCreatedPayload,

@@ -1439,12 +1439,14 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
         en: 'Choose the stars for at least one product, then send.',
         ur: 'کم از کم ایک چیز کے لیے ستارے چنیں، پھر بھیجیں۔',
       };
+    case 'return':
+      return returnProblemWords(problem.reason);
   }
 }
 
 /** Why the customer can no longer do `action` here, and whom to ask instead. */
 function tooLateWords(
-  action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell',
+  action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell' | 'return',
 ): Sentence {
   switch (action) {
     case 'cancel':
@@ -1476,6 +1478,37 @@ function tooLateWords(
       return {
         en: 'This offer is no longer open. Ask the shop in your chat to add anything else.',
         ur: 'یہ آفر اب دستیاب نہیں۔ کچھ اور شامل کرنے کے لیے اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+    case 'return':
+      return {
+        en: "A return can't be asked for here any more. Ask the shop in your chat.",
+        ur: 'اب یہاں واپسی کی درخواست نہیں ہو سکتی۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+  }
+}
+
+/** Why a return asked for was not taken (ADR-675), and what to do instead. */
+function returnProblemWords(reason: 'none' | 'reason' | 'preference' | 'waiting'): Sentence {
+  switch (reason) {
+    case 'none':
+      return {
+        en: 'Choose how many of an item you want to send back.',
+        ur: 'منتخب کریں کہ کسی چیز کی کتنی تعداد واپس بھیجنی ہے۔',
+      };
+    case 'reason':
+      return {
+        en: 'Say why each item you choose goes back.',
+        ur: 'ہر منتخب چیز کی واپسی کی وجہ بتائیں۔',
+      };
+    case 'preference':
+      return {
+        en: 'Choose what you would like instead: another size, store credit or your money back.',
+        ur: 'منتخب کریں کہ بدلے میں کیا چاہیے: دوسرا سائز، اسٹور کریڈٹ یا رقم کی واپسی۔',
+      };
+    case 'waiting':
+      return {
+        en: 'The shop has your request already, and will answer it soon.',
+        ur: 'دکان کو آپ کی درخواست مل چکی ہے، وہ جلد جواب دے گی۔',
       };
   }
 }

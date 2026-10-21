@@ -55,6 +55,9 @@ export const OrderEvents = {
   ReturnCreated: 'return.created',
   ReturnClosed: 'return.closed',
   ReturnCancelled: 'return.cancelled',
+  ReturnRequested: 'return_request.created',
+  ReturnRequestApproved: 'return_request.approved',
+  ReturnRequestDeclined: 'return_request.declined',
   RiskSettingsUpdated: 'order_risk_settings.updated',
   OrderSettingsUpdated: 'order_settings.updated',
   SavedSearchCreated: 'saved_search.created',
@@ -270,6 +273,14 @@ export interface ReturnPayload {
   orderVersion: number;
 }
 
+/** A return a shopper asked for, as it stands (ADR-675). The aggregate is the request. */
+export interface ReturnRequestPayload {
+  orderId: string;
+  status: 'requested' | 'approved' | 'declined';
+  /** The return it became, once approved. */
+  returnId: string | null;
+}
+
 /** The shop changed when risky orders wait for review. The aggregate is the shop. */
 export interface RiskSettingsUpdatedPayload {
   /** 1 to 100, or null to hold none. */
@@ -297,6 +308,8 @@ export interface OrderSettingsUpdatedPayload {
   creditBackOnReturn: boolean;
   /** Whether a refused parcel holds its customer's orders yet to ship for review (ADR-674). */
   holdWhenRefused: boolean;
+  /** Days after delivery a shopper may ask for a return (ADR-675); null for none. */
+  returnWindowDays: number | null;
   /** Which orders' customers are called to confirm them (ADR-611). */
   confirmationCalls: 'off' | 'high_value' | 'all';
   /** The most staff without `give_any_discount` take off an order (ADR-651); null for any. */

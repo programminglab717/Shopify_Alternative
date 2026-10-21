@@ -141,6 +141,14 @@ export class OrderSettings {
   })
   holdWhenRefused!: boolean;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      "Days after delivery a shopper may ask for a return from their order's page, staff " +
+      'approving or declining it (ORD-08, ADR-675); null for none.',
+  })
+  returnWindowDays!: number | null;
+
   @Field(() => ConfirmationCalls)
   confirmationCalls!: ConfirmationCalls;
 
@@ -208,6 +216,9 @@ export class OrderSettingsInput {
 
   @Field(() => Boolean, { nullable: true })
   holdWhenRefused?: boolean | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 30; null for no returns asked online.' })
+  returnWindowDays?: number | null;
 
   @Field(() => ConfirmationCalls, { nullable: true })
   confirmationCalls?: ConfirmationCalls | null;

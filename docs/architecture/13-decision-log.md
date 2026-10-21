@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-674 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-675 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -682,6 +682,7 @@
 | 672 | A parcel its customer refused pushes who confirms orders of each other order of theirs confirmed and not yet shipped, to call them before it ships | Accepted |
 | 673 | A parcel its customer refused tells on WhatsApp whom each other order of theirs yet to ship is given to, else who confirms orders | Accepted |
 | 674 | A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to ship for review, where the shop says so | Accepted |
+| 675 | Shoppers ask for a return from their order's page, within the days the shop takes returns after delivery, one waiting at a time; staff approve it into a return or decline it saying why | Accepted |
 
 ---
 
@@ -23466,3 +23467,32 @@
   other orders while the courier's update holds its own, and two refusals at once could wait on
   each other. **Holding every order of theirs, prepaid too:** money already paid ships no risk of
   a refusal's cost.
+
+## ADR-675 · Shoppers ask for a return from their order's page, within the days the shop takes returns after delivery, one waiting at a time; staff approve it into a return or decline it saying why
+
+* **Context:** Returns are recorded by staff alone (ADR-136): a shopper who wants another size
+  writes to the shop on WhatsApp, and staff type in what they said. The return portal of
+  ORD-08 (06 §8) lets the shopper say it themselves, from the order's page their link opens
+  (ADR-038), which they keep until 30 days after the order ends (status shortcut 18).
+* **Decision:** An order setting, `returnWindowDays` (migration 0299, 1 to 30, none by default:
+  no returns asked online), in Shopify's sense of a return window, counted from the order's
+  last delivered parcel; 30 at most since the link lasts no longer. Within it, the order's page
+  takes `action=return`: units of each line not returned already, each with one of Shopify's
+  return reasons, what the shopper would like (another size or item, store credit or their
+  money back) and a note of up to 500 characters. It is kept as a return request
+  (`orders.return_requests` and its lines, ID `retq`), one waiting at a time for each order,
+  said on the order's timeline and as an event. Staff see the requests through the Admin API
+  (`returnRequests`, `read_orders`) and approve one (`returnRequestApprove`, `write_orders`),
+  which records the ADR-136 return of what was asked, in the same transaction, its note saying
+  it was asked by the customer and what for, or decline it (`returnRequestDecline`) saying why,
+  as the shopper will be told. A declined request lets the shopper ask again while the days
+  last. Their note goes with their erasure (ADR-026).
+* **Consequences:** A shopper asks for a return without writing to the shop, and staff decide
+  on what they said; what to give back, another size, credit or a refund, stays staff's choice
+  on the return (ADR-137, ADR-613). The page's form, telling the shopper the answer and the
+  admin's page follow.
+* **Alternatives:** **Requests becoming returns by themselves:** staff would get parcels they
+  never agreed to take back, worn or out of the shop's rules. **A return window counted from
+  the order's placing:** an order slow to arrive would leave the shopper no days to ask.
+  **Photos with the request:** the order's page takes a transfer's receipt already, but a reason
+  and a note decide most returns; photos can follow.

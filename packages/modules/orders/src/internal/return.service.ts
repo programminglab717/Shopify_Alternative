@@ -64,6 +64,18 @@ export interface ReturnCreateInput {
   exchangeShippingPrice?: string | null;
 }
 
+/** A return's input once checked, to record on a locked order (ADR-675). */
+export interface CheckedReturn {
+  asked: (ReturnLineInput & { field: string[] })[];
+  /** Where it comes back to; the order's location if null. */
+  locationId: string | null;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
+  note: string;
+  exchange: { variantId: string; quantity: number; price: bigint | null }[];
+  exchangeShipping: bigint;
+}
+
 /** Units of a returned line going back in stock as it is checked in; the rest are written off. */
 export interface ReturnRestockInput {
   lineItemId: string;
@@ -201,116 +213,139 @@ export class ReturnService {
     return this.db.tenant(shopId, async (tx): Promise<MutationResult<ReturnResult>> => {
       const order = await lockOrder(tx, shopId, input.orderId);
       if (!order) return failOne(['input', 'orderId'], 'NOT_FOUND', 'Order not found');
-      const locationId = input.locationId ?? order.locationId;
-      const location = (await this.locations.locationsOf(tx, shopId, [locationId])).get(locationId);
-      if (!location?.isActive) {
-        return failOne(
-          ['input', 'locationId'],
-          'NOT_FOUND',
-          input.locationId
-            ? 'Location not found, or not active'
-            : "The order's location is not active: say where it comes back to",
-        );
-      }
-      const returnable = await returnableUnits(tx, shopId, order.id);
-      const orderLines = await tx
-        .select()
-        .from(lines)
-        .where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
-      const byId = new Map(orderLines.map((line) => [line.id, line]));
-      const errors: FieldError[] = [];
-      for (const entry of asked) {
-        const line = byId.get(entry.lineItemId);
-        if (!line) {
-          errors.push({
-            field: [...entry.field, 'lineItemId'],
-            code: 'NOT_FOUND',
-            message: 'Line item not found on this order',
-          });
-          continue;
-        }
-        const left = returnable.get(line.id) ?? 0;
-        if (entry.quantity > left) {
-          errors.push({
-            field: [...entry.field, 'quantity'],
-            code: 'INVALID',
-            message:
-              left === 0
-                ? `No "${itemName(line)}" was delivered that is not coming back already`
-                : `Only ${left} of "${itemName(line)}" delivered can come back`,
-          });
-        }
-      }
-      if (errors.length > 0) return { ok: false, errors };
-
-      const [{ next }] = (
-        await tx.execute<{ next: number }>(sql`
-          SELECT coalesce(max(number), 0) + 1 AS next
-            FROM orders.returns
-           WHERE shop_id = ${shopId} AND order_id = ${order.id}`)
-      ).rows as [{ next: number }];
-      const name = returnName(order.number, next);
-      let current = order;
-      let swapped: { orderId: string; words: string } | null = null;
-      const id = newId();
-      if (exchange.length > 0) {
-        const sent = await this.#exchange(tx, tenant, order, {
-          name,
-          returnId: id,
-          lines: exchange,
-          shipping: exchangeShipping,
-          back: asked.map((entry) => ({
-            line: byId.get(entry.lineItemId)!,
-            units: entry.quantity,
-          })),
-          orderLines,
-        });
-        if (!sent.ok) return sent;
-        current = sent.value.order;
-        swapped = { orderId: sent.value.exchangeOrderId, words: sent.value.words };
-      }
-      const { actorKind, actorId } = actorColumnsOf(tenant.actor);
-      const [created] = await tx
-        .insert(returns)
-        .values({
-          shopId,
-          id,
-          orderId: order.id,
-          number: next,
-          locationId,
-          trackingCompany,
-          trackingNumber,
-          note,
-          exchangeOrderId: swapped?.orderId ?? null,
-          actorKind,
-          actorId,
-        })
-        .returning();
-      await tx.insert(returnLines).values(
-        asked.map((entry) => ({
-          shopId,
-          returnId: id,
-          lineId: entry.lineItemId,
-          quantity: entry.quantity,
-          reason: entry.reason,
-        })),
-      );
-      const what = asked
-        .map((entry) => {
-          const line = byId.get(entry.lineItemId)!;
-          return `${entry.quantity} × ${itemName(line)}, ${REASON_WORDS[entry.reason]}`;
-        })
-        .join('; ');
-      const via = [trackingCompany, trackingNumber].filter(Boolean).join(' ');
-      return this.#changed(tx, tenant, current, created!, {
-        type: OrderEvents.ReturnCreated,
-        message: clipped(
-          `Return ${name} recorded: ${what}` +
-            (via ? `; coming back by ${via}` : '') +
-            ` to ${location.name}` +
-            (swapped ? `; ${swapped.words}` : ''),
-        ),
+      return this.createLocked(tx, tenant, order, {
+        asked,
+        locationId: input.locationId ?? null,
+        trackingCompany,
+        trackingNumber,
+        note,
+        exchange,
+        exchangeShipping,
       });
+    });
+  }
+
+  /**
+   * Records a return of the order locked in `tx`, as {@link create} does once its input is
+   * checked: by staff, or from a shopper's request they approved (ADR-675).
+   */
+  async createLocked(
+    tx: Tx,
+    tenant: TenantContext,
+    order: OrderRow,
+    input: CheckedReturn,
+  ): Promise<MutationResult<ReturnResult>> {
+    const { shopId } = tenant;
+    const { asked, trackingCompany, trackingNumber, note, exchange, exchangeShipping } = input;
+    const locationId = input.locationId ?? order.locationId;
+    const location = (await this.locations.locationsOf(tx, shopId, [locationId])).get(locationId);
+    if (!location?.isActive) {
+      return failOne(
+        ['input', 'locationId'],
+        'NOT_FOUND',
+        input.locationId
+          ? 'Location not found, or not active'
+          : "The order's location is not active: say where it comes back to",
+      );
+    }
+    const returnable = await returnableUnits(tx, shopId, order.id);
+    const orderLines = await tx
+      .select()
+      .from(lines)
+      .where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
+    const byId = new Map(orderLines.map((line) => [line.id, line]));
+    const errors: FieldError[] = [];
+    for (const entry of asked) {
+      const line = byId.get(entry.lineItemId);
+      if (!line) {
+        errors.push({
+          field: [...entry.field, 'lineItemId'],
+          code: 'NOT_FOUND',
+          message: 'Line item not found on this order',
+        });
+        continue;
+      }
+      const left = returnable.get(line.id) ?? 0;
+      if (entry.quantity > left) {
+        errors.push({
+          field: [...entry.field, 'quantity'],
+          code: 'INVALID',
+          message:
+            left === 0
+              ? `No "${itemName(line)}" was delivered that is not coming back already`
+              : `Only ${left} of "${itemName(line)}" delivered can come back`,
+        });
+      }
+    }
+    if (errors.length > 0) return { ok: false, errors };
+
+    const [{ next }] = (
+      await tx.execute<{ next: number }>(sql`
+        SELECT coalesce(max(number), 0) + 1 AS next
+          FROM orders.returns
+         WHERE shop_id = ${shopId} AND order_id = ${order.id}`)
+    ).rows as [{ next: number }];
+    const name = returnName(order.number, next);
+    let current = order;
+    let swapped: { orderId: string; words: string } | null = null;
+    const id = newId();
+    if (exchange.length > 0) {
+      const sent = await this.#exchange(tx, tenant, order, {
+        name,
+        returnId: id,
+        lines: exchange,
+        shipping: exchangeShipping,
+        back: asked.map((entry) => ({
+          line: byId.get(entry.lineItemId)!,
+          units: entry.quantity,
+        })),
+        orderLines,
+      });
+      if (!sent.ok) return sent;
+      current = sent.value.order;
+      swapped = { orderId: sent.value.exchangeOrderId, words: sent.value.words };
+    }
+    const { actorKind, actorId } = actorColumnsOf(tenant.actor);
+    const [created] = await tx
+      .insert(returns)
+      .values({
+        shopId,
+        id,
+        orderId: order.id,
+        number: next,
+        locationId,
+        trackingCompany,
+        trackingNumber,
+        note,
+        exchangeOrderId: swapped?.orderId ?? null,
+        actorKind,
+        actorId,
+      })
+      .returning();
+    await tx.insert(returnLines).values(
+      asked.map((entry) => ({
+        shopId,
+        returnId: id,
+        lineId: entry.lineItemId,
+        quantity: entry.quantity,
+        reason: entry.reason,
+      })),
+    );
+    const what = asked
+      .map((entry) => {
+        const line = byId.get(entry.lineItemId)!;
+        return `${entry.quantity} × ${itemName(line)}, ${REASON_WORDS[entry.reason]}`;
+      })
+      .join('; ');
+    const via = [trackingCompany, trackingNumber].filter(Boolean).join(' ');
+    return this.#changed(tx, tenant, current, created!, {
+      type: OrderEvents.ReturnCreated,
+      message: clipped(
+        `Return ${name} recorded: ${what}` +
+          (via ? `; coming back by ${via}` : '') +
+          ` to ${location.name}` +
+          (swapped ? `; ${swapped.words}` : ''),
+      ),
     });
   }
 
@@ -709,7 +744,7 @@ type ReturnEventType =
  * Units of each of the order's lines that may come back: delivered, less those on its returns
  * that are not cancelled. A refused parcel comes back as itself.
  */
-async function returnableUnits(
+export async function returnableUnits(
   tx: Tx,
   shopId: string,
   orderId: string,

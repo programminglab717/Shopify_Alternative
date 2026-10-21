@@ -59,6 +59,8 @@ import { OrderService } from './order.service.js';
 import { RefundService } from './refund.service.js';
 import { ReturnResolver } from './graphql/return.resolver.js';
 import { ReturnService } from './return.service.js';
+import { ReturnRequestResolver } from './graphql/return-request.resolver.js';
+import { ReturnRequestService } from './return-request.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 import { SalesReportService } from './sales-report.service.js';
 import { SavedSearchService } from './saved-search.service.js';
@@ -104,6 +106,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderEditService,
     PostPurchaseOffers,
     ReturnService,
+    ReturnRequestService,
     OrderResolver,
     FulfillmentResolver,
     CustomerOrdersResolver,
@@ -130,6 +133,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderCommentResolver,
     OrderEditResolver,
     ReturnResolver,
+    ReturnRequestResolver,
     OrderSegmentFacts,
     OrderCustomerData,
   ],
@@ -159,6 +163,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     TodayService,
     OrderEditService,
     ReturnService,
+    ReturnRequestService,
   ],
 })
 export class OrdersModule {}

@@ -533,7 +533,13 @@ flowchart TB
   ([ADR-137](./13-decision-log.md#adr-137--a-return-may-send-another-size-at-once-as-an-order-of-its-own-paid-by-what-was-paid-for-what-comes-back-credited-from-its-order-as-a-refund-by-exchange-in-which-no-money-moves-the-door-collecting-the-rest)).
   Returns on their way are listed the longest first, to chase, and counted on the home
   ([ADR-138](./13-decision-log.md#adr-138--customer-returns-on-their-way-are-listed-the-longest-first-with-their-days-and-items-and-counted-on-the-home-as-parcels-coming-back-are)).
-  The shopper's portal, reverse pickups and return rules come later.
+  Shoppers ask for a return from their order's page, within the days after delivery the shop
+  takes returns (1 to 30, none by default), units of each item with its reason and whether
+  they would like another size, store credit or their money back; staff approve it into such
+  a return or decline it saying why
+  ([ADR-675](./13-decision-log.md#adr-675--shoppers-ask-for-a-return-from-their-orders-page-within-the-days-the-shop-takes-returns-after-delivery-one-waiting-at-a-time-staff-approve-it-into-a-return-or-decline-it-saying-why)).
+  The page's form, the shopper told the answer, reverse pickups and return rules beyond a
+  window come later.
 
 ---
 

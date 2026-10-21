@@ -17,6 +17,7 @@ import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, trackingPage, type LinkPage } from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm, type LinkClient } from './links.js';
 import { OrderLinkService, type OrderLinkView, type ReviewForm } from './order-link.service.js';
+import type { ReturnRequestForm } from './return-request.service.js';
 import { OrderTrackingService } from './tracking.service.js';
 import type { ReceiptUpload } from './transfer-receipt.service.js';
 
@@ -116,7 +117,8 @@ export class DraftLinkController {
  * (`action=cancel`) a cash-on-delivery order that waits for them, saves a corrected address
  * (`action=address`), takes the receipt of a transfer (`action=receipt`, a form with the file,
  * ADR-080), or, once it is delivered, the customer's stars for its products (`action=review`,
- * `rating_<product>` and `body_<product>`, ADR-399). As for drafts, only a POST changes anything.
+ * `rating_<product>` and `body_<product>`, ADR-399) and a return they ask for (`action=return`,
+ * ADR-675). As for drafts, only a POST changes anything.
  */
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
@@ -211,6 +213,9 @@ export class OrderLinkController {
       case 'review':
         view = await this.links.review(token, reviewForm(body));
         break;
+      case 'return':
+        view = await this.links.requestReturn(token, returnForm(body));
+        break;
       case 'upsell':
         view = await this.links.takeOffer(token, field(body, 'variant'));
         break;
@@ -230,9 +235,13 @@ export class OrderLinkController {
         return;
     }
     if (view.kind === 'order' && !view.problem) {
-      const done = { address: 'saved', receipt: 'sent', review: 'reviewed', upsell: 'added' }[
-        action as string
-      ];
+      const done = {
+        address: 'saved',
+        receipt: 'sent',
+        review: 'reviewed',
+        upsell: 'added',
+        return: 'asked',
+      }[action as string];
       return seeOther(reply, done ? `${token}?${done}` : token);
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
@@ -338,6 +347,21 @@ function reviewForm(body: unknown): ReviewForm {
     }
   }
   return form;
+}
+
+/**
+ * The return the customer asks for (ADR-675): `quantity_<line>` and `reason_<line>` for each item
+ * they send back, `preference` and `note`.
+ */
+function returnForm(body: unknown): ReturnRequestForm {
+  const lines = new Map<string, { quantity: string; reason: string }>();
+  for (const [name, quantity] of Object.entries(fieldsOf(body))) {
+    const lineId = /^quantity_(.+)$/.exec(name)?.[1];
+    if (lineId && UUID.test(lineId)) {
+      lines.set(lineId, { quantity, reason: field(body, `reason_${lineId}`) });
+    }
+  }
+  return { lines, preference: field(body, 'preference'), note: field(body, 'note') };
 }
 
 /** The receipt the form carried: its bytes, too many of them, or none. */

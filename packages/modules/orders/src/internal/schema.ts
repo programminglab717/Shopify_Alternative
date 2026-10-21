@@ -737,6 +737,48 @@ export const returnLines = ordersSchema.table(
   (table) => [primaryKey({ columns: [table.shopId, table.returnId, table.lineId] })],
 );
 
+/** What a shopper would like for what they send back (ORD-08, ADR-675). */
+export const RETURN_PREFERENCES = ['exchange', 'store_credit', 'refund'] as const;
+export type ReturnPreferenceValue = (typeof RETURN_PREFERENCES)[number];
+
+export const RETURN_REQUEST_STATUSES = ['requested', 'approved', 'declined'] as const;
+export type ReturnRequestStatusValue = (typeof RETURN_REQUEST_STATUSES)[number];
+
+/** A return a shopper asked for from their order's page (ORD-08, ADR-675). */
+export const returnRequests = ordersSchema.table(
+  'return_requests',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    status: text('status', { enum: RETURN_REQUEST_STATUSES }).notNull().default('requested'),
+    preference: text('preference', { enum: RETURN_PREFERENCES }).notNull(),
+    note: text('note').notNull().default(''),
+    declineReason: text('decline_reason'),
+    /** The return it became, once approved. */
+    returnId: uuid('return_id'),
+    decidedActorKind: text('decided_actor_kind', { enum: ['app', 'staff'] }),
+    decidedActorId: uuid('decided_actor_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type ReturnRequestRow = typeof returnRequests.$inferSelect;
+
+export const returnRequestLines = ordersSchema.table(
+  'return_request_lines',
+  {
+    shopId: uuid('shop_id').notNull(),
+    requestId: uuid('request_id').notNull(),
+    lineId: uuid('line_id').notNull(),
+    quantity: integer('quantity').notNull(),
+    reason: text('reason', { enum: RETURN_REASONS }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.requestId, table.lineId] })],
+);
+
 export const draftOrders = ordersSchema.table(
   'draft_orders',
   {

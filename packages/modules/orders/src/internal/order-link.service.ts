@@ -46,6 +46,12 @@ import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-sto
 import { OrderService } from './order.service.js';
 import type { OrderRecord } from './records.js';
 import {
+  requestReturnLocked,
+  returnOfferIn,
+  type ReturnOffer,
+  type ReturnRequestForm,
+} from './return-request.service.js';
+import {
   LINK_DAYS_AFTER_END,
   addressChangeable,
   awaitsCustomer,
@@ -141,6 +147,11 @@ export type OrderLinkView =
       steps: ParcelSteps;
       /** Once it is delivered, its products to rate (ADR-399); empty before. */
       reviewable: ReviewableProduct[];
+      /**
+       * Once it is delivered, what the customer may ask to send back and until when, and their
+       * latest request (ADR-675); null where the shop takes none and they asked for none.
+       */
+      returns: ReturnOffer | null;
       /**
        * Until a cash-on-delivery order is packed, a product the shop pairs with what it holds,
        * offered to add with a tap and pay at the door (MKT-09, ADR-438); null for none.
@@ -388,6 +399,15 @@ export class OrderLinkService {
   }
 
   /**
+   * The customer asks to send back items of their delivered order (ORD-08, ADR-675), within the
+   * days the shop takes returns: how many of each, why, and what they would like instead. Staff
+   * approve or decline it.
+   */
+  async requestReturn(token: string, form: ReturnRequestForm): Promise<OrderLinkView> {
+    return this.#act(token, (tx, shopId, order) => requestReturnLocked(tx, shopId, order, form));
+  }
+
+  /**
    * The customer sends the receipt of their transfer through the link, while the order waits for
    * it: a photo, a screenshot or a PDF, which the shop sees with the order (ADR-080).
    */
@@ -551,6 +571,7 @@ export class OrderLinkService {
         record.fulfillments.map((parcel) => parcel.id),
       ),
       reviewable: reviewable(record) ? await reviewableIn(tx, shopId, record) : [],
+      returns: await returnOfferIn(tx, shopId, record),
       offer: this.offers ? await this.offers.offerIn(tx, shopId, record) : null,
       storeCredit: await customerCreditIn(tx, shopId, record),
       problem,

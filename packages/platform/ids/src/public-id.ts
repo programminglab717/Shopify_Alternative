@@ -95,6 +95,7 @@ export const ID_PREFIXES = {
   billingWalletEntry: 'bwe',
   billingTransfer: 'btr',
   return: 'ret',
+  returnRequest: 'retq',
   conversionEvent: 'cnv',
   message: 'msg',
   whatsAppTemplate: 'wtm',

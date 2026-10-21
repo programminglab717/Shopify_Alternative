@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Returns shoppers ask for
+
+* **Shoppers ask for a return from their order's page, within the days the shop takes returns
+  after delivery; staff approve it into a return or decline it saying why** ([ADR-675](../architecture/13-decision-log.md#adr-675--shoppers-ask-for-a-return-from-their-orders-page-within-the-days-the-shop-takes-returns-after-delivery-one-waiting-at-a-time-staff-approve-it-into-a-return-or-decline-it-saying-why)): the
+  first part of the return portal (ORD-08), a new order setting (migration 0299) and the Admin
+  API's `returnRequests`, `returnRequestApprove` and `returnRequestDecline`.
+* 3837 tests, three more: two of the orders module's and the core's.
+
 ### 33f36c9 · A refusal holds the customer's next orders
 
 * **A parcel its customer refused holds their other cash-on-delivery orders confirmed and yet to
