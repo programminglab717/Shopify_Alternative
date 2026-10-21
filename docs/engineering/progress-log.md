@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Personalisation fields
+### 957841c · Personalisation fields
 
 * **A product made to order asks the shopper for up to five fields, text or a choice, each answer
   a property of the cart line its page adds** ([ADR-689](../architecture/13-decision-log.md#adr-689--a-product-made-to-order-asks-the-shopper-for-up-to-five-fields-text-or-a-choice-each-answer-a-property-of-the-cart-line-its-page-adds)): CAT-15's embroidered names and engravings,
