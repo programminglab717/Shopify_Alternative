@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A theme's versions
+### f5cc9b5 · A theme's versions
 
 * **A theme keeps its last 30 changes, each with the files it touched as they were, and is
   taken back to the version one made as a change of its own** ([ADR-694](../architecture/13-decision-log.md#adr-694--a-theme-keeps-its-last-30-changes-each-with-the-files-it-touched-as-they-were-and-is-taken-back-to-the-version-one-made-as-a-change-of-its-own)): OS-03's rollback
