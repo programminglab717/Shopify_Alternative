@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Stock held while a shopper checks out
+### 817bc0a · Stock held while a shopper checks out
 
 * **Where the shop asks, a checkout begun holds its cart's stock for the shop's minutes** ([ADR-715](../architecture/13-decision-log.md#adr-715--where-the-shop-asks-a-checkout-begun-holds-its-carts-stock-for-the-shops-minutes-at-the-location-the-order-would-ship-from-the-holders-cart-counts-it-as-theirs-and-the-order-another-checkout-of-the-cart-or-the-sweep-gives-it-back)):
   at the location the order would ship from, a bundle as its parts; the holder's cart counts it
