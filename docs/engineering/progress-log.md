@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A personalisation field's price in the admin
+### 8c836e0 · A personalisation field's price in the admin
 
 * **The admin's Personalisation card asks what each field's answer adds to the price, in rupees,
   blank for nothing** ([ADR-698](../architecture/13-decision-log.md#adr-698--the-admins-personalisation-card-asks-what-each-fields-answer-adds-to-the-price-in-rupees-blank-for-nothing)): CAT-15's fields that cost, for merchants.
