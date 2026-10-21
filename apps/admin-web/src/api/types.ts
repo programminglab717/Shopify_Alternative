@@ -312,6 +312,11 @@ export interface OrderDetail {
     preorderShipsOn?: string | null;
     /** The bundle it was sold as a part of (ADR-410); absent where a fake core leaves it out. */
     bundle?: { key: string; title: string; quantity: number } | null;
+    /**
+     * Its cart line's properties, an embroidered name or an engraving (ADR-687), apps' among
+     * them; absent where a fake core leaves it out.
+     */
+    customAttributes?: { key: string; value: string }[];
     unitPrice: MoneyValue;
     totalPrice: MoneyValue;
   }[];

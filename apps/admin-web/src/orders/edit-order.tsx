@@ -108,6 +108,13 @@ function useSaid() {
   };
 }
 
+/**
+ * What the shopper wrote or chose on a line (ADR-687); those whose keys begin "_" are apps', not
+ * shown, as on Shopify.
+ */
+export const shownAttributes = (attributes: { key: string; value: string }[] = []) =>
+  attributes.filter(({ key }) => !key.startsWith('_'));
+
 const lineTitle = (line: OrderDetail['lineItems'][number]) =>
   line.variantTitle && line.variantTitle !== 'Default Title'
     ? `${line.title} · ${line.variantTitle}`
@@ -469,6 +476,11 @@ export function OrderItems({ order }: { order: OrderDetail }) {
                   })}
                 </span>
               )}
+              {shownAttributes(line.customAttributes).map(({ key, value }) => (
+                <span key={key} className="break-words" dir="auto">
+                  <bdi>{key}</bdi>: <bdi>{value}</bdi>
+                </span>
+              ))}
               <span className="num text-secondary">
                 {money(line.unitPrice)} × {formatCount(line.quantity)}
               </span>

@@ -20,6 +20,7 @@ import {
   maskPkMobile,
   type PkProvinceCode,
 } from '@hatti/pk';
+import { shownLineProperties } from './documents.js';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import { LOCATION_SCRIPT, locationField, locationFormOf, pinLine } from './location.js';
@@ -1716,6 +1717,16 @@ function amount(value: bigint, currency: CurrencyCode): string {
   return formatMoney(money(value, currency));
 }
 
+/**
+ * What the shopper wrote or chose on a line, an embroidered name or an engraving, each on a line
+ * of its own (ADR-688); apps' left out.
+ */
+function propertyLines(properties: Record<string, string>): Html[] {
+  return shownLineProperties({ properties }).map(
+    ([name, value]) => html`<br /><span class="small">${text(name)}: ${text(value)}</span>`,
+  );
+}
+
 /** A line sold on pre-order (ADR-403): the day it ships by, YYYY-MM-DD, in words. */
 function preorderWords(shipsOn: string): Words {
   const day = new Intl.DateTimeFormat('en-GB', {
@@ -1771,7 +1782,7 @@ function summary(shown: ShownOrder): Html {
                   (part, index) =>
                     html`${index > 0 && ', '}${ltr(`${part.quantity} ×`)} ${text(part.name)}`,
                 )}</span
-              >
+              >${propertyLines(bundle.properties)}
             </td>
             <td class="num">${ltr(rs(bundle.total))}</td>
           </tr>`;
@@ -1785,7 +1796,7 @@ function summary(shown: ShownOrder): Html {
               html`<br /><span class="small"
                   >${say('bilingual', preorderWords(line.preorderShipsOn))}</span
                 >`
-            }
+            }${propertyLines(line.properties ?? {})}
           </td>
           <td class="num">${ltr(rs(line.total))}</td>
         </tr>`;

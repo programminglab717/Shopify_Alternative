@@ -62,7 +62,7 @@ describe.skipIf(!server)("Orders keeping their cart lines' properties (CAT-15, A
       [1, { Name: 'Ali', _ref: '7' }],
       [2, {}],
     ]);
-    // The note still says them, the order's page not showing them yet.
-    expect(placed.order.note).toBe('1 × Kurta: Name: Ali');
+    // Its lines say them, its note no longer (ADR-688).
+    expect(placed.order.note).toBe('');
   });
 });

@@ -2015,17 +2015,11 @@ export function shownProperties(properties: Record<string, string>): [string, st
 }
 
 /**
- * The order's note: the cart's, then each line's properties, which the order's lines keep too
- * (ADR-687) though its page does not show them yet, cut to what an order's note holds.
+ * The order's note: the cart's, cut to what an order's note holds. Its lines' properties are its
+ * lines' own (ADR-687), shown with them (ADR-688), no longer copied here.
  */
 export function orderNoteOf(cart: CartJson): string {
-  const lines = cart.items.flatMap((item) => {
-    const properties = shownProperties(item.properties);
-    if (properties.length === 0) return [];
-    const values = properties.map(([name, value]) => `${name}: ${value}`).join(', ');
-    return [`${item.quantity} × ${itemName(item.title, item.variantTitle)}: ${values}`];
-  });
-  const note = [cart.note.trim(), ...lines].filter((part) => part !== '').join('\n');
+  const note = cart.note.trim();
   const max = ORDER_LIMITS.note;
   return note.length <= max ? note : `${note.slice(0, max - 1)}…`;
 }

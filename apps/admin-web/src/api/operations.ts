@@ -219,6 +219,10 @@ export const OrderQuery = /* GraphQL */ `
           title
           quantity
         }
+        customAttributes {
+          key
+          value
+        }
         unitPrice {
           ...Money
         }

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Lines' properties shown
+
+* **The admin's order page and the customer's order page show what the shopper wrote on each
+  line, and checkout no longer copies it into the order's note** ([ADR-688](../architecture/13-decision-log.md#adr-688--the-admins-order-page-and-the-customers-order-page-show-what-the-shopper-wrote-on-each-line-and-checkout-no-longer-copies-it-into-the-orders-note)): CAT-15's
+  personalisation read where orders are read.
+* 3901 tests, three more: the orders module's and the admin's.
+
 ### 13bedfe · Lines' properties on orders
 
 * **An order's lines keep the properties their cart lines had, Shopify's customAttributes, and

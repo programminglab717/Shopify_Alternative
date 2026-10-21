@@ -67,29 +67,19 @@ function item(title: string, variantTitle: string, properties: Record<string, st
 }
 
 describe('orderNoteOf', () => {
-  it("is the cart's note, then the properties shoppers see of each line", () => {
+  it("is the cart's note alone, its lines keeping their properties (ADR-688)", () => {
     expect(orderNoteOf(CART)).toBe('');
     expect(orderNoteOf({ ...CART, note: '  Call first  ' })).toBe('Call first');
     const cart = {
       ...CART,
       note: 'Call first',
-      items: [
-        item('Kurta', 'M', { Name: 'Ali', Colour: 'Gold', _bundle: '7' }),
-        item('Dupatta', 'Default Title', { _app: 'x' }),
-        item('Mug', 'Default Title', { Text: 'Eid Mubarak' }),
-      ],
+      items: [item('Kurta', 'M', { Name: 'Ali', Colour: 'Gold', _bundle: '7' })],
     };
-    expect(orderNoteOf(cart)).toBe(
-      'Call first\n2 × Kurta (M): Name: Ali, Colour: Gold\n2 × Mug: Text: Eid Mubarak',
-    );
+    expect(orderNoteOf(cart)).toBe('Call first');
   });
 
   it("is cut to what an order's note holds", () => {
-    const note = orderNoteOf({
-      ...CART,
-      note: 'n'.repeat(4_900),
-      items: [item('Mug', 'Default Title', { Text: 'x'.repeat(100) })],
-    });
+    const note = orderNoteOf({ ...CART, note: `${'n'.repeat(4_990)}${'x'.repeat(100)}` });
     expect(note).toHaveLength(5_000);
     expect(note.endsWith('x…')).toBe(true);
   });
@@ -352,15 +342,22 @@ describe.skipIf(!server)('CheckoutService', () => {
         address2: 'Gulshan-e-Iqbal',
         landmark: 'Near Jamia Masjid',
       },
-      note: 'Please call before coming\n1 × Lawn 3-piece (M): Stitching: Yes',
+      // The cart's note; its lines' properties are on its lines (ADR-688).
+      note: 'Please call before coming',
       // Placed by its customer, who agreed to no policies: the shop has none.
       agreement: { policyVersions: [], ip: null, userAgent: null },
     });
     expect(
-      order.lines.map((line) => [line.variantId, line.variantTitle, line.quantity, line.unitPrice]),
+      order.lines.map((line) => [
+        line.variantId,
+        line.variantTitle,
+        line.quantity,
+        line.unitPrice,
+        line.properties,
+      ]),
     ).toEqual([
-      [small, 'S', 2, 4_500_00n],
-      [medium, 'M', 1, 4_500_00n],
+      [small, 'S', 2, 4_500_00n, {}],
+      [medium, 'M', 1, 4_500_00n, { Stitching: 'Yes' }],
     ]);
     const events = (await f.outbox()).map((event) => event.event_type);
     expect(events).toContain('order.created');

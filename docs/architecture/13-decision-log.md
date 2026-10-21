@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-687 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-688 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -695,6 +695,7 @@
 | 685 | A shop keeps groups of its own words that mean the same, which its storefront's search reads beside Hatti's commerce lexicon, each word a whole word as the shop wrote it | Accepted |
 | 686 | The admin's online store has a Search synonyms tab, for those who change products: each group a line of words between commas, saved whole, and a group begun from a search that found nothing | Accepted |
 | 687 | An order's lines keep the properties their cart lines had, Shopify's customAttributes, and packing slips and invoices print those not apps' under each item | Accepted |
+| 688 | The admin's order page and the customer's order page show what the shopper wrote on each line, and checkout no longer copies it into the order's note | Accepted |
 
 ---
 
@@ -23816,3 +23817,21 @@
 * **Alternatives:** **Only the note:** what was asked of each item is lost to apps and cut with
   the note. **A table of a line's properties:** they are read and written whole with the line,
   never searched.
+
+## ADR-688 · The admin's order page and the customer's order page show what the shopper wrote on each line, and checkout no longer copies it into the order's note
+
+* **Context:** An order's lines keep their properties, and packing slips and invoices print them
+  ([ADR-687](#adr-687--an-orders-lines-keep-the-properties-their-cart-lines-had-shopifys-customattributes-and-packing-slips-and-invoices-print-those-not-apps-under-each-item)), but the admin's order page and the page the customer's link opens did
+  not show them, so checkout still copied them into the order's note
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)), saying them twice.
+* **Decision:**
+  * **The admin's order page** says each property under its line, "Name: value", the name and
+    value each isolated for right-to-left text; those whose names begin "_" are apps', not shown.
+  * **The customer's order page** says them the same way under each line; a bundle, shown once
+    ([ADR-411](#adr-411--a-bundles-storefront-page-lists-what-one-set-holds-each-part-linked-while-it-is-for-sale-as-hattis-productbundle-a-part-off-sale-leaves-the-set-unsold-a-customers-order-page-shows-a-bundle-once-its-parts-named-under-it)), says those its parts' lines keep, which are the bundle line's.
+  * **Checkout's note** is the cart's note alone, cut to what an order's note holds. Orders placed
+    before ADR-687 keep their properties in their notes.
+* **Consequences:** The note is the shopper's again, and what they asked of each item is beside
+  the item wherever an order is read.
+* **Alternatives:** **Keeping them in the note too:** the same words twice, and the note cut
+  sooner for orders of many personalised items.

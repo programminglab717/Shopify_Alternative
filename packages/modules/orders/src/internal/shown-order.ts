@@ -22,6 +22,8 @@ export interface ShownOrder {
     preorderShipsOn?: string | null;
     /** The bundle it was sold as a part of (ADR-410); a draft's lines have none. */
     bundle?: LineBundle | null;
+    /** What the shopper wrote or chose on it (ADR-687); a draft's lines have none. */
+    properties?: Record<string, string>;
   }[];
   /** The message to go with it as a gift (ADR-413); a draft has none. */
   giftMessage?: string | null;
@@ -197,6 +199,8 @@ export type ShownItem =
         total: bigint;
         /** Each part once, as "Lawn shirt (M)", with its units in the order. */
         parts: { name: string; quantity: number }[];
+        /** What the shopper wrote or chose on it, which its parts' lines each keep (ADR-688). */
+        properties: Record<string, string>;
       };
     };
 
@@ -214,7 +218,13 @@ export function shownItems(lines: ShownOrder['lines']): ShownItem[] {
     }
     let bundle = bundles.get(line.bundle.key);
     if (!bundle) {
-      bundle = { title: line.bundle.title, quantity: line.bundle.quantity, total: 0n, parts: [] };
+      bundle = {
+        title: line.bundle.title,
+        quantity: line.bundle.quantity,
+        total: 0n,
+        parts: [],
+        properties: line.properties ?? {},
+      };
       bundles.set(line.bundle.key, bundle);
       items.push({ bundle });
     }

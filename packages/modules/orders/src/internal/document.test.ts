@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { checkAddress } from './address.js';
 import { shownLineProperties } from './documents.js';
 import { creditNoteName, invoiceName, taxYearOf } from './invoice-series.js';
+import { orderLinkPage } from './link-pages.js';
 import { mapUrlOf } from './location.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -635,9 +636,10 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(erased).not.toContain('Ammi');
   });
 
-  it("keeps a line's properties, and prints those not apps' on the packing slip and invoice (ADR-687)", async () => {
+  /** A kurta named for the shopper, an app's own property with it, and a chappal: as checkout places them. */
+  async function placeNamed() {
     const address = checkAddress(new InputChecker(), [], ADDRESS)!;
-    const order = unwrap(
+    return unwrap(
       await f.db.tenant(f.a.shopId, (tx) =>
         f.orders.placeIn(
           tx,
@@ -672,6 +674,10 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
         ),
       ),
     );
+  }
+
+  it("keeps a line's properties, and prints those not apps' on the packing slip and invoice (ADR-687)", async () => {
+    const order = await placeNamed();
     const kept = (await f.orders.get(f.a, order.id))!;
     expect(kept.lines.map((line) => line.properties)).toEqual([
       { Engraving: 'Ayesha <3', _bundle_ref: 'x1' },
@@ -687,6 +693,16 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
       expect(wordsOf(html)).toContain('Kurta Engraving : Ayesha &lt;3');
       expect(html).not.toContain('_bundle_ref');
     }
+  });
+
+  it("shows the customer what they wrote on each line, on their order's page (ADR-688)", async () => {
+    const order = await placeNamed();
+    const token = unwrap(await f.links.createLink(f.a, order.id)).url.split('/o/')[1]!;
+    const view = await f.links.viewLink(token);
+    if (view.kind !== 'order') throw new Error(`Expected an order, got ${view.kind}`);
+    const page = orderLinkPage(view).html;
+    expect(wordsOf(page)).toContain('Kurta Engraving : Ayesha &lt;3');
+    expect(page).not.toContain('_bundle_ref');
   });
 
   it('prints up to 250 orders at a time', async () => {

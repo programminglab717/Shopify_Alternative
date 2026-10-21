@@ -167,6 +167,28 @@ describe("Changing an order's items and charges, on its page", () => {
     expect(await screen.findAllByText('Part of Eid 3-piece suit × 2')).toHaveLength(2);
   });
 
+  it('says what the shopper wrote on each line, not apps’ properties (ADR-687)', async () => {
+    const named = order({
+      lineItems: [
+        {
+          ...line('li_1', 'Lawn suit', 'M', 1, '2500'),
+          customAttributes: [
+            { key: 'Embroidered name', value: 'عائشہ' },
+            { key: '_ref', value: 'app-7' },
+          ],
+        },
+        { ...line('li_2', 'Dupatta', 'Default Title', 1, '1200'), customAttributes: [] },
+      ],
+    });
+    vi.stubGlobal('fetch', core('owner', named).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const items = await screen.findByRole('region', { name: 'Items' });
+    expect(await within(items).findByText('Embroidered name')).toBeTruthy();
+    expect(within(items).getByText('عائشہ')).toBeTruthy();
+    expect(within(items).queryByText('_ref')).toBeNull();
+    expect(within(items).queryByText('app-7')).toBeNull();
+  });
+
   it('changes quantities, takes a line off and adds a variant at a price agreed on the call', async () => {
     const fake = core('confirmation_agent');
     vi.stubGlobal('fetch', fake.fetcher);
