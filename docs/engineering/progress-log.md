@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A shop's own search synonyms
+
+* **A shop keeps groups of its own words that mean the same, which its storefront's search reads
+  beside Hatti's commerce lexicon, each word a whole word as the shop wrote it** ([ADR-685](../architecture/13-decision-log.md#adr-685--a-shop-keeps-groups-of-its-own-words-that-mean-the-same-which-its-storefronts-search-reads-beside-hattis-commerce-lexicon-each-word-a-whole-word-as-the-shop-wrote-it)):
+  SRC-04's synonyms, through the Admin API, migration 0301.
+* 3888 tests, four more: three of the catalog's and one of the core's.
+
 ### 399c236 · What shoppers search for, in the admin
 
 * **The admin's analytics show what shoppers searched for over the period the page shows, the

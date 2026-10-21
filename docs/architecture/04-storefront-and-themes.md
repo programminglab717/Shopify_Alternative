@@ -259,6 +259,9 @@ the words typed, each kind best first, and reads the page of them it shows from 
 the same way ([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense), [ADR-212](./13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)).
 Where no product has every word as typed, each word none holds is read as the shop's own words a
 typo or two from it, the fewest typos first ([ADR-234](./13-decision-log.md#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)).
+A product is found by words that mean the same, Hatti's in English, Roman Urdu and Urdu
+([ADR-481](./13-decision-log.md#adr-481--a-commerce-lexicon-a-storefronts-search-finds-what-a-word-means-in-english-roman-urdu-or-urdu-juta-the-shops-shoes-after-what-holds-the-word-as-typed)) and the shop's own
+([ADR-685](./13-decision-log.md#adr-685--a-shop-keeps-groups-of-its-own-words-that-mean-the-same-which-its-storefronts-search-reads-beside-hattis-commerce-lexicon-each-word-a-whole-word-as-the-shop-wrote-it)).
 Each is found by the shop's Urdu for it as by its own words
 ([ADR-240](./13-decision-log.md#adr-240--a-storefronts-search-finds-products-pages-and-articles-by-the-shops-urdu-for-them-as-by-its-own-words-from-words-of-each-translation-kept-folded-beside-its-own-as-its-translations-change-its-own-words-first)).
 Hatti Base's header suggests products, pages and articles as a shopper types, the last word taken

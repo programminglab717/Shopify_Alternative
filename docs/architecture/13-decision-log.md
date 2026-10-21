@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-684 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-685 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -692,6 +692,7 @@
 | 682 | Checkout asks once for more of an address that leaves out a house number or the street, saying what riders look for, and places it as it is when the shopper posts it again | Accepted |
 | 683 | What shoppers search a shop for is reported by the search's own page, counted by its words a day at a time in Valkey with those that found nothing, and read through storeSearches | Accepted |
 | 684 | The admin's analytics show what shoppers searched for over the period the page shows, the most searched and those that found nothing, each opening the products list searched for its words | Accepted |
+| 685 | A shop keeps groups of its own words that mean the same, which its storefront's search reads beside Hatti's commerce lexicon, each word a whole word as the shop wrote it | Accepted |
 
 ---
 
@@ -23739,3 +23740,31 @@
 * **Alternatives:** **A page of its own:** searches sit beside the store's visits and sales, for
   the same period. **The storefront's search for the words, at the shop's address:** the products
   list is where a merchant can change what is found.
+
+## ADR-685 · A shop keeps groups of its own words that mean the same, which its storefront's search reads beside Hatti's commerce lexicon, each word a whole word as the shop wrote it
+
+* **Context:** SRC-04 asks for merchandising and synonyms. A storefront's search finds products
+  by the words they hold ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)) and by Hatti's commerce lexicon, words that mean
+  the same in English, Roman Urdu and Urdu for every shop ([ADR-481](#adr-481--a-commerce-lexicon-a-storefronts-search-finds-what-a-word-means-in-english-roman-urdu-or-urdu-juta-the-shops-shoes-after-what-holds-the-word-as-typed)), which said a
+  shop's own synonyms were to come. Searches that find nothing now show which words shoppers use
+  that a shop's products lack ([ADR-683](#adr-683--what-shoppers-search-a-shop-for-is-reported-by-the-searchs-own-page-counted-by-its-words-a-day-at-a-time-in-valkey-with-those-that-found-nothing-and-read-through-storesearches)): "chappal" in a shop that wrote "sandals".
+* **Decision:**
+  * **The catalog keeps a shop's groups of words that mean the same**, all of them in one row,
+    replaced together by `searchSynonymsSet` (with `write_products`) and read by
+    `searchSynonyms` (with `read_products`). A shop keeps 100 groups at most, each of two to ten
+    words. A word is one word as the search folds it, 40 characters at most, in one group alone:
+    a phrase, a blank, or a word in two groups is refused, with each word's place, and nothing
+    changes. Each group is kept as the shop wrote it and as the search folds it.
+  * **A storefront's search** (the search page and predictive search) reads the shop's groups
+    beside the lexicon: a word typed finds what holds it, or any word in its group as a whole
+    word, as the lexicon's words do. Products holding the first word as typed still come first.
+    The search reads the row once for each search.
+  * **A change tells** `search_synonyms.updated`, with how many groups there are, on the activity
+    log.
+* **Consequences:** A word is a whole word as the shop wrote it: "sandal" is not "sandals", so a
+  shop writes both where shoppers type both. Pages and articles are found by their own words and
+  the lexicon's alone. Search pages the edge keeps for a minute show a change after it.
+* **Alternatives:** **One-way synonyms and phrases**, as Shopify's Search & Discovery has them:
+  later, if shops ask. **Synonyms in each product's search text:** every product rewritten
+  whenever a group changes, as ADR-481 said of the lexicon. **Pins, hides and boosts for a
+  search:** the rest of SRC-04, later.

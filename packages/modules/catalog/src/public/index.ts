@@ -174,6 +174,12 @@ export {
   type ShownMetafields,
 } from '../internal/metafields.js';
 export {
+  SEARCH_SYNONYM_LIMITS,
+  SearchSynonymEvents,
+  type SearchSynonymGroup,
+  type SearchSynonymsUpdatedPayload,
+} from '../internal/search-synonyms.js';
+export {
   SIZE_CHART_LIMITS,
   SizeChartEvents,
   SizeChartService,

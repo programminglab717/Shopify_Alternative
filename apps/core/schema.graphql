@@ -9194,6 +9194,11 @@ type Mutation {
   savedSearchUpdate(input: SavedSearchUpdateInput!): SavedSearchUpdatePayload!
 
   """
+  Replaces the shop's groups of words that mean the same, 100 at most; none takes them all away. Searches find by them at once; pages the edge keeps for a minute show them after it.
+  """
+  searchSynonymsSet(groups: [SearchSynonymGroupInput!]!): SearchSynonymsSetPayload!
+
+  """
   Saves a customer filter. The query is checked; problems come back as user errors.
   """
   segmentCreate(name: String!, query: String!): SegmentCreatePayload!
@@ -14216,6 +14221,11 @@ type Query {
     topProducts: Int
   ): SalesReport!
 
+  """
+  The shop's own groups of words that mean the same, in its order (ADR-685).
+  """
+  searchSynonyms: [SearchSynonymGroup!]!
+
   """A segment by ID, or null if not found."""
   segment(id: ID!): Segment
 
@@ -15158,6 +15168,27 @@ enum SearchResultType {
   DRAFT_ORDER
   ORDER
   PRODUCT
+}
+
+"""
+Words that mean the same to the shop's shoppers (SRC-04, ADR-685): a storefront's search finds what holds any of them for any, beside the words Hatti knows mean the same.
+"""
+type SearchSynonymGroup {
+  """Two to ten words, as the shop wrote them."""
+  words: [String!]!
+}
+
+input SearchSynonymGroupInput {
+  """
+  Two to 10 words that mean the same, each one word of 40 characters at most, in no other group.
+  """
+  words: [String!]!
+}
+
+type SearchSynonymsSetPayload {
+  """The shop's groups now; null when they were refused."""
+  searchSynonyms: [SearchSynonymGroup!]
+  userErrors: [UserError!]!
 }
 
 """The season it is for (ADR-477)."""
