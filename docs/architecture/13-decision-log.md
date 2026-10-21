@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-694 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-695 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -702,6 +702,7 @@
 | 692 | A shop pins products to the top of a term's search, in its order, and hides others from it: the whole search as the search folds it, read live as synonyms are | Accepted |
 | 693 | The admin's online store has a Search results tab, for those who change products: a term's products pinned in order and hidden, and a top search opened from analytics | Accepted |
 | 694 | A theme keeps its last 30 changes, each with the files it touched as they were, and is taken back to the version one made as a change of its own | Accepted |
+| 695 | A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of what is due, as a merchant would publish it then | Accepted |
 
 ---
 
@@ -23993,3 +23994,25 @@
 * **Alternatives:** **Whole snapshots of every file at each change:** most changes touch one
   file, and a theme keeps up to a hundred of 256 KB each. **Versions without end:** thirty is a
   season of changes, kept without a sweep.
+
+## ADR-695 · A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of what is due, as a merchant would publish it then
+
+* **Context:** A shop prepares its Eid theme ahead and publishes it by hand when Eid comes,
+  often at midnight (OS-03). Articles and pages already appear at a time ahead through the
+  worker's sweep of scheduled content ([ADR-215](#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)); a theme could not.
+* **Decision:**
+  * **A theme keeps when it is to be published** (`online_store.themes.publish_at`), a minute to
+    a year ahead; null takes the time away. The main theme is refused, as is another shop's.
+    Setting or clearing it is told as `theme.publish_scheduled`.
+  * **The worker's sweep publishes what is due**, in the same pass as articles and pages: the
+    shops with a theme due, then each shop's due themes locked, their times cleared, and the
+    one set latest published, as `themePublish` would, telling the storefront. Two due at once
+    end at the later one.
+  * **Publishing a theme by hand clears its time.** Publishing changes roles, not files, so it
+    is not a version ([ADR-694](#adr-694--a-theme-keeps-its-last-30-changes-each-with-the-files-it-touched-as-they-were-and-is-taken-back-to-the-version-one-made-as-a-change-of-its-own)).
+  * **Admin API:** a theme's `publishAt`, and `themeSchedulePublish(id, publishAt)`, with
+    `write_themes`.
+* **Consequences:** A shop's Eid look goes live at midnight with nobody awake; its sweep runs
+  each minute, so a theme is published within a minute of its time.
+* **Alternatives:** **A job queued for the time:** a job kept apart from the theme is lost or
+  doubled when the time is changed; a time on the theme, swept, is changed and cleared with it.

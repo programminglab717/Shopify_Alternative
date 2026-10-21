@@ -4,11 +4,12 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { checkShopFile, editorSchemas, platformTheme } from '@hatti/themes';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import {
   OnlineStoreEvents,
   type ThemeCreatedPayload,
   type ThemeDeletedPayload,
+  type ThemePublishScheduledPayload,
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
 } from './events.js';
@@ -48,6 +49,7 @@ function toThemeRecord(row: ThemeRow): ThemeRecord {
     base: row.base,
     role: row.role,
     version: row.version,
+    publishAt: row.publishAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -250,28 +252,116 @@ export class ThemeService {
 
   /** Makes a theme the main one, which the storefront shows; the one before is unpublished. */
   async publish(tenant: TenantContext, id: string): Promise<MutationResult<ThemeRecord>> {
+    return this.db.tenant(tenant.shopId, (tx) => this.#publishIn(tx, tenant.shopId, id));
+  }
+
+  /**
+   * Has the worker publish a theme at `at` (OS-03, ADR-695), in place of any time set before;
+   * null calls it off. A time a minute to a year ahead; not for the main theme.
+   */
+  async schedulePublish(
+    tenant: TenantContext,
+    id: string,
+    at: Date | null,
+    now: Date = new Date(),
+  ): Promise<MutationResult<ThemeRecord>> {
+    if (at !== null) {
+      const ahead = at.getTime() - now.getTime();
+      if (!(ahead >= 60_000)) {
+        return failOne(['publishAt'], 'INVALID', 'A theme is published a minute ahead at least');
+      }
+      if (ahead > 366 * 86_400_000) {
+        return failOne(['publishAt'], 'INVALID', 'A theme is published a year ahead at most');
+      }
+    }
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const main = await ensureMainTheme(tx, tenant.shopId);
       const theme = await this.#find(tx, tenant.shopId, id, { lock: true });
       if (!theme) return failOne(['id'], 'NOT_FOUND', 'Theme not found');
-      if (theme.role === 'main') return { ok: true, value: toThemeRecord(theme) };
-      await tx
+      if (theme.role === 'main' && at !== null) {
+        return failOne(['id'], 'INVALID', 'The storefront shows this theme already');
+      }
+      const [updated] = await tx
         .update(themes)
-        .set({ role: 'unpublished', updatedAt: sql`now()` })
-        .where(and(eq(themes.shopId, tenant.shopId), eq(themes.id, main.id)));
-      const [published] = await tx
-        .update(themes)
-        .set({ role: 'main', version: sql`${themes.version} + 1`, updatedAt: sql`now()` })
+        .set({ publishAt: at, updatedAt: sql`now()` })
         .where(and(eq(themes.shopId, tenant.shopId), eq(themes.id, id)))
         .returning();
-      await appendEvent<ThemePublishedPayload>(tx, tenant.shopId, {
-        type: OnlineStoreEvents.ThemePublished,
+      await appendEvent<ThemePublishScheduledPayload>(tx, tenant.shopId, {
+        type: OnlineStoreEvents.ThemePublishScheduled,
         aggregateType: 'theme',
         aggregateId: id,
-        payload: { previousId: main.id, version: published!.version },
+        payload: { publishAt: at?.toISOString() ?? null },
       });
-      return { ok: true, value: toThemeRecord(published!) };
+      return { ok: true, value: toThemeRecord(updated!) };
     });
+  }
+
+  /** The shops with a theme whose time to be published came, across shops (ADR-695). */
+  async shopsWithThemesDue(): Promise<string[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM online_store.themes WHERE publish_at <= now()`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Publishes the shop's theme whose time came (ADR-695), as {@link publish} does: of two whose
+   * times both came, the later, the times of the others called off. How many it published.
+   */
+  async publishDue(shopId: string): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      const due = await tx
+        .select({ id: themes.id })
+        .from(themes)
+        .where(and(eq(themes.shopId, shopId), lte(themes.publishAt, sql`now()`)))
+        .orderBy(desc(themes.publishAt))
+        .for('update');
+      if (due.length === 0) return 0;
+      await tx
+        .update(themes)
+        .set({ publishAt: null })
+        .where(
+          and(
+            eq(themes.shopId, shopId),
+            inArray(
+              themes.id,
+              due.map((row) => row.id),
+            ),
+          ),
+        );
+      const published = await this.#publishIn(tx, shopId, due[0]!.id);
+      return published.ok ? 1 : 0;
+    });
+  }
+
+  /** Makes a theme the main one in the caller's transaction `tx`, as {@link publish} does. */
+  async #publishIn(tx: Tx, shopId: string, id: string): Promise<MutationResult<ThemeRecord>> {
+    const main = await ensureMainTheme(tx, shopId);
+    const theme = await this.#find(tx, shopId, id, { lock: true });
+    if (!theme) return failOne(['id'], 'NOT_FOUND', 'Theme not found');
+    if (theme.role === 'main') return { ok: true, value: toThemeRecord(theme) };
+    await tx
+      .update(themes)
+      .set({ role: 'unpublished', updatedAt: sql`now()` })
+      .where(and(eq(themes.shopId, shopId), eq(themes.id, main.id)));
+    // Published now, its time set ahead is called off.
+    const [published] = await tx
+      .update(themes)
+      .set({
+        role: 'main',
+        publishAt: null,
+        version: sql`${themes.version} + 1`,
+        updatedAt: sql`now()`,
+      })
+      .where(and(eq(themes.shopId, shopId), eq(themes.id, id)))
+      .returning();
+    await appendEvent<ThemePublishedPayload>(tx, shopId, {
+      type: OnlineStoreEvents.ThemePublished,
+      aggregateType: 'theme',
+      aggregateId: id,
+      payload: { previousId: main.id, version: published!.version },
+    });
+    return { ok: true, value: toThemeRecord(published!) };
   }
 
   /** Deletes a theme the storefront does not show, with its files. */

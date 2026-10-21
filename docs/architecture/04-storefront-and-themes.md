@@ -304,7 +304,8 @@ Check reads each file against Hatti Base when it is saved, as the storefront wou
 it with what is wrong; a file the storefront still cannot use, saved before the platform theme
 changed, is left out, and the platform theme's shows. A theme keeps its last 30 changes, each
 with the files it touched as they were, and is taken back to the version one made as a
-change of its own ([ADR-694](./13-decision-log.md#adr-694--a-theme-keeps-its-last-30-changes-each-with-the-files-it-touched-as-they-were-and-is-taken-back-to-the-version-one-made-as-a-change-of-its-own)). Any theme, published or
+change of its own ([ADR-694](./13-decision-log.md#adr-694--a-theme-keeps-its-last-30-changes-each-with-the-files-it-touched-as-they-were-and-is-taken-back-to-the-version-one-made-as-a-change-of-its-own)), and is published at a time
+set ahead by the worker's sweep ([ADR-695](./13-decision-log.md#adr-695--a-theme-is-published-at-a-time-set-ahead-a-minute-to-a-year-off-by-the-workers-sweep-of-what-is-due-as-a-merchant-would-publish-it-then)). Any theme, published or
 not, can be seen on the storefront through a preview link the core seals, for 14 days: the
 storefront keeps it in a cookie, asks the core for the theme's files as saved, and shows every
 page in it, uncached, with a bar that names it and ends the preview

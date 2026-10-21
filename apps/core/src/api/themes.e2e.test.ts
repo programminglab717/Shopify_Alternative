@@ -285,6 +285,40 @@ describe.skipIf(!server)('Admin GraphQL API: online store themes', () => {
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 
+  it('publishes a theme at a time set ahead, or calls it off (ADR-695)', async () => {
+    const created = await call(
+      tokens.a,
+      `mutation { themeCreate(name: "Lawn launch") { theme { id } userErrors { code } } }`,
+    );
+    const id = created.theme.id;
+    const SCHEDULE = `mutation ($id: ID!, $at: DateTime) {
+      themeSchedulePublish(id: $id, publishAt: $at) {
+        theme { id role publishAt } userErrors { field code message }
+      }
+    }`;
+    const at = new Date(Date.now() + 3 * 3_600_000).toISOString();
+    expect(await call(tokens.a, SCHEDULE, { id, at })).toEqual({
+      theme: { id, role: 'UNPUBLISHED', publishAt: at },
+      userErrors: [],
+    });
+    expect(
+      (await call(tokens.reader, `query ($id: ID!) { theme(id: $id) { publishAt } }`, { id }))
+        .publishAt,
+    ).toBe(at);
+    // Too near is refused; null calls it off; readers can't set it.
+    const near = new Date(Date.now() + 1_000).toISOString();
+    expect((await call(tokens.a, SCHEDULE, { id, at: near })).userErrors).toEqual([
+      {
+        field: ['publishAt'],
+        code: 'INVALID',
+        message: 'A theme is published a minute ahead at least',
+      },
+    ]);
+    expect((await call(tokens.a, SCHEDULE, { id, at: null })).theme.publishAt).toBeNull();
+    const denied = await gql(tokens.reader, SCHEDULE, { id, at });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('needs the themes scopes, and keeps each shop to its own themes', async () => {
     for (const [token, query] of [
       [tokens.products, '{ themes(first: 1) { nodes { id } } }'],

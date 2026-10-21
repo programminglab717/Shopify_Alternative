@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A theme published at a time set ahead
+
+* **A theme is published at a time set ahead, a minute to a year off, by the worker's sweep of
+  what is due** ([ADR-695](../architecture/13-decision-log.md#adr-695--a-theme-is-published-at-a-time-set-ahead-a-minute-to-a-year-off-by-the-workers-sweep-of-what-is-due-as-a-merchant-would-publish-it-then)): OS-03's scheduled publishing through the Admin API.
+* 3935 tests, four more: the online store's and the core's.
+
 ### f5cc9b5 · A theme's versions
 
 * **A theme keeps its last 30 changes, each with the files it touched as they were, and is

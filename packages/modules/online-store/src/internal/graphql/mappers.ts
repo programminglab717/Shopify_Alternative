@@ -68,6 +68,7 @@ export function toTheme(record: ThemeRecord): OnlineStoreTheme {
     role: record.role === 'main' ? ThemeRole.MAIN : ThemeRole.UNPUBLISHED,
     base: record.base,
     version: record.version,
+    publishAt: record.publishAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });

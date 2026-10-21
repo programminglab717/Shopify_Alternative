@@ -9434,6 +9434,11 @@ type Mutation {
   themeRollback(id: ID!, version: Int!): ThemeRollbackPayload!
 
   """
+  Has the worker publish a theme at a time set ahead, a minute to a year from now, in place of any time set before (OS-03, ADR-695): the Eid look live at the minute chosen. Null calls it off; publishing it before then calls it off too.
+  """
+  themeSchedulePublish(id: ID!, publishAt: DateTime): ThemeSchedulePublishPayload!
+
+  """
   Connects the shop's TikTok advertiser account, in place of any it had, or gives it another token (ADR-566), once TikTok says the token reads it and that it bills in the shop's currency: from then on, the worker pulls its spend by day and campaign every few hours, the last week's again each time, and the last 30 days' at once, as a Meta ad account's. What the shop typed by hand stays its own. On plans with true profit. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   tiktokAdAccountConnect(input: TikTokAdAccountConnectInput!): TikTokAdAccountConnectPayload!
@@ -9816,6 +9821,11 @@ type OnlineStoreTheme {
   A link to the storefront showing the theme, published or not, for 14 days: to look at it, or to send for a second opinion. The pages opened from it show the theme, as saved, until the link ends or the preview's bar ends it.
   """
   previewUrl: String!
+
+  """
+  When the worker publishes it, set ahead with `themeSchedulePublish` (ADR-695); null when it is not.
+  """
+  publishAt: DateTime
   role: ThemeRole!
   updatedAt: DateTime!
 
@@ -17099,6 +17109,11 @@ enum ThemeRole {
 }
 
 type ThemeRollbackPayload {
+  theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+type ThemeSchedulePublishPayload {
   theme: OnlineStoreTheme
   userErrors: [UserError!]!
 }

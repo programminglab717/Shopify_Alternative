@@ -60,6 +60,15 @@ export class OnlineStoreThemeVersion {
 }
 
 @ObjectType()
+export class ThemeSchedulePublishPayload {
+  @Field(() => OnlineStoreTheme, { nullable: true })
+  theme!: OnlineStoreTheme | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class ThemeRollbackPayload {
   @Field(() => OnlineStoreTheme, { nullable: true })
   theme!: OnlineStoreTheme | null;
@@ -178,6 +187,14 @@ export class OnlineStoreTheme {
 
   @Field({ description: 'The platform theme it is built on, such as hatti-base.' })
   base!: string;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When the worker publishes it, set ahead with `themeSchedulePublish` (ADR-695); null when ' +
+      'it is not.',
+  })
+  publishAt!: Date | null;
 
   @Field(() => Int, { description: 'Goes up with every change to the theme.' })
   version!: number;

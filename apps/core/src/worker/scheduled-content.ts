@@ -1,6 +1,6 @@
 import type { Logger } from '@hatti/logger';
 import type { PriceSaleService, ProductService } from '@hatti/catalog/public';
-import type { ArticleService, PageService } from '@hatti/online-store/public';
+import type { ArticleService, PageService, ThemeService } from '@hatti/online-store/public';
 import { repeat } from './repeat.js';
 
 /** What shows a kind of content once its time comes: the shops with some due, and each shop's. */
@@ -10,14 +10,15 @@ export interface ScheduledKind {
 }
 
 /**
- * The online store's articles (ADR-215) and pages (ADR-217), and the catalog's products
- * (ADR-441) and sales set ahead (ADR-443), as the sweep shows, starts or ends them.
+ * The online store's articles (ADR-215), pages (ADR-217) and themes (ADR-695), and the catalog's
+ * products (ADR-441) and sales set ahead (ADR-443), as the sweep shows, starts or ends them.
  */
 export function scheduledKinds(
   articles: Pick<ArticleService, 'shopsWithArticlesDue' | 'showDue'>,
   pages: Pick<PageService, 'shopsWithPagesDue' | 'showDue'>,
   products: Pick<ProductService, 'shopsWithProductsDue' | 'publishDue'>,
   sales: Pick<PriceSaleService, 'shopsWithSalesDue' | 'runDue'>,
+  themes: Pick<ThemeService, 'shopsWithThemesDue' | 'publishDue'>,
 ): Record<string, ScheduledKind> {
   return {
     articles: {
@@ -30,6 +31,10 @@ export function scheduledKinds(
       showDue: (shop) => products.publishDue(shop),
     },
     sales: { shopsDue: () => sales.shopsWithSalesDue(), showDue: (shop) => sales.runDue(shop) },
+    themes: {
+      shopsDue: () => themes.shopsWithThemesDue(),
+      showDue: (shop) => themes.publishDue(shop),
+    },
   };
 }
 

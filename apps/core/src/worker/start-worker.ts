@@ -72,6 +72,7 @@ import {
   LinkTapsService,
   PageService,
   SessionDaysService,
+  ThemeService,
 } from '@hatti/online-store/public';
 import {
   CustomerAnswers,
@@ -562,13 +563,15 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => domainChecks.stop());
-    // Articles and pages published at a time ahead shown once it comes (ADR-215, ADR-217).
+    // Articles, pages and themes published at a time ahead shown once it comes (ADR-215,
+    // ADR-217, ADR-695).
     const scheduledContent = new ScheduledContent(
       scheduledKinds(
         new ArticleService(database),
         new PageService(database),
         new ProductService(database),
         new PriceSaleService(database),
+        new ThemeService(database),
       ),
       logger,
     ).start(config.SCHEDULED_INTERVAL_MS);

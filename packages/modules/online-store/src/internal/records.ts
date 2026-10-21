@@ -14,6 +14,8 @@ export interface ThemeRecord {
   role: ThemeRoleValue;
   /** Goes up with every change to the theme. */
   version: number;
+  /** When the worker publishes it, set ahead (ADR-695); null when not. */
+  publishAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -7,7 +7,17 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
-import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  GraphQLISODateTime,
+  ID,
+  Int,
+  Mutation,
+  Parent,
+  Query,
+  ResolveField,
+  Resolver,
+} from '@nestjs/graphql';
 import { PREVIEW_DAYS, ThemePreviewService } from '../theme-preview.js';
 import { ThemeService } from '../theme.service.js';
 import {
@@ -31,6 +41,7 @@ import {
   ThemeFilesUpsertPayload,
   ThemePublishPayload,
   ThemeRollbackPayload,
+  ThemeSchedulePublishPayload,
   ThemeVersionCause,
   ThemesArgs,
 } from './theme.types.js';
@@ -172,6 +183,25 @@ export class ThemeResolver {
   ): Promise<ThemePublishPayload> {
     const result = await this.service.publish(tenant, uuidOf('theme', id));
     return Object.assign(new ThemePublishPayload(), {
+      theme: result.ok ? toTheme(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => ThemeSchedulePublishPayload, {
+    description:
+      'Has the worker publish a theme at a time set ahead, a minute to a year from now, in ' +
+      'place of any time set before (OS-03, ADR-695): the Eid look live at the minute chosen. ' +
+      'Null calls it off; publishing it before then calls it off too.',
+  })
+  @RequireScopes('write_themes')
+  async themeSchedulePublish(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('publishAt', { type: () => GraphQLISODateTime, nullable: true }) publishAt: Date | null,
+  ): Promise<ThemeSchedulePublishPayload> {
+    const result = await this.service.schedulePublish(tenant, uuidOf('theme', id), publishAt);
+    return Object.assign(new ThemeSchedulePublishPayload(), {
       theme: result.ok ? toTheme(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

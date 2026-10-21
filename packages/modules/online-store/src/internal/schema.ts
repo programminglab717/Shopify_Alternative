@@ -36,6 +36,7 @@ export const themes = onlineStoreSchema.table(
     base: text('base').notNull(),
     role: text('role').$type<ThemeRoleValue>().notNull(),
     version: integer('version').notNull().default(1),
+    publishAt: timestamp('publish_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

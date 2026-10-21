@@ -11,6 +11,8 @@ export const OnlineStoreEvents = {
   ThemeCreated: 'theme.created',
   ThemeUpdated: 'theme.updated',
   ThemePublished: 'theme.published',
+  /** A theme's publishing set ahead, moved or called off (ADR-695). */
+  ThemePublishScheduled: 'theme.publish_scheduled',
   ThemeDeleted: 'theme.deleted',
   MenuCreated: 'menu.created',
   MenuUpdated: 'menu.updated',
@@ -59,6 +61,11 @@ export interface ThemePublishedPayload {
   /** The theme that was main until then, now unpublished; null if there was none. */
   previousId: string | null;
   version: number;
+}
+
+export interface ThemePublishScheduledPayload {
+  /** When the worker publishes it, as ISO 8601; null once called off. */
+  publishAt: string | null;
 }
 
 export interface ThemeDeletedPayload {
