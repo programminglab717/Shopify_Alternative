@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Returns asked online, answered in the admin
+### 1dcc7bc · Returns asked online, answered in the admin
 
 * **The admin lists the returns customers asked for online under Returns, to approve or decline
   with the reason they are told, and sets the days the shop takes them in its order policies**
