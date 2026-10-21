@@ -72,5 +72,5 @@ export class TrustBadgeService {
 
 /** The badges in order, the same for the same badges however their stored keys are ordered. */
 function keyOf(badges: readonly TrustBadgeValue[]): string {
-  return badges.map((badge) => `${badge.kind}:${badge.days ?? ''}`).join(',');
+  return badges.map((badge) => JSON.stringify([badge.kind, badge.days, badge.text ?? null])).join();
 }

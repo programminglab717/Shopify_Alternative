@@ -7349,6 +7349,7 @@ export const CheckoutPageQuery = /* GraphQL */ `
     checkoutTrustBadges {
       kind
       days
+      text
     }
     checkoutMarketingChannels
     onlineStorePreferences {
@@ -7456,6 +7457,7 @@ export const CheckoutTrustBadgesUpdateMutation = /* GraphQL */ `
       checkoutTrustBadges {
         kind
         days
+        text
       }
       userErrors {
         ...Problems

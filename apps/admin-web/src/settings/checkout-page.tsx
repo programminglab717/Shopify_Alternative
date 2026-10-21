@@ -40,6 +40,7 @@ const KINDS: readonly CheckoutTrustBadgeKind[] = [
   'EXCHANGE',
   'RETURNS',
   'WHATSAPP',
+  'CUSTOM',
 ];
 
 /** Badges that say within how many days. */
@@ -47,6 +48,9 @@ const WITH_DAYS: ReadonlySet<CheckoutTrustBadgeKind> = new Set(['EXCHANGE', 'RET
 
 /** The most badges the checkout shows. */
 const MOST = 4;
+
+/** The most a badge in the shop's own words says (ADR-711). */
+const MOST_TEXT = 60;
 
 /** How long after a shopper leaves the shop may remind them, in minutes (ADR-393); '' for never. */
 export const REMINDER_DELAYS = ['', '30', '60', '180', '600'] as const;
@@ -60,12 +64,20 @@ interface BadgeRow {
   key: number;
   kind: CheckoutTrustBadgeKind;
   days: string;
+  text: string;
 }
+
+/** A badge's own words on one line, as the core keeps them. */
+const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 /** The badges as the core takes them, from what the form holds. */
 function badgesOf(rows: readonly BadgeRow[]) {
   return rows.map((row) =>
-    WITH_DAYS.has(row.kind) ? { kind: row.kind, days: parseWhole(row.days) } : { kind: row.kind },
+    WITH_DAYS.has(row.kind)
+      ? { kind: row.kind, days: parseWhole(row.days) }
+      : row.kind === 'CUSTOM'
+        ? { kind: row.kind, text: oneLine(row.text) }
+        : { kind: row.kind },
   );
 }
 
@@ -77,6 +89,7 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
       key: (next.current += 1),
       kind: badge.kind,
       days: badge.days === null ? '' : String(badge.days),
+      text: badge.text ?? '',
     }));
   const updateBadges = useAdminMutation<
     CheckoutTrustBadgesUpdateData,
@@ -139,11 +152,19 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   const [saved, setSaved] = useState(false);
   const hasWhatsapp = Boolean(data.onlineStorePreferences.whatsappNumber);
 
-  const unused = KINDS.filter((kind) => !rows.some((row) => row.kind === kind));
+  // A badge in the shop's own words may come more than once.
+  const unused = KINDS.filter(
+    (kind) => kind === 'CUSTOM' || !rows.some((row) => row.kind === kind),
+  );
   const [adding, setAdding] = useState<CheckoutTrustBadgeKind | ''>('');
   const badgesNow = badgesOf(rows);
-  const badgesWas = data.checkoutTrustBadges.map((badge) =>
-    WITH_DAYS.has(badge.kind) ? { kind: badge.kind, days: badge.days } : { kind: badge.kind },
+  const badgesWas = badgesOf(
+    data.checkoutTrustBadges.map((badge) => ({
+      key: 0,
+      kind: badge.kind,
+      days: badge.days === null ? '' : String(badge.days),
+      text: badge.text ?? '',
+    })),
   );
   const badgesChanged = JSON.stringify(badgesNow) !== JSON.stringify(badgesWas);
   const channelsNow = CHANNELS.filter((channel) => channels.includes(channel));
@@ -175,6 +196,11 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
       setProblems([
         `${t(`checkoutPage.badge.${bad.kind}` as MessageKey, { days: bad.days.trim() || '…' })}: ${t('checkoutPage.badDays')}`,
       ]);
+      return;
+    }
+    const wordless = rows.find((row) => row.kind === 'CUSTOM' && oneLine(row.text) === '');
+    if (wordless) {
+      setProblems([t('checkoutPage.badText')]);
       return;
     }
     setProblems([]);
@@ -232,16 +258,21 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
         {rows.length > 0 ? (
           <ol className="flex flex-col gap-2">
             {rows.map((row, index) => {
-              const label = t(`checkoutPage.badge.${row.kind}` as MessageKey, {
-                days: row.days.trim() || '…',
-              });
+              const label =
+                row.kind === 'CUSTOM'
+                  ? oneLine(row.text) || t('checkoutPage.badge.CUSTOM')
+                  : t(`checkoutPage.badge.${row.kind}` as MessageKey, {
+                      days: row.days.trim() || '…',
+                    });
               return (
                 <li
                   key={row.key}
                   className="flex flex-wrap items-end gap-3 rounded-control border border-line p-3"
                 >
                   <span className="flex min-w-40 flex-1 flex-col">
-                    <span className="font-medium">{label}</span>
+                    <span className="font-medium" dir="auto">
+                      {label}
+                    </span>
                     <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                       {t(`checkoutPage.badgeHint.${row.kind}` as MessageKey)}
                     </span>
@@ -257,6 +288,23 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
                         setRows((all) =>
                           all.map((each) =>
                             each.key === row.key ? { ...each, days: event.target.value } : each,
+                          ),
+                        )
+                      }
+                    />
+                  )}
+                  {row.kind === 'CUSTOM' && (
+                    <TextField
+                      label={t('checkoutPage.badgeText')}
+                      dir="auto"
+                      maxLength={MOST_TEXT}
+                      className="min-w-56 flex-1"
+                      placeholder={t('checkoutPage.badgeTextExample')}
+                      value={row.text}
+                      onChange={(event) =>
+                        setRows((all) =>
+                          all.map((each) =>
+                            each.key === row.key ? { ...each, text: event.target.value } : each,
                           ),
                         )
                       }
@@ -321,6 +369,7 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
                     key: (next.current += 1),
                     kind: adding,
                     days: WITH_DAYS.has(adding) ? '7' : '',
+                    text: '',
                   },
                 ]);
                 setAdding('');

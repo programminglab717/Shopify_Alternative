@@ -878,8 +878,8 @@ function advanceTermsWords(
  * The badges the shop chose, under the button (ADR-086): cash on delivery and opening the parcel
  * only where the page offers cash on delivery for the cart (`codOffered`); an exchange or
  * returns linked to the refund policy where the shop has one; help on WhatsApp where it has a
- * number. First, what Hatti verified of the shop, whatever it chose (ADR-710). Nothing when none
- * is left.
+ * number; one in the shop's own words as it wrote them, in whichever language (ADR-711). First,
+ * what Hatti verified of the shop, whatever it chose (ADR-710). Nothing when none is left.
  */
 function badgeList(shop: CheckoutShop, codOffered: boolean): Html | false {
   const refund = shop.policies.some((policy) => policy.type === 'refund_policy');
@@ -910,6 +910,8 @@ function badgeList(shop: CheckoutShop, codOffered: boolean): Html | false {
           : [];
       case 'original':
         return [words];
+      case 'custom':
+        return [html`<span dir="auto">${badge.text ?? ''}</span>`];
     }
   });
   const items = [...verified, ...chosen];
@@ -938,6 +940,8 @@ function badgeWords(badge: TrustBadgeValue): Html {
   const days = String(badge.days ?? 0);
   const words: { en: string; ur: HtmlValue } = (() => {
     switch (badge.kind) {
+      case 'custom':
+        return { en: badge.text ?? '', ur: badge.text ?? '' };
       case 'cash_on_delivery':
         return { en: 'Cash on delivery', ur: 'کیش آن ڈیلیوری' };
       case 'open_parcel':

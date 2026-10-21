@@ -16,6 +16,7 @@ const KINDS = {
   returns: CheckoutTrustBadgeKind.RETURNS,
   original: CheckoutTrustBadgeKind.ORIGINAL,
   whatsapp: CheckoutTrustBadgeKind.WHATSAPP,
+  custom: CheckoutTrustBadgeKind.CUSTOM,
 } satisfies Record<TrustBadgeKind, CheckoutTrustBadgeKind>;
 
 const KIND_VALUES = Object.fromEntries(
@@ -36,7 +37,8 @@ export class TrustBadgeResolver {
 
   @Mutation(() => CheckoutTrustBadgesUpdatePayload, {
     description:
-      "Replaces the badges the checkout's page shows, in the order given: up to 4, each once. " +
+      "Replaces the badges the checkout's page shows, in the order given: up to 4, each once; " +
+      'CUSTOM ones once for each thing they say. ' +
       "WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.",
   })
   @RequireScopes('write_settings')
@@ -46,7 +48,11 @@ export class TrustBadgeResolver {
   ): Promise<CheckoutTrustBadgesUpdatePayload> {
     const result = await this.service.update(
       tenant,
-      badges.map((badge) => ({ kind: KIND_VALUES[badge.kind], days: badge.days })),
+      badges.map((badge) => ({
+        kind: KIND_VALUES[badge.kind],
+        days: badge.days,
+        text: badge.text,
+      })),
     );
     return Object.assign(new CheckoutTrustBadgesUpdatePayload(), {
       checkoutTrustBadges: result.ok ? result.value.map(toBadge) : null,
@@ -56,5 +62,9 @@ export class TrustBadgeResolver {
 }
 
 function toBadge(badge: TrustBadgeValue): CheckoutTrustBadge {
-  return Object.assign(new CheckoutTrustBadge(), { kind: KINDS[badge.kind], days: badge.days });
+  return Object.assign(new CheckoutTrustBadge(), {
+    kind: KINDS[badge.kind],
+    days: badge.days,
+    text: badge.text ?? null,
+  });
 }

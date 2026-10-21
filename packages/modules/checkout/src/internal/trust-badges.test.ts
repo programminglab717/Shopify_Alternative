@@ -55,6 +55,39 @@ describe('checkTrustBadges', () => {
       ]),
     ).toEqual([['badges', 'TOO_MANY', 'At most 4 badges']]);
   });
+
+  it("takes badges in the shop's own words, on one line, each saying something else (ADR-711)", () => {
+    expect(
+      badges([
+        { kind: 'custom', text: '  Stitched   in\nLahore ' },
+        { kind: 'custom', text: 'لاہور میں سلا ہوا', days: null },
+        { kind: 'original' },
+      ]),
+    ).toEqual([
+      { kind: 'custom', days: null, text: 'Stitched in Lahore' },
+      { kind: 'custom', days: null, text: 'لاہور میں سلا ہوا' },
+      { kind: 'original', days: null },
+    ]);
+    expect(
+      badges([
+        { kind: 'custom', text: ' ' },
+        { kind: 'custom', text: 'x'.repeat(61) },
+        { kind: 'custom', text: 'Free alterations', days: 7 },
+        { kind: 'custom', text: 'FREE ALTERATIONS' },
+      ]),
+    ).toEqual([
+      ['badges.0.text', 'BLANK', 'Say what the badge says, such as "Stitched in Lahore"'],
+      ['badges.1.text', 'TOO_LONG', 'A badge says at most 60 characters'],
+      ['badges.2.days', 'INVALID', 'Only an exchange or returns badge takes a number of days'],
+      ['badges.3.kind', 'INVALID', 'Each badge once'],
+    ]);
+    expect(badges([{ kind: 'original', text: 'Really original' }])).toEqual([
+      ['badges.0.text', 'INVALID', 'Only a badge in your own words takes text'],
+    ]);
+    expect(badges([{ kind: 'custom', text: 'x'.repeat(60) }])).toEqual([
+      { kind: 'custom', days: null, text: 'x'.repeat(60) },
+    ]);
+  });
 });
 
 describe.skipIf(!server)('Trust badges on the checkout', () => {
@@ -114,6 +147,23 @@ describe.skipIf(!server)('Trust badges on the checkout', () => {
       { badges: [] },
     ]);
     expect(await f.badges.get(f.b)).toEqual([]);
+  });
+
+  it("keeps a badge's own words, and a change to them alone is a change (ADR-711)", async () => {
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    const chosen = [{ kind: 'custom', days: null, text: 'Stitched in Lahore' }] as const;
+    expect(
+      unwrap(await f.badges.update(f.a, [{ kind: 'custom', text: 'Stitched in Lahore' }])),
+    ).toEqual(chosen);
+    expect(await f.badges.get(f.a)).toEqual(chosen);
+    unwrap(await f.badges.update(f.a, [{ kind: 'custom', text: 'Stitched in Lahore ' }]));
+    unwrap(await f.badges.update(f.a, [{ kind: 'custom', text: 'Stitched in Karachi' }]));
+    expect(
+      (await f.outbox()).filter((event) => event.event_type === 'trust_badges.updated'),
+    ).toHaveLength(2);
+    expect(await f.badges.get(f.a)).toEqual([
+      { kind: 'custom', days: null, text: 'Stitched in Karachi' },
+    ]);
   });
 
   it("shows them on the checkout's page, with the shop's WhatsApp number", async () => {

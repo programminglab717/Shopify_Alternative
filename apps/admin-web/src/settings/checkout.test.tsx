@@ -105,10 +105,9 @@ function core(role: StaffRole, whatsappNumber: string | null) {
         };
       }
       case 'CheckoutTrustBadgesUpdate':
-        badges = (variables.badges as { kind: string; days?: number }[]).map((badge) => ({
-          kind: badge.kind,
-          days: badge.days ?? null,
-        }));
+        badges = (variables.badges as { kind: string; days?: number; text?: string }[]).map(
+          (badge) => ({ kind: badge.kind, days: badge.days ?? null, text: badge.text ?? null }),
+        );
         return { checkoutTrustBadgesUpdate: { checkoutTrustBadges: badges, userErrors: [] } };
       case 'CheckoutMarketingChannelsUpdate':
         channels = variables.channels as string[];
@@ -169,6 +168,45 @@ describe('The checkout page', () => {
       { channels: ['WHATSAPP', 'SMS'] },
     ]);
     expect(screen.getByText('14-day exchange')).toBeTruthy();
+  });
+
+  it("adds badges in the shop's own words, more than one, each saying something (ADR-711)", async () => {
+    const fake = core('owner', null);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/checkout');
+
+    const add = (await screen.findByLabelText('Add a badge')) as HTMLSelectElement;
+    fireEvent.change(add, { target: { value: 'CUSTOM' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByText('In your own words', { selector: 'span' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    expect(await screen.findByText('Say what each badge in your own words says.')).toBeTruthy();
+    const words = screen.getByLabelText('What it says') as HTMLInputElement;
+    expect(words.dir).toBe('auto');
+    expect(words.maxLength).toBe(60);
+    type('What it says', '  Stitched  in Lahore ');
+    // The row goes by what it says; another may be added, saying something else.
+    expect(screen.getByRole('button', { name: 'Remove Stitched in Lahore' })).toBeTruthy();
+    expect([...add.options].map((each) => each.value)).toContain('CUSTOM');
+    fireEvent.change(add, { target: { value: 'CUSTOM' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.change(screen.getAllByLabelText('What it says')[1]!, {
+      target: { value: 'لاہور میں سلا ہوا' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    expect(await screen.findByText('Saved. The checkout shows it in a moment.')).toBeTruthy();
+    expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toEqual([
+      {
+        badges: [
+          { kind: 'CASH_ON_DELIVERY' },
+          { kind: 'CUSTOM', text: 'Stitched in Lahore' },
+          { kind: 'CUSTOM', text: 'لاہور میں سلا ہوا' },
+        ],
+      },
+    ]);
+    // Saved, nothing is left to send.
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    await waitFor(() => expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toHaveLength(1));
   });
 
   it('offers Help on WhatsApp only with a WhatsApp number, and removes a badge alone', async () => {

@@ -1281,6 +1281,22 @@ describe('checkoutPage', () => {
     expect(list({ ...SHOP, verified: null })).toBeUndefined();
   });
 
+  it("shows a badge in the shop's own words as it wrote them, in either direction (ADR-711)", () => {
+    const badges = [
+      { kind: 'custom', days: null, text: 'Stitched in <Lahore>' },
+      { kind: 'custom', days: null, text: 'لاہور میں سلا ہوا' },
+      { kind: 'original', days: null },
+    ] as const;
+    const list = /<ul class="badges stack">([\s\S]*?)<\/ul>/.exec(
+      checkoutPage(openView({ shop: { ...SHOP, badges } })).html,
+    )![1]!;
+    expect(list.match(/<li>[\s\S]*?<\/li>/g)!.slice(0, 2)).toEqual([
+      '<li><span dir="auto">Stitched in &lt;Lahore&gt;</span></li>',
+      '<li><span dir="auto">لاہور میں سلا ہوا</span></li>',
+    ]);
+    expect(list).toContain('<span lang="en">100% original products');
+  });
+
   it("links the shop's policies at the foot of the page, each opening beside the checkout", () => {
     const shop = {
       ...SHOP,

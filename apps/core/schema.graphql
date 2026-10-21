@@ -1593,20 +1593,33 @@ type CheckoutTrustBadge {
   """For EXCHANGE and RETURNS: within how many days; null for the rest."""
   days: Int
   kind: CheckoutTrustBadgeKind!
+
+  """For CUSTOM: what the badge says; null for the rest."""
+  text: String
 }
 
 input CheckoutTrustBadgeInput {
   """For EXCHANGE and RETURNS, which need it: 1 to 90. None for the rest."""
   days: Int
   kind: CheckoutTrustBadgeKind!
+
+  """
+  For CUSTOM, which needs it: what the badge says, up to 60 characters on one line. None for the rest.
+  """
+  text: String
 }
 
 """
-A badge from the platform's set, which the checkout's page words in English and Urdu.
+A badge from the platform's set, which the checkout's page words in English and Urdu; or one in the shop's own words.
 """
 enum CheckoutTrustBadgeKind {
   """"Cash on delivery": shown where the page offers it for the cart."""
   CASH_ON_DELIVERY
+
+  """
+  The shop's own words, its text, shown as written: "Stitched in Lahore". It may come more than once, saying something else each time.
+  """
+  CUSTOM
 
   """"7-day exchange", with its days: linked to the refund policy, if any."""
   EXCHANGE
@@ -8081,7 +8094,7 @@ type Mutation {
   checkoutRecoverySettingsUpdate(offerAfterHours: Int, offerDiscountCodeId: ID, reminderAfterMinutes: Int): CheckoutRecoverySettingsUpdatePayload!
 
   """
-  Replaces the badges the checkout's page shows, in the order given: up to 4, each once. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
+  Replaces the badges the checkout's page shows, in the order given: up to 4, each once; CUSTOM ones once for each thing they say. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
   """
   checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-710 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-711 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -718,6 +718,7 @@
 | 708 | The theme editor's preview shows the theme's settings as they change, every section of the page rendered again with them, the few around the sections once saved | Accepted |
 | 709 | A cart permalink fills in its checkout with the shopper's details as Shopify's checkout[...] gives them: name, number, email, city and address, never kept with visits | Accepted |
 | 710 | The checkout says first among its badges what Hatti verified of the shop, its seller's identity or a registered business, whatever badges the shop chose | Accepted |
+| 711 | A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than one saying something else each, shown as written in English or Urdu | Accepted |
 
 ---
 
@@ -24360,3 +24361,26 @@
 * **Alternatives:** **A badge the shop picks:** one it could pick unverified, or leave off when
   it would help. **Beside the shop's name at the page's head:** the badges are where shoppers
   look for reasons to trust it.
+
+## ADR-711 · A checkout's badges may be in the shop's own words, up to 60 characters on a line, more than one saying something else each, shown as written in English or Urdu
+
+* **Context:** A checkout's badges came from the platform's set alone, worded in English and
+  Urdu ([ADR-086](#adr-086--a-shop-chooses-trust-badges-for-its-checkout-from-the-platforms-set-worded-in-english-and-urdu-and-shown-under-the-button-where-they-hold)). A shop's reasons to be trusted are often its own: "Stitched in
+  Lahore", "Free alterations", "Delivered in a gift box". CHK-14 asks for badges in its own words.
+* **Decision:**
+  * **A badge of the kind `custom` carries its text**, which the shop writes: one line, its spaces
+    tidied, 1 to 60 characters. It takes no days; no other badge takes a text.
+  * **It may come more than once**, within the four badges, each saying something else, compared
+    without letter case; the platform's badges stay once each.
+  * **The page shows it as written**, in whichever language the shop wrote it, its direction its
+    own (`dir="auto"`), escaped as all text is, after what Hatti verified ([ADR-710](#adr-710--the-checkout-says-first-among-its-badges-what-hatti-verified-of-the-shop-its-sellers-identity-or-a-registered-business-whatever-badges-the-shop-chose)) and
+    in the shop's order among its other badges. The Admin API's `CheckoutTrustBadge` carries it
+    as `text`, kind `CUSTOM`; badges kept before have none and read as before.
+  * **The admin's card adds one** as it adds the others, with a field for what it says, the row
+    named by it.
+* **Consequences:** A shop says what sets it apart where shoppers decide. The platform does not
+  check what it says, as it does not check a product's description: a false claim is the shop's,
+  reportable as any of its pages are.
+* **Alternatives:** **One text per badge, in English and in Urdu:** most shops write one or the
+  other, and a second field left blank shows nothing. **More platform badges:** they would never
+  cover what each shop has to say.

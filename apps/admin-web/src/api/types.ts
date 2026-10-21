@@ -3500,12 +3500,16 @@ export interface CustomerErasureRequestsData {
 }
 
 export type CheckoutTrustBadgeKind =
-  'CASH_ON_DELIVERY' | 'OPEN_PARCEL' | 'ORIGINAL' | 'EXCHANGE' | 'RETURNS' | 'WHATSAPP';
+  'CASH_ON_DELIVERY' | 'OPEN_PARCEL' | 'ORIGINAL' | 'EXCHANGE' | 'RETURNS' | 'WHATSAPP' | 'CUSTOM';
 
-/** A badge under the checkout's button (CHK-14): days for exchanges and returns alone. */
+/**
+ * A badge under the checkout's button (CHK-14): days for exchanges and returns alone; text for one
+ * in the shop's own words alone (ADR-711).
+ */
 export interface CheckoutTrustBadge {
   kind: CheckoutTrustBadgeKind;
   days: number | null;
+  text?: string | null;
 }
 
 export interface CheckoutPageData {
