@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Verified shops at checkout
+### 69fe028 · Verified shops at checkout
 
 * **The checkout says first among its badges what Hatti verified of the shop, its seller's
   identity or a registered business, whatever badges the shop chose** ([ADR-710](../architecture/13-decision-log.md#adr-710--the-checkout-says-first-among-its-badges-what-hatti-verified-of-the-shop-its-sellers-identity-or-a-registered-business-whatever-badges-the-shop-chose)): CHK-14's
