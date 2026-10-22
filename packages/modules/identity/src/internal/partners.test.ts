@@ -2,6 +2,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { SecretBox, base32Decode, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { legalVersions } from '@hatti/legal';
 import { fromPublicId } from '@hatti/ids';
 import { RateLimiter } from '@hatti/ratelimit';
 import { Redis } from 'ioredis';
@@ -13,6 +14,8 @@ import { newId } from '@hatti/ids';
 import { PartnersService, recordPartnerEarning } from './partners.service.js';
 import { StaffService } from './staff.service.js';
 
+/** What an owner agrees to, to open a shop (ADR-737): the current versions. */
+const AGREED = legalVersions();
 const server = testDatabaseServer();
 const redisUrl = process.env.REDIS_URL;
 const PASSWORD = 'correct horse battery staple';
@@ -111,11 +114,18 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
   it('opens development stores, closed until each is handed to its client, and lists its stores', async () => {
     const agency = await signUp();
     expect(
-      (await authError(partners.openDevelopmentStore(agency, { name: 'Zari Lawn' }))).code,
+      (
+        await authError(
+          partners.openDevelopmentStore(agency, { name: 'Zari Lawn', agreed: AGREED }),
+        )
+      ).code,
     ).toBe('NOT_PARTNER');
     await partners.join(agency, { businessName: 'Pixel Media' });
 
-    const opened = await partners.openDevelopmentStore(agency, { name: 'Zari Lawn' });
+    const opened = await partners.openDevelopmentStore(agency, {
+      name: 'Zari Lawn',
+      agreed: AGREED,
+    });
     expect(opened).toMatchObject({ name: 'Zari Lawn', handle: 'zari-lawn', role: 'owner' });
     const shopId = fromPublicId(opened.id, 'shop')!;
     expect(await shopOf(shopId)).toEqual({ development: true, handle: 'zari-lawn' });
@@ -126,20 +136,23 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
     );
     expect(events.rows.map((row) => row.event_type)).toEqual(['shop.opened']);
     expect(
-      (await authError(partners.openDevelopmentStore(agency, { name: 'X', handle: 'zari-lawn' })))
-        .code,
+      (
+        await authError(
+          partners.openDevelopmentStore(agency, { name: 'X', handle: 'zari-lawn', agreed: AGREED }),
+        )
+      ).code,
     ).toBe('HANDLE_TAKEN');
 
     // A client's shop the agency was let into, and one of its own, which is not a client's.
     const clientShop = await signUp();
     const theirs = await identity.openShop(
       await identity.authenticate(clientShop.tokens.accessToken),
-      { name: 'Gota Kinari' },
+      { name: 'Gota Kinari', agreed: AGREED },
       client(),
     );
     const own = await identity.openShop(
       await identity.authenticate(agency.tokens.accessToken),
-      { name: 'Pixel Prints' },
+      { name: 'Pixel Prints', agreed: AGREED },
       client(),
     );
     await identity.grantMembership({
@@ -189,17 +202,18 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
     const agency = await signUp();
     await partners.join(agency, { businessName: 'Studio 92' });
     for (let at = 0; at < 20; at += 1) {
-      await partners.openDevelopmentStore(agency, { name: `Client ${at}` });
+      await partners.openDevelopmentStore(agency, { name: `Client ${at}`, agreed: AGREED });
     }
     expect(
-      (await authError(partners.openDevelopmentStore(agency, { name: 'One more' }))).message,
+      (await authError(partners.openDevelopmentStore(agency, { name: 'One more', agreed: AGREED })))
+        .message,
     ).toBe('A partner builds 20 development stores at once at most: hand one over first');
     // Its own shops are counted apart.
     expect(
       (
         await identity.openShop(
           await identity.authenticate(agency.tokens.accessToken),
-          { name: 'Studio Store' },
+          { name: 'Studio Store', agreed: AGREED },
           client(),
         )
       ).role,
@@ -233,18 +247,22 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
       identity.authenticate(account.tokens.accessToken);
     const referred = await identity.openShop(
       await session(merchant),
-      { name: 'Zari Lawn', referralCode: ` ${referralCode.toUpperCase()} ` },
+      {
+        name: 'Zari Lawn',
+        referralCode: ` ${referralCode.toUpperCase()} `,
+        agreed: AGREED,
+      },
       client(),
     );
     const stranger = await signUp();
     await identity.openShop(
       await session(stranger),
-      { name: 'Gota', referralCode: 'nosuchco' },
+      { name: 'Gota', referralCode: 'nosuchco', agreed: AGREED },
       client(),
     );
     await identity.openShop(
       await session(agency),
-      { name: 'Pixel Prints', referralCode },
+      { name: 'Pixel Prints', referralCode, agreed: AGREED },
       client(),
     );
     const shopId = fromPublicId(referred.id, 'shop')!;
@@ -262,7 +280,13 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
     expect(await pay(shopId, first, 299_900n)).toBeNull();
     expect(await pay(shopId, newId(), 2_999_000n, '1002')).toBe(599_800n);
     const gota = fromPublicId(
-      (await identity.openShop(await session(stranger), { name: 'Other' }, client())).id,
+      (
+        await identity.openShop(
+          await session(stranger),
+          { name: 'Other', agreed: AGREED },
+          client(),
+        )
+      ).id,
       'shop',
     )!;
     expect(await pay(gota, newId(), 299_900n)).toBeNull();

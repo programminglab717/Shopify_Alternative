@@ -95,7 +95,17 @@ describe.skipIf(!server)('/auth/google: merchants sign up and in with Google (AD
       shops: [],
       google: { email: 'nadia@example.pk', connectedAt: expect.any(String) },
     });
-    const shop = await call('POST', '/auth/shops', { name: 'Nadia Crafts' }, body.accessToken);
+    // Hatti's terms as they are, agreed to (ADR-737).
+    const { documents } = (await api.app.inject({ method: 'GET', url: '/auth/agreement' })).json<{
+      documents: { handle: string; version: string }[];
+    }>();
+    const agreed = Object.fromEntries(documents.map((each) => [each.handle, each.version]));
+    const shop = await call(
+      'POST',
+      '/auth/shops',
+      { name: 'Nadia Crafts', agreed },
+      body.accessToken,
+    );
     expect([shop.statusCode, shop.json().shop]).toMatchObject([
       201,
       { name: 'Nadia Crafts', handle: 'nadia-crafts', role: 'owner', mfaRequired: true },

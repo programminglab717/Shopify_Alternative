@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { Store } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { ApiError } from '../api/client';
 import type { StaffMemberRole } from '../api/types';
 import { AuthLayout } from '../auth/auth-layout';
 import { useSessionStore } from '../auth/context';
@@ -14,6 +15,7 @@ import { roleLabel } from '../settings/settings-page';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { TermsAgreement, useTermsAgreement } from './terms-agreement';
 
 /** A partner as they see themselves (ADR-504). */
 export interface Partner {
@@ -156,21 +158,27 @@ function Dashboard({ partner, stores }: { partner: Partner; stores: PartnerStore
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
+  // The partner agrees to Hatti's terms as the store's owner while they build it (ADR-737).
+  const agreement = useTermsAgreement();
 
   const onOpen = async (event: FormEvent) => {
     event.preventDefault();
+    if (!agreement.agreed) return;
     setBusy(true);
     setProblem(null);
     setOpened(null);
     try {
       const { shop } = await store.auth<{ shop: { name: string } }>('/auth/partner/stores', {
-        body: { name: name.trim() },
+        body: { name: name.trim(), agreed: agreement.agreed },
       });
       setOpened(shop.name);
       setName('');
       await queryClient.invalidateQueries({ queryKey: KEY });
     } catch (failure) {
       setProblem(errorText(failure, t));
+      if (failure instanceof ApiError && failure.code === 'TERMS_CHANGED') {
+        await agreement.refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -194,6 +202,7 @@ function Dashboard({ partner, stores }: { partner: Partner; stores: PartnerStore
           onChange={(event) => setName(event.target.value)}
           required
         />
+        <TermsAgreement agreement={agreement} />
         {opened && <Alert tone="success">{t('partner.opened', { shop: opened })}</Alert>}
         {problem && <Alert tone="danger">{problem}</Alert>}
         <Button type="submit" busy={busy} icon={<Store aria-hidden className="size-5" />}>

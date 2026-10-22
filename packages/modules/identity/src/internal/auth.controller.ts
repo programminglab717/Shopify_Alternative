@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Optional,
   Param,
   Post,
   Req,
@@ -13,10 +14,12 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from '@nestjs/common';
+import { PublicSite } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { shopAgreementDocuments } from './agreements.js';
 import { AuthError } from './errors.js';
 import {
   IdentityService,
@@ -138,6 +141,8 @@ const shopBody = z.object({
   name: z.string().max(1_024),
   handle: z.string().max(100).nullish(),
   referralCode: z.string().max(32).nullish(),
+  // Each of Hatti's documents agreed to, by the version shown: { "terms": "2026-10-22", … }.
+  agreed: z.record(z.string().max(40), z.string().max(20)).nullish(),
 });
 const codeBody = z.object({ code: z.string().max(32) });
 const partnerBody = z.object({
@@ -263,6 +268,7 @@ export class AuthController {
     private readonly staff: StaffService,
     private readonly support: SupportAccessService,
     private readonly partners: PartnersService,
+    @Optional() private readonly site?: PublicSite,
   ) {}
 
   @Post('sign-up')
@@ -624,9 +630,25 @@ export class AuthController {
   }
 
   /**
-   * Opens a shop of the signed-in user's own (ONB-01, ADR-145): `{ name, handle?, referralCode? }`,
-   * the code a partner's link brought them by (ADR-505); the shop, its handle and the user's role
-   * in it. Its owner signs in with a second factor to use it.
+   * What opening a shop asks its owner to agree to (ADR-737): Hatti's terms of service, acceptable
+   * use policy and data processing agreement, each with its version and where to read it.
+   */
+  @Get('agreement')
+  agreement(@Res({ passthrough: true }) reply: FastifyReply) {
+    reply.header('cache-control', 'public, max-age=300');
+    return {
+      documents: shopAgreementDocuments().map((document) => ({
+        ...document,
+        url: this.site?.url(`/legal/${document.handle}`) ?? `/legal/${document.handle}`,
+      })),
+    };
+  }
+
+  /**
+   * Opens a shop of the signed-in user's own (ONB-01, ADR-145): `{ name, handle?, referralCode?,
+   * agreed }`, the code a partner's link brought them by (ADR-505), and the versions of Hatti's
+   * terms they agreed to, as `GET /auth/agreement` gives them (ADR-737); the shop, its handle and
+   * the user's role in it. Its owner signs in with a second factor to use it.
    */
   @Post('shops')
   @HttpCode(201)
@@ -888,7 +910,8 @@ export class AuthController {
   }
 
   /**
-   * Opens a development store for a partner to build (ADR-504): `{ name, handle? }`. Closed to
+   * Opens a development store for a partner to build (ADR-504): `{ name, handle?, agreed }`, the
+   * partner agreeing to Hatti's terms as its owner meanwhile (ADR-737). Closed to
    * shoppers until the partner hands it to its client, as an owner hands over any shop.
    */
   @Post('partner/stores')
@@ -902,6 +925,7 @@ export class AuthController {
     const shop = await this.partners.openDevelopmentStore(
       await this.session(request),
       parse(shopBody, body),
+      clientOf(request),
     );
     return { shop };
   }

@@ -56,6 +56,7 @@ import {
   type AccountEmailLanguage,
   type AccountEmailSender,
 } from './account-emails.js';
+import { recordShopAgreement, shopAgreement, type AgreedVersions } from './agreements.js';
 import { memberAccess } from './custom-roles.js';
 import {
   liftSuppression,
@@ -2253,7 +2254,13 @@ export class IdentityService {
    */
   async openShop(
     auth: AuthenticatedSession,
-    input: { name: string; handle?: string | null; referralCode?: string | null },
+    input: {
+      name: string;
+      handle?: string | null;
+      referralCode?: string | null;
+      /** The versions of Hatti's terms the owner was shown and agreed to (ADR-737). */
+      agreed?: AgreedVersions | null;
+    },
     client: ClientInfo,
   ): Promise<OpenedShop> {
     await this.limit(RATE_LIMITS.openShopByUser, auth.userId);
@@ -2268,6 +2275,7 @@ export class IdentityService {
     if (Object.keys(fields).length > 0) {
       throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', { fields });
     }
+    const agreement = shopAgreement(input.agreed);
     return this.db.transaction(async (tx) => {
       // A partner's development stores are counted apart (ADR-504).
       const [owned] = await tx
@@ -2293,6 +2301,7 @@ export class IdentityService {
         numbered: asked === null,
       });
       await tx.insert(memberships).values({ userId: auth.userId, shopId, role: 'owner' });
+      await recordShopAgreement(tx, shopId, auth.userId, agreement, client);
       // Brought by a partner's link (ADR-505): theirs, as referred. A code that is no one's is
       // no reason not to open the shop.
       if (input.referralCode?.trim()) {

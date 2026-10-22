@@ -3,6 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { ChevronRight, Handshake, Store } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { ApiError } from '../api/client';
 import { AuthLayout } from '../auth/auth-layout';
 import { ME_KEY, useMe, useSessionStore } from '../auth/context';
 import type { ShopAccess } from '../auth/session';
@@ -14,6 +15,7 @@ import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { forgetReferral, referralCode, rememberReferral } from './referral';
 import { TextField } from '../ui/field';
+import { TermsAgreement, useTermsAgreement } from './terms-agreement';
 
 /** Opening a shop (ONB-01, ONB-10): its name; Pakistan's currency and time, and Free, to start. */
 function OpenShopForm({ first }: { first: boolean }) {
@@ -24,22 +26,32 @@ function OpenShopForm({ first }: { first: boolean }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Hatti's terms, agreed to in opening it (ADR-737).
+  const agreement = useTermsAgreement();
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!agreement.agreed) return;
     setBusy(true);
     setError(null);
     try {
       // Brought by a partner's link (ADR-505): the shop is theirs, as referred.
       const referral = referralCode();
       const { shop } = await store.auth<{ shop: ShopAccess }>('/auth/shops', {
-        body: { name: name.trim(), ...(referral && { referralCode: referral }) },
+        body: {
+          name: name.trim(),
+          agreed: agreement.agreed,
+          ...(referral && { referralCode: referral }),
+        },
       });
       forgetReferral();
       await queryClient.invalidateQueries({ queryKey: ME_KEY });
       await navigate({ to: '/$shopId', params: { shopId: shop.id } });
     } catch (failure) {
       setError(errorText(failure, t));
+      if (failure instanceof ApiError && failure.code === 'TERMS_CHANGED') {
+        await agreement.refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -55,6 +67,7 @@ function OpenShopForm({ first }: { first: boolean }) {
         autoFocus={first}
         required
       />
+      <TermsAgreement agreement={agreement} />
       {error && <Alert tone="danger">{error}</Alert>}
       <Button type="submit" busy={busy}>
         {t('shops.openSubmit')}

@@ -923,6 +923,9 @@ importers:
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
+      '@hatti/legal':
+        specifier: workspace:*
+        version: link:../../platform/legal
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money

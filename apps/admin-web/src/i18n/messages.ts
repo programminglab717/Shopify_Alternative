@@ -91,6 +91,13 @@ const en = {
   'shops.openBody': 'Give your shop a name. You can change it later.',
   'shops.name': 'Shop name',
   'shops.openSubmit': 'Open my shop',
+  'terms.agreeStart': "I agree to Hatti's",
+  'terms.agreeEnd': '.',
+  'terms.and': 'and',
+  'terms.comma': ', ',
+  'terms.doc.terms': 'terms of service',
+  'terms.doc.acceptableUse': 'acceptable use policy',
+  'terms.doc.dataProcessing': 'data processing agreement',
   'shops.none': 'You are not part of a shop yet.',
   'shops.noAccess': 'You no longer have access to this shop.',
 
@@ -113,6 +120,8 @@ const en = {
   'error.PHONE_TAKEN': 'An account already uses this number. Sign in instead.',
   'error.HANDLE_TAKEN': 'Another shop already has this address. Try another.',
   'error.TOO_MANY_SHOPS': 'You can own up to 5 shops.',
+  'error.TERMS_CHANGED':
+    "Hatti's terms have changed since this page opened: read them again and tick the box.",
   'error.PHONE_SIGN_IN_UNAVAILABLE':
     'Signing in by mobile is not available right now. Use your email.',
   'error.CODE_NOT_SENT': 'The code could not be sent. Try again, or send it by SMS.',
@@ -5647,6 +5656,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shops.openBody': 'اپنی دکان کا نام رکھیں۔ آپ اسے بعد میں بدل سکتے ہیں۔',
   'shops.name': 'دکان کا نام',
   'shops.openSubmit': 'میری دکان کھولیں',
+  'terms.agreeStart': 'میں ہٹی کی',
+  'terms.agreeEnd': ' سے متفق ہوں۔',
+  'terms.and': 'اور',
+  'terms.comma': '، ',
+  'terms.doc.terms': 'سروس کی شرائط',
+  'terms.doc.acceptableUse': 'قابلِ قبول استعمال کی پالیسی',
+  'terms.doc.dataProcessing': 'ڈیٹا پراسیسنگ کے معاہدے',
   'shops.none': 'آپ ابھی کسی دکان میں شامل نہیں ہیں۔',
   'shops.noAccess': 'اب آپ کو اس دکان تک رسائی نہیں ہے۔',
 
@@ -5669,6 +5685,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'error.PHONE_TAKEN': 'یہ نمبر پہلے سے ایک اکاؤنٹ میں ہے۔ اس کی بجائے سائن ان کریں۔',
   'error.HANDLE_TAKEN': 'یہ پتہ کسی اور دکان کا ہے۔ کوئی اور آزمائیں۔',
   'error.TOO_MANY_SHOPS': 'آپ زیادہ سے زیادہ 5 دکانوں کے مالک ہو سکتے ہیں۔',
+  'error.TERMS_CHANGED':
+    'یہ صفحہ کھلنے کے بعد ہٹی کی شرائط بدل گئی ہیں: انہیں دوبارہ پڑھیں اور خانے پر نشان لگائیں۔',
   'error.PHONE_SIGN_IN_UNAVAILABLE':
     'موبائل سے سائن ان ابھی دستیاب نہیں۔ اپنی ای میل استعمال کریں۔',
   'error.CODE_NOT_SENT': 'کوڈ نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں، یا ایس ایم ایس سے بھیجیں۔',

@@ -131,7 +131,12 @@ describe.skipIf(!server)(
       expect((await post('/auth/language', { language: 'fr' }, body.accessToken)).statusCode).toBe(
         400,
       );
-      const shop = await post('/auth/shops', { name: 'Bilal Shoes' }, body.accessToken);
+      // Hatti's terms as they are, agreed to (ADR-737).
+      const { documents } = (await api.app.inject({ method: 'GET', url: '/auth/agreement' })).json<{
+        documents: { handle: string; version: string }[];
+      }>();
+      const agreed = Object.fromEntries(documents.map((each) => [each.handle, each.version]));
+      const shop = await post('/auth/shops', { name: 'Bilal Shoes', agreed }, body.accessToken);
       expect([shop.statusCode, shop.json().shop]).toMatchObject([
         201,
         { name: 'Bilal Shoes', handle: 'bilal-shoes', role: 'owner' },

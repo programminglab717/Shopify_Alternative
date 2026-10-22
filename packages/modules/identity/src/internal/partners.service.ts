@@ -4,8 +4,9 @@ import type { Db } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
+import { recordShopAgreement, shopAgreement, type AgreedVersions } from './agreements.js';
 import { AuthError } from './errors.js';
-import type { AuthenticatedSession, OpenedShop } from './identity.service.js';
+import type { AuthenticatedSession, ClientInfo, OpenedShop } from './identity.service.js';
 import {
   SHOP_LIMITS,
   ShopEvents,
@@ -305,7 +306,8 @@ export class PartnersService {
    */
   async openDevelopmentStore(
     auth: Pick<AuthenticatedSession, 'userId'>,
-    input: { name: string; handle?: string | null },
+    input: { name: string; handle?: string | null; agreed?: AgreedVersions | null },
+    client: ClientInfo = {},
   ): Promise<OpenedShop> {
     const name = input.name.replace(/\p{Cc}/gu, '').trim();
     const asked = input.handle?.trim().toLowerCase() || null;
@@ -320,6 +322,8 @@ export class PartnersService {
     }
     return this.db.transaction(async (tx) => {
       await this.#partner(tx, auth.userId, { lock: true });
+      // The partner agrees as the store's owner while they build it (ADR-737).
+      const agreement = shopAgreement(input.agreed);
       const { rows } = await tx.execute<{ count: number }>(sql`
         SELECT count(*)::int AS count FROM identity.partner_stores
          WHERE partner_id = ${auth.userId} AND kind = 'development' AND transferred_at IS NULL`);
@@ -341,6 +345,7 @@ export class PartnersService {
       await tx.execute(sql`
         INSERT INTO identity.partner_stores (shop_id, partner_id, kind)
              VALUES (${shopId}, ${auth.userId}, 'development')`);
+      await recordShopAgreement(tx, shopId, auth.userId, agreement, client);
       await appendEvent<ShopOpenedPayload>(tx, shopId, {
         type: ShopEvents.ShopOpened,
         aggregateType: 'shop',

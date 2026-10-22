@@ -28,6 +28,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/legal": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/ratelimit": "workspace:*",

@@ -3,6 +3,7 @@ import { PRESET_CAPABILITIES, ROLE_SCOPES, SUPPORT_SCOPES, type StaffRole } from
 import { SecretBox, base32Decode, sha256, totp } from '@hatti/crypto';
 import { Database, pgError } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { legalVersions } from '@hatti/legal';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { RateLimiter } from '@hatti/ratelimit';
 import { sql } from 'drizzle-orm';
@@ -57,6 +58,8 @@ import {
 } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
+/** What an owner agrees to, to open a shop (ADR-737): the current versions. */
+const AGREED = legalVersions();
 const server = testDatabaseServer();
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
@@ -2246,10 +2249,67 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
     const grant = (userId: string, shopId: string, role: StaffRole) =>
       service.grantMembership({ userId, shopId, role });
 
+    it("opens a shop only once its owner agrees to Hatti's terms as they are now, and keeps what they agreed to (ADR-737)", async () => {
+      const { tokens } = await signUp();
+      const session = await auth(tokens.accessToken);
+      const without = await authError(service.openShop(session, { name: 'Noor' }, client()));
+      expect([without.code, without.status, without.details.fields]).toEqual([
+        'INVALID_INPUT',
+        422,
+        {
+          agreed:
+            "Agree to Hatti's terms of service, acceptable use policy and data processing agreement",
+        },
+      ]);
+      // One left out, as a page that showed only the terms would.
+      const partly = await authError(
+        service.openShop(session, { name: 'Noor', agreed: { terms: AGREED.terms } }, client()),
+      );
+      expect(partly.code).toBe('INVALID_INPUT');
+      // A version since replaced: the page shows the new text first.
+      const stale = await authError(
+        service.openShop(
+          session,
+          { name: 'Noor', agreed: { ...AGREED, terms: '2026-01-01' } },
+          client(),
+        ),
+      );
+      expect([stale.code, stale.status]).toEqual(['TERMS_CHANGED', 409]);
+      const { rows: none } = await admin.query(
+        'SELECT 1 FROM identity.shop_agreements WHERE user_id = $1',
+        [session.userId],
+      );
+      expect(none).toEqual([]);
+
+      const from = client();
+      const opened = await service.openShop(session, { name: 'Noor', agreed: AGREED }, from);
+      const { rows } = await admin.query(
+        `SELECT shop_id, documents, host(ip) AS ip, user_agent
+           FROM identity.shop_agreements WHERE user_id = $1`,
+        [session.userId],
+      );
+      expect(rows).toEqual([
+        {
+          shop_id: fromPublicId(opened.id, 'shop'),
+          documents: {
+            terms: AGREED.terms,
+            'acceptable-use': AGREED['acceptable-use'],
+            'data-processing': AGREED['data-processing'],
+          },
+          ip: from.ip,
+          user_agent: from.userAgent,
+        },
+      ]);
+    });
+
     it('opens a shop its user owns, in the control plane, for its storefront to be published (ADR-145)', async () => {
       const { tokens } = await signUp();
       const session = await auth(tokens.accessToken);
-      const opened = await service.openShop(session, { name: '  Zari Fashions  ' }, client());
+      const opened = await service.openShop(
+        session,
+        { name: '  Zari Fashions  ', agreed: AGREED },
+        client(),
+      );
       expect(opened).toMatchObject({
         name: 'Zari Fashions',
         handle: 'zari-fashions',
@@ -2319,22 +2379,34 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
     it('numbers a handle made from the name when another shop has it, and refuses one asked for', async () => {
       const { tokens } = await signUp();
       const session = await auth(tokens.accessToken);
-      const first = await service.openShop(session, { name: 'Lawn House' }, client());
-      const second = await service.openShop(session, { name: 'Lawn  House!' }, client());
+      const first = await service.openShop(
+        session,
+        { name: 'Lawn House', agreed: AGREED },
+        client(),
+      );
+      const second = await service.openShop(
+        session,
+        { name: 'Lawn  House!', agreed: AGREED },
+        client(),
+      );
       expect([first.handle, second.handle]).toEqual(['lawn-house', 'lawn-house-2']);
       const taken = await authError(
-        service.openShop(session, { name: 'Other', handle: ' Lawn-House ' }, client()),
+        service.openShop(
+          session,
+          { name: 'Other', handle: ' Lawn-House ', agreed: AGREED },
+          client(),
+        ),
       );
       expect([taken.code, taken.details.fields]).toEqual([
         'HANDLE_TAKEN',
         { handle: 'Taken by another shop' },
       ]);
       const reserved = await authError(
-        service.openShop(session, { name: 'Admin', handle: 'admin' }, client()),
+        service.openShop(session, { name: 'Admin', handle: 'admin', agreed: AGREED }, client()),
       );
       expect(reserved.details.fields).toEqual({ handle: 'This handle is kept for the platform' });
       const invalid = await authError(
-        service.openShop(session, { name: ' ', handle: '-x-' }, client()),
+        service.openShop(session, { name: ' ', handle: '-x-', agreed: AGREED }, client()),
       );
       expect([invalid.code, Object.keys(invalid.details.fields!)]).toEqual([
         'INVALID_INPUT',
@@ -2346,9 +2418,11 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       const { tokens } = await signUp();
       const session = await auth(tokens.accessToken);
       for (let shop = 1; shop <= SHOP_LIMITS.ownedShops; shop += 1) {
-        await service.openShop(session, { name: `Bazaar ${shop}` }, client());
+        await service.openShop(session, { name: `Bazaar ${shop}`, agreed: AGREED }, client());
       }
-      const more = await authError(service.openShop(session, { name: 'Bazaar 6' }, client()));
+      const more = await authError(
+        service.openShop(session, { name: 'Bazaar 6', agreed: AGREED }, client()),
+      );
       expect([more.code, more.status]).toEqual(['TOO_MANY_SHOPS', 422]);
     });
 

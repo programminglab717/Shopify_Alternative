@@ -43,6 +43,15 @@ describe("Hatti's partners (PRT-01, ADR-504)", () => {
       () => ({}),
       (path, body, method) => {
         if (path === '/auth/partner' && method === 'GET') return { partner, stores };
+        if (path === '/auth/agreement') {
+          return {
+            documents: [
+              { handle: 'terms', version: '2026-10-22', url: '/legal/terms' },
+              { handle: 'acceptable-use', version: '2026-10-22', url: '/legal/acceptable-use' },
+              { handle: 'data-processing', version: '2026-10-22', url: '/legal/data-processing' },
+            ],
+          };
+        }
         if (path === '/auth/partner') {
           partner = {
             businessName: 'Pixel Media',
@@ -53,7 +62,9 @@ describe("Hatti's partners (PRT-01, ADR-504)", () => {
           return { partner };
         }
         if (path === '/auth/partner/stores') {
-          const { name } = body as { name: string };
+          const { name, agreed } = body as { name: string; agreed: Record<string, string> };
+          // The partner agreed to Hatti's terms as the store's owner (ADR-737).
+          expect(Object.keys(agreed)).toEqual(['terms', 'acceptable-use', 'data-processing']);
           stores = [
             {
               id: 'shop_10',
@@ -88,6 +99,7 @@ describe("Hatti's partners (PRT-01, ADR-504)", () => {
     expect(screen.getByText('Client')).toBeTruthy();
 
     type("Your client's store name", 'Noor Jewels');
+    (await screen.findByRole('checkbox', { name: /I agree to Hatti's/ })).click();
     await press('Open a development store');
     await screen.findByText(
       'Opened Noor Jewels. It shows shoppers that it opens soon until you hand it over.',

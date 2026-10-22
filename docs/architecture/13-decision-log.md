@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-736 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-737 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -744,6 +744,7 @@
 | 734 | Kundan for jewellery, Nikhar for beauty and Kiryana for groceries complete Hatti's six themes, one for each starter kit, which the store builder starts each kind of shop on | Accepted |
 | 735 | The launch load test is a k6 script kept in the repository: shoppers browsing and placing cash-on-delivery orders side by side at three times 12 §2's launch peak, held to 12 §1's objectives, against staging's load-test shop, each shopper from an address and a number of its own | Accepted |
 | 736 | Hatti's own terms, privacy policy, acceptable use policy, data processing agreement and sub-processors are versioned texts in a package of their own, served by the core at /legal with their gist in Urdu, and marked drafts while any blank is left for counsel | Accepted |
+| 737 | A shop opens only once its owner agrees to Hatti's terms of service, acceptable use policy and data processing agreement as they are now: the versions shown are sent with the shop, refused when stale, and kept with who agreed and from where | Accepted |
 
 ---
 
@@ -25086,3 +25087,29 @@
   months, a closed shop's data deleted after 90 days, closing a shop from the admin, and the
   emails of changes to the terms and of new sub-processors; they must be built before the texts
   take effect. Opening a shop does not yet record agreement to them; that comes next.
+
+## ADR-737 · A shop opens only once its owner agrees to Hatti's terms of service, acceptable use policy and data processing agreement as they are now: the versions shown are sent with the shop, refused when stale, and kept with who agreed and from where
+
+* **Context:** Hatti's own terms are written and versioned ([ADR-736](#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)), but a shop
+  opened agreeing to nothing. The agreement is evidence, as a shopper's to a shop's policies is
+  ([ADR-057](#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from)): which text, by whom, when and from where.
+* **Decision:**
+  * **`GET /auth/agreement`** names what opening a shop agrees to, `SHOP_AGREEMENT`'s three
+    documents, each with its version and its page's address on the core's public site.
+  * **`POST /auth/shops`** and a partner's **`POST /auth/partner/stores`** take `agreed`, each
+    document's version as shown. One missing is refused as `INVALID_INPUT` on the field
+    `agreed`; a version no longer current as `TERMS_CHANGED` (409), so the page shows the new
+    text before anyone agrees to it. A partner is asked as the development store's owner while
+    they build it, after it is known they are a partner.
+  * **`identity.shop_agreements`** keeps each agreement in the transaction that opens the shop:
+    the shop, the user, the versions as JSON, the internet address and the browser. Its rows
+    are only inserted, and kept with the user's ID after their account is gone, as the audit
+    log keeps actors.
+  * **The admin's forms** to open a shop and a development store carry a box, "I agree to
+    Hatti's terms of service, acceptable use policy and data processing agreement", each name
+    linking to its page, in English and Urdu, required before the form sends; a `TERMS_CHANGED`
+    unticks it and reloads the versions.
+* **Consequences:** every shop opened from now has its owner's agreement on record. Shops opened
+  before have none, a shop handed to a new owner or to a partner's client stays under the
+  agreement of whoever opened it, and a new version does not yet ask existing owners to agree
+  again; each is for when the texts take effect (OWN-41).

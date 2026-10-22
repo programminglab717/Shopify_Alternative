@@ -131,6 +131,9 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
     return secret;
   }
 
+  /** The versions of Hatti's terms a shop's owner agrees to. */
+  let agreed: Record<string, string> = {};
+
   beforeAll(async () => {
     testDb = await createTestDatabase(server);
     admin = new pg.Client({ connectionString: testDb.adminUrl });
@@ -142,6 +145,10 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
     api = await startTestApi(testDb, {
       emails: { sender: outbox, adminUrl: 'https://admin.hatti.pk' },
     });
+    // Opening a shop agrees to Hatti's terms as they are (ADR-737).
+    const asked = await api.app.inject({ method: 'GET', url: '/auth/agreement' });
+    const { documents } = asked.json() as { documents: { handle: string; version: string }[] };
+    agreed = Object.fromEntries(documents.map((document) => [document.handle, document.version]));
   });
 
   afterAll(async () => {
@@ -209,7 +216,44 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
 
     it("opens a shop of the user's own, which its Admin API serves once they have a second factor (ADR-145)", async () => {
       const { accessToken } = await signUp();
-      const opened = await post('/auth/shops', { name: 'Sana Lawn' }, accessToken);
+      // What the owner agrees to, with where to read each (ADR-737).
+      const asked = await get('/auth/agreement', accessToken);
+      expect(asked.headers['cache-control']).toBe('public, max-age=300');
+      const { documents } = asked.json() as {
+        documents: { handle: string; version: string; url: string }[];
+      };
+      expect(documents.map((document) => [document.handle, document.url])).toEqual([
+        ['terms', 'http://localhost:4000/legal/terms'],
+        ['acceptable-use', 'http://localhost:4000/legal/acceptable-use'],
+        ['data-processing', 'http://localhost:4000/legal/data-processing'],
+      ]);
+      const unagreed = await post('/auth/shops', { name: 'Sana Lawn' }, accessToken);
+      expect([unagreed.statusCode, unagreed.json()]).toEqual([
+        422,
+        {
+          error: {
+            code: 'INVALID_INPUT',
+            message: 'Some details need fixing',
+            fields: {
+              agreed:
+                "Agree to Hatti's terms of service, acceptable use policy and data processing agreement",
+            },
+          },
+        },
+      ]);
+      const stale = await post(
+        '/auth/shops',
+        { name: 'Sana Lawn', agreed: { ...agreed, terms: '2020-01-01' } },
+        accessToken,
+      );
+      expect([stale.statusCode, (stale.json() as { error: { code: string } }).error.code]).toEqual([
+        409,
+        'TERMS_CHANGED',
+      ]);
+      expect(agreed).toEqual(
+        Object.fromEntries(documents.map((document) => [document.handle, document.version])),
+      );
+      const opened = await post('/auth/shops', { name: 'Sana Lawn', agreed }, accessToken);
       expect([opened.statusCode, opened.headers['cache-control']]).toEqual([201, 'no-store']);
       const { shop } = opened.json() as { shop: { id: string } };
       const shopId = fromPublicId(shop.id, 'shop');
@@ -227,7 +271,11 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         data: { shop: { name: 'Sana Lawn', handle: 'sana-lawn', currencyCode: 'PKR' } },
       });
       // A handle is one shop's.
-      const again = await post('/auth/shops', { name: 'Copy', handle: 'sana-lawn' }, accessToken);
+      const again = await post(
+        '/auth/shops',
+        { name: 'Copy', handle: 'sana-lawn', agreed },
+        accessToken,
+      );
       expect([again.statusCode, again.json()]).toEqual([
         409,
         {
@@ -261,7 +309,11 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(joined.json()).toMatchObject({
         partner: { businessName: 'Pixel Media', website: 'https://pixel.pk' },
       });
-      const opened = await post('/auth/partner/stores', { name: 'Noor Jewels' }, accessToken);
+      const opened = await post(
+        '/auth/partner/stores',
+        { name: 'Noor Jewels', agreed },
+        accessToken,
+      );
       expect(opened.statusCode).toBe(201);
       const { shop } = opened.json() as { shop: { id: string } };
       expect(shop).toMatchObject({ name: 'Noor Jewels', handle: 'noor-jewels', role: 'owner' });
@@ -288,7 +340,7 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       const merchant = await signUp();
       const referred = await post(
         '/auth/shops',
-        { name: 'Sana Prints', referralCode: partner.referralCode },
+        { name: 'Sana Prints', referralCode: partner.referralCode, agreed },
         merchant.accessToken,
       );
       expect(referred.statusCode).toBe(201);

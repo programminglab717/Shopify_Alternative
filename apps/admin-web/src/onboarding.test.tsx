@@ -41,6 +41,22 @@ function fakeCore() {
           session: { id: 'ses_1', mfaVerified: false },
           shops,
         });
+      case '/auth/agreement':
+        return json(200, {
+          documents: [
+            { handle: 'terms', version: '2026-10-22', url: 'https://hatti.pk/legal/terms' },
+            {
+              handle: 'acceptable-use',
+              version: '2026-10-22',
+              url: 'https://hatti.pk/legal/acceptable-use',
+            },
+            {
+              handle: 'data-processing',
+              version: '2026-10-22',
+              url: 'https://hatti.pk/legal/data-processing',
+            },
+          ],
+        });
       case '/auth/shops': {
         const shop = { id: 'shop_1', name: body!.name!, role: 'owner', mfaRequired: true };
         shops.push(shop);
@@ -126,6 +142,12 @@ describe('A merchant new to Hatti', () => {
     // A partner's link brought them (ADR-505): the shop takes its code, and it is forgotten.
     window.localStorage.setItem('hatti.referral', 'k7mq2xpa');
     type('Shop name', 'Zari Fashions');
+    // Hatti's terms, each linked, agreed to by ticking the box (ADR-737).
+    const agree = await screen.findByRole('checkbox', { name: /I agree to Hatti's/ });
+    expect(
+      screen.getByRole('link', { name: 'data processing agreement' }).getAttribute('href'),
+    ).toBe('https://hatti.pk/legal/data-processing');
+    await act(async () => fireEvent.click(agree));
     await press('Open my shop');
 
     // An owner's role needs the second step before the shop's admin opens.
@@ -137,6 +159,11 @@ describe('A merchant new to Hatti', () => {
     expect(screen.getByText('JBSW Y3DP EHPK 3PXP')).toBeTruthy();
     expect(core.sent.find((request) => request.path === '/auth/shops')?.body).toEqual({
       name: 'Zari Fashions',
+      agreed: {
+        terms: '2026-10-22',
+        'acceptable-use': '2026-10-22',
+        'data-processing': '2026-10-22',
+      },
       referralCode: 'k7mq2xpa',
     });
     expect(window.localStorage.getItem('hatti.referral')).toBeNull();
