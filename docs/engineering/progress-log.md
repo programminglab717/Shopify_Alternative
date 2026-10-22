@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Phones' LCP watched
+### 888117a · Phones' LCP watched
 
 * **Shoppers' largest contentful paint as a metric** ([ADR-729](../architecture/13-decision-log.md#adr-729--shoppers-largest-contentful-paint-is-a-storefront-histogram-ticketed-when-phones-p75-passes-two-seconds-payments-callback-objective-waits-for-gateways-that-say-when-they-were-paid)): the storefront records each counted
   Web Vitals report's LCP by device and kind of page, and `HattiStorefrontLcpSlow` tickets when
