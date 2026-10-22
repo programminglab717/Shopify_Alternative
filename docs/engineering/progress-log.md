@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Closing a shop
+### d461865 · Closing a shop
 
 * **An owner closes their shop from the admin** ([ADR-740](../architecture/13-decision-log.md#adr-740--a-shops-owner-closes-it-from-the-admin-typing-its-name-after-confirming-who-they-are-its-storefront-checkout-admin-api-and-renewals-stop-and-they-may-reopen-it-for-the-90-days-its-data-is-kept)): Settings → Store details, its name
   typed, who they are confirmed. Its storefront, checkout and Admin API stop, and it is not
