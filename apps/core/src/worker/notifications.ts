@@ -104,7 +104,7 @@ export class OrderNotifications {
     switch (event.type) {
       case OrderEvents.OrderCreated: {
         const { splitFromId } = event.payload as Partial<OrderCreatedPayload>;
-        if (!splitFromId) await this.#placed(event.shopId, event.aggregateId);
+        if (!splitFromId) await this.#placed(event.shopId, event.aggregateId, event.occurredAt);
         return;
       }
       case OrderEvents.OrderConfirmed:
@@ -468,7 +468,7 @@ export class OrderNotifications {
    * An order placed: asked to confirm it, with its link, while it waits for its customer and the
    * shop has not turned that off; told it was placed otherwise.
    */
-  async #placed(shopId: string, orderId: string): Promise<void> {
+  async #placed(shopId: string, orderId: string, occurredAt: string): Promise<void> {
     await this.database.tenant(shopId, async (tx) => {
       const order = await orderNotificationFactsIn(tx, shopId, orderId);
       if (!order || order.erased || !order.phone) return;
@@ -485,6 +485,8 @@ export class OrderNotifications {
         customerId: order.customerId,
         dedupeKey: `${kind}:${orderId}`,
         variables,
+        // Its minute to go in starts with the order (12 §1, ADR-728).
+        dueSince: new Date(occurredAt),
         // Paid online at checkout a moment later, as most are, the payment's news says both
         // (ADR-621): this waits to be taken over, and goes for an order left unpaid.
         notBefore:

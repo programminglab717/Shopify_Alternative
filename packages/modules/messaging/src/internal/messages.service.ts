@@ -74,6 +74,12 @@ export interface MessageToQueue {
    * (ADR-621); at once otherwise.
    */
   notBefore?: Date | null;
+  /**
+   * When what it tells of happened, where that was before it is queued: an order's creation for
+   * the news of it placed. Its wait is counted from then (ADR-728), from its queuing otherwise,
+   * and from `notBefore` whenever that is given.
+   */
+  dueSince?: Date | null;
 }
 
 /** A message the sender took to send. */
@@ -194,6 +200,7 @@ export async function queueMessageIn(
     message.channel ??
     (settings.routing === 'economy' && INFORMATIONAL.has(message.kind) ? 'sms' : 'whatsapp');
   const notBefore = message.notBefore?.toISOString() ?? null;
+  const dueAt = notBefore ?? message.dueSince?.toISOString() ?? null;
   const { rows } = await tx.execute<{ id: string }>(sql`
     INSERT INTO messaging.messages
            (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
@@ -201,7 +208,7 @@ export async function queueMessageIn(
     VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
             ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
             ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null},
-            coalesce(${notBefore}::timestamptz, now()), coalesce(${notBefore}::timestamptz, now()))
+            coalesce(${notBefore}::timestamptz, now()), coalesce(${dueAt}::timestamptz, now()))
         ON CONFLICT (shop_id, dedupe_key) DO NOTHING
     RETURNING id`);
   const id = rows[0]?.id ?? null;
@@ -219,7 +226,7 @@ export async function queueMessageIn(
       VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
               ${JSON.stringify(variables)}::jsonb, ${message.orderId ?? null},
               ${message.customerId ?? null}, ${`${message.dedupeKey}:email`},
-              coalesce(${notBefore}::timestamptz, now()), coalesce(${notBefore}::timestamptz, now()))
+              coalesce(${notBefore}::timestamptz, now()), coalesce(${dueAt}::timestamptz, now()))
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
   }
   return id;

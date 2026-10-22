@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### A confirmation's minute counted from its order
+
+* **Messages due since what they tell of** ([ADR-728](../architecture/13-decision-log.md#adr-728--an-order-confirmations-minute-is-counted-from-the-order-a-message-is-due-since-what-it-tells-of-happened-when-that-came-before-it-was-queued)): `dueSince`, given by the worker's news of an
+  order placed as the order's event's time, so the outbox's wait counts against confirmations'
+  objective as customers feel it.
+* 4009 tests (1 new).
+
 ### b4db763 · Webhooks, confirmations and bookings watched
 
 * **How long the worker's work waits** ([ADR-727](../architecture/13-decision-log.md#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes)): histograms of a webhook's wait for its first try,

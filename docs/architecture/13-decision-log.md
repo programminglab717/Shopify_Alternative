@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-727 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-728 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -735,6 +735,7 @@
 | 725 | The admin's objectives, the outbox and sign-ins are watched by Prometheus rules kept in the repository, burn-rate alerts with unit tests and a runbook each, and a Grafana dashboard whose queries CI parses | Accepted |
 | 726 | The storefront's and checkout's objectives are watched too: the storefront sends its telemetry, and the request durations' buckets include 800 ms | Accepted |
 | 727 | Webhooks, order confirmations and courier bookings are watched by how long they wait: histograms the worker records, with burn-rate alerts against 12 §1's minute, minute and five minutes | Accepted |
+| 728 | An order confirmation's minute is counted from the order: a message is due since what it tells of happened, when that came before it was queued | Accepted |
 
 ---
 
@@ -24845,3 +24846,16 @@
   two minutes) and is to be added to the confirmation's when events carry the time they occurred
   into what they queue. Bookings a courier made wait are visible on the dashboard but spend no
   budget. Payments' callbacks and LCP still have no alerts.
+
+## ADR-728 · An order confirmation's minute is counted from the order: a message is due since what it tells of happened, when that came before it was queued
+
+* **Context:** [ADR-727](#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes) counted a confirmation's wait from when the worker queued it,
+  after the order's event had left the outbox, so a confirmation sent 20 seconds after it was
+  queued but 70 after the order counted as on time. 12 §1's objective is a minute from the order.
+* **Decision:** A message to queue may say `dueSince`, when what it tells of happened; its `due_at`
+  is its `notBefore` if it has one, else `dueSince`, else its queuing. The worker's news of an order
+  placed (the question to confirm it, or word it was placed) gives the `order.created` event's
+  `occurredAt`, the moment the order was committed with its event.
+* **Consequences:** `HattiConfirmationMessageBudgetBurn` now spends budget for the outbox's lag
+  too, which is what a customer waits through; `HattiOutboxLagging` still pages apart, naming the
+  cause. Other messages are counted from their queuing until their own events say when they began.

@@ -523,6 +523,7 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     const before = await placedOnes();
     const now = Date.now();
     const [first, held] = [newId(), newId()];
+    // Queued as the order happened; the next test counts from an order before it was queued.
     await messages.queue(a.shopId, placed(first));
     const later = new Date(now + 10 * 60_000);
     await messages.queue(a.shopId, { ...placed(held), notBefore: later });
@@ -541,6 +542,36 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     const after = await placedOnes();
     const added = (bound: number | 'count') => after(bound) - before(bound);
     expect([added('count'), added(15), added(30), added(45)]).toEqual([2, 0, 1, 2]);
+  });
+
+  it("counts a message's wait from what it tells of, where that came before it was queued (ADR-728)", async () => {
+    const counted = async () => {
+      const points = await recorded.histogram('hatti.messages.send.delay');
+      const point = points.find(
+        (each) =>
+          each.attributes.kind === 'order_confirmation' && each.attributes.channel === 'whatsapp',
+      );
+      return (bound: number | 'count') =>
+        point === undefined ? 0 : bound === 'count' ? point.count : point.atMost.get(bound)!;
+    };
+    const before = await counted();
+    const now = Date.now();
+    // The order placed fifty seconds before the worker queued its message, sent twenty after.
+    await messages.queue(a.shopId, {
+      ...placed(newId()),
+      kind: 'order_confirmation',
+      dueSince: new Date(now - 50_000),
+    });
+    const [taken] = await messages.claim(a.shopId, new Date(now + 1_000), 10, 300_000);
+    await messages.settle(
+      a.shopId,
+      [{ id: taken!.id, status: 'sent', provider: 'whatsapp_cloud', providerMessageId: 'wamid.x' }],
+      new Date(now + 20_000),
+    );
+    const after = await counted();
+    const added = (bound: number | 'count') => after(bound) - before(bound);
+    // Seventy seconds: late, though twenty after it was queued.
+    expect([added('count'), added(60), added(120)]).toEqual([1, 0, 1]);
   });
 
   it('sends by SMS what WhatsApp took and did not deliver, once, and within a day', async () => {

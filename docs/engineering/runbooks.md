@@ -158,8 +158,8 @@ More than 1% of order confirmations (the message asking a customer to confirm a 
 saying it was placed) go over a minute after they were due. Customers confirm later, or not at all,
 and shops call them instead. The `…Slow` alert is the same, as a ticket.
 
-1. The outbox comes first: a confirmation is queued only when the worker hears of the order, so see
-   `HattiOutboxLagging` and the dashboard's outbox lag.
+1. The outbox comes first: a confirmation's minute starts with the order (ADR-728), but it is
+   queued only when the worker hears of it, so see `HattiOutboxLagging` and the outbox lag.
 2. The messages' sender runs every `MESSAGES_INTERVAL_MS` (5 seconds). Its logs say whether
    WhatsApp's Cloud API or the SMS gateway is refusing or slow; tries put off for a provider count
    as late.

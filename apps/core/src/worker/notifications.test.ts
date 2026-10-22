@@ -382,6 +382,16 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect((await timeline(order.id)).filter(([kind]) => kind === 'link')).toEqual([
       ['link', 'Sent the customer a link with the message asking them to confirm the order'],
     ]);
+    // Due since the order was placed, not since the worker heard of it (ADR-728).
+    const { rows: due } = await admin.query<{ due: boolean }>(
+      `SELECT abs(extract(epoch FROM m.due_at - e.occurred_at)) < 0.001 AS due
+         FROM messaging.messages m
+         JOIN platform.outbox_events e
+           ON e.aggregate_id = m.order_id AND e.event_type = 'order.created'
+        WHERE m.order_id = $1 AND m.kind = 'order_confirmation'`,
+      [order.id],
+    );
+    expect(due).toEqual([{ due: true }]);
 
     // Confirmed by the shop on a call: told so. Shipped without a tracking number: news once it
     // has one.
