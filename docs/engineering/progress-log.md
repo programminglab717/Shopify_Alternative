@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The store builder's theme
+### 838a320 · The store builder's theme
 
 * **A shop starts on its kind's theme** ([ADR-732](../architecture/13-decision-log.md#adr-732--the-store-builder-starts-a-shop-on-hattis-theme-for-its-kind-lawn-for-fashion-and-bazaar-for-electronics-published-where-the-main-theme-holds-nothing-of-the-shops-own-the-accent-goes-among-that-themes-settings)): the store builder's plan names Lawn for
   fashion, Bazaar for electronics and Hatti Base for the rest; building begins a theme on it,
