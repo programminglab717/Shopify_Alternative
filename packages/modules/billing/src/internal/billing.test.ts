@@ -268,6 +268,28 @@ describe.skipIf(!server)('Billing', () => {
     ]);
   });
 
+  it('renews no shop its owner closed while it is closed, and renews it again reopened (ADR-740)', async () => {
+    const now = Date.now();
+    await f.subscribe(f.a, 'starter', 'monthly', {
+      start: new Date(now - 27 * DAY),
+      end: new Date(now + 3 * DAY),
+    });
+    await f.admin.query(
+      "UPDATE control.shops SET status = 'closed', closed_at = now() WHERE id = $1",
+      [f.a.shopId],
+    );
+    try {
+      expect(await f.billing.sweep()).toEqual({ invoiced: 0, reminded: 0, ended: 0, failed: 0 });
+      expect(await f.billing.invoicesOf(f.a.shopId)).toEqual([]);
+    } finally {
+      await f.admin.query(
+        "UPDATE control.shops SET status = 'active', closed_at = NULL WHERE id = $1",
+        [f.a.shopId],
+      );
+    }
+    expect(await f.billing.sweep()).toEqual({ invoiced: 1, reminded: 0, ended: 0, failed: 0 });
+  });
+
   it('renews a week ahead, carries the paid period on, and puts unpaid or ended plans on Free', async () => {
     const now = Date.now();
     const soon = { start: new Date(now - 27 * DAY), end: new Date(now + 3 * DAY) };

@@ -17,6 +17,7 @@ import { useImageUpload } from '../shell/use-image-upload';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { CloseShop } from './close-shop';
 import { BackToSettings } from './settings-page';
 
 type LogoKind = 'logo' | 'squareLogo';
@@ -187,7 +188,7 @@ function WhatsappField({ current }: { current: string | null }) {
 /**
  * The shop as customers see it beyond its theme: its logo, which checkout and customers' links
  * show in place of its name (ADR-081); its square logo, atop its link page (ADR-205); and the
- * WhatsApp number its storefront's links go to.
+ * WhatsApp number its storefront's links go to. And, for its owner, closing it (ADR-740).
  */
 export function ShopPage() {
   const { t } = useLocale();
@@ -212,6 +213,7 @@ export function ShopPage() {
       <LogoField kind="logo" current={brand.logo} />
       <LogoField kind="squareLogo" current={brand.squareLogo} />
       <WhatsappField current={query.data.onlineStorePreferences.whatsappNumber} />
+      <CloseShop />
     </div>
   );
 }

@@ -14,11 +14,23 @@ export const ShopEvents = {
   ShopOpened: 'shop.opened',
   /** A partner's development store went to its client, and opens to shoppers (ADR-504). */
   DevelopmentStoreTransferred: 'shop.development_store_transferred',
+  /** Its owner closed it (ADR-740): its storefront goes, and its data in 90 days. */
+  ShopClosed: 'shop.closed',
+  /** Its owner reopened it within the 90 days: its storefront is published again. */
+  ShopReopened: 'shop.reopened',
 } as const;
 
 export interface ShopOpenedPayload {
   handle: string;
 }
+
+export interface ShopClosedPayload {
+  /** ISO 8601: when it closed, from which its data is deleted after `CLOSED_SHOP_DAYS`. */
+  closedAt: string;
+}
+
+/** How long a closed shop's data stays, for its owner to export it or reopen the shop (ADR-740). */
+export const CLOSED_SHOP_DAYS = 90;
 
 /** What opening a shop takes, at most. */
 export const SHOP_LIMITS = {

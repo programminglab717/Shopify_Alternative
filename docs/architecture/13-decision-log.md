@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-739 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-740 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -747,6 +747,7 @@
 | 737 | A shop opens only once its owner agrees to Hatti's terms of service, acceptable use policy and data processing agreement as they are now: the versions shown are sent with the shop, refused when stale, and kept with who agreed and from where | Accepted |
 | 738 | What messages said is kept twelve months: the worker then clears a message to a customer's variables and error, keeping that it was sent, and deletes what customers wrote in the inbox and through the contact form, with conversations left empty | Accepted |
 | 739 | A shop's owner agrees to Hatti's terms again whenever theirs for it are not the current versions: after a new version, a handover, or for a shop opened before agreements were kept, asked above every page of the admin and recorded as on opening a shop | Accepted |
+| 740 | A shop's owner closes it from the admin, typing its name after confirming who they are: its storefront, checkout, Admin API and renewals stop, and they may reopen it for the 90 days its data is kept | Accepted |
 
 ---
 
@@ -25167,3 +25168,35 @@
   Whether a due agreement should, after a while, close the admin, the Admin API or the shop,
   and how long a new version is announced before it takes effect, are counsel's calls
   (OWN-41); telling owners by email of a new version is still to be built.
+
+## ADR-740 · A shop's owner closes it from the admin, typing its name after confirming who they are: its storefront, checkout, Admin API and renewals stop, and they may reopen it for the 90 days its data is kept
+
+* **Context:** Hatti's terms let an owner close their shop and keep its data 90 days for them to
+  export ([ADR-736](#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)), but only Hatti's support could close one. `control.shops`
+  had a `closed` status since the first migration, which the Admin API, `/auth/me` and the
+  storefront's directory already treat as gone ([ADR-461](#adr-461--hattis-people-take-a-store-down-when-its-reports-are-upheld-the-shop-suspended-its-storefront-answering-with-hattis-page-saying-so-its-checkout-and-admin-closed-its-owner-told-why-and-restored-the-same-way)).
+* **Decision:**
+  * **`POST /auth/shops/{id}/close`** takes `{ name }`, the shop's name as it is, from its
+    owner alone, who has confirmed who they are lately. It sets the shop `closed` with
+    `closed_at` (migration 0315, the two kept together by a check), records a `shop_closed`
+    auth event and a `shop.closed` outbox event. A shop Hatti took down stays Hatti's to
+    decide: its owner cannot close it (`SHOP_NOT_OPEN`).
+  * **What stops:** the Admin API and every page of its admin, as for any shop not active;
+    its storefront and checkout, the publisher taking its handle and domains out of the
+    directory on `shop.closed`; its renewals, the billing sweep passing over closed shops.
+  * **`/auth/me`** gives its owner `closedShops`, each with when it closed and when its data
+    goes, `CLOSED_SHOP_DAYS` (90) after.
+  * **`POST /auth/shops/{id}/reopen`** reopens it, for its owner, while its data is kept: it is
+    as it was, `shop.reopened` publishing all of its storefront again; renewals resume, an
+    unpaid period lapsing to Free as any other's ([ADR-511](#adr-511--humane-dunning-an-overdue-periods-owner-reminded-the-day-it-ends-with-three-days-left-and-with-one-each-once-and-the-admin-saying-by-when-the-store-open-throughout)).
+  * **Identity's database role** may now change a shop's status between `active` and
+    `closed` alone: a permissive policy for that, and a restrictive one so that no other
+    change of identity's leaves a shop `suspended`.
+  * **The admin:** Settings → Store details ends, for the owner, with "Close this shop", the
+    button waiting for its name typed; their shops page lists closed shops with the day their
+    data goes and Reopen, in English and Urdu.
+* **Consequences:** an owner can leave without asking anyone, and change their mind for 90
+  days. The data is not yet deleted after them, nor is an export made for the owner on
+  closing; the owner reopens to export. Open orders, courier bookings, payments and credit
+  are left as they are when a shop closes; refunds of unused credit are counsel's call
+  (OWN-41).

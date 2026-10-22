@@ -145,6 +145,7 @@ const shopBody = z.object({
   agreed: z.record(z.string().max(40), z.string().max(20)).nullish(),
 });
 const agreementBody = shopBody.pick({ agreed: true });
+const closeBody = z.object({ name: z.string().max(1_024) });
 const codeBody = z.object({ code: z.string().max(32) });
 const partnerBody = z.object({
   businessName: z.string().max(1_024),
@@ -686,6 +687,42 @@ export class AuthController {
       parse(agreementBody, body).agreed,
       clientOf(request),
     );
+  }
+
+  /**
+   * Closes a shop the signed-in user owns (ADR-740), `{ name }` typed as it is, once they have
+   * confirmed who they are lately: its storefront, checkout and Admin API stop, and its data stays
+   * 90 days, during which they may reopen it. When it closed and when its data goes.
+   */
+  @Post('shops/:id/close')
+  @HttpCode(200)
+  async closeShop(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const shop = await this.identity.closeShop(
+      await this.session(request),
+      id,
+      parse(closeBody, body),
+      clientOf(request),
+    );
+    return { shop };
+  }
+
+  /** Reopens a shop its owner closed, while its data is kept (ADR-740): the shop, as on opening. */
+  @Post('shops/:id/reopen')
+  @HttpCode(200)
+  async reopenShop(
+    @Param('id') id: string,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const shop = await this.identity.reopenShop(await this.session(request), id, clientOf(request));
+    return { shop };
   }
 
   @Get('sessions')

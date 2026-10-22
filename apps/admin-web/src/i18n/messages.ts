@@ -102,6 +102,15 @@ const en = {
   'terms.dueBody':
     "Hatti's terms have changed since you last agreed to them for this shop, or the shop is newly yours. Read them and agree to keep using it.",
   'terms.dueSubmit': 'Agree',
+  'closeShop.title': 'Close this shop',
+  'closeShop.body':
+    "Its storefront, checkout and admin stop at once, and its plan isn't renewed. Its data stays 90 days: you can reopen it from your shops until then, or export it first. After that it is deleted, except records the law needs kept.",
+  'closeShop.typeName': 'Type {name} to close it',
+  'closeShop.submit': 'Close the shop',
+  'closedShops.title': 'Closed shops',
+  'closedShops.deletes': 'Its data is deleted on {date}',
+  'closedShops.reopen': 'Reopen',
+  'closedShops.reopenNamed': 'Reopen {name}',
   'shops.none': 'You are not part of a shop yet.',
   'shops.noAccess': 'You no longer have access to this shop.',
 
@@ -5671,6 +5680,15 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'terms.dueBody':
     'آپ نے اس دکان کے لیے ہٹی کی شرائط سے جب آخری بار اتفاق کیا، تب سے وہ بدل گئی ہیں، یا یہ دکان ابھی آپ کی ہوئی ہے۔ انہیں پڑھیں اور اسے استعمال کرتے رہنے کے لیے اتفاق کریں۔',
   'terms.dueSubmit': 'متفق ہوں',
+  'closeShop.title': 'یہ دکان بند کریں',
+  'closeShop.body':
+    'اس کا اسٹور فرنٹ، چیک آؤٹ اور ایڈمن فوراً بند ہو جائیں گے، اور اس کے پلان کی تجدید نہیں ہوگی۔ اس کا ڈیٹا 90 دن رہے گا: تب تک آپ اپنی دکانوں سے اسے دوبارہ کھول سکتے ہیں، یا پہلے اسے ایکسپورٹ کر سکتے ہیں۔ اس کے بعد یہ حذف ہو جائے گا، سوائے ان ریکارڈز کے جو قانون کے مطابق رکھنے ضروری ہیں۔',
+  'closeShop.typeName': 'بند کرنے کے لیے {name} لکھیں',
+  'closeShop.submit': 'دکان بند کریں',
+  'closedShops.title': 'بند دکانیں',
+  'closedShops.deletes': 'اس کا ڈیٹا {date} کو حذف ہو جائے گا',
+  'closedShops.reopen': 'دوبارہ کھولیں',
+  'closedShops.reopenNamed': '{name} دوبارہ کھولیں',
   'shops.none': 'آپ ابھی کسی دکان میں شامل نہیں ہیں۔',
   'shops.noAccess': 'اب آپ کو اس دکان تک رسائی نہیں ہے۔',
 

@@ -309,6 +309,47 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect(agreements).toEqual([{ count: 2 }]);
     });
 
+    it('closes a shop for its owner, its Admin API refused, and reopens it while its data is kept (ADR-740)', async () => {
+      const { accessToken } = await signUp();
+      const opened = await post('/auth/shops', { name: 'Gul Bano', agreed }, accessToken);
+      const { shop } = opened.json() as { shop: { id: string } };
+      const shopId = fromPublicId(shop.id, 'shop');
+      await enableTwoStep(accessToken);
+      const query = '{ shop { name } }';
+      expect((await graphql(accessToken, shopId, query)).json()).toEqual({
+        data: { shop: { name: 'Gul Bano' } },
+      });
+
+      const misnamed = await post(`/auth/shops/${shop.id}/close`, { name: 'Gul' }, accessToken);
+      expect([misnamed.statusCode, misnamed.json().error.code]).toEqual([422, 'INVALID_INPUT']);
+      const closed = await post(`/auth/shops/${shop.id}/close`, { name: 'Gul Bano' }, accessToken);
+      expect([closed.statusCode, closed.headers['cache-control']]).toEqual([200, 'no-store']);
+      expect(closed.json().shop).toMatchObject({ id: shop.id, name: 'Gul Bano' });
+      expect((await graphql(accessToken, shopId, query)).statusCode).toBe(403);
+      const me = (await get('/auth/me', accessToken)).json();
+      expect(me.shops).toEqual([]);
+      expect(me.closedShops).toEqual([closed.json().shop]);
+      const again = await post(`/auth/shops/${shop.id}/close`, { name: 'Gul Bano' }, accessToken);
+      expect([again.statusCode, again.json().error.code]).toEqual([409, 'SHOP_NOT_OPEN']);
+      const stranger = await signUp();
+      expect(
+        (await post(`/auth/shops/${shop.id}/reopen`, {}, stranger.accessToken)).statusCode,
+      ).toBe(404);
+
+      const reopened = await post(`/auth/shops/${shop.id}/reopen`, {}, accessToken);
+      expect([reopened.statusCode, reopened.json()]).toEqual([
+        200,
+        { shop: { id: shop.id, name: 'Gul Bano', role: 'owner', mfaRequired: true } },
+      ]);
+      expect((await graphql(accessToken, shopId, query)).json()).toEqual({
+        data: { shop: { name: 'Gul Bano' } },
+      });
+      expect((await post(`/auth/shops/${shop.id}/reopen`, {}, accessToken)).statusCode).toBe(409);
+      expect((await post(`/auth/shops/${shop.id}/close`, { name: 'Gul Bano' })).statusCode).toBe(
+        401,
+      );
+    });
+
     it('lets a partner open development stores and see them on its dashboard (PRT-01, ADR-504)', async () => {
       const { accessToken } = await signUp();
       expect((await get('/auth/partner', accessToken)).json()).toEqual({

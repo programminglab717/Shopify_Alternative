@@ -208,6 +208,13 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('theme.deleted', { name: 'Winter' }))).toEqual([]);
   });
 
+  it("takes a closed shop's storefront down, and publishes all of it reopened (ADR-740)", () => {
+    expect(itemsFor(event('shop.closed', { closedAt: '2026-10-22T09:00:00.000Z' }))).toEqual([
+      Items.shop,
+    ]);
+    expect(itemsFor(event('shop.reopened', {}))).toEqual([Items.everything]);
+  });
+
   it('rebuilds the menus when one is made, changed or deleted', () => {
     for (const type of ['menu.created', 'menu.updated', 'menu.deleted']) {
       expect(itemsFor(event(type, { handle: 'sale' })), type).toEqual(['menus']);
@@ -851,7 +858,12 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
 
   it("keeps a suspended shop's handle for its storefront to say so, takes a closed one's out, and gives it back (ADR-461)", async () => {
     const status = (value: string) =>
-      admin.query('UPDATE control.shops SET status = $2 WHERE id = $1', [shopId, value]);
+      admin.query(
+        `UPDATE control.shops
+            SET status = $2, closed_at = CASE WHEN $2 = 'closed' THEN now() END
+          WHERE id = $1`,
+        [shopId, value],
+      );
     await status('suspended');
     await publisher.publishAll(shopId);
     expect(await publisher.directory.find('zari-fashions')).toBe(shopId);

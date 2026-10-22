@@ -26,6 +26,9 @@ export type AuthErrorCode =
   | 'TOO_MANY_SHOPS'
   // Hatti's terms changed after the page agreeing to them was shown (ADR-737).
   | 'TERMS_CHANGED'
+  // A shop closed, or taken down by Hatti, that the request needs open, or the other way (ADR-740).
+  | 'SHOP_NOT_OPEN'
+  | 'SHOP_NOT_CLOSED'
   | 'NOT_SUPPORT'
   | 'PHONE_SIGN_IN_UNAVAILABLE'
   | 'CODE_NOT_SENT'

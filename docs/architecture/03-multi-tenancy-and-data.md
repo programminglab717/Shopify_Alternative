@@ -515,7 +515,7 @@ The `events` table above replaces them with V1.
 
 | Data | Retention | Deletion trigger |
 |---|---|---|
-| Active shop commerce data | Life of the shop | Shop closure + 90 days (export offered), except records legally required to be kept |
+| Active shop commerce data | Life of the shop | Shop closure + 90 days (export offered), except records legally required to be kept. Built: the owner closes it and may reopen it for the 90 days ([ADR-740](./13-decision-log.md#adr-740--a-shops-owner-closes-it-from-the-admin-typing-its-name-after-confirming-who-they-are-its-storefront-checkout-admin-api-and-renewals-stop-and-they-may-reopen-it-for-the-90-days-its-data-is-kept)); the deletion after is still to come |
 | Tax and accounting records (orders, invoices, refunds) | ≥ 6 years (confirm with counsel) | Automatic purge job after the legal period |
 | Abandoned carts/checkouts | 90 days. Built: a cart 14 days after its last change, a checkout a day after it starts and a browser's proof of a number 30 days after it was proved, deleted by the worker's sweep across shops (ADR-042, ADR-230); a checkout with the number its shopper typed kept 30 days as an abandoned checkout, for its shop and its reminder (CHK-12, ADR-393) | TTL job |
 | Message content | 12 months. Built: a message's variables and error cleared, what customers wrote in the inbox and the contact form deleted ([ADR-738](./13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)) | The worker's sweep; partition drop once partitioned |

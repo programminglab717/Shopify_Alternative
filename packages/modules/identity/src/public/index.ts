@@ -41,6 +41,7 @@ export {
   type GoogleConnection,
   type GoogleSignInResult,
   type IdentityServiceOptions,
+  type ClosedShop,
   type MemberShop,
   type OpenedShop,
   type PhoneSignInResult,
@@ -71,11 +72,13 @@ export {
 export { GOOGLE, type GoogleSignInSettings } from '../internal/google.js';
 export { StaffAccessResolver, type StaffAccessResult } from '../internal/staff-access.js';
 export {
+  CLOSED_SHOP_DAYS,
   RESERVED_HANDLES,
   SHOP_LIMITS,
   ShopEvents,
   handleFrom,
   handleProblem,
+  type ShopClosedPayload,
   type ShopOpenedPayload,
 } from '../internal/shops.js';
 export {

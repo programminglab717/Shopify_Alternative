@@ -45,7 +45,7 @@ import {
   type PhoneCodeLanguage,
 } from './phone-codes.js';
 import * as schema from './schema.js';
-import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
+import { CLOSED_SHOP_DAYS, SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
 import { StaffAccessResolver } from './staff-access.js';
 import {
@@ -2349,6 +2349,92 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(await dueOf(session)).toBe(true);
     });
 
+    it('closes a shop its owner names, keeps it 90 days to reopen, and lets no one else (ADR-740)', async () => {
+      const owner = await signUp();
+      const session = await auth(owner.tokens.accessToken);
+      const opened = await service.openShop(
+        session,
+        { name: 'Noor Lawn', agreed: AGREED },
+        client(),
+      );
+      const shopId = fromPublicId(opened.id, 'shop');
+      const manager = await signUp();
+      await grant(manager.userId, shopId, 'manager');
+      const managing = await auth(manager.tokens.accessToken);
+      const close = (as: typeof session, name = 'Noor Lawn') =>
+        service.closeShop(as, opened.id, { name }, client());
+      const eventsOf = async (type: string) =>
+        (
+          await admin.query(
+            'SELECT payload FROM platform.outbox_events WHERE shop_id = $1 AND event_type = $2',
+            [shopId, type],
+          )
+        ).rows.map((row) => row.payload);
+
+      // Its owner alone, having confirmed who they are lately, and typing its name.
+      expect((await authError(close(managing))).code).toBe('NOT_FOUND');
+      expect(
+        (await authError(service.closeShop(session, 'shop_nope', { name: 'x' }, client()))).code,
+      ).toBe('NOT_FOUND');
+      const stale = { ...session, authenticatedAt: new Date(clock - 3_600_000) };
+      expect((await authError(close(stale))).code).toBe('REAUTHENTICATION_REQUIRED');
+      const misnamed = await authError(close(session, 'Noor'));
+      expect([misnamed.code, misnamed.details.fields]).toEqual([
+        'INVALID_INPUT',
+        { name: "Type the shop's name as it is to close it" },
+      ]);
+
+      const closed = await close(session, ' Noor Lawn ');
+      expect(closed).toEqual({
+        id: opened.id,
+        name: 'Noor Lawn',
+        closedAt: new Date(clock),
+        deletesAt: new Date(clock + CLOSED_SHOP_DAYS * 86_400_000),
+      });
+      expect(await eventsOf('shop.closed')).toEqual([{ closedAt: new Date(clock).toISOString() }]);
+      // Gone from the shops they work in, for its staff too; listed to its owner as closed.
+      const me = await service.me(session);
+      expect(me.shops.map((each) => each.id)).not.toContain(opened.id);
+      expect(me.closedShops).toEqual([closed]);
+      const staffMe = await service.me(managing);
+      expect([staffMe.shops, staffMe.closedShops]).toEqual([[], []]);
+      expect((await authError(close(session))).code).toBe('SHOP_NOT_OPEN');
+
+      // Reopened while kept: as it was.
+      expect(await service.reopenShop(session, opened.id, client())).toEqual({
+        id: opened.id,
+        name: 'Noor Lawn',
+        role: 'owner',
+        mfaRequired: true,
+      });
+      expect(await eventsOf('shop.reopened')).toEqual([{}]);
+      const back = await service.me(session);
+      expect([back.shops.map((each) => each.id), back.closedShops]).toEqual([[opened.id], []]);
+      expect((await authError(service.reopenShop(session, opened.id, client()))).code).toBe(
+        'SHOP_NOT_CLOSED',
+      );
+      expect((await authError(service.reopenShop(managing, opened.id, client()))).code).toBe(
+        'NOT_FOUND',
+      );
+
+      // Closed longer than its data is kept: neither listed nor reopened.
+      await close(session);
+      await admin.query(
+        "UPDATE control.shops SET closed_at = closed_at - interval '91 days' WHERE id = $1",
+        [shopId],
+      );
+      expect((await service.me(session)).closedShops).toEqual([]);
+      expect((await authError(service.reopenShop(session, opened.id, client()))).code).toBe(
+        'SHOP_NOT_CLOSED',
+      );
+      // A shop Hatti took down is not its owner's to close.
+      await admin.query(
+        "UPDATE control.shops SET status = 'suspended', closed_at = NULL WHERE id = $1",
+        [shopId],
+      );
+      expect((await authError(close(session))).code).toBe('SHOP_NOT_OPEN');
+    });
+
     it('opens a shop its user owns, in the control plane, for its storefront to be published (ADR-145)', async () => {
       const { tokens } = await signUp();
       const session = await auth(tokens.accessToken);
@@ -2414,12 +2500,12 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         .execute(
           sql`insert into platform.outbox_events
                 (id, shop_id, aggregate_type, aggregate_id, event_type, payload)
-              values (${newId()}, ${shopId}, 'shop', ${shopId}, 'shop.closed', '{}')`,
+              values (${newId()}, ${shopId}, 'shop', ${shopId}, 'shop.deleted', '{}')`,
         )
         .catch((error) => error);
       expect(other.cause?.code ?? other.code).toBe('42501');
       const renamed = await identityDb.app
-        .execute(sql`update control.shops set status = 'closed' where id = ${shopId}`)
+        .execute(sql`update control.shops set status = 'suspended' where id = ${shopId}`)
         .catch((error) => error);
       expect(renamed.cause?.code ?? renamed.code).toBe('42501');
     });

@@ -438,6 +438,12 @@ export function itemsFor(event: DomainEvent): string[] {
     case ShopEvents.DevelopmentStoreTransferred:
       // Its document says whether a partner still builds it (ADR-504).
       return [Items.shop];
+    case ShopEvents.ShopClosed:
+      // Its owner closed it (ADR-740): its addresses go from the directory, its storefront with them.
+      return [Items.shop];
+    case ShopEvents.ShopReopened:
+      // Reopened as it was: all of it, as on opening, for what changed while it was closed.
+      return [Items.everything];
     case TrustEvents.StoreSuspended:
     case TrustEvents.StoreRestored:
       // Its document says whether Hatti took it down (ADR-461).
@@ -508,6 +514,8 @@ export const PUBLISHED_EVENTS = [
   FileEvents.FileUpdated,
   ShopEvents.ShopOpened,
   ShopEvents.DevelopmentStoreTransferred,
+  ShopEvents.ShopClosed,
+  ShopEvents.ShopReopened,
   TrustEvents.StoreSuspended,
   TrustEvents.StoreRestored,
   TrustEvents.VerificationChanged,

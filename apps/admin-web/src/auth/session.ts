@@ -39,6 +39,14 @@ export interface ShopAccess {
   agreementDue?: boolean;
 }
 
+/** A shop its owner closed (ADR-740), whose data is kept until `deletesAt`. */
+export interface ClosedShopAccess {
+  id: string;
+  name: string;
+  closedAt: string;
+  deletesAt: string;
+}
+
 export interface AccountUser {
   id: string;
   name: string;
@@ -57,6 +65,8 @@ export interface Me {
   user: AccountUser;
   session: { id: string; mfaVerified: boolean; authenticatedAt: string };
   shops: ShopAccess[];
+  /** The shops it owns and closed, while their data is kept (ADR-740). */
+  closedShops?: ClosedShopAccess[];
   /** The Google account that signs it in, if one is connected. */
   google?: { email: string; connectedAt: string } | null;
 }

@@ -15,6 +15,7 @@ import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { forgetReferral, referralCode, rememberReferral } from './referral';
 import { TextField } from '../ui/field';
+import { ClosedShops } from './closed-shops';
 import { TermsAgreement, useTermsAgreement } from './terms-agreement';
 
 /** Opening a shop (ONB-01, ONB-10): its name; Pakistan's currency and time, and Free, to start. */
@@ -114,11 +115,12 @@ export function ShopsPage() {
   const navigate = useNavigate();
   const [opening, setOpening] = useState(false);
   const shops = me.data?.shops ?? [];
+  const closed = me.data?.closedShops ?? [];
   // An invitation opened before signing in comes first, once signed in.
   const [invited] = useState(takePendingInvitation);
   // As does a partner's referral link to this page (ADR-505).
   useState(() => rememberReferral());
-  const only = !invited && shops.length === 1 ? shops[0] : undefined;
+  const only = !invited && shops.length === 1 && closed.length === 0 ? shops[0] : undefined;
 
   useEffect(() => {
     if (invited) {
@@ -148,6 +150,7 @@ export function ShopsPage() {
   if (shops.length === 0) {
     return (
       <AuthLayout title={t('shops.openTitle')}>
+        <ClosedShops shops={closed} />
         <OpenShopForm first />
         <AskAccessLink />
         <PartnersLink />
@@ -180,6 +183,7 @@ export function ShopsPage() {
               </li>
             ))}
           </ul>
+          <ClosedShops shops={closed} />
           <Button variant="secondary" onClick={() => setOpening(true)}>
             {t('shops.open')}
           </Button>

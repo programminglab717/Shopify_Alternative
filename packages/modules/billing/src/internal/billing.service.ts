@@ -953,9 +953,13 @@ export class BillingService extends PlanAllowance {
     const horizon = new Date(at.getTime() + BILLING_LIMITS.renewalDays * DAY_MS);
     const { rows: due } = await this.db.system((tx) =>
       tx.execute<{ shop_id: string }>(sql`
-        SELECT shop_id FROM billing.subscriptions
-         WHERE plan <> 'free' AND period_end <= ${horizon.toISOString()}
-         ORDER BY period_end
+        SELECT b.shop_id FROM billing.subscriptions b
+         WHERE b.plan <> 'free' AND b.period_end <= ${horizon.toISOString()}
+           -- A shop its owner closed is not renewed while closed (ADR-740); reopened, its
+           -- period is renewed, or ends, as any other's.
+           AND NOT EXISTS (SELECT 1 FROM control.shops s
+                            WHERE s.id = b.shop_id AND s.status = 'closed')
+         ORDER BY b.period_end
          LIMIT 200`),
     );
     const done = { invoiced: 0, reminded: 0, ended: 0, failed: 0 };

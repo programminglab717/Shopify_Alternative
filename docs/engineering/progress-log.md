@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
+### Closing a shop
+
+* **An owner closes their shop from the admin** ([ADR-740](../architecture/13-decision-log.md#adr-740--a-shops-owner-closes-it-from-the-admin-typing-its-name-after-confirming-who-they-are-its-storefront-checkout-admin-api-and-renewals-stop-and-they-may-reopen-it-for-the-90-days-its-data-is-kept)): Settings → Store details, its name
+  typed, who they are confirmed. Its storefront, checkout and Admin API stop, and it is not
+  renewed while closed.
+* **For 90 days it is listed to them**, with the day its data goes, and reopened at a tap, as
+  it was; a shop Hatti took down is not its owner's to close.
+* **Deleting its data after the 90 days** is next.
+* 4049 tests (6 new).
+
 ### bd03f45 · Agreeing again
 
 * **An owner agrees to Hatti's terms again** ([ADR-739](../architecture/13-decision-log.md#adr-739--a-shops-owner-agrees-to-hattis-terms-again-whenever-theirs-for-it-are-not-the-current-versions-after-a-new-version-a-handover-or-for-a-shop-opened-before-agreements-were-kept-asked-above-every-page-of-the-admin-and-recorded-as-on-opening-a-shop)) whenever theirs for a shop is not to the

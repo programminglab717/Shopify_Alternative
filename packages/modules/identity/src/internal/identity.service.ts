@@ -117,14 +117,18 @@ import {
   users,
 } from './schema.js';
 import {
+  CLOSED_SHOP_DAYS,
   SHOP_LIMITS,
   ShopEvents,
   handleFrom,
   handleProblem,
   insertShop,
+  type ShopClosedPayload,
   type ShopOpenedPayload,
 } from './shops.js';
 import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const TOKEN_PREFIX = {
   access: 'hsa_',
@@ -391,6 +395,17 @@ export interface MemberShop extends ShopAccess {
    * (ADR-739), as a shop handed to them, opened before agreements were kept, or whose terms changed.
    */
   agreementDue: boolean;
+}
+
+/**
+ * A shop its owner closed (ADR-740), whose data stays until `deletesAt`: they may reopen it until
+ * then, to export it or to go on.
+ */
+export interface ClosedShop {
+  id: string;
+  name: string;
+  closedAt: Date;
+  deletesAt: Date;
 }
 
 /** A shop the user just opened, with the handle its storefront took. */
@@ -2389,6 +2404,8 @@ export class IdentityService {
     user: UserProfile;
     session: SessionSummary;
     shops: MemberShop[];
+    /** The shops they own and closed, while they may still reopen them (ADR-740). */
+    closedShops: ClosedShop[];
     /** The Google account that signs them in, where one is connected (ADR-164). */
     google: GoogleConnection | null;
   }> {
@@ -2430,6 +2447,19 @@ export class IdentityService {
       auth.userId,
       rows.filter((row) => row.role === 'owner').map((row) => row.shopId),
     );
+    const closed = await this.db
+      .select({ shopId: shops.id, name: shops.name, closedAt: shops.closedAt })
+      .from(memberships)
+      .innerJoin(shops, eq(shops.id, memberships.shopId))
+      .where(
+        and(
+          eq(memberships.userId, auth.userId),
+          eq(memberships.role, 'owner'),
+          eq(shops.status, 'closed'),
+          gt(shops.closedAt, new Date(this.now().getTime() - CLOSED_SHOP_DAYS * DAY_MS)),
+        ),
+      )
+      .orderBy(desc(shops.closedAt));
     return {
       user,
       session: {
@@ -2461,8 +2491,144 @@ export class IdentityService {
           },
         ];
       }),
+      closedShops: closed.map((row) => ({
+        id: toPublicId('shop', row.shopId),
+        name: row.name,
+        closedAt: row.closedAt!,
+        deletesAt: new Date(row.closedAt!.getTime() + CLOSED_SHOP_DAYS * DAY_MS),
+      })),
       google: google ?? null,
     };
+  }
+
+  /**
+   * Closes a shop of the signed-in owner's (ADR-740), who confirmed who they are lately and typed
+   * its name: its storefront, checkout, Admin API and renewals stop at once, and its data stays
+   * `CLOSED_SHOP_DAYS`, during which they may reopen it. A shop Hatti took down is not theirs to
+   * close; anyone but its owner is told it was not found.
+   */
+  async closeShop(
+    auth: AuthenticatedSession,
+    publicShopId: string,
+    input: { name: string },
+    client: ClientInfo,
+  ): Promise<ClosedShop> {
+    this.mustHaveAuthenticatedRecently(auth);
+    const now = this.now();
+    return this.db.transaction(async (tx) => {
+      const shop = await this.#ownedShop(tx, auth, publicShopId);
+      if (shop.status !== 'active') {
+        throw new AuthError('SHOP_NOT_OPEN', 409, 'This shop is not open');
+      }
+      if (input.name.trim() !== shop.name.trim()) {
+        throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', {
+          fields: { name: "Type the shop's name as it is to close it" },
+        });
+      }
+      const closed = await tx
+        .update(shops)
+        .set({ status: 'closed', closedAt: now, updatedAt: now })
+        .where(and(eq(shops.id, shop.id), eq(shops.status, 'active')))
+        .returning({ id: shops.id });
+      if (closed.length === 0) throw new AuthError('SHOP_NOT_OPEN', 409, 'This shop is not open');
+      await appendEvent<ShopClosedPayload>(tx, shop.id, {
+        type: ShopEvents.ShopClosed,
+        aggregateType: 'shop',
+        aggregateId: shop.id,
+        payload: { closedAt: now.toISOString() },
+      });
+      await this.recordEvent(tx, auth.userId, 'shop_closed', client);
+      return {
+        id: toPublicId('shop', shop.id),
+        name: shop.name,
+        closedAt: now,
+        deletesAt: new Date(now.getTime() + CLOSED_SHOP_DAYS * DAY_MS),
+      };
+    });
+  }
+
+  /**
+   * Reopens a shop its owner closed, while its data is still kept (ADR-740): it is as it was,
+   * its storefront published again. Its owner signs in to it with a second factor, as always.
+   */
+  async reopenShop(
+    auth: AuthenticatedSession,
+    publicShopId: string,
+    client: ClientInfo,
+  ): Promise<ShopAccess> {
+    this.mustHaveAuthenticatedRecently(auth);
+    const now = this.now();
+    return this.db.transaction(async (tx) => {
+      const shop = await this.#ownedShop(tx, auth, publicShopId);
+      const kept =
+        shop.closedAt !== null &&
+        shop.closedAt.getTime() + CLOSED_SHOP_DAYS * DAY_MS > now.getTime();
+      if (shop.status !== 'closed' || !kept) {
+        throw new AuthError(
+          'SHOP_NOT_CLOSED',
+          409,
+          'This shop is not closed, or can no longer reopen',
+        );
+      }
+      const reopened = await tx
+        .update(shops)
+        .set({ status: 'active', closedAt: null, updatedAt: now })
+        .where(and(eq(shops.id, shop.id), eq(shops.status, 'closed')))
+        .returning({ id: shops.id });
+      if (reopened.length === 0) {
+        throw new AuthError(
+          'SHOP_NOT_CLOSED',
+          409,
+          'This shop is not closed, or can no longer reopen',
+        );
+      }
+      await appendEvent(tx, shop.id, {
+        type: ShopEvents.ShopReopened,
+        aggregateType: 'shop',
+        aggregateId: shop.id,
+        payload: {},
+      });
+      await this.recordEvent(tx, auth.userId, 'shop_reopened', client);
+      return {
+        id: toPublicId('shop', shop.id),
+        name: shop.name,
+        role: 'owner',
+        mfaRequired: MFA_REQUIRED_ROLES.has('owner'),
+      };
+    });
+  }
+
+  /**
+   * The shop `publicShopId` names, which the user owns, whatever its status; else not found. Its
+   * change is made only from the status read, so two at once change it once.
+   */
+  async #ownedShop(
+    tx: Executor,
+    auth: AuthenticatedSession,
+    publicShopId: string,
+  ): Promise<{ id: string; name: string; status: string; closedAt: Date | null }> {
+    const shopId = tryFromPublicId(publicShopId, 'shop');
+    const [shop] = shopId
+      ? await tx
+          .select({
+            id: shops.id,
+            name: shops.name,
+            status: shops.status,
+            closedAt: shops.closedAt,
+          })
+          .from(memberships)
+          .innerJoin(shops, eq(shops.id, memberships.shopId))
+          .where(
+            and(
+              eq(memberships.shopId, shopId),
+              eq(memberships.userId, auth.userId),
+              eq(memberships.role, 'owner'),
+              eq(memberships.status, 'active'),
+            ),
+          )
+      : [];
+    if (!shop) throw new AuthError('NOT_FOUND', 404, 'Shop not found');
+    return shop;
   }
 
   /**

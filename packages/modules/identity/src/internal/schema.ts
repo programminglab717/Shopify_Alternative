@@ -320,4 +320,7 @@ export const shops = pgSchema('control').table('shops', {
   name: text('name').notNull(),
   handle: text('handle').notNull(),
   status: text('status').notNull(),
+  /** When its owner closed it (ADR-740); null while open. */
+  closedAt: at('closed_at'),
+  updatedAt: at('updated_at'),
 });
