@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-738 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-739 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -746,6 +746,7 @@
 | 736 | Hatti's own terms, privacy policy, acceptable use policy, data processing agreement and sub-processors are versioned texts in a package of their own, served by the core at /legal with their gist in Urdu, and marked drafts while any blank is left for counsel | Accepted |
 | 737 | A shop opens only once its owner agrees to Hatti's terms of service, acceptable use policy and data processing agreement as they are now: the versions shown are sent with the shop, refused when stale, and kept with who agreed and from where | Accepted |
 | 738 | What messages said is kept twelve months: the worker then clears a message to a customer's variables and error, keeping that it was sent, and deletes what customers wrote in the inbox and through the contact form, with conversations left empty | Accepted |
+| 739 | A shop's owner agrees to Hatti's terms again whenever theirs for it are not the current versions: after a new version, a handover, or for a shop opened before agreements were kept, asked above every page of the admin and recorded as on opening a shop | Accepted |
 
 ---
 
@@ -25143,3 +25144,26 @@
   keeps the rest. Support requests to Hatti and their WhatsApp threads
   ([ADR-560](#adr-560--what-a-shops-staff-write-to-hattis-support-whatsapp-number-is-kept-as-a-request-of-their-shop-threaded-and-hattis-answer-goes-back-on-whatsapp-within-the-day)) are not messages to customers, and are kept as Hatti's support
   records; backups keep what was purged until they roll over.
+
+## ADR-739 · A shop's owner agrees to Hatti's terms again whenever theirs for it are not the current versions: after a new version, a handover, or for a shop opened before agreements were kept, asked above every page of the admin and recorded as on opening a shop
+
+* **Context:** a shop's owner agrees to Hatti's terms in opening it ([ADR-737](#adr-737--a-shop-opens-only-once-its-owner-agrees-to-hattis-terms-of-service-acceptable-use-policy-and-data-processing-agreement-as-they-are-now-the-versions-shown-are-sent-with-the-shop-refused-when-stale-and-kept-with-who-agreed-and-from-where)),
+  but a shop handed to a new owner ([ADR-104](#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)) stayed under the old owner's
+  agreement, shops opened before had none, and a new version of a text asked no one again.
+* **Decision:**
+  * **Due is computed, not stored:** a shop's agreement is due for its owner when
+    `identity.shop_agreements` holds none by that user, for that shop, whose versions contain
+    the current ones. A new version in `@hatti/legal`, a handover and an old shop all make it
+    due with no migration and no job.
+  * **`GET /auth/me`** gives each shop `agreementDue`, true only for its owner.
+  * **`POST /auth/shops/{id}/agreement`** takes `{ agreed }`, checked as on opening a shop:
+    every document, by the version shown, else `INVALID_INPUT` or `TERMS_CHANGED`. Only the
+    shop's owner agrees for it, anyone else being told it was not found. It adds a row, with
+    the address and browser, and a `terms_agreed` auth event.
+  * **The admin** shows the owner, above every page of the shop, the box of opening a shop
+    with each document linked, in English and Urdu, until they agree; it does not shut the
+    admin meanwhile.
+* **Consequences:** the record shows who agreed to what, for each shop, as the texts change.
+  Whether a due agreement should, after a while, close the admin, the Admin API or the shop,
+  and how long a new version is announced before it takes effect, are counsel's calls
+  (OWN-41); telling owners by email of a new version is still to be built.

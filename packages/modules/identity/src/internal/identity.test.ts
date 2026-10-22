@@ -2039,6 +2039,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
             scopes: ['read_products', 'write_orders'],
             capabilities: [],
             customRole: { id: toPublicId('customRole', customRoleId), name: 'Caller, masked' },
+            agreementDue: false,
           },
         ]);
         // And the worker, which tells them only of the work they may do (ADR-581).
@@ -2302,6 +2303,52 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       ]);
     });
 
+    it("asks a shop's owner to agree again when its terms change or it is handed to them, and takes their agreement for it alone (ADR-739)", async () => {
+      // A shop handed over, or opened before agreements were kept: its owner never agreed.
+      const shopId = newId();
+      await admin.query('INSERT INTO control.shops (id, name) VALUES ($1, $2)', [shopId, 'Noor']);
+      const owner = await signUp();
+      const manager = await signUp();
+      await grant(owner.userId, shopId, 'owner');
+      await grant(manager.userId, shopId, 'manager');
+      const session = await auth(owner.tokens.accessToken);
+      const managing = await auth(manager.tokens.accessToken);
+      const publicId = toPublicId('shop', shopId);
+      const dueOf = async (of: typeof session) =>
+        (await service.me(of)).shops.find((each) => each.id === publicId)?.agreementDue;
+      expect(await dueOf(session)).toBe(true);
+      // Only its owner is asked, and only its owner agrees for it.
+      expect(await dueOf(managing)).toBe(false);
+      const notOwner = await authError(service.agreeToTerms(managing, publicId, AGREED, client()));
+      expect([notOwner.code, notOwner.status]).toEqual(['NOT_FOUND', 404]);
+      const unknown = await authError(service.agreeToTerms(session, 'shop_nope', AGREED, client()));
+      expect(unknown.code).toBe('NOT_FOUND');
+      // As on opening a shop: every document, by the version shown.
+      const stale = await authError(
+        service.agreeToTerms(session, publicId, { ...AGREED, terms: '2026-01-01' }, client()),
+      );
+      expect(stale.code).toBe('TERMS_CHANGED');
+      expect(await dueOf(session)).toBe(true);
+
+      const from = client();
+      expect(await service.agreeToTerms(session, publicId, AGREED, from)).toEqual({
+        agreementDue: false,
+      });
+      expect(await dueOf(session)).toBe(false);
+      const { rows } = await admin.query(
+        `SELECT user_id, host(ip) AS ip FROM identity.shop_agreements WHERE shop_id = $1`,
+        [shopId],
+      );
+      expect(rows).toEqual([{ user_id: owner.userId, ip: from.ip }]);
+      // The terms change: what they agreed to is no longer what is in effect.
+      await admin.query(
+        `UPDATE identity.shop_agreements SET documents = documents || '{"terms": "2026-01-01"}'
+          WHERE shop_id = $1`,
+        [shopId],
+      );
+      expect(await dueOf(session)).toBe(true);
+    });
+
     it('opens a shop its user owns, in the control plane, for its storefront to be published (ADR-145)', async () => {
       const { tokens } = await signUp();
       const session = await auth(tokens.accessToken);
@@ -2340,6 +2387,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           scopes: ROLE_SCOPES.owner,
           capabilities: PRESET_CAPABILITIES.owner,
           customRole: null,
+          agreementDue: false,
         },
       ]);
       // The worker hears of it, to publish its storefront.
@@ -2441,6 +2489,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           scopes: ['read_products', 'read_inventory', 'read_locations', 'write_orders'],
           capabilities: [],
           customRole: null,
+          agreementDue: false,
         },
         {
           id: toPublicId('shop', shopB),
@@ -2450,6 +2499,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           scopes: ROLE_SCOPES.manager,
           capabilities: PRESET_CAPABILITIES.manager,
           customRole: null,
+          agreementDue: false,
         },
       ]);
     });

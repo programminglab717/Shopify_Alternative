@@ -55,7 +55,7 @@ nothing secret is ever committed. Shortcuts are the numbered rows of
 | ID | What is asked | Why | Status |
 |---|---|---|---|
 | OWN-40 | Counsel engaged in Pakistan | Tax classification (whether Hatti is an "online marketplace"); PECA; the data protection bill and data localisation for the cell's location; network risk signals before they launch ([11 §7](../architecture/11-security-and-compliance.md#7-privacy)); retention periods, tax records kept six years as assumed; confirming the payments "connector" model needs no licence | open |
-| OWN-41 | Hatti's own terms of service, privacy policy, acceptable use policy and data processing agreement reviewed by counsel. Drafts are served at `/legal` (`packages/platform/legal`, ADR-736); each blank is marked [To come: …], among them the courts for disputes, liability and an indemnity, licensed goods, refunds of unused credit and audits; counsel sets `LEGAL_REVIEWED` once none is left | Shops' sign-up and takedowns refer to them; the launch checklist's legal pages and DPA | open |
+| OWN-41 | Hatti's own terms of service, privacy policy, acceptable use policy and data processing agreement reviewed by counsel. Drafts are served at `/legal` (`packages/platform/legal`, ADR-736); each blank is marked [To come: …], among them the courts for disputes, liability and an indemnity, licensed goods, refunds of unused credit and audits; counsel sets `LEGAL_REVIEWED` once none is left. Counsel also says whether an owner who has not agreed to a new version (ADR-739) is, after some days, shut out of the admin or the shop, and how long ahead a new version is announced | Shops' sign-up and takedowns refer to them; the launch checklist's legal pages and DPA | open |
 
 ## Settled
 

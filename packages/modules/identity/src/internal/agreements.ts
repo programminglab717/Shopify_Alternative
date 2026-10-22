@@ -1,3 +1,4 @@
+import type { Db } from '@hatti/db';
 import { SHOP_AGREEMENT, legalVersions, type LegalHandle } from '@hatti/legal';
 import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
@@ -59,4 +60,26 @@ export async function recordShopAgreement(
 export function shopAgreementDocuments(): { handle: LegalHandle; version: string }[] {
   const current = legalVersions();
   return SHOP_AGREEMENT.map((handle) => ({ handle, version: current[handle] }));
+}
+
+/**
+ * Of `shopIds`, those `userId` has not agreed to Hatti's terms for as they are now (ADR-739): a
+ * shop opened before agreements were kept, one handed to them, or one whose terms have changed
+ * since they last agreed.
+ */
+export async function agreementsDue(
+  executor: Pick<Db, 'execute'>,
+  userId: string,
+  shopIds: readonly string[],
+): Promise<Set<string>> {
+  if (shopIds.length === 0) return new Set();
+  const current = Object.fromEntries(
+    shopAgreementDocuments().map((each) => [each.handle, each.version]),
+  );
+  const { rows } = await executor.execute<{ id: string }>(sql`
+    SELECT s.id FROM unnest(${sql.param([...shopIds])}::uuid[]) AS s(id)
+     WHERE NOT EXISTS (SELECT 1 FROM identity.shop_agreements a
+                        WHERE a.shop_id = s.id AND a.user_id = ${userId}
+                          AND a.documents @> ${JSON.stringify(current)}::jsonb)`);
+  return new Set(rows.map((row) => row.id));
 }

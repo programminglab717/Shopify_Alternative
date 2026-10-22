@@ -35,6 +35,8 @@ export interface ShopAccess {
   capabilities?: string[];
   /** The shop's own role it holds, made from its preset; null for the preset's. */
   customRole?: { id: string; name: string } | null;
+  /** For its owner: whether Hatti's terms as they are now are still to be agreed to (ADR-739). */
+  agreementDue?: boolean;
 }
 
 export interface AccountUser {

@@ -98,6 +98,10 @@ const en = {
   'terms.doc.terms': 'terms of service',
   'terms.doc.acceptableUse': 'acceptable use policy',
   'terms.doc.dataProcessing': 'data processing agreement',
+  'terms.dueTitle': "Agree to Hatti's terms for this shop",
+  'terms.dueBody':
+    "Hatti's terms have changed since you last agreed to them for this shop, or the shop is newly yours. Read them and agree to keep using it.",
+  'terms.dueSubmit': 'Agree',
   'shops.none': 'You are not part of a shop yet.',
   'shops.noAccess': 'You no longer have access to this shop.',
 
@@ -5663,6 +5667,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'terms.doc.terms': 'سروس کی شرائط',
   'terms.doc.acceptableUse': 'قابلِ قبول استعمال کی پالیسی',
   'terms.doc.dataProcessing': 'ڈیٹا پراسیسنگ کے معاہدے',
+  'terms.dueTitle': 'اس دکان کے لیے ہٹی کی شرائط سے اتفاق کریں',
+  'terms.dueBody':
+    'آپ نے اس دکان کے لیے ہٹی کی شرائط سے جب آخری بار اتفاق کیا، تب سے وہ بدل گئی ہیں، یا یہ دکان ابھی آپ کی ہوئی ہے۔ انہیں پڑھیں اور اسے استعمال کرتے رہنے کے لیے اتفاق کریں۔',
+  'terms.dueSubmit': 'متفق ہوں',
   'shops.none': 'آپ ابھی کسی دکان میں شامل نہیں ہیں۔',
   'shops.noAccess': 'اب آپ کو اس دکان تک رسائی نہیں ہے۔',
 

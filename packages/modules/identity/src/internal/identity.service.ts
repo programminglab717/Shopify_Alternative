@@ -56,7 +56,12 @@ import {
   type AccountEmailLanguage,
   type AccountEmailSender,
 } from './account-emails.js';
-import { recordShopAgreement, shopAgreement, type AgreedVersions } from './agreements.js';
+import {
+  agreementsDue,
+  recordShopAgreement,
+  shopAgreement,
+  type AgreedVersions,
+} from './agreements.js';
 import { memberAccess } from './custom-roles.js';
 import {
   liftSuppression,
@@ -381,6 +386,11 @@ export interface MemberShop extends ShopAccess {
   scopes: AccessScope[];
   capabilities: StaffCapability[];
   customRole: { id: string; name: string } | null;
+  /**
+   * For its owner: whether they have yet to agree to Hatti's terms as they are now for it
+   * (ADR-739), as a shop handed to them, opened before agreements were kept, or whose terms changed.
+   */
+  agreementDue: boolean;
 }
 
 /** A shop the user just opened, with the handle its storefront took. */
@@ -2325,6 +2335,42 @@ export class IdentityService {
   }
 
   /**
+   * Records the owner's agreement to Hatti's terms for a shop of theirs as they are now (ADR-739),
+   * when its terms changed since they agreed, it was handed to them, or it opened before agreements
+   * were kept: the versions they were shown, checked as on opening a shop (ADR-737). Only its owner
+   * agrees for it; anyone else is told it was not found.
+   */
+  async agreeToTerms(
+    auth: AuthenticatedSession,
+    publicShopId: string,
+    agreed: AgreedVersions | null | undefined,
+    client: ClientInfo,
+  ): Promise<{ agreementDue: false }> {
+    const shopId = tryFromPublicId(publicShopId, 'shop');
+    const agreement = shopAgreement(agreed);
+    await this.db.transaction(async (tx) => {
+      const [owner] = shopId
+        ? await tx
+            .select({ shopId: memberships.shopId })
+            .from(memberships)
+            .innerJoin(shops, and(eq(shops.id, memberships.shopId), eq(shops.status, 'active')))
+            .where(
+              and(
+                eq(memberships.shopId, shopId),
+                eq(memberships.userId, auth.userId),
+                eq(memberships.role, 'owner'),
+                eq(memberships.status, 'active'),
+              ),
+            )
+        : [];
+      if (!owner) throw new AuthError('NOT_FOUND', 404, 'Shop not found');
+      await recordShopAgreement(tx, owner.shopId, auth.userId, agreement, client);
+      await this.recordEvent(tx, auth.userId, 'terms_agreed', client);
+    });
+    return { agreementDue: false };
+  }
+
+  /**
    * Sets the language Hatti's emails and messages to the signed-in user are in (ADR-194): English
    * or Urdu. The user.
    */
@@ -2379,6 +2425,11 @@ export class IdentityService {
         ),
       )
       .orderBy(asc(shops.name));
+    const due = await agreementsDue(
+      this.db,
+      auth.userId,
+      rows.filter((row) => row.role === 'owner').map((row) => row.shopId),
+    );
     return {
       user,
       session: {
@@ -2406,6 +2457,7 @@ export class IdentityService {
               row.customRoleId === null || row.customRoleName === null
                 ? null
                 : { id: toPublicId('customRole', row.customRoleId), name: row.customRoleName },
+            agreementDue: due.has(row.shopId),
           },
         ];
       }),

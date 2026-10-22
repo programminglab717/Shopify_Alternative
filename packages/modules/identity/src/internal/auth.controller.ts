@@ -144,6 +144,7 @@ const shopBody = z.object({
   // Each of Hatti's documents agreed to, by the version shown: { "terms": "2026-10-22", … }.
   agreed: z.record(z.string().max(40), z.string().max(20)).nullish(),
 });
+const agreementBody = shopBody.pick({ agreed: true });
 const codeBody = z.object({ code: z.string().max(32) });
 const partnerBody = z.object({
   businessName: z.string().max(1_024),
@@ -664,6 +665,27 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /**
+   * Agrees to Hatti's terms for a shop the signed-in user owns, as they are now (ADR-739): `{
+   * agreed }`, the versions `GET /auth/agreement` gave, when `/auth/me` says its agreement is due.
+   */
+  @Post('shops/:id/agreement')
+  @HttpCode(200)
+  async agreeToTerms(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    return this.identity.agreeToTerms(
+      await this.session(request),
+      id,
+      parse(agreementBody, body).agreed,
+      clientOf(request),
+    );
   }
 
   @Get('sessions')

@@ -44,6 +44,7 @@ import { Button } from '../ui/button';
 import { EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { LanguageToggle } from '../ui/language-toggle';
 import { PlatformStatusBanner } from './platform-status';
+import { TermsBanner } from './terms-banner';
 import { ShopProvider } from './shop-context';
 
 interface NavItem {
@@ -277,6 +278,7 @@ export function Shell() {
             </button>
           </header>
           <PlatformStatusBanner />
+          <TermsBanner shop={shop} />
           <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">
             <Outlet />
           </main>

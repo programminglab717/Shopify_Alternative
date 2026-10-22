@@ -16,6 +16,18 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
+### Agreeing again
+
+* **An owner agrees to Hatti's terms again** ([ADR-739](../architecture/13-decision-log.md#adr-739--a-shops-owner-agrees-to-hattis-terms-again-whenever-theirs-for-it-are-not-the-current-versions-after-a-new-version-a-handover-or-for-a-shop-opened-before-agreements-were-kept-asked-above-every-page-of-the-admin-and-recorded-as-on-opening-a-shop)) whenever theirs for a shop is not to the
+  current versions: after a new version, when the shop is handed to them, and for shops opened
+  before agreements were kept. Due is worked out from the agreements kept, so nothing is stored
+  or swept.
+* **`/auth/me` says it is due**, and `POST /auth/shops/{id}/agreement` takes it from the owner
+  alone, checked as on opening a shop.
+* **The admin asks above every page**, with the same box and links, in English and Urdu, until
+  they agree; whether it should ever shut anything is counsel's call (OWN-41).
+* 4043 tests (3 new).
+
 ### 98044e3 · Messages kept twelve months
 
 * **What messages said goes after twelve months** ([ADR-738](../architecture/13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)), as Hatti's privacy policy says: a

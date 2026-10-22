@@ -288,6 +288,25 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       ]);
       expect((await post('/auth/shops', { name: 'Anyone' })).statusCode).toBe(401);
       expect((await post('/auth/shops', { handle: 7 }, accessToken)).statusCode).toBe(400);
+      // Its owner agreed in opening it; one agrees again for it as the terms change (ADR-739).
+      const shops = (await get('/auth/me', accessToken)).json().shops as Json[];
+      expect(shops.find((each) => each.id === shop.id)).toMatchObject({ agreementDue: false });
+      const path = `/auth/shops/${shop.id}/agreement`;
+      const agreedAgain = await post(path, { agreed }, accessToken);
+      expect([
+        agreedAgain.statusCode,
+        agreedAgain.headers['cache-control'],
+        agreedAgain.json(),
+      ]).toEqual([200, 'no-store', { agreementDue: false }]);
+      expect((await post(path, {}, accessToken)).statusCode).toBe(422);
+      const stranger = await signUp();
+      expect((await post(path, { agreed }, stranger.accessToken)).statusCode).toBe(404);
+      expect((await post(path, { agreed })).statusCode).toBe(401);
+      const { rows: agreements } = await admin.query(
+        'SELECT count(*)::int AS count FROM identity.shop_agreements WHERE shop_id = $1',
+        [shopId],
+      );
+      expect(agreements).toEqual([{ count: 2 }]);
     });
 
     it('lets a partner open development stores and see them on its dashboard (PRT-01, ADR-504)', async () => {
@@ -1817,6 +1836,7 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
           scopes: ['write_orders'],
           capabilities: ['assign_orders'],
           customRole: { id: leadId, name: 'Lead' },
+          agreementDue: false,
         },
       ]);
       expect(await shopsOf(agent.accessToken)).toMatchObject([
