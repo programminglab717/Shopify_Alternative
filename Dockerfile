@@ -53,4 +53,4 @@ FROM runtime AS storefront
 COPY --from=build /out/storefront /app
 WORKDIR /app/apps/storefront
 EXPOSE 4100
-CMD ["node", "--enable-source-maps", "dist/cli/serve.js"]
+CMD ["node", "--enable-source-maps", "--import", "./dist/cli/instrumentation.js", "dist/cli/serve.js"]

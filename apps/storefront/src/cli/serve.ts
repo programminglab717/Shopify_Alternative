@@ -5,6 +5,7 @@ import { Redis } from 'ioredis';
 import { sampleStore } from '../fixtures.js';
 import { PageRenderer } from '../render.js';
 import { createStorefrontServer } from '../server.js';
+import { shutdownTelemetry } from '@hatti/telemetry';
 import { loadTheme, readThemeDir } from '@hatti/themes';
 
 // Serves storefronts in Hatti Base, to look at pages as a phone would: pnpm dev:storefront. The
@@ -80,6 +81,8 @@ const stop = () => {
   app
     .close()
     .then(() => redis.quit())
+    // Flush the last spans and metrics, or they are lost with the process.
+    .then(() => shutdownTelemetry())
     .then(() => process.exit(0))
     .catch((error: unknown) => {
       console.error('Shutdown failed:', (error as Error).message);

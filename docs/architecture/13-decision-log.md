@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-725 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-726 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -733,6 +733,7 @@
 | 723 | Hatti Base says what larger orders pay at most to deliver: each rate on product pages, and the largest a cart reaches on the cart page, from the rates in the shop's document | Accepted |
 | 724 | The core and the storefront are built into container images of their own from one Dockerfile, each holding its app's built code and production dependencies alone, and CI builds both and runs them against an empty database on every push | Accepted |
 | 725 | The admin's objectives, the outbox and sign-ins are watched by Prometheus rules kept in the repository, burn-rate alerts with unit tests and a runbook each, and a Grafana dashboard whose queries CI parses | Accepted |
+| 726 | The storefront's and checkout's objectives are watched too: the storefront sends its telemetry, and the request durations' buckets include 800 ms | Accepted |
 
 ---
 
@@ -24774,3 +24775,35 @@
   checkout, webhook, message and booking objectives have no metrics yet; each gets its burn-rate
   alerts in these files when its metric is sent. A route with few requests can page on a handful
   of slow ones; if that is noisy, the alerts gain a minimum rate.
+
+## ADR-726 · The storefront's and checkout's objectives are watched too: the storefront sends its telemetry, and the request durations' buckets include 800 ms
+
+* **Context:** [ADR-725](#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses) watched the admin's objectives and left the storefront's and
+  checkout's for when they sent metrics. They are the objectives shoppers feel and the strictest of
+  [12 §1](./12-scalability-and-reliability.md#1-service-level-objectives): 99.95% of storefront page
+  requests and of checkout's API calls successful, and orders placed within 800 ms at p95. The
+  storefront sent no telemetry at all, and OpenTelemetry's buckets for request durations jump from
+  750 ms to 1 s, so no histogram could say how many orders took over 800 ms.
+* **Decision:**
+  * **The storefront starts `@hatti/telemetry`** as the core does, from
+    `dist/cli/instrumentation.js` imported before its server (the image's command and `pnpm serve`),
+    as the service `storefront`, and shuts it down with the server. Its job is `hatti/storefront`.
+  * **One view for `http.server.request.duration`** in `@hatti/telemetry`: OpenTelemetry's
+    recommended buckets with 0.8 s added, for every service, so the core's checkout calls are
+    counted against 800 ms exactly.
+  * **The storefront's objective** is read as 0.05% of the storefront's requests ending in a server
+    error; **checkout's** as 0.05% of the core's cart, checkout and payment-link calls
+    (`/storefront/shops/:shopId/cart…`, `…/checkouts…`, `…/payment-links…` and `/checkouts/…`)
+    ending in one, a shopper's mistakes being 4xx and not counted; **placing orders** as 95% of the
+    `POST`s of a checkout's form within 800 ms. Each has recording rules from 5 minutes to 3 days
+    and ADR-725's multiwindow burn-rate alerts, a page and a ticket, with promtool tests and a
+    runbook.
+  * **The storefront's silence pages** too, as the core's does.
+  * **The dashboard** becomes "Hatti core and storefront", with a row of the storefront's statuses,
+    checkout's p95, the three budgets left and their burn rates.
+* **Consequences:** The edge's own successes (pages served from Cloudflare's cache) are not in the
+  storefront's ratio, which counts the renderer's requests alone; once the edge is in front, its
+  analytics complete the picture. LCP's objective is the Web Vitals beacon's
+  ([ADR-485](#adr-485--the-store-speed-score-shoppers-own-core-web-vitals-counted-by-the-storefront-in-histograms-of-28-days-scored-per-device-as-google-judges-them-with-fixes)) and has no alert yet. Payments' callback objective, webhooks', messages'
+  and bookings' still have no metrics. Probes at `/healthz` and `/readyz` are left out of the
+  storefront's metrics, as they are of the core's.

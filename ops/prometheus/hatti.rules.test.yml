@@ -210,3 +210,123 @@ tests:
               summary: The core's API or worker has sent no metrics for ten minutes
               description: Either it is down, or its telemetry cannot reach the collector.
               runbook: docs/engineering/runbooks.md#hatticoremetricsmissing
+
+  # A storefront failing one request in a hundred for 70 minutes: 20 times its budget of 0.05%,
+  # which pages; the core's API is quiet throughout.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="hatti/storefront",http_route="/*",http_response_status_code="200"}'
+        values: '0+99x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/storefront",http_route="/*",http_response_status_code="500"}'
+        values: '0+1x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiStorefrontErrorBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Storefronts fail fast enough to spend the month's error budget in days
+              description: 1% of storefront requests ended in a server error; the objective allows 0.05%.
+              runbook: docs/engineering/runbooks.md#hattistorefronterrorbudgetburn
+      - eval_time: 70m
+        alertname: HattiCheckoutErrorBudgetBurn
+        exp_alerts: []
+
+  # A storefront failing one request in 5,000, under its budget, for seven hours: quiet.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="hatti/storefront",http_route="/*",http_response_status_code="200"}'
+        values: '0+4999x420'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/storefront",http_route="/*",http_response_status_code="503"}'
+        values: '0+1x420'
+    alert_rule_test:
+      - eval_time: 420m
+        alertname: HattiStorefrontErrorBudgetBurn
+        exp_alerts: []
+      - eval_time: 420m
+        alertname: HattiStorefrontErrorBudgetBurnSlow
+        exp_alerts: []
+
+  # Checkout's own routes failing two calls in a hundred page; the admin's GraphQL failing as often
+  # at the same time is the admin's budget, not checkout's.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/checkouts/:token",http_response_status_code="200"}'
+        values: '0+49x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/storefront/shops/:shopId/cart/:action",http_response_status_code="200"}'
+        values: '0+49x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/checkouts/:token",http_response_status_code="502"}'
+        values: '0+2x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiCheckoutErrorBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Checkout fails fast enough to spend the month's error budget in days
+              description: 2% of cart and checkout requests ended in a server error; the objective allows 0.05%.
+              runbook: docs/engineering/runbooks.md#hatticheckouterrorbudgetburn
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/checkouts/:token",http_response_status_code="200"}'
+        values: '0+100x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="200"}'
+        values: '0+98x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_route="/graphql",http_response_status_code="500"}'
+        values: '0+2x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiCheckoutErrorBudgetBurn
+        exp_alerts: []
+
+  # Every checkout form sent taking over 800 ms for 70 minutes pages; the page's views being as
+  # slow, without forms sent, would not, as they place nothing.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route="/checkouts/:token",le="0.8"}'
+        values: '0+1x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route="/checkouts/:token",http_response_status_code="200"}'
+        values: '0+20x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiCheckoutPlacementLatencyBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Placing orders is slow fast enough to spend the month's latency budget in days
+              description: 95% of checkout forms sent took over 800 ms; the objective allows 5%.
+              runbook: docs/engineering/runbooks.md#hatticheckoutplacementlatencybudgetburn
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="GET",http_route="/checkouts/:token",le="0.8"}'
+        values: '0x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="GET",http_route="/checkouts/:token",http_response_status_code="200"}'
+        values: '0+20x70'
+      - series: 'http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route="/storefront/shops/:shopId/checkouts/:token",le="0.8"}'
+        values: '0+20x70'
+      - series: 'http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route="/storefront/shops/:shopId/checkouts/:token",http_response_status_code="200"}'
+        values: '0+20x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiCheckoutPlacementLatencyBudgetBurn
+        exp_alerts: []
+
+  # The storefront silent.
+  - interval: 1m
+    input_series:
+      - series: 'target_info{job="hatti/storefront"}'
+        values: '1x5'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: HattiStorefrontMetricsMissing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: hatti/storefront
+            exp_annotations:
+              summary: The storefront has sent no metrics for ten minutes
+              description: Either it is down, or its telemetry cannot reach the collector.
+              runbook: docs/engineering/runbooks.md#hattistorefrontmetricsmissing

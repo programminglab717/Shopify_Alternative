@@ -1,10 +1,10 @@
-# Hatti's recording rules and alerts (ADR-725), over the metrics the core sends by OTLP, as
-# Prometheus names them: dots become underscores, the unit and _total are appended, and the job
-# is service.namespace/service.name, such as hatti/core-api. Each alert's runbook is a section of
-# docs/engineering/runbooks.md.
+# Hatti's recording rules and alerts (ADR-725, ADR-726), over the metrics the core and the
+# storefront send by OTLP, as Prometheus names them: dots become underscores, the unit and _total
+# are appended, and the job is service.namespace/service.name, such as hatti/core-api. Each alert's
+# runbook is a section of docs/engineering/runbooks.md.
 #
-# The admin's objectives are 12 §1's: 95% of Admin GraphQL requests answered within 500 ms, and
-# 99.9% of the Admin API's requests answered without a server error, each over 30 days. Their
+# The objectives are 12 §1's. The admin's: 95% of Admin GraphQL requests answered within 500 ms,
+# and 99.9% of the Admin API's requests answered without a server error, each over 30 days. Their
 # alerts burn the error budget as the SRE workbook's multiwindow, multi-burn-rate alerts do: a page
 # when an hour's burn would spend 2% of the month's budget, or six hours' 5%; a ticket when a
 # day's would spend 10%, or three days' as much as the month allows.
@@ -156,6 +156,219 @@ groups:
             error; the objective allows 0.1%.
           runbook: docs/engineering/runbooks.md#hattiadminapierrorbudgetburn
 
+  # The storefront's and checkout's objectives (12 §1, ADR-726): 99.95% of storefront requests and
+  # of the core's cart and checkout calls answered without a server error, and 95% of checkout
+  # forms sent, each placing the order or saying why not, answered within 800 ms, over 30 days.
+  - name: hatti-storefront-and-checkout-slis
+    interval: 1m
+    rules:
+      - record: hatti:storefront_errors:ratio_rate5m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[5m]))
+      - record: hatti:storefront_errors:ratio_rate30m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[30m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[30m]))
+      - record: hatti:storefront_errors:ratio_rate1h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[1h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[1h]))
+      - record: hatti:storefront_errors:ratio_rate2h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[2h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[2h]))
+      - record: hatti:storefront_errors:ratio_rate6h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[6h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[6h]))
+      - record: hatti:storefront_errors:ratio_rate1d
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[1d]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[1d]))
+      - record: hatti:storefront_errors:ratio_rate3d
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront",http_response_status_code=~"5.."}[3d]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/storefront"}[3d]))
+      - record: hatti:checkout_errors:ratio_rate5m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[5m]))
+      - record: hatti:checkout_errors:ratio_rate30m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[30m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[30m]))
+      - record: hatti:checkout_errors:ratio_rate1h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[1h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[1h]))
+      - record: hatti:checkout_errors:ratio_rate2h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[2h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[2h]))
+      - record: hatti:checkout_errors:ratio_rate6h
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[6h]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[6h]))
+      - record: hatti:checkout_errors:ratio_rate1d
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[1d]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[1d]))
+      - record: hatti:checkout_errors:ratio_rate3d
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*",http_response_status_code=~"5.."}[3d]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_route=~"/checkouts/.*|/storefront/shops/:shopId/(cart|checkouts|payment-links).*"}[3d]))
+      - record: hatti:checkout_place_slow:ratio_rate5m
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[5m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[5m]))
+          )
+      - record: hatti:checkout_place_slow:ratio_rate30m
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[30m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[30m]))
+          )
+      - record: hatti:checkout_place_slow:ratio_rate1h
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[1h]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[1h]))
+          )
+      - record: hatti:checkout_place_slow:ratio_rate2h
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[2h]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[2h]))
+          )
+      - record: hatti:checkout_place_slow:ratio_rate6h
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[6h]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[6h]))
+          )
+      - record: hatti:checkout_place_slow:ratio_rate1d
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[1d]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[1d]))
+          )
+      - record: hatti:checkout_place_slow:ratio_rate3d
+        expr: |
+          1 - (
+            sum(rate(http_server_request_duration_seconds_bucket{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token",le="0.8"}[3d]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="hatti/core-api",http_request_method="POST",http_route=~"/checkouts/:token|/storefront/shops/:shopId/checkouts/:token"}[3d]))
+          )
+
+  - name: hatti-storefront-and-checkout-slos
+    rules:
+      - alert: HattiStorefrontErrorBudgetBurn
+        expr: |
+          (hatti:storefront_errors:ratio_rate1h > 14.4 * 0.0005 and hatti:storefront_errors:ratio_rate5m > 14.4 * 0.0005)
+          or
+          (hatti:storefront_errors:ratio_rate6h > 6 * 0.0005 and hatti:storefront_errors:ratio_rate30m > 6 * 0.0005)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Storefronts fail fast enough to spend the month's error budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of storefront requests ended in a server error; the
+            objective allows 0.05%.
+          runbook: docs/engineering/runbooks.md#hattistorefronterrorbudgetburn
+      - alert: HattiStorefrontErrorBudgetBurnSlow
+        expr: |
+          (hatti:storefront_errors:ratio_rate1d > 3 * 0.0005 and hatti:storefront_errors:ratio_rate2h > 3 * 0.0005)
+          or
+          (hatti:storefront_errors:ratio_rate3d > 0.0005 and hatti:storefront_errors:ratio_rate6h > 0.0005)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Storefronts fail often enough to spend the month's error budget
+          description: >-
+            {{ $value | humanizePercentage }} of storefront requests ended in a server error; the
+            objective allows 0.05%.
+          runbook: docs/engineering/runbooks.md#hattistorefronterrorbudgetburn
+      - alert: HattiCheckoutErrorBudgetBurn
+        expr: |
+          (hatti:checkout_errors:ratio_rate1h > 14.4 * 0.0005 and hatti:checkout_errors:ratio_rate5m > 14.4 * 0.0005)
+          or
+          (hatti:checkout_errors:ratio_rate6h > 6 * 0.0005 and hatti:checkout_errors:ratio_rate30m > 6 * 0.0005)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Checkout fails fast enough to spend the month's error budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of cart and checkout requests ended in a server error;
+            the objective allows 0.05%.
+          runbook: docs/engineering/runbooks.md#hatticheckouterrorbudgetburn
+      - alert: HattiCheckoutErrorBudgetBurnSlow
+        expr: |
+          (hatti:checkout_errors:ratio_rate1d > 3 * 0.0005 and hatti:checkout_errors:ratio_rate2h > 3 * 0.0005)
+          or
+          (hatti:checkout_errors:ratio_rate3d > 0.0005 and hatti:checkout_errors:ratio_rate6h > 0.0005)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Checkout fails often enough to spend the month's error budget
+          description: >-
+            {{ $value | humanizePercentage }} of cart and checkout requests ended in a server error;
+            the objective allows 0.05%.
+          runbook: docs/engineering/runbooks.md#hatticheckouterrorbudgetburn
+      - alert: HattiCheckoutPlacementLatencyBudgetBurn
+        expr: |
+          (hatti:checkout_place_slow:ratio_rate1h > 14.4 * 0.05 and hatti:checkout_place_slow:ratio_rate5m > 14.4 * 0.05)
+          or
+          (hatti:checkout_place_slow:ratio_rate6h > 6 * 0.05 and hatti:checkout_place_slow:ratio_rate30m > 6 * 0.05)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Placing orders is slow fast enough to spend the month's latency budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of checkout forms sent took over 800 ms; the objective
+            allows 5%.
+          runbook: docs/engineering/runbooks.md#hatticheckoutplacementlatencybudgetburn
+      - alert: HattiCheckoutPlacementLatencyBudgetBurnSlow
+        expr: |
+          (hatti:checkout_place_slow:ratio_rate1d > 3 * 0.05 and hatti:checkout_place_slow:ratio_rate2h > 3 * 0.05)
+          or
+          (hatti:checkout_place_slow:ratio_rate3d > 0.05 and hatti:checkout_place_slow:ratio_rate6h > 0.05)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Placing orders is slow often enough to spend the month's latency budget
+          description: >-
+            {{ $value | humanizePercentage }} of checkout forms sent took over 800 ms; the objective
+            allows 5%.
+          runbook: docs/engineering/runbooks.md#hatticheckoutplacementlatencybudgetburn
+
   - name: hatti-events
     rules:
       # Order confirmations are to be sent within a minute of the order (12 §1), and every event
@@ -233,3 +446,11 @@ groups:
           summary: The core's API or worker has sent no metrics for ten minutes
           description: Either it is down, or its telemetry cannot reach the collector.
           runbook: docs/engineering/runbooks.md#hatticoremetricsmissing
+      - alert: HattiStorefrontMetricsMissing
+        expr: absent_over_time(target_info{job="hatti/storefront"}[10m])
+        labels:
+          severity: page
+        annotations:
+          summary: The storefront has sent no metrics for ten minutes
+          description: Either it is down, or its telemetry cannot reach the collector.
+          runbook: docs/engineering/runbooks.md#hattistorefrontmetricsmissing

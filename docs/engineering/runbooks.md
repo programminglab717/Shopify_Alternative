@@ -2,7 +2,8 @@
 
 What to do when one of Hatti's alerts fires ([ADR-725](../architecture/13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)). The
 alerts are in `ops/prometheus/hatti.rules.yml`, each naming its section here; the dashboard they
-point at is `ops/grafana/hatti-core.json` ("Hatti core"). A page wants someone now; a ticket wants
+point at is `ops/grafana/hatti-core.json` ("Hatti core and storefront"). The storefront's and
+checkout's alerts came with [ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms). A page wants someone now; a ticket wants
 someone today.
 
 The objectives are [12 §1](../architecture/12-scalability-and-reliability.md)'s. A surface that has
@@ -78,5 +79,61 @@ The core's API or worker has sent no metrics for ten minutes. Every other alert 
 meanwhile.
 
 1. Are its pods running and ready? `kubectl get pods`, and their last logs.
+2. If they run, their telemetry cannot reach the collector: check `OTEL_EXPORTER_OTLP_ENDPOINT`
+   and the collector's health.
+
+## HattiStorefrontErrorBudgetBurn
+
+More than 0.05% of the storefront's requests end in a server error, fast enough to spend the
+month's budget early. Shoppers see an error page instead of a shop. The `…Slow` alert is the same,
+as a ticket.
+
+1. The dashboard's storefront requests by status show whether it is every shop or a few: the
+   storefront's logs carry each error with its host and its request's trace.
+2. `/readyz` failing means Valkey is unreachable: the storefront renders from the read models kept
+   there, so see Valkey's health first (memory, connections, failover).
+3. One shop's errors alone usually mean its theme: a section that fails to render. Its theme's
+   last change is the first suspect; taking the theme back to its previous version (ADR-694)
+   puts it right.
+4. A deploy of the storefront within the hour: roll it back, then look.
+
+## HattiCheckoutErrorBudgetBurn
+
+More than 0.05% of the core's cart, checkout and payment-link calls end in a server error. Shoppers
+cannot add to their carts or place orders: this costs shops sales directly. The `…Slow` alert is
+the same, as a ticket.
+
+1. The dashboard's checkout panels, and the core API's logs filtered to `/storefront/shops/` and
+   `/checkouts/`, name the route and the error.
+2. Errors only when sending the checkout form point at what placing an order touches: stock
+   reservations, discounts, shipping rates, or a payment gateway that is down. Traces show which
+   span failed.
+3. Postgres saturated (connections, locks on stock during a drop): see whether PgBouncer's pool
+   is full before adding pods. A drop's hot product contending on its stock is what Drop Mode is
+   for ([12 §5](../architecture/12-scalability-and-reliability.md#5-drop-mode-flash-sales-and-lawn-launches),
+   ADR-019), not built yet.
+4. A deploy within the hour: roll it back, then look.
+
+## HattiCheckoutPlacementLatencyBudgetBurn
+
+More than 5% of checkout forms sent take over 800 ms to place the order. Shoppers wait, and some
+send the form again or leave. The `…Slow` alert is the same burn, slower, as a ticket.
+
+1. On the dashboard, see whether the checkout p95 rose at once (a deploy, the database, a
+   provider) or climbs with traffic (a drop or a sale).
+2. In Tempo, find the slow traces of `POST /storefront/shops/:shopId/checkouts/:token`: a slow
+   span to a courier's rates or a gateway is the provider's; a slow SQL statement wants its plan
+   looked at (`pnpm bench:db prepared`, ADR-111).
+3. Contention on one product's stock during a drop looks like this: traces show orders waiting on
+   the same rows. Drop Mode's waiting room (12 §5) is the answer, and not built yet.
+
+## HattiStorefrontMetricsMissing
+
+The storefront has sent no metrics for ten minutes. The storefront's alerts are blind to it
+meanwhile.
+
+1. Are its pods running and ready? `kubectl get pods`, and their last logs. The storefront refuses
+   to start in production without `STOREFRONT_URL`, `REDIS_URL`, `CORE_API_URL` and
+   `STOREFRONT_SERVICE_KEY`, and says which is missing.
 2. If they run, their telemetry cannot reach the collector: check `OTEL_EXPORTER_OTLP_ENDPOINT`
    and the collector's health.

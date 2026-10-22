@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The storefront's and checkout's objectives watched
+
+* **The storefront sends its telemetry** ([ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)): traces and metrics by OTLP as the service
+  `storefront`, started before its server in the image and `pnpm serve`.
+* **Request durations counted within 800 ms:** `@hatti/telemetry`'s view adds the bucket that
+  checkout's placement objective needs.
+* **Burn-rate alerts** for storefront errors, checkout's server errors and slow order placement, a
+  page when the storefront goes quiet, promtool tests and a runbook for each; the dashboard's new
+  "Storefront and checkout" row.
+* 4005 tests (1 new).
+
 ### e793ede · Waiting on the owner
 
 * **One register of what only Hatti's owner can do**, in

@@ -8,7 +8,11 @@ import { IORedisInstrumentation } from '@opentelemetry/instrumentation-ioredis';
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import {
+  AggregationType,
+  PeriodicExportingMetricReader,
+  type ViewOptions,
+} from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
@@ -27,6 +31,25 @@ export interface Telemetry {
 
 const disabled: Telemetry = { enabled: false, shutdown: async () => {} };
 let current: Telemetry = disabled;
+
+/**
+ * The HTTP server histogram's buckets, in seconds: OpenTelemetry's defaults with 0.8 added, so that
+ * checkout's objective of placing orders within 800 ms (12 §1) falls on a bucket's edge (ADR-726).
+ */
+export const HTTP_SERVER_DURATION_BUCKETS = [
+  0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 0.8, 1, 2.5, 5, 7.5, 10,
+];
+
+/** How metrics are aggregated where OpenTelemetry's defaults do not fit Hatti's objectives. */
+export const METRIC_VIEWS: ViewOptions[] = [
+  {
+    instrumentName: 'http.server.request.duration',
+    aggregation: {
+      type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+      options: { boundaries: HTTP_SERVER_DURATION_BUCKETS },
+    },
+  },
+];
 
 /** Probes run every few seconds; tracing them would drown real traffic. */
 const UNTRACED_PATHS = new Set(['/healthz', '/readyz']);
@@ -64,6 +87,7 @@ export function startTelemetry(options: TelemetryOptions): Telemetry {
         exportIntervalMillis: Number(env.OTEL_METRIC_EXPORT_INTERVAL ?? 60_000),
       }),
     ],
+    views: METRIC_VIEWS,
     instrumentations: [
       new HttpInstrumentation({
         ignoreIncomingRequestHook: (request: IncomingMessage) =>

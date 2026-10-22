@@ -23,6 +23,9 @@
 | Order confirmation messages | Sent within 60 s of order creation | 99% |
 | Courier booking | Booked within 5 min of request (courier API healthy) | 99% |
 
+The storefront's, checkout's and the admin's objectives are watched by multiwindow burn-rate
+alerts in `ops/prometheus` ([ADR-725](./13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses), [ADR-726](./13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)), each with a runbook in [docs/engineering/runbooks.md](../engineering/runbooks.md).
+
 **Error budgets** gate releases. A surface that burns more than 50% of its monthly budget freezes
 risky deploys for that surface until the budget recovers.
 
