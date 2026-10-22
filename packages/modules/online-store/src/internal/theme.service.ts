@@ -2,7 +2,7 @@ import { InputChecker, fail, failOne, type MutationResult, type TenantContext } 
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { checkShopFile, editorSchemas, platformTheme } from '@hatti/themes';
+import { checkShopFile, editorSchemas, isPlatformTheme, platformTheme } from '@hatti/themes';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import {
@@ -199,13 +199,21 @@ export class ThemeService {
     return { theme: toThemeRecord(row), files: await this.#files(tx, shopId, row.id) };
   }
 
-  /** A new theme, not yet published: on the platform theme, or a copy of `copyFrom`'s files. */
+  /**
+   * A new theme, not yet published: a copy of `copyFrom`'s files, or one of Hatti's themes as it
+   * comes, `base` (ADR-730), Hatti Base when neither is given.
+   */
   async create(
     tenant: TenantContext,
-    input: { name: string; copyFrom?: string | null },
+    input: { name: string; copyFrom?: string | null; base?: string | null },
   ): Promise<MutationResult<ThemeRecord>> {
     const check = new InputChecker();
     const name = check.text(['name'], input.name, { required: true, max: THEME_LIMITS.name });
+    if (input.copyFrom && input.base) {
+      check.add(['base'], 'INVALID', "Give a theme to copy or one of Hatti's themes, not both");
+    } else if (input.base && !(await isPlatformTheme(input.base))) {
+      check.add(['base'], 'NOT_FOUND', "Hatti's themes have none of that name");
+    }
     if (!check.ok || name === null) return fail(check.errors);
     return this.db.tenant(tenant.shopId, async (tx) => {
       await ensureMainTheme(tx, tenant.shopId);
@@ -224,7 +232,7 @@ export class ThemeService {
           shopId: tenant.shopId,
           id: newId(),
           name,
-          base: source?.base ?? BASE_THEME,
+          base: source?.base ?? input.base ?? BASE_THEME,
           role: 'unpublished',
         })
         .returning();
@@ -719,22 +727,31 @@ export async function themesName(tx: Tx, shopId: string, text: string): Promise<
 /**
  * The shop's accent colour, as its main theme sets it (Hatti Base's `color_accent`), in its
  * current settings or the preset they name, for pages the core renders in the shop's name, such
- * as checkout's. Null when the theme leaves it to the platform's, or sets anything but a hex
- * colour.
+ * as checkout's; as the platform theme it is built on sets it, where the shop has set none
+ * (ADR-730). Null when neither sets one, or sets anything but a hex colour.
  */
 export async function shopAccentOf(tx: Tx, shopId: string): Promise<string | null> {
   const [row] = await tx
-    .select({ body: themeFiles.body })
-    .from(themeFiles)
-    .innerJoin(themes, and(eq(themes.shopId, themeFiles.shopId), eq(themes.id, themeFiles.themeId)))
-    .where(
+    .select({ base: themes.base, body: themeFiles.body })
+    .from(themes)
+    .leftJoin(
+      themeFiles,
       and(
-        eq(themeFiles.shopId, shopId),
-        eq(themes.role, 'main'),
+        eq(themeFiles.shopId, themes.shopId),
+        eq(themeFiles.themeId, themes.id),
         eq(themeFiles.filename, 'config/settings_data.json'),
       ),
-    );
+    )
+    .where(and(eq(themes.shopId, shopId), eq(themes.role, 'main')));
   if (!row) return null;
+  if (row.body === null) {
+    if (row.base === BASE_THEME) return null;
+    const settings = await platformTheme(row.base).then(
+      (theme) => theme.settings,
+      () => null,
+    );
+    return hexOf(settings?.color_accent);
+  }
   let data: { current?: unknown; presets?: Record<string, unknown> };
   try {
     data = JSON.parse(row.body) as typeof data;
@@ -742,9 +759,13 @@ export async function shopAccentOf(tx: Tx, shopId: string): Promise<string | nul
     return null;
   }
   const current = typeof data.current === 'string' ? data.presets?.[data.current] : data.current;
-  const accent =
+  return hexOf(
     typeof current === 'object' && current !== null
       ? (current as { color_accent?: unknown }).color_accent
-      : undefined;
+      : undefined,
+  );
+}
+
+function hexOf(accent: unknown): string | null {
   return typeof accent === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(accent) ? accent : null;
 }

@@ -80,7 +80,7 @@ import {
   ShopThemes,
   type StorefrontServerOptions,
 } from './server.js';
-import { loadTheme, readThemeDir, type Theme } from '@hatti/themes';
+import { loadTheme, platformTheme, readThemeDir, type Theme } from '@hatti/themes';
 
 // Before the servers that record them are made.
 const recorded = collectMetrics();
@@ -306,6 +306,30 @@ describe("Shops' themes", () => {
     expect(home(next)).toBe(bannerHome('Two'));
     await themes.for('s1', shopWith({ id: 'thm-1', version: 2 }), data);
     expect(store.fetched).toBe(3);
+  });
+
+  it('lays each theme over the platform theme it is built on, Hatti Base for one unknown (ADR-730)', async () => {
+    const lawn = await platformTheme('lawn');
+    const themes = new ShopThemes(base, {
+      platform: new Map([
+        ['hatti-base', base],
+        ['lawn', lawn],
+      ]),
+    });
+    const on = (name: string) => holding({ ...doc(1, 'One'), base: name }) as unknown as StoreData;
+    const shop = shopWith({ id: 'thm-1', version: 1 });
+    const dressed = await themes.for('s1', shop, on('lawn'));
+    expect(home(dressed)).toBe(bannerHome('One'));
+    expect(dressed.files['snippets/theme-style.liquid']).toBe(
+      lawn.files['snippets/theme-style.liquid'],
+    );
+    expect(dressed.settings).toMatchObject({ color_accent: '#9D174D' });
+    // A theme the storefront does not know, from a newer core: on Hatti Base, never failing.
+    const unknown = await themes.for('s2', shop, on('zevar'));
+    expect(unknown.files['snippets/theme-style.liquid']).toBe(
+      base.files['snippets/theme-style.liquid'],
+    );
+    expect(unknown.settings).toMatchObject({ color_accent: '#0F766E' });
   });
 
   it('keeps themes up to a size, letting the least recently used go first', async () => {

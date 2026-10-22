@@ -1,0 +1,37 @@
+{
+  "sections": {
+    "banner": {
+      "type": "image-banner",
+      "settings": {
+        "image": {
+          "src": "/images/banners/eid-lawn.jpg",
+          "width": 1500,
+          "height": 900,
+          "alt": "Models in Eid lawn suits"
+        }
+      },
+      "blocks": {
+        "heading": { "type": "heading", "settings": { "heading": "The new season" } },
+        "text": {
+          "type": "text",
+          "settings": {
+            "text": "Lawn, chiffon and khaddar: unstitched and ready to wear, delivered across Pakistan."
+          }
+        },
+        "button": {
+          "type": "button",
+          "settings": { "label": "Shop new arrivals", "link": "/collections/all" }
+        }
+      },
+      "block_order": ["heading", "text", "button"]
+    },
+    "arrivals": {
+      "type": "featured-collection",
+      "settings": { "title": "New arrivals", "collection": "all", "products_to_show": 8 }
+    },
+    "recently_viewed": { "type": "recently-viewed", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": {} },
+    "whatsapp": { "type": "whatsapp-cta", "settings": {} }
+  },
+  "order": ["banner", "arrivals", "recently_viewed", "newsletter", "whatsapp"]
+}

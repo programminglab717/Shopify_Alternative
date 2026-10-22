@@ -7,6 +7,7 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
+import { platformThemes } from '@hatti/themes';
 import {
   Args,
   GraphQLISODateTime,
@@ -31,6 +32,7 @@ import {
 import {
   OnlineStoreTheme,
   OnlineStoreThemeConnection,
+  PlatformTheme,
   OnlineStoreThemeEditor,
   OnlineStoreThemeFile,
   OnlineStoreThemeFilesUpsertFileInput,
@@ -70,6 +72,22 @@ export class ThemeResolver {
       roles: args.roles?.map(toRoleValue) ?? null,
     });
     return toThemeConnection(items, hasNextPage);
+  }
+
+  @Query(() => [PlatformTheme], {
+    description: "Hatti's own themes a shop may begin a theme with, Hatti Base first (ADR-730).",
+  })
+  @RequireScopes('read_themes')
+  async platformThemes(): Promise<PlatformTheme[]> {
+    return (await platformThemes()).map((theme) =>
+      Object.assign(new PlatformTheme(), {
+        handle: theme.handle,
+        name: theme.name,
+        description: theme.description.en,
+        descriptionUrdu: theme.description.ur,
+        extends: theme.extends,
+      }),
+    );
   }
 
   @Query(() => OnlineStoreTheme, { nullable: true })
@@ -152,8 +170,9 @@ export class ThemeResolver {
 
   @Mutation(() => ThemeCreatePayload, {
     description:
-      'A new theme to prepare before publishing it: on the platform theme, or a copy of the files ' +
-      'of `copyFrom`, such as the main theme.',
+      'A new theme to prepare before publishing it: a copy of the files of `copyFrom`, such as ' +
+      "the main theme, or one of Hatti's themes as it comes, `base` (`platformThemes`), Hatti " +
+      'Base when neither is given.',
   })
   @RequireScopes('write_themes')
   @RequireIdempotencyKey()
@@ -161,10 +180,12 @@ export class ThemeResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args('name') name: string,
     @Args('copyFrom', { type: () => ID, nullable: true }) copyFrom?: string | null,
+    @Args('base', { type: () => String, nullable: true }) base?: string | null,
   ): Promise<ThemeCreatePayload> {
     const result = await this.service.create(tenant, {
       name,
       copyFrom: copyFrom ? uuidOf('theme', copyFrom) : null,
+      base: base ?? null,
     });
     return Object.assign(new ThemeCreatePayload(), {
       theme: result.ok ? toTheme(result.value) : null,

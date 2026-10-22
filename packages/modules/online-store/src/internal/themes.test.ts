@@ -397,6 +397,44 @@ describe.skipIf(!server)('ThemeService', () => {
     expect(errorsOf(await f.themes.create(f.a, { name: 'One too many' }))[0]?.[1]).toBe('TOO_MANY');
   });
 
+  it("begins a theme on one of Hatti's themes as it comes, and checks files against it (ADR-730)", async () => {
+    const main = await f.themes.main(f.a);
+    const lawn = unwrap(await f.themes.create(f.a, { name: 'Lawn season', base: 'lawn' }));
+    expect(lawn).toMatchObject({ base: 'lawn', role: 'unpublished' });
+    expect(await f.themes.files(f.a, lawn.id)).toEqual([]);
+    // A copy keeps what it was built on.
+    const copy = unwrap(await f.themes.create(f.a, { name: 'Lawn copy', copyFrom: lawn.id }));
+    expect(copy.base).toBe('lawn');
+    expect(
+      errorsOf(await f.themes.create(f.a, { name: 'Zevar', base: 'zevar' }))[0]?.slice(0, 2),
+    ).toEqual(['base', 'NOT_FOUND']);
+    expect(
+      errorsOf(
+        await f.themes.create(f.a, { name: 'Both', base: 'lawn', copyFrom: main.id }),
+      )[0]?.slice(0, 2),
+    ).toEqual(['base', 'INVALID']);
+    // The editor starts from the files of the theme it is built on.
+    const editor = await f.themes.editor(f.a, lawn.id, 'lawn', 'en');
+    const settings = editor.files.find((file) => file.filename === 'config/settings_data.json');
+    expect(settings).toMatchObject({ own: false });
+    expect(settings?.body).toContain('#9D174D');
+
+    // Checkout's colour is the theme's own until the shop sets one.
+    const accentOf = () => f.db.tenant(f.a.shopId, (tx) => shopAccentOf(tx, f.a.shopId));
+    expect(await accentOf()).toBeNull();
+    unwrap(await f.themes.publish(f.a, lawn.id));
+    expect(await accentOf()).toBe('#9D174D');
+    unwrap(
+      await f.themes.upsertFiles(f.a, lawn.id, [
+        {
+          filename: 'config/settings_data.json',
+          body: JSON.stringify({ current: { color_accent: '#1D4ED8' } }),
+        },
+      ]),
+    );
+    expect(await accentOf()).toBe('#1D4ED8');
+  });
+
   it('gives read models the main theme with its files', async () => {
     const main = await f.themes.main(f.a);
     unwrap(

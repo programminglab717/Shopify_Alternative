@@ -252,6 +252,31 @@ export class OnlineStoreThemeFilesUpsertFileInput {
   body!: string;
 }
 
+@ObjectType({
+  description:
+    "One of Hatti's own themes (OS-01, ADR-730), which a shop's theme is built on: Hatti Base, or " +
+    'a theme for one kind of shop built on it.',
+})
+export class PlatformTheme {
+  @Field({ description: 'Its name as a theme keeps it as its `base`: "hatti-base".' })
+  handle!: string;
+
+  @Field()
+  name!: string;
+
+  @Field({ description: 'What it is for, in English.' })
+  description!: string;
+
+  @Field({ description: 'What it is for, in Urdu.' })
+  descriptionUrdu!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The theme it is built on, whose sections it shares; null for Hatti Base.',
+  })
+  extends!: string | null;
+}
+
 @ObjectType()
 export class ThemeCreatePayload {
   @Field(() => OnlineStoreTheme, { nullable: true })

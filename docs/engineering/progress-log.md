@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Hatti's themes, and Lawn
+
+* **A library of Hatti's themes** ([ADR-730](../architecture/13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)): `themes/library.json`, each theme said what it is for
+  in English and Urdu; one built on another holds only the files it changes.
+* **Lawn**, for clothes, the first built on Hatti Base: portrait photos, serif headings, Nastaliq
+  in Urdu, an ivory and rose palette, and the season's new arrivals first.
+* **A theme begun on any of them**: `themeCreate`'s `base`, the Admin API's `platformThemes`, and
+  the admin's "Start from"; the storefront lays each shop's theme over the theme it is built on,
+  and checkout takes that theme's colour.
+* 4014 tests (5 new).
+
 ### 888117a · Phones' LCP watched
 
 * **Shoppers' largest contentful paint as a metric** ([ADR-729](../architecture/13-decision-log.md#adr-729--shoppers-largest-contentful-paint-is-a-storefront-histogram-ticketed-when-phones-p75-passes-two-seconds-payments-callback-objective-waits-for-gateways-that-say-when-they-were-paid)): the storefront records each counted

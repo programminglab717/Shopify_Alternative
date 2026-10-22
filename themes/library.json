@@ -1,0 +1,20 @@
+[
+  {
+    "handle": "hatti-base",
+    "name": "Hatti Base",
+    "description": {
+      "en": "Light and fast for any shop, on any phone.",
+      "ur": "ہر دکان کے لیے، ہر فون پر ہلکا اور تیز۔"
+    },
+    "extends": null
+  },
+  {
+    "handle": "lawn",
+    "name": "Lawn",
+    "description": {
+      "en": "For clothes: portrait photos, serif headings and the season's new arrivals first.",
+      "ur": "کپڑوں کے لیے: لمبی تصویریں، نفیس سرخیاں، اور سیزن کی نئی آمد سب سے پہلے۔"
+    },
+    "extends": "hatti-base"
+  }
+]

@@ -3748,8 +3748,17 @@ export interface OnlineStoreTheme {
   updatedAt: string;
 }
 
+/** One of Hatti's own themes, which a shop's theme is built on (ADR-730). */
+export interface PlatformTheme {
+  handle: string;
+  name: string;
+  description: string;
+  descriptionUrdu: string;
+}
+
 export interface ThemesData {
   themes: { nodes: OnlineStoreTheme[] };
+  platformThemes: PlatformTheme[];
 }
 
 /** One change a theme keeps (ADR-694). */

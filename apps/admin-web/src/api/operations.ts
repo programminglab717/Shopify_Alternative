@@ -7954,6 +7954,12 @@ export const ThemesQuery = /* GraphQL */ `
         ...Theme
       }
     }
+    platformThemes {
+      handle
+      name
+      description
+      descriptionUrdu
+    }
   }
   ${THEME}
 `;
@@ -8069,8 +8075,8 @@ export const ThemeFilesDeleteMutation = /* GraphQL */ `
 
 /** A theme added, a copy of one the shop has or on the platform theme afresh. */
 export const ThemeCreateMutation = /* GraphQL */ `
-  mutation ThemeCreate($name: String!, $copyFrom: ID) {
-    themeCreate(name: $name, copyFrom: $copyFrom) {
+  mutation ThemeCreate($name: String!, $copyFrom: ID, $base: String) {
+    themeCreate(name: $name, copyFrom: $copyFrom, base: $base) {
       theme {
         ...Theme
       }

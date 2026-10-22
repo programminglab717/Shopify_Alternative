@@ -19,7 +19,7 @@ import {
   ThemePublishMutation,
   ThemesQuery,
 } from '../api/operations';
-import type { OnlineStoreTheme, ThemesData, UserError } from '../api/types';
+import type { OnlineStoreTheme, PlatformTheme, ThemesData, UserError } from '../api/types';
 import { gate } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatRelative } from '../i18n/format';
@@ -35,8 +35,8 @@ import { ScheduledNote, ThemeSchedule, ThemeVersions, VersionsButton } from './t
 /** Those who change the shop's themes: its owner and managers, as the core allows. */
 export const EDITS_THEMES = gate(['owner', 'manager'], 'write_themes');
 
-/** The choice, when adding a theme, of starting from the platform theme rather than a copy. */
-const PLATFORM = '';
+/** How the choice, when adding a theme, of one of Hatti's themes rather than a copy begins. */
+const PLATFORM = 'platform:';
 
 /** Runs a change of a theme and says what went wrong, the core's words or the network's. */
 function useChange() {
@@ -211,23 +211,34 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
   );
 }
 
-/** A theme added: a copy of one the shop has, the main one to begin with, or the platform's. */
-function AddTheme({ themes }: { themes: OnlineStoreTheme[] }) {
-  const { t } = useLocale();
+/**
+ * A theme added: a copy of one the shop has, the main one to begin with, or one of Hatti's own
+ * themes as it comes (ADR-730), each said what it is for.
+ */
+function AddTheme({ themes, library }: { themes: OnlineStoreTheme[]; library: PlatformTheme[] }) {
+  const { t, locale } = useLocale();
   const create = useAdminMutation<
     { themeCreate: { userErrors: UserError[] } },
-    { name: string; copyFrom: string | null }
+    { name: string; copyFrom: string | null; base: string | null }
   >(ThemeCreateMutation);
   const { problem, change } = useChange();
   const main = themes.find((theme) => theme.role === 'MAIN');
-  const [from, setFrom] = useState(main?.id ?? PLATFORM);
+  const [from, setFrom] = useState(main?.id ?? `${PLATFORM}${library[0]?.handle ?? ''}`);
   const [name, setName] = useState('');
+  const base = from.startsWith(PLATFORM) ? from.slice(PLATFORM.length) : null;
+  const chosen = library.find((theme) => theme.handle === base);
 
   const onAdd = (event: FormEvent) => {
     event.preventDefault();
     void change(
       async () =>
-        (await create.mutateAsync({ name: name.trim(), copyFrom: from || null })).themeCreate,
+        (
+          await create.mutateAsync({
+            name: name.trim(),
+            copyFrom: base === null ? from : null,
+            base: base || null,
+          })
+        ).themeCreate,
     ).then((ok) => ok && setName(''));
   };
 
@@ -242,10 +253,18 @@ function AddTheme({ themes }: { themes: OnlineStoreTheme[] }) {
               value: theme.id,
               label: t('themes.copyOf', { name: theme.name }),
             })),
-            { value: PLATFORM, label: t('themes.platform') },
+            ...library.map((theme) => ({
+              value: `${PLATFORM}${theme.handle}`,
+              label: t('themes.platform', { name: theme.name }),
+            })),
           ]}
           onChange={setFrom}
         />
+        {chosen && (
+          <p className="text-secondary">
+            {locale === 'ur' ? chosen.descriptionUrdu : chosen.description}
+          </p>
+        )}
         <TextField
           label={t('themes.name')}
           dir="auto"
@@ -261,7 +280,11 @@ function AddTheme({ themes }: { themes: OnlineStoreTheme[] }) {
           busy={create.isPending}
           disabled={!name.trim()}
           icon={
-            from ? <Copy aria-hidden className="size-5" /> : <Plus aria-hidden className="size-5" />
+            base === null ? (
+              <Copy aria-hidden className="size-5" />
+            ) : (
+              <Plus aria-hidden className="size-5" />
+            )
           }
         >
           {t('themes.addSubmit')}
@@ -311,7 +334,7 @@ export function ThemesTab() {
           ))}
         </ul>
       </Card>
-      <AddTheme themes={themes} />
+      <AddTheme themes={themes} library={query.data.platformThemes} />
     </div>
   );
 }

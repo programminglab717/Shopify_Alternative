@@ -1,0 +1,11 @@
+{
+  "current": {
+    "color_text": "#3B0A1E",
+    "color_background": "#FFFBF5",
+    "color_accent": "#9D174D",
+    "page_width": 1280,
+    "show_breadcrumbs": true,
+    "whatsapp_orders": true,
+    "whatsapp_chat": true
+  }
+}

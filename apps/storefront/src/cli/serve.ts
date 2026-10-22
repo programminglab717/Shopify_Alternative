@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 import { StorefrontApiClient } from '@hatti/storefront-api';
 import { MemoryStore } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
@@ -6,7 +5,7 @@ import { sampleStore } from '../fixtures.js';
 import { PageRenderer } from '../render.js';
 import { createStorefrontServer } from '../server.js';
 import { shutdownTelemetry } from '@hatti/telemetry';
-import { loadTheme, readThemeDir } from '@hatti/themes';
+import { allPlatformThemes } from '@hatti/themes';
 
 // Serves storefronts in Hatti Base, to look at pages as a phone would: pnpm dev:storefront. The
 // platform's domain, from STOREFRONT_URL (http://localhost:4100 unless set), shows the sample
@@ -28,8 +27,9 @@ if (production) {
   );
   if (missing.length > 0) throw new Error(`Set ${missing.join(', ')} to serve in production`);
 }
-const themeDir = fileURLToPath(new URL('../../../../themes/hatti-base', import.meta.url));
-const theme = loadTheme(await readThemeDir(themeDir));
+// Hatti's themes (ADR-730), each shop's theme over the one it is built on.
+const platformThemes = await allPlatformThemes();
+const theme = platformThemes.get('hatti-base')!;
 const site = new URL(process.env.STOREFRONT_URL ?? 'http://localhost:4100');
 const renderer = new PageRenderer(theme, {
   platformUrl: site.origin,
@@ -57,6 +57,7 @@ for (const origin of editorOrigins) {
 }
 const app = createStorefrontServer({
   theme,
+  platformThemes,
   renderer,
   domain: site.hostname,
   redis,

@@ -345,6 +345,14 @@ function core(role: StaffRole, { refuseOnce = false } = {}) {
               },
             ],
           },
+          platformThemes: [
+            {
+              handle: 'hatti-base',
+              name: 'Hatti Base',
+              description: "Hatti's own theme.",
+              descriptionUrdu: 'ہٹی کی اپنی تھیم۔',
+            },
+          ],
         };
       default:
         throw new Error(`unexpected ${operation}`);

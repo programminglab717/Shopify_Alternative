@@ -23,6 +23,7 @@
         --page-width: {{ settings.page_width }}px;
       }
     {% endstyle %}
+    {%- render 'theme-style' %}
     {{ content_for_header }}
   </head>
   <body class="template-{{ template.name }}">

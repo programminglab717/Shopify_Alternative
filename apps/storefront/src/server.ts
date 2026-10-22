@@ -133,7 +133,13 @@ import {
 import { overlayTheme, type Theme, type ThemeError } from '@hatti/themes';
 
 export interface StorefrontServerOptions {
+  /** Hatti Base: the theme of shops with none of their own, and of any built on a theme unknown. */
   theme: Theme;
+  /**
+   * Hatti's themes by handle (ADR-730), each shop's theme laid over the one it is built on; Hatti
+   * Base alone without them.
+   */
+  platformThemes?: ReadonlyMap<string, Theme>;
   renderer: PageRenderer;
   /** The platform's domain, without a port: each shop answers at {handle}.{domain}. */
   domain: string;
@@ -532,6 +538,8 @@ export class ShopThemes {
     private readonly options: {
       maxBytes?: number;
       onRejected?: (shopId: string, error: ThemeError) => void;
+      /** The platform themes shops' themes are built on, by handle (ADR-730). */
+      platform?: ReadonlyMap<string, Theme>;
     } = {},
   ) {}
 
@@ -585,7 +593,9 @@ export class ShopThemes {
   }
 
   #overlay(shopId: string, doc: ThemeDoc): Theme {
-    return overlayTheme(this.base, doc.files, (error) => this.options.onRejected?.(shopId, error));
+    // Over the platform theme it is built on; Hatti Base for one this storefront does not know.
+    const base = this.options.platform?.get(doc.base) ?? this.base;
+    return overlayTheme(base, doc.files, (error) => this.options.onRejected?.(shopId, error));
   }
 
   /** `doc` laid over the platform theme, and kept as `key` while there is room. */
@@ -657,7 +667,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const domainShops = directory
     ? new ShopResolver({ find: (host) => directory.findDomain(host) })
     : null;
-  const themes = new ShopThemes(theme, { onRejected: options.onThemeFileRejected });
+  const themes = new ShopThemes(theme, {
+    onRejected: options.onThemeFileRejected,
+    platform: options.platformThemes,
+  });
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
   // What shoppers do on each shop, counted as Shopify's analytics count it (ADR-180).
   const activity = redis ? new StorefrontActivity(redis, keys) : null;

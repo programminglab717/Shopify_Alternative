@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-729 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-730 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -737,6 +737,7 @@
 | 727 | Webhooks, order confirmations and courier bookings are watched by how long they wait: histograms the worker records, with burn-rate alerts against 12 §1's minute, minute and five minutes | Accepted |
 | 728 | An order confirmation's minute is counted from the order: a message is due since what it tells of happened, when that came before it was queued | Accepted |
 | 729 | Shoppers' largest contentful paint is a storefront histogram, ticketed when phones' p75 passes two seconds; payments' callback objective waits for gateways that say when they were paid | Accepted |
+| 730 | Hatti's themes are a library listed in themes/library.json, a theme built on another holding only the files it changes; a shop begins a theme on any of them, and Lawn, for clothes, is the first built on Hatti Base | Accepted |
 
 ---
 
@@ -24881,3 +24882,36 @@
     which gateways sign a time.
 * **Consequences:** The objective is read on all phones, not mid-range Android over 4G alone,
   which no browser reports; it is the stricter reading. A shop's own LCP stays its speed score's.
+
+## ADR-730 · Hatti's themes are a library listed in themes/library.json, a theme built on another holding only the files it changes; a shop begins a theme on any of them, and Lawn, for clothes, is the first built on Hatti Base
+
+* **Context:** OS-01 promises Hatti Base and two themes for kinds of shop at the MVP, six at V1
+  ([04 §3.5](./04-storefront-and-themes.md#35-free-theme-line-up-launch)). A shop's theme already
+  names the platform theme it is built on, `base` ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)), and Theme Check reads
+  files against it, but only Hatti Base existed: `themeCreate` could not choose another, and the
+  storefront laid every shop's files over Hatti Base whatever its `base` said.
+* **Decision:**
+  * **`themes/library.json` lists Hatti's themes** in the order shops are offered them: each its
+    folder's handle, its name, what it is for in English and Urdu, and the theme it is built on,
+    listed before it. `@hatti/themes` reads it (`platformThemes`, `isPlatformTheme`) and refuses
+    a list with a name twice, a parent after its child, or no description.
+  * **A theme built on another holds only what it changes**: `platformTheme('lawn')` is Hatti
+    Base's files with Lawn's over them. A vertical theme shares Hatti Base's sections, snippets,
+    templates and translations, so a fix to them reaches every theme, and is its own settings,
+    home page and look.
+  * **Hatti Base renders `snippets/theme-style.liquid` after its stylesheet**, empty in Hatti Base:
+    a theme built on it gives its styles there, inline, so its pages ask for no more files.
+  * **`themeCreate` takes `base`**, any of the library's themes, as an alternative to `copyFrom`
+    (both refused; an unknown one is NOT_FOUND); the Admin API's `platformThemes` lists the
+    library; the admin's "Start from" offers each of them as it comes, with what it is for in
+    the admin's language.
+  * **The storefront loads the library at start** and lays each shop's theme over the theme it is
+    built on, Hatti Base for one it does not know, as a core newer than it could name.
+  * **Checkout's colour** is the shop's theme's own, then that of the theme it is built on.
+  * **Lawn**, for clothes: portrait product photos (3:4), serif headings in English with Nastaliq
+    kept in Urdu, quiet spaced section titles, rounded buttons, an ivory and rose palette, and a
+    home page of the season's banner, new arrivals and what the shopper viewed.
+* **Consequences:** Adding a theme is a folder of changed files and a line in the library, with no
+  code. A theme built on Hatti Base cannot leave out one of its sections or templates, only
+  change them; one that must is a theme of its own, with `extends` null. Shops cannot move a theme
+  to another base: they begin a new theme on it. The second vertical theme is next.

@@ -39,7 +39,23 @@ function core(role: StaffRole) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Themes':
-        return { themes: { nodes: themes } };
+        return {
+          themes: { nodes: themes },
+          platformThemes: [
+            {
+              handle: 'hatti-base',
+              name: 'Hatti Base',
+              description: 'Light and fast for any shop, on any phone.',
+              descriptionUrdu: 'ہر دکان کے لیے، ہر فون پر ہلکا اور تیز۔',
+            },
+            {
+              handle: 'lawn',
+              name: 'Lawn',
+              description: 'For clothes: large photos, and the season on every page.',
+              descriptionUrdu: 'کپڑوں کے لیے۔',
+            },
+          ],
+        };
       case 'ThemeVersions':
         return {
           theme: {
@@ -176,13 +192,18 @@ describe("The online store's themes", () => {
     type('Name', 'Eid sale');
     fireEvent.click(screen.getByRole('button', { name: 'Add theme' }));
     expect(await screen.findByText('Name: is the name of another theme')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Start from'), { target: { value: '' } });
+    // Or one of Hatti's themes as it comes, said what it is for (ADR-730).
+    fireEvent.change(screen.getByLabelText('Start from'), { target: { value: 'platform:lawn' } });
+    expect(
+      screen.getByText('For clothes: large photos, and the season on every page.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Hatti Base, as it comes' })).toBeTruthy();
     type('Name', 'Winter');
     fireEvent.click(screen.getByRole('button', { name: 'Add theme' }));
     expect(await within(list).findByText('Winter')).toBeTruthy();
     expect(sentOf(fake, 'ThemeCreate')).toEqual([
-      { name: 'Eid sale', copyFrom: 'th_1' },
-      { name: 'Winter', copyFrom: null },
+      { name: 'Eid sale', copyFrom: 'th_1', base: null },
+      { name: 'Winter', copyFrom: null, base: 'lawn' },
     ]);
   });
 

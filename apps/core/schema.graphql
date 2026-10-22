@@ -9503,9 +9503,9 @@ type Mutation {
   taxSettingsUpdate(input: TaxSettingsUpdateInput!): TaxSettingsUpdatePayload!
 
   """
-  A new theme to prepare before publishing it: on the platform theme, or a copy of the files of `copyFrom`, such as the main theme.
+  A new theme to prepare before publishing it: a copy of the files of `copyFrom`, such as the main theme, or one of Hatti's themes as it comes, `base` (`platformThemes`), Hatti Base when neither is given.
   """
-  themeCreate(copyFrom: ID, name: String!): ThemeCreatePayload!
+  themeCreate(base: String, copyFrom: ID, name: String!): ThemeCreatePayload!
 
   """Deletes a theme other than the main one."""
   themeDelete(id: ID!): ThemeDeletePayload!
@@ -12244,6 +12244,26 @@ type PlatformStatus {
 }
 
 """
+One of Hatti's own themes (OS-01, ADR-730), which a shop's theme is built on: Hatti Base, or a theme for one kind of shop built on it.
+"""
+type PlatformTheme {
+  """What it is for, in English."""
+  description: String!
+
+  """What it is for, in Urdu."""
+  descriptionUrdu: String!
+
+  """
+  The theme it is built on, whose sections it shares; null for Hatti Base.
+  """
+  extends: String
+
+  """Its name as a theme keeps it as its `base`: "hatti-base"."""
+  handle: String!
+  name: String!
+}
+
+"""
 A percentage off the shop's chosen products from a time to a time (CAT-17, ADR-443): when it starts, each variant's price is cut to a whole unit and its old price shown as the compare-at price; when it ends, both come back, unless the price was changed by hand meanwhile.
 """
 type PriceSale {
@@ -14269,6 +14289,11 @@ type Query {
   What is wrong at Hatti now, or planned soon (BIL-06, ADR-498): for every member of a shop's staff, whatever their role.
   """
   platformStatus: PlatformStatus!
+
+  """
+  Hatti's own themes a shop may begin a theme with, Hatti Base first (ADR-730).
+  """
+  platformThemes: [PlatformTheme!]!
   priceSale(id: ID!): PriceSale
 
   """The shop's sales, those starting latest first; the newest hundred."""

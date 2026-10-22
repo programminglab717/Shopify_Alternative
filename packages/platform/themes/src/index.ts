@@ -1,6 +1,14 @@
 export { checkShopFile, MOST_SECTIONS } from './check.js';
 export { editorSchemas, type EditorSchemas } from './editor.js';
-export { platformTheme, platformThemeDir } from './platform.js';
+export {
+  allPlatformThemes,
+  isPlatformTheme,
+  libraryOf,
+  platformTheme,
+  platformThemeDir,
+  platformThemes,
+  type PlatformThemeInfo,
+} from './platform.js';
 export {
   imageValue,
   isRichText,

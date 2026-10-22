@@ -392,6 +392,11 @@ from checkout ([ADR-206](./13-decision-log.md#adr-206--each-product-a-shops-link
 | **Bazaar** | Electronics & general | Dense grids, compare, specs tables, installments badge |
 | **Rasoi** | Food, bakery, grocery | Delivery date/slot picker, minimum order, area-based delivery |
 
+Hatti's themes are listed in `themes/library.json`, each a folder under `themes/`; one built on
+another holds only the files it changes, laid over its parent's, its styles in
+`snippets/theme-style.liquid` ([ADR-730](./13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)). Hatti Base and
+Lawn are built; the others follow.
+
 A **theme marketplace** for local designers (paid themes priced in PKR, revenue share) follows in
 the Growth phase.
 

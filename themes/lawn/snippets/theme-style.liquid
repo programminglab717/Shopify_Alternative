@@ -1,0 +1,31 @@
+{%- comment -%}
+  Lawn (ADR-730): Hatti Base dressed for clothes. Serif headings in English, Nastaliq kept in
+  Urdu, portrait photos as clothes are shot, quiet spaced titles and soft buttons.
+{%- endcomment -%}
+{% style %}
+  h1,
+  h2,
+  h3,
+  .card__title {
+    font-family: 'Noto Serif', Georgia, 'Times New Roman', serif;
+    letter-spacing: 0.01em;
+  }
+  html[lang='ur'] h1,
+  html[lang='ur'] h2,
+  html[lang='ur'] h3,
+  html[lang='ur'] .card__title {
+    font-family: var(--font-urdu);
+    letter-spacing: normal;
+  }
+  .card__media {
+    aspect-ratio: 3 / 4;
+  }
+  html:not([lang='ur']) .section-title h2 {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 1.05rem;
+  }
+  .button {
+    border-radius: 999px;
+  }
+{% endstyle %}
