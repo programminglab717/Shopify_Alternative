@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { ReadableStream } from 'node:stream/web';
 import {
@@ -18,6 +19,18 @@ import {
   type Credentials,
   type SigningOptions,
 } from './sigv4.js';
+
+/**
+ * A rule of a bucket's CORS configuration (ADR-733): the origins whose browsers may send the
+ * methods, with the headers, and what they may read of the answer.
+ */
+export interface CorsRule {
+  origins: string[];
+  methods: ('GET' | 'HEAD' | 'PUT' | 'POST' | 'DELETE')[];
+  headers: string[];
+  exposeHeaders: string[];
+  maxAgeSeconds: number;
+}
 
 export interface S3StorageOptions {
   /** The S3 API's address, without the bucket: "https://{account}.r2.cloudflarestorage.com". */
@@ -160,6 +173,65 @@ export class S3Storage extends ObjectStorage {
     } while (token);
   }
 
+  /** The bucket's CORS rules (GetBucketCors); null where it has none. */
+  async cors(): Promise<CorsRule[] | null> {
+    const response = await this.#send('GET', this.#corsUrl());
+    if (response.status === 404) return null;
+    if (!response.ok) throw await failure('GET', '?cors', response);
+    const body = await response.text();
+    const all = (xml: string, tag: string) =>
+      [...xml.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, 'g'))].map(([, value]) =>
+        unescapeXml(value!),
+      );
+    return [...body.matchAll(/<CORSRule>([\s\S]*?)<\/CORSRule>/g)].map(([, rule]) => ({
+      origins: all(rule!, 'AllowedOrigin'),
+      methods: all(rule!, 'AllowedMethod') as CorsRule['methods'],
+      headers: all(rule!, 'AllowedHeader'),
+      exposeHeaders: all(rule!, 'ExposeHeader'),
+      maxAgeSeconds: Number(all(rule!, 'MaxAgeSeconds')[0] ?? 0),
+    }));
+  }
+
+  /** Puts `rules` in place of the bucket's CORS rules (PutBucketCors), as R2 takes them. */
+  async setCors(rules: readonly CorsRule[]): Promise<void> {
+    const element = (tag: string, value: string | number) =>
+      `<${tag}>${escapeXml(String(value))}</${tag}>`;
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?><CORSConfiguration>' +
+      rules
+        .map(
+          (rule) =>
+            '<CORSRule>' +
+            rule.origins.map((origin) => element('AllowedOrigin', origin)).join('') +
+            rule.methods.map((method) => element('AllowedMethod', method)).join('') +
+            rule.headers.map((header) => element('AllowedHeader', header)).join('') +
+            rule.exposeHeaders.map((header) => element('ExposeHeader', header)).join('') +
+            element('MaxAgeSeconds', rule.maxAgeSeconds) +
+            '</CORSRule>',
+        )
+        .join('') +
+      '</CORSConfiguration>';
+    const body = Buffer.from(xml);
+    const response = await this.#send(
+      'PUT',
+      this.#corsUrl(),
+      {
+        'content-type': 'application/xml',
+        'content-length': String(body.length),
+        // S3 asks a bucket's configuration to come with its digest.
+        'content-md5': createHash('md5').update(body).digest('base64'),
+      },
+      body,
+    );
+    if (!response.ok) throw await failure('PUT', '?cors', response);
+  }
+
+  #corsUrl(): URL {
+    const url = new URL(this.#base);
+    url.search = 'cors';
+    return url;
+  }
+
   #url(key: string): URL {
     assertObjectKey(key);
     return new URL(`${this.#base}${uriEncode(key, true)}`);
@@ -205,6 +277,20 @@ export function inlineDisposition(filename: string): string {
 }
 
 /** XML's five entities, as a listing escapes keys. */
+function escapeXml(text: string): string {
+  return text.replace(/[<>&"']/g, (char) =>
+    char === '<'
+      ? '&lt;'
+      : char === '>'
+        ? '&gt;'
+        : char === '&'
+          ? '&amp;'
+          : char === '"'
+            ? '&quot;'
+            : '&apos;',
+  );
+}
+
 function unescapeXml(text: string): string {
   return text.replace(/&(lt|gt|quot|apos|amp);/g, (_, name: string) =>
     name === 'lt' ? '<' : name === 'gt' ? '>' : name === 'quot' ? '"' : name === 'apos' ? "'" : '&',

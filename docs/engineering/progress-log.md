@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The bucket's CORS rule
+
+* **One command sets it** ([ADR-733](../architecture/13-decision-log.md#adr-733--the-buckets-cors-rule-is-set-by-a-command-of-the-cores-for-the-admins-origin-alone-from-admin_url-get-head-and-put-with-a-content-type-compared-before-it-is-put)): `storage-cors show` compares the bucket's CORS rules with
+  the one Hatti needs, the admin's origin from `ADMIN_URL` uploading and reading; `apply` puts it.
+  The S3 client reads and puts a bucket's CORS configuration.
+* **For you**: run `apply` once R2's bucket exists ([OWN-27](./owner-actions.md)).
+* 4019 tests (2 new).
+
 ### 838a320 · The store builder's theme
 
 * **A shop starts on its kind's theme** ([ADR-732](../architecture/13-decision-log.md#adr-732--the-store-builder-starts-a-shop-on-hattis-theme-for-its-kind-lawn-for-fashion-and-bazaar-for-electronics-published-where-the-main-theme-holds-nothing-of-the-shops-own-the-accent-goes-among-that-themes-settings)): the store builder's plan names Lawn for

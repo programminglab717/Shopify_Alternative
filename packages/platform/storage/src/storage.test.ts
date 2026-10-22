@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -256,6 +257,37 @@ describe('S3Storage', () => {
     expect((await text(await storage.stream(KEY))).toString()).toBe('0123456789');
     expect(sent[1]!.headers.range).toBeUndefined();
     expect(await storage.stream('shops/a/missing.mp4')).toBeNull();
+  });
+
+  it("puts the bucket's CORS rules with their digest, and reads them back (ADR-733)", async () => {
+    let kept: string | null = null;
+    const { storage, sent } = storageWith((request) => {
+      if (request.method === 'PUT') {
+        kept = Buffer.from(request.body!).toString();
+        return new Response(null);
+      }
+      return kept === null
+        ? new Response('<Error><Code>NoSuchCORSConfiguration</Code></Error>', { status: 404 })
+        : new Response(kept);
+    });
+    expect(await storage.cors()).toBeNull();
+    const rule = {
+      origins: ['https://admin.hatti.pk'],
+      methods: ['GET', 'HEAD', 'PUT'] as const,
+      headers: ['content-type'],
+      exposeHeaders: ['ETag'],
+      maxAgeSeconds: 3600,
+    };
+    await storage.setCors([{ ...rule, methods: [...rule.methods] }]);
+    const put = sent.find((request) => request.method === 'PUT')!;
+    expect(put.url).toBe('https://acct.r2.cloudflarestorage.com/hatti-files/?cors');
+    expect(put.headers['content-md5']).toBe(createHash('md5').update(put.body!).digest('base64'));
+    expect(put.headers.authorization).toContain('content-md5;content-type;host');
+    expect(kept).toContain('<AllowedOrigin>https://admin.hatti.pk</AllowedOrigin>');
+    expect(await storage.cors()).toEqual([{ ...rule, methods: ['GET', 'HEAD', 'PUT'] }]);
+    await expect(
+      storageWith(() => new Response('denied', { status: 403 })).storage.setCors([]),
+    ).rejects.toThrow('Storage PUT ?cors failed: 403');
   });
 
   it('reads whole objects, and removes a prefix a listing page at a time', async () => {

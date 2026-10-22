@@ -979,6 +979,19 @@ const emailSuppressionSchema = z
   })
   .refine(sesComplete, SES_COMPLETE);
 
+/**
+ * Whoever runs Hatti sets the bucket's CORS rule for the admin's uploads (ADR-733): the bucket
+ * through the S3 API, and where staff use the admin.
+ */
+const storageCorsSchema = z
+  .object({
+    ...storage,
+    STORAGE_DRIVER: z.literal('s3'),
+    /** Where staff use the admin, whose browsers upload straight to the bucket (ADR-268). */
+    ADMIN_URL: env.httpUrl(),
+  })
+  .refine(storageComplete, STORAGE_COMPLETE);
+
 export type ApiConfig = z.output<typeof apiSchema>;
 export type WorkerConfig = z.output<typeof workerSchema>;
 export type SeedConfig = z.output<typeof seedSchema>;
@@ -990,6 +1003,7 @@ export type SupportRequestsConfig = z.output<typeof supportRequestsSchema>;
 export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
 export type TrustReportsConfig = z.output<typeof trustReportsSchema>;
 export type StatusIncidentsConfig = z.output<typeof statusIncidentsSchema>;
+export type StorageCorsConfig = z.output<typeof storageCorsSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
@@ -1010,3 +1024,5 @@ export const loadTrustReportsConfig = (source?: Env): TrustReportsConfig =>
   parseEnv(trustReportsSchema, source);
 export const loadStatusIncidentsConfig = (source?: Env): StatusIncidentsConfig =>
   parseEnv(statusIncidentsSchema, source);
+export const loadStorageCorsConfig = (source?: Env): StorageCorsConfig =>
+  parseEnv(storageCorsSchema, source);

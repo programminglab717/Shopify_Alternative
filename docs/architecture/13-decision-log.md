@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-732 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-733 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -740,6 +740,7 @@
 | 730 | Hatti's themes are a library listed in themes/library.json, a theme built on another holding only the files it changes; a shop begins a theme on any of them, and Lawn, for clothes, is the first built on Hatti Base | Accepted |
 | 731 | Bazaar, for electronics, is Hatti's second theme built on Hatti Base: more products to a row, square photos shown whole on white, and the week's deals first | Accepted |
 | 732 | The store builder starts a shop on Hatti's theme for its kind, Lawn for fashion and Bazaar for electronics, published where the main theme holds nothing of the shop's own; the accent goes among that theme's settings | Accepted |
+| 733 | The bucket's CORS rule is set by a command of the core's, for the admin's origin alone, from ADMIN_URL: GET, HEAD and PUT with a content type, compared before it is put | Accepted |
 
 ---
 
@@ -24964,3 +24965,23 @@
 * **Consequences:** A new fashion or electronics shop opens on its kind's theme in the one tap
   the builder already was. A shop that changed its theme sees the new one beside it and chooses.
   The old main theme stays among the themes, to go back to.
+
+## ADR-733 · The bucket's CORS rule is set by a command of the core's, for the admin's origin alone, from ADMIN_URL: GET, HEAD and PUT with a content type, compared before it is put
+
+* **Context:** The admin's browsers upload files straight to the bucket through URLs the API
+  signs ([ADR-268](#adr-268--merchants-add-a-products-photos-from-its-page-taken-with-the-phones-camera-or-chosen-from-its-gallery-a-large-photo-is-made-2048-pixels-a-side-in-the-browser-before-it-goes-up-straight-to-storage-through-a-signed-url-any-origin-may-use-and-each-is-shown-as-the-core-makes-it-ready-or-says-why-it-could-not)), and read some back. Locally the API's storage answers CORS for
+  any origin; R2 answers it only as the bucket's CORS configuration says, and none was kept
+  anywhere: it was a step left to whoever sets up the bucket, from memory.
+* **Decision:**
+  * **`S3Storage` reads and puts a bucket's CORS rules** through the S3 API (GetBucketCors and
+    PutBucketCors, the configuration sent with its MD5, as S3 asks).
+  * **The rule is Hatti's code's** (`storageCorsRules`): `ADMIN_URL`'s origin alone, GET, HEAD and
+    PUT, the `content-type` header the signed upload names, `ETag` readable, an hour's preflight.
+    The signature, not the origin, is what grants a request; the rule only lets the browser send
+    it.
+  * **`pnpm --filter @hatti/core storage-cors show|apply`**, with the storage settings and
+    `ADMIN_URL`: `show` compares the bucket's rules with Hatti's and exits 1 when they differ;
+    `apply` puts Hatti's in their place where they differ.
+* **Consequences:** Setting up a bucket, or moving the admin, is one command, and a check that can
+  run in a deploy. The storefront and shops' apps upload through the API or from servers, so need
+  no rule. A rule of the operator's own beside Hatti's is replaced by `apply`.

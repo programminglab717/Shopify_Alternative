@@ -12,12 +12,14 @@ import {
   googleAdsOptions,
   loadApiConfig,
   loadBillingTransfersConfig,
+  loadStorageCorsConfig,
   loadSupportRequestsConfig,
   loadWorkerConfig,
   passkeysOf,
   queryCostLimitsOf,
   vapidKeysOf,
 } from './config.js';
+import { storageCorsRules } from './storage.js';
 
 const KEY = 'k'.repeat(32);
 
@@ -478,6 +480,30 @@ describe("Hatti's people's transfers tool (ADR-254)", () => {
     expect(() => loadBillingTransfersConfig({ DATABASE_URL: env.DATABASE_URL })).toThrow(
       'DATABASE_SYSTEM_URL',
     );
+  });
+});
+
+describe("The bucket's CORS rule (ADR-733)", () => {
+  it("reads the bucket and the admin's address, and lets the admin's origin alone upload", () => {
+    const config = loadStorageCorsConfig({ ...R2, ADMIN_URL: 'https://admin.hatti.pk/' });
+    expect(config).toMatchObject({ S3_BUCKET: 'hatti-files', S3_REGION: 'auto' });
+    expect(storageCorsRules(config.ADMIN_URL)).toEqual([
+      {
+        origins: ['https://admin.hatti.pk'],
+        methods: ['GET', 'HEAD', 'PUT'],
+        headers: ['content-type'],
+        exposeHeaders: ['ETag'],
+        maxAgeSeconds: 3600,
+      },
+    ]);
+    // A directory has no CORS to set, and the admin's address is what the rule is for.
+    expect(() => loadStorageCorsConfig({ ADMIN_URL: 'https://admin.hatti.pk' })).toThrow(
+      'STORAGE_DRIVER',
+    );
+    expect(() => loadStorageCorsConfig(R2)).toThrow('ADMIN_URL');
+    expect(() =>
+      loadStorageCorsConfig({ ...R2, S3_BUCKET: undefined, ADMIN_URL: 'https://admin.hatti.pk' }),
+    ).toThrow('S3_BUCKET');
   });
 });
 

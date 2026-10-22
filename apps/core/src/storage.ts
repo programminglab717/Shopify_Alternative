@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
-import { LocalStorage, S3Storage, type ObjectStorage } from '@hatti/storage';
+import { LocalStorage, S3Storage, type CorsRule, type ObjectStorage } from '@hatti/storage';
 import type { StorageConfig } from './config.js';
 
 /** Where the API serves local storage's files: {PUBLIC_URL}/storage/{key}. */
@@ -36,4 +36,21 @@ export function createStorage(config: StorageConfig, publicUrl: string): ObjectS
  */
 export function workerStorage(config: StorageConfig): ObjectStorage {
   return createStorage(config, 'http://localhost');
+}
+
+/**
+ * The bucket's CORS rule (ADR-733): the admin's browsers upload files straight to the bucket
+ * through URLs the API signs (ADR-268), and read them back; no other origin needs to. The
+ * signature, not the origin, is what grants a request: this only lets the browser send it.
+ */
+export function storageCorsRules(adminUrl: string): CorsRule[] {
+  return [
+    {
+      origins: [new URL(adminUrl).origin],
+      methods: ['GET', 'HEAD', 'PUT'],
+      headers: ['content-type'],
+      exposeHeaders: ['ETag'],
+      maxAgeSeconds: 3600,
+    },
+  ];
 }

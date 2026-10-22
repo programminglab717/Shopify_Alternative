@@ -56,6 +56,7 @@ export default defineConfig(
       '**/src/courier-cities.ts',
       '**/src/status-incidents.ts',
       '**/src/trust-reports.ts',
+      '**/src/storage-cors.ts',
       'scripts/**',
     ],
     rules: { 'no-console': 'off' },

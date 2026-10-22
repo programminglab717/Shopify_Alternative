@@ -21,7 +21,12 @@ export {
   type SignedRequest,
   type StoredObject,
 } from './object-storage.js';
-export { S3Storage, inlineDisposition, type S3StorageOptions } from './s3-storage.js';
+export {
+  S3Storage,
+  inlineDisposition,
+  type CorsRule,
+  type S3StorageOptions,
+} from './s3-storage.js';
 export {
   EMPTY_PAYLOAD_SHA256,
   presignUrl,
