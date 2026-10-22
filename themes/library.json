@@ -16,5 +16,14 @@
       "ur": "کپڑوں کے لیے: لمبی تصویریں، نفیس سرخیاں، اور سیزن کی نئی آمد سب سے پہلے۔"
     },
     "extends": "hatti-base"
+  },
+  {
+    "handle": "bazaar",
+    "name": "Bazaar",
+    "description": {
+      "en": "For electronics: more products to a row, square photos on white, and the week's deals first.",
+      "ur": "الیکٹرانکس کے لیے: ایک قطار میں زیادہ چیزیں، سفید پر چوکور تصویریں، اور ہفتے کی ڈیلز سب سے پہلے۔"
+    },
+    "extends": "hatti-base"
   }
 ]

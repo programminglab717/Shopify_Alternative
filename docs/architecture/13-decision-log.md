@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-730 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-731 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -738,6 +738,7 @@
 | 728 | An order confirmation's minute is counted from the order: a message is due since what it tells of happened, when that came before it was queued | Accepted |
 | 729 | Shoppers' largest contentful paint is a storefront histogram, ticketed when phones' p75 passes two seconds; payments' callback objective waits for gateways that say when they were paid | Accepted |
 | 730 | Hatti's themes are a library listed in themes/library.json, a theme built on another holding only the files it changes; a shop begins a theme on any of them, and Lawn, for clothes, is the first built on Hatti Base | Accepted |
+| 731 | Bazaar, for electronics, is Hatti's second theme built on Hatti Base: more products to a row, square photos shown whole on white, and the week's deals first | Accepted |
 
 ---
 
@@ -24915,3 +24916,25 @@
   code. A theme built on Hatti Base cannot leave out one of its sections or templates, only
   change them; one that must is a theme of its own, with `extends` null. Shops cannot move a theme
   to another base: they begin a new theme on it. The second vertical theme is next.
+
+## ADR-731 · Bazaar, for electronics, is Hatti's second theme built on Hatti Base: more products to a row, square photos shown whole on white, and the week's deals first
+
+* **Context:** OS-01's MVP is Hatti Base and two themes for kinds of shop
+  ([04 §3.5](./04-storefront-and-themes.md#35-free-theme-line-up-launch)); Lawn, for clothes, was the
+  first ([ADR-730](#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)). Electronics is the other kind of shop Pakistan's sellers open most
+  often, and the starter kits already have one for it ([ADR-486](#adr-486--vertical-starter-kits-what-a-kind-of-shop-sells-by-its-smart-collections-size-charts-and-main-menu-links-set-up-in-one-go-and-safe-to-apply-again)). Gadgets are shot
+  square on white, shoppers compare many at once, and a title that runs on (model, storage, colour)
+  must not push the price out of sight.
+* **Decision:** **Bazaar**, built on Hatti Base, holding only its settings, home page and
+  `snippets/theme-style.liquid`:
+  * five products to a row on wide screens (four, three and two below, as Hatti Base), each a
+    bordered white card with its photo square and shown whole (`object-fit: contain`), its title
+    kept to two lines and its price bold;
+  * firm corners, bold headings, a slate and blue palette, and the banner dark where it has no
+    picture, so a shop's first page reads before it has photos of its own;
+  * a home page of the week's deals: the banner, ten products of all the shop's products, what
+    the shopper viewed, the WhatsApp questions block and the sign-up.
+* **Consequences:** OS-01's MVP line-up is built; four more themes are V1's. Every theme in the
+  library now has its own templates and settings checked by Theme Check in the themes package's
+  tests, as a shop's copy of them is when saved, so a theme whose home page names a section Hatti
+  Base lacks fails there, not in a shop's storefront.

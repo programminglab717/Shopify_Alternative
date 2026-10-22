@@ -394,8 +394,9 @@ from checkout ([ADR-206](./13-decision-log.md#adr-206--each-product-a-shops-link
 
 Hatti's themes are listed in `themes/library.json`, each a folder under `themes/`; one built on
 another holds only the files it changes, laid over its parent's, its styles in
-`snippets/theme-style.liquid` ([ADR-730](./13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)). Hatti Base and
-Lawn are built; the others follow.
+`snippets/theme-style.liquid` ([ADR-730](./13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)). Hatti Base,
+Lawn for clothes and Bazaar for electronics ([ADR-731](./13-decision-log.md#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)) are
+built, the MVP's three; the others follow at V1.
 
 A **theme marketplace** for local designers (paid themes priced in PKR, revenue share) follows in
 the Growth phase.

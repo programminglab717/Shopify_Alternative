@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Bazaar, for electronics
+
+* **Bazaar** ([ADR-731](../architecture/13-decision-log.md#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)), Hatti's second theme built on Hatti Base: five products to a row, square
+  photos shown whole on white, titles kept to two lines, bold prices, and the week's deals first.
+  With Hatti Base and Lawn it is OS-01's MVP line-up.
+* **Every theme in the library checked**: each one's home page and settings pass Theme Check in
+  the themes package's tests, as a shop's copy of them is checked when saved.
+* 4016 tests (2 new).
+
 ### c958e6d · Hatti's themes, and Lawn
 
 * **A library of Hatti's themes** ([ADR-730](../architecture/13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)): `themes/library.json`, each theme said what it is for

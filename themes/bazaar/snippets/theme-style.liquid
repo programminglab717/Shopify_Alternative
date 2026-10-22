@@ -1,0 +1,56 @@
+{%- comment -%}
+  Bazaar (ADR-731): Hatti Base laid out for electronics. More products to a row, each photo
+  square and whole on white, as gadgets are shot; titles kept to two lines, prices bold, firm
+  corners, and the banner dark where it has no picture.
+{%- endcomment -%}
+{% style %}
+  h1,
+  h2,
+  h3 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .grid {
+    gap: 1rem 0.75rem;
+  }
+  .facets {
+    margin-block-end: 1.25rem;
+  }
+  .card {
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    background: #fff;
+  }
+  .card__media {
+    aspect-ratio: 1 / 1;
+    background: #fff;
+    border-radius: 0.25rem;
+  }
+  .card__media img {
+    object-fit: contain;
+  }
+  .card__title {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 0.9375rem;
+  }
+  .card .price {
+    font-weight: 700;
+  }
+  .button {
+    border-radius: 0.25rem;
+  }
+  html .banner {
+    min-block-size: 16rem;
+    background: #0b1220;
+  }
+  @media (min-width: 1200px) {
+    .grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+{% endstyle %}

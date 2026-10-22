@@ -1,0 +1,30 @@
+{
+  "sections": {
+    "banner": {
+      "type": "image-banner",
+      "settings": {},
+      "blocks": {
+        "heading": { "type": "heading", "settings": { "heading": "This week's deals" } },
+        "text": {
+          "type": "text",
+          "settings": {
+            "text": "Phones, earbuds, watches and chargers, delivered across Pakistan. Pay cash when they arrive."
+          }
+        },
+        "button": {
+          "type": "button",
+          "settings": { "label": "See every deal", "link": "/collections/all" }
+        }
+      },
+      "block_order": ["heading", "text", "button"]
+    },
+    "deals": {
+      "type": "featured-collection",
+      "settings": { "title": "Top deals", "collection": "all", "products_to_show": 10 }
+    },
+    "recently_viewed": { "type": "recently-viewed", "settings": {} },
+    "whatsapp": { "type": "whatsapp-cta", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": {} }
+  },
+  "order": ["banner", "deals", "recently_viewed", "whatsapp", "newsletter"]
+}
