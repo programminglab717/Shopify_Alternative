@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Telling shops of new legal versions
+### 7e0ac8d · Telling shops of new legal versions
 
 * **A new version of Hatti's terms, policies or list of sub-processors is announced** ([ADR-742](../architecture/13-decision-log.md#adr-742--every-shop-is-told-of-a-new-version-of-hattis-terms-policies-or-list-of-sub-processors-at-its-alerts-number-and-by-email-to-its-owner-once-the-worker-records-each-version-the-first-time-it-runs-with-it-and-one-that-follows-an-earlier-version-is-announced-to-the-shops-open-before-it)):
   to every shop open before it, at its alerts number and by email to its owner, in the shop's
