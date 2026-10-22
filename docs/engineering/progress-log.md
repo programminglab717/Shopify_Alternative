@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### The launch load test
+### ba7b2a4 · The launch load test
 
 * **k6 scripts in `ops/load`** ([ADR-735](../architecture/13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own)): shoppers browsing and placing cash-on-delivery orders
   side by side at three times 12 §2's launch peak, 900 page views a second and 450 orders a
