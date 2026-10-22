@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Kundan, Nikhar and Kiryana
+### 7bff433 · Kundan, Nikhar and Kiryana
 
 * **Three more themes** ([ADR-734](../architecture/13-decision-log.md#adr-734--kundan-for-jewellery-nikhar-for-beauty-and-kiryana-for-groceries-complete-hattis-six-themes-one-for-each-starter-kit-which-the-store-builder-starts-each-kind-of-shop-on)), built on Hatti Base: Kundan for jewellery, three larger
   pieces to a row with gold rules; Nikhar for beauty, soft rounded cards on a blush palette;
