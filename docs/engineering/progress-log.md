@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The storefront's and checkout's objectives watched
+### 0f04697 · The storefront's and checkout's objectives watched
 
 * **The storefront sends its telemetry** ([ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)): traces and metrics by OTLP as the service
   `storefront`, started before its server in the image and `pnpm serve`.
