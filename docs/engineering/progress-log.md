@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Hatti's themes, and Lawn
+### c958e6d · Hatti's themes, and Lawn
 
 * **A library of Hatti's themes** ([ADR-730](../architecture/13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)): `themes/library.json`, each theme said what it is for
   in English and Urdu; one built on another holds only the files it changes.
