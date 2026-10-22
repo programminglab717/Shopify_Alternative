@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### A confirmation's minute counted from its order
+### 220b069 · A confirmation's minute counted from its order
 
 * **Messages due since what they tell of** ([ADR-728](../architecture/13-decision-log.md#adr-728--an-order-confirmations-minute-is-counted-from-the-order-a-message-is-due-since-what-it-tells-of-happened-when-that-came-before-it-was-queued)): `dueSince`, given by the worker's news of an
   order placed as the order's event's time, so the outbox's wait counts against confirmations'
