@@ -391,7 +391,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 |---|---|---|
 | `outbox_events` | Daily range partitions | 7 days |
 | `tracking_events` | Monthly range partitions | 18 months, then archived to R2 as Parquet |
-| `messages`, `conversation_messages` | Monthly range partitions | 12 months of content; metadata kept longer |
+| `messages`, `conversation_messages` | Monthly range partitions | 12 months of content; metadata kept longer. Built, unpartitioned: the worker's sweep clears messages' content and deletes conversation and contact messages past 12 months ([ADR-738](./13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)) |
 | `audit_log` | Monthly range partitions | 24 months hot, then archive |
 | `activity_log` | Monthly range partitions, as `audit_log` | 24 months hot, then archive |
 | `webhook_deliveries` | Daily range partitions | 30 days |
@@ -518,7 +518,7 @@ The `events` table above replaces them with V1.
 | Active shop commerce data | Life of the shop | Shop closure + 90 days (export offered), except records legally required to be kept |
 | Tax and accounting records (orders, invoices, refunds) | ≥ 6 years (confirm with counsel) | Automatic purge job after the legal period |
 | Abandoned carts/checkouts | 90 days. Built: a cart 14 days after its last change, a checkout a day after it starts and a browser's proof of a number 30 days after it was proved, deleted by the worker's sweep across shops (ADR-042, ADR-230); a checkout with the number its shopper typed kept 30 days as an abandoned checkout, for its shop and its reminder (CHK-12, ADR-393) | TTL job |
-| Message content | 12 months | Partition drop |
+| Message content | 12 months. Built: a message's variables and error cleared, what customers wrote in the inbox and the contact form deleted ([ADR-738](./13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)) | The worker's sweep; partition drop once partitioned |
 | Storefront analytics raw events | 13 months | TTL |
 | Backups | 35-day PITR + monthly snapshots for 12 months | Rolling |
 | Customer erasure request | Anonymise PII within 30 days; keep financial records with pseudonymised customer. Built: at once, or ten days after it is asked for unless cancelled first, once no order is open; orders keep items, amounts and city under a customer ID that no longer exists (ADR-026, ADR-110) | Merchant action or API |

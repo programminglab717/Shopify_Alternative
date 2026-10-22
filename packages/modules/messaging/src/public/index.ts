@@ -61,6 +61,12 @@ export {
   type WhatsAppCloudOptions,
 } from '../internal/providers.js';
 export {
+  MESSAGE_CONTENT_KEPT,
+  MessageRetention,
+  RETENTION_BATCH,
+  type PurgedCounts,
+} from '../internal/retention.js';
+export {
   MESSAGE_ROUTINGS,
   MessagingSettingsService,
   settingsIn,

@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
+### Messages kept twelve months
+
+* **What messages said goes after twelve months** ([ADR-738](../architecture/13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)), as Hatti's privacy policy says: a
+  message to a customer keeps that it was sent, to whom, how and when, but its variables and
+  error are cleared; what customers wrote in the inbox and through the contact form is deleted,
+  and a conversation left empty with it.
+* **The worker sweeps it** across shops a batch at a time, each shop in its own transaction, by
+  indexes migration 0314 adds.
+* 4040 tests (8 new).
+
 ### 059e7cf · Agreeing to Hatti's terms
 
 * **A shop opens only with its owner's agreement** ([ADR-737](../architecture/13-decision-log.md#adr-737--a-shop-opens-only-once-its-owner-agrees-to-hattis-terms-of-service-acceptable-use-policy-and-data-processing-agreement-as-they-are-now-the-versions-shown-are-sent-with-the-shop-refused-when-stale-and-kept-with-who-agreed-and-from-where)) to Hatti's terms of service,

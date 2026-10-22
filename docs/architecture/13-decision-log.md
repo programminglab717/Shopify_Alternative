@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-737 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-738 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -745,6 +745,7 @@
 | 735 | The launch load test is a k6 script kept in the repository: shoppers browsing and placing cash-on-delivery orders side by side at three times 12 §2's launch peak, held to 12 §1's objectives, against staging's load-test shop, each shopper from an address and a number of its own | Accepted |
 | 736 | Hatti's own terms, privacy policy, acceptable use policy, data processing agreement and sub-processors are versioned texts in a package of their own, served by the core at /legal with their gist in Urdu, and marked drafts while any blank is left for counsel | Accepted |
 | 737 | A shop opens only once its owner agrees to Hatti's terms of service, acceptable use policy and data processing agreement as they are now: the versions shown are sent with the shop, refused when stale, and kept with who agreed and from where | Accepted |
+| 738 | What messages said is kept twelve months: the worker then clears a message to a customer's variables and error, keeping that it was sent, and deletes what customers wrote in the inbox and through the contact form, with conversations left empty | Accepted |
 
 ---
 
@@ -25113,3 +25114,32 @@
   before have none, a shop handed to a new owner or to a partner's client stays under the
   agreement of whoever opened it, and a new version does not yet ask existing owners to agree
   again; each is for when the texts take effect (OWN-41).
+
+## ADR-738 · What messages said is kept twelve months: the worker then clears a message to a customer's variables and error, keeping that it was sent, and deletes what customers wrote in the inbox and through the contact form, with conversations left empty
+
+* **Context:** Hatti's privacy policy and data processing agreement say messages are kept
+  twelve months ([ADR-736](#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)), and 03 §11 planned it, but every message stayed. The
+  plan was to drop monthly partitions; the tables are not partitioned, and a message's metadata
+  is still wanted after its content: the shop's bill counts what was sent
+  ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)), and a customer's history shows it.
+* **Decision:**
+  * **A message to a customer** (`messaging.messages`, WhatsApp, SMS, email or a call) keeps its
+    kind, channel, recipient, status and times; past twelve months its template's `variables`
+    become `{}` and its provider's `error` is cleared, which is what it said.
+  * **What customers wrote** is deleted past twelve months: a conversation's messages by when
+    they were written, and contact form messages by when they came. A conversation left with
+    nothing in it goes too; one that keeps newer messages has its unread count cut to what is
+    left of the customer's.
+  * **`MessageRetention`**, in the messaging module's public surface, finds a batch of each kind
+    with the system role, oldest first, and changes each shop's in its own transaction,
+    repeating the condition, as the checkout's expiry does ([ADR-230](#adr-230--carts-checkouts-and-browsers-proofs-of-a-number-are-deleted-once-past-their-time-by-a-sweep-in-the-worker-across-shops-and-the-longest-expired-first-each-shops-in-its-own-transaction-rather-than-by-shoppers-requests-as-their-shop-gets-new-ones)). A shop
+    that fails is logged and tried again next sweep.
+  * **The worker's `MessageContentRetention`** sweeps every `SWEEP_INTERVAL_MS`, a batch of a
+    thousand at a time until one comes back short. Migration 0314 adds the indexes the sweep
+    reads by: messages still holding content, by when they were made; conversation messages
+    by when written; conversations by their last message; contact messages by when they came.
+* **Consequences:** the twelve months are kept by a sweep rather than by dropping partitions;
+  when the tables are partitioned (03 §6.5) the content can go by partition and the sweep
+  keeps the rest. Support requests to Hatti and their WhatsApp threads
+  ([ADR-560](#adr-560--what-a-shops-staff-write-to-hattis-support-whatsapp-number-is-kept-as-a-request-of-their-shop-threaded-and-hattis-answer-goes-back-on-whatsapp-within-the-day)) are not messages to customers, and are kept as Hatti's support
+  records; backups keep what was purged until they roll over.

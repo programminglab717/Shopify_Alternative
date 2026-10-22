@@ -51,6 +51,7 @@ import {
 import {
   AutomationsService,
   BroadcastsService,
+  MessageRetention,
   MessagesService,
   PushService,
   SmsSendersService,
@@ -126,6 +127,7 @@ import { DomainNotices } from './domain-notices.js';
 import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
+import { MessageContentRetention } from './message-retention.js';
 import { AccountDataFiles } from './account-data-files.js';
 import { ExpiredMemberships } from './expired-memberships.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
@@ -508,6 +510,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => expired.stop());
+    // What messages said cleared, and what customers wrote deleted, after twelve months (ADR-738).
+    const messageRetention = new MessageContentRetention(
+      new MessageRetention(database),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => messageRetention.stop());
     // Shoppers' files of their own data let go once their day is up (ADR-572).
     const accountFiles = new AccountDataFiles(
       new AccountDataExpiry(database, workerStorage(config)),
