@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Messages kept twelve months
+### 98044e3 · Messages kept twelve months
 
 * **What messages said goes after twelve months** ([ADR-738](../architecture/13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)), as Hatti's privacy policy says: a
   message to a customer keeps that it was sent, to whom, how and when, but its variables and
