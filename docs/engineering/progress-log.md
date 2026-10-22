@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Agreeing again
+### bd03f45 · Agreeing again
 
 * **An owner agrees to Hatti's terms again** ([ADR-739](../architecture/13-decision-log.md#adr-739--a-shops-owner-agrees-to-hattis-terms-again-whenever-theirs-for-it-are-not-the-current-versions-after-a-new-version-a-handover-or-for-a-shop-opened-before-agreements-were-kept-asked-above-every-page-of-the-admin-and-recorded-as-on-opening-a-shop)) whenever theirs for a shop is not to the
   current versions: after a new version, when the shop is handed to them, and for shops opened
