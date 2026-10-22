@@ -2,7 +2,14 @@ import { InputChecker, fail, failOne, type MutationResult, type TenantContext } 
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { checkShopFile, editorSchemas, isPlatformTheme, platformTheme } from '@hatti/themes';
+import {
+  checkShopFile,
+  editorSchemas,
+  isPlatformTheme,
+  platformTheme,
+  platformThemes,
+  type PlatformThemeInfo,
+} from '@hatti/themes';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import {
@@ -167,6 +174,29 @@ export class ThemeService {
           : { filename, body, own: true, problems: checkShopFile(platform, filename, body) };
       }),
     };
+  }
+
+  /** Hatti's themes a shop may begin a theme on, in the order they are offered (ADR-730). */
+  library(): Promise<readonly PlatformThemeInfo[]> {
+    return platformThemes();
+  }
+
+  /**
+   * A file of a theme as the storefront reads it (ADR-732): the shop's own, else that of the
+   * platform theme it is built on; null where neither has one.
+   */
+  async fileAsShown(
+    tenant: TenantContext,
+    theme: Pick<ThemeRecord, 'id' | 'base'>,
+    filename: string,
+  ): Promise<string | null> {
+    const [own] = await this.files(tenant, theme.id, [filename]);
+    return own ? own.body : this.platformFile(theme.base, filename);
+  }
+
+  /** A file of the platform theme `base` as it comes; null where it has none. */
+  async platformFile(base: string, filename: string): Promise<string | null> {
+    return (await platformTheme(base)).files[filename] ?? null;
   }
 
   /**

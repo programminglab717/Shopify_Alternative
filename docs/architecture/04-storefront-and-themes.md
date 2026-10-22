@@ -396,7 +396,8 @@ Hatti's themes are listed in `themes/library.json`, each a folder under `themes/
 another holds only the files it changes, laid over its parent's, its styles in
 `snippets/theme-style.liquid` ([ADR-730](./13-decision-log.md#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)). Hatti Base,
 Lawn for clothes and Bazaar for electronics ([ADR-731](./13-decision-log.md#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)) are
-built, the MVP's three; the others follow at V1.
+built, the MVP's three; the others follow at V1. The store builder starts a fashion shop
+on Lawn and an electronics shop on Bazaar ([ADR-732](./13-decision-log.md#adr-732--the-store-builder-starts-a-shop-on-hattis-theme-for-its-kind-lawn-for-fashion-and-bazaar-for-electronics-published-where-the-main-theme-holds-nothing-of-the-shops-own-the-accent-goes-among-that-themes-settings)).
 
 A **theme marketplace** for local designers (paid themes priced in PKR, revenue share) follows in
 the Growth phase.

@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### The store builder's theme
+
+* **A shop starts on its kind's theme** ([ADR-732](../architecture/13-decision-log.md#adr-732--the-store-builder-starts-a-shop-on-hattis-theme-for-its-kind-lawn-for-fashion-and-bazaar-for-electronics-published-where-the-main-theme-holds-nothing-of-the-shops-own-the-accent-goes-among-that-themes-settings)): the store builder's plan names Lawn for
+  fashion, Bazaar for electronics and Hatti Base for the rest; building begins a theme on it,
+  published where the main theme holds nothing of the shop's own, else left beside it.
+* **The accent kept among the theme's settings**: where the shop has no settings file, those of
+  the theme it is built on, so Lawn's palette is not lost to Hatti Base's defaults.
+* **For you**: the themes' look and banner photographs ([OWN-12](./owner-actions.md)).
+* 4017 tests (1 new).
+
 ### c0e6a0f · Bazaar, for electronics
 
 * **Bazaar** ([ADR-731](../architecture/13-decision-log.md#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)), Hatti's second theme built on Hatti Base: five products to a row, square

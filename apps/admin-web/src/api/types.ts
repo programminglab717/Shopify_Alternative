@@ -4667,6 +4667,9 @@ export interface PlatformStatusData {
 /** What the store builder makes of a shop's description (ONB-03, ADR-502). */
 export interface StoreBuildPlanValue {
   kit: 'FASHION' | 'JEWELLERY' | 'BEAUTY' | 'ELECTRONICS' | 'GROCERY' | null;
+  /** Hatti's theme the shop starts on (ADR-732), by handle and name. */
+  theme: string;
+  themeName: string;
   accentColour: string;
   aboutHtml: string;
   seoTitle: string;
@@ -4683,6 +4686,8 @@ export interface StoreBuildData {
     collectionsMade: number;
     sizeChartsMade: number;
     menuLinksAdded: number;
+    /** The theme begun on the plan's; null where the main theme was on it already. */
+    theme: { id: string; name: string; published: boolean } | null;
     accentSet: boolean;
     seoSet: boolean;
     aboutPage: { id: string; handle: string } | null;

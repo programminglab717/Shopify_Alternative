@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-731 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-732 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -739,6 +739,7 @@
 | 729 | Shoppers' largest contentful paint is a storefront histogram, ticketed when phones' p75 passes two seconds; payments' callback objective waits for gateways that say when they were paid | Accepted |
 | 730 | Hatti's themes are a library listed in themes/library.json, a theme built on another holding only the files it changes; a shop begins a theme on any of them, and Lawn, for clothes, is the first built on Hatti Base | Accepted |
 | 731 | Bazaar, for electronics, is Hatti's second theme built on Hatti Base: more products to a row, square photos shown whole on white, and the week's deals first | Accepted |
+| 732 | The store builder starts a shop on Hatti's theme for its kind, Lawn for fashion and Bazaar for electronics, published where the main theme holds nothing of the shop's own; the accent goes among that theme's settings | Accepted |
 
 ---
 
@@ -24938,3 +24939,28 @@
   library now has its own templates and settings checked by Theme Check in the themes package's
   tests, as a shop's copy of them is when saved, so a theme whose home page names a section Hatti
   Base lacks fails there, not in a shop's storefront.
+
+## ADR-732 · The store builder starts a shop on Hatti's theme for its kind, Lawn for fashion and Bazaar for electronics, published where the main theme holds nothing of the shop's own; the accent goes among that theme's settings
+
+* **Context:** The store builder ([ADR-502](#adr-502--the-store-builder-a-shop-set-up-from-a-few-lines-saying-what-it-sells-its-kit-theme-colour-about-us-page-and-home-page-seo-leaving-what-it-set)) reads a shop's kind from a few lines and
+  sets up its kit and the main theme's accent, but every shop stayed on Hatti Base, though Lawn
+  ([ADR-730](#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base)) and Bazaar ([ADR-731](#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)) were made for fashion and
+  electronics. And a theme's settings file replaces the one of the theme it is built on whole: the
+  builder wrote the accent into a file of its own where the shop had none, so on Lawn it would
+  have put Hatti Base's defaults where Lawn's palette was.
+* **Decision:**
+  * **Each kit names a theme**: fashion Lawn, electronics Bazaar, the others Hatti Base, as does a
+    description naming no kind. The plan says which (`theme`, `themeName`) before anything is
+    built, and the admin shows it.
+  * **Building begins a theme on it**, unless the main theme is on it already, and uses again one
+    begun on it before rather than adding another. It is **published** where the main theme
+    holds nothing of the shop's own: no files, or settings that are those of the theme it is
+    built on but for the accent, as the builder leaves them. Otherwise it waits among the themes,
+    and the admin says so: a shop's own work is never put aside by the builder.
+  * **The accent goes among the settings the storefront reads**, the shop's own file or else that
+    of the theme it is built on (`ThemeService.fileAsShown`), so Lawn keeps its palette.
+  * A shop with as many themes as it may keep is left without its kind's theme rather than
+    failing the build.
+* **Consequences:** A new fashion or electronics shop opens on its kind's theme in the one tap
+  the builder already was. A shop that changed its theme sees the new one beside it and chooses.
+  The old main theme stays among the themes, to go back to.

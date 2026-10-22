@@ -21,8 +21,9 @@ const DESCRIPTION =
 
 const BUILD = `mutation ($input: StoreBuildInput!) {
   storeBuild(input: $input) {
-    plan { kit accentColour aboutHtml seoTitle seoDescription }
+    plan { kit theme themeName accentColour aboutHtml seoTitle seoDescription }
     collectionsMade sizeChartsMade menuLinksAdded accentSet seoSet
+    theme { id name published }
     aboutPage { handle }
     userErrors { field code }
   }
@@ -37,6 +38,7 @@ describe('The store builder reads what a shop sells (ONB-03, ADR-502)', () => {
     const plan = planStore('Zari', DESCRIPTION);
     expect(plan).toEqual({
       kit: 'fashion',
+      theme: 'lawn',
       accent: '#9F1239',
       about:
         '<p>Zari sells unstitched lawn suits and printed kurtas from Faisalabad, made for summer.</p>\n' +
@@ -48,6 +50,10 @@ describe('The store builder reads what a shop sells (ONB-03, ADR-502)', () => {
       },
     });
     expect(planStore('Zari', 'x '.repeat(200)).seo.description.length).toBeLessThanOrEqual(160);
+    // Hatti's theme for the shop's kind, Hatti Base where its kind has none (ADR-732).
+    expect(planStore('Volt', 'Phones, chargers and earbuds').theme).toBe('bazaar');
+    expect(planStore('Kundan', 'Handmade kundan jhumkas and bangles').theme).toBe('hatti-base');
+    expect(planStore('Zari', 'We do many things').theme).toBe('hatti-base');
   });
 });
 
@@ -110,9 +116,14 @@ describe.skipIf(!server)('Admin GraphQL API: the store builder (ONB-03, ADR-502)
   it('sets the shop up from its description, keeping what it set, and refuses what is wrong', async () => {
     const plan = await data(
       tokens.products,
-      '{ storeBuildPlan(description: "Lawn suits and kurtas for summer") { kit accentColour } }',
+      '{ storeBuildPlan(description: "Lawn suits and kurtas for summer") { kit theme themeName accentColour } }',
     );
-    expect(plan).toEqual({ kit: 'FASHION', accentColour: '#9F1239' });
+    expect(plan).toEqual({
+      kit: 'FASHION',
+      theme: 'lawn',
+      themeName: 'Lawn',
+      accentColour: '#9F1239',
+    });
     const denied = await gql(tokens.products, BUILD, { input: { description: DESCRIPTION } });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
     expect(
@@ -136,20 +147,32 @@ describe.skipIf(!server)('Admin GraphQL API: the store builder (ONB-03, ADR-502)
 
     const built = await data(tokens.owner, BUILD, { input: { description: DESCRIPTION } });
     expect(built).toMatchObject({
-      plan: { kit: 'FASHION', accentColour: '#9F1239', seoTitle: 'Zari' },
+      plan: { kit: 'FASHION', theme: 'lawn', accentColour: '#9F1239', seoTitle: 'Zari' },
       collectionsMade: 7,
       sizeChartsMade: 2,
       menuLinksAdded: 7,
+      // The main theme held nothing of the shop's own: the shop is on Lawn now (ADR-732).
+      theme: { name: 'Lawn', published: true },
       accentSet: true,
       seoSet: true,
       aboutPage: { handle: 'about-us' },
       userErrors: [],
     });
-    const files = await data(
-      tokens.owner,
-      `{ theme(id: "${theme.theme.id}") { files(filenames: ["config/settings_data.json"]) { body } } }`,
-    );
-    expect(JSON.parse(files.files[0].body).current.color_accent).toBe('#9F1239');
+    const SETTINGS = `query ($id: ID!) {
+      theme(id: $id) { role base files(filenames: ["config/settings_data.json"]) { body } }
+    }`;
+    const lawn = await data(tokens.owner, SETTINGS, { id: built.theme.id });
+    expect(lawn).toMatchObject({ role: 'MAIN', base: 'lawn' });
+    // The accent among Lawn's own settings, not in their place.
+    expect(JSON.parse(lawn.files[0].body).current).toMatchObject({
+      color_accent: '#9F1239',
+      color_background: '#FFFBF5',
+      page_width: 1280,
+    });
+    expect(await data(tokens.owner, SETTINGS, { id: theme.theme.id })).toMatchObject({
+      role: 'UNPUBLISHED',
+      files: [],
+    });
     const preferences = await data(
       tokens.owner,
       '{ onlineStorePreferences { seo { title description } } }',
@@ -167,9 +190,47 @@ describe.skipIf(!server)('Admin GraphQL API: the store builder (ONB-03, ADR-502)
     expect(again).toMatchObject({
       plan: { accentColour: '#0F766E' },
       collectionsMade: 0,
+      theme: null,
       accentSet: true,
       seoSet: false,
       aboutPage: null,
     });
+  });
+
+  it("leaves Hatti's theme for the shop's kind waiting where its theme has work of its own (ADR-732)", async () => {
+    const main = await data(tokens.owner, '{ themes(first: 10, roles: [MAIN]) { nodes { id } } }');
+    const saved = await data(
+      tokens.owner,
+      `mutation ($id: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
+        themeFilesUpsert(themeId: $id, files: $files) { userErrors { code } }
+      }`,
+      {
+        id: main.nodes[0].id,
+        files: [
+          {
+            filename: 'templates/index.json',
+            body: JSON.stringify({ sections: {}, order: [] }),
+          },
+        ],
+      },
+    );
+    expect(saved.userErrors).toEqual([]);
+    const electronics = { description: DESCRIPTION, kit: 'ELECTRONICS' };
+    const bazaar = await data(tokens.owner, BUILD, { input: electronics });
+    expect(bazaar).toMatchObject({
+      plan: { theme: 'bazaar', themeName: 'Bazaar' },
+      theme: { name: 'Bazaar', published: false },
+    });
+    const twice = await data(tokens.owner, BUILD, { input: electronics });
+    expect(twice.theme).toEqual(bazaar.theme);
+    const themes = await data(tokens.owner, '{ themes(first: 10) { nodes { name role } } }');
+    expect(themes.nodes).toEqual(
+      expect.arrayContaining([
+        { name: 'Lawn', role: 'MAIN' },
+        { name: 'Bazaar', role: 'UNPUBLISHED' },
+      ]),
+    );
+    // The shop's first main theme, the one it published, Lawn and Bazaar: none twice.
+    expect(themes.nodes).toHaveLength(4);
   });
 });

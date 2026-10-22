@@ -4780,6 +4780,11 @@ const en = {
   'builder.preview': 'See what it makes',
   'builder.kit': 'Kind of shop: {kit}',
   'builder.noKit': 'Kind of shop: none found in your words; no collections are made',
+  'builder.theme': 'Theme: {name}',
+  'builder.themePublished':
+    'Your store is on {name} now; the theme it was on is among your themes.',
+  'builder.themeWaiting':
+    'Your theme has changes of your own, so {name} waits among your themes for you to look at and publish.',
   'builder.accent': 'Theme colour: {colour}',
   'builder.seo': 'Search engines see: {title} · {description}',
   'builder.about': 'Your About us page',
@@ -10303,6 +10308,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'builder.preview': 'دیکھیں کیا بنے گا',
   'builder.kit': 'دکان کی قسم: {kit}',
   'builder.noKit': 'دکان کی قسم: آپ کے الفاظ سے نہیں ملی؛ کوئی کلیکشن نہیں بنے گا',
+  'builder.theme': 'تھیم: {name}',
+  'builder.themePublished': 'آپ کی دکان اب {name} پر ہے؛ پہلے والی تھیم آپ کی تھیمز میں موجود ہے۔',
+  'builder.themeWaiting':
+    'آپ کی تھیم میں آپ کی اپنی تبدیلیاں ہیں، اس لیے {name} آپ کی تھیمز میں ہے؛ دیکھ کر شائع کریں۔',
   'builder.accent': 'تھیم کا رنگ: {colour}',
   'builder.seo': 'سرچ انجن دیکھیں گے: {title} · {description}',
   'builder.about': 'آپ کا "ہمارے بارے میں" صفحہ',

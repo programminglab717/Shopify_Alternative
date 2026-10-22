@@ -9711,6 +9711,8 @@ export const PlatformStatusQuery = /* GraphQL */ `
 const STORE_BUILD_PLAN = /* GraphQL */ `
   fragment StoreBuildPlanParts on StoreBuildPlan {
     kit
+    theme
+    themeName
     accentColour
     aboutHtml
     seoTitle
@@ -9738,6 +9740,11 @@ export const StoreBuildMutation = /* GraphQL */ `
       collectionsMade
       sizeChartsMade
       menuLinksAdded
+      theme {
+        id
+        name
+        published
+      }
       accentSet
       seoSet
       aboutPage {

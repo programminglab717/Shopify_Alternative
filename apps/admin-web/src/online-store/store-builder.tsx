@@ -101,6 +101,7 @@ export function StoreBuilderTab() {
               ? t('builder.kit', { kit: t(`builder.kit.${plan.kit}`) })
               : t('builder.noKit')}
           </p>
+          <p>{t('builder.theme', { name: plan.themeName })}</p>
           <p className="flex items-center gap-2">
             <span
               aria-hidden
@@ -145,6 +146,13 @@ export function StoreBuilderTab() {
               ? t('builder.aboutMade', { handle: done.aboutPage.handle })
               : t('builder.aboutKept')}
           </p>
+          {done.theme && (
+            <p>
+              {t(done.theme.published ? 'builder.themePublished' : 'builder.themeWaiting', {
+                name: done.theme.name,
+              })}
+            </p>
+          )}
           {!done.seoSet && <p>{t('builder.seoKept')}</p>}
         </Alert>
       )}

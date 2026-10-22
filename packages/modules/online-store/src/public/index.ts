@@ -143,6 +143,8 @@ export {
   type ListThemesOptions,
   type ThemeFileInput,
 } from '../internal/theme.service.js';
+/** One of Hatti's themes, as the library lists it (ADR-730). */
+export type { PlatformThemeInfo } from '@hatti/themes';
 export { REDIRECT_LIMIT, redirectPath, redirectTarget } from '../internal/redirect-paths.js';
 export { toShopPolicy, toShopPolicyVersion } from '../internal/graphql/mappers.js';
 export {

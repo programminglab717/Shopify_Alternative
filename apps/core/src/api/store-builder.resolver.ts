@@ -17,7 +17,7 @@ import {
   Query,
   Resolver,
 } from '@nestjs/graphql';
-import { STORE_BUILDER_LIMITS, StoreBuilderService, type StorePlan } from './store-builder.js';
+import { STORE_BUILDER_LIMITS, StoreBuilderService, type PlannedStore } from './store-builder.js';
 import { StarterKit } from './starter-kits.resolver.js';
 import type { StarterKitValue } from './starter-kits.js';
 
@@ -28,6 +28,16 @@ export class StoreBuildPlan {
     description: 'The starter kit its words call for most; null when they call for none.',
   })
   kit!: StarterKit | null;
+
+  @Field({
+    description:
+      "The handle of Hatti's theme the shop starts on, made for its kind, such as lawn; " +
+      'hatti-base where its kind has none (ADR-732).',
+  })
+  theme!: string;
+
+  @Field({ description: "That theme's name, as Hatti's library calls it, such as Lawn." })
+  themeName!: string;
 
   @Field({ description: "The main theme's accent colour, such as #9F1239." })
   accentColour!: string;
@@ -51,6 +61,24 @@ export class StoreBuildPage {
   handle!: string;
 }
 
+@ObjectType({
+  description: "A theme the store builder began on Hatti's theme for the shop's kind.",
+})
+export class StoreBuildTheme {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  name!: string;
+
+  @Field({
+    description:
+      "Whether it was published: so where the main theme held nothing of the shop's own but " +
+      'its accent; else it waits among the themes for the owner to look at and publish.',
+  })
+  published!: boolean;
+}
+
 @ObjectType()
 export class StoreBuildPayload {
   @Field(() => StoreBuildPlan, { nullable: true, description: 'Null when nothing was done.' })
@@ -64,6 +92,12 @@ export class StoreBuildPayload {
 
   @Field(() => Int)
   menuLinksAdded!: number;
+
+  @Field(() => StoreBuildTheme, {
+    nullable: true,
+    description: "The theme begun on the plan's; null where the main theme is on it already.",
+  })
+  theme!: StoreBuildTheme | null;
 
   @Field({ description: 'Whether the main theme took the accent; false where there is none.' })
   accentSet!: boolean;
@@ -124,9 +158,11 @@ function checked(input: StoreBuildInput) {
   return { check, description, accent };
 }
 
-function toPlan(plan: StorePlan): StoreBuildPlan {
+function toPlan(plan: PlannedStore): StoreBuildPlan {
   return Object.assign(new StoreBuildPlan(), {
     kit: plan.kit as StarterKit | null,
+    theme: plan.theme,
+    themeName: plan.themeName,
     accentColour: plan.accent,
     aboutHtml: plan.about,
     seoTitle: plan.seo.title,
@@ -141,8 +177,8 @@ export class StoreBuilderResolver {
 
   @Query(() => StoreBuildPlan, {
     description:
-      "What storeBuild would make of the shop's description (ONB-03): its kit, accent, About " +
-      'us page and home page SEO. Changes nothing.',
+      "What storeBuild would make of the shop's description (ONB-03): its kit, theme, accent, " +
+      'About us page and home page SEO. Changes nothing.',
   })
   @RequireScopes('read_products')
   async storeBuildPlan(
@@ -155,9 +191,11 @@ export class StoreBuilderResolver {
   @Mutation(() => StoreBuildPayload, {
     description:
       'Sets the shop up from a few lines saying what it sells (ONB-03, ADR-502): the starter kit ' +
-      "its words call for, or the one given (ADR-486); the kit's accent, or the one given, in " +
-      "the main theme's settings; an About us page of the lines; and the home page's SEO. A " +
-      'page at about-us, and SEO the shop set, are left as they are.',
+      "its words call for, or the one given (ADR-486); a theme on Hatti's theme for its kind, " +
+      'published where the main theme holds nothing of its own but its accent (ADR-732); ' +
+      "the kit's accent, or the one given, in the main theme's settings; an About us page of " +
+      "the lines; and the home page's SEO. A page at about-us, and SEO the shop set, are left " +
+      'as they are.',
   })
   @RequireScopes(
     'write_products',
@@ -177,6 +215,7 @@ export class StoreBuilderResolver {
         collectionsMade: 0,
         sizeChartsMade: 0,
         menuLinksAdded: 0,
+        theme: null,
         accentSet: false,
         aboutPage: null,
         seoSet: false,
@@ -191,6 +230,7 @@ export class StoreBuilderResolver {
     return Object.assign(new StoreBuildPayload(), {
       ...built,
       plan: toPlan(built.plan),
+      theme: built.theme && { ...built.theme, id: toPublicId('theme', built.theme.id) },
       aboutPage: built.aboutPage && {
         id: toPublicId('page', built.aboutPage.id),
         handle: built.aboutPage.handle,

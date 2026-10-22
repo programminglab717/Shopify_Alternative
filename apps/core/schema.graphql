@@ -9449,7 +9449,7 @@ type Mutation {
   starterKitApply(kit: StarterKit!): StarterKitApplyPayload!
 
   """
-  Sets the shop up from a few lines saying what it sells (ONB-03, ADR-502): the starter kit its words call for, or the one given (ADR-486); the kit's accent, or the one given, in the main theme's settings; an About us page of the lines; and the home page's SEO. A page at about-us, and SEO the shop set, are left as they are.
+  Sets the shop up from a few lines saying what it sells (ONB-03, ADR-502): the starter kit its words call for, or the one given (ADR-486); a theme on Hatti's theme for its kind, published where the main theme holds nothing of its own but its accent (ADR-732); the kit's accent, or the one given, in the main theme's settings; an About us page of the lines; and the home page's SEO. A page at about-us, and SEO the shop set, are left as they are.
   """
   storeBuild(input: StoreBuildInput!): StoreBuildPayload!
 
@@ -14557,7 +14557,7 @@ type Query {
   starterKits: [StarterKitPreview!]!
 
   """
-  What storeBuild would make of the shop's description (ONB-03): its kit, accent, About us page and home page SEO. Changes nothing.
+  What storeBuild would make of the shop's description (ONB-03): its kit, theme, accent, About us page and home page SEO. Changes nothing.
   """
   storeBuildPlan(description: String!): StoreBuildPlan!
 
@@ -16414,6 +16414,11 @@ type StoreBuildPayload {
   """Whether the home page's SEO was set; false where the shop set its own."""
   seoSet: Boolean!
   sizeChartsMade: Int!
+
+  """
+  The theme begun on the plan's; null where the main theme is on it already.
+  """
+  theme: StoreBuildTheme
   userErrors: [UserError!]!
 }
 
@@ -16433,6 +16438,25 @@ type StoreBuildPlan {
 
   """What search engines are told of the home page: the shop's name."""
   seoTitle: String!
+
+  """
+  The handle of Hatti's theme the shop starts on, made for its kind, such as lawn; hatti-base where its kind has none (ADR-732).
+  """
+  theme: String!
+
+  """That theme's name, as Hatti's library calls it, such as Lawn."""
+  themeName: String!
+}
+
+"""A theme the store builder began on Hatti's theme for the shop's kind."""
+type StoreBuildTheme {
+  id: ID!
+  name: String!
+
+  """
+  Whether it was published: so where the main theme held nothing of the shop's own but its accent; else it waits among the themes for the owner to look at and publish.
+  """
+  published: Boolean!
 }
 
 """
