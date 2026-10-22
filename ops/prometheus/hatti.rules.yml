@@ -1,4 +1,4 @@
-# Hatti's recording rules and alerts (ADR-725, ADR-726), over the metrics the core and the
+# Hatti's recording rules and alerts (ADR-725, ADR-726, ADR-727), over the metrics the core and the
 # storefront send by OTLP, as Prometheus names them: dots become underscores, the unit and _total
 # are appended, and the job is service.namespace/service.name, such as hatti/core-api. Each alert's
 # runbook is a section of docs/engineering/runbooks.md.
@@ -368,6 +368,244 @@ groups:
             {{ $value | humanizePercentage }} of checkout forms sent took over 800 ms; the objective
             allows 5%.
           runbook: docs/engineering/runbooks.md#hatticheckoutplacementlatencybudgetburn
+
+  # The worker's objectives (12 §1, ADR-727), each 99% over 30 days: webhook deliveries first
+  # tried within a minute of being made, whatever the app then answers; order confirmations (the
+  # message asking to confirm, or saying the order was placed) sent within a minute of being due;
+  # and courier bookings booked within five minutes of being asked for, apart from those the
+  # courier made wait by refusing a try. Bucket bounds are matched as "60" or "60.0", as
+  # Prometheus's OTLP translation and its text format's normalisation may each write them.
+  - name: hatti-worker-slis
+    interval: 1m
+    rules:
+      - record: hatti:webhooks_first_try_late:ratio_rate5m
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[5m]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[5m]))
+          )
+      - record: hatti:webhooks_first_try_late:ratio_rate30m
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[30m]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[30m]))
+          )
+      - record: hatti:webhooks_first_try_late:ratio_rate1h
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[1h]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[1h]))
+          )
+      - record: hatti:webhooks_first_try_late:ratio_rate2h
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[2h]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[2h]))
+          )
+      - record: hatti:webhooks_first_try_late:ratio_rate6h
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[6h]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[6h]))
+          )
+      - record: hatti:webhooks_first_try_late:ratio_rate1d
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[1d]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[1d]))
+          )
+      - record: hatti:webhooks_first_try_late:ratio_rate3d
+        expr: |
+          1 - (
+            sum(rate(hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le=~"60|60\\.0"}[3d]))
+            /
+            sum(rate(hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}[3d]))
+          )
+      - record: hatti:confirmations_late:ratio_rate5m
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[5m]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[5m]))
+          )
+      - record: hatti:confirmations_late:ratio_rate30m
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[30m]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[30m]))
+          )
+      - record: hatti:confirmations_late:ratio_rate1h
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[1h]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[1h]))
+          )
+      - record: hatti:confirmations_late:ratio_rate2h
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[2h]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[2h]))
+          )
+      - record: hatti:confirmations_late:ratio_rate6h
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[6h]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[6h]))
+          )
+      - record: hatti:confirmations_late:ratio_rate1d
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[1d]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[1d]))
+          )
+      - record: hatti:confirmations_late:ratio_rate3d
+        expr: |
+          1 - (
+            sum(rate(hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email",le=~"60|60\\.0"}[3d]))
+            /
+            sum(rate(hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind=~"order_placed|order_confirmation",channel!="email"}[3d]))
+          )
+      - record: hatti:bookings_late:ratio_rate5m
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[5m]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[5m]))
+          )
+      - record: hatti:bookings_late:ratio_rate30m
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[30m]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[30m]))
+          )
+      - record: hatti:bookings_late:ratio_rate1h
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[1h]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[1h]))
+          )
+      - record: hatti:bookings_late:ratio_rate2h
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[2h]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[2h]))
+          )
+      - record: hatti:bookings_late:ratio_rate6h
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[6h]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[6h]))
+          )
+      - record: hatti:bookings_late:ratio_rate1d
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[1d]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[1d]))
+          )
+      - record: hatti:bookings_late:ratio_rate3d
+        expr: |
+          1 - (
+            sum(rate(hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",retried="false",le=~"300|300\\.0"}[3d]))
+            /
+            sum(rate(hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",retried="false"}[3d]))
+          )
+
+  - name: hatti-worker-slos
+    rules:
+      - alert: HattiWebhookFirstTryBudgetBurn
+        expr: |
+          (hatti:webhooks_first_try_late:ratio_rate1h > 14.4 * 0.01 and hatti:webhooks_first_try_late:ratio_rate5m > 14.4 * 0.01)
+          or
+          (hatti:webhooks_first_try_late:ratio_rate6h > 6 * 0.01 and hatti:webhooks_first_try_late:ratio_rate30m > 6 * 0.01)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Webhook deliveries wait fast enough to spend the month's budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of webhook deliveries were first tried over a minute after they were made; the objective allows 1%.
+          runbook: docs/engineering/runbooks.md#hattiwebhookfirsttrybudgetburn
+      - alert: HattiWebhookFirstTryBudgetBurnSlow
+        expr: |
+          (hatti:webhooks_first_try_late:ratio_rate1d > 3 * 0.01 and hatti:webhooks_first_try_late:ratio_rate2h > 3 * 0.01)
+          or
+          (hatti:webhooks_first_try_late:ratio_rate3d > 0.01 and hatti:webhooks_first_try_late:ratio_rate6h > 0.01)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Webhook deliveries wait often enough to spend the month's budget
+          description: >-
+            {{ $value | humanizePercentage }} of webhook deliveries were first tried over a minute after they were made; the objective allows 1%.
+          runbook: docs/engineering/runbooks.md#hattiwebhookfirsttrybudgetburn
+      - alert: HattiConfirmationMessageBudgetBurn
+        expr: |
+          (hatti:confirmations_late:ratio_rate1h > 14.4 * 0.01 and hatti:confirmations_late:ratio_rate5m > 14.4 * 0.01)
+          or
+          (hatti:confirmations_late:ratio_rate6h > 6 * 0.01 and hatti:confirmations_late:ratio_rate30m > 6 * 0.01)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Order confirmations go late fast enough to spend the month's budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of order confirmations were sent over a minute after they were due; the objective allows 1%.
+          runbook: docs/engineering/runbooks.md#hatticonfirmationmessagebudgetburn
+      - alert: HattiConfirmationMessageBudgetBurnSlow
+        expr: |
+          (hatti:confirmations_late:ratio_rate1d > 3 * 0.01 and hatti:confirmations_late:ratio_rate2h > 3 * 0.01)
+          or
+          (hatti:confirmations_late:ratio_rate3d > 0.01 and hatti:confirmations_late:ratio_rate6h > 0.01)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Order confirmations go late often enough to spend the month's budget
+          description: >-
+            {{ $value | humanizePercentage }} of order confirmations were sent over a minute after they were due; the objective allows 1%.
+          runbook: docs/engineering/runbooks.md#hatticonfirmationmessagebudgetburn
+      - alert: HattiCourierBookingBudgetBurn
+        expr: |
+          (hatti:bookings_late:ratio_rate1h > 14.4 * 0.01 and hatti:bookings_late:ratio_rate5m > 14.4 * 0.01)
+          or
+          (hatti:bookings_late:ratio_rate6h > 6 * 0.01 and hatti:bookings_late:ratio_rate30m > 6 * 0.01)
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: Courier bookings are slow fast enough to spend the month's budget in days
+          description: >-
+            {{ $value | humanizePercentage }} of courier bookings took over five minutes, the courier not refusing; the objective allows 1%.
+          runbook: docs/engineering/runbooks.md#hatticourierbookingbudgetburn
+      - alert: HattiCourierBookingBudgetBurnSlow
+        expr: |
+          (hatti:bookings_late:ratio_rate1d > 3 * 0.01 and hatti:bookings_late:ratio_rate2h > 3 * 0.01)
+          or
+          (hatti:bookings_late:ratio_rate3d > 0.01 and hatti:bookings_late:ratio_rate6h > 0.01)
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Courier bookings are slow often enough to spend the month's budget
+          description: >-
+            {{ $value | humanizePercentage }} of courier bookings took over five minutes, the courier not refusing; the objective allows 1%.
+          runbook: docs/engineering/runbooks.md#hatticourierbookingbudgetburn
 
   - name: hatti-events
     rules:

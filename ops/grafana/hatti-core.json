@@ -838,6 +838,304 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "Webhooks, confirmations and bookings (objectives, each 99%: webhooks first tried within a minute; confirmations sent within a minute; bookings within five minutes; 30 days)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Webhook tries by outcome",
+      "description": "Webhook deliveries tried a second, by how the try went.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 61
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (outcome) (rate(hatti_webhooks_tries_total{job=\"hatti/core-worker\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Courier bookings p95 by courier",
+      "description": "The time from a booking being asked for to its being booked, at the first try, the slowest twentieth.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 61
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, courier) (rate(hatti_couriers_booking_delay_seconds_bucket{job=\"hatti/core-worker\",retried=\"false\"}[$__rate_interval])))",
+          "legendFormat": "{{courier}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Webhook budget left, 30 days",
+      "description": "How much of the month's allowance of deliveries first tried late (1%) is left.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 69
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - (1 - sum(increase(hatti_webhooks_first_try_delay_seconds_bucket{job=\"hatti/core-worker\",le=~\"60|60\\\\.0\"}[30d])) / sum(increase(hatti_webhooks_first_try_delay_seconds_count{job=\"hatti/core-worker\"}[30d]))) / 0.01",
+          "legendFormat": "left"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Confirmation budget left, 30 days",
+      "description": "How much of the month's allowance of order confirmations sent late (1%) is left.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 69
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - (1 - sum(increase(hatti_messages_send_delay_seconds_bucket{job=\"hatti/core-worker\",kind=~\"order_placed|order_confirmation\",channel!=\"email\",le=~\"60|60\\\\.0\"}[30d])) / sum(increase(hatti_messages_send_delay_seconds_count{job=\"hatti/core-worker\",kind=~\"order_placed|order_confirmation\",channel!=\"email\"}[30d]))) / 0.01",
+          "legendFormat": "left"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "Booking budget left, 30 days",
+      "description": "How much of the month's allowance of bookings over five minutes (1%) is left.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 69
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - (1 - sum(increase(hatti_couriers_booking_delay_seconds_bucket{job=\"hatti/core-worker\",retried=\"false\",le=~\"300|300\\\\.0\"}[30d])) / sum(increase(hatti_couriers_booking_delay_seconds_count{job=\"hatti/core-worker\",retried=\"false\"}[30d]))) / 0.01",
+          "legendFormat": "left"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "Burn rates, last hour",
+      "description": "How many times faster than the month allows each budget is being spent; the page fires above 14.4.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 69
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "hatti:webhooks_first_try_late:ratio_rate1h / 0.01",
+          "legendFormat": "webhooks"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "hatti:confirmations_late:ratio_rate1h / 0.01",
+          "legendFormat": "confirmations"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "hatti:bookings_late:ratio_rate1h / 0.01",
+          "legendFormat": "bookings"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
     }
   ]
 }

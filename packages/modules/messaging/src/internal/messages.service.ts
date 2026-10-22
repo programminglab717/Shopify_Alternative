@@ -4,6 +4,7 @@ import { appendEvent } from '@hatti/events';
 import { isUuid } from '@hatti/ids';
 import { maskPkMobile } from '@hatti/pk';
 import { Injectable, Optional } from '@nestjs/common';
+import { metrics } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
 import { MessageCharges, chargedFor, messageCostOf } from './charges.js';
 import { emailStatusOf } from './email-events.js';
@@ -30,6 +31,9 @@ import {
 // while its channel cannot take it yet; sent by SMS instead when WhatsApp cannot deliver it; and
 // followed to delivery through WhatsApp's webhooks. The news of an order goes by email too, to the
 // address its customer gave (ADR-181): a copy of its own, queued with it.
+
+/** The buckets of {@link MessagesService}'s send delays, in seconds. */
+export const MESSAGE_SEND_DELAY_BUCKETS = [1, 5, 10, 15, 30, 45, 60, 120, 300, 900, 3600];
 
 export const MESSAGE_STATUSES = [
   'pending',
@@ -193,11 +197,11 @@ export async function queueMessageIn(
   const { rows } = await tx.execute<{ id: string }>(sql`
     INSERT INTO messaging.messages
            (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-            dedupe_key, broadcast_id, next_attempt_at)
+            dedupe_key, broadcast_id, next_attempt_at, due_at)
     VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
             ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
             ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null},
-            coalesce(${notBefore}::timestamptz, now()))
+            coalesce(${notBefore}::timestamptz, now()), coalesce(${notBefore}::timestamptz, now()))
         ON CONFLICT (shop_id, dedupe_key) DO NOTHING
     RETURNING id`);
   const id = rows[0]?.id ?? null;
@@ -211,11 +215,11 @@ export async function queueMessageIn(
     await tx.execute(sql`
       INSERT INTO messaging.messages
              (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-              dedupe_key, next_attempt_at)
+              dedupe_key, next_attempt_at, due_at)
       VALUES (${shopId}, ${message.kind}, 'email', ${email}, ${language},
               ${JSON.stringify(variables)}::jsonb, ${message.orderId ?? null},
               ${message.customerId ?? null}, ${`${message.dedupeKey}:email`},
-              coalesce(${notBefore}::timestamptz, now()))
+              coalesce(${notBefore}::timestamptz, now()), coalesce(${notBefore}::timestamptz, now()))
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
   }
   return id;
@@ -223,6 +227,19 @@ export async function queueMessageIn(
 
 @Injectable()
 export class MessagesService {
+  /**
+   * How long after it was due a message went, by kind and channel: order confirmations are to go
+   * within a minute of the order (12 §1, ADR-727). Those queued before due_at was kept, and the
+   * SMS sent in place of a WhatsApp message, are not counted.
+   */
+  readonly #sendDelays = metrics
+    .getMeter('hatti.messaging')
+    .createHistogram('hatti.messages.send.delay', {
+      unit: 's',
+      description: 'From a message being due to its being sent, by kind and channel',
+      advice: { explicitBucketBoundaries: MESSAGE_SEND_DELAY_BUCKETS },
+    });
+
   constructor(
     private readonly db: Database,
     /** What the shop's messages are paid from (ADR-155); without it, nothing is charged. */
@@ -406,11 +423,18 @@ export class MessagesService {
           kind: MessageKind;
           language: MessageLanguage;
           variables: MessageVariables;
+          due_at: string | Date | null;
         }>(sql`
           UPDATE messaging.messages SET ${set}
            WHERE shop_id = ${shopId} AND id = ${outcome.id} AND status = 'pending'
-          RETURNING channel, kind, language, variables`);
+          RETURNING channel, kind, language, variables, due_at`);
         if (rows.length === 0 || outcome.status === 'pending') continue;
+        if (outcome.status === 'sent' && rows[0]!.due_at !== null) {
+          this.#sendDelays.record((at.getTime() - toDate(rows[0]!.due_at).getTime()) / 1000, {
+            kind: rows[0]!.kind,
+            channel: rows[0]!.channel,
+          });
+        }
         if (outcome.status === 'sent' && this.charges && chargedFor(rows[0]!)) {
           await this.charges.chargeIn(tx, shopId, outcome.id, messageCostOf(rows[0]!));
         }

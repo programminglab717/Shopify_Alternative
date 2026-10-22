@@ -10,6 +10,7 @@ import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit, type DomainEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
+import { metrics } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
 import { sealedFor } from './apps.js';
 import { WebhookEvents, type WebhookSubscriptionChangedPayload } from './events.js';
@@ -138,6 +139,12 @@ async function subscriptionsIn(
 
 const NOT_FOUND = 'No webhook subscription of the shop has this ID';
 
+/**
+ * How long after it was made a delivery is first tried, in seconds: its objective is a minute
+ * (12 §1, ADR-727), whatever the app then answers.
+ */
+export const WEBHOOK_FIRST_TRY_BUCKETS = [1, 5, 10, 15, 30, 45, 60, 120, 300, 600, 1800];
+
 /** A delivery claimed for a try, with where it goes and what signs it. */
 type DueRow = {
   shop_id: string;
@@ -162,6 +169,16 @@ type DueRow = {
  */
 @Injectable()
 export class WebhookService {
+  readonly #meter = metrics.getMeter('hatti.apps');
+  readonly #tries = this.#meter.createCounter('hatti.webhooks.tries', {
+    description: 'Webhook deliveries tried, by outcome: delivered, retrying or failed',
+  });
+  readonly #firstTries = this.#meter.createHistogram('hatti.webhooks.first_try.delay', {
+    unit: 's',
+    description: 'From a webhook delivery being made to its first try',
+    advice: { explicitBucketBoundaries: WEBHOOK_FIRST_TRY_BUCKETS },
+  });
+
   constructor(
     private readonly db: Database,
     private readonly box: SecretBox,
@@ -375,6 +392,9 @@ export class WebhookService {
     });
 
     for (const row of due) {
+      if (row.attempts === 1) {
+        this.#firstTries.record((at.getTime() - toDate(row.created_at).getTime()) / 1000);
+      }
       const outcome = await this.#try(sender, row, at);
       const givenUp =
         outcome.error !== null &&
@@ -389,6 +409,7 @@ export class WebhookService {
                  next_attempt_at = ${new Date(at.getTime() + retryDelayMs(row.attempts))}
            WHERE shop_id = ${row.shop_id} AND id = ${row.id}`),
       );
+      this.#tries.add(1, { outcome: status === 'pending' ? 'retrying' : status });
       if (status === 'delivered') sweep.delivered += 1;
       else if (status === 'failed') sweep.failed += 1;
       else sweep.retrying += 1;

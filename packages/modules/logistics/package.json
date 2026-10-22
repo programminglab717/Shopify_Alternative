@@ -32,6 +32,7 @@
     "@hatti/pk": "workspace:*",
     "@hatti/storage": "workspace:*",
     "@hatti/xlsx": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {
@@ -43,6 +44,7 @@
   "devDependencies": {
     "@hatti/catalog": "workspace:*",
     "@hatti/customers": "workspace:*",
+    "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",

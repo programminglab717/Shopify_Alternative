@@ -3,6 +3,7 @@ import type { MutationResult, TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { collectMetrics } from '@hatti/telemetry/testing';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MessageCharges, type MessageCost } from './charges.js';
@@ -11,6 +12,8 @@ import { MessagesService, type MessageToQueue } from './messages.service.js';
 import { MessagingSettingsService } from './settings.service.js';
 
 const server = testDatabaseServer();
+// Before the services that record them are made.
+const recorded = collectMetrics();
 
 const AYESHA = '+923001234567';
 const BILAL = '+923217654321';
@@ -506,6 +509,38 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     await messages.claim(a.shopId, soon(), 10, 300_000);
     expect(await supersede(`order_placed:${taken}`)).toBe(false);
     expect(await supersede(`order_placed:${order}`)).toBe(false);
+  });
+
+  it('counts how long after it was due each message went, from its time if it was held (ADR-727)', async () => {
+    const placedOnes = async () => {
+      const points = await recorded.histogram('hatti.messages.send.delay');
+      const point = points.find(
+        (each) => each.attributes.kind === 'order_placed' && each.attributes.channel === 'whatsapp',
+      );
+      return (bound: number | 'count') =>
+        point === undefined ? 0 : bound === 'count' ? point.count : point.atMost.get(bound)!;
+    };
+    const before = await placedOnes();
+    const now = Date.now();
+    const [first, held] = [newId(), newId()];
+    await messages.queue(a.shopId, placed(first));
+    const later = new Date(now + 10 * 60_000);
+    await messages.queue(a.shopId, { ...placed(held), notBefore: later });
+    const sent = (id: string) => ({
+      id,
+      status: 'sent' as const,
+      provider: 'whatsapp_cloud',
+      providerMessageId: `wamid.${id}`,
+    });
+    // Forty seconds after it was queued; the held one twenty seconds after its time.
+    const [queued] = await messages.claim(a.shopId, new Date(now + 1_000), 10, 300_000);
+    await messages.settle(a.shopId, [sent(queued!.id)], new Date(now + 40_000));
+    const [waited] = await messages.claim(a.shopId, new Date(later.getTime() + 1_000), 10, 1);
+    await messages.settle(a.shopId, [sent(waited!.id)], new Date(later.getTime() + 20_000));
+
+    const after = await placedOnes();
+    const added = (bound: number | 'count') => after(bound) - before(bound);
+    expect([added('count'), added(15), added(30), added(45)]).toEqual([2, 0, 1, 2]);
   });
 
   it('sends by SMS what WhatsApp took and did not deliver, once, and within a day', async () => {

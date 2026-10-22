@@ -330,3 +330,121 @@ tests:
               summary: The storefront has sent no metrics for ten minutes
               description: Either it is down, or its telemetry cannot reach the collector.
               runbook: docs/engineering/runbooks.md#hattistorefrontmetricsmissing
+
+  # The worker's objectives (ADR-727). Every webhook delivery first tried over a minute after it
+  # was made, for 70 minutes, pages, its bucket bound written either way.
+  - interval: 1m
+    input_series:
+      - series: 'hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le="60.0"}'
+        values: '0x70'
+      - series: 'hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}'
+        values: '0+5x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiWebhookFirstTryBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Webhook deliveries wait fast enough to spend the month's budget in days
+              description: 100% of webhook deliveries were first tried over a minute after they were made; the objective allows 1%.
+              runbook: docs/engineering/runbooks.md#hattiwebhookfirsttrybudgetburn
+  - interval: 1m
+    input_series:
+      - series: 'hatti_webhooks_first_try_delay_seconds_bucket{job="hatti/core-worker",le="60"}'
+        values: '0+5x70'
+      - series: 'hatti_webhooks_first_try_delay_seconds_count{job="hatti/core-worker"}'
+        values: '0+5x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiWebhookFirstTryBudgetBurn
+        exp_alerts: []
+
+  # Half of the confirmations late pages; late emails, and late messages of other kinds, do not.
+  - interval: 1m
+    input_series:
+      - series: 'hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind="order_confirmation",channel="whatsapp",le="60"}'
+        values: '0+1x70'
+      - series: 'hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind="order_confirmation",channel="whatsapp"}'
+        values: '0+2x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiConfirmationMessageBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Order confirmations go late fast enough to spend the month's budget in days
+              description: 50% of order confirmations were sent over a minute after they were due; the objective allows 1%.
+              runbook: docs/engineering/runbooks.md#hatticonfirmationmessagebudgetburn
+  - interval: 1m
+    input_series:
+      - series: 'hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind="order_placed",channel="email",le="60"}'
+        values: '0x70'
+      - series: 'hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind="order_placed",channel="email"}'
+        values: '0+2x70'
+      - series: 'hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind="stock_low",channel="whatsapp",le="60"}'
+        values: '0x70'
+      - series: 'hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind="stock_low",channel="whatsapp"}'
+        values: '0+2x70'
+      - series: 'hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind="order_placed",channel="sms",le="60"}'
+        values: '0+3x70'
+      - series: 'hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind="order_placed",channel="sms"}'
+        values: '0+3x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiConfirmationMessageBudgetBurn
+        exp_alerts: []
+
+  # Bookings over five minutes at their first try page; those the courier made wait do not.
+  - interval: 1m
+    input_series:
+      - series: 'hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",courier="postex",retried="false",le="300"}'
+        values: '0x70'
+      - series: 'hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",courier="postex",retried="false"}'
+        values: '0+1x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiCourierBookingBudgetBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: Courier bookings are slow fast enough to spend the month's budget in days
+              description: 100% of courier bookings took over five minutes, the courier not refusing; the objective allows 1%.
+              runbook: docs/engineering/runbooks.md#hatticourierbookingbudgetburn
+  - interval: 1m
+    input_series:
+      - series: 'hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",courier="tcs",retried="true",le="300"}'
+        values: '0x70'
+      - series: 'hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",courier="tcs",retried="true"}'
+        values: '0+1x70'
+      - series: 'hatti_couriers_booking_delay_seconds_bucket{job="hatti/core-worker",courier="tcs",retried="false",le="300"}'
+        values: '0+4x70'
+      - series: 'hatti_couriers_booking_delay_seconds_count{job="hatti/core-worker",courier="tcs",retried="false"}'
+        values: '0+4x70'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: HattiCourierBookingBudgetBurn
+        exp_alerts: []
+
+  # A slow burn: a twentieth of confirmations late for a day and more tickets, and does not page.
+  - interval: 5m
+    input_series:
+      - series: 'hatti_messages_send_delay_seconds_bucket{job="hatti/core-worker",kind="order_placed",channel="whatsapp",le="60"}'
+        values: '0+19x400'
+      - series: 'hatti_messages_send_delay_seconds_count{job="hatti/core-worker",kind="order_placed",channel="whatsapp"}'
+        values: '0+20x400'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: HattiConfirmationMessageBudgetBurn
+        exp_alerts: []
+      - eval_time: 26h
+        alertname: HattiConfirmationMessageBudgetBurnSlow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Order confirmations go late often enough to spend the month's budget
+              description: 5% of order confirmations were sent over a minute after they were due; the objective allows 1%.
+              runbook: docs/engineering/runbooks.md#hatticonfirmationmessagebudgetburn

@@ -1,11 +1,14 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { collectMetrics } from '@hatti/telemetry/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BOOKING_LIMITS, TRACK_EVERY_MS, TRACK_FOR_MS } from './bookings.service.js';
 import { errorsOf, logisticsFixture, unwrap, type LogisticsFixture } from './test-support.js';
 
 const server = testDatabaseServer();
+// Before the services that record them are made.
+const recorded = collectMetrics();
 
 const TOKEN = 'pX7tokenLive0042abcd';
 
@@ -306,6 +309,40 @@ describe.skipIf(!server)("Shops' courier accounts and bookings", () => {
       'courier_booking.cancelled',
       'courier_booking.requested',
     ]);
+  });
+
+  it('counts how long each booking took, apart from those the courier made wait (ADR-727)', async () => {
+    unwrap(await postex());
+    const delays = async (retried: boolean) => {
+      const points = await recorded.histogram('hatti.couriers.booking.delay');
+      const point = points.find(
+        (each) => each.attributes.courier === 'postex' && each.attributes.retried === retried,
+      );
+      return (bound: number | 'count') =>
+        point === undefined ? 0 : bound === 'count' ? point.count : point.atMost.get(bound)!;
+    };
+    const [firstBefore, retriedBefore] = [await delays(false), await delays(true)];
+
+    const order = await f.confirmed(f.a, kurta);
+    const [booking] = unwrap(await f.bookings.request(f.a, { orderIds: [order.orderId] })).bookings;
+    const at = new Date(Date.now() + 1_000);
+    await f.bookings.claimToBook(f.a.shopId, at, 10, 60_000);
+    await f.bookings.recordTrackingNumber(f.a.shopId, booking!.id, 'CX-300400', 200_000n);
+    const { fulfillmentId } = unwrap(
+      await f.fulfillments.fulfill({ shopId: f.a.shopId, actor: 'system' }, order.orderId, {
+        tracking: { company: 'PostEx', number: 'CX-300400' },
+      }),
+    );
+    // Booked four minutes after it was asked for, at its first try: within the objective's five.
+    await f.bookings.markBooked(f.a.shopId, booking!.id, {
+      fulfillmentId,
+      at: new Date(Date.now() + 4 * 60_000),
+    });
+
+    const [first, retried] = [await delays(false), await delays(true)];
+    const added = (bound: number | 'count') => first(bound) - firstBefore(bound);
+    expect([added('count'), added(180), added(300)]).toEqual([1, 0, 1]);
+    expect(retried('count')).toBe(retriedBefore('count'));
   });
 
   it('keeps what the worker does: claims, books, fails and follows', async () => {

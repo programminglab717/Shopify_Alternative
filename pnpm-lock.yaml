@@ -488,10 +488,16 @@ importers:
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
+      '@hatti/telemetry':
+        specifier: workspace:*
+        version: link:../../platform/telemetry
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -1081,6 +1087,9 @@ importers:
       '@hatti/xlsx':
         specifier: workspace:*
         version: link:../../platform/xlsx
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
@@ -1091,6 +1100,9 @@ importers:
       '@hatti/customers':
         specifier: workspace:*
         version: link:../customers
+      '@hatti/telemetry':
+        specifier: workspace:*
+        version: link:../../platform/telemetry
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -1215,10 +1227,16 @@ importers:
       '@hatti/storefront-api':
         specifier: workspace:*
         version: link:../../platform/storefront-api
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
+      '@hatti/telemetry':
+        specifier: workspace:*
+        version: link:../../platform/telemetry
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)

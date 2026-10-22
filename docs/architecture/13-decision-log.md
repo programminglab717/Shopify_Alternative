@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-726 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-727 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -734,6 +734,7 @@
 | 724 | The core and the storefront are built into container images of their own from one Dockerfile, each holding its app's built code and production dependencies alone, and CI builds both and runs them against an empty database on every push | Accepted |
 | 725 | The admin's objectives, the outbox and sign-ins are watched by Prometheus rules kept in the repository, burn-rate alerts with unit tests and a runbook each, and a Grafana dashboard whose queries CI parses | Accepted |
 | 726 | The storefront's and checkout's objectives are watched too: the storefront sends its telemetry, and the request durations' buckets include 800 ms | Accepted |
+| 727 | Webhooks, order confirmations and courier bookings are watched by how long they wait: histograms the worker records, with burn-rate alerts against 12 §1's minute, minute and five minutes | Accepted |
 
 ---
 
@@ -24807,3 +24808,40 @@
   ([ADR-485](#adr-485--the-store-speed-score-shoppers-own-core-web-vitals-counted-by-the-storefront-in-histograms-of-28-days-scored-per-device-as-google-judges-them-with-fixes)) and has no alert yet. Payments' callback objective, webhooks', messages'
   and bookings' still have no metrics. Probes at `/healthz` and `/readyz` are left out of the
   storefront's metrics, as they are of the core's.
+
+## ADR-727 · Webhooks, order confirmations and courier bookings are watched by how long they wait: histograms the worker records, with burn-rate alerts against 12 §1's minute, minute and five minutes
+
+* **Context:** [12 §1](./12-scalability-and-reliability.md#1-service-level-objectives) promises
+  99% of webhooks delivered to healthy endpoints within a minute, 99% of order confirmation messages
+  sent within 60 seconds of the order, and 99% of courier bookings booked within five minutes while
+  the courier's API is healthy. The worker does all three ([ADR-397](#adr-397--a-custom-app-subscribes-to-topics-of-the-shops-events-at-https-addresses-the-worker-makes-one-delivery-an-event-and-subscription-for-apps-that-may-read-what-it-names-posts-it-signed-with-the-apps-secret-to-a-public-address-alone-and-tries-again-with-backoff-for-two-days),
+  [ADR-146](#adr-146--a-shops-customers-hear-of-their-orders-from-hattis-shared-whatsapp-number-or-by-sms-where-the-shop-saves-or-whatsapp-cannot-deliver-each-message-waits-in-postgres-queued-once-from-the-orders-events-until-the-worker-sends-it-and-whatsapps-webhook-follows-it-and-hears-customers-ask-to-stop), the bookings sweep), but nothing measured how long they took, so
+  [ADR-725](#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses) and [ADR-726](#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms) left them without alerts.
+* **Decision:**
+  * **Three histograms, in seconds, with buckets on each objective's bound** (OpenTelemetry's
+    `advice`): `hatti.webhooks.first_try.delay`, from a delivery being made to its first try;
+    `hatti.messages.send.delay`, from a message being due to its being sent, by `kind` and
+    `channel`; `hatti.couriers.booking.delay`, from a booking being asked for to its being booked,
+    by `courier` and `retried`. And a counter, `hatti.webhooks.tries`, by outcome.
+  * **"Healthy" is read as what the courier or app did not cause.** A webhook is counted at its
+    first try, whatever the app answers, since an app that fails is the unhealthy endpoint; a
+    booking counts only if booked at its first try, since a retried one is a courier that refused.
+  * **A message is due when it is queued, or at the time it was told to wait for**
+    ([ADR-621](#adr-621--an-order-placed-and-paid-together-is-told-of-its-payment-alone-the-news-of-it-placed-waits-ten-minutes-for-an-order-to-be-paid-online-at-checkout-and-the-news-of-a-payment-in-full-takes-its-place-while-no-sender-has-taken-it)): a new column, `messaging.messages.due_at` (migration 0312), set when
+    it is queued, so a confirmation held for its payment's news is not counted as late. Messages
+    queued before the column, and SMS sent in place of WhatsApp messages, have none and are not
+    counted.
+  * **Confirmations are `order_confirmation` and `order_placed`**, by WhatsApp or SMS, not their
+    email copies.
+  * Recording rules for each ratio from 5 minutes to 3 days, ADR-725's multiwindow burn-rate alerts
+    with a 1% budget, a page and a ticket each, promtool tests and a runbook; the dashboard's row
+    of webhook tries, bookings' p95 by courier, the three budgets left and their burn rates.
+  * Bucket bounds are matched as `60` or `60.0`, as Prometheus's OTLP translation and its text
+    format's normalisation may each write them.
+  * **`@hatti/telemetry/testing`'s `collectMetrics()`** reads what a test records, so each module
+    tests its own metric.
+* **Consequences:** A confirmation's minute is counted from when the worker queued it, after the
+  order's event left the outbox: the outbox's lag is watched apart (`HattiOutboxLagging` pages at
+  two minutes) and is to be added to the confirmation's when events carry the time they occurred
+  into what they queue. Bookings a courier made wait are visible on the dashboard but spend no
+  budget. Payments' callbacks and LCP still have no alerts.

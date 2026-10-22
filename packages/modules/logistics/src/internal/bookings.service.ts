@@ -13,6 +13,7 @@ import {
   type OrderShipmentFacts,
 } from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
+import { metrics } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
 import { COURIERS } from './courier-accounts.service.js';
 import {
@@ -182,8 +183,23 @@ export const BOOKING_FROM = sql`
  * the order as a parcel with the courier's tracking number, and then follows the parcel, so that
  * a courier slow or down never fails the request. An order is booked once at a time.
  */
+/**
+ * The buckets of a booking's time from being asked for to being booked, in seconds: its objective
+ * is five minutes while the courier's API is healthy (12 §1, ADR-727).
+ */
+export const BOOKING_DELAY_BUCKETS = [5, 15, 30, 60, 120, 180, 300, 600, 1800, 3600];
+
 @Injectable()
 export class CourierBookingService {
+  /** By courier, and whether it was tried more than once: a courier that could not take it. */
+  readonly #bookingDelays = metrics
+    .getMeter('hatti.logistics')
+    .createHistogram('hatti.couriers.booking.delay', {
+      unit: 's',
+      description: 'From a courier booking being asked for to its being booked',
+      advice: { explicitBucketBoundaries: BOOKING_DELAY_BUCKETS },
+    });
+
   constructor(
     private readonly db: Database,
     @Inject(COURIERS) private readonly couriers: Couriers,
@@ -561,6 +577,8 @@ export class CourierBookingService {
         account_id: string;
         courier: string;
         tracking_number: string;
+        attempts: number;
+        created_at: string | Date;
       }>(sql`
         UPDATE logistics.bookings b
            SET status = 'booked', fulfillment_id = ${booked.fulfillmentId},
@@ -571,9 +589,14 @@ export class CourierBookingService {
          WHERE b.shop_id = ${shopId} AND b.id = ${id} AND b.status = 'pending'
            AND b.tracking_number IS NOT NULL
            AND a.shop_id = b.shop_id AND a.id = b.account_id
-        RETURNING b.order_id, b.account_id, a.courier, b.tracking_number`);
+        RETURNING b.order_id, b.account_id, a.courier, b.tracking_number, b.attempts,
+                  b.created_at`);
       const row = rows[0];
       if (!row) return;
+      this.#bookingDelays.record((booked.at.getTime() - toDate(row.created_at).getTime()) / 1000, {
+        courier: row.courier,
+        retried: row.attempts > 1,
+      });
       // What the parcel is likely to cost by its account's rate card goes with it (ADR-383).
       await carryEstimateIn(tx, shopId, id, booked.fulfillmentId);
       await appendEvent<CourierBookingPayload>(tx, shopId, {

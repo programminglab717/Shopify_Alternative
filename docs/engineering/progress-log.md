@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Webhooks, confirmations and bookings watched
+
+* **How long the worker's work waits** ([ADR-727](../architecture/13-decision-log.md#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes)): histograms of a webhook's wait for its first try,
+  a message's from when it was due (a new `due_at`, migration 0312) and a courier booking's from
+  when it was asked for, with a counter of webhook tries by outcome.
+* **Burn-rate alerts** against 12 §1's minute for webhooks and order confirmations and five minutes
+  for bookings, each 99%, with promtool tests, runbooks and a dashboard row.
+* `@hatti/telemetry/testing` for tests that read what they record.
+* 4008 tests (3 new).
+
 ### 0f04697 · The storefront's and checkout's objectives watched
 
 * **The storefront sends its telemetry** ([ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)): traces and metrics by OTLP as the service

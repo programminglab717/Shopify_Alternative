@@ -3,7 +3,8 @@
 What to do when one of Hatti's alerts fires ([ADR-725](../architecture/13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)). The
 alerts are in `ops/prometheus/hatti.rules.yml`, each naming its section here; the dashboard they
 point at is `ops/grafana/hatti-core.json` ("Hatti core and storefront"). The storefront's and
-checkout's alerts came with [ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms). A page wants someone now; a ticket wants
+checkout's alerts came with [ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms). The webhooks', confirmations' and bookings'
+came with [ADR-727](../architecture/13-decision-log.md#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes). A page wants someone now; a ticket wants
 someone today.
 
 The objectives are [12 §1](../architecture/12-scalability-and-reliability.md)'s. A surface that has
@@ -137,3 +138,42 @@ meanwhile.
    `STOREFRONT_SERVICE_KEY`, and says which is missing.
 2. If they run, their telemetry cannot reach the collector: check `OTEL_EXPORTER_OTLP_ENDPOINT`
    and the collector's health.
+
+## HattiWebhookFirstTryBudgetBurn
+
+More than 1% of apps' webhook deliveries are first tried over a minute after they were made, fast
+enough to spend the month's budget early. Apps learn of orders and stock late. The `…Slow` alert is
+the same, as a ticket. How the apps answer does not count here: this is the worker falling behind.
+
+1. Is the worker running, and is its webhook sweep (every `WEBHOOK_INTERVAL_MS`, 10 seconds) keeping
+   up? The dashboard's webhook tries show its pace.
+2. Each sweep posts a batch of deliveries in turn: an app answering slowly holds the rest of its
+   batch. The worker's traces of the sweep show which address is slow.
+3. Many deliveries at once (an import, a bulk action) catch up by themselves; more worker pods take
+   batches of their own (`for update skip locked`).
+
+## HattiConfirmationMessageBudgetBurn
+
+More than 1% of order confirmations (the message asking a customer to confirm a cash order, or
+saying it was placed) go over a minute after they were due. Customers confirm later, or not at all,
+and shops call them instead. The `…Slow` alert is the same, as a ticket.
+
+1. The outbox comes first: a confirmation is queued only when the worker hears of the order, so see
+   `HattiOutboxLagging` and the dashboard's outbox lag.
+2. The messages' sender runs every `MESSAGES_INTERVAL_MS` (5 seconds). Its logs say whether
+   WhatsApp's Cloud API or the SMS gateway is refusing or slow; tries put off for a provider count
+   as late.
+3. A provider's rate limit holds a shop's messages back: the `error` of its pending messages in
+   `messaging.messages` says so.
+
+## HattiCourierBookingBudgetBurn
+
+More than 1% of courier bookings take over five minutes from being asked for, at their first try.
+Parcels miss the day's pickup. The `…Slow` alert is the same, as a ticket. Bookings that a courier
+refused and that were tried again are left out: the courier was not healthy.
+
+1. The dashboard's bookings p95 by courier shows whether one courier is slow or all are.
+2. One courier slow: its API answers slowly; the worker's traces of the bookings sweep show its
+   calls. Nothing to fix on our side but to tell the shops booking with it.
+3. All slow: is the worker's bookings sweep (every `COURIER_BOOKINGS_INTERVAL_MS`, 30 seconds)
+   running and keeping up? A large batch booked at once queues behind itself.

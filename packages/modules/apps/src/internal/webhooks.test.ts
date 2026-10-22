@@ -7,6 +7,7 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
+import { collectMetrics } from '@hatti/telemetry/testing';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CustomAppService } from './custom-apps.service.js';
@@ -22,6 +23,8 @@ import {
 import { WebhookService } from './webhooks.service.js';
 
 const server = testDatabaseServer();
+// Before the services that record them are made.
+const recorded = collectMetrics();
 const HOUR = 3_600_000;
 
 function unwrap<T>(result: MutationResult<T>): T {
@@ -375,6 +378,39 @@ describe.skipIf(!server)('Webhooks: subscriptions and deliveries (DEV-03, ADR-39
     // Another app sees none of them.
     const other = await app(['read_orders']);
     expect(await webhooks.deliveries(other.tenant, subscription!.id, other.id)).toBeNull();
+  });
+
+  it('counts how long a delivery waited for its first try, and how each try went (ADR-727)', async () => {
+    const sheet = await app(['read_orders']);
+    await subscribedHere(sheet.id, 'orders/paid');
+    const firstTries = async () =>
+      (await recorded.histogram('hatti.webhooks.first_try.delay'))[0] ?? null;
+    const before = (await firstTries())?.count ?? 0;
+    const late = (await firstTries())?.atMost.get(60) ?? 0;
+    const tries = async () =>
+      Object.fromEntries(
+        (await recorded.counter('hatti.webhooks.tries')).map((point) => [
+          point.attributes.outcome,
+          point.value,
+        ]),
+      );
+    const triedBefore = await tries();
+
+    await webhooks.fanOut(event(shopA, 'order.paid', 'order'));
+    // First tried a minute and a half after it was made, and refused: too late, whatever the app.
+    answers = [500];
+    const now = Date.now();
+    await webhooks.deliverDue(sender, new Date(now + 90_000));
+    // Its second try is no first try.
+    await webhooks.deliverDue(sender, new Date(now + 200_000));
+
+    const counted = await firstTries();
+    expect(counted!.count).toBe(before + 1);
+    expect(counted!.atMost.get(60)).toBe(late);
+    expect(counted!.atMost.get(120)).toBe(before + 1);
+    const after = await tries();
+    expect((after.retrying ?? 0) - (triedBefore.retrying ?? 0)).toBe(1);
+    expect((after.delivered ?? 0) - (triedBefore.delivered ?? 0)).toBe(1);
   });
 
   it("tells an app it was removed, and posts nothing more of the shop's to it", async () => {

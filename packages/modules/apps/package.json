@@ -24,6 +24,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {
@@ -33,6 +34,7 @@
     "reflect-metadata": "catalog:"
   },
   "devDependencies": {
+    "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",

@@ -177,7 +177,9 @@ The alerts and dashboards are code ([ADR-725](./13-decision-log.md#adr-725--the-
 `ops/prometheus`, unit-tested by promtool, each alert with a section in
 [the runbooks](../engineering/runbooks.md), and Grafana dashboards in `ops/grafana`, whose
 queries CI parses. The storefront sends its telemetry too, and the storefront's and checkout's
-objectives have their burn-rate alerts ([ADR-726](./13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)).
+objectives have their burn-rate alerts ([ADR-726](./13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)), as do
+webhooks', confirmations' and bookings' waits, from histograms the worker records
+([ADR-727](./13-decision-log.md#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes)).
 
 ---
 

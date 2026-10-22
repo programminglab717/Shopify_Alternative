@@ -29,6 +29,7 @@
     "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {
@@ -39,6 +40,7 @@
     "reflect-metadata": "catalog:"
   },
   "devDependencies": {
+    "@hatti/telemetry": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",
