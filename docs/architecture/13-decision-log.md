@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-740 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-741 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -748,6 +748,7 @@
 | 738 | What messages said is kept twelve months: the worker then clears a message to a customer's variables and error, keeping that it was sent, and deletes what customers wrote in the inbox and through the contact form, with conversations left empty | Accepted |
 | 739 | A shop's owner agrees to Hatti's terms again whenever theirs for it are not the current versions: after a new version, a handover, or for a shop opened before agreements were kept, asked above every page of the admin and recorded as on opening a shop | Accepted |
 | 740 | A shop's owner closes it from the admin, typing its name after confirming who they are: its storefront, checkout, Admin API and renewals stop, and they may reopen it for the 90 days its data is kept | Accepted |
+| 741 | A closed shop's data is deleted 90 days after it closed, table by table from those its tenant isolation names, but a list of records the law has Hatti keep, and its files; the worker does it once counsel has confirmed the list, Hatti's people by hand till then | Accepted |
 
 ---
 
@@ -25200,3 +25201,40 @@
   closing; the owner reopens to export. Open orders, courier bookings, payments and credit
   are left as they are when a shop closes; refunds of unused credit are counsel's call
   (OWN-41).
+
+## ADR-741 · A closed shop's data is deleted 90 days after it closed, table by table from those its tenant isolation names, but a list of records the law has Hatti keep, and its files; the worker does it once counsel has confirmed the list, Hatti's people by hand till then
+
+* **Context:** an owner closes their shop and may reopen it for 90 days
+  ([ADR-740](#adr-740--a-shops-owner-closes-it-from-the-admin-typing-its-name-after-confirming-who-they-are-its-storefront-checkout-admin-api-and-renewals-stop-and-they-may-reopen-it-for-the-90-days-its-data-is-kept)); Hatti's terms say its data is deleted after, but the records the
+  law has Hatti keep ([ADR-736](#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)). Nothing deleted it. A shop's rows are in some 176
+  tables, each with the `tenant_isolation` policy ([ADR-003](#adr-003--postgresql-shared-schema-with-shop_id--rls-cells-for-scale-out)), and its files under
+  `shops/{id}/` in storage.
+* **Decision:**
+  * **`ClosedShopData`** (`apps/core/src/closed-shops.ts`) finds the shops closed
+    `CLOSED_SHOP_KEPT_DAYS` (90) ago and not yet purged; reports, for one, every table with its
+    rows and whether they are kept and why; and purges it. The tables are read from
+    `pg_policy`, so a table added later is deleted with the rest unless it is listed as kept.
+  * **Kept** (`KEPT_ON_CLOSING`): the shop's row, closed; its sales, their lines, invoices,
+    refunds, credit notes and returns; FBR's invoices; Hatti's invoices, payments and wallet
+    entries with the shop; the audit log; and trust's reports, takedowns, appeals and rights
+    complaints. Each with why, for counsel to confirm (OWN-42).
+  * **The purge** deletes table by table, each in a transaction of its own with the system
+    login, and goes through them again until a pass deletes nothing: a table whose rows
+    another's still name goes on a later pass, as do rows a delete's trigger adds, such as media
+    to remove. Then it deletes `shops/{id}/` from storage and sets `purged_at` (migration
+    0316). A table left that could not go is reported and the shop not marked, for the next
+    sweep.
+  * **Never reopened, nor changed by identity, once purged:** `purged_at` is set only on a
+    closed shop (a check), and identity's restrictive policy on `control.shops` now refuses any
+    change to a purged one, which a permissive policy such as a development store's handover
+    could otherwise allow.
+  * **The worker's sweep** (`ClosedShopPurges`, five shops a sweep) runs only when
+    `CLOSED_SHOP_PURGE` is on, which it is not by default: deleting cannot be undone, and which
+    records are kept is counsel's call. Till then **`closed-shops list`** shows the shops due,
+    each with its report, and **`closed-shops purge <shop> --yes`** purges one, for Hatti's
+    people.
+* **Consequences:** a closed shop's data can be deleted as the terms say, and what is kept is
+  in one list with its reasons. The orders kept still hold their customers' names, numbers and
+  addresses; whether those are scrubbed is for counsel (OWN-42). Kept records are never deleted
+  after their six years yet. Identity's members and invitations of the shop, and its documents
+  in the storefront's store, which the publisher took down on closing, are not part of the purge.

@@ -63,6 +63,7 @@ export default defineConfig(
       '**/src/status-incidents.ts',
       '**/src/trust-reports.ts',
       '**/src/storage-cors.ts',
+      '**/src/closed-shops-cli.ts',
       'scripts/**',
     ],
     rules: { 'no-console': 'off' },

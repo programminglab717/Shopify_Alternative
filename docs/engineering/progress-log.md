@@ -16,6 +16,19 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
+### Deleting a closed shop's data
+
+* **90 days after a shop closed, its data can be deleted** ([ADR-741](../architecture/13-decision-log.md#adr-741--a-closed-shops-data-is-deleted-90-days-after-it-closed-table-by-table-from-those-its-tenant-isolation-names-but-a-list-of-records-the-law-has-hatti-keep-and-its-files-the-worker-does-it-once-counsel-has-confirmed-the-list-hattis-people-by-hand-till-then)): every table its rows are
+  in, found from their tenant isolation, but the records the law has Hatti keep, such as sales
+  and invoices for tax, and its files in storage. It is then never reopened.
+* **The worker does it only once `CLOSED_SHOP_PURGE` is on**, after counsel confirms what is
+  kept (OWN-42); till then `closed-shops list` shows the shops due and what would go, and
+  `closed-shops purge` deletes one by hand.
+* **A hole closed on the way:** identity can no longer change a purged shop at all, which a
+  development store's handover policy would otherwise have let it.
+* **CI's fix:** the takedowns test's closed shop now says when it closed, as 0315 requires.
+* 4054 tests (5 new).
+
 ### d461865 · Closing a shop
 
 * **An owner closes their shop from the admin** ([ADR-740](../architecture/13-decision-log.md#adr-740--a-shops-owner-closes-it-from-the-admin-typing-its-name-after-confirming-who-they-are-its-storefront-checkout-admin-api-and-renewals-stop-and-they-may-reopen-it-for-the-90-days-its-data-is-kept)): Settings → Store details, its name

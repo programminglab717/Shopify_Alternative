@@ -743,6 +743,12 @@ const workerSchema = z
     /** How often the sweeps run. */
     SWEEP_INTERVAL_MS: z.coerce.number().int().min(1_000).default(600_000),
     /**
+     * Whether the sweep deletes closed shops' data 90 days after they closed, but the records kept
+     * (ADR-741). Off until counsel confirms what is kept (OWN-41); Hatti's people may purge one
+     * shop meanwhile, with `closed-shops`.
+     */
+    CLOSED_SHOP_PURGE: env.flag().default(false),
+    /**
      * How often articles and pages published at a time ahead are shown once it comes (ADR-215,
      * ADR-217), and shops' broadcasts queued once theirs does (ADR-422).
      */
@@ -914,6 +920,18 @@ const billingTransfersSchema = z.object({
 });
 
 /**
+ * Hatti's people see the closed shops whose data is due to go, and purge one (ADR-741), with the
+ * system login, which reads and deletes every shop's, and the storage its files are in.
+ */
+const closedShopsSchema = z
+  .object({
+    ...storage,
+    DATABASE_URL: env.postgresUrl(),
+    DATABASE_SYSTEM_URL: env.postgresUrl(),
+  })
+  .refine(storageComplete, STORAGE_COMPLETE);
+
+/**
  * Hatti's people answer shops' support requests (ADR-508) with the app login and the system login,
  * which finds them across shops; and on WhatsApp, from Hatti's support number on Meta's Graph API,
  * those its staff wrote about there (ADR-560), where it is set up.
@@ -1004,6 +1022,7 @@ export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
 export type TrustReportsConfig = z.output<typeof trustReportsSchema>;
 export type StatusIncidentsConfig = z.output<typeof statusIncidentsSchema>;
 export type StorageCorsConfig = z.output<typeof storageCorsSchema>;
+export type ClosedShopsConfig = z.output<typeof closedShopsSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
@@ -1026,3 +1045,5 @@ export const loadStatusIncidentsConfig = (source?: Env): StatusIncidentsConfig =
   parseEnv(statusIncidentsSchema, source);
 export const loadStorageCorsConfig = (source?: Env): StorageCorsConfig =>
   parseEnv(storageCorsSchema, source);
+export const loadClosedShopsConfig = (source?: Env): ClosedShopsConfig =>
+  parseEnv(closedShopsSchema, source);

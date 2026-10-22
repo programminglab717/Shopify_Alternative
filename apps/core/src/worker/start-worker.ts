@@ -128,6 +128,8 @@ import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
 import { MessageContentRetention } from './message-retention.js';
+import { ClosedShopPurges } from './closed-shop-purges.js';
+import { ClosedShopData } from '../closed-shops.js';
 import { AccountDataFiles } from './account-data-files.js';
 import { ExpiredMemberships } from './expired-memberships.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
@@ -516,6 +518,15 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => messageRetention.stop());
+    // Closed shops' data deleted 90 days after they closed, but the records kept, once counsel has
+    // confirmed what is kept (ADR-741).
+    if (config.CLOSED_SHOP_PURGE) {
+      const closedShops = new ClosedShopPurges(
+        new ClosedShopData(database, workerStorage(config)),
+        logger,
+      ).start(config.SWEEP_INTERVAL_MS);
+      closers.push(() => closedShops.stop());
+    }
     // Shoppers' files of their own data let go once their day is up (ADR-572).
     const accountFiles = new AccountDataFiles(
       new AccountDataExpiry(database, workerStorage(config)),

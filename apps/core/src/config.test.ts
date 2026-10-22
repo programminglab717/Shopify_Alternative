@@ -12,6 +12,7 @@ import {
   googleAdsOptions,
   loadApiConfig,
   loadBillingTransfersConfig,
+  loadClosedShopsConfig,
   loadStorageCorsConfig,
   loadSupportRequestsConfig,
   loadWorkerConfig,
@@ -504,6 +505,29 @@ describe("The bucket's CORS rule (ADR-733)", () => {
     expect(() =>
       loadStorageCorsConfig({ ...R2, S3_BUCKET: undefined, ADMIN_URL: 'https://admin.hatti.pk' }),
     ).toThrow('S3_BUCKET');
+  });
+});
+
+describe("Closed shops' data (ADR-741)", () => {
+  const logins = {
+    DATABASE_URL: env.DATABASE_URL,
+    DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+  };
+
+  it('reads the logins and the storage its files are in; the sweep purges only once turned on', () => {
+    expect(loadClosedShopsConfig({ ...logins, ...R2 })).toMatchObject({
+      ...logins,
+      S3_BUCKET: 'hatti-files',
+    });
+    expect(() => loadClosedShopsConfig({ DATABASE_URL: env.DATABASE_URL })).toThrow(
+      'DATABASE_SYSTEM_URL',
+    );
+    expect(() => loadClosedShopsConfig({ ...logins, ...R2, S3_BUCKET: undefined })).toThrow(
+      'S3_BUCKET',
+    );
+    const worker = { ...logins, REDIS_URL: env.REDIS_URL };
+    expect(loadWorkerConfig(worker).CLOSED_SHOP_PURGE).toBe(false);
+    expect(loadWorkerConfig({ ...worker, CLOSED_SHOP_PURGE: 'true' }).CLOSED_SHOP_PURGE).toBe(true);
   });
 });
 
