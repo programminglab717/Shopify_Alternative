@@ -178,7 +178,9 @@ auto-scaled (WhatsApp throughput pre-checked); a **scheduled theme publish** at 
   query cost budgets for first-party clients.
 * **Load testing (k6):** weekly baseline; **pre-event tests** before Ramadan, White Friday and
   11.11, plus merchant-requested drop rehearsals for large brands. Scenarios replay realistic
-  traffic mixes (browse-heavy, then checkout surges).
+  traffic mixes (browse-heavy, then checkout surges). The launch test is `ops/load/launch.js`
+  ([ADR-735](./13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own)): browsing and cash-on-delivery orders side by
+  side at three times §2's launch peak, held to §1's objectives.
 * **Database hygiene:** top queries by total time reviewed weekly; N+1 detection in tests; indexes
   always led by `shop_id`; migrations use the expand/contract pattern and online index builds.
 * **Real-user monitoring:** Core Web Vitals per store, device class and network type, shown to

@@ -2394,6 +2394,9 @@ That is 4020 tests. They cover:
 * Kundan, Nikhar and Kiryana (ADR-734): each its kit's accent, its look and the products its
   home page shows, over Hatti Base's sections; the store builder's plan starting jewellery,
   beauty and grocery shops on them
+* The launch load test (ADR-735), with k6 rather than Vitest: its smoke run and two minutes at
+  100 pages a second and 2 orders a second against the seeded shop locally, every threshold
+  met and every order placed; `prepare.js` against the seeded shop's Admin API
 * Reports of stores (ADR-460): kept with the shopper's mobile number as E.164 and a hash of
   their address; refused without a reason or details, or with a number not a Pakistani
   mobile; a fourth of one store from one address in a day refused; listed with the store
@@ -3653,6 +3656,7 @@ revisiting it.
 | 129 | A term's rule pins up to 10 products and hides up to 50, for the whole search as the search folds it alone, 200 terms a shop, through the Admin API ([ADR-692](../architecture/13-decision-log.md#adr-692--a-shop-pins-products-to-the-top-of-a-terms-search-in-its-order-and-hides-others-from-it-the-whole-search-as-the-search-folds-it-read-live-as-synonyms-are)); the admin keeps them on the online store's Search results tab, a top search opened from analytics ([ADR-693](../architecture/13-decision-log.md#adr-693--the-admins-online-store-has-a-search-results-tab-for-those-who-change-products-a-terms-products-pinned-in-order-and-hidden-and-a-top-search-opened-from-analytics)) | Boosts by weight, tag or collection, rules for searches holding the term, and rules for a while, with a search engine that ranks (SRC-04) | With Typesense |
 | 130 | The core and the storefront are container images built and run against an empty database by CI on every push, but pushed to no registry, signed or scanned; the core runs from its image in development's settings there ([ADR-724](../architecture/13-decision-log.md#adr-724--the-core-and-the-storefront-are-built-into-container-images-of-their-own-from-one-dockerfile-each-holding-its-apps-built-code-and-production-dependencies-alone-and-ci-builds-both-and-runs-them-against-an-empty-database-on-every-push)) | Images pushed to the cell's registry with an SBOM and signatures, scanned, and deployed to staging from `main` by Argo CD (10 §4) | With the cell's infrastructure |
 | 131 | Alerts and a dashboard watch the admin's two objectives, the outbox and sign-ins, the storefront's and checkout's objectives ([ADR-726](../architecture/13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)), webhooks', confirmations' and bookings' objectives ([ADR-727](../architecture/13-decision-log.md#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes)), and the core's and storefront's silence; they go to no one until a cell's Alertmanager routes them, phones' LCP ([ADR-729](../architecture/13-decision-log.md#adr-729--shoppers-largest-contentful-paint-is-a-storefront-histogram-ticketed-when-phones-p75-passes-two-seconds-payments-callback-objective-waits-for-gateways-that-say-when-they-were-paid)); payments' callbacks' objective has no alert, gateways saying no time of payment ([ADR-725](../architecture/13-decision-log.md#adr-725--the-admins-objectives-the-outbox-and-sign-ins-are-watched-by-prometheus-rules-kept-in-the-repository-burn-rate-alerts-with-unit-tests-and-a-runbook-each-and-a-grafana-dashboard-whose-queries-ci-parses)) | Every objective of 12 §1 with burn-rate alerts, routed to on-call | With the cell's infrastructure; as each surface sends its metrics |
+| 132 | The launch load test is written and tried locally alone, against the seeded shop on one machine; nothing has run it at launch rates, and the Admin API has no scenario ([ADR-735](../architecture/13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own)) | The test run against staging at three times the launch peak, its result kept beside 12 §2, and before each sale season after; the Admin API under many shops' tokens | With staging (OWN-03, OWN-13) |
 
 ## Next steps
 
@@ -3667,7 +3671,8 @@ unblocks, in [Waiting on the owner](./owner-actions.md).
    gateways sign a time of payment (ADR-729).
 2. **Environments and IaC:** after the latency bake-off, write Terraform/OpenTofu for one cell
    (managed Postgres, Valkey, Kubernetes), push the images CI builds (ADR-724) to its registry,
-   signed with an SBOM, and deploy staging from `main`.
+   signed with an SBOM, and deploy staging from `main`; then the launch load test against
+   staging's load-test shop ([ADR-735](../architecture/13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own), OWN-13).
 3. **Spike 5 follow-ups:**
    * re-run the benchmark in the target cloud, with PgBouncer beside the API pods;
    * more statements prepared only as traces show their planning, each checked with

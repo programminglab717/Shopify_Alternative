@@ -43,6 +43,12 @@ export default defineConfig(
     languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
   },
   {
+    // k6's load tests (ADR-735) run in k6's own runtime, with its globals, and print as they go.
+    files: ['ops/load/**/*.js'],
+    languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly' } },
+    rules: { 'no-console': 'off' },
+  },
+  {
     // CLI entry points may print to the console.
     files: [
       '**/src/cli/**/*.ts',

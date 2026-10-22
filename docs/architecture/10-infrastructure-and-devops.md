@@ -180,6 +180,8 @@ queries CI parses. The storefront sends its telemetry too, and the storefront's 
 objectives have their burn-rate alerts ([ADR-726](./13-decision-log.md#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)), as do
 webhooks', confirmations' and bookings' waits, from histograms the worker records
 ([ADR-727](./13-decision-log.md#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes)).
+The load tests that hold the platform to those objectives before launch and each sale season
+are k6 scripts in `ops/load` ([ADR-735](./13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own)), run against staging.
 
 ---
 

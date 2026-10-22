@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-734 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-735 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -742,6 +742,7 @@
 | 732 | The store builder starts a shop on Hatti's theme for its kind, Lawn for fashion and Bazaar for electronics, published where the main theme holds nothing of the shop's own; the accent goes among that theme's settings | Accepted |
 | 733 | The bucket's CORS rule is set by a command of the core's, for the admin's origin alone, from ADMIN_URL: GET, HEAD and PUT with a content type, compared before it is put | Accepted |
 | 734 | Kundan for jewellery, Nikhar for beauty and Kiryana for groceries complete Hatti's six themes, one for each starter kit, which the store builder starts each kind of shop on | Accepted |
+| 735 | The launch load test is a k6 script kept in the repository: shoppers browsing and placing cash-on-delivery orders side by side at three times 12 §2's launch peak, held to 12 §1's objectives, against staging's load-test shop, each shopper from an address and a number of its own | Accepted |
 
 ---
 
@@ -25007,3 +25008,46 @@
     Each theme's accent is its kit's, so the builder's colour and the theme's agree.
 * **Consequences:** OS-01's V1 line-up of six is built. Hatti Base remains the theme for a shop
   whose words name no kind, and every theme shares its sections, so a new section reaches all six.
+
+## ADR-735 · The launch load test is a k6 script kept in the repository: shoppers browsing and placing cash-on-delivery orders side by side at three times 12 §2's launch peak, held to 12 §1's objectives, against staging's load-test shop, each shopper from an address and a number of its own
+
+* **Context:** the launch checklist asks for a load test at three times the traffic expected at
+  launch, and [12 §8](./12-scalability-and-reliability.md#8-performance-engineering) for k6 runs
+  before each sale season. The objectives it must hold are 12 §1's, and the burn-rate alerts that
+  watch them in production already exist ([ADR-726](#adr-726--the-storefronts-and-checkouts-objectives-are-watched-too-the-storefront-sends-its-telemetry-and-the-request-durations-buckets-include-800-ms)). Checkout guards itself in ways
+  a naive test trips at once: 120 cart changes a minute and 20 orders an hour from one address,
+  3 orders a day from one number (CHK-18), duplicates caught (CHK-11), codes asked by risk
+  (CHK-09), and stock that sells out.
+* **Decision:** `ops/load/launch.js`, run by k6 from a machine of its own:
+  * **Two scenarios side by side**, each at a rate of arrivals rather than a number of users, so
+    a slow server meets the same load instead of a lighter one: page views (product pages 40%,
+    collections 30%, the home page 20%, search 5%, suggestions 5%), and orders, each adding an
+    item to a new cart by the Ajax cart, beginning checkout, and posting the form for cash on
+    delivery as Hatti Base's page does, then reading the thank-you page.
+  * **The rates** ramp over two minutes to `MULTIPLIER` (3) times 12 §2's peak at the end of the
+    MVP, 900 page views a second and 450 orders a minute, held ten minutes. The page rate is the
+    edge's whole peak: against the origin, it asks the storefront to take everything as if the
+    cache had failed, harder than 12 §2's plan, and `BROWSE_RATE` sets the origin's share
+    instead.
+  * **Thresholds** are 12 §1's: 99.95% of page requests succeed, 99.95% of orders tried are
+    placed, and placing one, the form's POST alone, takes 800 ms at p95; pages render in 250 ms
+    at p95, spike 1's budget for a miss at the edge. A checkout that asks for a code, or a cart
+    that refuses an item as sold out, fails the run as a shop unfit for the test rather than
+    counting against the platform.
+  * **Each shopper is someone new:** an address of its own from the carrier-grade range
+    Pakistan's mobile networks share, in `X-Forwarded-For`, which a storefront run with
+    `TRUST_PROXY=true` takes as the shopper's, and a mobile number of its own, starting at a
+    random place each run. The products and variants come from the shop's sitemap and pages, each
+    variant tried in a cart first.
+  * **`ops/load/prepare.js`** makes the load-test shop's tracked variants keep selling past their
+    stock through the Admin API, so stock is still taken off as on a sale day but never runs out.
+  * **It runs only on staging**, against a shop kept for it, with no messaging keys: the numbers
+    are made up and some are someone's.
+* **Consequences:** the checklist's test is one command once staging exists (OWN-03, OWN-13).
+  Locally, against the seeded shop with everything on four cores, the smoke run and a two-minute
+  run at 100 pages a second and 2 orders a second, once `prepare.js` had run, passed every
+  threshold (pages 11 ms at p95, orders placed in 87 ms at p95, 330 of 330), and at 200 pages
+  and 5 orders a second every order was placed but the shared cores queued (pages 914 ms,
+  orders 1.04 s at p95); this checks the script, not the platform's capacity. The Admin API's objective has no scenario: its cost buckets hold each
+  app to its share ([ADR-576](#adr-576--the-admin-api-costs-each-query-before-it-runs-and-meters-it-per-app-or-member-of-staff-in-each-shop-shopifys-leaky-bucket-refusing-what-would-overdraw-it-and-saying-the-cost)), so its load is the shops', to be tested with many
+  shops' tokens once staging has them. CI lints the scripts but does not run them.

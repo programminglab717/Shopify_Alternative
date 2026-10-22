@@ -101,7 +101,7 @@ a public launch.
 **Launch readiness checklist:** pentest done and criticals fixed; status page; support rota in Urdu
 and English; SLO dashboards; incident runbooks; pricing and billing live; migration service
 staffed; partner programme open; legal pages and DPA published; load test at 3× expected launch
-traffic.
+traffic (the test is `ops/load/launch.js`, to run against staging).
 
 **Exit criteria:** ≥ 1,500 paying stores by month 12 (≈ Oct 2027); storefront and checkout SLOs met
 for 60 consecutive days; paid churn < 4%/month; support first response < 10 min in business hours.

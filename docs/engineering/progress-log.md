@@ -14,6 +14,24 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-22
+
+### The launch load test
+
+* **k6 scripts in `ops/load`** ([ADR-735](../architecture/13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own)): shoppers browsing and placing cash-on-delivery orders
+  side by side at three times 12 §2's launch peak, 900 page views a second and 450 orders a
+  minute, held to 12 §1's objectives; each shopper from an address and a number of its own, so
+  checkout's limits see shoppers rather than one machine; `prepare.js` keeps the load-test shop's
+  stock from selling out.
+* **Tried locally** against the seeded shop: at 100 pages and 2 orders a second every threshold
+  held (pages 11 ms, orders placed in 87 ms at p95, 330 of 330); at 200 pages and 5 orders a
+  second every order was still placed but the four shared cores queued. The first try found the seeded shop
+  selling out within 80 orders, which is why `prepare.js` exists and why a sold-out item now fails
+  the run as an unfit shop.
+* **For you**: the traffic to expect at launch, and a run on staging without messaging keys,
+  are [OWN-13](./owner-actions.md).
+* No new Vitest tests: k6 runs these, and CI lints them.
+
 ## 2026-10-21
 
 ### 7bff433 · Kundan, Nikhar and Kiryana
