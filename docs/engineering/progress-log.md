@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### Bazaar, for electronics
+### c0e6a0f · Bazaar, for electronics
 
 * **Bazaar** ([ADR-731](../architecture/13-decision-log.md#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)), Hatti's second theme built on Hatti Base: five products to a row, square
   photos shown whole on white, titles kept to two lines, bold prices, and the week's deals first.
