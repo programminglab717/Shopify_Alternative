@@ -134,13 +134,13 @@ export const KIT_ACCENTS: Record<StarterKitValue, string> = {
   grocery: '#15803D',
 };
 
-/** The theme each kind of shop starts on (ADR-732): Hatti's theme made for it, else Hatti Base. */
+/** The theme each kind of shop starts on: Hatti's theme made for it (ADR-732, ADR-734). */
 export const KIT_THEMES: Record<StarterKitValue, string> = {
   fashion: 'lawn',
-  jewellery: BASE_THEME,
-  beauty: BASE_THEME,
+  jewellery: 'kundan',
+  beauty: 'nikhar',
   electronics: 'bazaar',
-  grocery: BASE_THEME,
+  grocery: 'kiryana',
 };
 
 /** The platform's own, for a shop whose kind its words don't say. */

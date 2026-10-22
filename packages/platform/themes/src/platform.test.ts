@@ -15,6 +15,9 @@ describe("Hatti's themes, a library of them, each built on another or not (OS-01
       ['hatti-base', null],
       ['lawn', 'hatti-base'],
       ['bazaar', 'hatti-base'],
+      ['kundan', 'hatti-base'],
+      ['nikhar', 'hatti-base'],
+      ['kiryana', 'hatti-base'],
     ]);
     for (const theme of library) {
       expect(theme.description.en.length).toBeGreaterThan(10);
@@ -41,7 +44,14 @@ describe("Hatti's themes, a library of them, each built on another or not (OS-01
     expect(base.settings).toMatchObject({ color_accent: '#0F766E' });
     expect(lawn.files['templates/index.json']).not.toBe(base.files['templates/index.json']);
     expect(lawn.version).not.toBe(base.version);
-    expect([...(await allPlatformThemes()).keys()]).toEqual(['hatti-base', 'lawn', 'bazaar']);
+    expect([...(await allPlatformThemes()).keys()]).toEqual([
+      'hatti-base',
+      'lawn',
+      'bazaar',
+      'kundan',
+      'nikhar',
+      'kiryana',
+    ]);
   });
 
   it('dresses Bazaar for electronics: more to a row, square photos whole, deals first (ADR-731)', async () => {
@@ -70,6 +80,46 @@ describe("Hatti's themes, a library of them, each built on another or not (OS-01
     expect(bazaar.files['sections/main-product.liquid']).toBe(
       base.files['sections/main-product.liquid'],
     );
+  });
+
+  it('dresses Kundan for jewellery, Nikhar for beauty and Kiryana for groceries (ADR-734)', async () => {
+    const base = await platformTheme('hatti-base');
+    const looks = {
+      kundan: {
+        accent: '#A16207',
+        style: ['repeat(3, minmax(0, 1fr))', 'border-radius: 0'],
+        shown: 6,
+      },
+      nikhar: {
+        accent: '#BE185D',
+        style: ['border-radius: 1rem', 'border-radius: 999px'],
+        shown: 8,
+      },
+      kiryana: {
+        accent: '#15803D',
+        style: ['repeat(6, minmax(0, 1fr))', 'object-fit: contain'],
+        shown: 12,
+      },
+    };
+    for (const [handle, look] of Object.entries(looks)) {
+      const theme = await platformTheme(handle);
+      for (const rule of look.style) {
+        expect(theme.files['snippets/theme-style.liquid'], handle).toContain(rule);
+      }
+      expect(theme.settings, handle).toMatchObject({ color_accent: look.accent });
+      const home = JSON.parse(theme.files['templates/index.json']!) as {
+        sections: Record<string, { type: string; settings: { products_to_show?: number } }>;
+        order: string[];
+      };
+      expect(home.order[0], handle).toBe('banner');
+      const shown = Object.values(home.sections).find(
+        (each) => each.type === 'featured-collection',
+      );
+      expect(shown?.settings.products_to_show, handle).toBe(look.shown);
+      expect(theme.files['sections/main-product.liquid']).toBe(
+        base.files['sections/main-product.liquid'],
+      );
+    }
   });
 
   it("passes each theme's own templates and settings through Theme Check, as a shop's copy keeps to", async () => {

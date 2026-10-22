@@ -1,0 +1,33 @@
+{
+  "sections": {
+    "banner": {
+      "type": "image-banner",
+      "settings": {},
+      "blocks": {
+        "heading": {
+          "type": "heading",
+          "settings": { "heading": "Skincare that suits our weather" }
+        },
+        "text": {
+          "type": "text",
+          "settings": {
+            "text": "Serums, sunscreens and makeup, sealed and delivered across Pakistan. Pay cash when they arrive."
+          }
+        },
+        "button": {
+          "type": "button",
+          "settings": { "label": "Shop bestsellers", "link": "/collections/all" }
+        }
+      },
+      "block_order": ["heading", "text", "button"]
+    },
+    "bestsellers": {
+      "type": "featured-collection",
+      "settings": { "title": "Bestsellers", "collection": "all", "products_to_show": 8 }
+    },
+    "recently_viewed": { "type": "recently-viewed", "settings": {} },
+    "whatsapp": { "type": "whatsapp-cta", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": {} }
+  },
+  "order": ["banner", "bestsellers", "recently_viewed", "whatsapp", "newsletter"]
+}

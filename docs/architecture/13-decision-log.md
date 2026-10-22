@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-733 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-734 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -741,6 +741,7 @@
 | 731 | Bazaar, for electronics, is Hatti's second theme built on Hatti Base: more products to a row, square photos shown whole on white, and the week's deals first | Accepted |
 | 732 | The store builder starts a shop on Hatti's theme for its kind, Lawn for fashion and Bazaar for electronics, published where the main theme holds nothing of the shop's own; the accent goes among that theme's settings | Accepted |
 | 733 | The bucket's CORS rule is set by a command of the core's, for the admin's origin alone, from ADMIN_URL: GET, HEAD and PUT with a content type, compared before it is put | Accepted |
+| 734 | Kundan for jewellery, Nikhar for beauty and Kiryana for groceries complete Hatti's six themes, one for each starter kit, which the store builder starts each kind of shop on | Accepted |
 
 ---
 
@@ -24985,3 +24986,24 @@
 * **Consequences:** Setting up a bucket, or moving the admin, is one command, and a check that can
   run in a deploy. The storefront and shops' apps upload through the API or from servers, so need
   no rule. A rule of the operator's own beside Hatti's is replaced by `apply`.
+
+## ADR-734 · Kundan for jewellery, Nikhar for beauty and Kiryana for groceries complete Hatti's six themes, one for each starter kit, which the store builder starts each kind of shop on
+
+* **Context:** OS-01 promises six themes at V1. Lawn and Bazaar ([ADR-730](#adr-730--hattis-themes-are-a-library-listed-in-themeslibraryjson-a-theme-built-on-another-holding-only-the-files-it-changes-a-shop-begins-a-theme-on-any-of-them-and-lawn-for-clothes-is-the-first-built-on-hatti-base),
+  [ADR-731](#adr-731--bazaar-for-electronics-is-hattis-second-theme-built-on-hatti-base-more-products-to-a-row-square-photos-shown-whole-on-white-and-the-weeks-deals-first)) cover two of the five starter kits ([ADR-486](#adr-486--vertical-starter-kits-what-a-kind-of-shop-sells-by-its-smart-collections-size-charts-and-main-menu-links-set-up-in-one-go-and-safe-to-apply-again)); jewellery,
+  beauty and grocery shops still began on Hatti Base, and the store builder
+  ([ADR-732](#adr-732--the-store-builder-starts-a-shop-on-hattis-theme-for-its-kind-lawn-for-fashion-and-bazaar-for-electronics-published-where-the-main-theme-holds-nothing-of-the-shops-own-the-accent-goes-among-that-themes-settings)) had nothing else to start them on.
+* **Decision:** three more themes built on Hatti Base, each its settings, home page and styles:
+  * **Kundan**, for jewellery: three larger pieces to a row on wide screens, square photos filled
+    as jewellery is shot close, serif headings in English with Nastaliq kept in Urdu, titles and
+    prices centred, section titles centred over a thin gold rule, squared buttons, a dark banner
+    where it has no picture, and six new pieces on the home page.
+  * **Nikhar**, for beauty and skincare: square photos in soft rounded cards on a blush palette,
+    pill buttons, and eight bestsellers on the home page.
+  * **Kiryana**, for groceries: six to a row on wide screens, square photos shown whole on white,
+    titles kept to two lines, prices large and bold, compact cards, and twelve everyday
+    essentials on the home page, the most the section shows.
+  * Each starter kit names its theme, so the store builder starts every kind of shop on its own.
+    Each theme's accent is its kit's, so the builder's colour and the theme's agree.
+* **Consequences:** OS-01's V1 line-up of six is built. Hatti Base remains the theme for a shop
+  whose words name no kind, and every theme shares its sections, so a new section reaches all six.

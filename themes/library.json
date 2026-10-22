@@ -25,5 +25,32 @@
       "ur": "الیکٹرانکس کے لیے: ایک قطار میں زیادہ چیزیں، سفید پر چوکور تصویریں، اور ہفتے کی ڈیلز سب سے پہلے۔"
     },
     "extends": "hatti-base"
+  },
+  {
+    "handle": "kundan",
+    "name": "Kundan",
+    "description": {
+      "en": "For jewellery: fewer, larger pieces to a row, square close-up photos and gold rules.",
+      "ur": "زیورات کے لیے: ایک قطار میں کم مگر بڑی چیزیں، قریب سے لی گئی چوکور تصویریں اور سنہری لکیریں۔"
+    },
+    "extends": "hatti-base"
+  },
+  {
+    "handle": "nikhar",
+    "name": "Nikhar",
+    "description": {
+      "en": "For beauty and skincare: soft rounded cards, square photos and a blush palette.",
+      "ur": "بیوٹی اور اسکن کیئر کے لیے: نرم گول کارڈ، چوکور تصویریں اور گلابی رنگ۔"
+    },
+    "extends": "hatti-base"
+  },
+  {
+    "handle": "kiryana",
+    "name": "Kiryana",
+    "description": {
+      "en": "For groceries: six to a row, whole photos on white and big prices, for filling a basket fast.",
+      "ur": "کریانے کے لیے: ایک قطار میں چھ چیزیں، سفید پر پوری تصویریں اور بڑی قیمتیں، تاکہ ٹوکری جلد بھرے۔"
+    },
+    "extends": "hatti-base"
   }
 ]

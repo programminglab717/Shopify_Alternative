@@ -1,0 +1,33 @@
+{
+  "sections": {
+    "banner": {
+      "type": "image-banner",
+      "settings": {},
+      "blocks": {
+        "heading": {
+          "type": "heading",
+          "settings": { "heading": "Bridal sets and everyday pieces" }
+        },
+        "text": {
+          "type": "text",
+          "settings": {
+            "text": "Kundan, polki and silver, packed with care and delivered across Pakistan."
+          }
+        },
+        "button": {
+          "type": "button",
+          "settings": { "label": "See the collection", "link": "/collections/all" }
+        }
+      },
+      "block_order": ["heading", "text", "button"]
+    },
+    "pieces": {
+      "type": "featured-collection",
+      "settings": { "title": "New pieces", "collection": "all", "products_to_show": 6 }
+    },
+    "recently_viewed": { "type": "recently-viewed", "settings": {} },
+    "whatsapp": { "type": "whatsapp-cta", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": {} }
+  },
+  "order": ["banner", "pieces", "recently_viewed", "whatsapp", "newsletter"]
+}

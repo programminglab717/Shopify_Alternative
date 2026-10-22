@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Kundan, Nikhar and Kiryana
+
+* **Three more themes** ([ADR-734](../architecture/13-decision-log.md#adr-734--kundan-for-jewellery-nikhar-for-beauty-and-kiryana-for-groceries-complete-hattis-six-themes-one-for-each-starter-kit-which-the-store-builder-starts-each-kind-of-shop-on)), built on Hatti Base: Kundan for jewellery, three larger
+  pieces to a row with gold rules; Nikhar for beauty, soft rounded cards on a blush palette;
+  Kiryana for groceries, six to a row with whole photos and big prices. With Hatti Base, Lawn
+  and Bazaar, OS-01's V1 six.
+* **Every starter kit starts on its theme** in the store builder.
+* **For you**: their look and banner photos join [OWN-12](./owner-actions.md).
+* 4020 tests (1 new).
+
 ### 7cba4a1 · The bucket's CORS rule
 
 * **One command sets it** ([ADR-733](../architecture/13-decision-log.md#adr-733--the-buckets-cors-rule-is-set-by-a-command-of-the-cores-for-the-admins-origin-alone-from-admin_url-get-head-and-put-with-a-content-type-compared-before-it-is-put)): `storage-cors show` compares the bucket's CORS rules with

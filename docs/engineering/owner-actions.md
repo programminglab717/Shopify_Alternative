@@ -29,7 +29,7 @@ nothing secret is ever committed. Shortcuts are the numbered rows of
 | OWN-09 | The voice gateway for the Urdu confirmation calls (COD-03) | Calls to confirm orders (ADR-611) | Built against a gateway's documented API; `VOICE_GATEWAY_URL`, `VOICE_GATEWAY_KEY`, `VOICE_WEBHOOK_SECRET` | open |
 | OWN-10 | The SMS gateway, and the shared sender name registered for it | Codes, one-way updates and SMS campaigns (MKT-02) | `SMS_GATEWAY_URL`, `SMS_GATEWAY_KEY`, `SMS_SENDER`; branded senders shops ask for | open |
 | OWN-11 | The AI provider and model, and its key, for translations, product copy and photo crops (CAT-07, CAT-20, CAT-21) | AI drafts in the admin | `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`; daily quotas and credits by plan | open |
-| OWN-12 | Lawn's and Bazaar's look approved by you or a designer (ADR-730, ADR-731), and the photographs on their home pages: Lawn's banner names a placeholder image, and Bazaar's banner has no image, dark until one is set | The themes offered to shops at launch; the store builder starts fashion shops on Lawn and electronics shops on Bazaar (ADR-732) | Built, checked by Theme Check and rendered in tests; a shop changes its banner in the theme editor | open |
+| OWN-12 | The five vertical themes' look approved by you or a designer (Lawn, Bazaar, Kundan, Nikhar and Kiryana: ADR-730, ADR-731, ADR-734), and the photographs on their home pages: Lawn's banner names a placeholder image, and the others' banners have none, a dark band until one is set | The themes offered to shops at launch; the store builder starts fashion shops on Lawn and electronics shops on Bazaar (ADR-732) | Built, checked by Theme Check and rendered in tests; a shop changes its banner in the theme editor | open |
 
 ## Partners, accounts and keys
 

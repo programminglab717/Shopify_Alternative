@@ -1,0 +1,33 @@
+{
+  "sections": {
+    "banner": {
+      "type": "image-banner",
+      "settings": {},
+      "blocks": {
+        "heading": {
+          "type": "heading",
+          "settings": { "heading": "Your weekly basket, at your door" }
+        },
+        "text": {
+          "type": "text",
+          "settings": {
+            "text": "Spices, rice, tea, honey and desi ghee. Order on WhatsApp or here, and pay cash when it arrives."
+          }
+        },
+        "button": {
+          "type": "button",
+          "settings": { "label": "Fill your basket", "link": "/collections/all" }
+        }
+      },
+      "block_order": ["heading", "text", "button"]
+    },
+    "essentials": {
+      "type": "featured-collection",
+      "settings": { "title": "Everyday essentials", "collection": "all", "products_to_show": 12 }
+    },
+    "recently_viewed": { "type": "recently-viewed", "settings": {} },
+    "whatsapp": { "type": "whatsapp-cta", "settings": {} },
+    "newsletter": { "type": "newsletter", "settings": {} }
+  },
+  "order": ["banner", "essentials", "recently_viewed", "whatsapp", "newsletter"]
+}

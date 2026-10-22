@@ -1,0 +1,50 @@
+{%- comment -%}
+  Kiryana (ADR-734): Hatti Base laid out for groceries, where a shopper fills a basket of many
+  small things. Six to a row on wide screens, square photos shown whole on white, short titles,
+  the price large and bold, and compact cards.
+{%- endcomment -%}
+{% style %}
+  .grid {
+    gap: 0.75rem 0.5rem;
+  }
+  .card {
+    padding: 0.375rem;
+    border: 1px solid #dcebdf;
+    border-radius: 0.5rem;
+    background: #fff;
+  }
+  .card__media {
+    aspect-ratio: 1 / 1;
+    background: #fff;
+  }
+  .card__media img {
+    object-fit: contain;
+  }
+  .card__title {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 0.875rem;
+  }
+  .card .price__amount {
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+  .card .price__compare {
+    font-size: 0.8125rem;
+  }
+  .facets {
+    margin-block-end: 1rem;
+  }
+  html .banner {
+    min-block-size: 14rem;
+    background: #14532d;
+  }
+  @media (min-width: 1200px) {
+    .grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+{% endstyle %}

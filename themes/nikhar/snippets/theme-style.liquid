@@ -1,0 +1,32 @@
+{%- comment -%}
+  Nikhar (ADR-734): Hatti Base dressed for beauty and skincare. Square photos in soft rounded
+  cards, as bottles and palettes are shot; a blush palette, rounded headings' weight kept light,
+  and pill buttons.
+{%- endcomment -%}
+{% style %}
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+  }
+  .card {
+    padding: 0.5rem;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(63 29 43 / 0.08);
+  }
+  .card__media {
+    aspect-ratio: 1 / 1;
+    border-radius: 0.75rem;
+    background: #fdf2f6;
+  }
+  .card__title {
+    font-size: 0.9375rem;
+  }
+  .button {
+    border-radius: 999px;
+  }
+  html .banner {
+    background: #831843;
+  }
+{% endstyle %}

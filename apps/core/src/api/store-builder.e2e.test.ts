@@ -50,9 +50,11 @@ describe('The store builder reads what a shop sells (ONB-03, ADR-502)', () => {
       },
     });
     expect(planStore('Zari', 'x '.repeat(200)).seo.description.length).toBeLessThanOrEqual(160);
-    // Hatti's theme for the shop's kind, Hatti Base where its kind has none (ADR-732).
+    // Hatti's theme for the shop's kind (ADR-732, ADR-734), Hatti Base where its words name none.
     expect(planStore('Volt', 'Phones, chargers and earbuds').theme).toBe('bazaar');
-    expect(planStore('Kundan', 'Handmade kundan jhumkas and bangles').theme).toBe('hatti-base');
+    expect(planStore('Kundan', 'Handmade kundan jhumkas and bangles').theme).toBe('kundan');
+    expect(planStore('Glow', 'Skincare, makeup and a vitamin C serum').theme).toBe('nikhar');
+    expect(planStore('Desi', 'Pure honey, desi ghee and achar').theme).toBe('kiryana');
     expect(planStore('Zari', 'We do many things').theme).toBe('hatti-base');
   });
 });
