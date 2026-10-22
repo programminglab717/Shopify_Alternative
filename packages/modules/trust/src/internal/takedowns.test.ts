@@ -27,8 +27,8 @@ describe.skipIf(!server)('Stores taken down (TNS-01, ADR-461)', () => {
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(
-      `INSERT INTO control.shops (id, name, handle, status)
-       VALUES ($1, 'Zari', 'zari', 'active'), ($2, 'Gone', 'gone', 'closed')`,
+      `INSERT INTO control.shops (id, name, handle, status, closed_at)
+       VALUES ($1, 'Zari', 'zari', 'active', NULL), ($2, 'Gone', 'gone', 'closed', now())`,
       [zari, closed],
     );
     takedowns = new TakedownsService(db);
