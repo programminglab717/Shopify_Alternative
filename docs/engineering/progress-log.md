@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
-### The bucket's CORS rule
+### 7cba4a1 · The bucket's CORS rule
 
 * **One command sets it** ([ADR-733](../architecture/13-decision-log.md#adr-733--the-buckets-cors-rule-is-set-by-a-command-of-the-cores-for-the-admins-origin-alone-from-admin_url-get-head-and-put-with-a-content-type-compared-before-it-is-put)): `storage-cors show` compares the bucket's CORS rules with
   the one Hatti needs, the admin's origin from `ADMIN_URL` uploading and reading; `apply` puts it.
