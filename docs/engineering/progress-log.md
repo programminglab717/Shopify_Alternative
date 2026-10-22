@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Deleting a closed shop's data
+### 6f92f1c · Deleting a closed shop's data
 
 * **90 days after a shop closed, its data can be deleted** ([ADR-741](../architecture/13-decision-log.md#adr-741--a-closed-shops-data-is-deleted-90-days-after-it-closed-table-by-table-from-those-its-tenant-isolation-names-but-a-list-of-records-the-law-has-hatti-keep-and-its-files-the-worker-does-it-once-counsel-has-confirmed-the-list-hattis-people-by-hand-till-then)): every table its rows are
   in, found from their tenant isolation, but the records the law has Hatti keep, such as sales
