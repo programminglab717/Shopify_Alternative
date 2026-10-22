@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
+### Telling shops of new legal versions
+
+* **A new version of Hatti's terms, policies or list of sub-processors is announced** ([ADR-742](../architecture/13-decision-log.md#adr-742--every-shop-is-told-of-a-new-version-of-hattis-terms-policies-or-list-of-sub-processors-at-its-alerts-number-and-by-email-to-its-owner-once-the-worker-records-each-version-the-first-time-it-runs-with-it-and-one-that-follows-an-earlier-version-is-announced-to-the-shops-open-before-it)):
+  to every shop open before it, at its alerts number and by email to its owner, in the shop's
+  language, with the day it takes effect and its page; once, from Hatti and at its cost.
+* **Releasing it is all it takes:** the worker records each version the first time it runs with
+  it, and the first of each document, which owners agreed to in opening their shops, is not
+  announced.
+* **How long ahead** a version must be released is counsel's (OWN-41).
+* 4056 tests (2 new).
+
 ### 6f92f1c · Deleting a closed shop's data
 
 * **90 days after a shop closed, its data can be deleted** ([ADR-741](../architecture/13-decision-log.md#adr-741--a-closed-shops-data-is-deleted-90-days-after-it-closed-table-by-table-from-those-its-tenant-isolation-names-but-a-list-of-records-the-law-has-hatti-keep-and-its-files-the-worker-does-it-once-counsel-has-confirmed-the-list-hattis-people-by-hand-till-then)): every table its rows are

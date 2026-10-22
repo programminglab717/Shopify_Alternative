@@ -154,6 +154,7 @@ import { StaffAlerts } from './staff-alerts.js';
 import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
 import { StatusShopNotices } from './status-shop-notices.js';
+import { LegalChangeNotices } from './legal-notices.js';
 import { OrderTemplates } from './order-templates.js';
 import { StatusProbes } from './status-probes.js';
 import { IncidentsService, StatusSubscriptionsService } from '@hatti/trust/public';
@@ -681,6 +682,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => statusNotices.stop());
+    // Every shop open before it told of a new version of Hatti's terms and policies (ADR-742).
+    const legalNotices = new LegalChangeNotices(
+      database,
+      new MessagesService(database),
+      new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => legalNotices.stop());
     // Hatti's parts checked, incidents posted when one stops answering (ADR-536).
     if (config.STATUS_PROBES.length > 0) {
       const probes = new StatusProbes(

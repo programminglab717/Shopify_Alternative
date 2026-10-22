@@ -300,6 +300,9 @@ importers:
       '@hatti/inventory':
         specifier: workspace:*
         version: link:../../packages/modules/inventory
+      '@hatti/legal':
+        specifier: workspace:*
+        version: link:../../packages/platform/legal
       '@hatti/logger':
         specifier: workspace:*
         version: link:../../packages/platform/logger

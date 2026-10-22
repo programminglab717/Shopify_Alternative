@@ -22,7 +22,7 @@ export interface ShopNotice {
  */
 export async function tellShop(
   tx: Tx,
-  messages: MessagesService,
+  messages: Pick<MessagesService, 'queueIn'>,
   shopId: string,
   notice: ShopNotice,
 ): Promise<void> {

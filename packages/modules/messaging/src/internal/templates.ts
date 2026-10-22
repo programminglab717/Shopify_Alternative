@@ -74,6 +74,7 @@ export const MESSAGE_KINDS = [
   'rights_counter_refused',
   'listings_released',
   'status_update',
+  'legal_changed',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -156,6 +157,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'listings_released',
   // Hatti's outages, when they begin and end (ADR-544).
   'status_update',
+  // Hatti's terms and policies changed (ADR-742).
+  'legal_changed',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -205,6 +208,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'rights_counter_refused',
   'listings_released',
   'status_update',
+  'legal_changed',
 ];
 
 /**
@@ -390,7 +394,9 @@ export interface MessageVariables {
   /**
    * For Hatti's outages (ADR-544): what Hatti called it, in the shop's language where it said it
    * in Urdu too, "WhatsApp messages delayed"; where it stands, "Resolved"; and the parts it
-   * touches, "WhatsApp messages, SMS". In `url`, the status page.
+   * touches, "WhatsApp messages, SMS". In `url`, the status page. For a new version of one of
+   * Hatti's legal documents (ADR-742): its title, "Terms of Service", with `date` the day it takes
+   * effect and `url` its page.
    */
   title?: string;
   status?: string;
@@ -1354,6 +1360,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: 'Hatti status for {shop}: {title}. {status}. Touches: {touches}. See {url} for what Hatti says as it goes.',
       ur: 'ہٹی کی صورتحال، {shop} کے لیے: {title}۔ {status}۔ متاثرہ حصے: {touches}۔ ہٹی کی تازہ معلومات {url} پر دیکھیں۔',
+    },
+  },
+  legal_changed: {
+    whatsapp: 'hatti_legal_changed',
+    category: 'utility',
+    parameters: ['shop', 'title', 'date', 'url'],
+    hattiPays: true,
+    text: {
+      en: 'Hatti: a new version of our {title} takes effect on {date}, for {shop} as for every shop on Hatti. Read it here:',
+      ur: 'ہٹی: ہماری {title} کا نیا ورژن {date} سے نافذ ہوگا، {shop} سمیت ہٹی کی ہر دکان کے لیے۔ اسے یہاں پڑھیں:',
+    },
+    subject: {
+      en: "A new version of Hatti's {title} takes effect on {date}",
+      ur: 'ہٹی کی {title} کا نیا ورژن {date} سے نافذ ہوگا',
     },
   },
 };

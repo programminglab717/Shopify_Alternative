@@ -623,6 +623,7 @@ describe("Messages' words", () => {
       'rights_counter_refused',
       'listings_released',
       'status_update',
+      'legal_changed',
     ]);
     // Hatti's outages, in the shop's words for its status (ADR-544).
     expect(
@@ -640,6 +641,26 @@ describe("Messages' words", () => {
       'Checkout, Online payments',
       'https://hatti.pk/status',
     ]);
+    // A new version of Hatti's terms or policies, the day it takes effect and its page (ADR-742).
+    const terms = {
+      shop: 'Zari Fashions',
+      title: 'Terms of Service',
+      date: '1 December 2026',
+      url: 'https://hatti.pk/legal/terms',
+    };
+    expect(templateParameters('legal_changed', terms)).toEqual([
+      'Zari Fashions',
+      'Terms of Service',
+      '1 December 2026',
+      'https://hatti.pk/legal/terms',
+    ]);
+    expect(messageText('legal_changed', 'en', terms)).toBe(
+      'Hatti: a new version of our Terms of Service takes effect on 1 December 2026, for Zari ' +
+        'Fashions as for every shop on Hatti. Read it here: https://hatti.pk/legal/terms',
+    );
+    const email = messageEmail('legal_changed', 'ur', { ...terms, title: 'شرائطِ خدمت' })!;
+    expect(email.from).toBe('hatti');
+    expect(email.subject).toBe('ہٹی کی شرائطِ خدمت کا نیا ورژن 1 December 2026 سے نافذ ہوگا');
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
       // And the code to sign in to their account on the storefront (ADR-570).
@@ -685,6 +706,8 @@ describe("Messages' words", () => {
       'listings_released',
       // Hatti's outages (ADR-544).
       'status_update',
+      // And its terms and policies changed (ADR-742).
+      'legal_changed',
       'broadcast',
       'automation',
       // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
@@ -846,6 +869,7 @@ describe("Messages' words", () => {
       'listings_taken_down',
       'rights_counter_refused',
       'listings_released',
+      'legal_changed',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

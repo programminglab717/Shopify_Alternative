@@ -315,7 +315,7 @@ part of the plan from day one.
   mechanism**; periodic legal review. This feature launches only after counsel signs off.
 * **Sub-processors:** a public list (cloud, CDN, messaging, email, AI provider, KYC partner) with
   change notifications. *Built:* the list at `/legal/sub-processors`, with the terms, privacy
-  policy, acceptable use policy and data processing agreement, drafts for counsel ([ADR-736](./13-decision-log.md#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)).
+  policy, acceptable use policy and data processing agreement, drafts for counsel ([ADR-736](./13-decision-log.md#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)); a new version of any, the list too, announced to every shop at its alerts number and by email to its owner ([ADR-742](./13-decision-log.md#adr-742--every-shop-is-told-of-a-new-version-of-hattis-terms-policies-or-list-of-sub-processors-at-its-alerts-number-and-by-email-to-its-owner-once-the-worker-records-each-version-the-first-time-it-runs-with-it-and-one-that-follows-an-earlier-version-is-announced-to-the-shops-open-before-it)).
 * **Design target:** GDPR-grade practices, so we are ready when Pakistan's personal data
   protection law is enacted and for diaspora and EU-facing stores.
 

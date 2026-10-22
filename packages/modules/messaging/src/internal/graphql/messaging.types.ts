@@ -72,6 +72,7 @@ export enum MessageKind {
   RIGHTS_COUNTER_REFUSED = 'RIGHTS_COUNTER_REFUSED',
   LISTINGS_RELEASED = 'LISTINGS_RELEASED',
   STATUS_UPDATE = 'STATUS_UPDATE',
+  LEGAL_CHANGED = 'LEGAL_CHANGED',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
   SMS_BROADCAST = 'SMS_BROADCAST',
@@ -377,6 +378,12 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, from Hatti and paid by Hatti, at its alerts number: an outage of Hatti's " +
         'begun, or maintenance putting a part out of service set, and its ending (ADR-544).',
+    },
+    LEGAL_CHANGED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number and by email to its ' +
+        "owner: a new version of one of Hatti's legal documents, the day it takes effect and its " +
+        'page (ADR-742).',
     },
     BROADCAST: {
       description:

@@ -39,6 +39,7 @@
     "@hatti/identity": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/images": "workspace:*",
+    "@hatti/legal": "workspace:*",
     "@hatti/inventory": "workspace:*",
     "@hatti/logger": "workspace:*",
     "@hatti/logistics": "workspace:*",

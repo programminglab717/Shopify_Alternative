@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-741 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-742 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -749,6 +749,7 @@
 | 739 | A shop's owner agrees to Hatti's terms again whenever theirs for it are not the current versions: after a new version, a handover, or for a shop opened before agreements were kept, asked above every page of the admin and recorded as on opening a shop | Accepted |
 | 740 | A shop's owner closes it from the admin, typing its name after confirming who they are: its storefront, checkout, Admin API and renewals stop, and they may reopen it for the 90 days its data is kept | Accepted |
 | 741 | A closed shop's data is deleted 90 days after it closed, table by table from those its tenant isolation names, but a list of records the law has Hatti keep, and its files; the worker does it once counsel has confirmed the list, Hatti's people by hand till then | Accepted |
+| 742 | Every shop is told of a new version of Hatti's terms, policies or list of sub-processors, at its alerts number and by email to its owner, once: the worker records each version the first time it runs with it, and one that follows an earlier version is announced to the shops open before it | Accepted |
 
 ---
 
@@ -25238,3 +25239,32 @@
   addresses; whether those are scrubbed is for counsel (OWN-42). Kept records are never deleted
   after their six years yet. Identity's members and invitations of the shop, and its documents
   in the storefront's store, which the publisher took down on closing, are not part of the purge.
+
+## ADR-742 · Every shop is told of a new version of Hatti's terms, policies or list of sub-processors, at its alerts number and by email to its owner, once: the worker records each version the first time it runs with it, and one that follows an earlier version is announced to the shops open before it
+
+* **Context:** Hatti's terms, privacy policy, acceptable use policy, data processing agreement
+  and list of sub-processors are versioned texts that ship with a release
+  ([ADR-736](#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)). An owner agrees to them in opening a shop
+  ([ADR-737](#adr-737--a-shop-opens-only-once-its-owner-agrees-to-hattis-terms-of-service-acceptable-use-policy-and-data-processing-agreement-as-they-are-now-the-versions-shown-are-sent-with-the-shop-refused-when-stale-and-kept-with-who-agreed-and-from-where)) and is asked again in the admin after a new version
+  ([ADR-739](#adr-739--a-shops-owner-agrees-to-hattis-terms-again-whenever-theirs-for-it-are-not-the-current-versions-after-a-new-version-a-handover-or-for-a-shop-opened-before-agreements-were-kept-asked-above-every-page-of-the-admin-and-recorded-as-on-opening-a-shop)), but no one was told one had come, and the data processing
+  agreement and the sub-processors' page promise notice of changes.
+* **Decision:**
+  * **`platform.legal_versions`** (migration 0317) holds each document's versions as the worker
+    first saw them. The worker's `LegalChangeNotices` sweep records the versions of this release:
+    the first of each document is not announced, owners having agreed to it in opening their
+    shops; one that follows an earlier version of the same document is.
+  * **Who is told:** every shop open, or taken down, that was opened before the version was
+    first seen; not a closed shop, nor one opened after, whose owner agreed to that version.
+  * **How:** the new `legal_changed` message, Hatti's own and at its cost, as its other notices
+    to shops ([ADR-169](#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)): at the shop's alerts number on WhatsApp, from Hatti's
+    template `hatti_legal_changed`, and by email to its owner in their language
+    ([ADR-195](#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)). It names the document in the shop's language, the day the version
+    takes effect and its page at `/legal/{handle}`. A shop cannot turn it off.
+  * **Once:** each notice's key is the document and version, and the version is marked told
+    once every shop has it queued; a shop that failed is tried again on the next sweep, the
+    others not twice. A version replaced before it was announced is passed over for the newer.
+* **Consequences:** a change to Hatti's texts reaches every owner without anyone sending it, by
+  releasing the new version. How long before a version takes effect it must be released, so
+  that the notice comes in time, is counsel's (OWN-41): the version's date is the day it takes
+  effect, and releasing it early is how notice is given. Its WhatsApp template is approved with
+  Meta with Hatti's others (OWN-23); until it is, the email alone reaches the owner.
