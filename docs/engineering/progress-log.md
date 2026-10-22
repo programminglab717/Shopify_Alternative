@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Agreeing to Hatti's terms
+### 059e7cf · Agreeing to Hatti's terms
 
 * **A shop opens only with its owner's agreement** ([ADR-737](../architecture/13-decision-log.md#adr-737--a-shop-opens-only-once-its-owner-agrees-to-hattis-terms-of-service-acceptable-use-policy-and-data-processing-agreement-as-they-are-now-the-versions-shown-are-sent-with-the-shop-refused-when-stale-and-kept-with-who-agreed-and-from-where)) to Hatti's terms of service,
   acceptable use policy and data processing agreement, by the versions shown: refused without
