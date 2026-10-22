@@ -20,6 +20,7 @@
     "@hatti/storefront-data": "workspace:*",
     "@hatti/telemetry": "workspace:*",
     "@hatti/themes": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "fastify": "catalog:",
     "ioredis": "catalog:",
     "liquidjs": "catalog:"

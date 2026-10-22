@@ -2,6 +2,7 @@ import type { RenderedPage } from '@hatti/documents';
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { checkPassword } from '@hatti/crypto';
+import { metrics } from '@opentelemetry/api';
 import {
   MemoryStore,
   RedisStore,
@@ -644,6 +645,9 @@ export async function warmUp(renderer: PageRenderer): Promise<void> {
  * rendered from, and sent as it is written. Urdu pages are under /ur/. It warms up before it
  * listens.
  */
+/** The edges of {@link createStorefrontServer}'s LCP histogram, in milliseconds. */
+export const LCP_BUCKETS = [500, 1000, 1500, 2000, 2500, 3000, 4000, 6000, 10000];
+
 export function createStorefrontServer(options: StorefrontServerOptions): FastifyInstance {
   const { theme, renderer, domain, redis, sample } = options;
   const keys = options.keys ?? new StorefrontKeys();
@@ -657,6 +661,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
   // What shoppers do on each shop, counted as Shopify's analytics count it (ADR-180).
   const activity = redis ? new StorefrontActivity(redis, keys) : null;
+  // Shoppers' largest contentful paint across every shop, for the objective that three in four
+  // pages on a phone paint within two seconds (12 §1, ADR-729).
+  const paints = metrics.getMeter('hatti.storefront').createHistogram('hatti.storefront.lcp', {
+    unit: 'ms',
+    description: "Shoppers' largest contentful paint, by device and kind of page",
+    advice: { explicitBucketBoundaries: LCP_BUCKETS },
+  });
   // How fast each shop's pages are for its shoppers (ADR-485).
   const vitals = redis ? new StorefrontVitals(redis, keys) : null;
   // What each shop's shoppers search it for (ADR-683).
@@ -845,13 +856,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const userAgent = request.headers['user-agent'];
     const sample = vitalSampleOf(vitalsReportOf(request.body), userAgent);
     if (!sample) return reply.code(400).send();
-    if (
-      vitals &&
+    const counted =
       !found.preview &&
       found.store instanceof RedisStore &&
       sessionOf(request.headers.cookie) &&
-      !isRobot(userAgent)
-    ) {
+      !isRobot(userAgent);
+    if (counted && sample.values.lcp !== undefined) {
+      paints.record(sample.values.lcp, { device: sample.device, template: sample.template });
+    }
+    if (vitals && counted) {
       try {
         const timezone = (await found.store.shop()).timezone ?? 'Asia/Karachi';
         await vitals.record(found.shopId, timezone, sample);

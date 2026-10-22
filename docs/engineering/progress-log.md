@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-21
 
+### Phones' LCP watched
+
+* **Shoppers' largest contentful paint as a metric** ([ADR-729](../architecture/13-decision-log.md#adr-729--shoppers-largest-contentful-paint-is-a-storefront-histogram-ticketed-when-phones-p75-passes-two-seconds-payments-callback-objective-waits-for-gateways-that-say-when-they-were-paid)): the storefront records each counted
+  Web Vitals report's LCP by device and kind of page, and `HattiStorefrontLcpSlow` tickets when
+  phones' p75 stays over two seconds, with a runbook and a dashboard panel.
+* **Payments' callback objective waits** for gateways that say when they were paid; noted with
+  OWN-21 in the owner's register.
+* 4009 tests, as before; one more alert test run by promtool.
+
 ### 220b069 · A confirmation's minute counted from its order
 
 * **Messages due since what they tell of** ([ADR-728](../architecture/13-decision-log.md#adr-728--an-order-confirmations-minute-is-counted-from-the-order-a-message-is-due-since-what-it-tells-of-happened-when-that-came-before-it-was-queued)): `dueSince`, given by the worker's news of an

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-728 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-729 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -736,6 +736,7 @@
 | 726 | The storefront's and checkout's objectives are watched too: the storefront sends its telemetry, and the request durations' buckets include 800 ms | Accepted |
 | 727 | Webhooks, order confirmations and courier bookings are watched by how long they wait: histograms the worker records, with burn-rate alerts against 12 §1's minute, minute and five minutes | Accepted |
 | 728 | An order confirmation's minute is counted from the order: a message is due since what it tells of happened, when that came before it was queued | Accepted |
+| 729 | Shoppers' largest contentful paint is a storefront histogram, ticketed when phones' p75 passes two seconds; payments' callback objective waits for gateways that say when they were paid | Accepted |
 
 ---
 
@@ -24859,3 +24860,24 @@
 * **Consequences:** `HattiConfirmationMessageBudgetBurn` now spends budget for the outbox's lag
   too, which is what a customer waits through; `HattiOutboxLagging` still pages apart, naming the
   cause. Other messages are counted from their queuing until their own events say when they began.
+
+## ADR-729 · Shoppers' largest contentful paint is a storefront histogram, ticketed when phones' p75 passes two seconds; payments' callback objective waits for gateways that say when they were paid
+
+* **Context:** Two of [12 §1](./12-scalability-and-reliability.md#1-service-level-objectives)'s
+  objectives had no alert after [ADR-727](#adr-727--webhooks-order-confirmations-and-courier-bookings-are-watched-by-how-long-they-wait-histograms-the-worker-records-with-burn-rate-alerts-against-12-1s-minute-minute-and-five-minutes): p75 LCP at most 2.0 s on mid-range Android
+  over 4G, and a paid intent becoming a paid order within 60 s by callback (5 min by inquiry).
+  Shoppers' pages already report their Web Vitals to the storefront ([ADR-485](#adr-485--the-store-speed-score-shoppers-own-core-web-vitals-counted-by-the-storefront-in-histograms-of-28-days-scored-per-device-as-google-judges-them-with-fixes)), kept
+  per shop in Valkey for the speed score, not as metrics.
+* **Decision:**
+  * **The storefront records each counted report's LCP** in `hatti.storefront.lcp` (milliseconds,
+    buckets at 2,000 ms among others) by `device` and `template`, under the same rules as the
+    speed score: no robots, previews or sample shops, and a session's cookie.
+  * **`HattiStorefrontLcpSlow`**, a ticket: phones' p75 over the last hour above 2,000 ms for two
+    hours, with at least a hundred pages in the hour to judge by. A quality objective, not an
+    outage, so no page and no error budget; a promtool test, a runbook and a dashboard panel.
+  * **Payments' objective stays without an alert.** A gateway's callback or inquiry says that a
+    payment was made, not when, so "paid intent" has no start to count from; the session's start
+    includes the shopper's own time at the gateway. It waits for the sandboxes (OWN-21) to show
+    which gateways sign a time.
+* **Consequences:** The objective is read on all phones, not mid-range Android over 4G alone,
+  which no browser reports; it is the stricter reading. A shop's own LCP stays its speed score's.

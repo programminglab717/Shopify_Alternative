@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { collectMetrics } from '@hatti/telemetry/testing';
 import { fileURLToPath } from 'node:url';
 import {
   BuildQueue,
@@ -80,6 +81,9 @@ import {
   type StorefrontServerOptions,
 } from './server.js';
 import { loadTheme, readThemeDir, type Theme } from '@hatti/themes';
+
+// Before the servers that record them are made.
+const recorded = collectMetrics();
 
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl && process.env.CI) throw new Error('REDIS_URL must be set in CI');
@@ -5599,6 +5603,16 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
 
     const { histograms, pageViews } = await vitals.histograms(zari, [today]);
     expect(Object.fromEntries(pageViews)).toEqual({ 'mobile:product': 1 });
+    // And across every shop, for the objective of 12 §1 (ADR-729): the counted report alone.
+    const paints = await recorded.histogram('hatti.storefront.lcp');
+    expect(
+      paints.map((point) => [
+        point.attributes,
+        point.count,
+        point.atMost.get(2000),
+        point.atMost.get(2500),
+      ]),
+    ).toEqual([[{ device: 'mobile', template: 'product' }, 1, 0, 1]]);
     expect(summarize('lcp', histograms.get('mobile:product:lcp')!)).toMatchObject({
       samples: 1,
       p75: 2500,

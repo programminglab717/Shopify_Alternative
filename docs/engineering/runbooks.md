@@ -177,3 +177,16 @@ refused and that were tried again are left out: the courier was not healthy.
    calls. Nothing to fix on our side but to tell the shops booking with it.
 3. All slow: is the worker's bookings sweep (every `COURIER_BOOKINGS_INTERVAL_MS`, 30 seconds)
    running and keeping up? A large batch booked at once queues behind itself.
+
+## HattiStorefrontLcpSlow
+
+For two hours, three in four of shoppers' pages on a phone have taken over two seconds to paint
+their largest content, as their browsers measured it. Shoppers on mid-range Android phones over
+4G leave slow pages. A ticket: nothing is down.
+
+1. The dashboard's LCP by device shows whether phones alone are slow, and since when; the
+   speed score of a shop (ADR-485, through the Admin API) says which kinds of its pages.
+2. Every shop at once points at the storefront or the network: the storefront's request p95 and
+   time to first byte, then the edge's cache hit ratio once the edge is in front.
+3. A few shops point at their themes or images: large hero images and sections added lately.
+   Their speed scores' fixes say what to change.

@@ -531,7 +531,7 @@
     {
       "id": 14,
       "type": "row",
-      "title": "Storefront and checkout (objectives: 99.95% without a server error; 95% of checkout forms within 800 ms; 30 days)",
+      "title": "Storefront and checkout (objectives: 99.95% without a server error; 95% of checkout forms within 800 ms; 30 days; phones' pages painted within 2 s at p75)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -840,6 +840,53 @@
       "options": {}
     },
     {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Largest contentful paint p75 by device",
+      "description": "Three in four of shoppers' pages painted their largest content within this, as their browsers measured it; the objective is 2 s on phones.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.75, sum by (le, device) (rate(hatti_storefront_lcp_milliseconds_bucket{job=\"hatti/storefront\"}[$__rate_interval])))",
+          "legendFormat": "{{device}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
       "id": 21,
       "type": "row",
       "title": "Webhooks, confirmations and bookings (objectives, each 99%: webhooks first tried within a minute; confirmations sent within a minute; bookings within five minutes; 30 days)",
@@ -848,7 +895,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 68
       },
       "panels": []
     },
@@ -865,7 +912,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 61
+        "y": 69
       },
       "targets": [
         {
@@ -899,7 +946,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 61
+        "y": 69
       },
       "targets": [
         {
@@ -933,7 +980,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 69
+        "y": 77
       },
       "targets": [
         {
@@ -984,7 +1031,7 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 69
+        "y": 77
       },
       "targets": [
         {
@@ -1035,7 +1082,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 69
+        "y": 77
       },
       "targets": [
         {
@@ -1086,7 +1133,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 69
+        "y": 77
       },
       "targets": [
         {

@@ -1,4 +1,4 @@
-# Hatti's recording rules and alerts (ADR-725, ADR-726, ADR-727), over the metrics the core and the
+# Hatti's recording rules and alerts (ADR-725 to ADR-729), over the metrics the core and the
 # storefront send by OTLP, as Prometheus names them: dots become underscores, the unit and _total
 # are appended, and the job is service.namespace/service.name, such as hatti/core-api. Each alert's
 # runbook is a section of docs/engineering/runbooks.md.
@@ -606,6 +606,30 @@ groups:
           description: >-
             {{ $value | humanizePercentage }} of courier bookings took over five minutes, the courier not refusing; the objective allows 1%.
           runbook: docs/engineering/runbooks.md#hatticourierbookingbudgetburn
+
+  # Shoppers' largest contentful paint (12 §1, ADR-729): three in four pages on a phone painted
+  # within two seconds. A quality objective, not an outage: a ticket when it has held for two
+  # hours, and only with a hundred pages an hour to judge by.
+  - name: hatti-storefront-experience
+    interval: 5m
+    rules:
+      - record: hatti:storefront_lcp_mobile:p75_1h
+        expr: |
+          histogram_quantile(0.75, sum by (le) (rate(hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile"}[1h])))
+      - alert: HattiStorefrontLcpSlow
+        expr: |
+          hatti:storefront_lcp_mobile:p75_1h > 2000
+          and on ()
+          sum(increase(hatti_storefront_lcp_milliseconds_count{job="hatti/storefront",device="mobile"}[1h])) > 100
+        for: 2h
+        labels:
+          severity: ticket
+        annotations:
+          summary: Shoppers' pages paint slowly on phones
+          description: >-
+            Three in four pages on a phone painted their largest content within
+            {{ printf "%.0f" $value }} ms over the last hour; the objective is 2,000 ms.
+          runbook: docs/engineering/runbooks.md#hattistorefrontlcpslow
 
   - name: hatti-events
     rules:

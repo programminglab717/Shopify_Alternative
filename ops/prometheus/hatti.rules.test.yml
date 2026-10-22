@@ -448,3 +448,46 @@ tests:
               summary: Order confirmations go late often enough to spend the month's budget
               description: 5% of order confirmations were sent over a minute after they were due; the objective allows 1%.
               runbook: docs/engineering/runbooks.md#hatticonfirmationmessagebudgetburn
+
+  # Phones' pages painting in three seconds for three hours, at three hundred an hour, ticket
+  # (ADR-729); as slow but at fifty an hour, or quick, do not.
+  - interval: 5m
+    input_series:
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile",template="product",le="2000"}'
+        values: '0+5x40'
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile",template="product",le="3000"}'
+        values: '0+25x40'
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile",template="product",le="+Inf"}'
+        values: '0+25x40'
+      - series: 'hatti_storefront_lcp_milliseconds_count{job="hatti/storefront",device="mobile",template="product"}'
+        values: '0+25x40'
+    alert_rule_test:
+      - eval_time: 3h15m
+        alertname: HattiStorefrontLcpSlow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: Shoppers' pages paint slowly on phones
+              description: Three in four pages on a phone painted their largest content within 2688 ms over the last hour; the objective is 2,000 ms.
+              runbook: docs/engineering/runbooks.md#hattistorefrontlcpslow
+  - interval: 5m
+    input_series:
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile",template="product",le="2000"}'
+        values: '0+1x40'
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile",template="product",le="3000"}'
+        values: '0+4x40'
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="mobile",template="product",le="+Inf"}'
+        values: '0+4x40'
+      - series: 'hatti_storefront_lcp_milliseconds_count{job="hatti/storefront",device="mobile",template="product"}'
+        values: '0+4x40'
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="desktop",template="index",le="2000"}'
+        values: '0x40'
+      - series: 'hatti_storefront_lcp_milliseconds_bucket{job="hatti/storefront",device="desktop",template="index",le="+Inf"}'
+        values: '0+50x40'
+      - series: 'hatti_storefront_lcp_milliseconds_count{job="hatti/storefront",device="desktop",template="index"}'
+        values: '0+50x40'
+    alert_rule_test:
+      - eval_time: 3h15m
+        alertname: HattiStorefrontLcpSlow
+        exp_alerts: []
