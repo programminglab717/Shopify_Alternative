@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
-### Hatti's legal documents
+### 09b83e0 · Hatti's legal documents
 
 * **Terms, privacy policy, acceptable use policy, data processing agreement and
   sub-processors** ([ADR-736](../architecture/13-decision-log.md#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)), in `@hatti/legal`, each versioned, its English binding and its
