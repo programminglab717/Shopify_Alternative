@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-735 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-736 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -743,6 +743,7 @@
 | 733 | The bucket's CORS rule is set by a command of the core's, for the admin's origin alone, from ADMIN_URL: GET, HEAD and PUT with a content type, compared before it is put | Accepted |
 | 734 | Kundan for jewellery, Nikhar for beauty and Kiryana for groceries complete Hatti's six themes, one for each starter kit, which the store builder starts each kind of shop on | Accepted |
 | 735 | The launch load test is a k6 script kept in the repository: shoppers browsing and placing cash-on-delivery orders side by side at three times 12 §2's launch peak, held to 12 §1's objectives, against staging's load-test shop, each shopper from an address and a number of its own | Accepted |
+| 736 | Hatti's own terms, privacy policy, acceptable use policy, data processing agreement and sub-processors are versioned texts in a package of their own, served by the core at /legal with their gist in Urdu, and marked drafts while any blank is left for counsel | Accepted |
 
 ---
 
@@ -25051,3 +25052,37 @@
   orders 1.04 s at p95); this checks the script, not the platform's capacity. The Admin API's objective has no scenario: its cost buckets hold each
   app to its share ([ADR-576](#adr-576--the-admin-api-costs-each-query-before-it-runs-and-meters-it-per-app-or-member-of-staff-in-each-shop-shopifys-leaky-bucket-refusing-what-would-overdraw-it-and-saying-the-cost)), so its load is the shops', to be tested with many
   shops' tokens once staging has them. CI lints the scripts but does not run them.
+
+## ADR-736 · Hatti's own terms, privacy policy, acceptable use policy, data processing agreement and sub-processors are versioned texts in a package of their own, served by the core at /legal with their gist in Urdu, and marked drafts while any blank is left for counsel
+
+* **Context:** the launch checklist asks for legal pages and a DPA published, and 11 §7 for a
+  public list of sub-processors. Shops' own policies have drafts ([ADR-056](#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)), but Hatti
+  had no terms of its own: a shop opened agreeing to nothing, and the takedowns, the grace week
+  and the roles of controller and processor that 11 §7 describes were written nowhere a shop could
+  read them.
+* **Decision:**
+  * **`@hatti/legal`**, a platform package with no dependencies, keeps five documents: the terms
+    of service, the privacy policy, the acceptable use policy, the data processing agreement and
+    the sub-processors. Each has a version, the day it takes effect, which an agreement will
+    record; numbered sections in English, which bind; and its gist in Urdu.
+  * **The texts say what the platform does as built**: no fee on sales, the renewal invoice a
+    week ahead and a week's grace before the Free plan, the Rs 200,000 cash cap, screening,
+    reports decided within 48 hours, takedowns and appeals, the store export, customers' exports
+    and erasures, support access only with the owner's consent. A change to that changes the text
+    under a new version.
+  * **Blanks are explicit**: what only counsel or the owner can supply, Hatti's legal name and
+    address, the courts, the cell's region, the processors still to be chosen, is written
+    `[To come: ...]`. `LEGAL_REVIEWED` stays false, and a test refuses it true, while one is
+    left; until then every page says it is a draft.
+  * **The sub-processors** are a structured list: what each does, what data reaches it and where,
+    those still to be chosen named as blanks so the list cannot pass for final. The services a
+    shop connects itself, its gateways, couriers, own WhatsApp number and pixels, are its own
+    choices and not on it.
+  * **The core serves them** on its own address, as the status page is: `/legal`, `/legal/{handle}`
+    with its Urdu gist above the English, and `/legal.json` with each version, for the admin
+    and the agreement to read. A handle not known is a 404 that lists them.
+* **Consequences:** the drafts exist for counsel to work on (OWN-41) and the owner to complete
+  (OWN-30). Some of what they promise is policy still to build: messages purged after twelve
+  months, a closed shop's data deleted after 90 days, closing a shop from the admin, and the
+  emails of changes to the terms and of new sub-processors; they must be built before the texts
+  take effect. Opening a shop does not yet record agreement to them; that comes next.

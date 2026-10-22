@@ -314,7 +314,8 @@ part of the plan from day one.
   exposed; no raw cross-shop order history; a shopper-facing explanation and **dispute
   mechanism**; periodic legal review. This feature launches only after counsel signs off.
 * **Sub-processors:** a public list (cloud, CDN, messaging, email, AI provider, KYC partner) with
-  change notifications.
+  change notifications. *Built:* the list at `/legal/sub-processors`, with the terms, privacy
+  policy, acceptable use policy and data processing agreement, drafts for counsel ([ADR-736](./13-decision-log.md#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)).
 * **Design target:** GDPR-grade practices, so we are ready when Pakistan's personal data
   protection law is enacted and for diaspora and EU-facing stores.
 

@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-22
 
+### Hatti's legal documents
+
+* **Terms, privacy policy, acceptable use policy, data processing agreement and
+  sub-processors** ([ADR-736](../architecture/13-decision-log.md#adr-736--hattis-own-terms-privacy-policy-acceptable-use-policy-data-processing-agreement-and-sub-processors-are-versioned-texts-in-a-package-of-their-own-served-by-the-core-at-legal-with-their-gist-in-urdu-and-marked-drafts-while-any-blank-is-left-for-counsel)), in `@hatti/legal`, each versioned, its English binding and its
+  gist in Urdu, saying what the platform does as built.
+* **Served by the core** at `/legal`, `/legal/{handle}` and `/legal.json`, each page marked a
+  draft while any `[To come: …]` blank is left, which a test holds.
+* **For you**: counsel's review is [OWN-41](./owner-actions.md), and Hatti's legal name,
+  address and privacy contact join OWN-30.
+* 4031 tests (11 new).
+
 ### ba7b2a4 · The launch load test
 
 * **k6 scripts in `ops/load`** ([ADR-735](../architecture/13-decision-log.md#adr-735--the-launch-load-test-is-a-k6-script-kept-in-the-repository-shoppers-browsing-and-placing-cash-on-delivery-orders-side-by-side-at-three-times-12-2s-launch-peak-held-to-12-1s-objectives-against-stagings-load-test-shop-each-shopper-from-an-address-and-a-number-of-its-own)): shoppers browsing and placing cash-on-delivery orders

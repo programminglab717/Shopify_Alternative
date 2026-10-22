@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppealController } from './appeal.controller.js';
 import { AppealsService } from './appeals.service.js';
 import { IncidentsService } from './incidents.service.js';
+import { LegalController } from './legal.controller.js';
 import { StatusResolver } from './graphql/status.resolver.js';
 import { StatusController } from './status.controller.js';
 import { StatusSubscriptionController } from './status-subscription.controller.js';
@@ -19,7 +20,7 @@ import { VerificationsService } from './verifications.service.js';
  * Trust and safety (TNS-01): shoppers' reports of stores, sent on by storefronts and decided by
  * Hatti's people, and stores taken down; rights owners' complaints of listings (TNS-04); shops
  * verified by Hatti (ONB-11); Hatti's status page, its incidents posted by Hatti's people
- * (BIL-06), and its emails to those who ask (ADR-535). Needs {@link Database} and {@link ObjectStorage} providers from the host
+ * (BIL-06), and its emails to those who ask (ADR-535); Hatti's own legal documents (ADR-736). Needs {@link Database} and {@link ObjectStorage} providers from the host
  * application.
  */
 @Module({
@@ -30,6 +31,7 @@ import { VerificationsService } from './verifications.service.js';
     RightsLinkController,
     StatusController,
     StatusSubscriptionController,
+    LegalController,
   ],
   providers: [
     ReportsService,

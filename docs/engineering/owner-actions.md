@@ -46,7 +46,7 @@ nothing secret is ever committed. Shortcuts are the numbered rows of
 | OWN-27 | Cloudflare: the account, R2's bucket and keys, Cloudflare for SaaS for shops' own domains, Turnstile for checkout (CHK-18), and an API token for purges | Files and images in production (the core refuses local files in production), shops' domains and certificates, the edge's cache | `S3_*`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `STOREFRONT_DNS_TARGET`; then `pnpm --filter @hatti/core storage-cors apply` sets the bucket's CORS for the admin (ADR-733) | open |
 | OWN-28 | FBR's sandboxes for POS integration and digital invoicing, with a registered shop's credentials (TAX-04) | FBR invoices tried end to end | `FBR_POS_*`, `FBR_DI_*` | open |
 | OWN-29 | An Apple developer account | Sign in with Apple and the iOS app | — | open |
-| OWN-30 | Hatti's own details for its invoices and support: bank account and IBAN, Raast ID, NTN and sales tax registration, support phone, WhatsApp, email and hours | Shops paying Hatti by transfer, Hatti's tax invoices, the Help page | `BILLING_BANK_*`, `BILLING_RAAST_ID`, `BILLING_NTN`, `BILLING_TAX_*`, `SUPPORT_*` | open |
+| OWN-30 | Hatti's own details for its invoices and support: bank account and IBAN, Raast ID, NTN and sales tax registration, support phone, WhatsApp, email and hours | Shops paying Hatti by transfer, Hatti's tax invoices, the Help page; the legal name, registration number, address and privacy contact the legal documents leave blank (ADR-736) | `BILLING_BANK_*`, `BILLING_RAAST_ID`, `BILLING_NTN`, `BILLING_TAX_*`, `SUPPORT_*` | open |
 | OWN-31 | The storefronts' domain submitted to the Public Suffix List, once the domain is final (OWN-01) | Pixels and cookies safe at shops' subdomains; the code editor (OWN-08) | — | open |
 | OWN-32 | Web Push keys generated for production (`pnpm --filter @hatti/core vapid-keys`) and kept in the secret manager | Staff's push alerts in production | `VAPID_*` | open |
 
@@ -55,7 +55,7 @@ nothing secret is ever committed. Shortcuts are the numbered rows of
 | ID | What is asked | Why | Status |
 |---|---|---|---|
 | OWN-40 | Counsel engaged in Pakistan | Tax classification (whether Hatti is an "online marketplace"); PECA; the data protection bill and data localisation for the cell's location; network risk signals before they launch ([11 §7](../architecture/11-security-and-compliance.md#7-privacy)); retention periods, tax records kept six years as assumed; confirming the payments "connector" model needs no licence | open |
-| OWN-41 | Hatti's own terms of service, privacy policy and acceptable use policy reviewed by counsel | Shops' sign-up and takedowns refer to them | open |
+| OWN-41 | Hatti's own terms of service, privacy policy, acceptable use policy and data processing agreement reviewed by counsel. Drafts are served at `/legal` (`packages/platform/legal`, ADR-736); each blank is marked [To come: …], among them the courts for disputes, liability and an indemnity, licensed goods, refunds of unused credit and audits; counsel sets `LEGAL_REVIEWED` once none is left | Shops' sign-up and takedowns refer to them; the launch checklist's legal pages and DPA | open |
 
 ## Settled
 
