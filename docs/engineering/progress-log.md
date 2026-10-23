@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Customers straight from a Shopify store
+### 62cf9f0 · Customers straight from a Shopify store
 
 * **The old store's customers come too,** each by their mobile number, with their name, email,
   note, tags and consent as the store had them; those with no number are counted and left out
