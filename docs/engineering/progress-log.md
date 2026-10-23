@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A Shopify store's metafields
+### 3675c64 · A Shopify store's metafields
 
 * **Themes keep their data:** moving a Shopify store sets its products', variants' and
   collections' metafields on the shop's own; gift cards stay behind, since Shopify never gives
