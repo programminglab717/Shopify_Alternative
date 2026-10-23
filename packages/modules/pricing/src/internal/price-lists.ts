@@ -1,4 +1,4 @@
-import { variantsIn } from '@hatti/catalog/public';
+import { variantNamesIn, variantsIn } from '@hatti/catalog/public';
 import {
   InputChecker,
   failOne,
@@ -67,10 +67,15 @@ export interface PriceListUpdateInput {
   quantityBreaks?: { minQuantity: number; percentOff: string }[] | null;
 }
 
-/** A variant's price in a list, in minor units. */
+/** A variant's price in a list, in minor units, with what the admin names it by (ADR-779). */
 export interface PriceListPrice {
   variantId: string;
   price: bigint;
+  productTitle: string;
+  /** Null for a product's only variant. */
+  variantTitle: string | null;
+  /** Its price to anyone, minor units. */
+  retailPrice: bigint;
 }
 
 /** A line to price for a customer: its variant, how many, and its price to anyone. */
@@ -90,6 +95,40 @@ export interface ListPrice {
 }
 
 const TAKEN = 'Another price list is for customers with this tag';
+
+/** A list's prices, named by their products and variants, by product then variant (ADR-779). */
+async function pricesOf(tx: Tx, shopId: string, id: string): Promise<PriceListPrice[]> {
+  const rows = await tx
+    .select({ variantId: priceListPrices.variantId, price: priceListPrices.price })
+    .from(priceListPrices)
+    .where(and(eq(priceListPrices.shopId, shopId), eq(priceListPrices.priceListId, id)))
+    .orderBy(asc(priceListPrices.variantId));
+  const names = await variantNamesIn(
+    tx,
+    shopId,
+    rows.map((row) => row.variantId),
+  );
+  return rows
+    .flatMap((row) => {
+      const name = names.get(row.variantId);
+      // A variant deleted takes its prices with it; one gone meanwhile is left out.
+      return name
+        ? [
+            {
+              ...row,
+              productTitle: name.productTitle,
+              variantTitle: name.variantTitle,
+              retailPrice: name.price,
+            },
+          ]
+        : [];
+    })
+    .sort(
+      (a, b) =>
+        a.productTitle.localeCompare(b.productTitle) ||
+        (a.variantTitle ?? '').localeCompare(b.variantTitle ?? ''),
+    );
+}
 
 /**
  * Wholesale price lists (CUS-06, ADR-778): a shop's prices for the customers it tags as
@@ -229,11 +268,7 @@ export class PriceListService {
         .from(priceLists)
         .where(and(eq(priceLists.shopId, tenant.shopId), eq(priceLists.id, id)));
       if (!list) return null;
-      return tx
-        .select({ variantId: priceListPrices.variantId, price: priceListPrices.price })
-        .from(priceListPrices)
-        .where(and(eq(priceListPrices.shopId, tenant.shopId), eq(priceListPrices.priceListId, id)))
-        .orderBy(asc(priceListPrices.variantId));
+      return pricesOf(tx, tenant.shopId, id);
     });
   }
 
@@ -323,14 +358,7 @@ export class PriceListService {
           .where(where)
           .returning();
         await changed(tx, tenant.shopId, PricingEvents.PriceListUpdated, row!);
-        const now = await tx
-          .select({ variantId: priceListPrices.variantId, price: priceListPrices.price })
-          .from(priceListPrices)
-          .where(
-            and(eq(priceListPrices.shopId, tenant.shopId), eq(priceListPrices.priceListId, id)),
-          )
-          .orderBy(asc(priceListPrices.variantId));
-        return { ok: true, value: now };
+        return { ok: true, value: await pricesOf(tx, tenant.shopId, id) };
       })
       .catch((error: unknown) => {
         if (error instanceof PriceListFullError) {

@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The admin's price lists
+
+* **Price lists in the admin:** under Products, a shop makes wholesale price lists, their
+  quantity breaks and their own prices for some variants, found as a draft's items are
+  (CUS-06, [ADR-779](../architecture/13-decision-log.md#adr-779--the-admins-price-lists-under-products-a-lists-own-prices-named-by-their-variants)).
+* **Named prices:** a list's prices come with their products' and variants' names and the
+  price to anyone.
+* 4213 tests (9 new).
+
 ### 4005568 · Price lists for wholesale customers
 
 * **Wholesale prices:** a shop keeps price lists for the customers it tags as wholesale, with a

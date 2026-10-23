@@ -215,7 +215,9 @@ export { giftCardProductIdsIn } from '../internal/gift-card-products.js';
 export {
   collectionsOfProductsIn,
   productsAndCollectionsIn,
+  variantNamesIn,
   variantsIn,
+  type VariantName,
 } from '../internal/discount-scopes.js';
 export {
   COMPLEMENTARY_PRODUCTS,

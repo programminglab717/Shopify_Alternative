@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
+  BadgePercent,
   Camera,
   ChevronRight,
   FileSpreadsheet,
@@ -249,6 +250,14 @@ export function ProductsPage() {
               {t('giftCards.title')}
             </Link>
           )}
+          <Link
+            to="/$shopId/products/price-lists"
+            params={{ shopId: shop.id }}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+          >
+            <BadgePercent aria-hidden className="size-5" />
+            {t('priceLists.title')}
+          </Link>
           <Link
             to="/$shopId/products/size-charts"
             params={{ shopId: shop.id }}

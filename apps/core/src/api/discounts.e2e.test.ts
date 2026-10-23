@@ -397,13 +397,22 @@ describe.skipIf(!server)('Admin GraphQL API: discount codes', () => {
       products,
       `mutation ($id: ID!, $prices: [PriceListPriceInput!]!) {
         priceListPricesSet(id: $id, prices: $prices) {
-          prices { variantId price { amount } } userErrors { field code }
+          prices { variantId price { amount } productTitle variantTitle retailPrice { amount } }
+          userErrors { field code }
         }
       }`,
       { id: list.id, prices: [{ variantId: toPublicId('variant', variant), price: '1800' }] },
     );
     expect(priced.data?.priceListPricesSet).toEqual({
-      prices: [{ variantId: toPublicId('variant', variant), price: { amount: '1800.00' } }],
+      prices: [
+        {
+          variantId: toPublicId('variant', variant),
+          price: { amount: '1800.00' },
+          productTitle: 'Wholesale lawn',
+          variantTitle: null,
+          retailPrice: { amount: '3000.00' },
+        },
+      ],
       userErrors: [],
     });
     const listed = await gql(products, '{ priceLists { name pricedVariants } }');

@@ -36,6 +36,48 @@ export async function variantsIn(
   return new Set(rows.map((row) => row.id));
 }
 
+/** A variant as a list of prices names it: its product's title, its own and its price to anyone. */
+export interface VariantName {
+  productTitle: string;
+  /** Null for a product's only variant, as the admin shows it. */
+  variantTitle: string | null;
+  /** Minor units. */
+  price: bigint;
+}
+
+/** The names and prices of those of `variantIds` the shop has, in one query (ADR-779). */
+export async function variantNamesIn(
+  tx: Tx,
+  shopId: string,
+  variantIds: readonly string[],
+): Promise<Map<string, VariantName>> {
+  if (variantIds.length === 0) return new Map();
+  const { rows } = await tx.execute<{
+    id: string;
+    product_title: string;
+    title: string;
+    only: boolean;
+    price: string;
+  }>(sql`
+    SELECT v.id, p.title AS product_title, v.title, v.price::text AS price,
+           NOT EXISTS (SELECT 1 FROM catalog.variants o
+                        WHERE o.shop_id = v.shop_id AND o.product_id = v.product_id
+                          AND o.id <> v.id) AS only
+      FROM catalog.variants v
+      JOIN catalog.products p ON p.shop_id = v.shop_id AND p.id = v.product_id
+     WHERE v.shop_id = ${shopId} AND v.id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])`);
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        productTitle: row.product_title,
+        variantTitle: row.only ? null : row.title,
+        price: BigInt(row.price),
+      },
+    ]),
+  );
+}
+
 /**
  * Which of `collectionIds` each of `productIds` is in, in one query (ADR-517): what checkout asks
  * of a cart's products for discounts given to collections. Products in none are left out.

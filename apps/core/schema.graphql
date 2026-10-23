@@ -12952,7 +12952,16 @@ type PriceListPayload {
 """A variant's price in a price list."""
 type PriceListPrice {
   price: Money!
+
+  """The variant's product's title (ADR-779)."""
+  productTitle: String!
+
+  """Its price to anyone, as the catalog has it now."""
+  retailPrice: Money!
   variantId: ID!
+
+  """The variant's own title; null for a product's only variant."""
+  variantTitle: String
 }
 
 input PriceListPriceInput {

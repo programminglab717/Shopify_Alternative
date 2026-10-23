@@ -100,7 +100,16 @@ describe.skipIf(!server)('Price lists for wholesale customers (CUS-06, ADR-778)'
     const prices = unwrap(
       await lists.setPrices(a, wholesale.id, [{ variantId: lawn, price: '1800' }]),
     );
-    expect(prices).toEqual([{ variantId: lawn, price: 180_000n }]);
+    // Named as the admin shows them (ADR-779): a product's only variant goes by its product's title.
+    expect(prices).toEqual([
+      {
+        variantId: lawn,
+        price: 180_000n,
+        productTitle: 'Lawn',
+        variantTitle: null,
+        retailPrice: 300_000n,
+      },
+    ]);
 
     const priced = (tags: string[], quantity: number) =>
       db.tenant(a.shopId, (tx) =>

@@ -11024,3 +11024,111 @@ export const AffiliatePayoutRecordMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const PRICE_LIST = /* GraphQL */ `
+  fragment PriceListFields on PriceList {
+    id
+    name
+    customerTag
+    percentOff
+    quantityBreaks {
+      minQuantity
+      percentOff
+    }
+    pricedVariants
+    updatedAt
+  }
+`;
+
+/** The shop's price lists for wholesale customers (CUS-06, ADR-779). */
+export const PriceListsQuery = /* GraphQL */ `
+  query PriceLists {
+    priceLists {
+      ...PriceListFields
+    }
+  }
+  ${PRICE_LIST}
+`;
+
+const PRICE_LIST_PRICE = /* GraphQL */ `
+  fragment PriceListPriceFields on PriceListPrice {
+    variantId
+    price {
+      ...Money
+    }
+    productTitle
+    variantTitle
+    retailPrice {
+      ...Money
+    }
+  }
+  ${MONEY}
+`;
+
+/** The variants with a price of their own in a list. */
+export const PriceListPricesQuery = /* GraphQL */ `
+  query PriceListPrices($id: ID!) {
+    priceListPrices(id: $id) {
+      ...PriceListPriceFields
+    }
+  }
+  ${PRICE_LIST_PRICE}
+`;
+
+export const PriceListCreateMutation = /* GraphQL */ `
+  mutation PriceListCreate($input: PriceListInput!) {
+    priceListCreate(input: $input) {
+      priceList {
+        ...PriceListFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRICE_LIST}
+  ${USER_ERRORS}
+`;
+
+export const PriceListUpdateMutation = /* GraphQL */ `
+  mutation PriceListUpdate($id: ID!, $input: PriceListInput!) {
+    priceListUpdate(id: $id, input: $input) {
+      priceList {
+        ...PriceListFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRICE_LIST}
+  ${USER_ERRORS}
+`;
+
+export const PriceListDeleteMutation = /* GraphQL */ `
+  mutation PriceListDelete($id: ID!) {
+    priceListDelete(id: $id) {
+      deletedPriceListId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Variants given a price of their own in a list, or (a price of null) taken out of it. */
+export const PriceListPricesSetMutation = /* GraphQL */ `
+  mutation PriceListPricesSet($id: ID!, $prices: [PriceListPriceInput!]!) {
+    priceListPricesSet(id: $id, prices: $prices) {
+      prices {
+        ...PriceListPriceFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRICE_LIST_PRICE}
+  ${USER_ERRORS}
+`;

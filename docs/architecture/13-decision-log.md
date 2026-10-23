@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-778 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-779 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -786,6 +786,7 @@
 | 776 | Affiliates: people who bring a shop customers by a link or code of their own, earning a share of the orders once delivered | Accepted |
 | 777 | Marketing's affiliates page: each creator's link, code and figures, payouts recorded and their part ended | Accepted |
 | 778 | Price lists for wholesale customers: a share off, prices of their own and quantity breaks, by a tag the shop gives them | Accepted |
+| 779 | The admin's price lists under Products, a list's own prices named by their variants | Accepted |
 
 ---
 
@@ -26083,3 +26084,22 @@
   again. The storefront and checkout do not use price lists yet: a signed-in wholesale
   customer's cart is the next step, with the cached product pages showing retail prices and the
   cart repricing.
+
+## ADR-779 · The admin's price lists under Products, a list's own prices named by their variants
+
+* **Context:** ADR-778 kept price lists in the core with only the Admin API to make them; a
+  shop needs to make them in the admin, and a list's prices came back as bare variant ids, which
+  a page cannot show without asking for every variant again (CUS-06).
+* **Decision:** a variant's price in a list now carries its product's title, its own title
+  (null for a product's only variant, as the admin shows it) and its price to anyone, read in
+  one query through the catalog's facade (`variantNamesIn`), with the list's prices ordered by
+  product then variant. The admin's Products page links to Price lists: each list with its
+  customers' tag, its share off, its quantity breaks and how many variants have a price of
+  their own; a form makes a list or changes one, its breaks added and removed (up to five); a
+  list's own prices open beneath it, each with the price to anyone beside it, changed in place,
+  taken out, or added by finding products as a draft order does, and saved together, only
+  what changed sent. Lists are deleted after a confirmation. Those who change products make
+  and change lists; others see them. The activity log names price lists and affiliates.
+* **Consequences:** a shop sets wholesale prices without the API, and sees what each list
+  takes off at a glance. The page holds at most the 2,000 prices a list keeps, so it shows
+  them all without paging. Wholesale prices in the storefront's cart are the next step.

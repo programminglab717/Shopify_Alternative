@@ -9,7 +9,11 @@ import {
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PriceListService, type PriceListRecord } from '../price-lists.js';
+import {
+  PriceListService,
+  type PriceListPrice as PriceListPriceRecord,
+  type PriceListRecord,
+} from '../price-lists.js';
 import {
   PriceList,
   PriceListDeletePayload,
@@ -152,12 +156,12 @@ export class PriceListResolver {
   }
 }
 
-function toPrice(
-  tenant: TenantContext,
-  each: { variantId: string; price: bigint },
-): PriceListPrice {
+function toPrice(tenant: TenantContext, each: PriceListPriceRecord): PriceListPrice {
   return Object.assign(new PriceListPrice(), {
     variantId: toPublicId('variant', each.variantId),
     price: Money.from(money(each.price, tenant.currency)),
+    productTitle: each.productTitle,
+    variantTitle: each.variantTitle,
+    retailPrice: Money.from(money(each.retailPrice, tenant.currency)),
   });
 }

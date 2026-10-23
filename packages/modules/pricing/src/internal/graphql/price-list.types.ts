@@ -46,6 +46,18 @@ export class PriceListPrice {
 
   @Field(() => Money)
   price!: Money;
+
+  @Field({ description: "The variant's product's title (ADR-779)." })
+  productTitle!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The variant's own title; null for a product's only variant.",
+  })
+  variantTitle!: string | null;
+
+  @Field(() => Money, { description: 'Its price to anyone, as the catalog has it now.' })
+  retailPrice!: Money;
 }
 
 @InputType()

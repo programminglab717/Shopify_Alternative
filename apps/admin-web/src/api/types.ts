@@ -5266,3 +5266,37 @@ export interface AffiliatePayload {
   affiliate: AffiliateValue | null;
   userErrors: UserError[];
 }
+
+/** A price list for wholesale customers (CUS-06, ADR-779). */
+export interface PriceListValue {
+  id: string;
+  name: string;
+  customerTag: string;
+  /** In percent, as the shop writes it: "10". */
+  percentOff: string;
+  quantityBreaks: { minQuantity: number; percentOff: string }[];
+  pricedVariants: number;
+  updatedAt: string;
+}
+
+export interface PriceListsData {
+  priceLists: PriceListValue[];
+}
+
+/** A variant's own price in a list, with its name and its price to anyone. */
+export interface PriceListPriceValue {
+  variantId: string;
+  price: MoneyValue;
+  productTitle: string;
+  variantTitle: string | null;
+  retailPrice: MoneyValue;
+}
+
+export interface PriceListPricesData {
+  priceListPrices: PriceListPriceValue[] | null;
+}
+
+export interface PriceListPayload {
+  priceList: PriceListValue | null;
+  userErrors: UserError[];
+}

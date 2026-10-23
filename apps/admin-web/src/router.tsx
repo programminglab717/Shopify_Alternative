@@ -109,6 +109,7 @@ import { ProductFilesPage } from './products/files-page';
 import { ReviewsPage } from './products/reviews-page';
 import { GiftCardsPage } from './products/gift-cards-page';
 import { SalesPage } from './products/sales-page';
+import { PriceListsPage } from './products/price-lists-page';
 import { SizeChartPage, SizeChartsPage } from './products/size-charts';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
@@ -355,6 +356,12 @@ const productGiftCards = createRoute({
   getParentRoute: () => shop,
   path: 'products/gift-cards',
   component: GiftCardsPage,
+});
+
+const productPriceLists = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/price-lists',
+  component: PriceListsPage,
 });
 
 const productSizeCharts = createRoute({
@@ -976,6 +983,7 @@ export const routeTree = root.addChildren([
     productReviews,
     productSales,
     productGiftCards,
+    productPriceLists,
     productSizeCharts,
     productSizeChart,
     product,
