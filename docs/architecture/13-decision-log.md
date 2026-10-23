@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-786 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-787 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -794,6 +794,7 @@
 | 784 | A Shopify store's customers' addresses fill their address books, only where a book is empty | Accepted |
 | 785 | A collection shows one of the shop's files as its image, served as articles' are, and Shopify's are brought | Accepted |
 | 786 | A Shopify store's orders are kept as past orders, a history apart from Hatti's orders that nothing acts on | Accepted |
+| 787 | A shopper's account lists their past orders under their orders, with no page and nothing to buy again | Accepted |
 
 ---
 
@@ -26259,3 +26260,19 @@
   The statuses are Shopify's words, shown as they are, not translated. A past order has no page
   of its own yet, and the storefront's account does not show past orders; both can follow from
   the same table.
+
+## ADR-787 · A shopper's account lists their past orders under their orders, with no page and nothing to buy again
+
+* **Context:** ADR-786 keeps a moved store's orders as past orders, shown to staff on the
+  customer's page. The shopper who placed them sees their account on the storefront (ADR-571)
+  list only what they ordered since the move.
+* **Decision:** the account the core gives (`AccountJson`) carries `pastOrders`, the customer's
+  latest twenty, read in the account's own transaction: name, date, whether cancelled, the
+  store's statuses in lower case, total, item count and items. Liquid's `customer` has them as
+  Hatti's `past_orders`, the statuses labelled as the account's own where they are the same words
+  (paid, refunded, fulfilled…) and the store's words otherwise. Hatti Base's account page lists
+  them in a section of their own under the orders, with no link and no "Buy again", since nothing
+  of them is the shop's to open or sell as it was.
+* **Consequences:** a returning shopper sees their whole history with the shop. Their totals are
+  shown with the shop's currency, as the store priced them in it. Older cores give no
+  `pastOrders`, and the storefront shows none.
