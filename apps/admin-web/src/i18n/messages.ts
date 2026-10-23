@@ -3016,6 +3016,13 @@ const en = {
   'files.collectionsImported': 'Collections added: {created}; left as they were: {skipped}.',
   'files.collectionsMissing': 'Products not in your shop, left out of their collections: {count}.',
   'files.collectionError': '{handle}: {message}',
+  'files.storeCustomers': 'Bring its customers too',
+  'files.storeCustomersHint':
+    'Each by their mobile number, with their name, email, note, tags and marketing consent. The app needs the read_customers scope, and access to customers’ details in its settings.',
+  'files.customersChecked': 'Customers to add: {created}; already here: {skipped}.',
+  'files.customersImported': 'Customers added: {created}; already here: {skipped}.',
+  'files.customersWithoutPhone': 'Customers with no phone number, left out: {count}.',
+  'files.customerError': '{customer}: {message}',
   'files.storeBlogs': 'Bring its blogs too',
   'files.storeBlogsHint':
     'Its blogs and their articles, at the same addresses, without their images. The app needs the read_content scope too.',
@@ -8617,6 +8624,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.collectionsImported': 'شامل کلیکشنز: {created}؛ ویسے ہی: {skipped}۔',
   'files.collectionsMissing': 'جو پروڈکٹس آپ کی دکان میں نہیں، اپنے کلیکشنز سے باہر رہیں: {count}۔',
   'files.collectionError': '{handle}: {message}',
+  'files.storeCustomers': 'اس کے کسٹمرز بھی لائیں',
+  'files.storeCustomersHint':
+    'ہر ایک اپنے موبائل نمبر سے، نام، ای میل، نوٹ، ٹیگز اور مارکیٹنگ کی اجازت کے ساتھ۔ ایپ کو read_customers اسکوپ، اور اپنی سیٹنگز میں کسٹمرز کی تفصیلات تک رسائی بھی چاہیے۔',
+  'files.customersChecked': 'شامل کرنے کو کسٹمرز: {created}؛ پہلے سے موجود: {skipped}۔',
+  'files.customersImported': 'شامل کسٹمرز: {created}؛ پہلے سے موجود: {skipped}۔',
+  'files.customersWithoutPhone': 'جن کسٹمرز کا فون نمبر نہیں، باہر رہے: {count}۔',
+  'files.customerError': '{customer}: {message}',
   'files.storeBlogs': 'اس کے بلاگز بھی لائیں',
   'files.storeBlogsHint':
     'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، تصاویر کے بغیر۔ ایپ کو read_content اسکوپ بھی چاہیے۔',

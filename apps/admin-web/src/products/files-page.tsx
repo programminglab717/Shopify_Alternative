@@ -11,6 +11,7 @@ import {
   PagesImportFromShopifyMutation,
   BlogsImportFromShopifyMutation,
   CollectionsImportFromShopifyMutation,
+  CustomersImportFromShopifyMutation,
   ProductsImportMutation,
   UrlRedirectsImportFromShopifyMutation,
 } from '../api/operations';
@@ -29,6 +30,8 @@ import type {
   BlogsImportFromShopifyResult,
   CollectionsImportFromShopifyData,
   CollectionsImportFromShopifyResult,
+  CustomersImportFromShopifyData,
+  CustomersImportFromShopifyResult,
   ProductsImportResult,
   UrlRedirectsImportFromShopifyData,
   UrlRedirectsImportResult,
@@ -45,6 +48,7 @@ import { Alert, EmptyState } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 import { EDITS_MENUS } from '../online-store/menus';
+import { MOVES_CUSTOMERS } from '../customers/transfer-page';
 import { WRITES_BLOGS, WRITES_PAGES } from '../online-store/pages';
 import { EDITS_PRODUCTS } from './status';
 
@@ -114,6 +118,8 @@ function ImportFromStore() {
   const writesPages = permits(shop, WRITES_PAGES);
   // And its blogs theirs who write those (ADR-753).
   const writesBlogs = permits(shop, WRITES_BLOGS);
+  // And its customers theirs who may bring customers in (ADR-755).
+  const movesCustomers = permits(shop, MOVES_CUSTOMERS);
   type Store = { store: string; accessToken?: string; clientId?: string; clientSecret?: string };
   const run = useAdminMutation<
     ProductsImportFromShopifyData,
@@ -130,6 +136,10 @@ function ImportFromStore() {
     CollectionsImportFromShopifyData,
     Store & { dryRun: boolean }
   >(CollectionsImportFromShopifyMutation);
+  const moveCustomers = useAdminMutation<
+    CustomersImportFromShopifyData,
+    Store & { dryRun: boolean }
+  >(CustomersImportFromShopifyMutation);
   const moveBlogs = useAdminMutation<BlogsImportFromShopifyData, Store & { dryRun: boolean }>(
     BlogsImportFromShopifyMutation,
   );
@@ -144,12 +154,14 @@ function ImportFromStore() {
   const [withRedirects, setWithRedirects] = useState(editsRedirects);
   const [withPages, setWithPages] = useState(writesPages);
   const [withBlogs, setWithBlogs] = useState(writesBlogs);
+  const [withCustomers, setWithCustomers] = useState(movesCustomers);
   const [checked, setChecked] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
     pages: PagesImportFromShopifyResult | null;
     blogs: BlogsImportFromShopifyResult | null;
     collections: CollectionsImportFromShopifyResult | null;
+    customers: CustomersImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
@@ -157,6 +169,7 @@ function ImportFromStore() {
     pages: PagesImportFromShopifyResult | null;
     blogs: BlogsImportFromShopifyResult | null;
     collections: CollectionsImportFromShopifyResult | null;
+    customers: CustomersImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
@@ -171,6 +184,7 @@ function ImportFromStore() {
       pages?: PagesImportFromShopifyResult;
       blogs?: BlogsImportFromShopifyResult;
       collections?: CollectionsImportFromShopifyResult;
+      customers?: CustomersImportFromShopifyResult;
     } = {};
     const ok = await attempt(async () => {
       answer.products = (
@@ -212,12 +226,22 @@ function ImportFromStore() {
       });
       if (!moved) return null;
     }
+    if (withCustomers && movesCustomers) {
+      const moved = await attempt(async () => {
+        answer.customers = (
+          await moveCustomers.mutateAsync({ ...given(), dryRun })
+        ).customersImportFromShopify;
+        return answer.customers;
+      });
+      if (!moved) return null;
+    }
     return {
       products: answer.products!,
       redirects: answer.redirects ?? null,
       pages: answer.pages ?? null,
       blogs: answer.blogs ?? null,
       collections: answer.collections ?? null,
+      customers: answer.customers ?? null,
     };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
@@ -237,7 +261,8 @@ function ImportFromStore() {
     moveRedirects.isPending ||
     movePages.isPending ||
     moveBlogs.isPending ||
-    moveCollections.isPending;
+    moveCollections.isPending ||
+    moveCustomers.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -322,6 +347,14 @@ function ImportFromStore() {
           onChange={changed(setWithBlogs)}
         />
       )}
+      {movesCustomers && (
+        <CheckField
+          label={t('files.storeCustomers')}
+          hint={t('files.storeCustomersHint')}
+          checked={withCustomers}
+          onChange={changed(setWithCustomers)}
+        />
+      )}
       <Button
         variant="secondary"
         className="self-start"
@@ -391,13 +424,25 @@ function ImportFromStore() {
               <ArticleErrors result={checked.blogs} />
             </>
           )}
+          {checked.customers && (
+            <>
+              <p>
+                {t('files.customersChecked', {
+                  created: formatCount(checked.customers.created),
+                  skipped: formatCount(checked.customers.skipped),
+                })}
+              </p>
+              <CustomerErrors result={checked.customers} />
+            </>
+          )}
           {checked.products.created +
             checked.products.updated +
             (checked.collections?.created ?? 0) +
             (checked.redirects?.created ?? 0) +
             (checked.pages?.created ?? 0) +
             (checked.blogs?.blogsCreated ?? 0) +
-            (checked.blogs?.created ?? 0) >
+            (checked.blogs?.created ?? 0) +
+            (checked.customers?.created ?? 0) >
             0 && (
             <Button
               className="self-start"
@@ -471,11 +516,44 @@ function ImportFromStore() {
                 })}
               </span>
             )}
+            {done.customers && (
+              <span>
+                {t('files.customersImported', {
+                  created: formatCount(done.customers.created),
+                  skipped: formatCount(done.customers.skipped),
+                })}
+              </span>
+            )}
           </span>
         </Alert>
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
+  );
+}
+
+/** A store's customers the shop could not take, each by their name, and those with no number. */
+function CustomerErrors({ result }: { result: CustomersImportFromShopifyResult }) {
+  const { t } = useLocale();
+  if (result.customerErrorCount === 0 && result.withoutPhone === 0) return null;
+  return (
+    <Alert tone="warning">
+      <span className="flex flex-col gap-1">
+        {result.withoutPhone > 0 && (
+          <span>
+            {t('files.customersWithoutPhone', { count: formatCount(result.withoutPhone) })}
+          </span>
+        )}
+        {result.customerErrorCount > 0 && (
+          <span>{t('moving.rowErrors', { count: result.customerErrorCount })}</span>
+        )}
+        {result.customerErrors.slice(0, 5).map((error, index) => (
+          <span key={index}>
+            {t('files.customerError', { customer: error.customer, message: error.message })}
+          </span>
+        ))}
+      </span>
+    </Alert>
   );
 }
 

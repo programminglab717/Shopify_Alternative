@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Customers straight from a Shopify store
+
+* **The old store's customers come too,** each by their mobile number, with their name, email,
+  note, tags and consent as the store had them; those with no number are counted and left out
+  ([ADR-755](../architecture/13-decision-log.md#adr-755--a-shopify-stores-customers-come-through-its-admin-api-written-as-shopifys-customer-export-for-the-customer-import-a-few-thousand-at-a-time-those-with-no-phone-number-counted-and-left-out)).
+* 4117 tests (4 new).
+
 ### 9e9046b · Collections straight from a Shopify store
 
 * **The old store's collections come too,** each at its own address: a smart one with its

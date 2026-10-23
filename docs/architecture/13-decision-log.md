@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-754 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-755 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -762,6 +762,7 @@
 | 752 | A Shopify store's own pages come through its Admin API, each made as pageCreate makes one at its handle, shown as and since the store showed it, and the admin's store card brings them too | Accepted |
 | 753 | A Shopify store's blogs and their articles come through its Admin API, each at its handle, a blog the shop has taking the articles, and the admin's store card brings them too | Accepted |
 | 754 | A Shopify store's collections come through its Admin API, each at its handle, a smart one with its rules and a hand-picked one with the shop's products of its products' handles in its order, and the admin's store card brings them after the products | Accepted |
+| 755 | A Shopify store's customers come through its Admin API, written as Shopify's customer export for the customer import a few thousand at a time, those with no phone number counted and left out | Accepted |
 
 ---
 
@@ -25565,3 +25566,28 @@
   * **The admin's store card** brings the collections straight after the products, on by default.
 * **Consequences:** products, collections, redirects, pages and blogs come from a Shopify store
   in one step. Customers, orders, discount codes and collections' images are still to come.
+
+## ADR-755 · A Shopify store's customers come through its Admin API, written as Shopify's customer export for the customer import a few thousand at a time, those with no phone number counted and left out
+
+* **Context:** a shop's customers are what its broadcasts, segments and risk scores work from
+  (08 §5). The customer import already took Shopify's customer export (CUS-07), but the owner
+  had to export it first.
+* **Decision:**
+  * **`readStoreCustomers`** in `@hatti/shopify-admin` asks the store, then every customer in
+    one bulk query: name, default email and phone with their marketing states, the default
+    address's phone, note and tags. Its own number is used, else its address's. The app needs
+    the read_customers scope and Shopify's leave to read customers' details, which Shopify's
+    refusal is said as.
+  * **`storeCustomersCsv`** writes them as Shopify's customer export: first and last name,
+    email, phone, a subscribed state as yes and an unsubscribed one as unsubscribed, note and
+    tags; and the name of the customer on each row.
+  * **`customersImportFromShopify`** feeds them to the customer import (now exported by the
+    customers module) 2,000 at a time, fewer where a file would be longer than it takes. A
+    customer with no number is counted, and left out: the shop finds its customers by their
+    mobile numbers. Customers already here are left as they are, and a number not Pakistani's
+    is named by the customer. Its dry run counts.
+  * **The admin's store card** brings the customers last, on by default for those who may bring
+    customers in.
+* **Consequences:** products, collections, redirects, pages, blogs and customers come from a
+  Shopify store in one step. Customers' addresses, and orders and discount codes, are still to
+  come.

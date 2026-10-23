@@ -2848,6 +2848,21 @@ export interface CollectionsImportFromShopifyData {
   collectionsImportFromShopify: CollectionsImportFromShopifyResult;
 }
 
+export interface CustomersImportFromShopifyResult {
+  dryRun: boolean;
+  customers: number;
+  withoutPhone: number;
+  created: number;
+  skipped: number;
+  customerErrorCount: number;
+  customerErrors: { customer: string; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface CustomersImportFromShopifyData {
+  customersImportFromShopify: CustomersImportFromShopifyResult;
+}
+
 export interface BlogsImportFromShopifyResult {
   dryRun: boolean;
   blogs: number;

@@ -6293,6 +6293,40 @@ export const CollectionsImportFromShopifyMutation = /* GraphQL */ `
   }
 `;
 
+export const CustomersImportFromShopifyMutation = /* GraphQL */ `
+  mutation CustomersImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    customersImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      customers
+      withoutPhone
+      created
+      skipped
+      customerErrorCount
+      customerErrors {
+        customer
+        message
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
 export const BlogsImportFromShopifyMutation = /* GraphQL */ `
   mutation BlogsImportFromShopify(
     $store: String!

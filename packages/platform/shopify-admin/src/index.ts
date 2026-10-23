@@ -39,3 +39,10 @@ export {
   type StoreCollectionRule,
   type StoreCollections,
 } from './collections.js';
+export {
+  CUSTOMERS_BULK_QUERY,
+  readStoreCustomers,
+  storeCustomersCsv,
+  type StoreCustomer,
+  type StoreCustomers,
+} from './customers.js';

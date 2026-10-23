@@ -52,6 +52,8 @@ import { StoreCreditService } from './store-credit.service.js';
     BlocklistService,
     SegmentFieldRegistry,
     SegmentService,
+    // For a Shopify store's customers through its Admin API (ADR-755).
+    CustomerTransferService,
     CustomerDataRegistry,
     CustomerDataService,
     StoreCreditService,
