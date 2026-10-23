@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A delivery slot chosen at checkout
+### bd9b7f4 · A delivery slot chosen at checkout
 
 * **When to deliver:** where the shop offers times of the day, checkout asks the shopper for one,
   checks it is still offered when the order is placed, and the order keeps it (CHK-15, [ADR-769](../architecture/13-decision-log.md#adr-769--checkout-asks-for-a-delivery-slot-where-the-shop-offers-one-checks-it-again-when-placing-and-the-order-keeps-its-start-and-end)).
