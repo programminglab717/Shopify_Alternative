@@ -11,6 +11,7 @@ export const COLLECTIONS_BULK_QUERY = `{
       node {
         id handle title descriptionHtml sortOrder templateSuffix
         seo { title description }
+        image { url altText }
         ruleSet { appliedDisjunctively rules { column relation condition } }
         products { edges { node { id handle } } }
       }
@@ -37,6 +38,8 @@ export interface StoreCollection {
   sortOrder: string;
   templateSuffix: string | null;
   seo: { title: string | null; description: string | null };
+  /** Its image at Shopify's CDN (ADR-785); null for none. */
+  image: { url: string; altText: string | null } | null;
   /** Null for a collection whose products were chosen by hand. */
   ruleSet: { appliedDisjunctively: boolean; rules: StoreCollectionRule[] } | null;
   /** Its products' handles, in its order. */
@@ -79,6 +82,8 @@ export async function readStoreCollections(
       const id = String(line.id ?? '');
       if (id.startsWith('gid://shopify/Collection/')) {
         const seo = line.seo as { title?: unknown; description?: unknown } | null | undefined;
+        const image = line.image as { url?: unknown; altText?: unknown } | null | undefined;
+        const imageUrl = text(image?.url);
         const ruleSet = line.ruleSet as
           { appliedDisjunctively?: unknown; rules?: StoreCollectionRule[] } | null | undefined;
         collections.set(id, {
@@ -88,6 +93,7 @@ export async function readStoreCollections(
           sortOrder: text(line.sortOrder) ?? 'MANUAL',
           templateSuffix: text(line.templateSuffix),
           seo: { title: text(seo?.title), description: text(seo?.description) },
+          image: imageUrl === null ? null : { url: imageUrl, altText: text(image?.altText) },
           ruleSet: ruleSet
             ? {
                 appliedDisjunctively: ruleSet.appliedDisjunctively === true,

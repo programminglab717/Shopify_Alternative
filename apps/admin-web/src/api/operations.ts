@@ -5111,6 +5111,9 @@ export const CollectionQuery = /* GraphQL */ `
         description
       }
       description
+      image {
+        fileId
+      }
       sortOrder
       productsCount
       ruleSet {
@@ -6352,6 +6355,7 @@ export const CollectionsImportFromShopifyMutation = /* GraphQL */ `
       created
       skipped
       productsMissing
+      images
       collectionErrors {
         handle
         message

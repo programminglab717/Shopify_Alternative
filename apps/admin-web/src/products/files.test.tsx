@@ -108,6 +108,7 @@ function core(role: StaffRole) {
             created: 2,
             skipped: 0,
             productsMissing: variables.dryRun ? 0 : 1,
+            images: variables.dryRun ? 0 : 2,
             collectionErrors: [
               {
                 handle: 'in-stock',
@@ -300,7 +301,9 @@ describe('Products and stock by file', () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText('Redirects added: 2; left as they were: 0.')).toBeTruthy();
-    expect(screen.getByText('Collections added: 2; left as they were: 0.')).toBeTruthy();
+    expect(
+      screen.getByText('Collections added: 2, 2 with their images; left as they were: 0.'),
+    ).toBeTruthy();
     expect(
       screen.getByText('Products not in your shop, left out of their collections: 1.'),
     ).toBeTruthy();

@@ -11,6 +11,7 @@ const LINES = [
     sortOrder: 'MANUAL',
     templateSuffix: '',
     seo: { title: 'Eid edit 2026', description: null },
+    image: { url: 'https://cdn.shopify.com/s/files/1/eid.jpg', altText: 'Eid edit' },
     ruleSet: null,
   },
   { id: 'gid://shopify/Product/12', handle: 'lawn-suit', __parentId: 'gid://shopify/Collection/1' },
@@ -76,10 +77,13 @@ describe("A store's collections through its Admin API (ADR-754)", () => {
       sortOrder: 'MANUAL',
       templateSuffix: null,
       seo: { title: 'Eid edit 2026', description: null },
+      // Its image, to bring (ADR-785).
+      image: { url: 'https://cdn.shopify.com/s/files/1/eid.jpg', altText: 'Eid edit' },
       ruleSet: null,
       products: ['lawn-suit', 'silk-dupatta'],
     });
     expect(collections[1]).toMatchObject({
+      image: null,
       handle: 'under-5000',
       sortOrder: 'PRICE_ASC',
       ruleSet: {

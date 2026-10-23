@@ -17,7 +17,7 @@ type Json = any;
 
 const IMPORT = `mutation ($store: String!, $accessToken: String, $dryRun: Boolean) {
   collectionsImportFromShopify(store: $store, accessToken: $accessToken, dryRun: $dryRun) {
-    collections created skipped productsMissing dryRun
+    collections created skipped productsMissing images dryRun
     collectionErrors { handle message }
     userErrors { field code message }
   }
@@ -35,6 +35,7 @@ const LINES = [
     descriptionHtml: '<p>Picked for Eid.</p>',
     sortOrder: 'BEST_SELLING',
     seo: { title: 'Eid edit 2026', description: null },
+    image: { url: 'https://cdn.shopify.com/s/files/1/Eid%20edit.webp?v=2', altText: 'Lawn suits' },
     ruleSet: null,
   },
   {
@@ -51,6 +52,7 @@ const LINES = [
     descriptionHtml: '',
     sortOrder: 'PRICE_ASC',
     seo: { title: null, description: null },
+    image: { url: 'https://cdn.shopify.com/s/files/1/gone.jpg', altText: null },
     ruleSet: {
       appliedDisjunctively: false,
       rules: [
@@ -111,6 +113,18 @@ const shopify = new ShopifyStores(
     return Response.json({ data });
   },
   { sleep: async () => {} },
+  {
+    // Shopify's CDN: one collection's image, and one gone.
+    fetch: async (url) =>
+      url.includes('Eid%20edit')
+        ? { ok: true, body: Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ') }
+        : {
+            ok: false,
+            transient: false,
+            code: 'IMAGE_DOWNLOAD_FAILURE',
+            message: 'It answered 404 Not Found',
+          },
+  },
 );
 
 describe.skipIf(!server)("Admin GraphQL API: collections from a Shopify store's Admin API", () => {
@@ -140,7 +154,7 @@ describe.skipIf(!server)("Admin GraphQL API: collections from a Shopify store's 
     await admin.query(
       `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
        VALUES ($1, 'test', $2, $3, $4)`,
-      [shop, hash, hint, ['write_products', 'read_products']],
+      [shop, hash, hint, ['write_products', 'read_products', 'read_files']],
     );
     token = issued;
     api = await startTestApi(testDb, { shopifyStores: shopify });
@@ -178,21 +192,31 @@ describe.skipIf(!server)("Admin GraphQL API: collections from a Shopify store's 
       created: 3,
       skipped: 0,
       productsMissing: 0,
+      images: 0,
       dryRun: true,
       collectionErrors: [refusal],
       userErrors: [],
     });
+    // An image Shopify no longer has is said; its collection is made without it (ADR-785).
     expect((await gql(IMPORT, variables)).data?.collectionsImportFromShopify).toMatchObject({
       created: 3,
       skipped: 0,
       productsMissing: 1,
-      collectionErrors: [refusal],
+      images: 1,
+      collectionErrors: [
+        {
+          handle: 'lawn-under-5000',
+          message: 'Its image was not brought: It answered 404 Not Found',
+        },
+        refusal,
+      ],
     });
 
-    const fields = `title description sortOrder seo { title }
+    const fields = `title description sortOrder seo { title } image { fileId altText }
       ruleSet { appliedDisjunctively rules { column relation condition } }
       products(first: 10) { nodes { handle } }`;
     const { data } = await gql(`{
+      files(first: 5) { nodes { id filename mimeType } }
       eid: collectionByHandle(handle: "eid-edit") { ${fields} }
       lawn: collectionByHandle(handle: "lawn-under-5000") { ${fields} }
       heavy: collectionByHandle(handle: "heavy") { ${fields} }
@@ -203,10 +227,16 @@ describe.skipIf(!server)("Admin GraphQL API: collections from a Shopify store's 
       description: '<p>Picked for Eid.</p>',
       sortOrder: 'MANUAL',
       seo: { title: 'Eid edit 2026' },
+      // Its image, one of the shop's files, named as Shopify had it.
+      image: { fileId: data?.files.nodes[0].id, altText: 'Lawn suits' },
       ruleSet: null,
       products: { nodes: [{ handle: 'silk-dupatta' }, { handle: 'lawn-suit' }] },
     });
+    expect(data?.files.nodes).toEqual([
+      expect.objectContaining({ filename: 'Eid edit.webp', mimeType: 'image/webp' }),
+    ]);
     expect(data?.lawn).toMatchObject({
+      image: null,
       sortOrder: 'PRICE_ASC',
       ruleSet: {
         appliedDisjunctively: false,
@@ -230,6 +260,7 @@ describe.skipIf(!server)("Admin GraphQL API: collections from a Shopify store's 
     expect((await gql(IMPORT, variables)).data?.collectionsImportFromShopify).toMatchObject({
       created: 0,
       skipped: 3,
+      images: 0,
       collectionErrors: [refusal],
     });
   });

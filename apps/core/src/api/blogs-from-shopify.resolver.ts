@@ -1,7 +1,7 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { FileService } from '@hatti/files/public';
 import { ArticleService, BlogService, type CommentPolicyValue } from '@hatti/online-store/public';
-import { readStoreBlogs, type StoreArticle } from '@hatti/shopify-admin';
+import { readStoreBlogs } from '@hatti/shopify-admin';
 import { Args, Field, Int, Mutation, ObjectType, Resolver } from '@nestjs/graphql';
 import { ShopifyStores, storeGiven, storeRefusalOf } from './shopify-stores.js';
 
@@ -174,7 +174,12 @@ export class BlogsFromShopifyResolver {
           counts.created++;
           continue;
         }
-        const image = await this.#imageOf(tenant, article);
+        const image = await this.shopify.keepImage(
+          this.files,
+          tenant,
+          article.image,
+          article.handle,
+        );
         if (typeof image === 'string') {
           failed(blog.handle, article.handle, `Its image was not brought: ${image}`);
         }
@@ -217,27 +222,6 @@ export class BlogsFromShopifyResolver {
     });
   }
 
-  /**
-   * The store's image of `article` kept as one of the shop's files, as the article takes it
-   * (ADR-783): null for none; why not when it could not be fetched or kept.
-   */
-  async #imageOf(
-    tenant: TenantContext,
-    article: StoreArticle,
-  ): Promise<{ fileId: string; altText: string } | null | string> {
-    if (!article.image) return null;
-    const fetched = await this.shopify.images.fetch(article.image.url);
-    if (!fetched.ok) return fetched.message;
-    const altText = article.image.altText ?? '';
-    const made = await this.files.createImage(tenant, {
-      filename: filenameOf(article.image.url, article.handle),
-      body: fetched.body,
-      alt: altText,
-    });
-    if (!made.ok) return made.errors.map((error) => error.message).join('; ');
-    return { fileId: made.value.id, altText };
-  }
-
   /** The shop's blogs' IDs by their handles. */
   async #blogIds(tenant: TenantContext): Promise<Map<string, string>> {
     const ids = new Map<string, string>();
@@ -261,15 +245,4 @@ export class BlogsFromShopifyResolver {
       after = page.items.at(-1)!.id;
     }
   }
-}
-
-/** The name of the file at `url`, as its path ends; `fallback` where it names none. */
-export function filenameOf(url: string, fallback: string): string {
-  let name = '';
-  try {
-    name = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
-  } catch {
-    // Not a URL, or not one whose name reads: the fallback.
-  }
-  return (name.trim() || fallback).slice(0, 255);
 }

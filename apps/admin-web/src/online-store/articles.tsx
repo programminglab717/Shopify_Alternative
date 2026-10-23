@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeft, Ban, Check, Clock, Eye, ImageUp, Trash2, Undo2 } from 'lucide-react';
-import { useRef, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import { ArrowLeft, Ban, Check, Clock, Eye, Trash2, Undo2 } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import {
   ArticleCreateMutation,
   ArticleDeleteMutation,
@@ -12,7 +12,6 @@ import {
   CommentDeleteMutation,
   CommentNotSpamMutation,
   CommentSpamMutation,
-  FileQuery,
 } from '../api/operations';
 import type {
   ArticleComment,
@@ -21,7 +20,6 @@ import type {
   BlogData,
   CommentStatus,
   ContentMutationData,
-  ShopFileData,
 } from '../api/types';
 import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -31,7 +29,7 @@ import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
-import { useImageUpload } from '../shell/use-image-upload';
+import { ShopImageField } from '../shell/shop-image-field';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -55,84 +53,6 @@ const tagsOf = (text: string) =>
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean);
-
-/** The article's image: chosen from the phone, shown from the shop's files, or taken away. */
-function ArticleImage({
-  image,
-  onChange,
-}: {
-  image: { fileId: string; preview?: string } | null;
-  onChange: (image: { fileId: string; preview?: string } | null) => void;
-}) {
-  const { t } = useLocale();
-  const upload = useImageUpload();
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const file = useAdminQuery<ShopFileData>(
-    ['file', image?.fileId],
-    FileQuery,
-    { id: image?.fileId ?? '' },
-    { enabled: Boolean(image && !image.preview) },
-  );
-  const src = image?.preview ?? file.data?.file?.url;
-
-  const onChosen = (event: ChangeEvent<HTMLInputElement>) => {
-    const chosen = event.target.files?.[0];
-    event.target.value = '';
-    if (!chosen) return;
-    setBusy(true);
-    setProblem(null);
-    void upload(chosen, t('articles.image'))
-      .then((made) => {
-        if ('problem' in made) setProblem(made.problem);
-        else onChange({ fileId: made.id, preview: URL.createObjectURL(chosen) });
-      })
-      .catch((failure: unknown) => setProblem(errorText(failure, t)))
-      .finally(() => setBusy(false));
-  };
-
-  return (
-    <FormSection title={t('articles.image')} hint={t('articles.imageHint')}>
-      {image && src && (
-        <img
-          src={src}
-          alt={t('articles.image')}
-          className="max-h-48 self-start rounded-control border border-line object-contain"
-        />
-      )}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="secondary"
-          icon={<ImageUp aria-hidden className="size-5" />}
-          busy={busy}
-          onClick={() => input.current?.click()}
-        >
-          {t(image ? 'articles.imageReplace' : 'articles.imageChoose')}
-        </Button>
-        {image && (
-          <Button
-            variant="danger"
-            icon={<Trash2 aria-hidden className="size-5" />}
-            disabled={busy}
-            onClick={() => onChange(null)}
-          >
-            {t('articles.imageRemove')}
-          </Button>
-        )}
-      </div>
-      <input
-        ref={input}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        aria-label={t('articles.image')}
-        onChange={onChosen}
-      />
-      {problem && <Alert tone="danger">{problem}</Alert>}
-    </FormSection>
-  );
-}
 
 /**
  * An article's title, body, author, tags and image, and when it shows: now, from a time ahead in
@@ -250,7 +170,12 @@ function ArticleForm({ blogId, article }: { blogId: string; article?: ArticleDet
           onChange={(event) => setTags(event.target.value)}
         />
       </FormSection>
-      <ArticleImage image={image} onChange={setImage} />
+      <ShopImageField
+        title={t('articles.image')}
+        hint={t('articles.imageHint')}
+        image={image}
+        onChange={setImage}
+      />
       <FormSection title={t('pages.visibility')}>
         <fieldset className="flex flex-col gap-1">
           <legend className="sr-only">{t('pages.visibility')}</legend>

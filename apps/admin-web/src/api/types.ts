@@ -2265,6 +2265,8 @@ export interface CollectionData {
     /** Its own title and description for search engines (ADR-231); absent where a fake core leaves it out. */
     seo?: { title: string | null; description: string | null };
     description: string;
+    /** One of the shop's files, shown as its image (ADR-785); absent where a fake core leaves it out. */
+    image?: { fileId: string } | null;
     sortOrder: CollectionSortOrder;
     productsCount: number;
     ruleSet: { appliedDisjunctively: boolean; rules: CollectionRule[] } | null;
@@ -2880,6 +2882,8 @@ export interface CollectionsImportFromShopifyResult {
   created: number;
   skipped: number;
   productsMissing: number;
+  /** Collections' images brought, as the shop's files (ADR-785). */
+  images: number;
   collectionErrors: { handle: string; message: string }[];
   userErrors: UserError[];
 }

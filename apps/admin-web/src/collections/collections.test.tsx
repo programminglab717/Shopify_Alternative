@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn, type } from '../test-support';
@@ -37,6 +37,8 @@ const RULES = {
   products: { nodes: [product('prod_1', 'Lawn suit')] },
 };
 
+const STORAGE = 'https://storage.hatti.test/s/zari/banner';
+
 const done = (field: string) => ({ [field]: { collection: { id: 'col_1' }, userErrors: [] } });
 
 function core(role: StaffRole) {
@@ -57,7 +59,32 @@ function core(role: StaffRole) {
           },
         };
       case 'Collection':
-        return { collection: variables.id === 'col_2' ? RULES : HAND };
+        return {
+          collection:
+            variables.id === 'col_2'
+              ? RULES
+              : variables.id === 'col_3'
+                ? { ...HAND, id: 'col_3', image: { fileId: 'fil_5' } }
+                : HAND,
+        };
+      case 'ShopFile':
+        return { file: { id: variables.id, url: `${STORAGE}/eid.jpg`, alt: '' } };
+      case 'StagedUploadsCreate':
+        return {
+          stagedUploadsCreate: {
+            stagedTargets: [
+              {
+                url: `${STORAGE}?expires=1&signature=s`,
+                httpMethod: 'PUT',
+                resourceUrl: STORAGE,
+                parameters: [{ name: 'content-type', value: 'image/png' }],
+              },
+            ],
+            userErrors: [],
+          },
+        };
+      case 'FileCreate':
+        return { fileCreate: { files: [{ id: 'fil_1' }], userErrors: [] } };
       case 'CollectionProductSearch':
         return {
           products: { nodes: [product('prod_1', 'Lawn suit'), product('prod_9', 'Chappal')] },
@@ -213,6 +240,39 @@ describe('Collections', () => {
       expect(sentOf(fake, 'CollectionDelete')).toEqual({ input: { id: 'col_1' } }),
     );
     await waitFor(() => expect(sentOf(fake, 'Collections')).toEqual({ query: null }));
+  });
+
+  it('gives a collection an image from the phone, and takes it away (ADR-785)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/collections/col_1');
+
+    const details = await screen.findByRole('region', { name: 'Details' });
+    await act(async () =>
+      fireEvent.change(within(details).getByLabelText('Image', { selector: 'input' }), {
+        target: { files: [new File([new Uint8Array(4)], 'eid.png', { type: 'image/png' })] },
+      }),
+    );
+    expect(await within(details).findByRole('button', { name: 'Replace the image' })).toBeTruthy();
+    fireEvent.click(within(details).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'CollectionUpdate')).toEqual({
+        input: { id: 'col_1', image: { fileId: 'fil_1', altText: 'Eid edit' } },
+      }),
+    );
+    cleanup();
+
+    // One with an image shows it, and takes it away.
+    renderAdmin('/shop_1/collections/col_3');
+    const shown = await screen.findByRole('region', { name: 'Details' });
+    expect(((await within(shown).findByAltText('Image')) as HTMLImageElement).src).toBe(
+      `${STORAGE}/eid.jpg`,
+    );
+    fireEvent.click(within(shown).getByRole('button', { name: 'Take the image away' }));
+    fireEvent.click(within(shown).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'CollectionUpdate')).toEqual({ input: { id: 'col_3', image: null } }),
+    );
   });
 
   it('shows a collection made by rules to a packer as it is, with nothing to change', async () => {

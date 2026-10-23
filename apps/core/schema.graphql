@@ -2465,6 +2465,11 @@ type CollectionsImportFromShopifyPayload {
   dryRun: Boolean!
 
   """
+  Collections' images brought, as the shop's files (ADR-785); none in a dry run.
+  """
+  images: Int!
+
+  """
   Products of the store's hand-picked collections the shop has no product with the handle of, and which were left out of them; 0 in a dry run, which comes before the products do.
   """
   productsMissing: Int!
@@ -8692,7 +8697,7 @@ type Mutation {
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
 
   """
-  Imports a Shopify store's collections through its Admin API (ONB-05, ADR-754), each keeping its handle and so its address at /collections/{handle}: its title, description, search listing and sort order; a smart collection its rules, a weight in grams and a price in the shop's currency; a hand-picked one the shop's products with the handles of its products, in its order, so its products come first. Collections whose handles the shop has are left as they are; one with a rule the catalog has not is named with why. Give the store and its app as productsImportFromShopify takes them. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  Imports a Shopify store's collections through its Admin API (ONB-05, ADR-754), each keeping its handle and so its address at /collections/{handle}: its title, description, search listing and sort order; a smart collection its rules, a weight in grams and a price in the shop's currency; a hand-picked one the shop's products with the handles of its products, in its order, so its products come first. Collections whose handles the shop has are left as they are; one with a rule the catalog has not is named with why. A collection's image is fetched from Shopify and kept as one of the shop's files (ADR-785); one that cannot be is said, the collection made without it. Give the store and its app as productsImportFromShopify takes them. Nothing given is kept. dryRun reads the store and counts, changing nothing.
   """
   collectionsImportFromShopify(
     accessToken: String
@@ -17396,7 +17401,7 @@ type StoreBuildTheme {
   published: Boolean!
 }
 
-"""A store's collection that did not go in, and why."""
+"""A store's collection that did not go in, or its image, and why."""
 type StoreCollectionImportError {
   """The collection's handle at the store."""
   handle: String!

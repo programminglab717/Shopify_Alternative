@@ -527,6 +527,7 @@ function ImportFromStore() {
               <span>
                 {t('files.collectionsImported', {
                   created: formatCount(done.collections.created),
+                  images: formatCount(done.collections.images),
                   skipped: formatCount(done.collections.skipped),
                 })}
               </span>

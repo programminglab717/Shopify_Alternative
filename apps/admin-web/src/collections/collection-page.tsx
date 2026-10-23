@@ -28,6 +28,7 @@ import { EDITS_PRODUCTS, ProductStatusBadge } from '../products/status';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
+import { ShopImageField } from '../shell/shop-image-field';
 import { Button } from '../ui/button';
 import { Alert, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -41,7 +42,10 @@ type Collection = NonNullable<CollectionData['collection']>;
 const sameRules = (a: readonly CollectionRule[], b: readonly CollectionRule[]) =>
   JSON.stringify(a.map(ruleInput)) === JSON.stringify(b.map(ruleInput));
 
-/** The collection's title, description, order and rules, changed by those who change products. */
+/**
+ * The collection's title, description, image (ADR-785), order and rules, changed by those who
+ * change products.
+ */
 function Details({ collection, edits }: { collection: Collection; edits: boolean }) {
   const { t } = useLocale();
   const update = useAdminMutation<CollectionMutationData, { input: Record<string, unknown> }>(
@@ -50,6 +54,9 @@ function Details({ collection, edits }: { collection: Collection; edits: boolean
   const { problem, attempt } = useAttempt();
   const [title, setTitle] = useState(collection.title);
   const [description, setDescription] = useState(collection.description);
+  const [image, setImage] = useState<{ fileId: string; preview?: string } | null>(
+    collection.image ? { fileId: collection.image.fileId } : null,
+  );
   const [sortOrder, setSortOrder] = useState<CollectionSortOrder>(collection.sortOrder);
   const [rules, setRules] = useState<CollectionRule[]>(collection.ruleSet?.rules ?? []);
   const [any, setAny] = useState(collection.ruleSet?.appliedDisjunctively ?? false);
@@ -62,6 +69,9 @@ function Details({ collection, edits }: { collection: Collection; edits: boolean
   const input = {
     ...(title.trim() !== collection.title && { title: title.trim() }),
     ...(description.trim() !== collection.description && { description: description.trim() }),
+    ...(image?.fileId !== collection.image?.fileId && {
+      image: image ? { fileId: image.fileId, altText: title.trim() } : null,
+    }),
     ...(sortOrder !== collection.sortOrder && { sortOrder }),
     ...(rulesChanged && { ruleSet: { appliedDisjunctively: any, rules: rules.map(ruleInput) } }),
   };
@@ -108,6 +118,12 @@ function Details({ collection, edits }: { collection: Collection; edits: boolean
           label={t('collection.description')}
           value={description}
           onChange={setDescription}
+        />
+        <ShopImageField
+          title={t('collection.image')}
+          hint={t('collection.imageHint')}
+          image={image}
+          onChange={setImage}
         />
         {smart && (
           <RulesEditor

@@ -8,6 +8,7 @@ import {
   type RuleColumn,
   type RuleRelation,
 } from '@hatti/catalog/public';
+import { FileService } from '@hatti/files/public';
 import { readStoreCollections, type StoreCollection } from '@hatti/shopify-admin';
 import { Args, Field, Int, Mutation, ObjectType, Resolver } from '@nestjs/graphql';
 import { ShopifyStores, storeGiven, storeRefusalOf } from './shopify-stores.js';
@@ -36,7 +37,9 @@ const SORT_ORDERS = new Set([
 
 const PRICE_COLUMNS: readonly RuleColumn[] = ['variant_price', 'variant_compare_at_price'];
 
-@ObjectType({ description: "A store's collection that did not go in, and why." })
+@ObjectType({
+  description: "A store's collection that did not go in, or its image, and why.",
+})
 export class StoreCollectionImportError {
   @Field({ description: "The collection's handle at the store." })
   handle!: string;
@@ -65,6 +68,11 @@ export class CollectionsImportFromShopifyPayload {
   })
   productsMissing!: number;
 
+  @Field(() => Int, {
+    description: "Collections' images brought, as the shop's files (ADR-785); none in a dry run.",
+  })
+  images!: number;
+
   @Field(() => [StoreCollectionImportError])
   collectionErrors!: StoreCollectionImportError[];
 
@@ -85,6 +93,7 @@ export class CollectionsFromShopifyResolver {
   constructor(
     private readonly collections: CollectionService,
     private readonly products: ProductService,
+    private readonly files: FileService,
     private readonly shopify: ShopifyStores,
   ) {}
 
@@ -96,6 +105,8 @@ export class CollectionsFromShopifyResolver {
       "price in the shop's currency; a hand-picked one the shop's products with the handles of " +
       'its products, in its order, so its products come first. Collections whose handles the ' +
       'shop has are left as they are; one with a rule the catalog has not is named with why. ' +
+      "A collection's image is fetched from Shopify and kept as one of the shop's files " +
+      '(ADR-785); one that cannot be is said, the collection made without it. ' +
       'Give the store and its app as productsImportFromShopify takes them. Nothing given is ' +
       'kept. dryRun reads the store and counts, changing nothing.',
   })
@@ -119,6 +130,7 @@ export class CollectionsFromShopifyResolver {
         created: 0,
         skipped: 0,
         productsMissing: 0,
+        images: 0,
         collectionErrors: [],
         dryRun: dry,
         userErrors: [],
@@ -147,6 +159,7 @@ export class CollectionsFromShopifyResolver {
     let created = 0;
     let skipped = 0;
     let productsMissing = 0;
+    let images = 0;
     const collectionErrors: StoreCollectionImportError[] = [];
     const failed = (handle: string, message: string) =>
       collectionErrors.push(Object.assign(new StoreCollectionImportError(), { handle, message }));
@@ -174,6 +187,16 @@ export class CollectionsFromShopifyResolver {
         productIds = [...new Set(collection.products)].flatMap((handle) => ids.get(handle) ?? []);
         productsMissing += new Set(collection.products).size - productIds.length;
       }
+      const image = await this.shopify.keepImage(
+        this.files,
+        tenant,
+        collection.image,
+        collection.handle,
+      );
+      if (typeof image === 'string') {
+        failed(collection.handle, `Its image was not brought: ${image}`);
+      }
+      const kept = typeof image === 'object' && image !== null ? image.fileId : null;
       const made = await this.collections.create(tenant, {
         title: collection.title,
         handle: collection.handle,
@@ -182,8 +205,11 @@ export class CollectionsFromShopifyResolver {
         seo: collection.seo,
         ruleSet: rules.ruleSet,
         productIds: productIds.slice(0, BATCH),
+        ...(typeof image === 'object' && { image }),
       });
       if (!made.ok) {
+        // The image goes with the collection that did not.
+        if (kept) await this.files.delete(tenant, [kept]);
         if (made.errors.some((error) => error.code === 'TAKEN')) skipped++;
         else failed(collection.handle, made.errors.map((error) => error.message).join('; '));
         continue;
@@ -192,12 +218,14 @@ export class CollectionsFromShopifyResolver {
         await this.collections.addProducts(tenant, made.value.id, productIds.slice(at, at + BATCH));
       }
       created++;
+      if (kept) images++;
     }
     return payload({
       collections: storeCollections.length,
       created,
       skipped,
       productsMissing,
+      images,
       collectionErrors,
     });
   }

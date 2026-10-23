@@ -1,3 +1,5 @@
+import type { TenantContext } from '@hatti/api';
+import type { FileService } from '@hatti/files/public';
 import { ImageFetcher } from '@hatti/images';
 import {
   ShopifyAdmin,
@@ -23,6 +25,41 @@ export class ShopifyStores {
   connect(shop: string, credentials: ShopifyCredentials): ShopifyAdmin {
     return new ShopifyAdmin({ shop, credentials, fetch: this.fetchFn });
   }
+
+  /**
+   * A store's image fetched from its CDN and kept as one of the shop's files (ADR-783), as an
+   * article or a collection takes it: null for none; why not when it could not be fetched or
+   * kept. Named as the CDN's path ends, else `name`.
+   */
+  async keepImage(
+    files: FileService,
+    tenant: TenantContext,
+    image: { url: string; altText: string | null } | null,
+    name: string,
+  ): Promise<{ fileId: string; altText: string } | null | string> {
+    if (!image) return null;
+    const fetched = await this.images.fetch(image.url);
+    if (!fetched.ok) return fetched.message;
+    const altText = image.altText ?? '';
+    const made = await files.createImage(tenant, {
+      filename: filenameOf(image.url, name),
+      body: fetched.body,
+      alt: altText,
+    });
+    if (!made.ok) return made.errors.map((error) => error.message).join('; ');
+    return { fileId: made.value.id, altText };
+  }
+}
+
+/** The name of the file at `url`, as its path ends; `fallback` where it names none. */
+export function filenameOf(url: string, fallback: string): string {
+  let name = '';
+  try {
+    name = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
+  } catch {
+    // Not a URL, or not one whose name reads: the fallback.
+  }
+  return (name.trim() || fallback).slice(0, 255);
 }
 
 /** What the owner gave of their store's app: its token, or its client ID and secret. */
