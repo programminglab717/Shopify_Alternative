@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A shopper's past orders in their account
+### 1daa5c6 · A shopper's past orders in their account
 
 * **Their whole history:** a signed-in shopper sees their orders from the store the shop moved
   from under their orders on Hatti Base's account page (CUS-02, ONB-05, [ADR-787](../architecture/13-decision-log.md#adr-787--a-shoppers-account-lists-their-past-orders-under-their-orders-with-no-page-and-nothing-to-buy-again)).
