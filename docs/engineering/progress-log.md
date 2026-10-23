@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### The inbox pushed to staff's phones
+### 1d7abfd · The inbox pushed to staff's phones
 
 * **Staff hear of customers on WhatsApp at once:** a customer who begins waiting is pushed to
   whoever has their conversation, else to all who answer; a conversation given to someone is
