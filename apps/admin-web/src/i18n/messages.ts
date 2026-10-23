@@ -3490,6 +3490,14 @@ const en = {
   'analytics.sessionsOverTime': 'Sessions over time',
   'analytics.sessionsBar': '{date}: {count} sessions, {converted} ordered',
   'analytics.sessionsBar.one': '{date}: 1 session, {converted} ordered',
+  'cohorts.title': 'Customers who came back',
+  'cohorts.hint':
+    'Customers by the month of their first order, and the share of them who ordered again in each month after.',
+  'cohorts.month': 'First order',
+  'cohorts.customers': 'Customers',
+  'cohorts.after': '+{n} mo',
+  'cohorts.again': 'Ordered again',
+  'cohorts.none': 'No customers yet. Once orders come in, you see here how many come back.',
   'searches.title': 'What shoppers search for',
   'searches.hint':
     'Searches on your online store in these days, as shoppers made them: the most searched, and those that found nothing.',
@@ -9231,6 +9239,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'analytics.sessionsOverTime': 'وقت کے ساتھ سیشنز',
   'analytics.sessionsBar': '{date}: {count} سیشنز، {converted} نے آرڈر کیا',
   'analytics.sessionsBar.one': '{date}: 1 سیشن، {converted} نے آرڈر کیا',
+  'cohorts.title': 'واپس آنے والے گاہک',
+  'cohorts.hint':
+    'گاہک ان کے پہلے آرڈر کے مہینے کے لحاظ سے، اور ان میں سے کتنے فیصد نے ہر بعد کے مہینے میں دوبارہ آرڈر کیا۔',
+  'cohorts.month': 'پہلا آرڈر',
+  'cohorts.customers': 'گاہک',
+  'cohorts.after': '+{n} ماہ',
+  'cohorts.again': 'دوبارہ آرڈر',
+  'cohorts.none': 'ابھی کوئی گاہک نہیں۔ آرڈر آنے پر یہاں دیکھیں کہ کتنے واپس آتے ہیں۔',
   'searches.title': 'خریدار کیا تلاش کرتے ہیں',
   'searches.hint':
     'ان دنوں میں آپ کے آن لائن اسٹور پر خریداروں کی تلاشیں: سب سے زیادہ تلاش کی گئیں، اور وہ جن میں کچھ نہیں ملا۔',

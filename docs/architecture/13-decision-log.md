@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-774 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-775 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -782,6 +782,7 @@
 | 772 | A delivery slot takes as many orders as the shop says, counted again under a lock when an order is placed in it | Accepted |
 | 773 | A shop's delivery slots leave out the days of the week it does not deliver on | Accepted |
 | 774 | Customers are put in cohorts by the month of their first order, and counted again in each month they come back | Accepted |
+| 775 | Analytics shows a cohort table: each month's new customers, and the share who ordered again each month after | Accepted |
 
 ---
 
@@ -25992,3 +25993,16 @@
 * **Consequences:** shops see retention without exporting orders. Customers merged (ADR-130)
   count as one, as their orders move to the one kept. RFM (recency, frequency, money) builds on
   the same orders later; segments (CUS-03) already filter by orders and spend.
+
+## ADR-775 · Analytics shows a cohort table: each month's new customers, and the share who ordered again each month after
+
+* **Context:** customer cohorts (ADR-774) were in the Admin API alone; owners read retention on
+  Analytics, beside sales and searches (ANL-04).
+* **Decision:** Analytics gets "Customers who came back", after what shoppers search for: a
+  table of the last 12 months' cohorts, the newest last, with each month's new customers, the
+  share of them who ordered in each of the six months after (blank where that month has not
+  come yet, a dash for a month without new customers), and the share who have ordered again at
+  all. The table scrolls sideways on a phone. It reads `customerCohorts` with the analytics
+  page's own `read_orders`; before any customer it says nothing has come yet.
+* **Consequences:** an owner sees whether an Eid month's customers came back, without
+  exporting orders. Cohorts by where customers came from, and RFM, can follow on the same table.

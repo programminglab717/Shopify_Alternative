@@ -1700,6 +1700,20 @@ export interface StoreSearchTermsValue {
   foundNothing: number;
 }
 
+/** Customers whose first order fell in a month, and who came back (ANL-04, ADR-774). */
+export interface CustomerCohortValue {
+  /** "2026-10". */
+  month: string;
+  customers: number;
+  /** Those who ordered in each month after, the next first. */
+  returned: number[];
+  orderedAgain: number;
+}
+
+export interface CustomerCohortsData {
+  customerCohorts: CustomerCohortValue[];
+}
+
 export interface StoreSearchesData {
   storeSearches: {
     days: number;

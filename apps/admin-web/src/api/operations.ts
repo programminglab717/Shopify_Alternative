@@ -3754,6 +3754,17 @@ export const SearchRuleDeleteMutation = /* GraphQL */ `
 `;
 
 /** What shoppers searched the online store for over the last days (SRC-06, ADR-683). */
+export const CustomerCohortsQuery = /* GraphQL */ `
+  query CustomerCohorts($months: Int) {
+    customerCohorts(months: $months) {
+      month
+      customers
+      returned
+      orderedAgain
+    }
+  }
+`;
+
 export const StoreSearchesQuery = /* GraphQL */ `
   query StoreSearches($days: Int!) {
     storeSearches(days: $days) {

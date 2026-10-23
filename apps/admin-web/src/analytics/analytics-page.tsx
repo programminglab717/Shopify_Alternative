@@ -13,6 +13,7 @@ import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { ErrorState, Loading } from '../ui/feedback';
 import { CodHealth } from './cod-health';
+import { Cohorts } from './cohorts';
 import { CourierPerformance } from './courier-performance';
 import { Bars, Figure } from './figures';
 import { type Days, PeriodTabs, usePeriod } from './period';
@@ -211,6 +212,7 @@ export function AnalyticsPage() {
       )}
       <Visits from={from} before={before} previousFrom={previousFrom} interval={interval} />
       <Searches days={days} />
+      <Cohorts />
       <CodHealth from={from} before={before} />
       <CourierPerformance from={from} before={before} />
       <StockReport days={days} />
