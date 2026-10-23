@@ -512,6 +512,72 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     }
   });
 
+  it("shows a collection's image, one of the shop's files, at an address of its own (ADR-785)", async () => {
+    const writer = await issueToken(['write_files', 'write_products']);
+    const upload = async (filename: string, mimeType: string, bytes: Buffer) => {
+      const staged = await gql(writer, STAGE, {
+        input: [{ filename, mimeType, fileSize: String(bytes.length) }],
+      });
+      const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+      expect((await call('PUT', target.url, bytes, mimeType)).statusCode).toBe(200);
+      const created = await gql(writer, CREATE, {
+        files: [{ originalSource: target.resourceUrl }],
+      });
+      return created.data!.fileCreate.files[0].id as string;
+    };
+    const banner = await upload('Eid banner.png', 'image/png', png(80));
+    const catalogue = await upload('Lookbook.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n'));
+    const CREATE_COLLECTION = `mutation ($input: CollectionCreateInput!) {
+      collectionCreate(input: $input) {
+        collection { id image { fileId altText } }
+        userErrors { field code message }
+      }
+    }`;
+    expect(
+      (
+        await gql(writer, CREATE_COLLECTION, {
+          input: { title: 'Lookbook', image: { fileId: catalogue } },
+        })
+      ).data!.collectionCreate.userErrors,
+    ).toEqual([
+      {
+        field: ['input', 'image', 'fileId'],
+        code: 'NOT_FOUND',
+        message: "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+      },
+    ]);
+    const collection = (
+      await gql(writer, CREATE_COLLECTION, {
+        input: { title: 'Eid edit', image: { fileId: banner, altText: 'Lawn suits' } },
+      })
+    ).data!.collectionCreate.collection;
+    expect(collection.image).toEqual({ fileId: banner, altText: 'Lawn suits' });
+    // The banner says which collection shows it (ADR-639).
+    expect((await gql(writer, USES, { id: banner })).data?.file.uses).toEqual([
+      { kind: 'COLLECTION_IMAGE', id: collection.id, title: 'Eid edit' },
+    ]);
+    const collectionId = fromPublicId(collection.id as string, 'collection');
+    const served = await call('GET', `/collection-images/${shop}/${collectionId}`);
+    expect([served.statusCode, served.headers['content-type']]).toEqual([200, 'image/png']);
+    expect(served.rawPayload.equals(png(80))).toBe(true);
+    // Taken off, it is served no more.
+    const removed = await gql(
+      writer,
+      `mutation ($input: CollectionUpdateInput!) {
+        collectionUpdate(input: $input) { collection { image { fileId } } userErrors { message } }
+      }`,
+      { input: { id: collection.id, image: null } },
+    );
+    expect(removed.data!.collectionUpdate).toEqual({ collection: { image: null }, userErrors: [] });
+    for (const path of [
+      `/collection-images/${shop}/${collectionId}`,
+      `/collection-images/${newId()}/${collectionId}`,
+      '/collection-images/zari/eid',
+    ]) {
+      expect((await call('GET', path)).statusCode, path).toBe(404);
+    }
+  });
+
   it("shows the shop's social sharing image, one of its files, at an address of its own (ADR-243)", async () => {
     const writer = await issueToken(['write_files', 'write_settings']);
     const upload = async (filename: string, mimeType: string, bytes: Buffer) => {

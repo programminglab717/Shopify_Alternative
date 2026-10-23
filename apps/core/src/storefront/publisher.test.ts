@@ -313,19 +313,14 @@ describe('What storefront documents an event makes stale', () => {
 
   it('rebuilds the shop when its brand changes, or a file goes that may have been a logo (ADR-205)', () => {
     expect(itemsFor(event('shop_brand.updated', { changed: ['squareLogo'] }))).toEqual(['shop']);
-    // A file deleted may have been an article's image too (ADR-213).
-    expect(itemsFor(event('file.deleted', {}))).toEqual(['shop', 'every-article']);
+    // A file deleted may have been an article's image too (ADR-213), or a collection's (ADR-785).
+    const pictured = ['shop', 'every-article', 'every-collection'];
+    expect(itemsFor(event('file.deleted', {}))).toEqual(pictured);
     // Its words for what it shows stand in for theirs; its name is shown nowhere (ADR-638).
-    expect(itemsFor(event('file.updated', { changed: ['filename', 'alt'] }))).toEqual([
-      'shop',
-      'every-article',
-    ]);
+    expect(itemsFor(event('file.updated', { changed: ['filename', 'alt'] }))).toEqual(pictured);
     expect(itemsFor(event('file.updated', { changed: ['filename'] }))).toEqual([]);
     // What it holds replaced, the addresses naming it change (ADR-647).
-    expect(itemsFor(event('file.updated', { changed: ['file'] }))).toEqual([
-      'shop',
-      'every-article',
-    ]);
+    expect(itemsFor(event('file.updated', { changed: ['file'] }))).toEqual(pictured);
   });
 
   it('publishes a shop whole once it is opened (ADR-145)', () => {
@@ -1205,6 +1200,42 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await imageOf('lookbook/eid-lawn')).toBeNull();
     expect(await imageOf('lookbook/sizes')).toEqual(plainImage);
     unwrap(await blogs.delete(tenant, lookbook.id));
+    await deliver();
+  });
+
+  it("names a collection's image where the API serves it, and drops it when its file goes (ADR-785)", async () => {
+    const banner = newId();
+    await admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status, alt)
+       VALUES ($1, $2, $3, 'banner.png', 'image/png', 100, 'ready', 'Eid banner')`,
+      [shopId, banner, `shops/${shopId}/files/${banner}/banner.png`],
+    );
+    const eid = unwrap(
+      await collections.create(tenant, { title: 'Eid Lawn', image: { fileId: banner } }),
+    );
+    await deliver();
+    const imageOf = async () => (await store().collectionByHandle('eid-lawn'))?.image;
+    expect(await imageOf()).toEqual({
+      src: `http://localhost:4000/collection-images/${shopId}/${eid.id}?v=${banner.slice(-8)}`,
+      width: 0,
+      height: 0,
+      alt: 'Eid banner',
+    });
+    unwrap(
+      await collections.update(tenant, { id: eid.id, image: { fileId: banner, altText: 'Lawn' } }),
+    );
+    await deliver();
+    expect((await imageOf())?.alt).toBe('Lawn');
+
+    // Its file deleted, the collection is shown without one.
+    const files = new FileService(database, {
+      delete: () => Promise.resolve(),
+      deletePrefix: () => Promise.resolve(),
+    } as unknown as ObjectStorage);
+    unwrap(await files.delete(tenant, [banner]));
+    expect(await deliver()).toEqual(['file.deleted']);
+    expect(await imageOf()).toBeNull();
+    unwrap(await collections.delete(tenant, eid.id));
     await deliver();
   });
 

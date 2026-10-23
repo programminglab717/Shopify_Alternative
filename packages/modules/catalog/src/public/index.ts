@@ -9,6 +9,9 @@ export {
 } from '../internal/collection-rules.js';
 export {
   CollectionService,
+  collectionImageOf,
+  collectionsPicturingIn,
+  type CollectionImageInput,
   type CollectionRuleSetInput,
   type CreateCollectionInput,
   type UpdateCollectionInput,
@@ -114,6 +117,7 @@ export {
 } from '../internal/product-filter.js';
 export type { ImageFormatValue, MediaTypeValue, ProductStatusValue } from '../internal/schema.js';
 export type {
+  CollectionImageValue,
   CollectionRecord,
   FocalPointRecord,
   MediaCropRecord,

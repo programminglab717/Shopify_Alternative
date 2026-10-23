@@ -216,6 +216,9 @@ export const collections = catalogSchema.table(
     /** For search engines and link previews, in place of its own (ADR-231); null for its own. */
     seoTitle: text('seo_title'),
     seoDescription: text('seo_description'),
+    /** One of the shop's files, shown as its image (ADR-785); null for none. */
+    imageFileId: uuid('image_file_id'),
+    imageAlt: text('image_alt').notNull().default(''),
     searchText: text('search_text').notNull().default(''),
     version: integer('version').notNull().default(1),
     ...timestamps,

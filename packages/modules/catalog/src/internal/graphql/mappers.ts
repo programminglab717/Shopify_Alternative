@@ -9,6 +9,7 @@ import type { CollectionSortOrderValue, ProductStatusValue } from '../schema.js'
 import { externalVideoUrls } from '../videos.js';
 import {
   Collection,
+  CollectionImage,
   CollectionConnection,
   CollectionEdge,
   CollectionRule,
@@ -215,6 +216,12 @@ export function toCollection(record: CollectionRecord): Collection {
     description: record.description,
     sortOrder: record.sortOrder.toUpperCase() as CollectionSortOrder,
     seo: Object.assign(new SEO(), record.seo),
+    image:
+      record.image &&
+      Object.assign(new CollectionImage(), {
+        fileId: toPublicId('file', record.image.fileId),
+        altText: record.image.altText === '' ? null : record.image.altText,
+      }),
     ruleSet:
       record.rules === null
         ? null

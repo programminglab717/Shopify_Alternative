@@ -123,6 +123,7 @@ import {
 import { TrustEvents, verifiedLevelIn } from '@hatti/trust/public';
 import type { Redis } from 'ioredis';
 import { articleImagePathOf } from '../api/article-images.js';
+import { collectionImagePathOf } from '../api/collection-images.js';
 import { logoPathOf } from '../api/logos.js';
 import { sharingImagePathOf } from '../api/sharing-images.js';
 import {
@@ -420,16 +421,17 @@ export function itemsFor(event: DomainEvent): string[] {
     // Its document names its logos (ADR-205).
     case FileEvents.ShopBrandUpdated:
       return [Items.shop];
-    // A file deleted may have been one of its logos, or an article's image (ADR-213).
+    // A file deleted may have been one of its logos, an article's image (ADR-213), or a
+    // collection's (ADR-785).
     case FileEvents.FileDeleted:
-      return [Items.shop, Items.everyArticle];
-    // A file's words for what it shows stand in for an article's or the sharing image's own
-    // (ADR-638), and the addresses of its logos and images name what a file holds (ADR-647); its
-    // name is shown nowhere.
+      return [Items.shop, Items.everyArticle, Items.everyCollection];
+    // A file's words for what it shows stand in for an article's, a collection's or the sharing
+    // image's own (ADR-638), and the addresses of its logos and images name what a file holds
+    // (ADR-647); its name is shown nowhere.
     case FileEvents.FileUpdated: {
       const { changed } = event.payload as unknown as FileUpdatedPayload;
       return changed.includes('alt') || changed.includes('file')
-        ? [Items.shop, Items.everyArticle]
+        ? [Items.shop, Items.everyArticle, Items.everyCollection]
         : [];
     }
     case ShopEvents.ShopOpened:
@@ -1259,10 +1261,27 @@ export class StorefrontPublisher {
       'collection',
       records.map((record) => record.id),
     );
+    // Each image where the API serves it, its address naming its file, while it is one (ADR-785).
+    const ready = await this.services.files.readyImagesIn(
+      tx,
+      shopId,
+      records.flatMap((record) => (record.image ? [record.image.fileId] : [])),
+    );
+    const images = this.options.images ?? LOCAL_IMAGES;
     const docs = [];
     for (const record of records) {
       const productIds = await this.services.collections.activeProductIdsOf(tx, shopId, record);
-      const doc = collectionDoc(record, productIds, translations.get(record.id));
+      const file = record.image && ready.get(record.image.fileId);
+      const image: ImageDoc | null =
+        record.image && file
+          ? {
+              src: images.url(collectionImagePathOf(shopId, record.id, file.key)),
+              width: 0,
+              height: 0,
+              alt: record.image.altText || file.alt || null,
+            }
+          : null;
+      const doc = collectionDoc(record, productIds, translations.get(record.id), image);
       const own = fields.get(record.id);
       docs.push(own ? { ...doc, metafields: own } : doc);
     }

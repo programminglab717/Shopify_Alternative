@@ -153,6 +153,12 @@ export interface ProductRecord {
   media: MediaRecord[];
 }
 
+/** A collection's image: one of the shop's files, and its own words for it, empty for none. */
+export interface CollectionImageValue {
+  fileId: string;
+  altText: string;
+}
+
 export interface CollectionRecord {
   id: string;
   title: string;
@@ -164,6 +170,8 @@ export interface CollectionRecord {
   disjunctive: boolean;
   /** What search engines are told in place of its title and description (ADR-231). */
   seo: SeoValue;
+  /** One of the shop's files, shown as its image (ADR-785); null for none. */
+  image: CollectionImageValue | null;
   productsCount: number;
   version: number;
   createdAt: Date;

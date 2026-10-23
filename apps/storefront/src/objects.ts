@@ -662,6 +662,13 @@ export function collectionObject(
     url: `${ctx.prefix ?? ''}/collections/${doc.handle}`,
     description: doc.descriptionHtml,
     image: doc.image ? new ImageDrop(doc.image) : null,
+    // Its own image, else its first product's, as Shopify's (ADR-785).
+    get featured_image(): unknown {
+      if (doc.image) return new ImageDrop(doc.image);
+      const first = productIds[0];
+      if (first === undefined) return null;
+      return lazyProducts([first], ctx)[0]!.liquidMethodMissing('featured_image');
+    },
     products_count: productIds.length,
     all_products_count: doc.productIds.length,
     filters: listing?.filters ?? [],

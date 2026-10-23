@@ -7,7 +7,7 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
-import { toPublicId } from '@hatti/ids';
+import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import type { RuleColumn, RuleRelation } from '../collection-rules.js';
 import {
@@ -23,6 +23,7 @@ import {
   CollectionCreateInput,
   CollectionDeleteInput,
   CollectionDeletePayload,
+  CollectionImageInput,
   CollectionPayload,
   CollectionRuleSetInput,
   CollectionUpdateInput,
@@ -148,6 +149,7 @@ export class CollectionResolver {
         sortOrder: input.sortOrder ? toSortOrderValue(input.sortOrder) : null,
         ruleSet: toRuleSet(input.ruleSet),
         seo: input.seo,
+        image: imageOf(input.image),
         productIds: input.products?.map((id) => uuidOf('product', id)),
       }),
     );
@@ -171,6 +173,7 @@ export class CollectionResolver {
             : input.sortOrder && toSortOrderValue(input.sortOrder),
         ruleSet: toRuleSet(input.ruleSet),
         seo: input.seo,
+        image: imageOf(input.image),
         redirectNewHandle: input.redirectNewHandle,
       }),
     );
@@ -244,4 +247,11 @@ export class CollectionResolver {
       ),
     );
   }
+}
+
+/** A collection's image as the service takes it (ADR-785): its file's ID, unwrapped. */
+function imageOf(
+  input: CollectionImageInput | null | undefined,
+): CollectionImageInput | null | undefined {
+  return input && { fileId: tryFromPublicId(input.fileId, 'file') ?? '', altText: input.altText };
 }

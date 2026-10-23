@@ -667,6 +667,45 @@ describe('Storefront rendering', () => {
     expect(await trailOf({ path: '/collections/eid-lawn' }, off)).toBeNull();
   });
 
+  it("shows a collection's image on its page, and as its featured image, else its first product's (ADR-785)", async () => {
+    const sample = sampleStore();
+    const eid = sample.collections.find((each) => each.handle === 'eid-lawn')!;
+    eid.image = {
+      src: 'https://api.hatti.pk/collection-images/s/c?v=abcd1234',
+      width: 0,
+      height: 0,
+      alt: 'Lawn suits on a line',
+    };
+    const pageOf = async (path: string, theme = files) => {
+      const renderer = new PageRenderer(loadTheme(theme), { limits: { timeMs: 10_000 } });
+      return (await renderer.render({ path }, new MemoryStore(sample).fresh())).html;
+    };
+    const html = await pageOf('/collections/eid-lawn');
+    expect(html).toMatch(
+      /<figure class="collection__image"><img src="https:\/\/api\.hatti\.pk\/collection-images\/s\/c\?v=abcd1234[^"]*width=1600"[^>]*alt="Lawn suits on a line"/,
+    );
+    // None shown for a collection without one.
+    expect(await pageOf('/collections/all')).not.toContain('<figure class="collection__image"');
+
+    // A theme's featured image: its own, else its first product's.
+    const theme = {
+      ...files,
+      'sections/main-collection.liquid':
+        '<p id="f">{{ collection.featured_image.src | default: "none" }}</p>' +
+        '{% schema %}{"name": "Collection", "settings": [' +
+        '{"type": "range", "id": "products_per_page", "min": 8, "max": 48, "step": 4, "default": 24},' +
+        '{"type": "checkbox", "id": "show_image", "default": true}]}{% endschema %}',
+    };
+    const featured = async (handle: string) =>
+      /<p id="f">([^<]*)<\/p>/.exec(await pageOf(`/collections/${handle}`, theme))?.[1];
+    expect(await featured('eid-lawn')).toBe(eid.image.src);
+    const first = sample.products.find(
+      (product) =>
+        product.id === sample.collections.find((each) => each.handle === 'all')!.productIds[0],
+    )!;
+    expect(await featured('all')).toBe(first.images[0]!.src);
+  });
+
   it('plays a YouTube or Vimeo video the shop chose in a section of its own (OS-08, ADR-705)', async () => {
     const sample = sampleStore();
     const pages = sample.pages ?? [];

@@ -2243,6 +2243,9 @@ type Collection {
   """Unique, URL-safe name within the shop, e.g. "eid-collection"."""
   handle: String!
   id: ID!
+
+  """One of the shop's files, shown as its image (ADR-785); null for none."""
+  image: CollectionImage
   metafield(key: String!, namespace: String!): Metafield
 
   """
@@ -2287,6 +2290,9 @@ input CollectionCreateInput {
   """Generated from the title if omitted."""
   handle: String
 
+  """Its image (ADR-785)."""
+  image: CollectionImageInput
+
   """Manual collections: first products, in order."""
   products: [ID!]
 
@@ -2313,6 +2319,26 @@ type CollectionDeletePayload {
 type CollectionEdge {
   cursor: String!
   node: Collection!
+}
+
+"""
+A collection's image (ADR-785): one of the shop's files, which its storefront shows as Shopify's collection.image.
+"""
+type CollectionImage {
+  """What it shows, for those who cannot see it; null for its file's own."""
+  altText: String
+
+  """The file, as `file` finds it."""
+  fileId: ID!
+}
+
+"""A collection's image: one of the shop's files, an image."""
+input CollectionImageInput {
+  """What it shows, for those who cannot see it; the file's own when blank."""
+  altText: String
+
+  """A JPEG, PNG, WebP or GIF the shop uploaded."""
+  fileId: ID!
 }
 
 type CollectionPayload {
@@ -2410,6 +2436,9 @@ input CollectionUpdateInput {
   description: String
   handle: String
   id: ID!
+
+  """Its image (ADR-785): left out, it stays; null for none."""
+  image: CollectionImageInput
 
   """
   With a new handle, whether the collection's old address sends shoppers to its new one: a URL redirect is made, as on Shopify. False unless given.
@@ -5325,7 +5354,7 @@ type File {
   url: String!
 
   """
-  Where it is used, as the shop keeps it now: its logos, the sharing image, articles by title and themes by name. A page or a product names none of the shop’s files.
+  Where it is used, as the shop keeps it now: its logos, the sharing image, articles and collections by title, and themes by name. A page or a product names none of the shop’s files.
   """
   uses: [FileUse!]!
 }
@@ -5383,19 +5412,20 @@ type FileUpdatePayload {
 
 """Where one of the shop's files is used (ADR-639)."""
 type FileUse {
-  """The article or theme; null for the rest."""
+  """The article, collection or theme; null for the rest."""
   id: ID
   kind: FileUseKind!
 
-  """The article's or theme's title."""
+  """The article's, collection's or theme's title."""
   title: String
 }
 
 """
-What uses one of the shop's files (ADR-639): its logo or square logo, the sharing image of its pages, an article's image, or a theme's settings.
+What uses one of the shop's files (ADR-639): its logo or square logo, the sharing image of its pages, an article's or a collection's image (ADR-785), or a theme's settings.
 """
 enum FileUseKind {
   ARTICLE_IMAGE
+  COLLECTION_IMAGE
   LOGO
   SHARING_IMAGE
   SQUARE_LOGO

@@ -122,6 +122,9 @@
     "main-collection": {
       "name": "Collection",
       "settings": {
+        "show_image": {
+          "label": "Show the collection's image"
+        },
         "products_per_page": {
           "label": "Products per page"
         }

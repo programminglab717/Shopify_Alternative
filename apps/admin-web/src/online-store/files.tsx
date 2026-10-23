@@ -340,7 +340,8 @@ function FileRow({ file }: { file: ShopFilesData['files']['nodes'][number] }) {
   );
 }
 
-type FileUseKind = 'LOGO' | 'SQUARE_LOGO' | 'SHARING_IMAGE' | 'ARTICLE_IMAGE' | 'THEME';
+type FileUseKind =
+  'LOGO' | 'SQUARE_LOGO' | 'SHARING_IMAGE' | 'ARTICLE_IMAGE' | 'COLLECTION_IMAGE' | 'THEME';
 
 /** Where a file is used, asked as its delete is (ADR-639): what will show nothing once it goes. */
 function FileUses({ id }: { id: string }) {

@@ -99,6 +99,34 @@ export class CollectionRuleSet {
 
 @ObjectType({
   description:
+    "A collection's image (ADR-785): one of the shop's files, which its storefront shows as " +
+    "Shopify's collection.image.",
+})
+export class CollectionImage {
+  @Field(() => ID, { description: 'The file, as `file` finds it.' })
+  fileId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "What it shows, for those who cannot see it; null for its file's own.",
+  })
+  altText!: string | null;
+}
+
+@InputType({ description: "A collection's image: one of the shop's files, an image." })
+export class CollectionImageInput {
+  @Field(() => ID, { description: 'A JPEG, PNG, WebP or GIF the shop uploaded.' })
+  fileId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "What it shows, for those who cannot see it; the file's own when blank.",
+  })
+  altText?: string | null;
+}
+
+@ObjectType({
+  description:
     'A group of products. Manual collections hold the products added to them; smart ' +
     'collections hold every product that meets their rules, kept up to date as products change.',
 })
@@ -127,6 +155,12 @@ export class Collection {
       '(ADR-231).',
   })
   seo!: SEO;
+
+  @Field(() => CollectionImage, {
+    nullable: true,
+    description: "One of the shop's files, shown as its image (ADR-785); null for none.",
+  })
+  image!: CollectionImage | null;
 
   @Field(() => Int)
   productsCount!: number;
@@ -218,6 +252,9 @@ export class CollectionCreateInput {
   })
   seo?: SEOInput | null;
 
+  @Field(() => CollectionImageInput, { nullable: true, description: 'Its image (ADR-785).' })
+  image?: CollectionImageInput | null;
+
   @Field(() => [ID], {
     nullable: true,
     description: 'Manual collections: first products, in order.',
@@ -253,6 +290,12 @@ export class CollectionUpdateInput {
     description: 'A field left out stays as it is; null or blank clears it.',
   })
   seo?: SEOInput | null;
+
+  @Field(() => CollectionImageInput, {
+    nullable: true,
+    description: 'Its image (ADR-785): left out, it stays; null for none.',
+  })
+  image?: CollectionImageInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

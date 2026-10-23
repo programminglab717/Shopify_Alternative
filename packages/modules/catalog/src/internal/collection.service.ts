@@ -2,10 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { checkSeo, type SeoInputValue, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { newId } from '@hatti/ids';
+import { readyImagesIn } from '@hatti/files/public';
+import { isUuid, newId } from '@hatti/ids';
 import { searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, ne, sql, type SQL } from 'drizzle-orm';
 import { MAX_RULES, checkRules, type RuleColumn, type RuleRelation } from './collection-rules.js';
 import { refreshMemberships } from './collection-store.js';
 import {
@@ -25,7 +26,7 @@ import {
   type MutationResult,
 } from './input-checker.js';
 import { queryProducts } from './product-store.js';
-import type { CollectionRecord, Page, ProductRecord } from './records.js';
+import type { CollectionImageValue, CollectionRecord, Page, ProductRecord } from './records.js';
 import {
   collections,
   type CollectionRow,
@@ -45,6 +46,13 @@ export interface CollectionRuleSetInput {
   rules: CollectionRuleInput[];
 }
 
+/** A collection's image as given (ADR-785): one of the shop's files, by its ID, and its words. */
+export interface CollectionImageInput {
+  fileId: string;
+  /** What it shows, for those who cannot see it; the file's own when blank. */
+  altText?: string | null;
+}
+
 export interface CreateCollectionInput {
   title: string;
   handle?: string | null;
@@ -52,6 +60,8 @@ export interface CreateCollectionInput {
   sortOrder?: CollectionSortOrderValue | null;
   /** What search engines are told in place of its title and description (ADR-231). */
   seo?: SeoInputValue | null;
+  /** One of the shop's images, shown as its own (ADR-785); null for none. */
+  image?: CollectionImageInput | null;
   /** Makes a smart collection. */
   ruleSet?: CollectionRuleSetInput | null;
   /** For a manual collection: its first products, in order. */
@@ -68,6 +78,8 @@ export interface UpdateCollectionInput {
   ruleSet?: CollectionRuleSetInput | null;
   /** A field left out stays as it is; null or blank clears it (ADR-231). */
   seo?: SeoInputValue | null;
+  /** Left out, it stays; null for none (ADR-785). */
+  image?: CollectionImageInput | null;
   /**
    * With a new handle: the collection's old address sends shoppers to its new one, as Shopify's
    * `redirectNewHandle` does. The online store writes the redirect on the event (ADR-053).
@@ -114,6 +126,7 @@ function toRecord(row: CollectionRow & { productsCount: number }): CollectionRec
     rules: row.rules ?? null,
     disjunctive: row.disjunctive,
     seo: { title: row.seoTitle, description: row.seoDescription },
+    image: row.imageFileId ? { fileId: row.imageFileId, altText: row.imageAlt } : null,
     productsCount: row.productsCount,
     version: row.version,
     createdAt: row.createdAt,
@@ -192,6 +205,7 @@ export class CollectionService {
     const description =
       check.text(['input', 'description'], input.description, { max: LIMITS.description }) ?? '';
     const seo = checkSeo(check, ['input', 'seo'], input.seo);
+    const image = checkImage(check, input.image);
     const requestedHandle =
       input.handle === null || input.handle === undefined
         ? null
@@ -220,6 +234,9 @@ export class CollectionService {
     if (!check.ok || title === null) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
+      if (image && !(await isImageIn(tx, tenant.shopId, image.fileId))) {
+        return failOne<CollectionRecord>(['input', 'image', 'fileId'], 'NOT_FOUND', NO_IMAGE);
+      }
       const id = newId();
       const base = requestedHandle ?? (toHandle(title) || 'collection');
       const values = {
@@ -232,6 +249,8 @@ export class CollectionService {
         disjunctive: input.ruleSet?.appliedDisjunctively ?? false,
         seoTitle: seo.title ?? null,
         seoDescription: seo.description ?? null,
+        imageFileId: image?.fileId ?? null,
+        imageAlt: image?.altText ?? '',
         searchText: searchKey(title),
       };
       let row: CollectionRow | undefined;
@@ -293,6 +312,8 @@ export class CollectionService {
         | 'disjunctive'
         | 'seoTitle'
         | 'seoDescription'
+        | 'imageFileId'
+        | 'imageAlt'
       >
     > = {};
     if (input.title !== undefined) {
@@ -324,6 +345,11 @@ export class CollectionService {
     const seo = checkSeo(check, ['input', 'seo'], input.seo);
     if (seo.title !== undefined) changes.seoTitle = seo.title;
     if (seo.description !== undefined) changes.seoDescription = seo.description;
+    const image = checkImage(check, input.image);
+    if (image !== undefined) {
+      changes.imageFileId = image?.fileId ?? null;
+      changes.imageAlt = image?.altText ?? '';
+    }
     if (!check.ok) return fail(check.errors);
 
     try {
@@ -335,6 +361,13 @@ export class CollectionService {
           .for('update');
         if (!current)
           return failOne<CollectionRecord>(['input', 'id'], 'NOT_FOUND', 'Collection not found');
+        if (
+          image &&
+          image.fileId !== current.imageFileId &&
+          !(await isImageIn(tx, tenant.shopId, image.fileId))
+        ) {
+          return failOne<CollectionRecord>(['input', 'image', 'fileId'], 'NOT_FOUND', NO_IMAGE);
+        }
         const smart = current.rules !== null;
         if (input.ruleSet !== undefined && !smart) {
           return failOne<CollectionRecord>(
@@ -398,7 +431,13 @@ export class CollectionService {
             aggregateType: 'collection',
             aggregateId: current.id,
             payload: {
-              changed: [...new Set(changed.map((key) => (key === 'disjunctive' ? 'rules' : key)))],
+              changed: [
+                ...new Set(
+                  changed.map((key) =>
+                    key === 'disjunctive' ? 'rules' : key.startsWith('image') ? 'image' : key,
+                  ),
+                ),
+              ],
               version: updated!.version,
               ...movedFrom(current.handle, changed, input.redirectNewHandle),
             },
@@ -858,9 +897,58 @@ function allColumns() {
     disjunctive: collections.disjunctive,
     seoTitle: collections.seoTitle,
     seoDescription: collections.seoDescription,
+    imageFileId: collections.imageFileId,
+    imageAlt: collections.imageAlt,
     searchText: collections.searchText,
     version: collections.version,
     createdAt: collections.createdAt,
     updatedAt: collections.updatedAt,
   };
+}
+
+const NO_IMAGE = "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded";
+
+/** The image `input` names, its words checked: undefined when not given, null for none. */
+function checkImage(
+  check: InputChecker,
+  input: CollectionImageInput | null | undefined,
+): CollectionImageValue | null | undefined {
+  if (input === undefined || input === null) return input;
+  const altText =
+    check.text(['input', 'image', 'altText'], input.altText ?? '', { max: LIMITS.alt }) ?? '';
+  return { fileId: input.fileId, altText };
+}
+
+/** Whether `fileId` is one of the shop's images a page can show (ADR-785). */
+async function isImageIn(tx: Tx, shopId: string, fileId: string): Promise<boolean> {
+  return isUuid(fileId) && (await readyImagesIn(tx, shopId, [fileId])).has(fileId);
+}
+
+/**
+ * The image the shop's collection `collectionId` shows (ADR-785), as the API serves it to its
+ * storefront's pages: null for none, or no such collection.
+ */
+export async function collectionImageOf(
+  tx: Tx,
+  shopId: string,
+  collectionId: string,
+): Promise<CollectionImageValue | null> {
+  const [found] = await tx
+    .select({ fileId: collections.imageFileId, altText: collections.imageAlt })
+    .from(collections)
+    .where(and(eq(collections.shopId, shopId), eq(collections.id, collectionId)));
+  return found?.fileId ? { fileId: found.fileId, altText: found.altText } : null;
+}
+
+/** The shop's collections showing its file `fileId` as their image (ADR-785), by title. */
+export async function collectionsPicturingIn(
+  tx: Tx,
+  shopId: string,
+  fileId: string,
+): Promise<{ id: string; title: string }[]> {
+  return tx
+    .select({ id: collections.id, title: collections.title })
+    .from(collections)
+    .where(and(eq(collections.shopId, shopId), eq(collections.imageFileId, fileId)))
+    .orderBy(asc(collections.title), asc(collections.id));
 }

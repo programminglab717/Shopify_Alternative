@@ -122,6 +122,9 @@
     "main-collection": {
       "name": "کلیکشن",
       "settings": {
+        "show_image": {
+          "label": "کلیکشن کی تصویر دکھائیں"
+        },
         "products_per_page": {
           "label": "ایک صفحے پر پروڈکٹس"
         }

@@ -384,13 +384,15 @@ export function collectionDoc(
   productIds: string[],
   /** Its fields the shop translated (ADR-238), a description as text. */
   translations?: TranslatedFields,
+  /** Its image, where the API serves it (ADR-785); null for none. */
+  image: ImageDoc | null = null,
 ): CollectionDoc {
   return {
     id: record.id,
     handle: record.handle,
     title: record.title,
     descriptionHtml: textToHtml(record.description),
-    image: null,
+    image,
     productIds,
     updatedAt: record.updatedAt.toISOString(),
     seo: record.seo,

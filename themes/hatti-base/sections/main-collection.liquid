@@ -4,6 +4,11 @@
       <h1 dir="auto">{{ collection.title | escape }}</h1>
       <p>{{ 'sections.collection.count' | t: count: collection.products_count }}</p>
     </div>
+    {%- if section.settings.show_image and collection.image -%}
+      <figure class="collection__image">
+        {{- collection.image | image_url: width: 1600 | image_tag: widths: '800, 1200, 1600', sizes: '100vw', fetchpriority: 'high' -}}
+      </figure>
+    {%- endif -%}
     {%- if collection.description != blank -%}
       <div class="rte" dir="auto">{{ collection.description }}</div>
     {%- endif -%}
@@ -33,7 +38,18 @@
       "max": 48,
       "step": 4,
       "default": 24
+    },
+    {
+      "type": "checkbox",
+      "id": "show_image",
+      "label": "t:sections.main-collection.settings.show_image.label",
+      "default": true
     }
   ]
 }
 {% endschema %}
+
+{% stylesheet %}
+  .collection__image { margin: 0 0 1.5rem; }
+  .collection__image img { inline-size: 100%; block-size: auto; max-block-size: 28rem; object-fit: cover; border-radius: 0.5rem; }
+{% endstylesheet %}

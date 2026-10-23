@@ -25,6 +25,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
+    "@hatti/files": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/images": "workspace:*",
     "@hatti/money": "workspace:*",

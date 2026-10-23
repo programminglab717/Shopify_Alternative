@@ -18,6 +18,7 @@ import { serveImages } from './images.js';
 import { serveVideos } from './videos.js';
 import { serveLocalStorage } from './local-storage.js';
 import { serveArticleImages } from './article-images.js';
+import { serveCollectionImages } from './collection-images.js';
 import { FileImages } from './file-images.js';
 import { serveLogos } from './logos.js';
 import { serveSharingImages } from './sharing-images.js';
@@ -114,6 +115,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveLogos(fastify, options.database, fileImages);
   // Published articles' images, for their storefronts' pages (ADR-213).
   serveArticleImages(fastify, options.database, fileImages);
+  // Collections' images, for their storefronts' pages (ADR-785).
+  serveCollectionImages(fastify, options.database, fileImages);
   // Shops' social sharing images, for their pages' link previews (ADR-243).
   serveSharingImages(fastify, options.database, fileImages);
   // The pictures shops chose for their themes, for their storefronts to serve (ADR-326).

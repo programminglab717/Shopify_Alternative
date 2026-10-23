@@ -441,6 +441,57 @@ describe.skipIf(!server)('CollectionService', () => {
     ).toEqual([]);
   });
 
+  it("shows one of the shop's images as a collection's, with words of its own (ADR-785)", async () => {
+    /** A file of the shop's, of `type`, ready or only staged. */
+    const file = async (shopId: string, type = 'image/png', status = 'ready') => {
+      const id = newId();
+      await f.admin.query(
+        `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+         VALUES ($1, $2, $3, 'x', $4, 10, $5)`,
+        [shopId, id, `shops/${shopId}/files/${id}/x`, type, status],
+      );
+      return id;
+    };
+    const banner = await file(f.a.shopId);
+    const made = unwrap(
+      await f.collections.create(f.a, {
+        title: 'Eid',
+        image: { fileId: banner, altText: ' Lawn suits ' },
+      }),
+    );
+    expect(made.image).toEqual({ fileId: banner, altText: 'Lawn suits' });
+    // Words changed alone, then another image, then none.
+    const other = await file(f.a.shopId, 'image/webp');
+    const worded = unwrap(
+      await f.collections.update(f.a, { id: made.id, image: { fileId: banner } }),
+    );
+    expect(worded).toMatchObject({ image: { fileId: banner, altText: '' }, version: 2 });
+    unwrap(await f.collections.update(f.a, { id: made.id, image: { fileId: other } }));
+    expect((await f.collections.update(f.a, { id: made.id, title: 'Eid sale' })).ok).toBe(true);
+    expect((await f.collections.get(f.a, made.id))?.image?.fileId).toBe(other);
+    expect(unwrap(await f.collections.update(f.a, { id: made.id, image: null })).image).toBeNull();
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'collection.updated')
+        .map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([['image'], ['image'], ['title'], ['image']]);
+
+    // Not an image, not ready, another shop's, or no file: refused.
+    for (const fileId of [
+      await file(f.a.shopId, 'application/pdf'),
+      await file(f.a.shopId, 'image/png', 'staged'),
+      await file(f.b.shopId),
+      'nope',
+    ]) {
+      expect(errorsOf(await f.collections.create(f.a, { title: 'X', image: { fileId } }))).toEqual([
+        ['input.image.fileId', 'NOT_FOUND'],
+      ]);
+      expect(errorsOf(await f.collections.update(f.a, { id: made.id, image: { fileId } }))).toEqual(
+        [['input.image.fileId', 'NOT_FOUND']],
+      );
+    }
+  });
+
   it('deletes a collection and keeps its products', async () => {
     const lawn = await product('Lawn Suit');
     const collection = unwrap(
