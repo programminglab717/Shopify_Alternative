@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Labels on the inbox's conversations
+### c0c2a93 · Labels on the inbox's conversations
 
 * **Staff sort the inbox by what customers write about:** a conversation is labelled "delivery",
   "size" or "refund" in the shop's own words, and the inbox shows those with one label, with how
