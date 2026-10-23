@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Price lists for wholesale customers
+### 4005568 · Price lists for wholesale customers
 
 * **Wholesale prices:** a shop keeps price lists for the customers it tags as wholesale, with a
   share off, prices of its own for some variants and more off by the dozen (CUS-06, [ADR-778](../architecture/13-decision-log.md#adr-778--price-lists-for-wholesale-customers-a-share-off-prices-of-their-own-and-quantity-breaks-by-a-tag-the-shop-gives-them)).
