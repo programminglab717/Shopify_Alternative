@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### The Shopify store import in the admin
+### cc606c7 · The Shopify store import in the admin
 
 * **Products → Import and export now opens with "Import from your Shopify store":** the store's
   address and the owner's app, checked first and then imported, each problem named by its
