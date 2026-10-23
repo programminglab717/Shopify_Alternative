@@ -1,4 +1,5 @@
 import { SecretBox } from '@hatti/crypto';
+import { ErrorTracker } from '@hatti/logger';
 import { describe, expect, it } from 'vitest';
 import {
   hattiBankAccountOf,
@@ -20,6 +21,7 @@ import {
   queryCostLimitsOf,
   vapidKeysOf,
 } from './config.js';
+import { errorTrackerOf } from './logging.js';
 import { storageCorsRules } from './storage.js';
 
 const KEY = 'k'.repeat(32);
@@ -528,6 +530,28 @@ describe("Closed shops' data (ADR-741)", () => {
     const worker = { ...logins, REDIS_URL: env.REDIS_URL };
     expect(loadWorkerConfig(worker).CLOSED_SHOP_PURGE).toBe(false);
     expect(loadWorkerConfig({ ...worker, CLOSED_SHOP_PURGE: 'true' }).CLOSED_SHOP_PURGE).toBe(true);
+  });
+});
+
+describe('Errors sent to the error tracker (ADR-743)', () => {
+  const worker = {
+    DATABASE_URL: env.DATABASE_URL,
+    DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+    REDIS_URL: env.REDIS_URL,
+  };
+
+  it("sends none without a DSN, and files them under NODE_ENV's name unless told another", () => {
+    expect(errorTrackerOf(loadWorkerConfig(worker))).toBeUndefined();
+    const config = loadWorkerConfig({
+      ...worker,
+      ERROR_TRACKING_DSN: 'https://abc123@errors.hatti.pk/7',
+      ERROR_TRACKING_RELEASE: 'core@1.4.0',
+    });
+    expect(config).toMatchObject({ ERROR_TRACKING_RELEASE: 'core@1.4.0' });
+    expect(errorTrackerOf(config)).toBeInstanceOf(ErrorTracker);
+    expect(() =>
+      loadWorkerConfig({ ...worker, ERROR_TRACKING_DSN: 'https://errors.hatti.pk/7' }),
+    ).toThrow('ERROR_TRACKING_DSN');
   });
 });
 

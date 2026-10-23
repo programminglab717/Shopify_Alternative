@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-742 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-743 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -750,6 +750,7 @@
 | 740 | A shop's owner closes it from the admin, typing its name after confirming who they are: its storefront, checkout, Admin API and renewals stop, and they may reopen it for the 90 days its data is kept | Accepted |
 | 741 | A closed shop's data is deleted 90 days after it closed, table by table from those its tenant isolation names, but a list of records the law has Hatti keep, and its files; the worker does it once counsel has confirmed the list, Hatti's people by hand till then | Accepted |
 | 742 | Every shop is told of a new version of Hatti's terms, policies or list of sub-processors, at its alerts number and by email to its owner, once: the worker records each version the first time it runs with it, and one that follows an earlier version is announced to the shops open before it | Accepted |
+| 743 | Errors the core logs go to a self-hosted GlitchTip, the open-source error tracker, in the protocol Sentry's SDKs speak, sent by Hatti's logger itself after redaction; no paid service | Accepted |
 
 ---
 
@@ -25268,3 +25269,35 @@
   that the notice comes in time, is counsel's (OWN-41): the version's date is the day it takes
   effect, and releasing it early is how notice is given. Its WhatsApp template is approved with
   Meta with Hatti's others (OWN-23); until it is, the email alone reaches the owner.
+
+## ADR-743 · Errors the core logs go to a self-hosted GlitchTip, the open-source error tracker, in the protocol Sentry's SDKs speak, sent by Hatti's logger itself after redaction; no paid service
+
+* **Context:** the stack chose Sentry for errors (02, 10 §observability), and OWN-05 asked
+  whether to use it. Hatti's owner settled it on 2026-10-23: nothing paid; free or open source
+  alone. Sentry's hosted service is paid past its free tier, and its self-hosted server is under
+  the Functional Source License, free to host for oneself but not open source. GlitchTip is open
+  source (MIT), free to host, and takes events from Sentry's SDKs unchanged. Errors were in the
+  logs alone, which no one reads until something is already wrong.
+* **Decision:**
+  * **GlitchTip, hosted by Hatti** with the cell, receives errors. Nothing in the code is tied to
+    it: any server that takes Sentry's event protocol would do.
+  * **Hatti's logger sends them** (`ErrorTracker` in `@hatti/logger`): every line logged at
+    error or fatal is also sent, as an event with its message, its error's type and stack frames,
+    the service, the shop where the line names one, its trace id, and its other fields. It is sent
+    as the line was written, **after redaction**, so no number, email, address or secret leaves
+    that the logs would not hold. No SDK and no new dependency: a few dozen lines that post an
+    envelope to the project's DSN.
+  * **Never in the way:** sending never throws nor holds up the line; at most 60 events a minute
+    are sent and the rest dropped, so a storm of errors cannot flood the tracker or the network;
+    the logs keep every line regardless.
+  * **The core's API and worker** send to the DSN in `ERROR_TRACKING_DSN`, filed under
+    `ERROR_TRACKING_ENVIRONMENT` (NODE_ENV's by default) and `ERROR_TRACKING_RELEASE`; without a
+    DSN nothing is sent. An exception nothing caught, or a rejection nothing handled, is logged
+    as fatal, so that it reaches the tracker too, before the process exits; shutting down waits a
+    moment for the last events.
+* **Consequences:** errors can be seen, grouped and followed in GlitchTip's interface without
+  paying anyone. GlitchTip is one more thing to host and keep up, with its own database (its
+  install guide: glitchtip.com/documentation/install). The storefront, which logs to the console,
+  and the admin in the browser do not send errors yet; GlitchTip's browser SDK support (Sentry's
+  browser SDK, MIT) would serve the admin when it does. Performance tracing stays with
+  OpenTelemetry and Tempo, not the tracker.

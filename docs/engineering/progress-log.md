@@ -14,6 +14,19 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-23
+
+### Errors to a self-hosted GlitchTip
+
+* **The owner's rule, nothing paid:** errors go to GlitchTip, the open-source error tracker
+  Hatti hosts itself, not to Sentry's paid service ([ADR-743](../architecture/13-decision-log.md#adr-743--errors-the-core-logs-go-to-a-self-hosted-glitchtip-the-open-source-error-tracker-in-the-protocol-sentrys-sdks-speak-sent-by-hattis-logger-itself-after-redaction-no-paid-service)).
+* **Hatti's logger sends them:** every line the core's API and worker log at error or fatal is
+  also sent, after redaction, with its stack, the shop and the trace; no SDK, no new dependency.
+  At most 60 a minute, and sending never gets in the way of logging.
+* **Set `ERROR_TRACKING_DSN`** to a GlitchTip project's DSN once GlitchTip is hosted with the
+  cell (OWN-05); unset, nothing is sent.
+* 4063 tests (7 new).
+
 ## 2026-10-22
 
 ### 7e0ac8d · Telling shops of new legal versions

@@ -1,5 +1,6 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
+import { parseDsn } from '@hatti/logger';
 import type { GoogleAdsOptions } from '@hatti/marketing/public';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
 import { FBR_DI_URLS } from '@hatti/tax/public';
@@ -340,6 +341,25 @@ const storefrontDnsTarget = z
 const common = {
   NODE_ENV: env.nodeEnv(),
   LOG_LEVEL: env.logLevel(),
+  /**
+   * Where errors logged go too (ADR-743): a project's DSN on Hatti's own GlitchTip, the
+   * open-source error tracker, or any that takes Sentry's protocol. Unset, none are sent.
+   */
+  ERROR_TRACKING_DSN: z
+    .string()
+    .refine((dsn) => {
+      try {
+        parseDsn(dsn);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Expected a DSN, such as https://<key>@errors.hatti.pk/<project>')
+    .optional(),
+  /** What the tracker files events under: "staging", "production"; NODE_ENV's by default. */
+  ERROR_TRACKING_ENVIRONMENT: z.string().min(1).max(64).optional(),
+  /** The release running, such as the image's tag, which the tracker groups events by. */
+  ERROR_TRACKING_RELEASE: z.string().min(1).max(200).optional(),
   /** hatti_app login: row-level security applies. */
   DATABASE_URL: env.postgresUrl(),
   REDIS_URL: env.redisUrl(),

@@ -15,6 +15,7 @@ import {
   vapidKeysOf,
 } from './config.js';
 import { couriersOf } from './couriers.js';
+import { errorTrackerOf, logUncaught } from './logging.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
 import {
@@ -29,7 +30,10 @@ import { onShutdown } from './shutdown.js';
 import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
 
 const config = loadApiConfig();
-const logger = createLogger({ name: 'core-api', level: config.LOG_LEVEL });
+// Errors go to the error tracker too, once its DSN is set (ADR-743).
+const errorTracker = errorTrackerOf(config);
+const logger = createLogger({ name: 'core-api', level: config.LOG_LEVEL, errorTracker });
+logUncaught(logger, errorTracker);
 const database = new Database({
   appUrl: config.DATABASE_URL,
   applicationName: 'core-api',
@@ -138,4 +142,5 @@ onShutdown(logger, async () => {
   await database.close();
   await identityDatabase.close();
   redis.disconnect();
+  await errorTracker?.flush();
 });

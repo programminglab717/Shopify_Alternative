@@ -1,8 +1,17 @@
 import { isSpanContextValid, trace } from '@opentelemetry/api';
-import { pino, stdSerializers, stdTimeFunctions } from 'pino';
+import { destination, pino, stdSerializers, stdTimeFunctions, symbols } from 'pino';
 import type { DestinationStream, Level, LevelWithSilent, Logger } from 'pino';
+import type { ErrorTracker } from './error-tracking.js';
 
 export type { Level, LevelWithSilent, Logger };
+export {
+  ErrorTracker,
+  eventOf,
+  framesOf,
+  parseDsn,
+  type ErrorTrackerDsn,
+  type ErrorTrackerOptions,
+} from './error-tracking.js';
 
 /**
  * Keys whose values never reach logs: credentials, and personal data covered by our privacy
@@ -47,6 +56,35 @@ export interface CreateLoggerOptions {
   base?: Record<string, unknown>;
   /** Defaults to stdout. Tests pass an in-memory stream. */
   destination?: DestinationStream;
+  /** Where lines at error and fatal go too, redacted, once a DSN is set (ADR-743). */
+  errorTracker?: ErrorTracker;
+}
+
+/** pino's error level: lines at it or above go to the error tracker. */
+const ERROR_LEVEL = 50;
+
+/**
+ * `destination`, with each line at error or above also given to `tracker`: as written, so
+ * redacted. pino tells a stream that asks for it each line's level.
+ */
+function trackedDestination(
+  destination: DestinationStream,
+  tracker: ErrorTracker,
+): DestinationStream {
+  const stream = {
+    [symbols.needsMetadataGsym]: true,
+    lastLevel: 0,
+    write(line: string) {
+      destination.write(line);
+      if (stream.lastLevel < ERROR_LEVEL) return;
+      try {
+        tracker.capture(JSON.parse(line) as Record<string, unknown>);
+      } catch {
+        // A line that is no JSON is in the logs still.
+      }
+    },
+  };
+  return stream;
 }
 
 /** trace_id and span_id of the active span, so logs and traces can be joined. */
@@ -73,6 +111,8 @@ export function createLogger(options: CreateLoggerOptions): Logger {
       redact: { paths: [...REDACT_PATHS], censor: '[redacted]' },
       mixin: traceFields,
     },
-    options.destination,
+    options.errorTracker
+      ? trackedDestination(options.destination ?? destination(1), options.errorTracker)
+      : options.destination,
   );
 }
