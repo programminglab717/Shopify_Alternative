@@ -13,6 +13,7 @@ import { ApiModule, type ApiModuleOptions } from './api.module.js';
 import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { keepRawBodies, readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
+import { receiveAdminErrors } from './admin-errors.js';
 import { serveImages } from './images.js';
 import { serveVideos } from './videos.js';
 import { serveLocalStorage } from './local-storage.js';
@@ -117,6 +118,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveSharingImages(fastify, options.database, fileImages);
   // The pictures shops chose for their themes, for their storefronts to serve (ADR-326).
   serveThemeImages(fastify, options.database, fileImages);
+  // What failed in the admin's browser, logged for the error tracker (ADR-745).
+  receiveAdminErrors(fastify, options.logger, options.identity.rateLimiter ?? null);
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(hearingEmailEvents(options)),

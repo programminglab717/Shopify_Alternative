@@ -5,9 +5,29 @@ import './styles.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app';
+import { createReporter, reportUncaught } from './errors/reporting';
 import { registerServiceWorker } from './offline/register';
 
-createRoot(document.getElementById('root')!).render(
+// What fails in a built admin is reported to the core (ADR-745); in development, the console has it.
+const reporter = import.meta.env.PROD
+  ? createReporter({ release: import.meta.env.VITE_RELEASE || undefined })
+  : null;
+if (reporter) reportUncaught(reporter);
+
+createRoot(
+  document.getElementById('root')!,
+  // What React could not render, whether nothing caught it, which goes on to the browser as
+  // React would send it, or a boundary showed its fallback in its place.
+  reporter
+    ? {
+        onUncaughtError: (error) => {
+          reporter.report(error);
+          window.reportError(error);
+        },
+        onCaughtError: (error) => reporter.report(error),
+      }
+    : {},
+).render(
   <StrictMode>
     <App />
   </StrictMode>,

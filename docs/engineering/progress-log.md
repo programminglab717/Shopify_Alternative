@@ -16,6 +16,18 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The admin's errors to GlitchTip, through the core
+
+* **What fails in the admin's browser is reported to the core** at `/admin/errors`, which logs it
+  as the admin's and so sends it to the same self-hosted GlitchTip ([ADR-745](../architecture/13-decision-log.md#adr-745--the-admins-browser-errors-are-reported-to-the-core-at-adminerrors-which-logs-them-as-the-admins-for-the-error-tracker-after-its-redaction-no-dsn-in-the-browser-a-limit-for-each-browser-and-for-all-numbers-and-emails-taken-out-ids-out-of-the-pages-path)). No DSN is in the
+  browser.
+* **Nothing personal leaves:** the page's IDs are taken out of its path and its query never sent;
+  the core takes numbers and email addresses out of what is reported. Each browser may report 20
+  a minute, and all together 20, so the core's own errors keep their room.
+* **For later:** the edge sends `/admin/errors` to the core, and the admin's source maps go to
+  GlitchTip once it is hosted (OWN-05).
+* 4072 tests (8 new).
+
 ### 1432307 · The storefront's errors to GlitchTip too
 
 * **The storefront logs now,** JSON through Hatti's logger as the core does, and sends what it

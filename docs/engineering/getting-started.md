@@ -720,8 +720,8 @@ With the core running (`pnpm dev:api`), start the admin and open it on a phone-s
 pnpm dev:admin          # http://localhost:5173/
 ```
 
-Vite sends `/auth` and `/admin/api` on to the core at `http://localhost:4000` (`HATTI_API_URL`
-to change it). Sign in with the seed's owner: choose **Email**, give the email and password
+Vite sends `/auth`, `/admin/api` and `/admin/errors` on to the core at `http://localhost:4000`
+(`HATTI_API_URL` to change it). Sign in with the seed's owner: choose **Email**, give the email and password
 `pnpm seed` printed, then the code from `pnpm totp <2-step key>`. The shop opens on Home, with its
 orders a tap away; **اردو** in the header switches to Urdu, right to left. A new account signs up
 by mobile only where the core sends codes (`WHATSAPP_*` or `SMS_*`); by email, it always can.
@@ -729,7 +729,7 @@ Passkeys added under **Account** belong to the admin's origin, which the core ta
 `PASSKEY_ORIGINS=http://localhost:5173` in `.env` (`.env.example` has it); the links in the core's
 emails open the admin there too.
 
-The service worker that lets the admin open offline (ADR-295) is registered by builds alone: `pnpm --filter @hatti/admin-web build`, then `pnpm --filter @hatti/admin-web preview` serves the build at http://localhost:4173/, sending `/auth` and `/admin/api` on to the core as the dev server does. Chrome's DevTools, under Application, show the worker, what it keeps and the manifest, and Network's Offline tries it without a connection.
+The service worker that lets the admin open offline (ADR-295) is registered by builds alone: `pnpm --filter @hatti/admin-web build`, then `pnpm --filter @hatti/admin-web preview` serves the build at http://localhost:4173/, sending `/auth`, `/admin/api` and `/admin/errors` on to the core as the dev server does; a build reports what fails in it to the core (ADR-745), which logs it. Chrome's DevTools, under Application, show the worker, what it keeps and the manifest, and Network's Offline tries it without a connection.
 
 ## Look at a storefront
 

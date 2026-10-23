@@ -79,6 +79,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/admin/api': api,
+      '/admin/errors': api,
       '/auth': api,
     },
   },

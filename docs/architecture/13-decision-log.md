@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-744 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-745 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -752,6 +752,7 @@
 | 742 | Every shop is told of a new version of Hatti's terms, policies or list of sub-processors, at its alerts number and by email to its owner, once: the worker records each version the first time it runs with it, and one that follows an earlier version is announced to the shops open before it | Accepted |
 | 743 | Errors the core logs go to a self-hosted GlitchTip, the open-source error tracker, in the protocol Sentry's SDKs speak, sent by Hatti's logger itself after redaction; no paid service | Accepted |
 | 744 | The storefront's errors go to the error tracker too: each answer that failed with a 5xx logged at error by Fastify's log controller, by its route and the first part of its path, never its address; requests themselves not logged | Accepted |
+| 745 | The admin's browser errors are reported to the core at /admin/errors, which logs them as the admin's for the error tracker after its redaction: no DSN in the browser, a limit for each browser and for all, numbers and emails taken out, IDs out of the page's path | Accepted |
 
 ---
 
@@ -25327,3 +25328,32 @@
   `storefront`. Errors after a page's head is sent (its sections stream) are Fastify's stream
   warnings, not sent; a section's failure is shown as its absence and logged at warn. The admin in
   the browser still sends nothing.
+
+## ADR-745 · The admin's browser errors are reported to the core at /admin/errors, which logs them as the admin's for the error tracker after its redaction: no DSN in the browser, a limit for each browser and for all, numbers and emails taken out, IDs out of the page's path
+
+* **Context:** after ADR-743 and ADR-744, the core's and the storefront's errors reach the
+  self-hosted GlitchTip; what fails in the admin, a React app in staff's browsers, was seen by no
+  one. Sentry's browser SDK would send straight to GlitchTip, but it puts the project's DSN in
+  every browser, sends what it finds before any redaction of Hatti's, and is one more dependency
+  in a bundle staff load on slow phones.
+* **Decision:**
+  * **The browser reports to the core**, on the admin's own origin: `POST /admin/errors` with
+    the error's type, message and stack, the page and the build's release. The core logs it at
+    error as the admin's (`service: admin-web`, its own release and platform), so it goes to the
+    tracker with the core's own errors, through the same logger and redaction; the browser holds
+    no DSN. The edge sends `/admin/errors` on to the core as it does `/auth` and `/admin/api`.
+  * **What is reported:** errors nothing caught, rejections nothing handled, and what React could
+    not render, whether or not a boundary showed its fallback. Not the API's refusals, nor a
+    network down: the core logs its own failures. Each fault once a page, and ten at most; a
+    report not sent never fails the page.
+  * **Nothing personal leaves:** the page is its path with its IDs taken out (`/shops/:id/orders/
+    :id`), never its query; the core cuts each part to a length and takes numbers and email
+    addresses out of the message, the stack and the page before logging them, since only the
+    logs' keys are redacted, not their values.
+  * **Open but limited:** errors come before signing in too, so the route needs no session; each
+    browser's address may report 20 a minute and all browsers together 20, so that the
+    tracker's 60 events a minute stay mostly the core's own; a report past either is refused.
+* **Consequences:** the admin's faults are in GlitchTip beside the core's and the storefront's,
+  tagged `admin-web`, with the browser and the page. Their stacks name the built, minified files
+  until the build's source maps are given to GlitchTip (its sourcemap upload, open source too),
+  which is left for when it is hosted; `VITE_RELEASE` names the build so that they can be matched.

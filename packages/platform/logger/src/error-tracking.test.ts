@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorTracker, createLogger, framesOf, parseDsn } from './index.js';
+import { ErrorTracker, createLogger, eventOf, framesOf, parseDsn } from './index.js';
 
 const DSN = 'https://abc123@errors.hatti.pk/7';
 
@@ -151,6 +151,56 @@ describe('Errors sent to the error tracker (ADR-743)', () => {
         filename: '/app/apps/core/dist/orders.js',
         lineno: 10,
         colno: 5,
+        in_app: true,
+      },
+    ]);
+  });
+
+  it("files a line logged for another service, as the admin's browser errors are, under it", () => {
+    const event = eventOf(
+      {
+        level: 'error',
+        name: 'core-api',
+        service: 'admin-web',
+        release: 'admin-web@2026.10.23',
+        platform: 'javascript',
+        msg: 'x is undefined',
+        page: '/shops/:id/orders',
+      },
+      { environment: 'production', release: 'core@1.4.0' },
+      new Date('2026-10-23T10:00:00Z'),
+    );
+    expect(event).toMatchObject({
+      logger: 'admin-web',
+      release: 'admin-web@2026.10.23',
+      platform: 'javascript',
+      tags: { service: 'admin-web' },
+      extra: { page: '/shops/:id/orders' },
+    });
+    expect(event.extra).not.toHaveProperty('service');
+  });
+
+  it("reads Firefox's and Safari's stacks too", () => {
+    expect(
+      framesOf(
+        [
+          'confirm@https://admin.hatti.pk/assets/index-3f2a.js:1:2345',
+          '@https://admin.hatti.pk/assets/index-3f2a.js:1:99',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      {
+        function: '?',
+        filename: 'https://admin.hatti.pk/assets/index-3f2a.js',
+        lineno: 1,
+        colno: 99,
+        in_app: true,
+      },
+      {
+        function: 'confirm',
+        filename: 'https://admin.hatti.pk/assets/index-3f2a.js',
+        lineno: 1,
+        colno: 2345,
         in_app: true,
       },
     ]);

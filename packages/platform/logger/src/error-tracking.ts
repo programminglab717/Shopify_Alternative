@@ -45,6 +45,9 @@ type LogLine = Record<string, unknown>;
 
 /** The fields of a line that are no context of its error: they are the event's own. */
 const OWN_FIELDS = new Set([
+  'service',
+  'release',
+  'platform',
   'level',
   'time',
   'msg',
@@ -127,7 +130,7 @@ export function eventOf(
   now: Date,
 ): Record<string, unknown> {
   const error = (line.err ?? line.error) as
-    { type?: string; message?: string; stack?: string } | undefined;
+    { type?: string; name?: unknown; message?: string; stack?: string } | undefined;
   const message = typeof line.msg === 'string' ? line.msg : undefined;
   const extra: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(line)) {
@@ -137,22 +140,29 @@ export function eventOf(
   }
   const traceId = typeof line.trace_id === 'string' ? line.trace_id : undefined;
   const spanId = typeof line.span_id === 'string' ? line.span_id : undefined;
+  // A line may speak for another service than the logger's, such as the admin's browser errors
+  // the core logs for it (ADR-745), with that service's release and platform.
+  const text = (key: string) => (typeof line[key] === 'string' ? line[key] : undefined);
+  const service = text('service') ?? text('name');
+  const release = text('release') ?? options.release;
   return {
     event_id: randomUUID().replaceAll('-', ''),
     timestamp: now.getTime() / 1000,
-    platform: 'node',
+    platform: text('platform') ?? 'node',
     level: line.level === 'fatal' ? 'fatal' : 'error',
-    logger: typeof line.name === 'string' ? line.name : undefined,
+    logger: service,
     server_name: hostname(),
     environment: options.environment,
-    ...(options.release ? { release: options.release } : {}),
+    ...(release ? { release } : {}),
     ...(message ? { message: { formatted: message } } : {}),
     ...(error
       ? {
           exception: {
             values: [
               {
-                type: error.type ?? 'Error',
+                // An error's own name, as a class that names itself or a browser's error has,
+                // says more than the constructor pino read its type from.
+                type: (typeof error.name === 'string' && error.name) || error.type || 'Error',
                 value: error.message ?? message ?? '',
                 ...(error.stack ? { stacktrace: { frames: framesOf(error.stack) } } : {}),
               },
@@ -161,7 +171,7 @@ export function eventOf(
         }
       : {}),
     tags: {
-      ...(typeof line.name === 'string' ? { service: line.name } : {}),
+      ...(service ? { service } : {}),
       ...(typeof line.shopId === 'string' ? { shop_id: line.shopId } : {}),
     },
     extra,
@@ -169,15 +179,20 @@ export function eventOf(
   };
 }
 
-/** A V8 stack's frames, the oldest first as the tracker reads them. */
+/**
+ * A stack's frames, the oldest first as the tracker reads them: V8's (Node, Chrome, Edge),
+ * "    at fn (file:1:2)", or Firefox's and Safari's, "fn@file:1:2".
+ */
 export function framesOf(stack: string): Record<string, unknown>[] {
   const frames: Record<string, unknown>[] = [];
-  for (const line of stack.split('\n').slice(1)) {
-    const match = /^\s*at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?$/.exec(line);
+  for (const line of stack.split('\n')) {
+    const match =
+      /^\s*at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?$/.exec(line) ??
+      /^\s*([^@\s]*)@(.+?):(\d+):(\d+)$/.exec(line);
     if (!match) continue;
     const [, fn, file, lineNo, column] = match;
     frames.push({
-      function: fn ?? '?',
+      function: fn || '?',
       filename: file,
       lineno: Number(lineNo),
       colno: Number(column),
