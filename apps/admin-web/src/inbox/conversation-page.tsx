@@ -54,6 +54,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { ConversationLabels } from './conversation-labels';
 import { ConversationOrder } from './conversation-order';
 import { mediaLabel, UnreadBadge, WORKS_INBOX } from './inbox-page';
+import { ProductCardPicker } from './product-card-picker';
 import { SavedReplyPicker } from './saved-replies';
 
 const PAGE = 50;
@@ -186,11 +187,18 @@ function ReplyBox({
         onChange={(event) => setBody(event.target.value)}
         className="rounded-control border border-line bg-surface px-3 py-2 text-text"
       />
-      <SavedReplyPicker
-        onPick={(saved) =>
-          setBody((current) => (current.trim() ? `${current.trimEnd()}\n${saved}` : saved))
-        }
-      />
+      <div className="flex flex-wrap gap-2">
+        <SavedReplyPicker
+          onPick={(saved) =>
+            setBody((current) => (current.trim() ? `${current.trimEnd()}\n${saved}` : saved))
+          }
+        />
+        <ProductCardPicker
+          onPick={(card) =>
+            setBody((current) => (current.trim() ? `${current.trimEnd()}\n\n${card}` : card))
+          }
+        />
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
           {t('inbox.replyCount', { count: formatCount(text.length), most: formatCount(REPLY_MAX) })}

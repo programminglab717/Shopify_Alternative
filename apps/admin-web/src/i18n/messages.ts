@@ -5568,6 +5568,9 @@ const en = {
   'inbox.nobodyYet': 'No one is answering it yet',
   'inbox.take': 'Answer it myself',
   'inbox.labels': 'Labels',
+  'inbox.product.pick': 'Put in a product',
+  'inbox.product.find': 'Find a product on sale',
+  'inbox.product.none': 'No product on sale matches',
   'inbox.order.title': 'Send an order',
   'inbox.order.hint':
     'Send one of the open drafts: its link lets the customer add their address and confirm.',
@@ -11277,6 +11280,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'inbox.nobodyYet': 'ابھی کوئی جواب نہیں دے رہا',
   'inbox.take': 'میں خود جواب دوں گا',
   'inbox.labels': 'لیبل',
+  'inbox.product.pick': 'پروڈکٹ شامل کریں',
+  'inbox.product.find': 'فروخت پر موجود پروڈکٹ تلاش کریں',
+  'inbox.product.none': 'فروخت پر کوئی ملتی جلتی پروڈکٹ نہیں',
   'inbox.order.title': 'آرڈر بھیجیں',
   'inbox.order.hint':
     'کھلے ڈرافٹس میں سے ایک بھیجیں: اس کے لنک سے گاہک اپنا پتہ لکھ کر آرڈر کنفرم کر سکتا ہے۔',

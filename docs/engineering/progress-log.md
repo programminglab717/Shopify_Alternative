@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### A product in an answer
+
+* **Staff answer "how much?" with the product itself:** a product on sale is put in the reply
+  with its price and link, and WhatsApp shows the customer its photo ([ADR-766](../architecture/13-decision-log.md#adr-766--a-product-is-put-in-an-answer-as-its-name-price-and-storefront-link-which-whatsapp-previews-with-the-products-photo-only-products-on-sale-are-offered)).
+* 4168 tests (3 new).
+
 ### 8b1c918 · An order's link sent from a conversation
 
 * **Staff send a draft's link in the chat it came from:** from a customer's conversation, one of

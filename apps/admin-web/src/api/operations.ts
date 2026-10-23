@@ -10270,6 +10270,36 @@ export const ConversationLabelsQuery = /* GraphQL */ `
   }
 `;
 
+/**
+ * The shop's products to put in an answer by name (ADR-766), with the storefront's address their
+ * links are at.
+ */
+export const ProductCardSearchQuery = /* GraphQL */ `
+  query ProductCardSearch($query: String) {
+    shop {
+      url
+    }
+    products(first: 8, query: $query) {
+      nodes {
+        id
+        title
+        handle
+        status
+        priceRange {
+          minVariantPrice {
+            amount
+            currencyCode
+          }
+          maxVariantPrice {
+            amount
+            currencyCode
+          }
+        }
+      }
+    }
+  }
+`;
+
 /** A draft's link sent as an answer in the conversation, to add the address and confirm (ADR-765). */
 export const ConversationDraftLinkSendMutation = /* GraphQL */ `
   mutation ConversationDraftLinkSend($id: ID!, $draftOrderId: ID!) {

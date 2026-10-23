@@ -249,7 +249,7 @@ export function SavedReplyPicker({ onPick }: { onPick: (body: string) => void })
     );
   }
   return (
-    <Card className="flex flex-col gap-2 p-3">
+    <Card className="flex w-full flex-col gap-2 p-3">
       <TextField
         label={t('savedReplies.find')}
         dir="auto"
