@@ -5211,3 +5211,58 @@ export interface ProductPersonalisationSetData {
     userErrors: UserError[];
   };
 }
+
+/** Someone who brings the shop customers by a link or code of their own (MKT-08, ADR-777). */
+export interface AffiliateValue {
+  id: string;
+  name: string;
+  phone: string | null;
+  ref: string;
+  discountCode: string | null;
+  /** Their share in percent, as written: "7.5". */
+  commission: string;
+  active: boolean;
+  endedAt: string | null;
+  createdAt: string;
+  stats: {
+    orders: number;
+    delivered: number;
+    sales: MoneyValue;
+    earned: MoneyValue;
+    pending: MoneyValue;
+    paid: MoneyValue;
+    owed: MoneyValue;
+  };
+}
+
+export interface AffiliatesData {
+  shop: { url: string };
+  affiliates: AffiliateValue[];
+}
+
+export interface AffiliateOrderValue {
+  orderId: string;
+  name: string;
+  placedAt: string;
+  stage: string;
+  source: 'CODE' | 'LINK';
+  base: MoneyValue;
+  commission: MoneyValue;
+}
+
+export interface AffiliatePayoutValue {
+  id: string;
+  amount: MoneyValue;
+  note: string;
+  paidAt: string;
+}
+
+export interface AffiliateActivityData {
+  affiliateOrders: AffiliateOrderValue[];
+  affiliatePayouts: AffiliatePayoutValue[];
+}
+
+export interface AffiliatePayload {
+  affiliate: AffiliateValue | null;
+  userErrors: UserError[];
+}

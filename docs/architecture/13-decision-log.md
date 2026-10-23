@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-776 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-777 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -784,6 +784,7 @@
 | 774 | Customers are put in cohorts by the month of their first order, and counted again in each month they come back | Accepted |
 | 775 | Analytics shows a cohort table: each month's new customers, and the share who ordered again each month after | Accepted |
 | 776 | Affiliates: people who bring a shop customers by a link or code of their own, earning a share of the orders once delivered | Accepted |
+| 777 | Marketing's affiliates page: each creator's link, code and figures, payouts recorded and their part ended | Accepted |
 
 ---
 
@@ -26035,6 +26036,24 @@
   checkout to change, and the figures follow orders as they are delivered, returned or refunded.
   A changed share counts for all the affiliate's orders, those before it too; the shop records
   what it paid, so what is owed stays right for the new share. The code is not checked against
-  the shop's discount codes, which pricing keeps: the admin offers the shop's codes to choose
-  from. Paying affiliates through Hatti, and a page of their own for creators to see their
+  the shop's discount codes, which pricing keeps: the shop types the code it gave them
+  (ADR-777). Paying affiliates through Hatti, and a page of their own for creators to see their
   figures, are left for later.
+
+## ADR-777 · Marketing's affiliates page: each creator's link, code and figures, payouts recorded and their part ended
+
+* **Context:** affiliates (ADR-776) were in the Admin API alone; the owners and marketers who
+  work with creators do it from the admin, often on a phone (MKT-08).
+* **Decision:** Marketing links to "Affiliates", a page at `/marketing/affiliates`. A form adds
+  one: name, mobile number, link name, discount code and share in percent, each refusal shown
+  beside its field. Each affiliate is a card with their link (the shop's address from
+  `shop.url` with `?ref=` and theirs) to copy, their code, their share, and their figures:
+  orders and how many were delivered, sales delivered, earned, on the way, paid and owed. From
+  the card the shop records a payout (amount and a note of how it was paid), opens their latest
+  orders (linked to each order, with its stage, whether code or link brought it, and its share)
+  and what it paid them, edits them, and ends their part or takes them back. The words are in
+  English and Urdu. The code is typed, not chosen from the shop's codes: a marketer may not read
+  discounts, and a code is upper-cased as orders keep it either way.
+* **Consequences:** a shop can hand a creator their link the minute it agrees terms, and settle
+  up from one screen. A creator's own page of their figures, and paying them through Hatti,
+  are left for later.

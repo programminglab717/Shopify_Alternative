@@ -3753,7 +3753,7 @@ export const SearchRuleDeleteMutation = /* GraphQL */ `
   }
 `;
 
-/** What shoppers searched the online store for over the last days (SRC-06, ADR-683). */
+/** Customers in cohorts by the month of their first order, and who came back (ANL-04, ADR-775). */
 export const CustomerCohortsQuery = /* GraphQL */ `
   query CustomerCohorts($months: Int) {
     customerCohorts(months: $months) {
@@ -3765,6 +3765,7 @@ export const CustomerCohortsQuery = /* GraphQL */ `
   }
 `;
 
+/** What shoppers searched the online store for over the last days (SRC-06, ADR-683). */
 export const StoreSearchesQuery = /* GraphQL */ `
   query StoreSearches($days: Int!) {
     storeSearches(days: $days) {
@@ -10897,4 +10898,129 @@ export const SeoArticlesQuery = /* GraphQL */ `
       }
     }
   }
+`;
+
+const AFFILIATE = /* GraphQL */ `
+  fragment AffiliateFields on Affiliate {
+    id
+    name
+    phone
+    ref
+    discountCode
+    commission
+    active
+    endedAt
+    createdAt
+    stats {
+      orders
+      delivered
+      sales {
+        amount
+        currencyCode
+      }
+      earned {
+        amount
+        currencyCode
+      }
+      pending {
+        amount
+        currencyCode
+      }
+      paid {
+        amount
+        currencyCode
+      }
+      owed {
+        amount
+        currencyCode
+      }
+    }
+  }
+`;
+
+/** The shop's affiliates with their figures, and its address their links begin with (ADR-777). */
+export const AffiliatesQuery = /* GraphQL */ `
+  query Affiliates {
+    shop {
+      url
+    }
+    affiliates {
+      ...AffiliateFields
+    }
+  }
+  ${AFFILIATE}
+`;
+
+/** An affiliate's latest orders and what the shop paid them (ADR-777). */
+export const AffiliateActivityQuery = /* GraphQL */ `
+  query AffiliateActivity($id: ID!) {
+    affiliateOrders(id: $id) {
+      orderId
+      name
+      placedAt
+      stage
+      source
+      base {
+        amount
+        currencyCode
+      }
+      commission {
+        amount
+        currencyCode
+      }
+    }
+    affiliatePayouts(id: $id) {
+      id
+      amount {
+        amount
+        currencyCode
+      }
+      note
+      paidAt
+    }
+  }
+`;
+
+export const AffiliateCreateMutation = /* GraphQL */ `
+  mutation AffiliateCreate($input: AffiliateCreateInput!) {
+    affiliateCreate(input: $input) {
+      affiliate {
+        ...AffiliateFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${AFFILIATE}
+  ${USER_ERRORS}
+`;
+
+export const AffiliateUpdateMutation = /* GraphQL */ `
+  mutation AffiliateUpdate($input: AffiliateUpdateInput!) {
+    affiliateUpdate(input: $input) {
+      affiliate {
+        ...AffiliateFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${AFFILIATE}
+  ${USER_ERRORS}
+`;
+
+export const AffiliatePayoutRecordMutation = /* GraphQL */ `
+  mutation AffiliatePayoutRecord($input: AffiliatePayoutRecordInput!) {
+    affiliatePayoutRecord(input: $input) {
+      payout {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;

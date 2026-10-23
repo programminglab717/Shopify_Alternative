@@ -8,6 +8,7 @@ import {
   CircleSlash,
   Clock,
   FileText,
+  Handshake,
   Megaphone,
   Send,
   Workflow,
@@ -520,6 +521,20 @@ export function BroadcastsPage() {
             <span className="font-medium">{t('calendar.title')}</span>
             <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
               {t('calendar.linkHint')}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+        </Link>
+        <Link
+          to="/$shopId/marketing/affiliates"
+          params={{ shopId }}
+          className="flex min-h-16 items-center gap-3 border-t border-line px-4 py-3"
+        >
+          <Handshake aria-hidden className="size-6 shrink-0 text-secondary" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="font-medium">{t('affiliates.title')}</span>
+            <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t('affiliates.linkHint')}
             </span>
           </span>
           <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />

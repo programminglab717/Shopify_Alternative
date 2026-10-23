@@ -88,6 +88,7 @@ import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AdSpendPage } from './marketing/ad-spend-page';
+import { AffiliatesPage } from './marketing/affiliates-page';
 import {
   GOOGLE_ADS_RETURN_PATH,
   GoogleAdsReturnPage,
@@ -802,6 +803,12 @@ const marketingCalendar = createRoute({
   component: CalendarPage,
 });
 
+const marketingAffiliates = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing/affiliates',
+  component: AffiliatesPage,
+});
+
 const marketingAdSpend = createRoute({
   getParentRoute: () => shop,
   path: 'marketing/ad-spend',
@@ -1049,6 +1056,7 @@ export const routeTree = root.addChildren([
     marketingAutomations,
     marketingCalendar,
     marketingAdSpend,
+    marketingAffiliates,
     settingsTax,
     settingsMessages,
     settingsOrders,

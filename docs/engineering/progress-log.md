@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Affiliates in the admin
+
+* **Marketing → Affiliates:** add a creator with their link name, code and share; each card
+  has their link to copy, what their orders came to, what they earned and what is owed; record
+  a payout, see their orders and payouts, and end their part (MKT-08, [ADR-777](../architecture/13-decision-log.md#adr-777--marketings-affiliates-page-each-creators-link-code-and-figures-payouts-recorded-and-their-part-ended)).
+* 4199 tests (8 new).
+
 ### 970c84b · Affiliates and influencers
 
 * **Creators' links and codes:** a shop adds the people who bring it customers, each with a
