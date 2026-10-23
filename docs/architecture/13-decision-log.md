@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-782 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-783 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -790,6 +790,7 @@
 | 780 | A signed-in wholesale customer's cart and checkout priced from their price lists, while their session lasts | Accepted |
 | 781 | A signed-in reseller's own price on Hatti Base's product page, asked for once the cached page loads | Accepted |
 | 782 | A signed-in reseller's own prices on Hatti Base's cards, every card's variants asked for together | Accepted |
+| 783 | A Shopify store's articles' images are fetched from its CDN and kept as the shop's files | Accepted |
 
 ---
 
@@ -26166,3 +26167,23 @@
   page, and other shoppers' pages ask nothing and stay cached. Themes extending Hatti Base get
   it with its card and header; a theme of a shop's own needs its own markup to show it. CUS-06
   is done for the storefront.
+
+## ADR-783 · A Shopify store's articles' images are fetched from its CDN and kept as the shop's files
+
+* **Context:** moving a Shopify store's blogs (ADR-753) brought every article but not its
+  image, which an article shows as one of the shop's files (ADR-213). An owner had to upload
+  each again by hand, and posts lost their pictures on the way.
+* **Decision:** the blogs' bulk query reads each article's `image { url altText }`. In a real
+  run, not a dry one, the core fetches it from Shopify's CDN through the image fetcher products'
+  images use (ADR-158): https alone, never a private network, at most 20 MB and 30 seconds.
+  `FileService.createImage` keeps the bytes as one of the shop's files, ready at once: a JPEG,
+  PNG, WebP or GIF told by its first bytes, no heavier than an upload may be, named as the CDN's
+  path ends, with Shopify's alt text, recording `file.created`. The article is made with it. An
+  image that cannot be fetched or kept is said in `articleErrors` and the article made without
+  it; an image whose article is not made is deleted again. The payload counts `images` brought,
+  and the admin's move page says how many.
+* **Consequences:** posts arrive with their pictures, in the shop's files where the owner can
+  rename, replace or reuse them. The image is kept as Shopify served it, as an upload is, not
+  re-encoded. A slow CDN slows the import, one image at a time; a store with thousands of
+  articles may take minutes. Collections have no image of their own yet, so theirs are not
+  brought.

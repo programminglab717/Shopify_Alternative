@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### A Shopify store's articles' images
+
+* **Posts keep their pictures:** moving a Shopify store's blogs fetches each article's image from
+  Shopify's CDN and keeps it as one of the shop's files, which the article shows; one that
+  cannot be brought is said (ONB-05, [ADR-783](../architecture/13-decision-log.md#adr-783--a-shopify-stores-articles-images-are-fetched-from-its-cdn-and-kept-as-the-shops-files)).
+* 4219 tests (1 new).
+
 ### 482099d · A reseller's own prices on cards
 
 * **Across the store:** a reseller signed in sees their own price on Hatti Base's collection,
