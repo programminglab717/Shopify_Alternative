@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Products straight from a Shopify store
+### a6cbe90 · Products straight from a Shopify store
 
 * **A shop moving from Shopify no longer downloads and uploads a CSV.** The owner gives their
   store's address and their app's access token, or a Dev Dashboard app's client ID and secret;
