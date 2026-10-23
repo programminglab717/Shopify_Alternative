@@ -63,6 +63,7 @@ import { CollectionPage } from './collections/collection-page';
 import { CollectionsPage, NewCollectionPage } from './collections/collections-page';
 import { DiscountsPage } from './discounts/discounts-page';
 import { OrdersExportPage } from './orders/export-page';
+import { PastOrdersPage } from './orders/past-orders-page';
 import { PaymentLinksPage } from './payment-links/payment-links-page';
 import { AbandonedPage } from './orders/abandoned-page';
 import { DraftPage } from './drafts/draft-page';
@@ -306,6 +307,12 @@ const ordersExport = createRoute({
   path: 'orders/export',
   validateSearch: validateOrdersSearch,
   component: OrdersExportPage,
+});
+
+const pastOrders = createRoute({
+  getParentRoute: () => shop,
+  path: 'orders/past',
+  component: PastOrdersPage,
 });
 
 const order = createRoute({
@@ -969,6 +976,7 @@ export const routeTree = root.addChildren([
     home,
     orders,
     ordersExport,
+    pastOrders,
     ordersPackers,
     order,
     desk,

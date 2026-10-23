@@ -2953,6 +2953,41 @@ export interface BlogsImportFromShopifyResult {
   userErrors: UserError[];
 }
 
+/** An amount of a past order, in the currency the old store priced it in. */
+export interface PastOrderAmount {
+  amount: string;
+  currencyCode: string;
+}
+
+/** An order from the store the shop moved from (ADR-786), as it was there. */
+export interface PastOrderValue {
+  id: string;
+  name: string;
+  customerId: string | null;
+  phone: string | null;
+  placedAt: string;
+  cancelledAt: string | null;
+  financialStatus: string | null;
+  fulfillmentStatus: string | null;
+  note: string;
+  total: PastOrderAmount;
+  lines: { title: string; variantTitle: string | null; quantity: number; price: PastOrderAmount }[];
+  shippingAddress: {
+    name: string | null;
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    province: string | null;
+  } | null;
+}
+
+export interface PastOrdersData {
+  pastOrders: {
+    nodes: PastOrderValue[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
 /** What bringing a Shopify store's orders as past orders came to (ADR-786). */
 export interface OrdersImportFromShopifyResult {
   dryRun: boolean;

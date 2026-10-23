@@ -7,6 +7,7 @@ import {
   Download,
   EyeOff,
   FilePen,
+  History,
   Inbox,
   PackageCheck,
   Printer,
@@ -27,14 +28,21 @@ import {
   OrderBulkConfirmMutation,
   OrderBulkMarkPackedMutation,
   OrdersQuery,
+  PastOrdersQuery,
 } from '../api/operations';
-import type { OrderBulkData, OrderListItem, OrderStage, OrdersData } from '../api/types';
+import type {
+  OrderBulkData,
+  OrderListItem,
+  OrderStage,
+  OrdersData,
+  PastOrdersData,
+} from '../api/types';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { SavedSearches } from '../shell/saved-searches';
-import { useAdminMutation, useShop, useShopTimezone } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { AssignPanel, CancelPanel, refusals, TagsPanel } from './bulk';
@@ -206,6 +214,9 @@ export function OrdersPage() {
   const pack = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkMarkPackedMutation);
   const queryClient = useQueryClient();
   const [showing, setShowing] = useState(false);
+  // Whether the shop has orders from the store it moved from, to link to (ADR-786).
+  const past = useAdminQuery<PastOrdersData>(['pastOrders', 'any'], PastOrdersQuery, { first: 1 });
+  const hasPast = (past.data?.pastOrders.nodes.length ?? 0) > 0;
 
   const listKey = ['admin', shop.id, 'orders', stage ?? null, q ?? null, location ?? null];
   const orders = useInfiniteQuery({
@@ -329,6 +340,16 @@ export function OrdersPage() {
             >
               <FilePen aria-hidden className="size-5" />
               {t('drafts.title')}
+            </Link>
+          )}
+          {hasPast && (
+            <Link
+              to="/$shopId/orders/past"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
+            >
+              <History aria-hidden className="size-5" />
+              {t('pastOrders.link')}
             </Link>
           )}
           {permits(shop, SEES_ABANDONED) && (

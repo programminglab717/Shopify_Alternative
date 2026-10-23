@@ -6460,6 +6460,49 @@ export const DiscountsImportFromShopifyMutation = /* GraphQL */ `
   }
 `;
 
+/** Orders from the store the shop moved from (ADR-786), the latest placed first. */
+export const PastOrdersQuery = /* GraphQL */ `
+  query PastOrders($first: Int, $after: String) {
+    pastOrders(first: $first, after: $after) {
+      nodes {
+        id
+        name
+        customerId
+        phone
+        placedAt
+        cancelledAt
+        financialStatus
+        fulfillmentStatus
+        note
+        total {
+          amount
+          currencyCode
+        }
+        lines {
+          title
+          variantTitle
+          quantity
+          price {
+            amount
+            currencyCode
+          }
+        }
+        shippingAddress {
+          name
+          address1
+          address2
+          city
+          province
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
 /** A Shopify store's orders kept as the shop's past orders (ADR-786). */
 export const OrdersImportFromShopifyMutation = /* GraphQL */ `
   mutation OrdersImportFromShopify(
