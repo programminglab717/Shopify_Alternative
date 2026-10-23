@@ -8,7 +8,7 @@ import {
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { ObjectStorage, maxUploadBytesOf } from '@hatti/storage';
+import { ObjectStorage, maxUploadBytesOf, sniffContentType } from '@hatti/storage';
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, ilike, inArray, lt, sql } from 'drizzle-orm';
 import {
@@ -202,6 +202,62 @@ export class FileService {
       return records;
     });
     return { ok: true, value: made };
+  }
+
+  /**
+   * Keeps `body`, an image read from elsewhere, as one of the shop's files, ready at once
+   * (ADR-783), as a shop moving from Shopify brings its articles' images: a JPEG, PNG, WebP or GIF
+   * told by its first bytes, weighing no more than an upload may. Records `file.created`.
+   */
+  async createImage(
+    tenant: TenantContext,
+    input: { filename: string; body: Buffer; alt?: string | null },
+  ): Promise<MutationResult<FileRecord>> {
+    const check = new InputChecker();
+    const filename = check.text(['filename'], input.filename, {
+      required: true,
+      max: FILE_LIMITS.filename,
+    });
+    const alt = check.text(['alt'], input.alt, { max: FILE_LIMITS.alt }) ?? '';
+    const type = sniffContentType(input.body.subarray(0, SNIFF_BYTES));
+    if (type === null || !isImage(type)) {
+      check.addMessage(['body'], 'INVALID', 'It is not a JPEG, PNG, WebP or GIF image');
+    } else if (input.body.length > maxUploadBytesOf(type)) {
+      const most = maxUploadBytesOf(type) / 1024 / 1024;
+      check.addMessage(['body'], 'INVALID', `The image is over ${most} MiB`);
+    }
+    if (!check.ok || !filename || type === null) return fail(check.errors);
+    const id = newId();
+    const key = `shops/${tenant.shopId}/files/${id}/${keyName(filename, type)}`;
+    await this.storage.put(key, input.body, type);
+    try {
+      const row = await this.db.tenant(tenant.shopId, async (tx) => {
+        const [made] = await tx
+          .insert(files)
+          .values({
+            shopId: tenant.shopId,
+            id,
+            key,
+            filename,
+            contentType: type,
+            size: input.body.length,
+            alt,
+            status: 'ready',
+          })
+          .returning();
+        await appendEvent<FileCreatedPayload>(tx, tenant.shopId, {
+          type: FileEvents.FileCreated,
+          aggregateType: 'file',
+          aggregateId: id,
+          payload: { contentType: type, size: input.body.length },
+        });
+        return made!;
+      });
+      return { ok: true, value: toRecord(row) };
+    } catch (error) {
+      await this.#remove([key]);
+      throw error;
+    }
   }
 
   /**

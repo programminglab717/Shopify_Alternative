@@ -343,6 +343,38 @@ describe.skipIf(!server)('FileService', () => {
     ).toEqual({ method: 'GET', filename: 'Receipt #1023.pdf' });
   });
 
+  it('keeps an image read from elsewhere as a file ready at once, told by its bytes (ADR-783)', async () => {
+    const made = unwrap(
+      await service.createImage(a, { filename: 'eid lawn.jpg', body: webp, alt: ' Lawn ' }),
+    );
+    expect(made).toMatchObject({
+      filename: 'eid lawn.jpg',
+      contentType: 'image/webp',
+      size: webp.length,
+      alt: 'Lawn',
+    });
+    // Kept under the shop's prefix, named for what it is.
+    expect(made.key).toBe(`shops/${a.shopId}/files/${made.id}/eid-lawn.webp`);
+    expect((await storage.read(made.key))?.body).toEqual(webp);
+    expect((await service.get(a, made.id))?.id).toBe(made.id);
+    expect((await outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      ['file.created', { contentType: 'image/webp', size: webp.length }],
+    ]);
+    // Not an image, too heavy, or nameless: nothing kept.
+    expect(errorsOf(await service.createImage(a, { filename: 'r.pdf', body: pdf }))).toEqual([
+      ['body', 'INVALID'],
+    ]);
+    expect(
+      errorsOf(
+        await service.createImage(a, { filename: 'big.png', body: png(20 * 1024 * 1024 + 1) }),
+      ),
+    ).toEqual([['body', 'INVALID']]);
+    expect(errorsOf(await service.createImage(a, { filename: ' ', body: webp }))).toEqual([
+      ['filename', 'BLANK'],
+    ]);
+    expect((await service.list(a, { first: 5 })).items).toHaveLength(1);
+  });
+
   it('removes uploads that are not what they were staged as', async () => {
     const [disguised, short] = unwrap(
       await stage([

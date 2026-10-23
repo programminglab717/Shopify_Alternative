@@ -17,7 +17,7 @@ type Json = any;
 
 const IMPORT = `mutation ($store: String!, $accessToken: String, $dryRun: Boolean) {
   blogsImportFromShopify(store: $store, accessToken: $accessToken, dryRun: $dryRun) {
-    blogs blogsCreated articles created skipped dryRun
+    blogs blogsCreated articles created skipped images dryRun
     articleErrors { blog article message }
     userErrors { field code message }
   }
@@ -36,6 +36,7 @@ const LINES = [
     isPublished: true,
     publishedAt: '2025-03-20T09:00:00Z',
     author: { name: 'Ayesha' },
+    image: { url: 'https://cdn.shopify.com/s/files/1/Eid%20lawn.webp?v=1', altText: 'Lawn suits' },
     __parentId: 'gid://shopify/Blog/1',
   },
   {
@@ -48,12 +49,15 @@ const LINES = [
     isPublished: false,
     publishedAt: null,
     author: null,
+    image: { url: 'https://cdn.shopify.com/s/files/1/gone.jpg', altText: null },
     __parentId: 'gid://shopify/Blog/1',
   },
   { id: 'gid://shopify/Blog/2', handle: 'recipes', title: 'Recipes', commentPolicy: 'CLOSED' },
 ]
   .map((line) => JSON.stringify(line))
   .join('\n');
+
+const WEBP = Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ');
 
 const shopify = new ShopifyStores(
   async (input, init) => {
@@ -78,6 +82,18 @@ const shopify = new ShopifyStores(
     return Response.json({ data });
   },
   { sleep: async () => {} },
+  {
+    // Shopify's CDN: one article's image, and one gone.
+    fetch: async (url) =>
+      url.includes('Eid%20lawn')
+        ? { ok: true, body: WEBP }
+        : {
+            ok: false,
+            transient: false,
+            code: 'IMAGE_DOWNLOAD_FAILURE',
+            message: 'It answered 404 Not Found',
+          },
+  },
 );
 
 describe.skipIf(!server)("Admin GraphQL API: blogs from a Shopify store's Admin API", () => {
@@ -107,7 +123,7 @@ describe.skipIf(!server)("Admin GraphQL API: blogs from a Shopify store's Admin 
     await admin.query(
       `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
        VALUES ($1, 'test', $2, $3, $4)`,
-      [shop, hash, hint, ['write_content', 'read_content']],
+      [shop, hash, hint, ['write_content', 'read_content', 'read_files']],
     );
     token = issued;
     api = await startTestApi(testDb, { shopifyStores: shopify });
@@ -130,20 +146,38 @@ describe.skipIf(!server)("Admin GraphQL API: blogs from a Shopify store's Admin 
       articles: 2,
       created: 2,
       skipped: 0,
+      images: 0,
       dryRun: true,
       articleErrors: [],
       userErrors: [],
     });
+    // An image Shopify no longer has is said; its article is made without it (ADR-783).
     expect((await gql(IMPORT, variables)).data?.blogsImportFromShopify).toMatchObject({
       blogsCreated: 2,
       created: 2,
       skipped: 0,
-      articleErrors: [],
+      images: 1,
+      articleErrors: [
+        {
+          blog: 'news',
+          article: 'winter-plans',
+          message: 'Its image was not brought: It answered 404 Not Found',
+        },
+      ],
     });
     const { data } = await gql(`{
       blogs(first: 10) { nodes { handle title commentPolicy } }
-      articles(first: 10) { nodes { handle title body author { name } tags isPublished publishedAt blog { handle } } }
+      articles(first: 10) { nodes { handle title body author { name } tags isPublished publishedAt blog { handle } image { fileId altText } } }
+      files(first: 10) { nodes { id filename mimeType alt } }
     }`);
+    // The image is one of the shop's files, named as Shopify had it.
+    expect(data?.files.nodes).toEqual([
+      expect.objectContaining({
+        filename: 'Eid lawn.webp',
+        mimeType: 'image/webp',
+        alt: 'Lawn suits',
+      }),
+    ]);
     expect(data?.blogs.nodes).toEqual([
       { handle: 'news', title: 'News', commentPolicy: 'MODERATED' },
       { handle: 'recipes', title: 'Recipes', commentPolicy: 'CLOSED' },
@@ -159,8 +193,14 @@ describe.skipIf(!server)("Admin GraphQL API: blogs from a Shopify store's Admin 
           isPublished: true,
           publishedAt: '2025-03-20T09:00:00.000Z',
           blog: { handle: 'news' },
+          image: { fileId: data?.files.nodes[0].id, altText: 'Lawn suits' },
         },
-        expect.objectContaining({ handle: 'winter-plans', isPublished: false, publishedAt: null }),
+        expect.objectContaining({
+          handle: 'winter-plans',
+          isPublished: false,
+          publishedAt: null,
+          image: null,
+        }),
       ]),
     );
 
@@ -169,6 +209,7 @@ describe.skipIf(!server)("Admin GraphQL API: blogs from a Shopify store's Admin 
       blogsCreated: 0,
       created: 0,
       skipped: 2,
+      images: 0,
     });
   });
 });

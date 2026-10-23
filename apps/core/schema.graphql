@@ -1339,6 +1339,11 @@ type BlogsImportFromShopifyPayload {
   dryRun: Boolean!
 
   """
+  Articles' images brought, as the shop's files (ADR-783); none in a dry run.
+  """
+  images: Int!
+
+  """
   Articles left as they are: their blog has an article with their handles already.
   """
   skipped: Int!
@@ -8556,7 +8561,7 @@ type Mutation {
   blogUpdate(blog: BlogUpdateInput!, id: ID!): BlogUpdatePayload!
 
   """
-  Imports a Shopify store's blogs and their articles through its Admin API (ONB-05, ADR-753), each keeping its handle and so its address at /blogs/{blog}/{article}: a blog's title and comment policy; an article's title, body, summary, author, tags, and whether it is shown and since when. A blog the shop has by handle takes the articles; articles whose handles their blog has are left as they are. Give the store and its app as productsImportFromShopify takes them; the app needs the read_content access scope. Articles' images are not brought. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  Imports a Shopify store's blogs and their articles through its Admin API (ONB-05, ADR-753), each keeping its handle and so its address at /blogs/{blog}/{article}: a blog's title and comment policy; an article's title, body, summary, author, tags, and whether it is shown and since when. A blog the shop has by handle takes the articles; articles whose handles their blog has are left as they are. Give the store and its app as productsImportFromShopify takes them; the app needs the read_content access scope. An article's image is fetched from Shopify and kept as one of the shop's files (ADR-783); one that cannot be is said in articleErrors, the article made without it. Nothing given is kept. dryRun reads the store and counts, changing nothing.
   """
   blogsImportFromShopify(
     accessToken: String
@@ -17261,7 +17266,9 @@ enum Stitching {
   UNSTITCHED
 }
 
-"""A store's blog or article that did not go in, and why."""
+"""
+A store's blog or article that did not go in, or an article's image, and why.
+"""
 type StoreArticleImportError {
   """The article's handle at the store; null for the blog itself."""
   article: String

@@ -21,6 +21,7 @@ const LINES = [
     publishedAt: '2025-03-20T09:00:00Z',
     templateSuffix: null,
     author: { name: 'Ayesha' },
+    image: { url: 'https://cdn.shopify.com/s/files/1/eid.jpg?v=1', altText: 'Lawn suits' },
     __parentId: 'gid://shopify/Blog/1',
   },
   {
@@ -34,6 +35,7 @@ const LINES = [
     publishedAt: null,
     templateSuffix: null,
     author: null,
+    image: null,
     __parentId: 'gid://shopify/Blog/1',
   },
   { id: 'gid://shopify/Blog/2', handle: 'recipes', title: 'Recipes', commentPolicy: 'CLOSED' },
@@ -83,8 +85,11 @@ describe("A store's blogs and their articles through its Admin API (ADR-753)", (
       isPublished: true,
       publishedAt: '2025-03-20T09:00:00Z',
       templateSuffix: null,
+      // Its image, to bring (ADR-783).
+      image: { url: 'https://cdn.shopify.com/s/files/1/eid.jpg?v=1', altText: 'Lawn suits' },
     });
     expect(blogs[0]!.articles[1]).toMatchObject({
+      image: null,
       author: null,
       summary: null,
       isPublished: false,

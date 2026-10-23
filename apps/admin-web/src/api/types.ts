@@ -2924,6 +2924,8 @@ export interface BlogsImportFromShopifyResult {
   articles: number;
   created: number;
   skipped: number;
+  /** Articles' images brought, as the shop's files (ADR-783). */
+  images: number;
   articleErrors: { blog: string; article: string | null; message: string }[];
   userErrors: UserError[];
 }

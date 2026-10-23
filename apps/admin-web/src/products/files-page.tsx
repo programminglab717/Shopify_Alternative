@@ -559,6 +559,7 @@ function ImportFromStore() {
                 {t('files.blogsImported', {
                   blogs: formatCount(done.blogs.blogsCreated),
                   created: formatCount(done.blogs.created),
+                  images: formatCount(done.blogs.images),
                   skipped: formatCount(done.blogs.skipped),
                 })}
               </span>

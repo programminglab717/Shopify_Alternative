@@ -12,6 +12,7 @@ export const BLOGS_BULK_QUERY = `{
             node {
               id handle title body summary tags isPublished publishedAt templateSuffix
               author { name }
+              image { url altText }
             }
           }
         }
@@ -35,6 +36,8 @@ export interface StoreArticle {
   isPublished: boolean;
   publishedAt: string | null;
   templateSuffix: string | null;
+  /** Its image at Shopify's CDN (ADR-783); null for none. */
+  image: { url: string; altText: string | null } | null;
 }
 
 /** A store's blog, with its articles in the store's order. */
@@ -94,6 +97,8 @@ export async function readStoreBlogs(
       const blog = typeof line.__parentId === 'string' ? blogs.get(line.__parentId) : undefined;
       if (!blog || !id.startsWith('gid://shopify/Article/')) continue;
       const author = line.author as { name?: unknown } | null | undefined;
+      const image = line.image as { url?: unknown; altText?: unknown } | null | undefined;
+      const imageUrl = text(image?.url);
       blog.articles.push({
         handle: String(line.handle),
         title: String(line.title),
@@ -104,6 +109,7 @@ export async function readStoreBlogs(
         isPublished: line.isPublished === true,
         publishedAt: text(line.publishedAt),
         templateSuffix: text(line.templateSuffix),
+        image: imageUrl === null ? null : { url: imageUrl, altText: text(image?.altText) },
       });
     }
   } catch {

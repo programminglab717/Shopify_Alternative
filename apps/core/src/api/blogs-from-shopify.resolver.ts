@@ -1,6 +1,7 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import { FileService } from '@hatti/files/public';
 import { ArticleService, BlogService, type CommentPolicyValue } from '@hatti/online-store/public';
-import { readStoreBlogs } from '@hatti/shopify-admin';
+import { readStoreBlogs, type StoreArticle } from '@hatti/shopify-admin';
 import { Args, Field, Int, Mutation, ObjectType, Resolver } from '@nestjs/graphql';
 import { ShopifyStores, storeGiven, storeRefusalOf } from './shopify-stores.js';
 
@@ -14,7 +15,9 @@ const COMMENT_POLICY: Readonly<Record<string, CommentPolicyValue>> = {
   AUTO_PUBLISHED: 'auto_published',
 };
 
-@ObjectType({ description: "A store's blog or article that did not go in, and why." })
+@ObjectType({
+  description: "A store's blog or article that did not go in, or an article's image, and why.",
+})
 export class StoreArticleImportError {
   @Field({ description: "The blog's handle at the store." })
   blog!: string;
@@ -48,6 +51,11 @@ export class BlogsImportFromShopifyPayload {
   })
   skipped!: number;
 
+  @Field(() => Int, {
+    description: "Articles' images brought, as the shop's files (ADR-783); none in a dry run.",
+  })
+  images!: number;
+
   @Field(() => [StoreArticleImportError])
   articleErrors!: StoreArticleImportError[];
 
@@ -68,6 +76,7 @@ export class BlogsFromShopifyResolver {
   constructor(
     private readonly blogs: BlogService,
     private readonly articles: ArticleService,
+    private readonly files: FileService,
     private readonly shopify: ShopifyStores,
   ) {}
 
@@ -79,8 +88,9 @@ export class BlogsFromShopifyResolver {
       'whether it is shown and since when. A blog the shop has by handle takes the articles; ' +
       'articles whose handles their blog has are left as they are. Give the store and its app as ' +
       'productsImportFromShopify takes them; the app needs the read_content access scope. ' +
-      "Articles' images are not brought. Nothing given is kept. dryRun reads the store and " +
-      'counts, changing nothing.',
+      "An article's image is fetched from Shopify and kept as one of the shop's files " +
+      '(ADR-783); one that cannot be is said in articleErrors, the article made without it. ' +
+      'Nothing given is kept. dryRun reads the store and counts, changing nothing.',
   })
   @RequireScopes('write_content')
   async blogsImportFromShopify(
@@ -103,6 +113,7 @@ export class BlogsFromShopifyResolver {
         articles: 0,
         created: 0,
         skipped: 0,
+        images: 0,
         articleErrors: [],
         dryRun: dry,
         userErrors: [],
@@ -127,7 +138,7 @@ export class BlogsFromShopifyResolver {
       });
     }
 
-    const counts = { blogsCreated: 0, created: 0, skipped: 0 };
+    const counts = { blogsCreated: 0, created: 0, skipped: 0, images: 0 };
     const articleErrors: StoreArticleImportError[] = [];
     const failed = (blog: string, article: string | null, message: string) =>
       articleErrors.push(Object.assign(new StoreArticleImportError(), { blog, article, message }));
@@ -163,6 +174,10 @@ export class BlogsFromShopifyResolver {
           counts.created++;
           continue;
         }
+        const image = await this.#imageOf(tenant, article);
+        if (typeof image === 'string') {
+          failed(blog.handle, article.handle, `Its image was not brought: ${image}`);
+        }
         const made = await this.articles.create(tenant, {
           blogId,
           title: article.title,
@@ -176,11 +191,18 @@ export class BlogsFromShopifyResolver {
           ...(article.isPublished &&
             article.publishedAt && { publishDate: new Date(article.publishedAt) }),
           templateSuffix: article.templateSuffix,
+          ...(typeof image === 'object' && { image }),
         });
+        const kept = typeof image === 'object' && image !== null ? image.fileId : null;
         if (made.ok) {
           counts.created++;
+          if (kept) counts.images++;
           handles.add(article.handle);
-        } else if (made.errors.some((error) => error.code === 'TAKEN')) {
+          continue;
+        }
+        // The image goes with the article that did not.
+        if (kept) await this.files.delete(tenant, [kept]);
+        if (made.errors.some((error) => error.code === 'TAKEN')) {
           counts.skipped++;
         } else {
           failed(blog.handle, article.handle, made.errors.map((error) => error.message).join('; '));
@@ -193,6 +215,27 @@ export class BlogsFromShopifyResolver {
       ...counts,
       articleErrors,
     });
+  }
+
+  /**
+   * The store's image of `article` kept as one of the shop's files, as the article takes it
+   * (ADR-783): null for none; why not when it could not be fetched or kept.
+   */
+  async #imageOf(
+    tenant: TenantContext,
+    article: StoreArticle,
+  ): Promise<{ fileId: string; altText: string } | null | string> {
+    if (!article.image) return null;
+    const fetched = await this.shopify.images.fetch(article.image.url);
+    if (!fetched.ok) return fetched.message;
+    const altText = article.image.altText ?? '';
+    const made = await this.files.createImage(tenant, {
+      filename: filenameOf(article.image.url, article.handle),
+      body: fetched.body,
+      alt: altText,
+    });
+    if (!made.ok) return made.errors.map((error) => error.message).join('; ');
+    return { fileId: made.value.id, altText };
   }
 
   /** The shop's blogs' IDs by their handles. */
@@ -218,4 +261,15 @@ export class BlogsFromShopifyResolver {
       after = page.items.at(-1)!.id;
     }
   }
+}
+
+/** The name of the file at `url`, as its path ends; `fallback` where it names none. */
+export function filenameOf(url: string, fallback: string): string {
+  let name = '';
+  try {
+    name = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
+  } catch {
+    // Not a URL, or not one whose name reads: the fallback.
+  }
+  return (name.trim() || fallback).slice(0, 255);
 }

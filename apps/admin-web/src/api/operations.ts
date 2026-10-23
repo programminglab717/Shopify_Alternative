@@ -6453,6 +6453,7 @@ export const BlogsImportFromShopifyMutation = /* GraphQL */ `
       articles
       created
       skipped
+      images
       articleErrors {
         blog
         article

@@ -3056,11 +3056,11 @@ const en = {
   'files.discountError': '{discount}: {message}',
   'files.storeBlogs': 'Bring its blogs too',
   'files.storeBlogsHint':
-    'Its blogs and their articles, at the same addresses, without their images. The app needs the read_content scope too.',
+    'Its blogs and their articles, at the same addresses, with their images. The app needs the read_content scope too.',
   'files.blogsChecked':
     'Blogs to add: {blogs}. Articles to add: {created}; to leave as they are: {skipped}.',
   'files.blogsImported':
-    'Blogs added: {blogs}. Articles added: {created}; left as they were: {skipped}.',
+    'Blogs added: {blogs}. Articles added: {created}, {images} with their images; left as they were: {skipped}.',
   'files.articleError': '{handle}: {message}',
   'files.checkStore': 'Check the store',
   'files.storeChecked':
@@ -8892,10 +8892,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.discountError': '{discount}: {message}',
   'files.storeBlogs': 'اس کے بلاگز بھی لائیں',
   'files.storeBlogsHint':
-    'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، تصاویر کے بغیر۔ ایپ کو read_content اسکوپ بھی چاہیے۔',
+    'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، اپنی تصاویر کے ساتھ۔ ایپ کو read_content اسکوپ بھی چاہیے۔',
   'files.blogsChecked':
     'شامل کرنے کو بلاگز: {blogs}۔ شامل کرنے کو مضامین: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
-  'files.blogsImported': 'شامل بلاگز: {blogs}۔ شامل مضامین: {created}؛ ویسے ہی: {skipped}۔',
+  'files.blogsImported':
+    'شامل بلاگز: {blogs}۔ شامل مضامین: {created}، {images} اپنی تصاویر کے ساتھ؛ ویسے ہی: {skipped}۔',
   'files.articleError': '{handle}: {message}',
   'files.checkStore': 'اسٹور جانچیں',
   'files.storeChecked':

@@ -151,6 +151,7 @@ function core(role: StaffRole) {
             articles: 6,
             created: 4,
             skipped: 1,
+            images: variables.dryRun ? 0 : 3,
             articleErrors: [{ blog: 'news', article: 'old-post', message: 'Title is blank' }],
             userErrors: [],
           },
@@ -300,7 +301,9 @@ describe('Products and stock by file', () => {
     ]);
     expect(screen.getByText('Pages added: 2; left as they were: 1.')).toBeTruthy();
     expect(
-      screen.getByText('Blogs added: 1. Articles added: 4; left as they were: 1.'),
+      screen.getByText(
+        'Blogs added: 1. Articles added: 4, 3 with their images; left as they were: 1.',
+      ),
     ).toBeTruthy();
     expect(screen.getByText('Customers added: 2; already here: 0.')).toBeTruthy();
     expect(screen.getByText('Discount codes added: 2; already here: 1.')).toBeTruthy();

@@ -1,3 +1,4 @@
+import { ImageFetcher } from '@hatti/images';
 import {
   ShopifyAdmin,
   shopDomainOf,
@@ -8,12 +9,14 @@ import {
 
 /**
  * Where the core reaches the Shopify stores owners move from (ADR-749): through the process's
- * fetch, or a test's own, waiting as long for Shopify's exports as it is told to.
+ * fetch, or a test's own, waiting as long for Shopify's exports as it is told to; and where it
+ * fetches the stores' images from (ADR-783), never a private network.
  */
 export class ShopifyStores {
   constructor(
     private readonly fetchFn: typeof fetch = fetch,
     readonly bulk: BulkQueryOptions = {},
+    readonly images: Pick<ImageFetcher, 'fetch'> = new ImageFetcher(),
   ) {}
 
   /** A store's Admin API with what its owner gave, used for one import and then let go. */
