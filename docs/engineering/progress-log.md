@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Blogs straight from a Shopify store
+### 871e509 · Blogs straight from a Shopify store
 
 * **The old store's blogs and articles come too,** each at its own address, an article shown
   since when the store showed it; the admin's store card brings them with the products,
