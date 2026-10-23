@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Customers who came back, on Analytics
+### e732766 · Customers who came back, on Analytics
 
 * **Retention table:** Analytics shows each month's new customers and the share who ordered
   again in each month after, the last 12 months (ANL-04, [ADR-775](../architecture/13-decision-log.md#adr-775--analytics-shows-a-cohort-table-each-months-new-customers-and-the-share-who-ordered-again-each-month-after)).
