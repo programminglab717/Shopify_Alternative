@@ -5252,6 +5252,22 @@ describe("Shoppers' accounts (ADR-571)", () => {
     'content-type': 'application/json',
   };
 
+  it("gives each card its variants and their prices, for a reseller's own price (ADR-782)", async () => {
+    const app = server();
+    const page = await app.inject({
+      method: 'GET',
+      url: '/collections/all',
+      headers: { host: 'localhost' },
+    });
+    expect(page.statusCode).toBe(200);
+    const [first] = sampleStore().products as [ProductDoc];
+    const pairs = first.variants.map((variant) => `${variant.id}:${variant.price}`).join(',');
+    expect(page.body).toContain(`data-card-own-price="${pairs}"`);
+    // Hidden until the header's script, signed in, finds a lower price of the reseller's own.
+    expect(page.body).toMatch(/data-words="Your price: \{price\}"\s+hidden/);
+    await app.close();
+  });
+
   it("answers a signed-in shopper's own prices for a product page's script (ADR-781)", async () => {
     const app = server();
     const cookie = signedIn();

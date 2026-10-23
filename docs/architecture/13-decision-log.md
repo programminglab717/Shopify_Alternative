@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-781 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-782 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -789,6 +789,7 @@
 | 779 | The admin's price lists under Products, a list's own prices named by their variants | Accepted |
 | 780 | A signed-in wholesale customer's cart and checkout priced from their price lists, while their session lasts | Accepted |
 | 781 | A signed-in reseller's own price on Hatti Base's product page, asked for once the cached page loads | Accepted |
+| 782 | A signed-in reseller's own prices on Hatti Base's cards, every card's variants asked for together | Accepted |
 
 ---
 
@@ -26148,3 +26149,20 @@
 * **Consequences:** cached pages stay cached, and the one request per page view is made only for
   shoppers signed in. The page still shows the price to anyone, as the shop's price; the
   reseller's own price is said beside it. Collection and search cards do not show it yet.
+
+## ADR-782 · A signed-in reseller's own prices on Hatti Base's cards, every card's variants asked for together
+
+* **Context:** ADR-781 showed a signed-in reseller their own price on a product's page; the
+  collection, search, related and recently viewed grids still show only the price to anyone,
+  and a reseller browses by those (CUS-06).
+* **Decision:** each card Hatti Base renders carries its variants' IDs and their prices to
+  anyone, and a hidden line for "Your price". The header's script, which every page runs, asks
+  `/account/prices.json` (ADR-781) only when the `hatti_signed_in` cookie says the shopper is
+  signed in: every card's variants together, a hundred at a time, each variant once a page, and
+  again for cards added later (recently viewed, the wishlist page), on the page's existing
+  observer, its changes made only where the words differ so it does not wake itself. A card
+  says the lowest of its variants' prices to the reseller where it is below the card's price.
+* **Consequences:** a reseller sees their price across the store with one or two requests a
+  page, and other shoppers' pages ask nothing and stay cached. Themes extending Hatti Base get
+  it with its card and header; a theme of a shop's own needs its own markup to show it. CUS-06
+  is done for the storefront.

@@ -326,6 +326,11 @@ h3 {
 .price__compare {
   color: var(--color-muted);
 }
+.card__own-price {
+  margin: 0;
+  color: var(--color-accent);
+  font-weight: 600;
+}
 .rte {
   max-inline-size: 42rem;
 }

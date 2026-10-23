@@ -39,4 +39,15 @@
   {% render 'wishlist-button', product: product %}
   {% render 'rating', product: product %}
   {% render 'price', product: product %}
+  {%- comment -%}
+    A signed-in reseller's own price (CUS-06, ADR-782), the lowest of its variants', asked for by
+    the header's script: each variant's ID and its price to anyone.
+  {%- endcomment -%}
+  <p
+    class="card__own-price"
+    data-card-own-price="{% for variant in product.variants %}{{ variant.id }}:{{ variant.price }}{% unless forloop.last %},{% endunless %}{% endfor %}"
+    data-price="{{ product.price }}"
+    data-words="{{ 'products.product.price.yours' | t: price: '{price}' | escape }}"
+    hidden
+  ></p>
 </div>

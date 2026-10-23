@@ -247,6 +247,65 @@
     }
   }
 
+  // A signed-in reseller's own prices on cards (CUS-06, ADR-782): every card's variants asked
+  // for together, a hundred at a time and each once a page; a card says the lowest of its
+  // variants' where it is below the card's price. Signed out, nothing is asked.
+  const ownPrices = new Map();
+  const askedPrices = new Set();
+  const showOwnPrices = () => {
+    for (const card of document.querySelectorAll('[data-card-own-price]')) {
+      let lowest = null;
+      for (const pair of card.dataset.cardOwnPrice.split(',')) {
+        const [id, price] = pair.split(':');
+        const own = ownPrices.get(id);
+        const amount = own ? own.amount : Number(price);
+        if (lowest === null || amount < lowest.amount) lowest = own ?? { amount };
+      }
+      const words =
+        lowest?.formatted && lowest.amount < Number(card.dataset.price)
+          ? card.dataset.words.replace('{price}', lowest.formatted)
+          : '';
+      // Only what changed, so the page's observer is not woken for nothing.
+      if (card.textContent !== words) card.textContent = words;
+      card.hidden = words === '';
+    }
+  };
+  const askOwnPrices = async () => {
+    const ids = [...document.querySelectorAll('[data-card-own-price]')]
+      .flatMap((card) => card.dataset.cardOwnPrice.split(',').map((pair) => pair.split(':')[0]))
+      .filter((id) => id && !askedPrices.has(id));
+    for (const id of ids) askedPrices.add(id);
+    for (let start = 0; start < ids.length; start += 100) {
+      try {
+        const asked = encodeURIComponent(ids.slice(start, start + 100).join(','));
+        const response = await fetch(`/account/prices.json?variants=${asked}`, {
+          headers: { accept: 'application/json' },
+          credentials: 'same-origin',
+        });
+        if (!response.ok) break;
+        const { prices } = await response.json();
+        for (const [id, price] of Object.entries(prices ?? {})) ownPrices.set(id, price);
+      } catch {
+        break;
+      }
+    }
+    showOwnPrices();
+  };
+  if (signedIn()) {
+    let pending = false;
+    const later = () => {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        askOwnPrices();
+      }, 50);
+    };
+    // Cards added later too, as recently viewed and the wishlist page add them.
+    new MutationObserver(later).observe(document.body, { childList: true, subtree: true });
+    askOwnPrices();
+  }
+
   // Signed in, the header's link says "Account" (ADR-571).
   if (signedIn()) {
     for (const link of document.querySelectorAll('[data-account-link]')) {
