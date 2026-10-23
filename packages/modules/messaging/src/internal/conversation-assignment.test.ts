@@ -13,9 +13,15 @@ function staff(shopId: string, userId: string): TenantContext {
   return {
     shopId,
     currency: 'PKR',
-    actor: { kind: 'staff', userId, role: 'confirmation_agent' },
+    actor: {
+      kind: 'staff',
+      userId,
+      sessionId: newId(),
+      role: 'confirmation_agent',
+      authenticatedAt: new Date(),
+    },
     scopes: new Set(['write_conversations']),
-  } as TenantContext;
+  };
 }
 
 describe.skipIf(!server)('Conversations given to staff (MSG-06, ADR-759)', () => {

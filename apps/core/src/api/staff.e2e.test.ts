@@ -1198,7 +1198,10 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
          RETURNING id`,
         [shopA],
       );
-      const [first, second] = rows.map((row) => toPublicId('conversation', row.id));
+      const [first, second] = rows.map((row) => toPublicId('conversation', row.id)) as [
+        string,
+        string,
+      ];
       const manager = await signUp();
       await grant(manager.userId, shopA, 'manager');
       await enableTwoStep(manager.accessToken);
