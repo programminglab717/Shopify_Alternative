@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### The inbox's reply times
+### 0afce9c · The inbox's reply times
 
 * **Owners see how fast the inbox answers:** how many customers who waited were answered, the
   typical wait and the share in time, for the shop and for each member, today or over 7 or 30
