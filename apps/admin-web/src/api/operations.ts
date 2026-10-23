@@ -7518,6 +7518,47 @@ export const ProductsExportQuery = /* GraphQL */ `
   }
 `;
 
+/** Products straight from a Shopify store's Admin API (ADR-749), checked first in a dry run. */
+export const ProductsImportFromShopifyMutation = /* GraphQL */ `
+  mutation ProductsImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+    $overwrite: Boolean
+  ) {
+    productsImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+      overwrite: $overwrite
+    ) {
+      dryRun
+      rows
+      created
+      updated
+      skipped
+      variants
+      images
+      stocked
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        handle
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Products from Shopify's or WooCommerce's product CSV, checked first in a dry run. */
 export const ProductsImportMutation = /* GraphQL */ `
   mutation ProductsImport(

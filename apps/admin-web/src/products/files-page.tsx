@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft, Download, FileUp } from 'lucide-react';
+import { ArrowLeft, Download, FileUp, Store } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import {
@@ -7,6 +7,7 @@ import {
   InventoryImportMutation,
   LocationsQuery,
   ProductsExportQuery,
+  ProductsImportFromShopifyMutation,
   ProductsImportMutation,
 } from '../api/operations';
 import type {
@@ -17,6 +18,7 @@ import type {
   LocationsData,
   ProductsExportData,
   ProductsImportData,
+  ProductsImportFromShopifyData,
   ProductsImportResult,
 } from '../api/types';
 import { permits } from '../auth/permissions';
@@ -28,6 +30,7 @@ import { CheckField, SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, EmptyState } from '../ui/feedback';
+import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 import { EDITS_PRODUCTS } from './status';
 
@@ -50,11 +53,17 @@ function RowErrors({ count, errors }: { count: number; errors: FileRowError[] })
         <span>{t('moving.rowErrors', { count })}</span>
         {errors.slice(0, 5).map((error) => (
           <span key={`${error.row}-${error.column ?? ''}`}>
-            {t('moving.rowError', {
-              row: error.row,
-              column: error.column ?? '',
-              message: error.message,
-            })}
+            {error.handle
+              ? t('files.storeRowError', {
+                  handle: error.handle,
+                  column: error.column ?? '',
+                  message: error.message,
+                })
+              : t('moving.rowError', {
+                  row: error.row,
+                  column: error.column ?? '',
+                  message: error.message,
+                })}
           </span>
         ))}
       </span>
@@ -71,6 +80,180 @@ function useChosenFile(onChosen: (file: { name: string; csv: string }) => void) 
     if (chosen) void chosen.text().then((csv) => onChosen({ name: chosen.name, csv }));
   };
   return { input, onChange, choose: () => input.current?.click() };
+}
+
+/** How the owner's app reaches their store: a Dev Dashboard app's ID and secret, or a token. */
+type StoreAccess = 'CLIENT' | 'TOKEN';
+
+/**
+ * Products straight from the owner's Shopify store, through its Admin API (ONB-05, ADR-749): its
+ * address and their app's client ID and secret, or its access token, held by the page alone
+ * while it is open; checked first, saying what it would make, update and leave, each problem by
+ * its product's handle; then taken in at a tap.
+ */
+function ImportFromStore() {
+  const { t } = useLocale();
+  const run = useAdminMutation<
+    ProductsImportFromShopifyData,
+    {
+      store: string;
+      accessToken?: string;
+      clientId?: string;
+      clientSecret?: string;
+      dryRun: boolean;
+      overwrite: boolean;
+    }
+  >(ProductsImportFromShopifyMutation);
+  const { problem, attempt } = useAttempt();
+  const [store, setStore] = useState('');
+  const [access, setAccess] = useState<StoreAccess>('CLIENT');
+  const [token, setToken] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [overwrite, setOverwrite] = useState(false);
+  const [checked, setChecked] = useState<ProductsImportResult | null>(null);
+  const [done, setDone] = useState<ProductsImportResult | null>(null);
+
+  const send = async (dryRun: boolean) => {
+    const answer: { value?: ProductsImportResult } = {};
+    const ok = await attempt(async () => {
+      answer.value = (
+        await run.mutateAsync({
+          store,
+          ...(access === 'TOKEN' ? { accessToken: token } : { clientId, clientSecret }),
+          dryRun,
+          overwrite,
+        })
+      ).productsImportFromShopify;
+      return answer.value;
+    });
+    return ok ? answer.value! : null;
+  };
+  // What is checked is for the store and app as typed: a change asks for a new check.
+  const changed =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      setChecked(null);
+    };
+  const ready =
+    store.trim() !== '' &&
+    (access === 'TOKEN'
+      ? token.trim() !== ''
+      : clientId.trim() !== '' && clientSecret.trim() !== '');
+
+  return (
+    <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
+      <TextField
+        label={t('files.storeAddress')}
+        value={store}
+        ltr
+        placeholder="zari.myshopify.com"
+        autoComplete="off"
+        onChange={(event) => changed(setStore)(event.target.value)}
+      />
+      <SelectField<StoreAccess>
+        label={t('files.storeAccess')}
+        value={access}
+        options={[
+          { value: 'CLIENT', label: t('files.storeClient') },
+          { value: 'TOKEN', label: t('files.storeToken') },
+        ]}
+        onChange={changed(setAccess)}
+      />
+      {access === 'TOKEN' ? (
+        <TextField
+          label={t('files.accessToken')}
+          type="password"
+          value={token}
+          ltr
+          autoComplete="off"
+          onChange={(event) => changed(setToken)(event.target.value)}
+        />
+      ) : (
+        <>
+          <TextField
+            label={t('files.clientId')}
+            value={clientId}
+            ltr
+            autoComplete="off"
+            onChange={(event) => changed(setClientId)(event.target.value)}
+          />
+          <TextField
+            label={t('files.clientSecret')}
+            type="password"
+            value={clientSecret}
+            ltr
+            autoComplete="off"
+            onChange={(event) => changed(setClientSecret)(event.target.value)}
+          />
+        </>
+      )}
+      <CheckField
+        label={t('files.storeOverwrite')}
+        hint={t('files.storeOverwriteHint')}
+        checked={overwrite}
+        onChange={changed(setOverwrite)}
+      />
+      <Button
+        variant="secondary"
+        className="self-start"
+        icon={<Store aria-hidden className="size-5" />}
+        disabled={!ready}
+        busy={run.isPending && !checked}
+        onClick={() => {
+          setDone(null);
+          void send(true).then(setChecked);
+        }}
+      >
+        {t('files.checkStore')}
+      </Button>
+      {checked && !done && (
+        <div className="flex flex-col gap-2 rounded-control border border-line p-3">
+          <p>
+            {t('files.storeChecked', {
+              created: formatCount(checked.created),
+              updated: formatCount(checked.updated),
+              skipped: formatCount(checked.skipped),
+              variants: formatCount(checked.variants),
+            })}
+          </p>
+          <RowErrors count={checked.rowErrorCount} errors={checked.rowErrors} />
+          {checked.created + checked.updated > 0 && (
+            <Button
+              className="self-start"
+              busy={run.isPending}
+              onClick={() =>
+                void send(false).then((result) => {
+                  if (result) {
+                    setDone(result);
+                    setChecked(null);
+                    // Done with: the page keeps no credentials of the store's.
+                    setToken('');
+                    setClientSecret('');
+                  }
+                })
+              }
+            >
+              {t('files.importProductsConfirm')}
+            </Button>
+          )}
+        </div>
+      )}
+      {done && (
+        <Alert tone="success">
+          {t('files.productsImported', {
+            created: formatCount(done.created),
+            updated: formatCount(done.updated),
+            skipped: formatCount(done.skipped),
+            images: formatCount(done.images),
+            stocked: formatCount(done.stocked),
+          })}
+        </Alert>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </FormSection>
+  );
 }
 
 /** Whose product export a file is (ADR-482). */
@@ -412,7 +595,10 @@ function StockCount() {
   );
 }
 
-/** Products and stock in and out of Hatti by file (CAT-05, ONB-05), for owners and managers. */
+/**
+ * Products and stock in and out of Hatti, from a Shopify store or by file (CAT-05, ONB-05), for
+ * owners and managers.
+ */
 export function ProductFilesPage() {
   const { t } = useLocale();
   const shop = useShop();
@@ -431,6 +617,7 @@ export function ProductFilesPage() {
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
         {t('files.title')}
       </h1>
+      <ImportFromStore />
       <ImportProducts />
       <ExportProducts />
       <StockCount />

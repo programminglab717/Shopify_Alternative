@@ -3615,6 +3615,8 @@ export interface CheckoutMarketingChannelsUpdateData {
 export interface FileRowError {
   row: number;
   column: string | null;
+  /** The row's product, where it came from a store rather than a file (ADR-749). */
+  handle?: string | null;
   message: string;
 }
 
@@ -3638,6 +3640,10 @@ export interface ProductsImportResult {
 
 export interface ProductsImportData {
   productsImport: ProductsImportResult;
+}
+
+export interface ProductsImportFromShopifyData {
+  productsImportFromShopify: ProductsImportResult;
 }
 
 export interface LocationsData {

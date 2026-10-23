@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The Shopify store import in the admin
+
+* **Products → Import and export now opens with "Import from your Shopify store":** the store's
+  address and the owner's app, checked first and then imported, each problem named by its
+  product, the secret cleared once done ([ADR-750](../architecture/13-decision-log.md#adr-750--the-admins-import-page-takes-products-straight-from-the-owners-shopify-store-its-address-and-their-apps-client-id-and-secret-or-token-checked-first-each-problem-by-its-products-handle-the-credentials-held-by-the-page-alone-and-cleared-once-imported)).
+* 4096 tests (2 new).
+
 ### a6cbe90 · Products straight from a Shopify store
 
 * **A shop moving from Shopify no longer downloads and uploads a CSV.** The owner gives their

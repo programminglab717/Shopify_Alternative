@@ -29,6 +29,52 @@ function core(role: StaffRole) {
           },
         };
       }
+      case 'ProductsImportFromShopify':
+        if (variables.store === 'zari.pk') {
+          return {
+            productsImportFromShopify: {
+              dryRun: true,
+              rows: 0,
+              created: 0,
+              updated: 0,
+              skipped: 0,
+              variants: 0,
+              images: 0,
+              stocked: 0,
+              rowErrorCount: 0,
+              rowErrors: [],
+              userErrors: [
+                {
+                  field: ['store'],
+                  code: 'INVALID',
+                  message: "Give the store's address at Shopify, as zari.myshopify.com",
+                },
+              ],
+            },
+          };
+        }
+        return {
+          productsImportFromShopify: {
+            dryRun: variables.dryRun,
+            rows: 9,
+            created: 4,
+            updated: 0,
+            skipped: 0,
+            variants: 9,
+            images: 5,
+            stocked: 9,
+            rowErrorCount: 1,
+            rowErrors: [
+              {
+                row: 7,
+                column: 'Image Src',
+                handle: 'lawn-suit',
+                message: 'is not an https address',
+              },
+            ],
+            userErrors: [],
+          },
+        };
       case 'ProductsExport':
         return { productsExport: { csv: PRODUCTS, productCount: 1, rowCount: 1 } };
       case 'Locations':
@@ -111,6 +157,69 @@ describe('Products and stock by file', () => {
       { csv: PRODUCTS, dryRun: true, overwrite: true, format: 'SHOPIFY' },
       { csv: PRODUCTS, dryRun: false, overwrite: true, format: 'SHOPIFY' },
     ]);
+  });
+
+  it("checks the owner's Shopify store through its app, then imports it, keeping no credentials (ADR-749)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products');
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Import and export' }));
+    const check = await screen.findByRole('button', { name: 'Check the store' });
+    expect((check as HTMLButtonElement).disabled).toBe(true);
+    type("Your store's address", 'zari.pk');
+    type('Client ID', 'client-1');
+    type('Client secret', 'secret-1');
+    fireEvent.click(check);
+    expect(
+      await screen.findByText(/Give the store's address at Shopify, as zari\.myshopify\.com/),
+    ).toBeTruthy();
+
+    type("Your store's address", 'zari.myshopify.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Check the store' }));
+    expect(
+      await screen.findByText(
+        'In your Shopify store: products to add: 4; to update: 0; to leave as they are: 0. Variants to make: 9.',
+      ),
+    ).toBeTruthy();
+    // No file to look a row up in: the product is named by its handle.
+    expect(screen.getByText('lawn-suit, Image Src: is not an https address')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Import them' }));
+    expect(
+      await screen.findByText(
+        'Imported. Products added: 4; updated: 0; left as they were: 0. Images: 5. Variants given stock: 9.',
+      ),
+    ).toBeTruthy();
+    expect((screen.getByLabelText('Client secret') as HTMLInputElement).value).toBe('');
+    const sent = sentOf(fake, 'ProductsImportFromShopify');
+    expect(sent.slice(1)).toEqual([
+      {
+        store: 'zari.myshopify.com',
+        clientId: 'client-1',
+        clientSecret: 'secret-1',
+        dryRun: true,
+        overwrite: false,
+      },
+      {
+        store: 'zari.myshopify.com',
+        clientId: 'client-1',
+        clientSecret: 'secret-1',
+        dryRun: false,
+        overwrite: false,
+      },
+    ]);
+
+    // Or a custom app's access token.
+    fireEvent.change(screen.getByLabelText('Your app'), { target: { value: 'TOKEN' } });
+    type('Access token', 'shpat_1');
+    fireEvent.click(screen.getByRole('button', { name: 'Check the store' }));
+    await waitFor(() => expect(sentOf(fake, 'ProductsImportFromShopify')).toHaveLength(4));
+    expect(sentOf(fake, 'ProductsImportFromShopify')[3]).toEqual({
+      store: 'zari.myshopify.com',
+      accessToken: 'shpat_1',
+      dryRun: true,
+      overwrite: false,
+    });
   });
 
   it("checks a WooCommerce export as WooCommerce's when told the file is from it (ADR-482)", async () => {

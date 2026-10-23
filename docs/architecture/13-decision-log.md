@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-749 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-750 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -757,6 +757,7 @@
 | 747 | Staff's sessions unused for 90 days and second steps' challenges a month past their end are deleted as new ones are made, with the address and browser they hold | Accepted |
 | 748 | Comments on articles forget the internet address and browser they were posted from after 90 days, and the log of staff's sign-ins and account changes is kept two years | Accepted |
 | 749 | A Shopify store's products come through its own Admin API, with its owner's app's token or client ID and secret, kept for nothing: one bulk query, written as Shopify's product export, which the product import takes as it takes a file | Accepted |
+| 750 | The admin's import page takes products straight from the owner's Shopify store: its address and their app's client ID and secret or token, checked first, each problem by its product's handle, the credentials held by the page alone and cleared once imported | Accepted |
 
 ---
 
@@ -25462,3 +25463,23 @@
   come, as are metafields and variants' images through `media` once Shopify leaves `image`;
   the admin's screen for it is next. A store too big for one import's 5,000 rows is moved by
   its CSV files.
+
+## ADR-750 · The admin's import page takes products straight from the owner's Shopify store: its address and their app's client ID and secret or token, checked first, each problem by its product's handle, the credentials held by the page alone and cleared once imported
+
+* **Context:** `productsImportFromShopify` (ADR-749) reads a Shopify store through its Admin API;
+  the admin's Products → Import and export page took files alone.
+* **Decision:**
+  * **Import from your Shopify store** is the page's first card: the store's address, and the
+    owner's app, a Dev Dashboard app's client ID and secret (the first choice, as Shopify makes
+    new apps there) or a custom app's access token, typed into fields the browser is told not to
+    fill or remember, the secret and token hidden as passwords. The hint says how to make the
+    app and its two scopes, and that Hatti keeps none of it.
+  * **Checked first:** "Check the store" runs a dry run and says what would be added, updated and
+    left, and the first problems, each by its product's handle and column, as there is no file to
+    look a row up in; "Import them" then imports. Changing the address, the app or the update
+    choice asks for a new check.
+  * **Credentials held by the page alone,** in its state while it is open, sent with each check and
+    the import, and the secret and token cleared once the import is done.
+* **Consequences:** an owner moving from Shopify moves their products from their phone, with no
+  file. The file card stays beside it for WooCommerce, Instagram and stores too big for one
+  import.

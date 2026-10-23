@@ -2984,6 +2984,23 @@ const en = {
   'files.title': 'Import and export',
   'files.cannot': 'Owners and managers bring products in and out by file.',
   'files.countByFile': 'Count by file',
+  'files.fromStore': 'Import from your Shopify store',
+  'files.fromStoreHint':
+    'Straight from your store, with no files: products with their options, variants, prices, costs, SKUs, images and stock. In Shopify, make an app in the Dev Dashboard with the read_products and read_inventory scopes, install it on your store and paste its client ID and secret here; or paste the access token of a custom app you made before. We keep none of them.',
+  'files.storeAddress': "Your store's address",
+  'files.storeAccess': 'Your app',
+  'files.storeClient': "A Dev Dashboard app's client ID and secret",
+  'files.storeToken': "A custom app's access token",
+  'files.accessToken': 'Access token',
+  'files.clientId': 'Client ID',
+  'files.clientSecret': 'Client secret',
+  'files.storeOverwrite': 'Update the products I already have',
+  'files.storeOverwriteHint':
+    'Products whose handles you have are updated from the store, their options the same; otherwise they are left as they are.',
+  'files.checkStore': 'Check the store',
+  'files.storeChecked':
+    'In your Shopify store: products to add: {created}; to update: {updated}; to leave as they are: {skipped}. Variants to make: {variants}.',
+  'files.storeRowError': '{handle}, {column}: {message}',
   'files.importProducts': 'Import products',
   'files.importProductsHint':
     "From Shopify's or WooCommerce's product export, as CSV: products with their options, variants, prices, SKUs, tags, images by address and stock. We check the file first and say what it would do.",
@@ -8541,6 +8558,23 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.title': 'امپورٹ اور ایکسپورٹ',
   'files.cannot': 'مالکان اور مینیجرز فائل سے پروڈکٹس لاتے اور نکالتے ہیں۔',
   'files.countByFile': 'فائل سے گنتی',
+  'files.fromStore': 'اپنے شاپیفائی اسٹور سے امپورٹ کریں',
+  'files.fromStoreHint':
+    'سیدھا اپنے اسٹور سے، بغیر فائل کے: پروڈکٹس اپنے آپشنز، اقسام، قیمتوں، لاگت، SKU، تصاویر اور اسٹاک کے ساتھ۔ شاپیفائی میں Dev Dashboard میں read_products اور read_inventory اسکوپس والی ایپ بنائیں، اسے اپنے اسٹور پر انسٹال کریں اور اس کی client ID اور secret یہاں لگائیں؛ یا پہلے بنائی گئی کسٹم ایپ کا access token لگائیں۔ ہم ان میں سے کچھ نہیں رکھتے۔',
+  'files.storeAddress': 'آپ کے اسٹور کا ایڈریس',
+  'files.storeAccess': 'آپ کی ایپ',
+  'files.storeClient': 'Dev Dashboard ایپ کی client ID اور secret',
+  'files.storeToken': 'کسٹم ایپ کا access token',
+  'files.accessToken': 'Access token',
+  'files.clientId': 'Client ID',
+  'files.clientSecret': 'Client secret',
+  'files.storeOverwrite': 'جو پروڈکٹس میرے پاس پہلے سے ہیں انہیں اپ ڈیٹ کریں',
+  'files.storeOverwriteHint':
+    'جن پروڈکٹس کے ہینڈل آپ کے پاس ہیں وہ اسٹور سے اپ ڈیٹ ہوتے ہیں، ان کے آپشنز وہی رہیں؛ ورنہ ویسے ہی چھوڑ دیے جاتے ہیں۔',
+  'files.checkStore': 'اسٹور جانچیں',
+  'files.storeChecked':
+    'آپ کے شاپیفائی اسٹور میں: شامل کرنے کو پروڈکٹس: {created}؛ اپ ڈیٹ کرنے کو: {updated}؛ ویسے ہی چھوڑنے کو: {skipped}۔ بنانے کو اقسام: {variants}۔',
+  'files.storeRowError': '{handle}، {column}: {message}',
   'files.importProducts': 'پروڈکٹس امپورٹ کریں',
   'files.importProductsHint':
     'شاپیفائی یا ووکامرس کے پروڈکٹ ایکسپورٹ سے، CSV میں: پروڈکٹس اپنے آپشنز، اقسام، قیمتوں، SKU، ٹیگز، ایڈریس سے تصاویر اور اسٹاک کے ساتھ۔ ہم پہلے فائل جانچ کر بتاتے ہیں کہ یہ کیا کرے گی۔',
