@@ -43,6 +43,7 @@ export {
   CUSTOMERS_BULK_QUERY,
   readStoreCustomers,
   storeCustomersCsv,
+  type StoreAddress,
   type StoreCustomer,
   type StoreCustomers,
 } from './customers.js';

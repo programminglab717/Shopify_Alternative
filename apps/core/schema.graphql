@@ -4322,6 +4322,14 @@ type CustomersExportPayload {
 }
 
 type CustomersImportFromShopifyPayload {
+  """Addresses that could not be kept, and why; the first are named."""
+  addressErrors: [StoreCustomerImportError!]!
+
+  """
+  Customers' addresses in Pakistan kept in their address books (ADR-784); none in a dry run.
+  """
+  addresses: Int!
+
   """Customers made, or that would be in a dry run."""
   created: Int!
 
@@ -8915,7 +8923,7 @@ type Mutation {
   ): CustomersImportPayload!
 
   """
-  Imports a Shopify store's customers through its Admin API (ONB-05, ADR-755) as customersImport takes Shopify's customer export: each by its mobile number, with its name, email, note, tags, and email and SMS marketing consent as the store had them. Customers with no phone number are counted and left out; customers already here are left as they are. Give the store and its app as productsImportFromShopify takes them; the app needs the read_customers access scope and Shopify's leave to read customers' names, emails, phones and addresses. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  Imports a Shopify store's customers through its Admin API (ONB-05, ADR-755) as customersImport takes Shopify's customer export: each by its mobile number, with its name, email, note, tags, and email and SMS marketing consent as the store had them. Customers with no phone number are counted and left out; customers already here are left as they are. Each customer's addresses in Pakistan go into their address book, the default as it was, where the book has none yet (ADR-784). Give the store and its app as productsImportFromShopify takes them; the app needs the read_customers access scope and Shopify's leave to read customers' names, emails, phones and addresses. Nothing given is kept. dryRun reads the store and counts, changing nothing.
   """
   customersImportFromShopify(
     accessToken: String

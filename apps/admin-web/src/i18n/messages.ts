@@ -3042,9 +3042,10 @@ const en = {
   'files.collectionError': '{handle}: {message}',
   'files.storeCustomers': 'Bring its customers too',
   'files.storeCustomersHint':
-    'Each by their mobile number, with their name, email, note, tags and marketing consent. The app needs the read_customers scope, and access to customers’ details in its settings.',
+    'Each by their mobile number, with their name, email, note, tags, marketing consent and addresses in Pakistan. The app needs the read_customers scope, and access to customers’ details in its settings.',
   'files.customersChecked': 'Customers to add: {created}; already here: {skipped}.',
-  'files.customersImported': 'Customers added: {created}; already here: {skipped}.',
+  'files.customersImported':
+    'Customers added: {created}; already here: {skipped}. Addresses kept in their books: {addresses}.',
   'files.customersWithoutPhone': 'Customers with no phone number, left out: {count}.',
   'files.customerError': '{customer}: {message}',
   'files.storeDiscounts': 'Bring its discount codes too',
@@ -8878,9 +8879,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.collectionError': '{handle}: {message}',
   'files.storeCustomers': 'اس کے کسٹمرز بھی لائیں',
   'files.storeCustomersHint':
-    'ہر ایک اپنے موبائل نمبر سے، نام، ای میل، نوٹ، ٹیگز اور مارکیٹنگ کی اجازت کے ساتھ۔ ایپ کو read_customers اسکوپ، اور اپنی سیٹنگز میں کسٹمرز کی تفصیلات تک رسائی بھی چاہیے۔',
+    'ہر ایک اپنے موبائل نمبر سے، نام، ای میل، نوٹ، ٹیگز، مارکیٹنگ کی اجازت اور پاکستان کے پتوں کے ساتھ۔ ایپ کو read_customers اسکوپ، اور اپنی سیٹنگز میں کسٹمرز کی تفصیلات تک رسائی بھی چاہیے۔',
   'files.customersChecked': 'شامل کرنے کو کسٹمرز: {created}؛ پہلے سے موجود: {skipped}۔',
-  'files.customersImported': 'شامل کسٹمرز: {created}؛ پہلے سے موجود: {skipped}۔',
+  'files.customersImported':
+    'شامل کسٹمرز: {created}؛ پہلے سے موجود: {skipped}۔ ان کی ایڈریس بکس میں رکھے پتے: {addresses}۔',
   'files.customersWithoutPhone': 'جن کسٹمرز کا فون نمبر نہیں، باہر رہے: {count}۔',
   'files.customerError': '{customer}: {message}',
   'files.storeDiscounts': 'اس کے ڈسکاؤنٹ کوڈز بھی لائیں',

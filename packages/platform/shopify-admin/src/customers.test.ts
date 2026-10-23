@@ -11,7 +11,36 @@ const LINES = [
     tags: ['vip', 'lahore'],
     defaultEmailAddress: { emailAddress: 'ayesha@example.pk', marketingState: 'SUBSCRIBED' },
     defaultPhoneNumber: { phoneNumber: '+923001234567', marketingState: 'UNSUBSCRIBED' },
-    defaultAddress: { phone: '+923211234567' },
+    defaultAddress: {
+      id: 'gid://shopify/MailingAddress/12?model_name=CustomerAddress',
+      phone: '+923211234567',
+    },
+  },
+  {
+    id: 'gid://shopify/MailingAddress/11?model_name=CustomerAddress',
+    firstName: 'Ayesha',
+    lastName: 'Khan',
+    phone: null,
+    address1: 'House 4, Street 2',
+    address2: '',
+    city: 'Karachi',
+    province: 'Sindh',
+    zip: '75500',
+    countryCodeV2: 'PK',
+    __parentId: 'gid://shopify/Customer/1',
+  },
+  {
+    id: 'gid://shopify/MailingAddress/12?model_name=CustomerAddress',
+    firstName: 'Ayesha',
+    lastName: null,
+    phone: '+923211234567',
+    address1: 'House 12, Street 4',
+    address2: 'Gulberg',
+    city: 'Lahore',
+    province: 'Punjab',
+    zip: null,
+    countryCodeV2: 'PK',
+    __parentId: 'gid://shopify/Customer/1',
   },
   {
     id: 'gid://shopify/Customer/2',
@@ -32,6 +61,13 @@ const LINES = [
     defaultEmailAddress: { emailAddress: 'bilal@example.pk', marketingState: 'NOT_SUBSCRIBED' },
     defaultPhoneNumber: null,
     defaultAddress: null,
+  },
+  // The address of a customer with no number, left out with them.
+  {
+    id: 'gid://shopify/MailingAddress/31',
+    address1: 'Somewhere',
+    city: 'Multan',
+    __parentId: 'gid://shopify/Customer/3',
   },
 ]
   .map((line) => JSON.stringify(line))
@@ -75,6 +111,31 @@ describe("A store's customers through its Admin API (ADR-755)", () => {
         smsMarketing: 'UNSUBSCRIBED',
         note: 'Prefers evening delivery',
         tags: ['vip', 'lahore'],
+        // Its addresses, the default first (ADR-784).
+        addresses: [
+          {
+            name: 'Ayesha',
+            phone: '+923211234567',
+            address1: 'House 12, Street 4',
+            address2: 'Gulberg',
+            city: 'Lahore',
+            province: 'Punjab',
+            zip: null,
+            countryCode: 'PK',
+            isDefault: true,
+          },
+          {
+            name: 'Ayesha Khan',
+            phone: null,
+            address1: 'House 4, Street 2',
+            address2: null,
+            city: 'Karachi',
+            province: 'Sindh',
+            zip: '75500',
+            countryCode: 'PK',
+            isDefault: false,
+          },
+        ],
       },
       {
         firstName: null,
@@ -85,6 +146,7 @@ describe("A store's customers through its Admin API (ADR-755)", () => {
         smsMarketing: null,
         note: null,
         tags: [],
+        addresses: [],
       },
     ]);
     // As Shopify's customer export writes them, each row named for its errors.

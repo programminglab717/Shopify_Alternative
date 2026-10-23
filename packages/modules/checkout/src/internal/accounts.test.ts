@@ -1174,6 +1174,37 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await saved(token, typed('Changed'), first!.id)).toHaveLength(ACCOUNT_ADDRESSES_MAX);
   });
 
+  it("fills brought customers' empty address books by their numbers, once (ONB-05, ADR-784)", async () => {
+    const ayesha = unwrap(await customers.create(f.a, { phone: '0300 1234567', name: 'Ayesha' }));
+    const bilal = unwrap(await customers.create(f.a, { phone: '0311 1234567', name: 'Bilal' }));
+    await customers.create(f.b, { phone: '0300 1234567', name: 'Ayesha' });
+    const books = [
+      {
+        phone: '+92 300 1234567',
+        addresses: [typed('Office'), typed('Home', { default: true }), typed('Bad', { city: '' })],
+      },
+      // A number no customer has, and one no one could have, keep nothing.
+      { phone: '0345 1234567', addresses: [typed('Nobody')] },
+      { phone: 'none', addresses: [typed('Nobody')] },
+      { phone: ZONG, addresses: [typed('Shop', { province: 'Sindh', city: 'Karachi' })] },
+    ];
+    expect(await f.accounts.bringAddresses(f.a.shopId, books)).toEqual({
+      added: 3,
+      problems: [{ book: 0, message: "City can't be blank" }],
+    });
+    const kept = await f.accounts.addressBooks(f.a.shopId, [ayesha.id, bilal.id]);
+    expect(kept.get(ayesha.id)?.map((a) => [a.address.name, a.isDefault])).toEqual([
+      ['Home', true],
+      ['Office', false],
+    ]);
+    expect(kept.get(bilal.id)?.map((a) => a.address)).toEqual([
+      expect.objectContaining({ name: 'Shop', city: 'Karachi', provinceCode: 'SD' }),
+    ]);
+    // Brought again, books with addresses are left as they are.
+    expect(await f.accounts.bringAddresses(f.a.shopId, books)).toEqual({ added: 0, problems: [] });
+    expect((await f.accounts.addressBooks(f.a.shopId, [ayesha.id])).get(ayesha.id)).toHaveLength(2);
+  });
+
   it("joins merged customers' address books, gives them in their file and erases them (ADR-583)", async () => {
     const token = await signIn(JAZZ);
     const ayesha = (await order(JAZZ)).customerId;

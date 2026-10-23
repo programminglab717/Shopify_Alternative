@@ -6390,6 +6390,11 @@ export const CustomersImportFromShopifyMutation = /* GraphQL */ `
         customer
         message
       }
+      addresses
+      addressErrors {
+        customer
+        message
+      }
       userErrors {
         field
         code

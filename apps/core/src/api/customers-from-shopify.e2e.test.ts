@@ -17,8 +17,9 @@ type Json = any;
 
 const IMPORT = `mutation ($store: String!, $accessToken: String, $dryRun: Boolean) {
   customersImportFromShopify(store: $store, accessToken: $accessToken, dryRun: $dryRun) {
-    customers withoutPhone created skipped customerErrorCount dryRun
+    customers withoutPhone created skipped customerErrorCount addresses dryRun
     customerErrors { customer message }
+    addressErrors { customer message }
     userErrors { field code message }
   }
 }`;
@@ -33,7 +34,48 @@ const LINES = [
     tags: ['vip'],
     defaultEmailAddress: { emailAddress: 'ayesha@example.pk', marketingState: 'SUBSCRIBED' },
     defaultPhoneNumber: { phoneNumber: '+923001234567', marketingState: 'UNSUBSCRIBED' },
-    defaultAddress: null,
+    defaultAddress: { id: 'gid://shopify/MailingAddress/12?model_name=CustomerAddress' },
+  },
+  // Her addresses: one at home, her default; one at work; one abroad; one without a city.
+  {
+    id: 'gid://shopify/MailingAddress/11?model_name=CustomerAddress',
+    firstName: 'Ayesha',
+    lastName: 'Khan',
+    phone: '042 35761234',
+    address1: 'Office 3, Main Boulevard',
+    city: 'Lahore',
+    province: 'Punjab',
+    zip: '54000',
+    countryCodeV2: 'PK',
+    __parentId: 'gid://shopify/Customer/1',
+  },
+  {
+    id: 'gid://shopify/MailingAddress/12?model_name=CustomerAddress',
+    firstName: null,
+    lastName: null,
+    phone: '0321 1234567',
+    address1: 'House 4, Street 2',
+    address2: 'DHA Phase 5',
+    city: 'Karachi',
+    province: 'Sindh',
+    countryCodeV2: 'PK',
+    __parentId: 'gid://shopify/Customer/1',
+  },
+  {
+    id: 'gid://shopify/MailingAddress/13?model_name=CustomerAddress',
+    firstName: 'Ayesha',
+    address1: '1 Market St',
+    city: 'Dubai',
+    countryCodeV2: 'AE',
+    __parentId: 'gid://shopify/Customer/1',
+  },
+  {
+    id: 'gid://shopify/MailingAddress/14?model_name=CustomerAddress',
+    firstName: 'Ayesha',
+    address1: 'Somewhere',
+    city: null,
+    countryCodeV2: 'PK',
+    __parentId: 'gid://shopify/Customer/1',
   },
   {
     id: 'gid://shopify/Customer/2',
@@ -144,14 +186,21 @@ describe.skipIf(!server)("Admin GraphQL API: customers from a Shopify store's Ad
       created: 2,
       skipped: 0,
       customerErrorCount: 1,
+      addresses: 0,
       dryRun: true,
       customerErrors: [abroad],
+      addressErrors: [],
       userErrors: [],
     });
+    // Her addresses in Pakistan go into her book: one without a city is said (ADR-784).
     expect((await gql(IMPORT, variables)).data?.customersImportFromShopify).toMatchObject({
       created: 2,
       skipped: 0,
       customerErrors: [abroad],
+      addresses: 2,
+      addressErrors: [
+        { customer: 'Ayesha Khan', message: "An address was not kept: City can't be blank" },
+      ],
     });
     const { data } = await gql(`{
       customers(first: 10) {
@@ -159,6 +208,7 @@ describe.skipIf(!server)("Admin GraphQL API: customers from a Shopify store's Ad
           name email note tags
           emailMarketingConsent { marketingState }
           smsMarketingConsent { marketingState }
+          savedAddresses { name phone address1 address2 city province zip }
         }
       }
     }`);
@@ -171,8 +221,30 @@ describe.skipIf(!server)("Admin GraphQL API: customers from a Shopify store's Ad
           tags: ['vip'],
           emailMarketingConsent: { marketingState: 'SUBSCRIBED' },
           smsMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
+          // Her default first, named as she is where it has no name; a landline's is reached
+          // on her mobile.
+          savedAddresses: [
+            {
+              name: 'Ayesha Khan',
+              phone: '+923211234567',
+              address1: 'House 4, Street 2',
+              address2: 'DHA Phase 5',
+              city: 'Karachi',
+              province: 'Sindh',
+              zip: null,
+            },
+            {
+              name: 'Ayesha Khan',
+              phone: '+923001234567',
+              address1: 'Office 3, Main Boulevard',
+              address2: null,
+              city: 'Lahore',
+              province: 'Punjab',
+              zip: '54000',
+            },
+          ],
         },
-        expect.objectContaining({ name: 'Bilal', email: null }),
+        expect.objectContaining({ name: 'Bilal', email: null, savedAddresses: [] }),
       ]),
     );
 
@@ -180,6 +252,8 @@ describe.skipIf(!server)("Admin GraphQL API: customers from a Shopify store's Ad
     expect((await gql(IMPORT, variables)).data?.customersImportFromShopify).toMatchObject({
       created: 0,
       skipped: 2,
+      addresses: 0,
+      addressErrors: [],
     });
   });
 });

@@ -577,9 +577,15 @@ function ImportFromStore() {
                 {t('files.customersImported', {
                   created: formatCount(done.customers.created),
                   skipped: formatCount(done.customers.skipped),
+                  addresses: formatCount(done.customers.addresses),
                 })}
               </span>
             )}
+            {done.customers?.addressErrors.slice(0, 5).map((error, index) => (
+              <span key={`address-${index}`}>
+                {t('files.customerError', { customer: error.customer, message: error.message })}
+              </span>
+            ))}
           </span>
         </Alert>
       )}

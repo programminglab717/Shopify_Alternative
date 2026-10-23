@@ -127,6 +127,15 @@ function core(role: StaffRole) {
             skipped: 0,
             customerErrorCount: 1,
             customerErrors: [{ customer: 'Sara Ali', message: 'is not a Pakistani mobile number' }],
+            addresses: variables.dryRun ? 0 : 3,
+            addressErrors: variables.dryRun
+              ? []
+              : [
+                  {
+                    customer: 'Ayesha Khan',
+                    message: "An address was not kept: City can't be blank",
+                  },
+                ],
             userErrors: [],
           },
         };
@@ -305,7 +314,12 @@ describe('Products and stock by file', () => {
         'Blogs added: 1. Articles added: 4, 3 with their images; left as they were: 1.',
       ),
     ).toBeTruthy();
-    expect(screen.getByText('Customers added: 2; already here: 0.')).toBeTruthy();
+    expect(
+      screen.getByText('Customers added: 2; already here: 0. Addresses kept in their books: 3.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Ayesha Khan: An address was not kept: City can't be blank"),
+    ).toBeTruthy();
     expect(screen.getByText('Discount codes added: 2; already here: 1.')).toBeTruthy();
     expect(sentOf(fake, 'DiscountsImportFromShopify').map((sent) => sent.dryRun)).toEqual([
       true,

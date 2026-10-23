@@ -1,6 +1,9 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import { AccountService } from '@hatti/checkout/public';
 import { CustomerTransferService, TRANSFER_LIMITS } from '@hatti/customers/public';
+import { parsePkMobile } from '@hatti/pk';
 import { readStoreCustomers, storeCustomersCsv, type StoreCustomer } from '@hatti/shopify-admin';
+import type { AccountAddressRequest } from '@hatti/storefront-api';
 import { Args, Field, Int, Mutation, ObjectType, Resolver } from '@nestjs/graphql';
 import { ShopifyStores, storeGiven, storeRefusalOf } from './shopify-stores.js';
 
@@ -40,6 +43,17 @@ export class CustomersImportFromShopifyPayload {
   @Field(() => [StoreCustomerImportError])
   customerErrors!: StoreCustomerImportError[];
 
+  @Field(() => Int, {
+    description:
+      "Customers' addresses in Pakistan kept in their address books (ADR-784); none in a dry run.",
+  })
+  addresses!: number;
+
+  @Field(() => [StoreCustomerImportError], {
+    description: 'Addresses that could not be kept, and why; the first are named.',
+  })
+  addressErrors!: StoreCustomerImportError[];
+
   @Field()
   dryRun!: boolean;
 
@@ -56,6 +70,7 @@ export class CustomersImportFromShopifyPayload {
 export class CustomersFromShopifyResolver {
   constructor(
     private readonly transfers: CustomerTransferService,
+    private readonly accounts: AccountService,
     private readonly shopify: ShopifyStores,
   ) {}
 
@@ -65,7 +80,8 @@ export class CustomersFromShopifyResolver {
       "customersImport takes Shopify's customer export: each by its mobile number, with its " +
       'name, email, note, tags, and email and SMS marketing consent as the store had them. ' +
       'Customers with no phone number are counted and left out; customers already here are ' +
-      'left as they are. Give the store and its app as productsImportFromShopify takes them; ' +
+      "left as they are. Each customer's addresses in Pakistan go into their address book, " +
+      'the default as it was, where the book has none yet (ADR-784). Give the store and its app as productsImportFromShopify takes them; ' +
       "the app needs the read_customers access scope and Shopify's leave to read customers' " +
       'names, emails, phones and addresses. Nothing given is kept. dryRun reads the store and ' +
       'counts, changing nothing.',
@@ -92,6 +108,8 @@ export class CustomersFromShopifyResolver {
         skipped: 0,
         customerErrorCount: 0,
         customerErrors: [],
+        addresses: 0,
+        addressErrors: [],
         dryRun: dry,
         userErrors: [],
         ...values,
@@ -144,8 +162,60 @@ export class CustomersFromShopifyResolver {
         );
       }
     }
-    return payload({ customers: customers.length, withoutPhone, ...totals, customerErrors });
+    if (dry)
+      return payload({ customers: customers.length, withoutPhone, ...totals, customerErrors });
+    const brought = await this.accounts.bringAddresses(tenant.shopId, customers.map(bookOf));
+    const addressErrors = brought.problems
+      .slice(0, TRANSFER_LIMITS.rowErrors)
+      .map(({ book, message }) =>
+        Object.assign(new StoreCustomerImportError(), {
+          customer: nameOf(customers[book]!),
+          message: `An address was not kept: ${message}`,
+        }),
+      );
+    return payload({
+      customers: customers.length,
+      withoutPhone,
+      ...totals,
+      customerErrors,
+      addresses: brought.added,
+      addressErrors,
+    });
   }
+}
+
+/** The customer's name at the store, or their email or number. */
+function nameOf(customer: StoreCustomer): string {
+  return (
+    [customer.firstName, customer.lastName].filter(Boolean).join(' ') ||
+    customer.email ||
+    customer.phone
+  );
+}
+
+/**
+ * The customer's addresses in Pakistan as their address book takes them (ADR-784): each named
+ * and reached as its own says, else as the customer is.
+ */
+function bookOf(customer: StoreCustomer): {
+  phone: string;
+  addresses: AccountAddressRequest[];
+} {
+  return {
+    phone: customer.phone,
+    addresses: customer.addresses
+      .filter((address) => (address.countryCode ?? 'PK') === 'PK')
+      .map((address) => ({
+        name: address.name ?? nameOf(customer),
+        phone: address.phone && parsePkMobile(address.phone) ? address.phone : customer.phone,
+        address1: address.address1 ?? '',
+        address2: address.address2,
+        city: address.city ?? '',
+        province: address.province,
+        zip: address.zip,
+        default: address.isDefault,
+      })),
+  };
 }
 
 /** The customers in files the customer import takes: fewer rows where one would be too long. */

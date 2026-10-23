@@ -2896,6 +2896,9 @@ export interface CustomersImportFromShopifyResult {
   skipped: number;
   customerErrorCount: number;
   customerErrors: { customer: string; message: string }[];
+  /** Addresses kept in customers' address books (ADR-784). */
+  addresses: number;
+  addressErrors: { customer: string; message: string }[];
   userErrors: UserError[];
 }
 

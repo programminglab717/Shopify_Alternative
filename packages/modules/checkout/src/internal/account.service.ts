@@ -30,19 +30,20 @@ import {
   accountOrdersIn,
   type AccountOrderItemFacts,
 } from '@hatti/orders/public';
-import { maskPkMobile } from '@hatti/pk';
+import { maskPkMobile, parsePkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
-import type {
-  AccountAddress,
-  AccountAddressRequest,
-  AccountDataEraseResponse,
-  AccountDataExportJson,
-  AccountDataExportResponse,
-  AccountDataRequestsJson,
-  AccountErasureJson,
-  AccountJson,
-  AccountOrderLineJson,
-  AccountSessionJson,
+import {
+  ACCOUNT_ADDRESSES_MAX,
+  type AccountAddress,
+  type AccountAddressRequest,
+  type AccountDataEraseResponse,
+  type AccountDataExportJson,
+  type AccountDataExportResponse,
+  type AccountDataRequestsJson,
+  type AccountErasureJson,
+  type AccountJson,
+  type AccountOrderLineJson,
+  type AccountSessionJson,
 } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -495,6 +496,36 @@ export class AccountService {
   ): Promise<Map<string, AccountAddressRecord[]>> {
     if (customerIds.length === 0) return new Map();
     return this.db.tenant(shopId, (tx) => addressBooksIn(tx, shopId, customerIds));
+  }
+
+  /**
+   * Fills the address books of customers brought from another store (ONB-05, ADR-784), each
+   * customer by their mobile number: their addresses checked as checkout's are, the one asked to
+   * be the default, at most {@link ACCOUNT_ADDRESSES_MAX}. A book with addresses already, or a
+   * number no customer has, is left as it is, so bringing them again adds none. How many
+   * addresses were kept, and why each that was not, by its book's index.
+   */
+  async bringAddresses(
+    shopId: string,
+    books: readonly { phone: string; addresses: readonly AccountAddressRequest[] }[],
+  ): Promise<{ added: number; problems: { book: number; message: string }[] }> {
+    let added = 0;
+    const problems: { book: number; message: string }[] = [];
+    for (const [index, book] of books.entries()) {
+      const phone = parsePkMobile(book.phone)?.e164;
+      if (!phone || book.addresses.length === 0) continue;
+      await this.db.tenant(shopId, async (tx) => {
+        const customer = await customerOfPhoneIn(tx, shopId, phone);
+        if (!customer || (await addressesIn(tx, shopId, customer.id)).length > 0) return;
+        for (const input of book.addresses.slice(0, ACCOUNT_ADDRESSES_MAX)) {
+          const check = new InputChecker();
+          if (await saveAddressIn(tx, check, shopId, customer.id, input, null)) added++;
+          else
+            problems.push({ book: index, message: check.errors.map((e) => e.message).join('; ') });
+        }
+      });
+    }
+    return { added, problems };
   }
 
   /**

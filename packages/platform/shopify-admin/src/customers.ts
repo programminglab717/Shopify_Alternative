@@ -3,7 +3,8 @@ import { jsonLines, runBulkQuery, type BulkQueryOptions } from './bulk.js';
 
 /**
  * A store's customers, as Shopify's bulk queries take them: each with its email address and phone
- * number and their marketing consent, its default address's phone, note and tags.
+ * number and their marketing consent, its default address's phone, note and tags; and its
+ * addresses, on lines of their own (ADR-784).
  */
 export const CUSTOMERS_BULK_QUERY = `{
   customers {
@@ -12,7 +13,12 @@ export const CUSTOMERS_BULK_QUERY = `{
         id firstName lastName note tags
         defaultEmailAddress { emailAddress marketingState }
         defaultPhoneNumber { phoneNumber marketingState }
-        defaultAddress { phone }
+        defaultAddress { id phone }
+        addressesV2 {
+          edges {
+            node { id firstName lastName phone address1 address2 city province zip countryCodeV2 }
+          }
+        }
       }
     }
   }
@@ -32,6 +38,25 @@ export interface StoreCustomer {
   smsMarketing: string | null;
   note: string | null;
   tags: string[];
+  /** Its addresses (ADR-784), its default first. */
+  addresses: StoreAddress[];
+}
+
+/** A customer's address at a store, as Shopify has it. */
+export interface StoreAddress {
+  /** Its own first and last names; null for neither. */
+  name: string | null;
+  phone: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  /** The province's name, as Punjab. */
+  province: string | null;
+  zip: string | null;
+  /** ISO 3166's two letters, as PK; null where Shopify gives none. */
+  countryCode: string | null;
+  /** Whether it is the customer's default. */
+  isDefault: boolean;
 }
 
 /** A store's customers, read through its Admin API. */
@@ -120,21 +145,43 @@ export async function readStoreCustomers(
       : file;
   }
   const customers: StoreCustomer[] = [];
+  // Each customer taken, by its ID, with its default address's, for its addresses' lines.
+  const byId = new Map<string, { customer: StoreCustomer; defaultAddress: string | null }>();
   let withoutPhone = 0;
   try {
     for (const line of jsonLines(file.value)) {
-      if (!String(line.id ?? '').startsWith('gid://shopify/Customer/')) continue;
+      const id = String(line.id ?? '');
+      if (id.startsWith('gid://shopify/MailingAddress/')) {
+        const owner = typeof line.__parentId === 'string' ? byId.get(line.__parentId) : undefined;
+        if (!owner) continue;
+        const names = [text(line.firstName), text(line.lastName)].filter(Boolean).join(' ');
+        const address: StoreAddress = {
+          name: names || null,
+          phone: text(line.phone),
+          address1: text(line.address1),
+          address2: text(line.address2),
+          city: text(line.city),
+          province: text(line.province),
+          zip: text(line.zip),
+          countryCode: text(line.countryCodeV2),
+          isDefault: owner.defaultAddress !== null && sameAddress(id, owner.defaultAddress),
+        };
+        if (address.isDefault) owner.customer.addresses.unshift(address);
+        else owner.customer.addresses.push(address);
+        continue;
+      }
+      if (!id.startsWith('gid://shopify/Customer/')) continue;
       const email = line.defaultEmailAddress as
         { emailAddress?: unknown; marketingState?: unknown } | null | undefined;
       const phone = line.defaultPhoneNumber as
         { phoneNumber?: unknown; marketingState?: unknown } | null | undefined;
-      const address = line.defaultAddress as { phone?: unknown } | null | undefined;
+      const address = line.defaultAddress as { id?: unknown; phone?: unknown } | null | undefined;
       const number = text(phone?.phoneNumber) ?? text(address?.phone);
       if (!number) {
         withoutPhone++;
         continue;
       }
-      customers.push({
+      const customer: StoreCustomer = {
         firstName: text(line.firstName),
         lastName: text(line.lastName),
         email: text(email?.emailAddress),
@@ -143,10 +190,21 @@ export async function readStoreCustomers(
         smsMarketing: text(phone?.marketingState),
         note: text(line.note),
         tags: Array.isArray(line.tags) ? line.tags.map(String) : [],
-      });
+        addresses: [],
+      };
+      customers.push(customer);
+      byId.set(id, { customer, defaultAddress: text(address?.id) });
     }
   } catch {
     return { ok: false, kind: 'other', message: "Shopify's export of the store could not be read" };
   }
   return { ok: true, value: { storeName: shop.value.shop.name, customers, withoutPhone } };
+}
+
+/**
+ * Whether Shopify's IDs `a` and `b` name one address: its addresses' IDs may carry a query, as
+ * gid://shopify/MailingAddress/1?model_name=CustomerAddress, which one may have and the other not.
+ */
+function sameAddress(a: string, b: string): boolean {
+  return a.split('?')[0] === b.split('?')[0];
 }
