@@ -139,6 +139,22 @@ export class Conversation {
   })
   replyableUntil!: Date | null;
 
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'Since when the customer has waited for an answer (ADR-760): their first message since ' +
+      'the shop last answered. Null once answered or closed.',
+  })
+  waitingSince!: Date | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      "When the shop means to have answered by: waitingSince plus the shop's " +
+      'replyTargetMinutes. Null when not waiting or the shop sets no target; past, it is overdue.',
+  })
+  answerBy!: Date | null;
+
   @Field(() => ConversationMessage, { nullable: true })
   lastMessage!: ConversationMessage | null;
 
@@ -192,6 +208,12 @@ export class ConversationsArgs {
 
   @Field(() => Boolean, { nullable: true, description: 'Those given to no one alone.' })
   unassigned?: boolean | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: "Those waiting for an answer past the shop's reply target alone (ADR-760).",
+  })
+  overdue?: boolean | null;
 }
 
 @ArgsType()

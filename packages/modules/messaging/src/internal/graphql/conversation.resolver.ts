@@ -67,6 +67,7 @@ export class ConversationResolver {
           status: args.status ? (args.status.toLowerCase() as 'open' | 'closed') : null,
           assigneeId: args.assignedToMe ? me : null,
           unassigned: args.unassigned ?? false,
+          overdue: args.overdue ?? false,
         }));
     const edges = items.map((record) =>
       Object.assign(new ConversationEdge(), {
@@ -102,6 +103,15 @@ export class ConversationResolver {
   @RequireScopes('read_conversations')
   async conversationsUnreadCount(@CurrentTenant() tenant: TenantContext): Promise<number> {
     return this.inbox.unreadCount(tenant);
+  }
+
+  @Query(() => Int, {
+    description:
+      "How many of the shop's conversations wait for an answer past its reply target (ADR-760).",
+  })
+  @RequireScopes('read_conversations')
+  async conversationsOverdueCount(@CurrentTenant() tenant: TenantContext): Promise<number> {
+    return this.inbox.overdueCount(tenant);
   }
 
   @Query(() => ConversationMessageConnection, {
@@ -212,6 +222,8 @@ export function toConversation(tenant: TenantContext, record: ConversationRecord
     lastInboundAt: record.lastInboundAt,
     replyableUntil:
       record.lastInboundAt && new Date(record.lastInboundAt.getTime() + CONVERSATION_WINDOW_MS),
+    waitingSince: record.waitingSince,
+    answerBy: record.answerBy,
     lastMessage: record.lastMessage && toMessage(record.lastMessage),
     createdAt: record.createdAt,
     assigneeId: record.assigneeId,

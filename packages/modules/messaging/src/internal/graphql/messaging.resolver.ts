@@ -113,6 +113,7 @@ export class MessagingResolver {
         : null,
       alertsPhone: input.alertsPhone,
       replyToEmail: input.replyToEmail,
+      replyTargetMinutes: input.replyTargetMinutes,
     });
     return Object.assign(new MessagingSettingsUpdatePayload(), {
       messagingSettings: result.ok ? toSettings(result.value) : null,
@@ -148,6 +149,7 @@ function toSettings(record: MessagingSettingsRecord): MessagingSettings {
     disabledNotifications: record.disabled.map((kind) => kind.toUpperCase() as MessageKind),
     alertsPhone: record.alertsPhone,
     replyToEmail: record.replyToEmail,
+    replyTargetMinutes: record.replyTargetMinutes,
     updatedAt: record.updatedAt,
   });
 }

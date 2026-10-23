@@ -3459,6 +3459,8 @@ export interface MessagingSettings {
   alertsPhone: string | null;
   /** Where replies to the shop's emails to its customers go (ADR-659). */
   replyToEmail: string | null;
+  /** The minutes in which the shop means to answer the inbox (ADR-760); null for none. */
+  replyTargetMinutes: number | null;
   updatedAt: string | null;
 }
 
@@ -4883,6 +4885,9 @@ export interface ConversationValue {
   createdAt: string;
   /** The member of staff it is given to, to answer (ADR-759). */
   assignee: { id: string; name: string } | null;
+  /** Since when the customer has waited for an answer, and by when to give it (ADR-760). */
+  waitingSince: string | null;
+  answerBy: string | null;
 }
 
 export interface ConversationsData {
@@ -4891,6 +4896,7 @@ export interface ConversationsData {
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
   };
   conversationsUnreadCount: number;
+  conversationsOverdueCount: number;
 }
 
 /** What a shopper wrote through the online store's contact form (ADR-589). */

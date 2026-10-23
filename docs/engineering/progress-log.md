@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### A time to answer the inbox by
+
+* **The shop says how soon it answers:** a customer waiting longer shows as overdue in the
+  inbox, on its own tab and counted in its heading; the rest say when to answer by ([ADR-760](../architecture/13-decision-log.md#adr-760--a-shop-says-in-how-many-minutes-it-answers-the-inbox-each-conversation-keeps-since-when-its-customer-has-waited-and-those-waiting-past-it-are-overdue)).
+* 4145 tests (4 new).
+
 ### e08c494 · Conversations given to staff
 
 * **Each conversation has someone to answer it:** a manager gives it to an agent, or an agent

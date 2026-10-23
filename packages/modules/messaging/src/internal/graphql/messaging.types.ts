@@ -593,6 +593,14 @@ export class MessagingSettings {
   })
   replyToEmail!: string | null;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'The minutes in which the shop means to answer a customer who writes (MSG-06): a ' +
+      'conversation waiting longer is overdue in the inbox. None sets no time.',
+  })
+  replyTargetMinutes!: number | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'Null while never changed.' })
   updatedAt!: Date | null;
 }
@@ -626,6 +634,14 @@ export class MessagingSettingsInput {
       'leaves replies unread.',
   })
   replyToEmail?: string | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'The minutes in which the shop means to answer a customer, 5 to 1,440; null sets none. ' +
+      'Left out, it stays as it is.',
+  })
+  replyTargetMinutes?: number | null;
 }
 
 @ObjectType()

@@ -132,6 +132,57 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     );
   });
 
+  it("keeps since when a customer waits, until answered or closed, overdue past the shop's target (ADR-760)", async () => {
+    const minutes = (n: number) => new Date(Date.now() + n * 60_000);
+    for (const phone of [AYESHA, BILAL]) {
+      await admin.query(
+        `INSERT INTO messaging.messages
+                (shop_id, kind, channel, recipient, language, dedupe_key, status, provider,
+                 provider_message_id, sent_at)
+         VALUES ($1, 'order_placed', 'whatsapp', $2, 'en', $3, 'sent', $4, $5, now())`,
+        [a.shopId, phone, `test:${newId()}`, WHATSAPP_CLOUD, `wamid.${newId()}`],
+      );
+    }
+    const first = minutes(-60);
+    await inbox.recordInbound(inbound({ at: first }));
+    const ayesha = async () =>
+      (await inbox.list(a, { first: 10, after: null })).items.find(
+        (each) => each.customerPhone === AYESHA,
+      )!;
+    // No target, no time to answer by.
+    expect(await ayesha()).toMatchObject({ waitingSince: first, answerBy: null });
+    expect(await inbox.overdueCount(a)).toBe(0);
+
+    await admin.query(
+      `INSERT INTO messaging.settings (shop_id, reply_target_minutes) VALUES ($1, 30)
+           ON CONFLICT (shop_id) DO UPDATE SET reply_target_minutes = 30`,
+      [a.shopId],
+    );
+    // Writing again waits from the first message still.
+    await inbox.recordInbound(inbound({ at: minutes(-55), text: 'Hello?' }));
+    await inbox.recordInbound(inbound({ from: BILAL, at: minutes(-10) }));
+    const { id, ...waiting } = await ayesha();
+    expect(waiting).toMatchObject({
+      waitingSince: first,
+      answerBy: new Date(first.getTime() + 30 * 60_000),
+    });
+    expect(await inbox.overdueCount(a)).toBe(1);
+    expect(await inbox.overdueCount(a, new Date(first.getTime() + 29 * 60_000))).toBe(0);
+    expect(await inbox.overdueCount(b)).toBe(0);
+    const overdue = await inbox.list(a, { first: 10, after: null, overdue: true });
+    expect(overdue.items.map((each) => each.id)).toEqual([id]);
+
+    // Answered, it waits no more; written to again, it waits from then; closed, not at all.
+    const { conversation } = unwrap(await inbox.reply(a, id, 'Ji, abhi batate hain', minutes(0)));
+    expect(conversation).toMatchObject({ waitingSince: null, answerBy: null });
+    expect(await inbox.overdueCount(a)).toBe(0);
+    const again = minutes(1);
+    await inbox.recordInbound(inbound({ at: again, text: 'Shukriya' }));
+    expect(await ayesha()).toMatchObject({ waitingSince: again });
+    expect(await inbox.setStatus(a, id, 'closed')).toMatchObject({ waitingSince: null });
+    expect(await inbox.setStatus(a, id, 'open')).toMatchObject({ waitingSince: null });
+  });
+
   it('answers from the shared number the customer wrote to, and reads the conversation', async () => {
     const id = await sharedConversation();
     const { conversation, message } = unwrap(

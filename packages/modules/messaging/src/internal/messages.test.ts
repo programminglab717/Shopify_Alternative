@@ -1050,6 +1050,7 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       disabled: [],
       alertsPhone: null,
       replyToEmail: null,
+      replyTargetMinutes: null,
       updatedAt: null,
     });
     const wrong = await settings.update(a, {
@@ -1058,6 +1059,7 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       disabled: ['order_placed', 'order_lost'],
       alertsPhone: '12345',
       replyToEmail: 'help at zari',
+      replyTargetMinutes: 2,
     });
     expect(wrong.ok || wrong.errors.map((error) => [error.field.join('.'), error.code])).toEqual([
       ['input.routing', 'INVALID'],
@@ -1065,17 +1067,20 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       ['input.disabled', 'INVALID'],
       ['input.alertsPhone', 'INVALID'],
       ['input.replyToEmail', 'INVALID'],
+      ['input.replyTargetMinutes', 'INVALID'],
     ]);
 
     const changed = unwrap(
       await settings.update(a, {
         language: 'ur',
         disabled: ['order_shipped', 'order_placed', 'order_shipped'],
+        replyTargetMinutes: 30,
       }),
     );
     expect(changed).toMatchObject({
       routing: 'rich',
       language: 'ur',
+      replyTargetMinutes: 30,
       disabled: ['order_placed', 'order_shipped'],
     });
     expect(changed.updatedAt).toBeInstanceOf(Date);
@@ -1096,18 +1101,24 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     );
     expect(unwrap(await settings.update(a, {})).replyToEmail).toBe('help@zari.pk');
     expect(unwrap(await settings.update(a, { replyToEmail: ' ' })).replyToEmail).toBeNull();
+    // The time to answer the inbox by (ADR-760): kept until taken away.
+    expect(unwrap(await settings.update(a, {})).replyTargetMinutes).toBe(30);
+    expect(
+      unwrap(await settings.update(a, { replyTargetMinutes: null })).replyTargetMinutes,
+    ).toBeNull();
     expect(await settings.get(b)).toMatchObject({ routing: 'rich', updatedAt: null });
 
     const { rows: events } = await admin.query<{ event_type: string; payload: { changed: [] } }>(
       'SELECT event_type, payload FROM platform.outbox_events ORDER BY id',
     );
     expect(events.map((event) => [event.event_type, event.payload.changed])).toEqual([
-      ['messaging_settings.updated', ['language', 'disabled']],
+      ['messaging_settings.updated', ['language', 'disabled', 'replyTargetMinutes']],
       ['messaging_settings.updated', ['routing']],
       ['messaging_settings.updated', ['alertsPhone']],
       ['messaging_settings.updated', ['alertsPhone']],
       ['messaging_settings.updated', ['replyToEmail']],
       ['messaging_settings.updated', ['replyToEmail']],
+      ['messaging_settings.updated', ['replyTargetMinutes']],
     ]);
     const { rows: audit } = await admin.query<{ action: string; details: object }>(
       'SELECT action, details FROM platform.audit_log ORDER BY id',
@@ -1115,7 +1126,12 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
     expect(audit).toMatchObject([
       {
         action: 'messaging_settings.updated',
-        details: { changed: ['language', 'disabled'], language: 'ur', before: null },
+        details: {
+          changed: ['language', 'disabled', 'replyTargetMinutes'],
+          language: 'ur',
+          replyTargetMinutes: 30,
+          before: null,
+        },
       },
       {
         action: 'messaging_settings.updated',
@@ -1125,6 +1141,10 @@ describe.skipIf(!server)("Messages: queued once, sent, followed, and customers' 
       { action: 'messaging_settings.updated', details: { changed: ['alertsPhone'] } },
       { action: 'messaging_settings.updated', details: { changed: ['replyToEmail'] } },
       { action: 'messaging_settings.updated', details: { changed: ['replyToEmail'] } },
+      {
+        action: 'messaging_settings.updated',
+        details: { changed: ['replyTargetMinutes'], replyTargetMinutes: null },
+      },
     ]);
     // The log keeps no contact details: never the number nor the address itself.
     expect(JSON.stringify(audit)).not.toContain('923001234567');

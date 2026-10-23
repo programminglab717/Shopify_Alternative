@@ -9,6 +9,7 @@ const SETTINGS = {
   disabledNotifications: ['STOCK_OUT'],
   alertsPhone: null,
   replyToEmail: null,
+  replyTargetMinutes: null,
   updatedAt: null,
 };
 
@@ -236,6 +237,34 @@ describe('Customer messages', () => {
     await waitFor(() =>
       expect(sentOf(fake, 'MessagingSettingsUpdate').at(-1)).toEqual({
         input: { replyToEmail: null },
+      }),
+    );
+  });
+
+  it('keeps the minutes in which the shop answers the inbox, blank for none (ADR-760)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const label = 'Answer the inbox within (minutes)';
+    expect(((await screen.findByLabelText(label)) as HTMLInputElement).value).toBe('');
+    // Past a day, the browser's own check keeps it from being sent.
+    type(label, '2000');
+    fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
+    expect(sentOf(fake, 'MessagingSettingsUpdate')).toEqual([]);
+    type(label, '30');
+    fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
+    expect(await screen.findByText('Saved. Messages from now on go like this.')).toBeTruthy();
+    expect(sentOf(fake, 'MessagingSettingsUpdate').at(-1)).toEqual({
+      input: { replyTargetMinutes: 30 },
+    });
+    expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe('30');
+
+    type(label, '');
+    fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'MessagingSettingsUpdate').at(-1)).toEqual({
+        input: { replyTargetMinutes: null },
       }),
     );
   });

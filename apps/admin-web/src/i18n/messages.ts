@@ -2694,6 +2694,9 @@ const en = {
   'messages.replyTo': 'Replies to emails go to',
   'messages.replyToHint':
     "Customers who gave an email hear of their orders there too. Give your address and their replies reach you; leave it blank and the emails say replies aren't read.",
+  'messages.replyTarget': 'Answer the inbox within (minutes)',
+  'messages.replyTargetHint':
+    'A customer who writes on WhatsApp and waits longer is overdue in the inbox. 5 to 1,440 minutes; leave it blank for no time.',
   'messages.which': 'Messages',
   'messages.always':
     "Codes customers prove their number with at checkout, and Hatti's notices about your bills, plan and domain, always go.",
@@ -5530,6 +5533,13 @@ const en = {
   'inbox.noneMine': 'None given to you',
   'inbox.noneMineHint': 'Conversations given to you to answer, still open, show here.',
   'inbox.givenTo': 'Given to {name}',
+  'inbox.tab.OVERDUE': 'Overdue',
+  'inbox.noneOverdue': 'No one waits too long',
+  'inbox.noneOverdueHint':
+    'Open conversations waiting past the time you set in Settings → Customer messages show here.',
+  'inbox.overdue': 'Overdue · wrote {when}',
+  'inbox.answerBy': 'Answer {when}',
+  'inbox.overdueCount': '{count} waiting too long',
   'inbox.assignee': 'Given to',
   'inbox.nobodyYet': 'No one is answering it yet',
   'inbox.take': 'Answer it myself',
@@ -8360,6 +8370,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.replyTo': 'ای میلز کے جواب یہاں جائیں',
   'messages.replyToHint':
     'جن کسٹمرز نے ای میل دی انہیں ان کے آرڈرز کی خبر وہاں بھی جاتی ہے۔ اپنا ای میل ایڈریس دیں تو ان کے جواب آپ تک پہنچیں گے؛ خالی چھوڑیں تو ای میلز میں لکھا ہوگا کہ جواب پڑھے نہیں جاتے۔',
+  'messages.replyTarget': 'ان باکس کا جواب اتنے منٹ میں',
+  'messages.replyTargetHint':
+    'جو گاہک واٹس ایپ پر لکھے اور اس سے زیادہ انتظار کرے، ان باکس میں دیر والا دکھے گا۔ 5 سے 1,440 منٹ؛ کوئی وقت نہیں چاہیے تو خالی چھوڑ دیں۔',
   'messages.which': 'میسجز',
   'messages.always':
     'چیک آؤٹ پر نمبر ثابت کرنے کے کوڈ، اور آپ کے بلوں، پلان اور ڈومین کے بارے میں ہٹی کے نوٹس ہمیشہ جاتے ہیں۔',
@@ -11189,6 +11202,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'inbox.noneMineHint':
     'جو بات چیت آپ کو جواب دینے کے لیے دی گئی ہو اور ابھی کھلی ہو، یہاں نظر آئے گی۔',
   'inbox.givenTo': '{name} کے پاس',
+  'inbox.tab.OVERDUE': 'دیر والی',
+  'inbox.noneOverdue': 'کوئی زیادہ دیر سے انتظار نہیں کر رہا',
+  'inbox.noneOverdueHint':
+    'کھلی بات چیت جو سیٹنگز → کسٹمر میسجز میں رکھے وقت سے زیادہ انتظار کر رہی ہو، یہاں نظر آئے گی۔',
+  'inbox.overdue': 'دیر ہو گئی · {when} لکھا',
+  'inbox.answerBy': 'جواب دیں: {when}',
+  'inbox.overdueCount': '{count} زیادہ دیر سے انتظار میں',
   'inbox.assignee': 'کس کے پاس',
   'inbox.nobodyYet': 'ابھی کوئی جواب نہیں دے رہا',
   'inbox.take': 'میں خود جواب دوں گا',

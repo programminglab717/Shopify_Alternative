@@ -72,6 +72,13 @@ export interface ConversationRecord {
   lastMessage: ConversationMessageRecord | null;
   /** The account of the member of staff it is given to, to answer (ADR-759); null for no one. */
   assigneeId: string | null;
+  /**
+   * Since when the customer has waited for an answer (ADR-760): their first message after the
+   * shop last answered; null once answered or closed.
+   */
+  waitingSince: Date | null;
+  /** When the shop means to have answered them by, its reply target after that; null for none. */
+  answerBy: Date | null;
   /** When it last had a message, to the microsecond: where the next page starts. */
   lastMessageAtExactly: string;
 }
@@ -87,6 +94,8 @@ export interface ConversationsListOptions {
   assigneeId?: string | null;
   /** Those given to no one alone. */
   unassigned?: boolean;
+  /** Those waiting for an answer past the shop's reply target alone (ADR-760). */
+  overdue?: boolean;
 }
 
 type ConversationRow = {
@@ -99,6 +108,8 @@ type ConversationRow = {
   last_inbound_at: string | Date | null;
   created_at: string | Date;
   assignee_id: string | null;
+  waiting_since: string | Date | null;
+  answer_by: string | Date | null;
   last_message_at_exactly: string;
   message_id: string | null;
   direction: ConversationDirectionValue | null;
@@ -172,7 +183,8 @@ export class ConversationsService {
       const messageId = kept.rows[0]?.id;
       if (!messageId) return;
       await tx.execute(sql`
-        UPDATE messaging.conversations SET unread = unread + 1
+        UPDATE messaging.conversations
+           SET unread = unread + 1, waiting_since = coalesce(waiting_since, ${at}::timestamptz)
          WHERE shop_id = ${shopId} AND id = ${conversationId}`);
       await appendEvent<ConversationMessageReceivedPayload>(tx, shopId, {
         type: MessagingEvents.ConversationMessageReceived,
@@ -197,6 +209,7 @@ export class ConversationsService {
            ${options.status ? sql`AND c.status = ${options.status}` : sql``}
            ${options.assigneeId ? sql`AND c.assignee_id = ${options.assigneeId}` : sql``}
            ${options.unassigned ? sql`AND c.assignee_id IS NULL` : sql``}
+           ${options.overdue ? sql`AND ${ANSWER_BY} < now()` : sql``}
            ${
              after
                ? sql`AND (c.last_message_at, c.id)
@@ -223,6 +236,17 @@ export class ConversationsService {
       tx.execute<{ count: number }>(sql`
         SELECT count(*)::int AS count FROM messaging.conversations
          WHERE shop_id = ${tenant.shopId} AND unread > 0`),
+    );
+    return rows[0]!.count;
+  }
+
+  /** How many of the shop's conversations wait for an answer past its reply target (ADR-760). */
+  async overdueCount(tenant: TenantContext, now: Date = new Date()): Promise<number> {
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<{ count: number }>(sql`
+        SELECT count(*)::int AS count FROM messaging.conversations c
+         WHERE c.shop_id = ${tenant.shopId} AND c.waiting_since IS NOT NULL
+           AND ${ANSWER_BY} < ${now.toISOString()}::timestamptz`),
     );
     return rows[0]!.count;
   }
@@ -325,7 +349,8 @@ export class ConversationsService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       await tx.execute(sql`
         UPDATE messaging.conversations
-           SET status = ${status}, unread = CASE WHEN ${status} = 'closed' THEN 0 ELSE unread END
+           SET status = ${status}, unread = CASE WHEN ${status} = 'closed' THEN 0 ELSE unread END,
+               waiting_since = CASE WHEN ${status} = 'closed' THEN NULL ELSE waiting_since END
          WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
       return conversationIn(tx, tenant.shopId, id);
     });
@@ -398,7 +423,8 @@ export class ConversationsService {
         const message = rows[0]!;
         await tx.execute(sql`
           UPDATE messaging.conversations
-             SET unread = 0, last_message_at = greatest(last_message_at, ${at}::timestamptz)
+             SET unread = 0, waiting_since = NULL,
+                 last_message_at = greatest(last_message_at, ${at}::timestamptz)
            WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
         await appendEvent<ConversationRepliedPayload>(tx, tenant.shopId, {
           type: MessagingEvents.ConversationReplied,
@@ -496,10 +522,15 @@ export class ConversationsService {
   }
 }
 
+/** When a conversation is to be answered by: since it waits, plus its shop's reply target. */
+const ANSWER_BY = sql`(c.waiting_since + make_interval(mins => (
+  SELECT s.reply_target_minutes FROM messaging.settings s WHERE s.shop_id = c.shop_id)))`;
+
 function conversationSelect(shopId: string) {
   return sql`
     SELECT c.id, c.customer_phone, c.via_phone_number_id, c.status, c.unread, c.last_message_at,
-           c.last_inbound_at, c.created_at, c.assignee_id,
+           c.last_inbound_at, c.created_at, c.assignee_id, c.waiting_since,
+           ${ANSWER_BY} AS answer_by,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
            m.id AS message_id, m.direction, m.body, m.media_kind, m.at,
            m.status AS message_status, m.error AS message_error
@@ -534,6 +565,8 @@ function toConversation(row: ConversationRow): ConversationRecord {
     lastInboundAt: toDateOrNull(row.last_inbound_at),
     createdAt: toDate(row.created_at),
     assigneeId: row.assignee_id,
+    waitingSince: toDateOrNull(row.waiting_since),
+    answerBy: toDateOrNull(row.answer_by),
     lastMessage:
       row.message_id && row.direction && row.at
         ? toMessage({

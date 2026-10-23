@@ -2659,6 +2659,11 @@ A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to
 """
 type Conversation {
   """
+  When the shop means to have answered by: waitingSince plus the shop's replyTargetMinutes. Null when not waiting or the shop sets no target; past, it is overdue.
+  """
+  answerBy: DateTime
+
+  """
   The member of staff it is given to, to answer; null while no one has it, and once they leave the shop.
   """
   assignee: ConversationAssignee
@@ -2686,6 +2691,11 @@ type Conversation {
 
   """Whether they last wrote to the shop's own number."""
   viaOwnNumber: Boolean!
+
+  """
+  Since when the customer has waited for an answer (ADR-760): their first message since the shop last answered. Null once answered or closed.
+  """
+  waitingSince: DateTime
 }
 
 type ConversationAssignPayload {
@@ -7840,6 +7850,11 @@ type MessagingSettings {
   language: MessageLanguage!
 
   """
+  The minutes in which the shop means to answer a customer who writes (MSG-06): a conversation waiting longer is overdue in the inbox. None sets no time.
+  """
+  replyTargetMinutes: Int
+
+  """
   Where replies to the shop's emails to its customers go, as their Reply-To: their words say a reply reaches the shop. None says replies aren't read.
   """
   replyToEmail: String
@@ -7858,6 +7873,11 @@ input MessagingSettingsInput {
   """The notifications to turn off, all of them; the others are on."""
   disabledNotifications: [MessageKind!]
   language: MessageLanguage
+
+  """
+  The minutes in which the shop means to answer a customer, 5 to 1,440; null sets none. Left out, it stays as it is.
+  """
+  replyTargetMinutes: Int
 
   """
   Where replies to the shop's emails to its customers go: an email address. Null or blank leaves replies unread.
@@ -13966,6 +13986,11 @@ type Query {
     """1 to 250; default 50."""
     first: Int
 
+    """
+    Those waiting for an answer past the shop's reply target alone (ADR-760).
+    """
+    overdue: Boolean
+
     """Those of this status alone."""
     status: ConversationStatus
 
@@ -13975,6 +14000,11 @@ type Query {
     """Those with messages unread alone."""
     unread: Boolean
   ): ConversationConnection!
+
+  """
+  How many of the shop's conversations wait for an answer past its reply target (ADR-760).
+  """
+  conversationsOverdueCount: Int!
 
   """
   How many of the shop's conversations have messages its staff have not read.

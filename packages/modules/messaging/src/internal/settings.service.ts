@@ -30,6 +30,8 @@ export interface MessagingSettingsRecord {
    * their words say a reply reaches the shop. None says replies aren't read.
    */
   replyToEmail: string | null;
+  /** How soon its staff answer a customer who writes, in minutes (ADR-760); null for no aim. */
+  replyTargetMinutes: number | null;
   updatedAt: Date | null;
 }
 
@@ -41,6 +43,8 @@ export interface MessagingSettingsInput {
   alertsPhone?: string | null;
   /** Left out, it stays; null or blank leaves replies unread. */
   replyToEmail?: string | null;
+  /** Left out, it stays; null sets no time to answer by. */
+  replyTargetMinutes?: number | null;
 }
 
 const DEFAULTS: MessagingSettingsRecord = {
@@ -49,6 +53,7 @@ const DEFAULTS: MessagingSettingsRecord = {
   disabled: [],
   alertsPhone: null,
   replyToEmail: null,
+  replyTargetMinutes: null,
   updatedAt: null,
 };
 
@@ -60,9 +65,11 @@ export async function settingsIn(tx: Tx, shopId: string): Promise<MessagingSetti
     disabled: MessageKind[];
     alerts_phone: string | null;
     reply_to_email: string | null;
+    reply_target_minutes: number | null;
     updated_at: string | Date;
   }>(sql`
-    SELECT routing, language, disabled, alerts_phone, reply_to_email, updated_at
+    SELECT routing, language, disabled, alerts_phone, reply_to_email, reply_target_minutes,
+           updated_at
       FROM messaging.settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   return row
@@ -72,6 +79,7 @@ export async function settingsIn(tx: Tx, shopId: string): Promise<MessagingSetti
         disabled: row.disabled,
         alertsPhone: row.alerts_phone,
         replyToEmail: row.reply_to_email,
+        replyTargetMinutes: row.reply_target_minutes,
         updatedAt: toDateOrNull(row.updated_at),
       }
     : DEFAULTS;
@@ -135,6 +143,15 @@ export class MessagingSettingsService {
       input.replyToEmail === undefined
         ? undefined
         : (check.email(['input', 'replyToEmail'], input.replyToEmail)?.toLowerCase() ?? null);
+    const replyTarget =
+      input.replyTargetMinutes === undefined
+        ? undefined
+        : input.replyTargetMinutes === null
+          ? null
+          : check.integer(['input', 'replyTargetMinutes'], input.replyTargetMinutes, {
+              min: 5,
+              max: 1440,
+            });
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -146,23 +163,27 @@ export class MessagingSettingsService {
       };
       const phone = alertsPhone === undefined ? current.alertsPhone : alertsPhone;
       const replyTo = replyToEmail === undefined ? current.replyToEmail : replyToEmail;
+      const target = replyTarget === undefined ? current.replyTargetMinutes : replyTarget;
       const changed = [
         ...(next.routing !== current.routing ? ['routing'] : []),
         ...(next.language !== current.language ? ['language'] : []),
         ...(next.disabled.join() !== [...current.disabled].sort().join() ? ['disabled'] : []),
         ...(phone !== current.alertsPhone ? ['alertsPhone'] : []),
         ...(replyTo !== current.replyToEmail ? ['replyToEmail'] : []),
+        ...(target !== current.replyTargetMinutes ? ['replyTargetMinutes'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: current };
       await tx.execute(sql`
         INSERT INTO messaging.settings
-               (shop_id, routing, language, disabled, alerts_phone, reply_to_email)
+               (shop_id, routing, language, disabled, alerts_phone, reply_to_email,
+                reply_target_minutes)
         VALUES (${tenant.shopId}, ${next.routing}, ${next.language},
-                ${sql.param(next.disabled)}::text[], ${phone}, ${replyTo})
+                ${sql.param(next.disabled)}::text[], ${phone}, ${replyTo}, ${target})
             ON CONFLICT (shop_id) DO UPDATE
                    SET routing = excluded.routing, language = excluded.language,
                        disabled = excluded.disabled, alerts_phone = excluded.alerts_phone,
                        reply_to_email = excluded.reply_to_email,
+                       reply_target_minutes = excluded.reply_target_minutes,
                        version = messaging.settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MessagingSettingsUpdatedPayload>(tx, tenant.shopId, {
@@ -180,6 +201,7 @@ export class MessagingSettingsService {
         details: {
           changed,
           ...next,
+          replyTargetMinutes: target,
           before: current.updatedAt
             ? { routing: current.routing, language: current.language, disabled: current.disabled }
             : null,

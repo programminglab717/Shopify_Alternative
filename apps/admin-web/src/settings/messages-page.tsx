@@ -74,6 +74,7 @@ type StatusChoice = (typeof STATUSES)[number];
 const LABELS: Partial<Record<string, MessageKey>> = {
   alertsPhone: 'messages.alertsPhone',
   replyToEmail: 'messages.replyTo',
+  replyTargetMinutes: 'messages.replyTarget',
   disabledNotifications: 'messages.which',
 };
 
@@ -124,6 +125,7 @@ function inputOf(
   disabled: readonly string[],
   phone: string,
   replyTo: string,
+  target: string,
 ) {
   return {
     routing,
@@ -131,6 +133,7 @@ function inputOf(
     disabledNotifications: [...disabled].sort(),
     alertsPhone: phone.trim() || null,
     replyToEmail: replyTo.trim() || null,
+    replyTargetMinutes: target.trim() ? Number(target) : null,
   };
 }
 
@@ -151,16 +154,18 @@ function SettingsForm({
   const [disabled, setDisabled] = useState<string[]>(settings.disabledNotifications);
   const [phone, setPhone] = useState(settings.alertsPhone ? formatPhone(settings.alertsPhone) : '');
   const [replyTo, setReplyTo] = useState(settings.replyToEmail ?? '');
+  const [target, setTarget] = useState(settings.replyTargetMinutes?.toString() ?? '');
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
-  const now = inputOf(routing, language, disabled, phone, replyTo);
+  const now = inputOf(routing, language, disabled, phone, replyTo, target);
   const was = inputOf(
     settings.routing,
     settings.language,
     settings.disabledNotifications,
     settings.alertsPhone ? formatPhone(settings.alertsPhone) : '',
     settings.replyToEmail ?? '',
+    settings.replyTargetMinutes?.toString() ?? '',
   );
   const changes = Object.fromEntries(
     Object.entries(now).filter(
@@ -194,6 +199,7 @@ function SettingsForm({
       }
       setPhone(kept.alertsPhone ? formatPhone(kept.alertsPhone) : '');
       setReplyTo(kept.replyToEmail ?? '');
+      setTarget(kept.replyTargetMinutes?.toString() ?? '');
       setSaved(true);
     } catch (failure) {
       setProblems([errorText(failure, t)]);
@@ -266,6 +272,18 @@ function SettingsForm({
           ltr
           value={replyTo}
           onChange={(event) => setReplyTo(event.target.value)}
+        />
+        <TextField
+          label={t('messages.replyTarget')}
+          hint={t('messages.replyTargetHint')}
+          type="number"
+          inputMode="numeric"
+          min={5}
+          max={1440}
+          placeholder="30"
+          ltr
+          value={target}
+          onChange={(event) => setTarget(event.target.value)}
         />
       </FormSection>
 

@@ -411,4 +411,54 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
     });
     expect(sent).toHaveLength(1);
   });
+
+  it("says since when a customer waits and by when to answer, overdue past the shop's target (ADR-760)", async () => {
+    const settings = await issueToken(shop, ['write_settings', 'read_conversations']);
+    const target = await data(
+      settings,
+      `mutation ($input: MessagingSettingsInput!) {
+         messagingSettingsUpdate(input: $input) {
+           messagingSettings { replyTargetMinutes } userErrors { field code message } } }`,
+      { input: { replyTargetMinutes: 30 } },
+    );
+    expect(target).toEqual({ messagingSettings: { replyTargetMinutes: 30 }, userErrors: [] });
+    const refused = await data(
+      settings,
+      `mutation { messagingSettingsUpdate(input: { replyTargetMinutes: 2000 }) {
+         userErrors { field code } } }`,
+    );
+    expect(refused.userErrors).toEqual([
+      { field: ['input', 'replyTargetMinutes'], code: 'INVALID' },
+    ]);
+
+    const wrote = new Date(Math.floor(Date.now() / 1000) * 1000 - 45 * 60_000);
+    await written(OWN, [
+      {
+        from: AYESHA.slice(1),
+        id: 'wamid.WAIT1',
+        type: 'text',
+        timestamp: at(wrote.toISOString()),
+        text: { body: 'Is the order on its way?' },
+      },
+    ]);
+    const list = await data(
+      tokens.reader,
+      '{ conversations(first: 5, overdue: true) { nodes { id waitingSince answerBy } } }',
+    );
+    expect(list.nodes).toEqual([
+      {
+        id: expect.stringMatching(/^chat_/),
+        waitingSince: wrote.toISOString(),
+        answerBy: new Date(wrote.getTime() + 30 * 60_000).toISOString(),
+      },
+    ]);
+    expect(await data(tokens.reader, '{ conversationsOverdueCount }')).toBe(1);
+    // Another shop's count is its own.
+    expect(await data(tokens.other, '{ conversationsOverdueCount }')).toBe(0);
+
+    // Closed, it waits no more.
+    const closed = await data(tokens.writer, STATUS, { id: list.nodes[0].id, status: 'CLOSED' });
+    expect(closed.userErrors).toEqual([]);
+    expect(await data(tokens.reader, '{ conversationsOverdueCount }')).toBe(0);
+  });
 });

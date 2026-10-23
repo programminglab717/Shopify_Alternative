@@ -7302,6 +7302,7 @@ const MESSAGING_SETTINGS = /* GraphQL */ `
     disabledNotifications
     alertsPhone
     replyToEmail
+    replyTargetMinutes
     updatedAt
   }
 `;
@@ -10170,6 +10171,8 @@ const CONVERSATION = /* GraphQL */ `
       id
       name
     }
+    waitingSince
+    answerBy
   }
   ${CONVERSATION_MESSAGE}
 `;
@@ -10203,6 +10206,7 @@ export const ConversationsQuery = /* GraphQL */ `
     $unread: Boolean
     $status: ConversationStatus
     $assignedToMe: Boolean
+    $overdue: Boolean
   ) {
     conversations(
       first: $first
@@ -10210,6 +10214,7 @@ export const ConversationsQuery = /* GraphQL */ `
       unread: $unread
       status: $status
       assignedToMe: $assignedToMe
+      overdue: $overdue
     ) {
       nodes {
         ...ConversationFields
@@ -10220,6 +10225,7 @@ export const ConversationsQuery = /* GraphQL */ `
       }
     }
     conversationsUnreadCount
+    conversationsOverdueCount
   }
   ${CONVERSATION}
 `;

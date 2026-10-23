@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-759 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-760 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -767,6 +767,7 @@
 | 757 | Variants get barcodes of the shop's own, EAN-13 numbers starting 2, and price labels are printed from the products list, 24 to a sheet of A4 or one to a label printer's 50×25 mm roll, each with its product, options, price and barcode | Accepted |
 | 758 | The inbox keeps the shop's saved replies, each a title and its words, at most 100, picked while answering and changed before sending | Accepted |
 | 759 | A conversation is given to a member of staff to answer, as an order is: those who give orders to others give it to anyone, others take one no one has, and whoever leaves gives theirs back | Accepted |
+| 760 | A shop says in how many minutes it answers the inbox; each conversation keeps since when its customer has waited, and those waiting past it are overdue | Accepted |
 
 ---
 
@@ -25693,3 +25694,27 @@
 * **Consequences:** a reply is still anyone's to send who answers the inbox; being given one
   says who should, not who may. Telling staff when a conversation is given to them, and a time
   to answer by, come after.
+
+## ADR-760 · A shop says in how many minutes it answers the inbox; each conversation keeps since when its customer has waited, and those waiting past it are overdue
+
+* **Context:** a customer asking on WhatsApp whether a suit comes in medium buys from whoever
+  answers first; a shop with several agents needs to see who has waited too long, not only who
+  wrote last (MSG-06).
+* **Decision:**
+  * **The shop's reply target,** `replyTargetMinutes` on the messaging settings, 5 to 1,440
+    minutes, or none (migration 0323). Left out of an update, it stays as it is.
+  * **A conversation keeps `waiting_since`:** the customer's first message after the shop last
+    answered. Answering clears it, as closing does; writing again while waiting keeps the first
+    time. The migration sets it on open conversations whose customer wrote last.
+  * **`Conversation.waitingSince` and `answerBy`,** the latter the former plus the shop's target,
+    worked out by the database as it is read, so a changed target applies at once to every
+    conversation. **`conversations(overdue: true)`** lists those past it and
+    **`conversationsOverdueCount`** counts them, both with the inbox's own scope rather than the
+    settings', so agents see them.
+  * **The admin's inbox** has an *Overdue* tab, says in its heading how many wait too long, and
+    on each open conversation either when to answer by or, in the danger colour, that it is
+    overdue and since when the customer wrote. The setting sits with the reply-to address on
+    Settings → Customer messages.
+* **Consequences:** being overdue is a state read, not an event; telling staff when a
+  conversation of theirs becomes overdue needs a sweep by the worker, which comes after. The
+  target runs by the clock, not by the shop's opening hours.

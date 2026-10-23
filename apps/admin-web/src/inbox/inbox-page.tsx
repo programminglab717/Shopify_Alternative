@@ -37,7 +37,7 @@ export const WORKS_INBOX = gate(['owner', 'manager', 'confirmation_agent'], 'wri
  * The conversations' tabs, the contact form's messages beside them (ADR-590), and the saved
  * replies (ADR-758).
  */
-type InboxTab = 'open' | 'mine' | 'unread' | 'closed' | 'form' | 'replies';
+type InboxTab = 'open' | 'mine' | 'overdue' | 'unread' | 'closed' | 'form' | 'replies';
 
 /** The inbox's search: which tab, the open conversations when none. */
 export interface InboxSearch {
@@ -47,6 +47,7 @@ export interface InboxSearch {
 export function validateInboxSearch(search: Record<string, unknown>): InboxSearch {
   const tab = search.tab;
   return tab === 'mine' ||
+    tab === 'overdue' ||
     tab === 'unread' ||
     tab === 'closed' ||
     tab === 'form' ||
@@ -63,6 +64,7 @@ const TABS: Record<
     status: ConversationStatus | null;
     unread: boolean | null;
     assignedToMe?: boolean;
+    overdue?: boolean;
     none: MessageKey;
     noneHint: MessageKey;
   }
@@ -81,6 +83,14 @@ const TABS: Record<
     assignedToMe: true,
     none: 'inbox.noneMine',
     noneHint: 'inbox.noneMineHint',
+  },
+  overdue: {
+    label: 'inbox.tab.OVERDUE',
+    status: 'OPEN',
+    unread: null,
+    overdue: true,
+    none: 'inbox.noneOverdue',
+    noneHint: 'inbox.noneOverdueHint',
   },
   unread: {
     label: 'inbox.tab.UNREAD',
@@ -125,6 +135,36 @@ export function UnreadBadge({ count }: { count: number }) {
   );
 }
 
+/**
+ * When a customer waiting is to be answered by, at the shop's reply target (ADR-760): overdue once
+ * past, in the danger colour; nothing while no one waits or the shop sets no target.
+ */
+export function AnswerBy({
+  conversation,
+  timezone,
+  now = new Date(),
+}: {
+  conversation: Pick<ConversationValue, 'waitingSince' | 'answerBy'>;
+  timezone: string;
+  now?: Date;
+}) {
+  const { t, locale } = useLocale();
+  const { waitingSince, answerBy } = conversation;
+  if (!waitingSince || !answerBy) return null;
+  const late = new Date(answerBy).getTime() <= now.getTime();
+  return (
+    <span
+      className={`text-[length:var(--hatti-type-caption-size)] ${
+        late ? 'font-medium text-danger' : 'text-secondary'
+      }`}
+    >
+      {late
+        ? t('inbox.overdue', { when: formatRelative(waitingSince, timezone, locale, now) })
+        : t('inbox.answerBy', { when: formatRelative(answerBy, timezone, locale, now) })}
+    </span>
+  );
+}
+
 function ConversationRow({
   conversation,
   timezone,
@@ -165,6 +205,9 @@ function ConversationRow({
             </span>
             {unread && <UnreadBadge count={conversation.unread} />}
           </span>
+          {conversation.status === 'OPEN' && (
+            <AnswerBy conversation={conversation} timezone={timezone} />
+          )}
           {conversation.assignee && (
             <span className="text-secondary text-[length:var(--hatti-type-caption-size)]">
               {t('inbox.givenTo', { name: conversation.assignee.name })}
@@ -186,11 +229,11 @@ export function InboxPage() {
   const { tab = 'open' } = useSearch({ from: '/$shopId/inbox' });
   const works = permits(useShop(), WORKS_INBOX);
   return tab === 'form' ? (
-    <InboxFrame tab="form" unreadCount={null}>
+    <InboxFrame tab="form" unreadCount={null} overdueCount={null}>
       <ContactMessages />
     </InboxFrame>
   ) : tab === 'replies' ? (
-    <InboxFrame tab="replies" unreadCount={null}>
+    <InboxFrame tab="replies" unreadCount={null} overdueCount={null}>
       <SavedReplies works={works} />
     </InboxFrame>
   ) : (
@@ -202,10 +245,12 @@ export function InboxPage() {
 function InboxFrame({
   tab,
   unreadCount,
+  overdueCount,
   children,
 }: {
   tab: InboxTab;
   unreadCount: number | null;
+  overdueCount: number | null;
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -235,6 +280,11 @@ function InboxFrame({
           {unreadCount !== null &&
             unreadCount > 0 &&
             ` · ${t('inbox.unreadCount', { count: formatCount(unreadCount) })}`}
+          {overdueCount !== null && overdueCount > 0 && (
+            <span className="font-medium text-danger">
+              {` · ${t('inbox.overdueCount', { count: formatCount(overdueCount) })}`}
+            </span>
+          )}
         </p>
       </header>
       <div role="tablist" className="flex gap-2 overflow-x-auto pb-1">
@@ -272,7 +322,7 @@ function Conversations({ tab }: { tab: Exclude<InboxTab, 'form' | 'replies'> }) 
   const store = useSessionStore();
   const shop = useShop();
   const timezone = useShopTimezone();
-  const { status, unread, assignedToMe = null, none, noneHint } = TABS[tab];
+  const { status, unread, assignedToMe = null, overdue = null, none, noneHint } = TABS[tab];
 
   const conversations = useInfiniteQuery({
     queryKey: ['admin', shop.id, 'conversations', tab],
@@ -283,6 +333,7 @@ function Conversations({ tab }: { tab: Exclude<InboxTab, 'form' | 'replies'> }) 
         status,
         unread,
         assignedToMe,
+        overdue,
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
@@ -291,9 +342,10 @@ function Conversations({ tab }: { tab: Exclude<InboxTab, 'form' | 'replies'> }) 
 
   const shown = conversations.data?.pages.flatMap((page) => page.conversations.nodes) ?? [];
   const unreadCount = conversations.data?.pages[0]?.conversationsUnreadCount ?? 0;
+  const overdueCount = conversations.data?.pages[0]?.conversationsOverdueCount ?? 0;
 
   return (
-    <InboxFrame tab={tab} unreadCount={unreadCount}>
+    <InboxFrame tab={tab} unreadCount={unreadCount} overdueCount={overdueCount}>
       {conversations.isPending ? (
         <Loading label={t('state.loading')} />
       ) : conversations.isError ? (
