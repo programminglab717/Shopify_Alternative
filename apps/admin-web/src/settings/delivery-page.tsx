@@ -37,6 +37,10 @@ const MOST_WEIGHTS = 10;
 /** The most rates by the order's value a shop sets (the core's DELIVERY_LIMITS). */
 const MOST_RATES = 10;
 
+/** The most delivery times a shop offers, and how many days ahead (the core's DELIVERY_LIMITS). */
+const MOST_SLOTS = 8;
+const MOST_SLOT_DAYS = 14;
+
 interface DaysState {
   min: string;
   max: string;
@@ -64,6 +68,13 @@ interface RateState {
   charge: string;
 }
 
+/** A time of the day the shop delivers in (ADR-768): "HH:MM" to "HH:MM", as typed. */
+interface SlotState {
+  key: number;
+  from: string;
+  until: string;
+}
+
 interface DeliveryState {
   charge: string;
   freeAbove: string;
@@ -73,6 +84,11 @@ interface DeliveryState {
   cutoffHour: string;
   weights: WeightState[];
   rates: RateState[];
+  slots: SlotState[];
+  /** "1" to "14". */
+  slotDays: string;
+  /** "0" to "72", as typed. */
+  slotLeadHours: string;
 }
 
 function daysState(days: DeliveryDaysValue | null): DaysState {
@@ -105,6 +121,9 @@ function stateOf(settings: DeliverySettingsValue): DeliveryState {
       from: priceText(rate.fromSubtotal.amount),
       charge: priceText(rate.charge.amount),
     })),
+    slots: (settings.slots ?? []).map((slot, key) => ({ key, ...slot })),
+    slotDays: String(settings.slotDays ?? 7),
+    slotLeadHours: String(settings.slotLeadHours ?? 2),
   };
 }
 
@@ -139,6 +158,10 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   cities: 'delivery.zoneCities',
   aboveGrams: 'delivery.weightOver',
   fromSubtotal: 'delivery.rateFrom',
+  from: 'delivery.slotFrom',
+  until: 'delivery.slotUntil',
+  slotDays: 'delivery.slotDays',
+  slotLeadHours: 'delivery.slotLeadHours',
 };
 
 /**
@@ -150,6 +173,7 @@ function zoneOf(t: Translate) {
     ['zones', 'delivery.zoneNumber'],
     ['weights', 'delivery.weightNumber'],
     ['valueRates', 'delivery.rateNumber'],
+    ['slots', 'delivery.slotNumber'],
   ] as const;
   return (field: string[]) => {
     for (const [list, words] of lists) {
@@ -345,6 +369,52 @@ function RateFields({
   );
 }
 
+function SlotFields({
+  slot,
+  number,
+  onChange,
+  onRemove,
+}: {
+  slot: SlotState;
+  number: number;
+  onChange: (slot: SlotState) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <li className="flex flex-col gap-2 rounded-control border border-line p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold">{t('delivery.slotNumber', { n: number })}</h3>
+        <Button
+          variant="danger"
+          icon={<Trash2 aria-hidden className="size-5" />}
+          onClick={onRemove}
+        >
+          {t('delivery.removeZone')}
+        </Button>
+      </div>
+      <Pair>
+        <TextField
+          label={t('delivery.slotFrom')}
+          type="time"
+          required
+          ltr
+          value={slot.from}
+          onChange={(event) => onChange({ ...slot, from: event.target.value })}
+        />
+        <TextField
+          label={t('delivery.slotUntil')}
+          type="time"
+          required
+          ltr
+          value={slot.until}
+          onChange={(event) => onChange({ ...slot, until: event.target.value })}
+        />
+      </Pair>
+    </li>
+  );
+}
+
 function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
   const { t } = useLocale();
   const save = useAdminMutation<
@@ -353,7 +423,10 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
   >(DeliverySettingsUpdateMutation);
   const [state, setState] = useState(() => stateOf(settings));
   const [nextKey, setNextKey] = useState(
-    settings.zones.length + (settings.weights?.length ?? 0) + (settings.valueRates?.length ?? 0),
+    settings.zones.length +
+      (settings.weights?.length ?? 0) +
+      (settings.valueRates?.length ?? 0) +
+      (settings.slots?.length ?? 0),
   );
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
@@ -364,6 +437,7 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
     const days = daysInput(state.days);
     const zones = state.zones.map((zone) => ({ zone, days: daysInput(zone.days) }));
     const weights = state.weights.map((weight) => ({ weight, grams: gramsOf(weight.kg) }));
+    const leadHours = parseWhole(state.slotLeadHours);
     const badDays = [
       ...(days === 'bad' ? [`${t('delivery.days')}: ${t('delivery.badDays')}`] : []),
       ...zones.flatMap(({ days: zoneDays }, index) =>
@@ -376,6 +450,9 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           ? [`${t('delivery.weightNumber', { n: index + 1 })}: ${t('delivery.badWeight')}`]
           : [],
       ),
+      ...(leadHours === null || Number.isNaN(leadHours) || leadHours > 72
+        ? [`${t('delivery.slotLeadHours')}: ${t('delivery.badLeadHours')}`]
+        : []),
     ];
     if (badDays.length > 0) {
       setProblems(badDays);
@@ -403,6 +480,9 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
             fromSubtotal: rate.from.trim(),
             charge: rate.charge.trim(),
           })),
+          slots: state.slots.map((slot) => ({ from: slot.from.trim(), until: slot.until.trim() })),
+          slotDays: Number(state.slotDays),
+          slotLeadHours: leadHours,
         },
       });
       if (deliverySettingsUpdate.userErrors.length > 0) {
@@ -421,6 +501,8 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
     setState({ ...state, zones: state.zones.map((each) => (each.key === key ? zone : each)) });
   const setRate = (key: number, rate: RateState) =>
     setState({ ...state, rates: state.rates.map((each) => (each.key === key ? rate : each)) });
+  const setSlot = (key: number, slot: SlotState) =>
+    setState({ ...state, slots: state.slots.map((each) => (each.key === key ? slot : each)) });
   const setWeight = (key: number, weight: WeightState) =>
     setState({
       ...state,
@@ -569,6 +651,63 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           >
             {t('delivery.addRate')}
           </Button>
+        )}
+      </FormSection>
+      <FormSection title={t('delivery.slots')} hint={t('delivery.slotsHint')}>
+        {state.slots.length > 0 && (
+          <ul className="flex flex-col gap-4">
+            {state.slots.map((slot, index) => (
+              <SlotFields
+                key={slot.key}
+                slot={slot}
+                number={index + 1}
+                onChange={(next) => setSlot(slot.key, next)}
+                onRemove={() =>
+                  setState({ ...state, slots: state.slots.filter((each) => each !== slot) })
+                }
+              />
+            ))}
+          </ul>
+        )}
+        {state.slots.length < MOST_SLOTS && (
+          <Button
+            variant="secondary"
+            className="self-start"
+            icon={<Plus aria-hidden className="size-5" />}
+            onClick={() => {
+              setState({
+                ...state,
+                slots: [...state.slots, { key: nextKey, from: '', until: '' }],
+              });
+              setNextKey(nextKey + 1);
+            }}
+          >
+            {t('delivery.addSlot')}
+          </Button>
+        )}
+        {state.slots.length > 0 && (
+          <Pair>
+            <SelectField
+              label={t('delivery.slotDays')}
+              value={state.slotDays}
+              options={Array.from({ length: MOST_SLOT_DAYS }, (_, index) => ({
+                value: String(index + 1),
+                label:
+                  index === 0
+                    ? t('delivery.slotToday')
+                    : t('delivery.slotDaysOption', { n: index + 1 }),
+              }))}
+              onChange={(slotDays) => setState({ ...state, slotDays })}
+            />
+            <TextField
+              label={t('delivery.slotLeadHours')}
+              hint={t('delivery.slotLeadHoursHint')}
+              inputMode="numeric"
+              ltr
+              value={state.slotLeadHours}
+              onChange={(event) => setState({ ...state, slotLeadHours: event.target.value })}
+            />
+          </Pair>
         )}
       </FormSection>
       <Problems problems={problems} />

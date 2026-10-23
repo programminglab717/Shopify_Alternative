@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-770 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-771 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -778,6 +778,7 @@
 | 768 | Delivery time slots are times of the day in Pakistan's time, offered on the days ahead from the hours ahead the shop needs | Accepted |
 | 769 | Checkout asks for a delivery slot where the shop offers one, checks it again when placing, and the order keeps its start and end | Accepted |
 | 770 | An order's delivery slot is said in Pakistan's time on the thank-you page, the order's link page and its packing slip | Accepted |
+| 771 | The admin sets delivery times with the delivery charges, and an order's page says the slot its customer chose | Accepted |
 
 ---
 
@@ -25922,3 +25923,16 @@
 * **Consequences:** the slot travels with the order to the customer and the packer. The admin's
   order page and the order's messages follow; WhatsApp's order templates are approved by Meta
   with fixed parameters, so a slot in them waits on new templates.
+
+## ADR-771 · The admin sets delivery times with the delivery charges, and an order's page says the slot its customer chose
+
+* **Context:** delivery slots (ADR-768) had only the Admin API; owners set delivery in Settings →
+  Delivery, and staff packing or sending riders out look at the order's page (CHK-15).
+* **Decision:** Settings → Delivery gets a "Delivery times" section, after the larger orders':
+  each time a from and an until (the browser's time field, "HH:MM"), up to 8, added and taken
+  off like zones; with any, "Days ahead offered" (today alone to 14 days) and "Hours you need
+  first" (0 to 72, checked before saving). The core's problems name the time, "Time 2 · From:
+  …". The order's page says "The customer chose delivery on Sat 24 Oct, 10:00 – 13:00", in
+  Pakistan's time, in place of the expected day.
+* **Consequences:** a shop sets up slots and sees them on each order without the API. The
+  settings form now always sends the slots and their days and hours, as it does the rest.

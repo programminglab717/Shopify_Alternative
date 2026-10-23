@@ -55,6 +55,27 @@ export function formatDateTime(iso: string, timeZone: string, locale: Locale): s
   }).format(new Date(iso));
 }
 
+/**
+ * A delivery slot (ADR-771) in Pakistan's time, where shops deliver: "Sat 24 Oct, 10:00 – 13:00".
+ */
+export function formatSlot(startsAt: string, endsAt: string, locale: Locale): string {
+  const timeZone = 'Asia/Karachi';
+  const day = new Intl.DateTimeFormat(dateLocale(locale), {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone,
+  }).format(new Date(startsAt));
+  const clock = (iso: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone,
+    }).format(new Date(iso));
+  return `${day}, ${clock(startsAt)} – ${clock(endsAt)}`;
+}
+
 /** "October 2026", of a year and month written "2026-10". */
 export function formatMonth(month: string, locale: Locale): string {
   return new Intl.DateTimeFormat(dateLocale(locale), {

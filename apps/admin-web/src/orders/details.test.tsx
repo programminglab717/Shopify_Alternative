@@ -360,6 +360,29 @@ describe("An order's everyday edits, on its page", () => {
     expect(within(plain).queryByText(/expect it by/)).toBeNull();
   });
 
+  it('shows the time the customer chose to have it delivered in, in place of the day (ADR-771)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      core(
+        'packer',
+        order({
+          deliveryExpectedOn: '2026-10-24',
+          deliverySlot: {
+            startsAt: '2026-10-24T05:00:00.000Z',
+            endsAt: '2026-10-24T08:00:00.000Z',
+          },
+        }),
+      ).fetcher,
+    );
+    renderAdmin('/shop_1/orders/ord_7');
+    const notes = await screen.findByRole('region', { name: 'Note and tags' });
+    // In Pakistan's time, where the shop delivers.
+    expect(
+      within(notes).getByText('The customer chose delivery on Sat 24 Oct, 10:00 – 13:00'),
+    ).toBeTruthy();
+    expect(within(notes).queryByText(/expect it by/)).toBeNull();
+  });
+
   it('leaves the address as it is once a parcel shipped, and edits to those who work orders', async () => {
     vi.stubGlobal(
       'fetch',

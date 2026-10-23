@@ -197,6 +197,10 @@ export const OrderQuery = /* GraphQL */ `
       note
       giftMessage
       deliveryExpectedOn
+      deliverySlot {
+        startsAt
+        endsAt
+      }
       tags
       phone
       email
@@ -2571,6 +2575,12 @@ const DELIVERY_SETTINGS = /* GraphQL */ `
         ...Money
       }
     }
+    slots {
+      from
+      until
+    }
+    slotDays
+    slotLeadHours
     updatedAt
   }
 `;

@@ -79,6 +79,10 @@ describe('Delivery and payment settings in the admin', () => {
         cutoffHour: null,
         weights: [],
         valueRates: [],
+        // No delivery times; their days and hours as the core's defaults (ADR-771).
+        slots: [],
+        slotDays: 7,
+        slotLeadHours: 2,
       },
     });
   });
@@ -105,6 +109,67 @@ describe('Delivery and payment settings in the admin', () => {
     expect(
       core.sent.find((each) => each.operation === 'DeliverySettingsUpdate')?.variables,
     ).toMatchObject({ input: { cutoffHour: 12 } });
+  });
+
+  it('saves the times of the day the shop delivers in, naming the time a problem is in (ADR-771)', async () => {
+    let answer: unknown = saved;
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'DeliverySettings') {
+        return {
+          deliverySettings: {
+            ...DELIVERY,
+            slots: [{ from: '10:00', until: '13:00' }],
+            slotDays: 3,
+            slotLeadHours: 2,
+          },
+        };
+      }
+      if (operation === 'DeliverySettingsUpdate') return { deliverySettingsUpdate: answer };
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/delivery');
+
+    expect(((await screen.findByLabelText('From')) as HTMLInputElement).value).toBe('10:00');
+    expect((screen.getByLabelText('Until') as HTMLInputElement).value).toBe('13:00');
+    expect((screen.getByLabelText('Days ahead offered') as HTMLSelectElement).value).toBe('3');
+    await press('Add a time');
+    fireEvent.change(screen.getAllByLabelText('From')[1]!, { target: { value: '16:00' } });
+    fireEvent.change(screen.getAllByLabelText('Until')[1]!, { target: { value: '19:00' } });
+    fireEvent.change(screen.getByLabelText('Days ahead offered'), { target: { value: '1' } });
+    type('Hours you need first', 'soon');
+    await press('Save');
+    expect(screen.getByText('Hours you need first: type whole hours from 0 to 72')).toBeTruthy();
+    expect(core.sent.some((each) => each.operation === 'DeliverySettingsUpdate')).toBe(false);
+
+    type('Hours you need first', '24');
+    await press('Save');
+    await screen.findByText('Saved. Checkout uses it from now on.');
+    expect(
+      core.sent.find((each) => each.operation === 'DeliverySettingsUpdate')?.variables,
+    ).toMatchObject({
+      input: {
+        slots: [
+          { from: '10:00', until: '13:00' },
+          { from: '16:00', until: '19:00' },
+        ],
+        slotDays: 1,
+        slotLeadHours: 24,
+      },
+    });
+
+    // The core's problems name the time.
+    answer = {
+      userErrors: [
+        {
+          field: ['input', 'slots', '1', 'from'],
+          code: 'INVALID',
+          message: 'This slot overlaps 10:00 to 13:00',
+        },
+      ],
+    };
+    await press('Save');
+    await screen.findByText('Time 2 · From: This slot overlaps 10:00 to 13:00');
   });
 
   it('saves what heavier orders cost more, weights in kilograms sent in grams (ADR-703)', async () => {

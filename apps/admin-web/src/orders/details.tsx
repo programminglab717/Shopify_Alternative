@@ -13,7 +13,7 @@ import {
 import type { OrderDetail, ParcelUserErrorsData, StaffData } from '../api/types';
 import { useMe } from '../auth/context';
 import { can, gate, hasCapability, permits } from '../auth/permissions';
-import { formatRelative } from '../i18n/format';
+import { formatRelative, formatSlot } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { shipsOnWords } from '../products/preorder';
 import { parseTags, TextArea } from '../products/product-form';
@@ -338,13 +338,22 @@ export function NoteAndTags({ order }: { order: OrderDetail }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {order.deliveryExpectedOn && (
+      {order.deliverySlot ? (
         <p className="flex items-center gap-2">
           <CalendarClock aria-hidden className="size-4 text-secondary" />
-          {t('details.deliveryExpected', {
-            date: shipsOnWords(order.deliveryExpectedOn, locale),
+          {t('details.deliverySlot', {
+            slot: formatSlot(order.deliverySlot.startsAt, order.deliverySlot.endsAt, locale),
           })}
         </p>
+      ) : (
+        order.deliveryExpectedOn && (
+          <p className="flex items-center gap-2">
+            <CalendarClock aria-hidden className="size-4 text-secondary" />
+            {t('details.deliveryExpected', {
+              date: shipsOnWords(order.deliveryExpectedOn, locale),
+            })}
+          </p>
+        )
       )}
       {order.giftMessage && (
         <div className="rounded-control border border-line px-3 py-2">

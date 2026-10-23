@@ -296,6 +296,11 @@ export interface OrderDetail {
    * leaves it out.
    */
   deliveryExpectedOn?: string | null;
+  /**
+   * The time its customer chose at checkout to have it delivered in (ADR-769); absent where a
+   * fake core leaves it out.
+   */
+  deliverySlot?: { startsAt: string; endsAt: string } | null;
   tags: string[];
   phone: string | null;
   email: string | null;
@@ -1226,6 +1231,12 @@ export interface DeliverySettingsValue {
   weights?: { aboveGrams: number; charge: MoneyValue }[];
   /** What larger orders pay at most, the smallest first (ADR-721); absent in old fakes. */
   valueRates?: { fromSubtotal: MoneyValue; charge: MoneyValue }[];
+  /** Times of the day it delivers in, "HH:MM" (ADR-768); absent in old fakes. */
+  slots?: { from: string; until: string }[];
+  /** How many days ahead slots are offered on; absent in old fakes. */
+  slotDays?: number;
+  /** How many hours ahead a slot must start; absent in old fakes. */
+  slotLeadHours?: number;
   updatedAt: string | null;
 }
 
