@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Barcodes and price labels
+### b991a73 · Barcodes and price labels
 
 * **A shop prints its own price labels,** from the products list, on A4 sticker sheets or a
   label printer's roll: each with its product, size or colour, price and a barcode to scan;
