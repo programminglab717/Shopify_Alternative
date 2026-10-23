@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Affiliates and influencers
+### 970c84b · Affiliates and influencers
 
 * **Creators' links and codes:** a shop adds the people who bring it customers, each with a
   link (the storefront with `?ref=`) and a discount code, and a share; orders placed with
