@@ -948,6 +948,30 @@ describe.skipIf(!server)('Order links', () => {
     expect(orderLinkPage(await shownOn(token)).html).not.toContain('Expected by');
   });
 
+  it('says the time chosen to deliver in, in place of the day, while it is still to come (ADR-770)', async () => {
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET delivery_expected_on = '2026-10-24',
+              delivery_slot_starts_at = '2026-10-24T10:00:00+05:00',
+              delivery_slot_ends_at = '2026-10-24T13:00:00+05:00'
+        WHERE id = '${order.id}'`,
+    );
+    const view = await shownOn(token);
+    expect(view.order.deliverySlot).toEqual({
+      startsAt: new Date('2026-10-24T05:00:00Z'),
+      endsAt: new Date('2026-10-24T08:00:00Z'),
+    });
+    const page = orderLinkPage(view).html;
+    expect(page).toContain('Delivery: Saturday 24 October, 10:00 – 13:00');
+    expect(page).toContain('ڈیلیوری: Saturday 24 October, 10:00 – 13:00');
+    expect(page).not.toContain('Expected by');
+    // Not once it is no longer coming.
+    unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    expect(orderLinkPage(await shownOn(token)).html).not.toContain('Delivery: Saturday');
+  });
+
   it("says what store credit the order's customer has with the shop (ADR-596)", async () => {
     const order = await f.order(f.a, [kurta]);
     unwrap(await f.orders.confirm(f.a, order.id));

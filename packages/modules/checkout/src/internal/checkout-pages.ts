@@ -16,6 +16,7 @@ import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-stor
 import {
   COD_CASH_LIMIT,
   cashPastLimitOf,
+  deliverySlotText,
   LOCATION_SCRIPT,
   MAP_SCRIPT,
   gatewayForm,
@@ -1112,6 +1113,13 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
             itemRow(line.quantity, itemName(line.title, line.variantTitle), rs(line.total)),
           )}
         </table>
+        ${
+          // The time the shopper chose to have it delivered in (ADR-770).
+          order.deliverySlot &&
+          html`<p class="small">
+            ${say('bilingual', LABELS.deliverySlot)}: ${deliverySlotText(order.deliverySlot)}
+          </p>`
+        }
         ${
           // The words to go with it as a gift (ADR-413), as the shopper wrote them.
           order.giftMessage &&

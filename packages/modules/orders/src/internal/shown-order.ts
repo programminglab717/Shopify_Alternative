@@ -3,7 +3,7 @@ import type { CurrencyCode } from '@hatti/money';
 import type { PolicyType } from '@hatti/online-store/public';
 import { maskPkMobile } from '@hatti/pk';
 import { taxByRate, type DraftTax } from './order-tax.js';
-import type { DraftOrderRecord, LineBundle, OrderRecord } from './records.js';
+import type { DeliverySlotValue, DraftOrderRecord, LineBundle, OrderRecord } from './records.js';
 import { itemName, transferOwed } from './rules.js';
 import type { OrderStageValue, StoredAddressValue } from './schema.js';
 
@@ -32,6 +32,11 @@ export interface ShownOrder {
    * delivered, cancelled or coming back, and a draft has none.
    */
   deliveryExpectedOn?: string | null;
+  /**
+   * The time its customer chose at checkout to have it delivered in (ADR-770), while it is still
+   * to come, as `deliveryExpectedOn` is; a draft has none.
+   */
+  deliverySlot?: DeliverySlotValue | null;
   /** Minor units. */
   subtotal: bigint;
   discount: bigint;
@@ -134,6 +139,7 @@ export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = [
     lines: order.lines,
     giftMessage: order.giftMessage,
     deliveryExpectedOn: AWAITED_STAGES.has(order.stage) ? order.deliveryExpectedOn : null,
+    deliverySlot: AWAITED_STAGES.has(order.stage) ? order.deliverySlot : null,
     subtotal: order.subtotal,
     discount: order.discount,
     transferDiscount: order.transferDiscount,

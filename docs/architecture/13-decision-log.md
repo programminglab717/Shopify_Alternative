@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-769 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-770 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -777,6 +777,7 @@
 | 767 | A payment link still taking orders is put in an answer as its title, what it sells and its address | Accepted |
 | 768 | Delivery time slots are times of the day in Pakistan's time, offered on the days ahead from the hours ahead the shop needs | Accepted |
 | 769 | Checkout asks for a delivery slot where the shop offers one, checks it again when placing, and the order keeps its start and end | Accepted |
+| 770 | An order's delivery slot is said in Pakistan's time on the thank-you page, the order's link page and its packing slip | Accepted |
 
 ---
 
@@ -25906,3 +25907,18 @@
 * **Consequences:** shops that deliver themselves get the slot the shopper chose with each
   order. Showing it on the thank-you and link pages, on packing slips and in the admin, and the
   admin's settings for it, follow; so do limits on how many orders a slot takes.
+
+## ADR-770 · An order's delivery slot is said in Pakistan's time on the thank-you page, the order's link page and its packing slip
+
+* **Context:** an order keeps the slot its customer chose (ADR-769); the customer wants it said
+  back, and whoever packs and sends the order out needs it on the slip.
+* **Decision:** orders' `deliverySlotText` says a slot in Pakistan's time, "Saturday 24 October,
+  10:00 – 13:00", for every page alike.
+  * **Thank-you page:** "Delivery time: …" with the items, beside the gift message.
+  * **The order's link page:** "Delivery: …" in place of "Expected by …", while the order is
+    still to come, as the day was (ADR-595); nothing once delivered, cancelled or coming back.
+  * **Packing slip:** a box "Deliver on" with the slot, large, under the units, for the rider's
+    round.
+* **Consequences:** the slot travels with the order to the customer and the packer. The admin's
+  order page and the order's messages follow; WhatsApp's order templates are approved by Meta
+  with fixed parameters, so a slot in them waits on new templates.

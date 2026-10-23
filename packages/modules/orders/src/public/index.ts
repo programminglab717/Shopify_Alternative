@@ -390,9 +390,11 @@ export {
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
 export { SalesInterval } from '../internal/graphql/sales-report.types.js';
 export { hidesPhones, toAddress, toOrder } from '../internal/graphql/mappers.js';
+export { deliverySlotText } from '../internal/delivery-slot.js';
 export {
   NO_ORDERS,
   type CustomerOrderStats,
+  type DeliverySlotValue,
   type DraftOrderLineRecord,
   type DraftOrderRecord,
   type FulfillmentEventRecord,

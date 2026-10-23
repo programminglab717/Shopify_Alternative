@@ -636,6 +636,29 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(erased).not.toContain('Ammi');
   });
 
+  it("prints the time chosen to deliver in on the packing slip, in Pakistan's time (ADR-770)", async () => {
+    const order = await f.order(f.a, [kurta]);
+    const slip = async (language: 'english' | 'urdu') =>
+      unwrap(
+        await f.documents.render(f.a, [order.id], {
+          kind: 'packing_slip',
+          paper: 'a4',
+          language,
+        }),
+      ).html;
+    expect(await slip('english')).not.toContain('Deliver on');
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET delivery_slot_starts_at = '2026-10-24T16:00:00+05:00',
+              delivery_slot_ends_at = '2026-10-24T19:00:00+05:00'
+        WHERE id = '${order.id}'`,
+    );
+    const english = await slip('english');
+    expect(english).toContain('Deliver on');
+    expect(english).toContain('Saturday 24 October, 16:00 – 19:00');
+    expect(await slip('urdu')).toContain('ڈیلیوری کا وقت');
+  });
+
   /** A kurta named for the shopper, an app's own property with it, and a chappal: as checkout places them. */
   async function placeNamed() {
     const address = checkAddress(new InputChecker(), [], ADDRESS)!;

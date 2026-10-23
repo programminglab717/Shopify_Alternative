@@ -22,6 +22,7 @@ import {
 import type { OrderInvoiceRecord } from './invoice-series.js';
 import { pinCode } from './location.js';
 import { taxByRate } from './order-tax.js';
+import { deliverySlotText } from './delivery-slot.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
@@ -103,6 +104,7 @@ const WORDS = {
   balanceDue: { en: 'Balance due', ur: 'بقایا رقم' },
   thanks: { en: 'Thank you for your order!', ur: 'آپ کے آرڈر کا شکریہ!' },
   giftMessage: { en: 'Gift message', ur: 'تحفے کا پیغام' },
+  deliverySlot: { en: 'Deliver on', ur: 'ڈیلیوری کا وقت' },
   cancelled: { en: 'Cancelled', ur: 'منسوخ' },
   doNotShip: { en: 'Cancelled: do not ship', ur: 'منسوخ: مت بھیجیں' },
   doNotPack: { en: 'Not confirmed: do not pack yet', ur: 'تصدیق باقی ہے: ابھی پیک نہ کریں' },
@@ -158,6 +160,14 @@ export function packingSlip(order: OrderRecord, context: DocumentContext): Html 
       </tbody>
     </table>
     <p class="strong">${t(WORDS.units)}: ${ltr(String(units))}</p>
+    ${
+      // The time its customer chose to have it delivered in (ADR-770), for the rider's round.
+      order.deliverySlot &&
+      html`<section class="box">
+        <p class="label">${t(WORDS.deliverySlot)}</p>
+        <p class="big">${ltr(deliverySlotText(order.deliverySlot))}</p>
+      </section>`
+    }
     ${
       // The customer's words to go with it as a gift (ADR-413), to copy onto a card or cut out.
       order.giftMessage &&

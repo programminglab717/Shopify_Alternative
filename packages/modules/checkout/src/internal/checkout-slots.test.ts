@@ -8,6 +8,15 @@ import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js
 
 const server = testDatabaseServer();
 
+/** A day, YYYY-MM-DD, as pages say it: "Saturday 24 October". */
+const slotDay = (day: string) =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(`${day}T00:00:00Z`));
+
 describe.skipIf(!server)('Delivery time slots chosen at checkout (CHK-15, ADR-769)', () => {
   let f: CheckoutFixture;
   let cake: string;
@@ -88,8 +97,9 @@ describe.skipIf(!server)('Delivery time slots chosen at checkout (CHK-15, ADR-76
       startsAt: second!.startsAt,
       endsAt: second!.endsAt,
     });
-    // Expected on the slot's day, not by the shop's working days.
+    // Expected on the slot's day, not by the shop's working days; the thank-you page says it.
     expect(placed.order.deliveryExpectedOn).toBe(second!.day);
+    expect(checkoutPage(placed).html).toContain(`${slotDay(second!.day)}, 00:00 – 23:59`);
     const { rows } = await f.admin.query<{ starts: string; ends: string }>(
       `SELECT to_char(delivery_slot_starts_at AT TIME ZONE 'Asia/Karachi', 'YYYY-MM-DD"T"HH24:MI') AS starts,
               to_char(delivery_slot_ends_at AT TIME ZONE 'Asia/Karachi', 'HH24:MI') AS ends

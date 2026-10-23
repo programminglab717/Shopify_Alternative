@@ -43,7 +43,13 @@ import type { OrderLinkView, ReviewableProduct } from './order-link.service.js';
 import type { PostPurchaseOffer } from './post-purchase-offer.js';
 import { RETURN_NOTE_MAX, type ReturnOffer } from './return-request.service.js';
 import type { TrackingView } from './tracking.service.js';
-import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
+import { deliverySlotText } from './delivery-slot.js';
+import type {
+  DeliverySlotValue,
+  FulfillmentEventRecord,
+  FulfillmentRecord,
+  OrderRecord,
+} from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
 import {
   RETURN_PREFERENCES,
@@ -1778,6 +1784,12 @@ function expectedByWords(day: string): Words {
   return { en: `Expected by ${words}`, ur: `${words} تک پہنچنے کی توقع` };
 }
 
+/** The time chosen to have it delivered in, in Pakistan's time (ADR-770). */
+function deliverySlotWords(slot: DeliverySlotValue): Words {
+  const when = deliverySlotText(slot);
+  return { en: `Delivery: ${when}`, ur: `ڈیلیوری: ${when}` };
+}
+
 /** The items and what they come to, down to what is paid at the door or by transfer. */
 function summary(shown: ShownOrder): Html {
   const row = (label: Words, value: string, className = '') =>
@@ -1823,8 +1835,11 @@ function summary(shown: ShownOrder): Html {
       })}
     </table>
     ${
-      // The day checkout said to expect it by, while it is still to come (ADR-595).
-      shown.deliveryExpectedOn && paragraphs(expectedByWords(shown.deliveryExpectedOn), 'small')
+      // The time the customer chose to have it delivered in (ADR-770), else the day checkout
+      // said to expect it by (ADR-595), while it is still to come.
+      shown.deliverySlot
+        ? paragraphs(deliverySlotWords(shown.deliverySlot), 'small')
+        : shown.deliveryExpectedOn && paragraphs(expectedByWords(shown.deliveryExpectedOn), 'small')
     }
     ${
       // The words to go with it as a gift (ADR-413), as the customer wrote them.

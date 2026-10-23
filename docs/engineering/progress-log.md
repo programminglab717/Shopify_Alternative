@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The delivery slot said back
+
+* **Where it shows:** the time the customer chose is on the thank-you page, the order's link
+  page while it is coming, and the packing slip, in Pakistan's time ([ADR-770](../architecture/13-decision-log.md#adr-770--an-orders-delivery-slot-is-said-in-pakistans-time-on-the-thank-you-page-the-orders-link-page-and-its-packing-slip)).
+* 4177 tests (2 new).
+
 ### bd9b7f4 · A delivery slot chosen at checkout
 
 * **When to deliver:** where the shop offers times of the day, checkout asks the shopper for one,
