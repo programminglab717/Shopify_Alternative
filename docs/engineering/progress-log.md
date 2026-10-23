@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Delivery times in the admin
+### a00befe · Delivery times in the admin
 
 * **Set and seen:** owners set delivery times, days ahead and hours first in Settings →
   Delivery, and an order's page says the slot its customer chose ([ADR-771](../architecture/13-decision-log.md#adr-771--the-admin-sets-delivery-times-with-the-delivery-charges-and-an-orders-page-says-the-slot-its-customer-chose)).
