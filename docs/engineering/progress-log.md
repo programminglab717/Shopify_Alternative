@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A Shopify store's customers' addresses
+### 0268651 · A Shopify store's customers' addresses
 
 * **Addresses come along:** moving a Shopify store's customers fills their address books with
   their addresses in Pakistan, the default as it was, where a book is empty (ONB-05, [ADR-784](../architecture/13-decision-log.md#adr-784--a-shopify-stores-customers-addresses-fill-their-address-books-only-where-a-book-is-empty)).
