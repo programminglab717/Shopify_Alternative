@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Old sign-ins forgotten
+
+* **Staff's ended sessions and second-step challenges were kept forever,** each with the
+  internet address and browser it came from. Sessions now go 90 days after they were last used,
+  and challenges a month after they ended, as new ones are made ([ADR-747](../architecture/13-decision-log.md#adr-747--staffs-sessions-unused-for-90-days-and-second-steps-challenges-a-month-past-their-end-are-deleted-as-new-ones-are-made-with-the-address-and-browser-they-hold)).
+* 4077 tests (2 new).
+
 ### 9f7596c · The outbox kept to a week
 
 * **Nothing deleted outbox events,** so the table grew with every change any shop made. The

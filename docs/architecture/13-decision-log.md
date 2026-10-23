@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-746 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-747 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -754,6 +754,7 @@
 | 744 | The storefront's errors go to the error tracker too: each answer that failed with a 5xx logged at error by Fastify's log controller, by its route and the first part of its path, never its address; requests themselves not logged | Accepted |
 | 745 | The admin's browser errors are reported to the core at /admin/errors, which logs them as the admin's for the error tracker after its redaction: no DSN in the browser, a limit for each browser and for all, numbers and emails taken out, IDs out of the page's path | Accepted |
 | 746 | Outbox events published more than seven days ago are deleted by the worker, a batch at a time, the oldest first; those not yet published or parked are kept | Accepted |
+| 747 | Staff's sessions unused for 90 days and second steps' challenges a month past their end are deleted as new ones are made, with the address and browser they hold | Accepted |
 
 ---
 
@@ -25379,3 +25380,23 @@
 * **Consequences:** the outbox stays about a week of events. A week is left for looking into what
   was published lately. When the outbox is partitioned by day (03 §6.5), a partition's events go
   by dropping it and this sweep goes.
+
+## ADR-747 · Staff's sessions unused for 90 days and second steps' challenges a month past their end are deleted as new ones are made, with the address and browser they hold
+
+* **Context:** identity keeps what it needs for a while and deletes it as new rows come: sign-in
+  codes and email links after a month, Google's nonces and passkeys' challenges once past their
+  end. Two of its tables were never trimmed: `identity.sessions`, every session ever begun,
+  signed out, revoked or long expired, and `identity.mfa_challenges`, every second step asked
+  for. Each holds the internet address and the browser it came from: personal data kept for no
+  use, growing with every sign-in.
+* **Decision:**
+  * **Sessions** go 90 days after they were last used, deleted as each new session begins. A
+    session ends at most 30 days after it began, so each has ended; and 90 days is how long a
+    device stays known to the sign-in alerts (ADR-179), which look no further back. The device
+    list shows live sessions alone, as before.
+  * **Second steps' challenges** go a month after their end, deleted as each new challenge is
+    made, kept that month to look into abuse as sign-in codes are.
+  * **Indexes** of sessions' last use and challenges' end find them without reading the tables.
+* **Consequences:** identity holds a sign-in's address and browser three months at most after
+  the session was last used. An account no one signs in to keeps its last sessions until someone
+  else's sign-in sweeps them, which any does, across accounts.

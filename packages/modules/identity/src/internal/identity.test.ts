@@ -33,6 +33,7 @@ import {
 import { AuthError } from './errors.js';
 import {
   IdentityService,
+  ENDED_KEPT,
   LIFETIMES,
   type ClientInfo,
   type SignInResult,
@@ -547,6 +548,62 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
 
       await service.signOut(current, client());
       expect((await authError(auth(second.tokens.accessToken))).code).toBe('UNAUTHENTICATED');
+    });
+  });
+
+  describe('what has ended (ADR-747)', () => {
+    const DAY_MS = 86_400_000;
+    const ago = (days: number) => new Date(clock - days * DAY_MS);
+
+    it('forgets sessions unused for 90 days as a session begins, keeping those used since', async () => {
+      const gone = await signUp();
+      const kept = await signUp();
+      await admin.query('UPDATE identity.sessions SET last_used_at = $2 WHERE user_id = $1', [
+        gone.userId,
+        ago(ENDED_KEPT.sessionDays + 1),
+      ]);
+      await admin.query('UPDATE identity.sessions SET last_used_at = $2 WHERE user_id = $1', [
+        kept.userId,
+        ago(ENDED_KEPT.sessionDays - 1),
+      ]);
+      await signUp();
+      const left = async (userId: string) =>
+        (
+          await admin.query<{ n: number }>(
+            'SELECT count(*)::int AS n FROM identity.sessions WHERE user_id = $1',
+            [userId],
+          )
+        ).rows[0]!.n;
+      expect(await left(gone.userId)).toBe(0);
+      expect(await left(kept.userId)).toBe(1);
+    });
+
+    it("forgets second steps' challenges a month past their end as a challenge is made", async () => {
+      const { email, userId } = await signUpWithTotp();
+      const challenge = async () => {
+        const result = await service.signIn({ email, password: PASSWORD }, client());
+        if (result.status !== 'mfa_required') throw new Error('expected a challenge');
+      };
+      await challenge();
+      await admin.query('UPDATE identity.mfa_challenges SET expires_at = $2 WHERE user_id = $1', [
+        userId,
+        ago(ENDED_KEPT.challengeDays + 1),
+      ]);
+      await challenge();
+      await admin.query(
+        'UPDATE identity.mfa_challenges SET expires_at = $2 WHERE user_id = $1 AND expires_at > $3',
+        [userId, ago(ENDED_KEPT.challengeDays - 1), ago(ENDED_KEPT.challengeDays)],
+      );
+      await challenge();
+      const { rows } = await admin.query<{ expires_at: Date }>(
+        'SELECT expires_at FROM identity.mfa_challenges WHERE user_id = $1 ORDER BY expires_at',
+        [userId],
+      );
+      // The month-old one went; the one past its end by less, and the new one, stay.
+      expect(rows.map((row) => row.expires_at.getTime())).toEqual([
+        ago(ENDED_KEPT.challengeDays - 1).getTime(),
+        clock + LIFETIMES.mfaChallengeMs,
+      ]);
     });
   });
 

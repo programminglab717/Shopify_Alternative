@@ -191,6 +191,17 @@ export const LIFETIMES = {
   refreshReuseGraceMs: 10_000,
 } as const;
 
+/**
+ * How long what has ended is kept (ADR-747): a session signed out, revoked or past its end is
+ * kept while it still tells the sign-in alerts a device is known, 90 days from its last use; a
+ * second step's challenge a month, as codes are, to look into abuse. Older ones go as new ones
+ * are made, with the address and browser they were made from.
+ */
+export const ENDED_KEPT = {
+  sessionDays: SIGN_IN_ALERT.knownDays,
+  challengeDays: 30,
+} as const;
+
 const MAX_CHALLENGE_ATTEMPTS = 5;
 const RECOVERY_CODE_COUNT = 10;
 
@@ -758,6 +769,14 @@ export class IdentityService {
               timeout: LIFETIMES.mfaChallengeMs,
             })
           : null;
+      await this.db
+        .delete(mfaChallenges)
+        .where(
+          lt(
+            mfaChallenges.expiresAt,
+            new Date(this.now().getTime() - ENDED_KEPT.challengeDays * 24 * 3_600_000),
+          ),
+        );
       await this.db.insert(mfaChallenges).values({
         id: newId(),
         userId: row.id,
@@ -3408,6 +3427,13 @@ export class IdentityService {
     const refreshToken = secretToken(TOKEN_PREFIX.refresh);
     const expiresAt = new Date(now.getTime() + LIFETIMES.sessionMs);
     const accessTokenExpiresAt = this.accessExpiry(now, expiresAt);
+    // Sessions unused for 90 days go, their device unknown by then: a session ends at most 30
+    // days after it began, so each of them has ended.
+    await tx
+      .delete(sessions)
+      .where(
+        lt(sessions.lastUsedAt, new Date(now.getTime() - ENDED_KEPT.sessionDays * 24 * 3_600_000)),
+      );
     await tx.insert(sessions).values({
       id,
       userId,
