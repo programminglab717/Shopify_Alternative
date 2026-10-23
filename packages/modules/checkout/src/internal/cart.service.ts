@@ -41,6 +41,7 @@ import type { CodProduct } from './cod-rules.js';
 import { orderItemsIn } from './discount-items.js';
 import { carts } from './schema.js';
 import { heldForCartIn } from './stock-holds.js';
+import { accountSessionIdIn, wholesaleFactsIn } from './wholesale.js';
 
 /** A cart's secret: 128 random bits in base64url, as customers' links have. */
 const TOKEN_BYTES = 16;
@@ -50,8 +51,15 @@ export type CartResult =
   | { ok: true; cart: CartJson; token: string | null; added: string[] }
   | { ok: false; error: CartError };
 
-/** A cart as kept, with the discount code its shopper applied. */
-export type KeptCart = CartContent & { id: string; discountCodes: string[] };
+/**
+ * A cart as kept, with the discount code its shopper applied and the account session of the
+ * shopper last signed in while they used it (ADR-780).
+ */
+export type KeptCart = CartContent & {
+  id: string;
+  discountCodes: string[];
+  accountSessionId: string | null;
+};
 
 /**
  * Shoppers' carts (ADR-042), which storefronts change for them. A cart keeps variants, quantities
@@ -67,20 +75,30 @@ export class CartService {
     private readonly inventory: InventoryService,
   ) {}
 
-  /** The shop's cart `token` names, priced now; null when it names none, as once it expired. */
-  async cart(shopId: string, token: string): Promise<CartJson | null> {
+  /**
+   * The shop's cart `token` names, priced now; null when it names none, as once it expired. Read
+   * by a shopper signed in to their account, the session `account` names (ADR-780), it is priced
+   * from their price lists from then on, while that session lasts.
+   */
+  async cart(
+    shopId: string,
+    token: string,
+    account: string | null = null,
+  ): Promise<CartJson | null> {
     const hash = hashOf(token);
     if (!hash) return null;
     return this.db.tenant(shopId, async (tx) => {
       const found = await this.#find(tx, shopId, hash, false);
       if (!found) return null;
+      const sessionId = await this.#signedIn(tx, shopId, found, account);
       const facts = await this.#facts(
         tx,
         shopId,
         found.lines.map((line) => line.variantId),
         found.id,
       );
-      return withDiscount(tx, shopId, await priced(tx, shopId, found, facts), found.discountCodes);
+      const listed = await wholesaleFactsIn(tx, shopId, sessionId, found.lines, facts);
+      return withDiscount(tx, shopId, await priced(tx, shopId, found, listed), found.discountCodes);
     });
   }
 
@@ -88,13 +106,21 @@ export class CartService {
    * Does `action` to the shop's cart `token` names, or else to a new cart with a secret of its
    * own: a token naming no cart, as once it expired, is never taken up. A new cart is kept only
    * once it holds something, a discount code alone included. Concurrent actions on a cart take
-   * turns.
+   * turns. Done by a shopper signed in to their account, the session `account` names, the cart is
+   * priced from their price lists (ADR-780).
    */
-  async act(shopId: string, token: string | null, action: CartAction): Promise<CartResult> {
+  async act(
+    shopId: string,
+    token: string | null,
+    action: CartAction,
+    account: string | null = null,
+  ): Promise<CartResult> {
     return this.db.tenant(shopId, async (tx): Promise<CartResult> => {
       const hash = token === null ? null : hashOf(token);
       const found = hash ? await this.#find(tx, shopId, hash, true) : null;
       const current = found ?? EMPTY_CART;
+      const signedIn = account === null ? null : await accountSessionIdIn(tx, shopId, account);
+      const accountSessionId = signedIn ?? found?.accountSessionId ?? null;
       const facts = await this.#facts(
         tx,
         shopId,
@@ -119,12 +145,13 @@ export class CartService {
         action.kind === 'update' && action.discountCodes !== null
           ? action.discountCodes
           : (found?.discountCodes ?? []);
-      const cart = await withDiscount(tx, shopId, cartJson(content, facts, asked), discountCodes);
+      const listed = await wholesaleFactsIn(tx, shopId, accountSessionId, content.lines, facts);
+      const cart = await withDiscount(tx, shopId, cartJson(content, listed, asked), discountCodes);
       const expiresAt = sql`now() + ${`${CART_DAYS} days`}::interval`;
       if (found) {
         await tx
           .update(carts)
-          .set({ ...content, discountCodes, updatedAt: sql`now()`, expiresAt })
+          .set({ ...content, discountCodes, accountSessionId, updatedAt: sql`now()`, expiresAt })
           .where(and(eq(carts.shopId, shopId), eq(carts.id, found.id)));
         return { ok: true, cart, token, added };
       }
@@ -138,6 +165,7 @@ export class CartService {
         tokenHash: sha256(secret),
         ...content,
         discountCodes,
+        accountSessionId,
         expiresAt,
       });
       return { ok: true, cart, token: secret, added };
@@ -163,7 +191,11 @@ export class CartService {
     return row ?? null;
   }
 
-  /** `cart` priced now, with what its discount code takes off, in the caller's transaction `tx`. */
+  /**
+   * `cart` priced now, with what its discount code takes off, in the caller's transaction `tx`:
+   * from the price lists of the shopper signed in while they used it, while their session lasts
+   * (ADR-780), as its checkout and the order placed from it are.
+   */
   async priceIn(tx: Tx, shopId: string, cart: KeptCart): Promise<CartJson> {
     const facts = await this.#facts(
       tx,
@@ -171,7 +203,8 @@ export class CartService {
       cart.lines.map((line) => line.variantId),
       cart.id,
     );
-    return withDiscount(tx, shopId, await priced(tx, shopId, cart, facts), cart.discountCodes);
+    const listed = await wholesaleFactsIn(tx, shopId, cart.accountSessionId, cart.lines, facts);
+    return withDiscount(tx, shopId, await priced(tx, shopId, cart, listed), cart.discountCodes);
   }
 
   /**
@@ -242,6 +275,25 @@ export class CartService {
   }
 
   /** The cart whose secret hashes to `hash`; prepared (ADR-111) when read, not locked. */
+  /**
+   * The account session the cart is priced for (ADR-780): the one `account` names, kept on the
+   * cart, where it is a session that lasts; else the one the cart keeps. Signing out ends it.
+   */
+  async #signedIn(
+    tx: Tx,
+    shopId: string,
+    cart: KeptCart,
+    account: string | null,
+  ): Promise<string | null> {
+    const signedIn = account === null ? null : await accountSessionIdIn(tx, shopId, account);
+    if (signedIn === null || signedIn === cart.accountSessionId) return cart.accountSessionId;
+    await tx
+      .update(carts)
+      .set({ accountSessionId: signedIn })
+      .where(and(eq(carts.shopId, shopId), eq(carts.id, cart.id)));
+    return signedIn;
+  }
+
   async #find(tx: Tx, shopId: string, hash: Buffer, lock: boolean): Promise<KeptCart | null> {
     const query = tx
       .select(KEPT)
@@ -382,6 +434,7 @@ const KEPT = {
   note: carts.note,
   attributes: carts.attributes,
   discountCodes: carts.discountCodes,
+  accountSessionId: carts.accountSessionId,
 };
 
 /** The digest to find a cart by; null for anything that cannot be a cart's secret. */

@@ -40,6 +40,11 @@ export const carts = checkoutSchema.table(
     attributes: jsonb('attributes').$type<Record<string, string>>().notNull().default({}),
     /** The discount code the shopper applied, as the shop wrote it; one at most for now. */
     discountCodes: text('discount_codes').array().notNull().default([]),
+    /**
+     * The account session of the shopper last signed in while they used it (ADR-780): its lines
+     * are priced from their price lists while it lasts.
+     */
+    accountSessionId: uuid('account_session_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),

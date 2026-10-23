@@ -153,23 +153,46 @@ export class StorefrontApiClient {
     this.#fetch = options.fetch ?? fetch;
   }
 
-  /** The cart the shopper's `token` names; null without one, or when it names none. */
-  async read(shopId: string, token: string | null): Promise<CartJson | null> {
+  /**
+   * The cart the shopper's `token` names; null without one, or when it names none. With the
+   * `account` session of a shopper signed in, priced from their price lists (ADR-780).
+   */
+  async read(
+    shopId: string,
+    token: string | null,
+    account: string | null = null,
+  ): Promise<CartJson | null> {
     if (!token) return null;
-    const response = await this.#request('GET', cartPath(shopId), token);
+    const response = await this.#request(
+      'GET',
+      cartPath(shopId),
+      token,
+      undefined,
+      account ? { [ACCOUNT_TOKEN_HEADER]: account } : {},
+    );
     if (response.status !== 200)
       throw new StorefrontApiError(response.status, await response.text());
     return ((await response.json()) as CartReadResponse).cart;
   }
 
-  /** Does `action` to the cart `token` names, or to a new cart, which the answer's token names. */
+  /**
+   * Does `action` to the cart `token` names, or to a new cart, which the answer's token names; as
+   * the shopper signed in with the `account` session, where they are (ADR-780).
+   */
   async act<A extends CartActionName>(
     shopId: string,
     token: string | null,
     action: A,
     body: CartBodies[A],
+    account: string | null = null,
   ): Promise<CartActionResult> {
-    const response = await this.#request('POST', cartPath(shopId, action), token, body);
+    const response = await this.#request(
+      'POST',
+      cartPath(shopId, action),
+      token,
+      body,
+      account ? { [ACCOUNT_TOKEN_HEADER]: account } : {},
+    );
     if (response.status === 200) {
       return { ok: true, ...((await response.json()) as CartChangeResponse) };
     }

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-779 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-780 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -787,6 +787,7 @@
 | 777 | Marketing's affiliates page: each creator's link, code and figures, payouts recorded and their part ended | Accepted |
 | 778 | Price lists for wholesale customers: a share off, prices of their own and quantity breaks, by a tag the shop gives them | Accepted |
 | 779 | The admin's price lists under Products, a list's own prices named by their variants | Accepted |
+| 780 | A signed-in wholesale customer's cart and checkout priced from their price lists, while their session lasts | Accepted |
 
 ---
 
@@ -26103,3 +26104,27 @@
 * **Consequences:** a shop sets wholesale prices without the API, and sees what each list
   takes off at a glance. The page holds at most the 2,000 prices a list keeps, so it shows
   them all without paging. Wholesale prices in the storefront's cart are the next step.
+
+## ADR-780 · A signed-in wholesale customer's cart and checkout priced from their price lists, while their session lasts
+
+* **Context:** ADR-778 priced a wholesale customer's draft orders from their price list; a
+  reseller who orders from the storefront still paid what anyone pays (CUS-06). The storefront
+  knows a shopper signed in to their account by the session secret it sends in `x-hatti-account`
+  (ADR-585); carts are found by a secret of their own, and checkout and the order read the cart.
+* **Decision:** a cart keeps the account session of the shopper last signed in while they used
+  it (migration 0334): the cart API takes the `x-hatti-account` header on reads and actions, and
+  a session that lasts is kept on the cart. Whenever the cart is priced, for its page, its
+  checkout or the order placed from it, a kept session that still lasts names the customer's
+  number, their tags give their price lists, and each variant is priced from them by how many of
+  it the cart holds together, as drafts are, never above the price to anyone. Without a session
+  that lasts, a customer, tags or a list, the cart is priced as before. The storefront sends the
+  account cookie's secret on every cart read and action. The session is looked up within the
+  checkout module by its digest and its ID, not through the account service, which already uses
+  the cart service.
+* **Consequences:** a reseller signed in sees and pays their wholesale prices in the cart, the
+  checkout and the order, discounts working from those prices. Signing out, or the session
+  ending, takes the prices away at the next read, as the cart keeps only the session, not the
+  prices. A cart used signed in keeps its prices if the shopper keeps browsing signed out on the
+  same device while the session lasts, which is the shopper's own device. Product pages are
+  cached for everyone and still show the price to anyone; showing a signed-in reseller their own
+  prices there is the next step.

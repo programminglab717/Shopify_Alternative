@@ -1538,7 +1538,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     );
     try {
       const token = cookieOf(request.headers.cookie, CART_COOKIE);
-      const cart = token && core ? await core.read(found.shopId, token) : null;
+      const cart =
+        token && core
+          ? await core.read(found.shopId, token, accountTokenOf(request.headers.cookie))
+          : null;
       const page = new URL(asked.page, 'http://storefront');
       const sections = await sectionsOf(found, page, asked.sections, cart, { theme: edited });
       // The layout's CSS too, as the theme's settings change (ADR-700).
@@ -1639,12 +1642,20 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     try {
       if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
       if (await changedTooMuch(request)) return await tooMany(reply);
-      const added = await core.act(found.shopId, null, 'add', { items });
+      const added = await core.act(
+        found.shopId,
+        null,
+        'add',
+        { items },
+        accountTokenOf(request.headers.cookie),
+      );
       if (!added.ok) {
         const words = (key: string, values: Record<string, unknown>) =>
           translation(theme, locale, key, values);
         const own = cookieOf(request.headers.cookie, CART_COOKIE);
-        const shown = own ? await core.read(found.shopId, own) : null;
+        const shown = own
+          ? await core.read(found.shopId, own, accountTokenOf(request.headers.cookie))
+          : null;
         const page = {
           path: '/cart',
           locale,
@@ -1661,7 +1672,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         discount: query.discount,
       });
       // What the link adds to its items; the items go to checkout even if the core refuses it.
-      if (Object.keys(body).length > 0) await core.act(found.shopId, added.token, 'update', body);
+      if (Object.keys(body).length > 0)
+        await core.act(
+          found.shopId,
+          added.token,
+          'update',
+          body,
+          accountTokenOf(request.headers.cookie),
+        );
       // The shopper's details it gives, as Shopify's `checkout[...]`, carried to the checkout's
       // page to fill it in (ADR-709).
       const filled = new URLSearchParams(
@@ -1725,7 +1743,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
     try {
       if (reading) {
-        const shown = token && core ? await core.read(found.shopId, token) : null;
+        const shown =
+          token && core
+            ? await core.read(found.shopId, token, accountTokenOf(request.headers.cookie))
+            : null;
         if (core) keep(shown ? token : null, shown);
         if (asksForSections(url)) return await sendSections(reply, found, url, shown);
         if (json) return await reply.send(await ajax(shown, found.store, urdu));
@@ -1746,13 +1767,21 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       // Shopify keeps a file a line's property names; nothing here would (ADR-701).
       if (withFiles.has(params)) return await refuse(422, "This shop's cart takes no files.");
       const { body, single } = cartBody(action, params);
-      const result = await core.act(found.shopId, token, action, body);
+      const result = await core.act(
+        found.shopId,
+        token,
+        action,
+        body,
+        accountTokenOf(request.headers.cookie),
+      );
       if (!result.ok) {
         const message = cartErrorMessage(result.error, words);
         const status = cartErrorStatus(result.error);
         if (json) return await reply.code(status).send(ajaxError(status, message));
         // The cart page again, saying why, as the cart is.
-        const shown = token ? await core.read(found.shopId, token) : null;
+        const shown = token
+          ? await core.read(found.shopId, token, accountTokenOf(request.headers.cookie))
+          : null;
         const page = { path: '/cart', locale, cart: shown, cartError: message };
         return await sendPage(reply, page, found, status);
       }
@@ -1839,7 +1868,13 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const token = cookieOf(request.headers.cookie, CART_COOKIE);
     try {
       if (core && request.method === 'GET' && !(await changedTooMuch(request))) {
-        const result = await core.act(found.shopId, token, 'update', { discount: code });
+        const result = await core.act(
+          found.shopId,
+          token,
+          'update',
+          { discount: code },
+          accountTokenOf(request.headers.cookie),
+        );
         if (result.ok && (result.token !== null || token !== null)) {
           reply.header('set-cookie', cartCookies(result.token, result.cart.itemCount, { secure }));
         }
@@ -1918,7 +1953,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         // The shopper's own cart: emptied by the order, unless a permalink's cart was ordered.
         const own = cookieOf(request.headers.cookie, CART_COOKIE);
         // The order is placed whatever the count says: a cart not read counts none.
-        const kept = own ? await core.read(found.shopId, own).catch(() => null) : null;
+        const kept = own
+          ? await core
+              .read(found.shopId, own, accountTokenOf(request.headers.cookie))
+              .catch(() => null)
+          : null;
         const count = cartCountCookie(kept?.itemCount ?? 0, { secure });
         // Its number proved by a code: its next checkouts need not ask again (ADR-199).
         reply.header(
@@ -3138,7 +3177,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const token = accountTokenOf(request.headers.cookie);
       if (!token) return await reply.redirect(`${prefix}/account/login`, 303);
       if (limiter !== null && !(await limiter.hit(ACCOUNT_REORDERS, request.ip)).allowed) {
-        const shown = cartToken ? await core.read(found.shopId, cartToken) : null;
+        const shown = cartToken
+          ? await core.read(found.shopId, cartToken, accountTokenOf(request.headers.cookie))
+          : null;
         const cartError = reorderNoticeMessage('too_many_requests', (key, values) =>
           translation(theme, locale, key, values),
         );
@@ -3159,9 +3200,18 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       let kept: Promise<CartJson | null> | null = null;
       const { added, short } = await addAgain(
         items,
-        (left) => core.act(found.shopId, cartToken, 'add', { items: left }),
+        (left) =>
+          core.act(
+            found.shopId,
+            cartToken,
+            'add',
+            { items: left },
+            accountTokenOf(request.headers.cookie),
+          ),
         async (variantId) => {
-          kept ??= cartToken ? core.read(found.shopId, cartToken) : Promise.resolve(null);
+          kept ??= cartToken
+            ? core.read(found.shopId, cartToken, accountTokenOf(request.headers.cookie))
+            : Promise.resolve(null);
           const cart = await kept;
           return (cart?.items ?? [])
             .filter((item) => item.variantId === variantId)
@@ -3436,7 +3486,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       if (asksForSections(url)) {
         // With the shopper's cart, as a drawer shows it: cookies naming no cart go.
         const token = cookieOf(request.headers.cookie, CART_COOKIE);
-        const shown = token && core ? await core.read(found.shopId, token) : null;
+        const shown =
+          token && core
+            ? await core.read(found.shopId, token, accountTokenOf(request.headers.cookie))
+            : null;
         if (token && core && !shown) {
           reply.header('set-cookie', cartCookies(null, 0, { secure }));
         }
