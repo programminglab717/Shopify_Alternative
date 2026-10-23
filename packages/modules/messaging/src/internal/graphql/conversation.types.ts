@@ -144,6 +144,9 @@ export class Conversation {
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
+
+  /** The account of the member of staff it is given to, for the core's `assignee` (ADR-759). */
+  assigneeId!: string | null;
 }
 
 @ObjectType()
@@ -180,6 +183,15 @@ export class ConversationsArgs {
 
   @Field(() => ConversationStatus, { nullable: true, description: 'Those of this status alone.' })
   status?: ConversationStatus | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Those given to the member of staff asking alone (ADR-759).',
+  })
+  assignedToMe?: boolean | null;
+
+  @Field(() => Boolean, { nullable: true, description: 'Those given to no one alone.' })
+  unassigned?: boolean | null;
 }
 
 @ArgsType()

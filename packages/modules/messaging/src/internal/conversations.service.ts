@@ -70,6 +70,8 @@ export interface ConversationRecord {
   lastInboundAt: Date | null;
   createdAt: Date;
   lastMessage: ConversationMessageRecord | null;
+  /** The account of the member of staff it is given to, to answer (ADR-759); null for no one. */
+  assigneeId: string | null;
   /** When it last had a message, to the microsecond: where the next page starts. */
   lastMessageAtExactly: string;
 }
@@ -81,6 +83,10 @@ export interface ConversationsListOptions {
   /** Those with messages unread alone. */
   unread?: boolean;
   status?: ConversationStatusValue | null;
+  /** Those given to this member of staff alone, by their account (ADR-759). */
+  assigneeId?: string | null;
+  /** Those given to no one alone. */
+  unassigned?: boolean;
 }
 
 type ConversationRow = {
@@ -92,6 +98,7 @@ type ConversationRow = {
   last_message_at: string | Date;
   last_inbound_at: string | Date | null;
   created_at: string | Date;
+  assignee_id: string | null;
   last_message_at_exactly: string;
   message_id: string | null;
   direction: ConversationDirectionValue | null;
@@ -188,6 +195,8 @@ export class ConversationsService {
         ${conversationSelect(tenant.shopId)}
            ${options.unread ? sql`AND c.unread > 0` : sql``}
            ${options.status ? sql`AND c.status = ${options.status}` : sql``}
+           ${options.assigneeId ? sql`AND c.assignee_id = ${options.assigneeId}` : sql``}
+           ${options.unassigned ? sql`AND c.assignee_id IS NULL` : sql``}
            ${
              after
                ? sql`AND (c.last_message_at, c.id)
@@ -256,6 +265,52 @@ export class ConversationsService {
          WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
       return conversationIn(tx, tenant.shopId, id);
     });
+  }
+
+  /**
+   * Gives the conversation to a member of staff to answer, by their account, or to no one
+   * (ADR-759): the conversation after. Those who may not take conversations from others
+   * (`fromOthers`) take only one no one has, and give back only their own.
+   */
+  async assign(
+    tenant: TenantContext,
+    id: string,
+    assigneeId: string | null,
+    options: { fromOthers: boolean },
+  ): Promise<MutationResult<ConversationRecord>> {
+    const self = tenant.actor.kind === 'staff' ? tenant.actor.userId : null;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const found = await conversationIn(tx, tenant.shopId, id);
+      if (!found) return failOne<never>(['id'], 'NOT_FOUND', 'No such conversation');
+      if (found.assigneeId === assigneeId) return { ok: true as const, value: found };
+      if (!options.fromOthers && found.assigneeId !== null && found.assigneeId !== self) {
+        return failOne<never>(
+          ['id'],
+          'INVALID',
+          'The conversation is given to someone else; an owner or manager gives it to another',
+        );
+      }
+      await tx.execute(sql`
+        UPDATE messaging.conversations
+           SET assignee_id = ${assigneeId},
+               assigned_at = ${assigneeId ? sql`now()` : sql`NULL`}
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
+      return { ok: true as const, value: (await conversationIn(tx, tenant.shopId, id))! };
+    });
+  }
+
+  /**
+   * Gives back to no one the conversations given to a member of staff who left the shop, for
+   * others to take (ADR-759): how many.
+   */
+  async release(tenant: TenantContext, staffMemberId: string): Promise<number> {
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute(sql`
+        UPDATE messaging.conversations SET assignee_id = NULL, assigned_at = NULL
+         WHERE shop_id = ${tenant.shopId} AND assignee_id = ${staffMemberId}
+        RETURNING id`),
+    );
+    return rows.length;
   }
 
   /**
@@ -444,7 +499,7 @@ export class ConversationsService {
 function conversationSelect(shopId: string) {
   return sql`
     SELECT c.id, c.customer_phone, c.via_phone_number_id, c.status, c.unread, c.last_message_at,
-           c.last_inbound_at, c.created_at,
+           c.last_inbound_at, c.created_at, c.assignee_id,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
            m.id AS message_id, m.direction, m.body, m.media_kind, m.at,
            m.status AS message_status, m.error AS message_error
@@ -478,6 +533,7 @@ function toConversation(row: ConversationRow): ConversationRecord {
     lastMessageAt: toDate(row.last_message_at),
     lastInboundAt: toDateOrNull(row.last_inbound_at),
     createdAt: toDate(row.created_at),
+    assigneeId: row.assignee_id,
     lastMessage:
       row.message_id && row.direction && row.at
         ? toMessage({

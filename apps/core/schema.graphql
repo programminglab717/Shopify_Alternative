@@ -2658,6 +2658,10 @@ type ContactMessageUpdatePayload {
 A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to the shop's own number, or to Hatti's shared one in answer to the shop.
 """
 type Conversation {
+  """
+  The member of staff it is given to, to answer; null while no one has it, and once they leave the shop.
+  """
+  assignee: ConversationAssignee
   createdAt: DateTime!
 
   """The customer's number, masked as the caller may see it."""
@@ -2682,6 +2686,20 @@ type Conversation {
 
   """Whether they last wrote to the shop's own number."""
   viaOwnNumber: Boolean!
+}
+
+type ConversationAssignPayload {
+  conversation: Conversation
+  userErrors: [UserError!]!
+}
+
+"""
+The member of staff a conversation is given to, to answer (MSG-06): who they are, not how they sign in.
+"""
+type ConversationAssignee {
+  """Their account: usr_…"""
+  id: ID!
+  name: String!
 }
 
 type ConversationConnection {
@@ -8351,6 +8369,16 @@ type Mutation {
   """
   contactMessageMarkRead(id: ID!, read: Boolean = true): ContactMessageUpdatePayload!
 
+  """
+  Gives a conversation to a member of staff to answer, or, without staffMemberId, to no one (MSG-06); staff find theirs with `assignedToMe`. Those who give orders to others (owners, managers and apps) give conversations to anyone, and take them from whoever has them; other staff take one no one has for themselves, and give back their own.
+  """
+  conversationAssign(
+    id: ID!
+
+    """Their account: usr_…"""
+    staffMemberId: ID
+  ): ConversationAssignPayload!
+
   """Marks the conversation's messages read by the shop's staff."""
   conversationMarkRead(id: ID!): ConversationUpdatePayload!
 
@@ -13932,11 +13960,17 @@ type Query {
   conversations(
     after: String
 
+    """Those given to the member of staff asking alone (ADR-759)."""
+    assignedToMe: Boolean
+
     """1 to 250; default 50."""
     first: Int
 
     """Those of this status alone."""
     status: ConversationStatus
+
+    """Those given to no one alone."""
+    unassigned: Boolean
 
     """Those with messages unread alone."""
     unread: Boolean

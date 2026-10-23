@@ -4881,6 +4881,8 @@ export interface ConversationValue {
   replyableUntil: string | null;
   lastMessage: ConversationMessageValue | null;
   createdAt: string;
+  /** The member of staff it is given to, to answer (ADR-759). */
+  assignee: { id: string; name: string } | null;
 }
 
 export interface ConversationsData {

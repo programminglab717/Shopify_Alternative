@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-758 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-759 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -766,6 +766,7 @@
 | 756 | A Shopify store's discount codes come through its Admin API, a page of five at a time, each code made with its discount's value, minimum, dates, uses left and what it is for, and those the shop cannot give named | Accepted |
 | 757 | Variants get barcodes of the shop's own, EAN-13 numbers starting 2, and price labels are printed from the products list, 24 to a sheet of A4 or one to a label printer's 50×25 mm roll, each with its product, options, price and barcode | Accepted |
 | 758 | The inbox keeps the shop's saved replies, each a title and its words, at most 100, picked while answering and changed before sending | Accepted |
+| 759 | A conversation is given to a member of staff to answer, as an order is: those who give orders to others give it to anyone, others take one no one has, and whoever leaves gives theirs back | Accepted |
 
 ---
 
@@ -25669,3 +25670,26 @@
   given to staff with a time to answer by, are left for after this.
 * **Alternatives:** **WhatsApp Business's own quick replies** live in its app on one phone, not
   with the shop's other staff in the inbox.
+
+## ADR-759 · A conversation is given to a member of staff to answer, as an order is: those who give orders to others give it to anyone, others take one no one has, and whoever leaves gives theirs back
+
+* **Context:** with more than one agent on the inbox, two answer the same customer, or each
+  leaves a conversation to the other (MSG-06). Orders are already given to staff to see through,
+  with the same rules for who gives and who takes (ORD-10, ADR-127).
+* **Decision:**
+  * **Messaging keeps whom a conversation is given to,** by their account, and since when
+    (migration 0322); the core checks that they work in the shop, as it does for orders.
+  * **`conversationAssign`** gives a conversation to a member of staff, or to no one. Those who
+    give orders to others (`assign_orders`: owners, managers, custom roles that keep it) and
+    apps give it to anyone and take it from whoever has it; other staff who answer take one no
+    one has for themselves, and give back their own. One capability covers both, rather than a
+    second to set on every custom role.
+  * **`Conversation.assignee`** says who has it; **`conversations(assignedToMe:,
+    unassigned:)`** finds one's own, and those no one has. Whoever leaves the shop gives theirs
+    back, as their orders are.
+  * **The admin's inbox** has a *Mine* tab of one's open conversations, and each row says whose
+    it is. A conversation's page lets managers give it to anyone and others take it or give it
+    back; marketers see whose it is.
+* **Consequences:** a reply is still anyone's to send who answers the inbox; being given one
+  says who should, not who may. Telling staff when a conversation is given to them, and a time
+  to answer by, come after.

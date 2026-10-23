@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Conversations given to staff
+
+* **Each conversation has someone to answer it:** a manager gives it to an agent, or an agent
+  takes one no one has, and finds theirs under *Mine*; whoever leaves gives theirs back
+  ([ADR-759](../architecture/13-decision-log.md#adr-759--a-conversation-is-given-to-a-member-of-staff-to-answer-as-an-order-is-those-who-give-orders-to-others-give-it-to-anyone-others-take-one-no-one-has-and-whoever-leaves-gives-theirs-back)).
+* 4141 tests (5 new).
+
 ### bab0dee · Saved replies in the inbox
 
 * **Staff answer the same questions in a tap:** the shop keeps its answers, delivery charges,

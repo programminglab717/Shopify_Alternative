@@ -16,6 +16,8 @@ export {
   type ConversationRecord,
 } from '../internal/conversations.service.js';
 export { MESSAGING_CUSTOMER_DATA, MessagingCustomerData } from '../internal/customer-data.js';
+export { Conversation } from '../internal/graphql/conversation.types.js';
+export { toConversation } from '../internal/graphql/conversation.resolver.js';
 export {
   MessagingEvents,
   type ConversationMessageReceivedPayload,

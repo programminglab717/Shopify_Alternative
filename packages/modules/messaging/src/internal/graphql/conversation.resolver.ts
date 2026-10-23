@@ -56,12 +56,18 @@ export class ConversationResolver {
       after = decodeTimeCursor(args.after);
       if (!isUuid(after.id)) throw badUserInput('Invalid cursor');
     }
-    const { items, hasNextPage } = await this.inbox.list(tenant, {
-      first: pageSize(args.first),
-      after: after && { id: after.id, lastMessageAt: after.at },
-      unread: args.unread ?? false,
-      status: args.status ? (args.status.toLowerCase() as 'open' | 'closed') : null,
-    });
+    // An app is no member of staff, and is given none.
+    const me = tenant.actor.kind === 'staff' ? tenant.actor.userId : null;
+    const { items, hasNextPage } = await (args.assignedToMe && !me
+      ? Promise.resolve({ items: [], hasNextPage: false })
+      : this.inbox.list(tenant, {
+          first: pageSize(args.first),
+          after: after && { id: after.id, lastMessageAt: after.at },
+          unread: args.unread ?? false,
+          status: args.status ? (args.status.toLowerCase() as 'open' | 'closed') : null,
+          assigneeId: args.assignedToMe ? me : null,
+          unassigned: args.unassigned ?? false,
+        }));
     const edges = items.map((record) =>
       Object.assign(new ConversationEdge(), {
         node: toConversation(tenant, record),
@@ -195,7 +201,7 @@ function payload(
   });
 }
 
-function toConversation(tenant: TenantContext, record: ConversationRecord): Conversation {
+export function toConversation(tenant: TenantContext, record: ConversationRecord): Conversation {
   return Object.assign(new Conversation(), {
     id: toPublicId('conversation', record.id),
     customerPhone: shownPhone(tenant, record.customerPhone),
@@ -208,6 +214,7 @@ function toConversation(tenant: TenantContext, record: ConversationRecord): Conv
       record.lastInboundAt && new Date(record.lastInboundAt.getTime() + CONVERSATION_WINDOW_MS),
     lastMessage: record.lastMessage && toMessage(record.lastMessage),
     createdAt: record.createdAt,
+    assigneeId: record.assigneeId,
   });
 }
 

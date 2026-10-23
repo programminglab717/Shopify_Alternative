@@ -1191,6 +1191,78 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       });
     });
 
+    it('gives conversations to staff as orders are, and takes them back from whoever leaves (ADR-759)', async () => {
+      const { rows } = await admin.query<{ id: string }>(
+        `INSERT INTO messaging.conversations (shop_id, customer_phone, last_message_at)
+         VALUES ($1, '+923001110001', now() - interval '1 hour'), ($1, '+923001110002', now())
+         RETURNING id`,
+        [shopA],
+      );
+      const [first, second] = rows.map((row) => toPublicId('conversation', row.id));
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      const other = await signUp();
+      await grant(other.userId, shopA, 'confirmation_agent');
+      const [agentId, otherId] = [
+        toPublicId('user', agent.userId),
+        toPublicId('user', other.userId),
+      ];
+      const as = (token: string, query: string) =>
+        graphql(token, shopA, query).then((response) => response.json() as Json);
+      const assign = (token: string, id: string, staffMemberId: string | null) =>
+        as(
+          token,
+          `mutation { conversationAssign(id: "${id}"${staffMemberId ? `, staffMemberId: "${staffMemberId}"` : ''}) {
+             conversation { id assignee { id name } } userErrors { field code message } } }`,
+        );
+      const listed = async (token: string, filter: string) =>
+        (
+          await as(token, `{ conversations(first: 5, ${filter}) { nodes { id } } }`)
+        ).data.conversations.nodes.map((each: { id: string }) => each.id);
+
+      expect((await assign(manager.accessToken, first, agentId)).data.conversationAssign).toEqual({
+        conversation: { id: first, assignee: { id: agentId, name: 'Sana Iqbal' } },
+        userErrors: [],
+      });
+      expect(await listed(agent.accessToken, 'assignedToMe: true')).toEqual([first]);
+      expect(await listed(agent.accessToken, 'unassigned: true')).toEqual([second]);
+
+      // Other agents take one no one has for themselves, but leave someone else's alone.
+      expect((await assign(other.accessToken, first, agentId)).errors[0]).toMatchObject({
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+      expect(
+        (await assign(other.accessToken, first, otherId)).data.conversationAssign.userErrors,
+      ).toEqual([
+        {
+          field: ['id'],
+          code: 'INVALID',
+          message:
+            'The conversation is given to someone else; an owner or manager gives it to another',
+        },
+      ]);
+      expect(
+        (await assign(other.accessToken, second, otherId)).data.conversationAssign.conversation
+          .assignee,
+      ).toEqual({ id: otherId, name: 'Sana Iqbal' });
+      expect(
+        (await assign(manager.accessToken, second, toPublicId('user', newId()))).data
+          .conversationAssign.userErrors,
+      ).toEqual([
+        { field: ['staffMemberId'], code: 'NOT_FOUND', message: 'Staff member not found' },
+      ]);
+
+      // Whoever leaves gives back their conversations, for others to take.
+      await as(
+        manager.accessToken,
+        `mutation { staffMemberRemove(id: "${otherId}") { removedStaffMemberId } }`,
+      );
+      expect(await listed(manager.accessToken, 'unassigned: true')).toEqual([second]);
+    });
+
     it('shares new orders among the agents on duty at the desk, where the shop says so (ADR-654)', async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       const manager = await signUp();

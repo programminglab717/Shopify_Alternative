@@ -21,6 +21,7 @@ import {
   type StaffMemberRecord,
   type StaffRoleChoice,
 } from '@hatti/identity/public';
+import { ConversationsService } from '@hatti/messaging/public';
 import { OrderService } from '@hatti/orders/public';
 import { Optional } from '@nestjs/common';
 import {
@@ -300,6 +301,7 @@ export class StaffResolver {
   constructor(
     private readonly staff: StaffService,
     private readonly orders: OrderService,
+    private readonly inbox: ConversationsService,
     private readonly db: Database,
     /** The shop's plan's limit on staff (ADR-154); without it, none. */
     @Optional() private readonly allowance?: PlanAllowance,
@@ -652,8 +654,10 @@ export class StaffResolver {
       await this.audit(tenant, 'staff.removed', 'user', result.value.userId, {
         role: ROLES[result.value.role],
       });
-      // Their open orders go back to no one, for others to take (ADR-127).
+      // Their open orders and conversations go back to no one, for others to take (ADR-127,
+      // ADR-759).
       await this.orders.release(tenant, result.value.userId);
+      await this.inbox.release(tenant, result.value.userId);
     }
     return Object.assign(new StaffMemberRemovePayload(), {
       removedStaffMemberId: result.ok ? toPublicId('user', result.value.userId) : null,

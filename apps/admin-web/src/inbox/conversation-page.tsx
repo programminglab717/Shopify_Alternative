@@ -20,11 +20,13 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  ConversationAssignMutation,
   ConversationMarkReadMutation,
   ConversationMessagesQuery,
   ConversationQuery,
   ConversationReplyMutation,
   ConversationUpdateStatusMutation,
+  StaffQuery,
 } from '../api/operations';
 import type {
   ConversationData,
@@ -35,14 +37,17 @@ import type {
   ConversationStatus,
   ConversationUpdatePayload,
   ConversationValue,
+  StaffData,
 } from '../api/types';
-import { useSessionStore } from '../auth/context';
+import { useMe, useSessionStore } from '../auth/context';
 import { permits } from '../auth/permissions';
 import { shownPhone } from '../customers/customers-page';
+import { ASSIGNS } from '../orders/details';
 import { errorText, userErrorText } from '../i18n/errors';
 import { formatCount, formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -206,6 +211,87 @@ function ReplyBox({
 }
 
 /**
+ * Who answers the conversation (MSG-06, ADR-759): those who give orders to others give it to
+ * anyone on the staff, or to no one; others who answer take one no one has, and give back their
+ * own; marketers see who has it.
+ */
+function ConversationAssignment({
+  conversation,
+  works,
+}: {
+  conversation: ConversationValue;
+  works: boolean;
+}) {
+  const { t } = useLocale();
+  const shop = useShop();
+  const me = useMe().data?.user.id;
+  const leads = works && permits(shop, ASSIGNS);
+  const staff = useAdminQuery<StaffData>(['staff'], StaffQuery, undefined, { enabled: leads });
+  const assign = useAdminMutation<
+    { conversationAssign: ConversationUpdatePayload },
+    { id: string; staffMemberId: string | null }
+  >(ConversationAssignMutation);
+  const [problem, setProblem] = useState<string | null>(null);
+  const assignee = conversation.assignee ?? null;
+
+  const give = async (staffMemberId: string | null) => {
+    setProblem(null);
+    try {
+      const { conversationAssign } = await assign.mutateAsync({
+        id: conversation.id,
+        staffMemberId,
+      });
+      if (conversationAssign.userErrors[0]) {
+        setProblem(userErrorText(conversationAssign.userErrors[0], t));
+      }
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  if (!works) {
+    return assignee ? (
+      <p className="text-secondary">{t('inbox.givenTo', { name: assignee.name })}</p>
+    ) : null;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {leads ? (
+        <SelectField<string>
+          label={t('inbox.assignee')}
+          value={assignee?.id ?? ''}
+          options={[
+            { value: '', label: t('details.nobody') },
+            ...(staff.data?.staffMembers ?? (assignee ? [assignee] : [])).map((member) => ({
+              value: member.id,
+              label: member.id === me ? t('details.me', { name: member.name }) : member.name,
+            })),
+          ]}
+          onChange={(value) => void give(value || null)}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex-1">
+            {assignee ? t('inbox.givenTo', { name: assignee.name }) : t('inbox.nobodyYet')}
+          </span>
+          {!assignee && me && (
+            <Button variant="secondary" busy={assign.isPending} onClick={() => void give(me)}>
+              {t('inbox.take')}
+            </Button>
+          )}
+          {assignee?.id === me && (
+            <Button variant="tertiary" busy={assign.isPending} onClick={() => void give(null)}>
+              {t('details.giveBack')}
+            </Button>
+          )}
+        </div>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
+/**
  * A conversation with a customer on WhatsApp (MSG-05, ADR-546): its messages, the oldest first and
  * older ones a page at a time. Those who work the inbox read it as it opens, close it or open it
  * again, and answer in the shop's own words; marketers only read.
@@ -338,6 +424,7 @@ export function ConversationPage() {
           </Button>
         )}
       </header>
+      <ConversationAssignment conversation={conversation} works={works} />
       {closed && <Alert tone="info">{t('inbox.closedNote')}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
       <Card className="flex flex-col gap-3 p-4">

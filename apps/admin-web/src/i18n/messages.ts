@@ -5526,6 +5526,13 @@ const en = {
   'inbox.tab.CLOSED': 'Closed',
   'inbox.tab.FORM': 'Contact form',
   'inbox.tab.REPLIES': 'Saved replies',
+  'inbox.tab.MINE': 'Mine',
+  'inbox.noneMine': 'None given to you',
+  'inbox.noneMineHint': 'Conversations given to you to answer, still open, show here.',
+  'inbox.givenTo': 'Given to {name}',
+  'inbox.assignee': 'Given to',
+  'inbox.nobodyYet': 'No one is answering it yet',
+  'inbox.take': 'Answer it myself',
   'savedReplies.intro':
     'What the shop answers again and again, kept to put in a reply in a tap and change before sending.',
   'savedReplies.new': 'New saved reply',
@@ -11177,6 +11184,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'inbox.tab.CLOSED': 'بند',
   'inbox.tab.FORM': 'رابطہ فارم',
   'inbox.tab.REPLIES': 'محفوظ جوابات',
+  'inbox.tab.MINE': 'میرے',
+  'inbox.noneMine': 'آپ کو کوئی نہیں دی گئی',
+  'inbox.noneMineHint':
+    'جو بات چیت آپ کو جواب دینے کے لیے دی گئی ہو اور ابھی کھلی ہو، یہاں نظر آئے گی۔',
+  'inbox.givenTo': '{name} کے پاس',
+  'inbox.assignee': 'کس کے پاس',
+  'inbox.nobodyYet': 'ابھی کوئی جواب نہیں دے رہا',
+  'inbox.take': 'میں خود جواب دوں گا',
   'savedReplies.intro':
     'دکان جو جواب بار بار دیتی ہے، ایک ٹیپ میں جواب میں ڈالنے اور بھیجنے سے پہلے بدلنے کے لیے محفوظ۔',
   'savedReplies.new': 'نیا محفوظ جواب',

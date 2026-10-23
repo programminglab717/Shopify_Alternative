@@ -37,7 +37,7 @@ export const WORKS_INBOX = gate(['owner', 'manager', 'confirmation_agent'], 'wri
  * The conversations' tabs, the contact form's messages beside them (ADR-590), and the saved
  * replies (ADR-758).
  */
-type InboxTab = 'open' | 'unread' | 'closed' | 'form' | 'replies';
+type InboxTab = 'open' | 'mine' | 'unread' | 'closed' | 'form' | 'replies';
 
 /** The inbox's search: which tab, the open conversations when none. */
 export interface InboxSearch {
@@ -46,7 +46,13 @@ export interface InboxSearch {
 
 export function validateInboxSearch(search: Record<string, unknown>): InboxSearch {
   const tab = search.tab;
-  return tab === 'unread' || tab === 'closed' || tab === 'form' || tab === 'replies' ? { tab } : {};
+  return tab === 'mine' ||
+    tab === 'unread' ||
+    tab === 'closed' ||
+    tab === 'form' ||
+    tab === 'replies'
+    ? { tab }
+    : {};
 }
 
 /** Each tab: its name, what it asks the API for, and what it says when empty. */
@@ -56,6 +62,7 @@ const TABS: Record<
     label: MessageKey;
     status: ConversationStatus | null;
     unread: boolean | null;
+    assignedToMe?: boolean;
     none: MessageKey;
     noneHint: MessageKey;
   }
@@ -66,6 +73,14 @@ const TABS: Record<
     unread: null,
     none: 'inbox.noneOpen',
     noneHint: 'inbox.noneOpenHint',
+  },
+  mine: {
+    label: 'inbox.tab.MINE',
+    status: 'OPEN',
+    unread: null,
+    assignedToMe: true,
+    none: 'inbox.noneMine',
+    noneHint: 'inbox.noneMineHint',
   },
   unread: {
     label: 'inbox.tab.UNREAD',
@@ -150,6 +165,11 @@ function ConversationRow({
             </span>
             {unread && <UnreadBadge count={conversation.unread} />}
           </span>
+          {conversation.assignee && (
+            <span className="text-secondary text-[length:var(--hatti-type-caption-size)]">
+              {t('inbox.givenTo', { name: conversation.assignee.name })}
+            </span>
+          )}
         </span>
         <ChevronRight aria-hidden className="size-5 shrink-0 text-secondary rtl:rotate-180" />
       </Link>
@@ -252,7 +272,7 @@ function Conversations({ tab }: { tab: Exclude<InboxTab, 'form' | 'replies'> }) 
   const store = useSessionStore();
   const shop = useShop();
   const timezone = useShopTimezone();
-  const { status, unread, none, noneHint } = TABS[tab];
+  const { status, unread, assignedToMe = null, none, noneHint } = TABS[tab];
 
   const conversations = useInfiniteQuery({
     queryKey: ['admin', shop.id, 'conversations', tab],
@@ -262,6 +282,7 @@ function Conversations({ tab }: { tab: Exclude<InboxTab, 'form' | 'replies'> }) 
         after: pageParam,
         status,
         unread,
+        assignedToMe,
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>

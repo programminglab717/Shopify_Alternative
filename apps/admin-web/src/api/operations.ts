@@ -10166,6 +10166,10 @@ const CONVERSATION = /* GraphQL */ `
       ...ConversationMessageFields
     }
     createdAt
+    assignee {
+      id
+      name
+    }
   }
   ${CONVERSATION_MESSAGE}
 `;
@@ -10193,8 +10197,20 @@ const CONTACT_MESSAGE = /* GraphQL */ `
 `;
 
 export const ConversationsQuery = /* GraphQL */ `
-  query Conversations($first: Int, $after: String, $unread: Boolean, $status: ConversationStatus) {
-    conversations(first: $first, after: $after, unread: $unread, status: $status) {
+  query Conversations(
+    $first: Int
+    $after: String
+    $unread: Boolean
+    $status: ConversationStatus
+    $assignedToMe: Boolean
+  ) {
+    conversations(
+      first: $first
+      after: $after
+      unread: $unread
+      status: $status
+      assignedToMe: $assignedToMe
+    ) {
       nodes {
         ...ConversationFields
       }
@@ -10361,6 +10377,22 @@ export const SavedReplyDeleteMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+/** A conversation given to a member of staff to answer, or to no one (ADR-759). */
+export const ConversationAssignMutation = /* GraphQL */ `
+  mutation ConversationAssign($id: ID!, $staffMemberId: ID) {
+    conversationAssign(id: $id, staffMemberId: $staffMemberId) {
+      conversation {
+        ...ConversationFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONVERSATION}
   ${USER_ERRORS}
 `;
 

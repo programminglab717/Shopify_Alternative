@@ -201,8 +201,8 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
     expect(screen.getByText('0333 1234567')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
     expect(sentOf(core, 'Conversations')).toEqual([
-      { first: 50, after: null, status: 'OPEN', unread: null },
-      { first: 50, after: 'cur_2', status: 'OPEN', unread: null },
+      { first: 50, after: null, status: 'OPEN', unread: null, assignedToMe: null },
+      { first: 50, after: 'cur_2', status: 'OPEN', unread: null, assignedToMe: null },
     ]);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Unread' }));
@@ -213,6 +213,7 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
       after: null,
       status: null,
       unread: true,
+      assignedToMe: null,
     });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Closed' }));
