@@ -1,4 +1,11 @@
-import { actorColumnsOf, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  actorColumnsOf,
+  fail,
+  failOne,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Inject, Injectable, Optional } from '@nestjs/common';
@@ -27,6 +34,9 @@ export const CONVERSATION_WINDOW_MS = 24 * 3_600_000;
 
 /** The longest reply WhatsApp takes, in characters. */
 export const REPLY_MAX_LENGTH = 4096;
+
+/** How many labels a conversation has at most, and how long each is (ADR-764). */
+export const CONVERSATION_LABEL_LIMITS = { perConversation: 10, length: 40, listed: 100 } as const;
 
 export type ConversationStatusValue = 'open' | 'closed';
 export type ConversationDirectionValue = 'inbound' | 'outbound';
@@ -80,6 +90,8 @@ export interface ConversationRecord {
   waitingSince: Date | null;
   /** When the shop means to have answered them by, its reply target after that; null for none. */
   answerBy: Date | null;
+  /** What the customer writes about, as the shop's staff labelled it (ADR-764). */
+  labels: string[];
   /** When it last had a message, to the microsecond: where the next page starts. */
   lastMessageAtExactly: string;
 }
@@ -97,7 +109,15 @@ export interface ConversationsListOptions {
   unassigned?: boolean;
   /** Those waiting for an answer past the shop's reply target alone (ADR-760). */
   overdue?: boolean;
+  /** Those with this label alone, as the shop writes it (ADR-764). */
+  label?: string | null;
 }
+
+/** A label the shop's conversations have, and how many open ones have it (ADR-764). */
+export type ConversationLabelRecord = {
+  name: string;
+  open: number;
+};
 
 type ConversationRow = {
   id: string;
@@ -111,6 +131,7 @@ type ConversationRow = {
   assignee_id: string | null;
   waiting_since: string | Date | null;
   answer_by: string | Date | null;
+  labels: string[];
   last_message_at_exactly: string;
   message_id: string | null;
   direction: ConversationDirectionValue | null;
@@ -220,6 +241,7 @@ export class ConversationsService {
            ${options.assigneeId ? sql`AND c.assignee_id = ${options.assigneeId}` : sql``}
            ${options.unassigned ? sql`AND c.assignee_id IS NULL` : sql``}
            ${options.overdue ? sql`AND ${ANSWER_BY} < now()` : sql``}
+           ${options.label ? sql`AND c.labels @> ARRAY[${options.label}]::text[]` : sql``}
            ${
              after
                ? sql`AND (c.last_message_at, c.id)
@@ -337,6 +359,71 @@ export class ConversationsService {
       });
       return { ok: true as const, value: (await conversationIn(tx, tenant.shopId, id))! };
     });
+  }
+
+  /**
+   * Labels the conversation with what the customer writes about, in place of its labels before
+   * (ADR-764): the conversation after. A label the shop already uses, in any case, is written as
+   * the shop writes it, so that one label is not two.
+   */
+  async setLabels(
+    tenant: TenantContext,
+    id: string,
+    labels: readonly string[],
+  ): Promise<MutationResult<ConversationRecord>> {
+    const check = new InputChecker();
+    const given = check.tags(['labels'], [...labels]);
+    if (given.some((label) => label.length > CONVERSATION_LABEL_LIMITS.length)) {
+      check.add(
+        ['labels'],
+        'TOO_LONG',
+        `contain a label longer than ${CONVERSATION_LABEL_LIMITS.length} characters`,
+      );
+    }
+    if (given.length > CONVERSATION_LABEL_LIMITS.perConversation) {
+      check.add(
+        ['labels'],
+        'TOO_MANY',
+        `can have at most ${CONVERSATION_LABEL_LIMITS.perConversation}`,
+      );
+    }
+    if (!check.ok) return fail(check.errors);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const found = await conversationIn(tx, tenant.shopId, id);
+      if (!found) return failOne<never>(['id'], 'NOT_FOUND', 'No such conversation');
+      const { rows } = await tx.execute<{ label: string }>(sql`
+        SELECT DISTINCT ON (lower(l.label)) l.label
+          FROM messaging.conversations c, unnest(c.labels) AS l(label)
+         WHERE c.shop_id = ${tenant.shopId} AND c.id <> ${id}
+           AND lower(l.label) IN (${sql.join(
+             given.length > 0 ? given.map((label) => sql`${label.toLowerCase()}`) : [sql`NULL`],
+             sql`, `,
+           )})
+         ORDER BY lower(l.label), l.label`);
+      const used = new Map(rows.map((row) => [row.label.toLowerCase(), row.label]));
+      const next = given.map((label) => used.get(label.toLowerCase()) ?? label);
+      await tx.execute(sql`
+        UPDATE messaging.conversations SET labels = ${sql.param(next)}::text[]
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
+      return { ok: true as const, value: (await conversationIn(tx, tenant.shopId, id))! };
+    });
+  }
+
+  /**
+   * The labels the shop's conversations have, by name, with how many open ones have each
+   * (ADR-764): the first 100.
+   */
+  async labels(tenant: TenantContext): Promise<ConversationLabelRecord[]> {
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<ConversationLabelRecord>(sql`
+        SELECT l.label AS name, count(*) FILTER (WHERE c.status = 'open')::int AS open
+          FROM messaging.conversations c, unnest(c.labels) AS l(label)
+         WHERE c.shop_id = ${tenant.shopId}
+         GROUP BY l.label
+         ORDER BY lower(l.label), l.label
+         LIMIT ${CONVERSATION_LABEL_LIMITS.listed}`),
+    );
+    return rows;
   }
 
   /**
@@ -603,7 +690,7 @@ const ANSWER_BY = sql`(c.waiting_since + make_interval(mins => (
 function conversationSelect(shopId: string) {
   return sql`
     SELECT c.id, c.customer_phone, c.via_phone_number_id, c.status, c.unread, c.last_message_at,
-           c.last_inbound_at, c.created_at, c.assignee_id, c.waiting_since,
+           c.last_inbound_at, c.created_at, c.assignee_id, c.waiting_since, c.labels,
            ${ANSWER_BY} AS answer_by,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
            m.id AS message_id, m.direction, m.body, m.media_kind, m.at,
@@ -641,6 +728,7 @@ function toConversation(row: ConversationRow): ConversationRecord {
     assigneeId: row.assignee_id,
     waitingSince: toDateOrNull(row.waiting_since),
     answerBy: toDateOrNull(row.answer_by),
+    labels: row.labels,
     lastMessage:
       row.message_id && row.direction && row.at
         ? toMessage({

@@ -10196,6 +10196,7 @@ const CONVERSATION = /* GraphQL */ `
     }
     waitingSince
     answerBy
+    labels
   }
   ${CONVERSATION_MESSAGE}
 `;
@@ -10230,6 +10231,7 @@ export const ConversationsQuery = /* GraphQL */ `
     $status: ConversationStatus
     $assignedToMe: Boolean
     $overdue: Boolean
+    $label: String
   ) {
     conversations(
       first: $first
@@ -10238,6 +10240,7 @@ export const ConversationsQuery = /* GraphQL */ `
       status: $status
       assignedToMe: $assignedToMe
       overdue: $overdue
+      label: $label
     ) {
       nodes {
         ...ConversationFields
@@ -10249,8 +10252,38 @@ export const ConversationsQuery = /* GraphQL */ `
     }
     conversationsUnreadCount
     conversationsOverdueCount
+    conversationLabels {
+      name
+      open
+    }
   }
   ${CONVERSATION}
+`;
+
+/** The labels the shop's conversations have, to choose from (ADR-764). */
+export const ConversationLabelsQuery = /* GraphQL */ `
+  query ConversationLabels {
+    conversationLabels {
+      name
+      open
+    }
+  }
+`;
+
+/** A conversation's labels, in place of those before (ADR-764). */
+export const ConversationLabelsSetMutation = /* GraphQL */ `
+  mutation ConversationLabelsSet($id: ID!, $labels: [String!]!) {
+    conversationLabelsSet(id: $id, labels: $labels) {
+      conversation {
+        ...ConversationFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONVERSATION}
+  ${USER_ERRORS}
 `;
 
 /** What shoppers wrote through the online store's contact form, the latest first (ADR-590). */

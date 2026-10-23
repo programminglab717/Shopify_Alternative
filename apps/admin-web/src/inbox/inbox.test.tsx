@@ -39,6 +39,7 @@ function conversation(id: string, customerPhone: string, extra: object = {}) {
     replyableUntil: LATER,
     lastMessage: null as Message | null,
     createdAt: ago(600),
+    labels: [] as string[],
     ...extra,
   };
 }
@@ -201,7 +202,15 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
     expect(screen.getByText('0333 1234567')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
     expect(sentOf(core, 'Conversations')).toEqual([
-      { first: 50, after: null, status: 'OPEN', unread: null, assignedToMe: null, overdue: null },
+      {
+        first: 50,
+        after: null,
+        status: 'OPEN',
+        unread: null,
+        assignedToMe: null,
+        overdue: null,
+        label: null,
+      },
       {
         first: 50,
         after: 'cur_2',
@@ -209,6 +218,7 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
         unread: null,
         assignedToMe: null,
         overdue: null,
+        label: null,
       },
     ]);
 
@@ -222,6 +232,7 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
       unread: true,
       assignedToMe: null,
       overdue: null,
+      label: null,
     });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Closed' }));

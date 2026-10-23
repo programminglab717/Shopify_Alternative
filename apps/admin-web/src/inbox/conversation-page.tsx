@@ -51,6 +51,7 @@ import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { ConversationLabels } from './conversation-labels';
 import { mediaLabel, UnreadBadge, WORKS_INBOX } from './inbox-page';
 import { SavedReplyPicker } from './saved-replies';
 
@@ -425,6 +426,7 @@ export function ConversationPage() {
         )}
       </header>
       <ConversationAssignment conversation={conversation} works={works} />
+      <ConversationLabels conversation={conversation} works={works} />
       {closed && <Alert tone="info">{t('inbox.closedNote')}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
       <Card className="flex flex-col gap-3 p-4">

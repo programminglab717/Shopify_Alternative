@@ -23,6 +23,7 @@ import {
   Conversation,
   ConversationConnection,
   ConversationEdge,
+  ConversationLabel,
   ConversationMessage,
   ConversationMessageConnection,
   ConversationMessageDirection,
@@ -68,6 +69,7 @@ export class ConversationResolver {
           assigneeId: args.assignedToMe ? me : null,
           unassigned: args.unassigned ?? false,
           overdue: args.overdue ?? false,
+          label: args.label?.trim() || null,
         }));
     const edges = items.map((record) =>
       Object.assign(new ConversationEdge(), {
@@ -112,6 +114,17 @@ export class ConversationResolver {
   @RequireScopes('read_conversations')
   async conversationsOverdueCount(@CurrentTenant() tenant: TenantContext): Promise<number> {
     return this.inbox.overdueCount(tenant);
+  }
+
+  @Query(() => [ConversationLabel], {
+    description:
+      "The labels the shop's conversations have, by name, with how many open ones have each " +
+      '(ADR-764): the first 100.',
+  })
+  @RequireScopes('read_conversations')
+  async conversationLabels(@CurrentTenant() tenant: TenantContext): Promise<ConversationLabel[]> {
+    const labels = await this.inbox.labels(tenant);
+    return labels.map((label) => Object.assign(new ConversationLabel(), label));
   }
 
   @Query(() => ConversationMessageConnection, {
@@ -176,6 +189,28 @@ export class ConversationResolver {
     );
   }
 
+  @Mutation(() => ConversationUpdatePayload, {
+    description:
+      'Labels the conversation with what the customer writes about, in place of its labels ' +
+      'before: up to 10, of up to 40 characters each; none takes them all off (ADR-764). A ' +
+      'label the shop already uses, in any case, is written as the shop writes it.',
+  })
+  @RequireScopes('write_conversations')
+  async conversationLabelsSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('labels', { type: () => [String] }) labels: string[],
+  ): Promise<ConversationUpdatePayload> {
+    const uuid = tryFromPublicId(id, 'conversation');
+    const result = uuid
+      ? await this.inbox.setLabels(tenant, uuid, labels)
+      : failOne<never>(['id'], 'NOT_FOUND', 'No such conversation');
+    return Object.assign(new ConversationUpdatePayload(), {
+      conversation: result.ok ? toConversation(tenant, result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
   @Mutation(() => ConversationReplyPayload, {
     description:
       "Answers the customer on WhatsApp in the shop's own words, from the number they wrote to: " +
@@ -224,6 +259,7 @@ export function toConversation(tenant: TenantContext, record: ConversationRecord
       record.lastInboundAt && new Date(record.lastInboundAt.getTime() + CONVERSATION_WINDOW_MS),
     waitingSince: record.waitingSince,
     answerBy: record.answerBy,
+    labels: record.labels,
     lastMessage: record.lastMessage && toMessage(record.lastMessage),
     createdAt: record.createdAt,
     assigneeId: record.assigneeId,

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Labels on the inbox's conversations
+
+* **Staff sort the inbox by what customers write about:** a conversation is labelled "delivery",
+  "size" or "refund" in the shop's own words, and the inbox shows those with one label, with how
+  many open ones have each ([ADR-764](../architecture/13-decision-log.md#adr-764--the-inboxs-conversations-carry-labels-of-what-the-customer-writes-about-written-as-the-shop-already-writes-them-and-the-inbox-shows-those-with-one-label-alone)).
+* 4160 tests (8 new).
+
 ### 0afce9c · The inbox's reply times
 
 * **Owners see how fast the inbox answers:** how many customers who waited were answered, the

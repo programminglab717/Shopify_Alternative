@@ -2674,6 +2674,11 @@ type Conversation {
   id: ID!
 
   """
+  What the customer writes about, as the shop's staff labelled it (ADR-764).
+  """
+  labels: [String!]!
+
+  """
   When the customer last wrote: WhatsApp lets the shop answer freely for a day.
   """
   lastInboundAt: DateTime
@@ -2721,6 +2726,14 @@ type ConversationConnection {
 type ConversationEdge {
   cursor: String!
   node: Conversation!
+}
+
+"""A label the shop's conversations have (ADR-764)."""
+type ConversationLabel {
+  name: String!
+
+  """How many open conversations have it."""
+  open: Int!
 }
 
 """A message of a conversation with a customer (ADR-545)."""
@@ -8440,6 +8453,11 @@ type Mutation {
     staffMemberId: ID
   ): ConversationAssignPayload!
 
+  """
+  Labels the conversation with what the customer writes about, in place of its labels before: up to 10, of up to 40 characters each; none takes them all off (ADR-764). A label the shop already uses, in any case, is written as the shop writes it.
+  """
+  conversationLabelsSet(id: ID!, labels: [String!]!): ConversationUpdatePayload!
+
   """Marks the conversation's messages read by the shop's staff."""
   conversationMarkRead(id: ID!): ConversationUpdatePayload!
 
@@ -14010,6 +14028,11 @@ type Query {
   contactMessagesUnreadCount: Int!
   conversation(id: ID!): Conversation
 
+  """
+  The labels the shop's conversations have, by name, with how many open ones have each (ADR-764): the first 100.
+  """
+  conversationLabels: [ConversationLabel!]!
+
   """A conversation's messages, the latest first, a page at a time."""
   conversationMessages(
     """The messages before this one: the last the page before showed."""
@@ -14029,6 +14052,9 @@ type Query {
 
     """1 to 250; default 50."""
     first: Int
+
+    """Those with this label alone, as the shop writes it (ADR-764)."""
+    label: String
 
     """
     Those waiting for an answer past the shop's reply target alone (ADR-760).

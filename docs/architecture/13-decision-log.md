@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-763 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-764 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -771,6 +771,7 @@
 | 761 | The inbox pushed to staff's phones: a customer who begins waiting on WhatsApp, to whom the conversation is given or else all who answer, and a conversation given to its member | Accepted |
 | 762 | A customer waiting past the shop's time to answer is pushed, once a wait, to whom the conversation is given or else all who answer, by a sweep of the worker | Accepted |
 | 763 | Each answer to a customer who waited is kept with how long they waited and who answered; the inbox's reply times are reported from them, for the shop and for each who answered | Accepted |
+| 764 | The inbox's conversations carry labels of what the customer writes about, written as the shop already writes them, and the inbox shows those with one label alone | Accepted |
 
 ---
 
@@ -25784,3 +25785,26 @@
     apps by what they were.
 * **Consequences:** answers before this change were not kept, so the report starts empty. Only
   answers end waits, so a conversation closed without one is not counted as answered.
+
+## ADR-764 · The inbox's conversations carry labels of what the customer writes about, written as the shop already writes them, and the inbox shows those with one label alone
+
+* **Context:** an inbox busy with delivery questions, size questions and refunds is read one
+  conversation at a time; staff could not sort it by what customers write about, nor see how
+  many open ones are about delivery (MSG-06).
+* **Decision:**
+  * **Labels on the conversation** (migration 0327): `messaging.conversations.labels`, up to 10
+    of up to 40 characters each, indexed for finding those with one. Set whole by
+    `conversationLabelsSet(id, labels)` with `write_conversations`; none takes them all off.
+    Blanks and repeats in any case are dropped.
+  * **One label, not two:** a label the shop already uses on another conversation, in any case,
+    is written as the shop writes it, so "delivery" given to one and "Delivery" to another is
+    one label to filter by.
+  * **`conversations(label:)`** shows those with the label alone; **`conversationLabels`** lists
+    the shop's labels by name, the first 100, with how many open conversations have each.
+  * **The admin:** the conversation's labels under who answers it, added from the shop's labels
+    or new ones and taken off with a tap; marketers see them alone. The inbox's rows show their
+    labels, and a row of the shop's labels with their open counts shows those with one, kept
+    across the tabs.
+* **Consequences:** labels are the shop's own words, not a fixed list, so no settings page is
+  needed; a label is gone when no conversation has it. Labels are not events: nothing is told
+  of them, and the activity log does not keep them.

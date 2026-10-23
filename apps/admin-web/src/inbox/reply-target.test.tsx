@@ -27,6 +27,7 @@ function targetCore() {
     assignee: null,
     waitingSince,
     answerBy,
+    labels: [] as string[],
   }));
   return fakeCore('confirmation_agent', (operation, variables) => {
     if (operation !== 'Conversations') throw new Error(`unexpected ${operation}`);

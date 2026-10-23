@@ -155,6 +155,11 @@ export class Conversation {
   })
   answerBy!: Date | null;
 
+  @Field(() => [String], {
+    description: "What the customer writes about, as the shop's staff labelled it (ADR-764).",
+  })
+  labels!: string[];
+
   @Field(() => ConversationMessage, { nullable: true })
   lastMessage!: ConversationMessage | null;
 
@@ -214,6 +219,21 @@ export class ConversationsArgs {
     description: "Those waiting for an answer past the shop's reply target alone (ADR-760).",
   })
   overdue?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Those with this label alone, as the shop writes it (ADR-764).',
+  })
+  label?: string | null;
+}
+
+@ObjectType({ description: "A label the shop's conversations have (ADR-764)." })
+export class ConversationLabel {
+  @Field()
+  name!: string;
+
+  @Field(() => Int, { description: 'How many open conversations have it.' })
+  open!: number;
 }
 
 @ArgsType()

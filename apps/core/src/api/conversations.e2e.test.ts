@@ -509,4 +509,48 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
     const refused = await gql(tokens.none, query, period);
     expect(refused.errors?.[0]).toMatchObject({ extensions: { code: 'ACCESS_DENIED' } });
   });
+
+  it('labels conversations with what customers write about, and lists those with a label (ADR-764)', async () => {
+    const { rows } = await admin.query<{ id: string }>(
+      `INSERT INTO messaging.conversations (shop_id, customer_phone, last_message_at)
+       VALUES ($1, '+923001119999', now() - interval '1 hour'), ($1, '+923001118888', now())
+       RETURNING id`,
+      [shop],
+    );
+    const [first, second] = rows.map((row) => toPublicId('conversation', row.id)) as [
+      string,
+      string,
+    ];
+    const label = `mutation ($id: ID!, $labels: [String!]!) {
+      conversationLabelsSet(id: $id, labels: $labels) {
+        conversation { id labels }
+        userErrors { field code message }
+      } }`;
+    expect(await data(tokens.writer, label, { id: first, labels: ['Delivery', 'size'] })).toEqual({
+      conversation: { id: first, labels: ['Delivery', 'size'] },
+      userErrors: [],
+    });
+    expect(await data(tokens.writer, label, { id: second, labels: ['delivery'] })).toEqual({
+      conversation: { id: second, labels: ['Delivery'] },
+      userErrors: [],
+    });
+    const labelled = `query ($label: String) {
+      conversations(label: $label) { nodes { id labels } } }`;
+    expect((await data(tokens.reader, labelled, { label: 'size' })).nodes).toEqual([
+      { id: first, labels: ['Delivery', 'size'] },
+    ]);
+    expect(await data(tokens.reader, '{ conversationLabels { name open } }')).toEqual([
+      { name: 'Delivery', open: 2 },
+      { name: 'size', open: 1 },
+    ]);
+    expect(await data(tokens.other, '{ conversationLabels { name open } }')).toEqual([]);
+    expect(await data(tokens.other, label, { id: first, labels: ['mine'] })).toMatchObject({
+      conversation: null,
+      userErrors: [{ code: 'NOT_FOUND' }],
+    });
+    const tooLong = await data(tokens.writer, label, { id: first, labels: ['x'.repeat(41)] });
+    expect(tooLong.userErrors).toMatchObject([{ field: ['labels'], code: 'TOO_LONG' }]);
+    const readOnly = await gql(tokens.reader, label, { id: first, labels: [] });
+    expect(readOnly.errors?.[0]).toMatchObject({ extensions: { code: 'ACCESS_DENIED' } });
+  });
 });

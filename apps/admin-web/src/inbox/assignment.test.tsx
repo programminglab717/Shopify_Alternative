@@ -28,6 +28,7 @@ function assignmentCore(role: StaffRole) {
     lastMessage: null,
     createdAt: ago(600),
     assignee,
+    labels: [] as string[],
   }));
   const find = (id: unknown) => conversations.find((each) => each.id === id)!;
   return fakeCore(role, (operation, variables) => {

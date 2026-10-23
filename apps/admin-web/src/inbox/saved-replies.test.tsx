@@ -23,6 +23,7 @@ function repliesCore(role: StaffRole = 'confirmation_agent') {
     replyableUntil: LATER,
     lastMessage: null,
     createdAt: ago(600),
+    labels: [] as string[],
   };
   const byTitle = () => kept.slice().sort((a, b) => a.title.localeCompare(b.title));
   const taken = (title: string, except: string | null) =>

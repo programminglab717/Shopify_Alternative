@@ -4888,6 +4888,14 @@ export interface ConversationValue {
   /** Since when the customer has waited for an answer, and by when to give it (ADR-760). */
   waitingSince: string | null;
   answerBy: string | null;
+  /** What the customer writes about, as the shop's staff labelled it (ADR-764). */
+  labels: string[];
+}
+
+/** A label the shop's conversations have, and how many open ones have it (ADR-764). */
+export interface ConversationLabelValue {
+  name: string;
+  open: number;
 }
 
 /** How long customers waited for answers, of the shop or of one who answered (ADR-763). */
@@ -4917,6 +4925,7 @@ export interface ConversationsData {
   };
   conversationsUnreadCount: number;
   conversationsOverdueCount: number;
+  conversationLabels: ConversationLabelValue[];
 }
 
 /** What a shopper wrote through the online store's contact form (ADR-589). */
