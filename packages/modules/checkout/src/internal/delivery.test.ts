@@ -15,6 +15,7 @@ import {
   expectedDeliveryOn,
   offeredSlot,
   offeredSlots,
+  slotsWithRoom,
   type DeliverySettingsInput,
   type DeliverySettingsRecord,
 } from './delivery.js';
@@ -242,6 +243,7 @@ describe('Delivery charges', () => {
       slots: [],
       slotDays: 7,
       slotLeadHours: 2,
+      slotCapacity: null,
     });
     // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
@@ -255,6 +257,7 @@ describe('Delivery charges', () => {
       slots: [],
       slotDays: 7,
       slotLeadHours: 2,
+      slotCapacity: null,
     });
     expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
     expect(
@@ -469,7 +472,12 @@ describe.skipIf(!server)('DeliveryService', () => {
   });
 
   it('keeps the times of the day the shop delivers in, recording a change of them (ADR-768)', async () => {
-    expect(await f.delivery.get(f.a)).toMatchObject({ slots: [], slotDays: 7, slotLeadHours: 2 });
+    expect(await f.delivery.get(f.a)).toMatchObject({
+      slots: [],
+      slotDays: 7,
+      slotLeadHours: 2,
+      slotCapacity: null,
+    });
     const slots = [
       { from: '10:00', until: '13:00' },
       { from: '16:00', until: '19:00' },
@@ -485,9 +493,12 @@ describe.skipIf(!server)('DeliveryService', () => {
     expect(await f.delivery.get(f.a)).toMatchObject({ slots, slotDays: 3, slotLeadHours: 24 });
     unwrap(await f.delivery.update(f.a, { slots: [] }));
     expect((await f.delivery.get(f.a)).slots).toEqual([]);
+    // How many orders a slot takes (ADR-772).
+    unwrap(await f.delivery.update(f.a, { slotCapacity: 4 }));
+    expect((await f.delivery.get(f.a)).slotCapacity).toBe(4);
     expect(
       (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
-    ).toEqual([['slots', 'slotDays'], ['slotLeadHours'], ['slots']]);
+    ).toEqual([['slots', 'slotDays'], ['slotLeadHours'], ['slots'], ['slotCapacity']]);
     await expect(
       f.admin.query(`UPDATE checkout.delivery_settings SET slot_days = 0 WHERE shop_id = $1`, [
         f.a.shopId,
@@ -585,6 +596,43 @@ describe('Delivery time slots (CHK-15, ADR-768)', () => {
     expect(offeredSlot(SLOTS, '2026-10-23T10:00-13:00', now)).toBeNull();
     expect(offeredSlot(SLOTS, '2026-10-25T10:00-13:00', now)).toBeNull();
     expect(offeredSlots(NO_DELIVERY_SETTINGS, now)).toEqual([]);
+  });
+});
+
+describe('How many orders a delivery slot takes (CHK-15, ADR-772)', () => {
+  it('takes a limit from 1 to 1,000, or none, and offers only slots with room', () => {
+    expect(checked({ slotCapacity: 5 })).toMatchObject({ slotCapacity: 5 });
+    expect(checked({ charge: '100' }, { ...NO_DELIVERY_SETTINGS, slotCapacity: 5 })).toMatchObject({
+      slotCapacity: 5,
+    });
+    expect(
+      checked({ slotCapacity: null }, { ...NO_DELIVERY_SETTINGS, slotCapacity: 5 }),
+    ).toMatchObject({ slotCapacity: null });
+    for (const slotCapacity of [0, 1001, 2.5]) {
+      expect(checked({ slotCapacity })).toEqual([
+        ['slotCapacity', 'A slot takes 1 to 1000 orders, or no limit'],
+      ]);
+    }
+    const settings: DeliverySettingsRecord = {
+      ...NO_DELIVERY_SETTINGS,
+      slots: [
+        { from: '10:00', until: '13:00' },
+        { from: '16:00', until: '19:00' },
+      ],
+      slotDays: 1,
+      slotLeadHours: 0,
+      slotCapacity: 2,
+    };
+    // 9 am in Karachi: both of today's slots are offered.
+    const offered = offeredSlots(settings, new Date('2026-10-23T04:00:00Z'));
+    const [morning, evening] = offered;
+    const taken = new Map([
+      [morning!.startsAt.getTime(), 2],
+      [evening!.startsAt.getTime(), 1],
+    ]);
+    expect(slotsWithRoom(settings, offered, taken)).toEqual([evening]);
+    // Without a limit, however many it has.
+    expect(slotsWithRoom({ ...settings, slotCapacity: null }, offered, taken)).toEqual(offered);
   });
 });
 

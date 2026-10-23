@@ -102,6 +102,7 @@ import {
   deliveryCountsFrom,
   expectedDeliveryOn,
   offeredSlots,
+  slotsWithRoom,
   type OfferedDeliverySlot,
   highestDeliveryCharge,
   type DeliverySettingsRecord,
@@ -1142,6 +1143,20 @@ export class CheckoutService {
       if (!pickupAt && view.deliverySlots.length > 0 && !slot) {
         return { ...view, problem: { kind: 'delivery_slot' } };
       }
+      // Counted again under a lock, until the order is placed, where the shop's slots take so
+      // many (ADR-772): another shopper may have taken its last place since the page was shown.
+      if (slot && (view.delivery.slotCapacity ?? null) !== null) {
+        const taken = await this.orders.deliverySlotsTakenIn(tx, found.shopId, [slot.startsAt], {
+          lock: true,
+        });
+        if (slotsWithRoom(view.delivery, [slot], taken).length === 0) {
+          return {
+            ...view,
+            deliverySlots: view.deliverySlots.filter((each) => each !== slot),
+            problem: { kind: 'delivery_slot' },
+          };
+        }
+      }
       const check = new InputChecker();
       const address = checkAddress(check, [], { ...formForPickup(form, pickupAt), zip: null });
       const email = check.email(['email'], form.email)?.toLowerCase() ?? null;
@@ -1700,7 +1715,7 @@ export class CheckoutService {
       gift: await this.#gift(tx, shopId, cart),
       giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
       countsFrom: deliveryCountsFrom(delivery, new Date()),
-      deliverySlots: offeredSlots(delivery, new Date()),
+      deliverySlots: await this.#deliverySlots(tx, shopId, delivery),
       ...(checkout.heldUntil &&
         checkout.heldUntil > new Date() && { heldUntil: checkout.heldUntil }),
       ...(this.mapTiles && { map: this.mapTiles }),
@@ -1762,6 +1777,25 @@ export class CheckoutService {
   }
 
   /** The locations offering pickup, as checkout offers them (ADR-391). */
+  /**
+   * The slots the page offers (ADR-769): those far enough ahead on the shop's days, with room for
+   * another order where the shop's slots take so many (ADR-772).
+   */
+  async #deliverySlots(
+    tx: Tx,
+    shopId: string,
+    delivery: DeliverySettingsRecord,
+  ): Promise<OfferedDeliverySlot[]> {
+    const offered = offeredSlots(delivery, new Date());
+    if (offered.length === 0 || (delivery.slotCapacity ?? null) === null) return offered;
+    const taken = await this.orders.deliverySlotsTakenIn(
+      tx,
+      shopId,
+      offered.map((slot) => slot.startsAt),
+    );
+    return slotsWithRoom(delivery, offered, taken);
+  }
+
   async #pickupPoints(tx: Tx, shopId: string): Promise<PickupPoint[]> {
     return (await pickupLocationsIn(tx, shopId))
       .map(pickupPointOf)

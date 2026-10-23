@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-771 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-772 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -779,6 +779,7 @@
 | 769 | Checkout asks for a delivery slot where the shop offers one, checks it again when placing, and the order keeps its start and end | Accepted |
 | 770 | An order's delivery slot is said in Pakistan's time on the thank-you page, the order's link page and its packing slip | Accepted |
 | 771 | The admin sets delivery times with the delivery charges, and an order's page says the slot its customer chose | Accepted |
+| 772 | A delivery slot takes as many orders as the shop says, counted again under a lock when an order is placed in it | Accepted |
 
 ---
 
@@ -25936,3 +25937,24 @@
   Pakistan's time, in place of the expected day.
 * **Consequences:** a shop sets up slots and sees them on each order without the API. The
   settings form now always sends the slots and their days and hours, as it does the rest.
+
+## ADR-772 · A delivery slot takes as many orders as the shop says, counted again under a lock when an order is placed in it
+
+* **Context:** a bakery's oven or a florist's one rider takes only so many orders in a time of
+  the day; slots (ADR-768) offered however many orders they had (CHK-15).
+* **Decision:** delivery settings get `slotCapacity`, 1 to 1,000 orders a slot takes on a day,
+  null for no limit (migration 0330, checked by the database too; named in
+  `delivery_settings.updated`; `DeliverySettings.slotCapacity` in the Admin API; "Orders per
+  time" in Settings → Delivery).
+  * **Counting:** orders' `deliverySlotsTakenIn` counts the orders, cancelled ones aside, in
+    slots by when they start, through a partial index on `(shop_id, delivery_slot_starts_at)`;
+    checkout's `slotsWithRoom` keeps the offered slots with fewer than the limit, so the page
+    offers no full one.
+  * **Placing:** with a limit, the chosen slot is counted again under the shop's slots' advisory
+    lock, held until the order is placed in the same transaction, so two shoppers cannot both
+    take its last place; one too late gets the page again with the `delivery_slot` problem, the
+    full slot no longer offered.
+  * **Cancelled orders** free their place.
+* **Consequences:** a shop takes no more orders in a time than it can deliver. One lock per shop
+  orders slot placements one at a time, only where a limit is set; a shop's checkouts are few
+  enough a minute for that.

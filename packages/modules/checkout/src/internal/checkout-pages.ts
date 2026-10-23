@@ -1869,9 +1869,9 @@ function problemWords(
     case 'delivery_slot':
       return {
         en:
-          'Choose a time to have your order delivered: the one you chose may be too soon now. ' +
-          'See below.',
-        ur: 'آرڈر کی ڈیلیوری کا وقت منتخب کریں: آپ کا منتخب کردہ وقت شاید اب بہت قریب ہے۔ نیچے دیکھیں۔',
+          'Choose a time to have your order delivered: the one you chose may be full or too ' +
+          'soon now. See below.',
+        ur: 'آرڈر کی ڈیلیوری کا وقت منتخب کریں: آپ کا منتخب کردہ وقت شاید بھر چکا ہے یا اب بہت قریب ہے۔ نیچے دیکھیں۔',
       };
     case 'refused':
       return {

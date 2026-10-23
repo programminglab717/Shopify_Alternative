@@ -79,6 +79,7 @@ function toDeliverySettings(
     ),
     slotDays: record.slotDays ?? 7,
     slotLeadHours: record.slotLeadHours ?? 2,
+    slotCapacity: record.slotCapacity ?? null,
     updatedAt: record.updatedAt,
   });
 }

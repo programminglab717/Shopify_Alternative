@@ -1237,6 +1237,8 @@ export interface DeliverySettingsValue {
   slotDays?: number;
   /** How many hours ahead a slot must start; absent in old fakes. */
   slotLeadHours?: number;
+  /** How many orders a slot takes (ADR-772); null for no limit, absent in old fakes. */
+  slotCapacity?: number | null;
   updatedAt: string | null;
 }
 

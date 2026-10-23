@@ -2581,6 +2581,7 @@ const DELIVERY_SETTINGS = /* GraphQL */ `
     }
     slotDays
     slotLeadHours
+    slotCapacity
     updatedAt
   }
 `;

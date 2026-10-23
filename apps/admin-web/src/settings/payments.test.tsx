@@ -83,6 +83,7 @@ describe('Delivery and payment settings in the admin', () => {
         slots: [],
         slotDays: 7,
         slotLeadHours: 2,
+        slotCapacity: null,
       },
     });
   });
@@ -143,6 +144,12 @@ describe('Delivery and payment settings in the admin', () => {
     expect(core.sent.some((each) => each.operation === 'DeliverySettingsUpdate')).toBe(false);
 
     type('Hours you need first', '24');
+    type('Orders per time', '0');
+    await press('Save');
+    expect(
+      screen.getByText('Orders per time: type a whole number of orders, or leave it blank'),
+    ).toBeTruthy();
+    type('Orders per time', '6');
     await press('Save');
     await screen.findByText('Saved. Checkout uses it from now on.');
     expect(
@@ -155,6 +162,7 @@ describe('Delivery and payment settings in the admin', () => {
         ],
         slotDays: 1,
         slotLeadHours: 24,
+        slotCapacity: 6,
       },
     });
 

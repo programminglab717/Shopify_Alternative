@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### How many orders a slot takes
+
+* **Full slots:** a shop says how many orders it takes in each delivery time; checkout offers
+  no full one, and counts again under a lock when an order takes a place (CHK-15, [ADR-772](../architecture/13-decision-log.md#adr-772--a-delivery-slot-takes-as-many-orders-as-the-shop-says-counted-again-under-a-lock-when-an-order-is-placed-in-it)).
+* 4181 tests (2 new).
+
 ### a00befe · Delivery times in the admin
 
 * **Set and seen:** owners set delivery times, days ahead and hours first in Settings →

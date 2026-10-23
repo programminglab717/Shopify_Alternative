@@ -4247,6 +4247,11 @@ type DeliverySettings {
   """Delivery is free for a subtotal of this or more; null for never."""
   freeAbove: Money
 
+  """
+  How many orders a slot on a day takes, cancelled ones aside (ADR-772): one that has as many is no longer offered. Null for no limit.
+  """
+  slotCapacity: Int
+
   """How many days ahead, today the first, slots are offered on."""
   slotDays: Int!
 
@@ -4288,6 +4293,9 @@ input DeliverySettingsUpdateInput {
 
   """Decimal, e.g. "5,000"; null or blank for no free delivery."""
   freeAbove: String
+
+  """How many orders a slot takes, 1 to 1,000; null for no limit."""
+  slotCapacity: Int
 
   """Slots offered 1 to 14 days ahead."""
   slotDays: Int

@@ -62,6 +62,7 @@ export class DeliveryService {
           : []),
         ...(next.slotDays !== (before.slotDays ?? 7) ? ['slotDays'] : []),
         ...(next.slotLeadHours !== (before.slotLeadHours ?? 2) ? ['slotLeadHours'] : []),
+        ...(next.slotCapacity !== (before.slotCapacity ?? null) ? ['slotCapacity'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       const values = {
@@ -76,6 +77,7 @@ export class DeliveryService {
         slots: next.slots ?? [],
         slotDays: next.slotDays ?? 7,
         slotLeadHours: next.slotLeadHours ?? 2,
+        slotCapacity: next.slotCapacity ?? null,
       };
       await tx
         .insert(deliverySettings)
@@ -131,6 +133,7 @@ export class DeliveryService {
       slots: row.slots.map((slot) => ({ from: slot.from, until: slot.until })),
       slotDays: row.slotDays,
       slotLeadHours: row.slotLeadHours,
+      slotCapacity: row.slotCapacity,
       updatedAt: row.updatedAt,
     };
   }

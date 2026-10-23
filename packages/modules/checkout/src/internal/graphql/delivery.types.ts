@@ -166,6 +166,14 @@ export class DeliverySettings {
   @Field(() => Int, { description: 'How many hours ahead a slot must start to be offered.' })
   slotLeadHours!: number;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'How many orders a slot on a day takes, cancelled ones aside (ADR-772): one that has as ' +
+      'many is no longer offered. Null for no limit.',
+  })
+  slotCapacity!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
@@ -251,6 +259,12 @@ export class DeliverySettingsUpdateInput {
     description: 'A slot offered from 0 to 72 hours before it starts.',
   })
   slotLeadHours?: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'How many orders a slot takes, 1 to 1,000; null for no limit.',
+  })
+  slotCapacity?: number | null;
 }
 
 @ObjectType()

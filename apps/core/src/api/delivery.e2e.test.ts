@@ -201,7 +201,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
     // Times of the day the shop delivers in (ADR-768), kept the earliest first.
     const SLOTS = `mutation ($input: DeliverySettingsUpdateInput!) {
       deliverySettingsUpdate(input: $input) {
-        deliverySettings { slots { from until } slotDays slotLeadHours }
+        deliverySettings { slots { from until } slotDays slotLeadHours slotCapacity }
         userErrors { field code }
       }
     }`;
@@ -212,6 +212,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           { from: '10:00', until: '13:00' },
         ],
         slotDays: 3,
+        slotCapacity: 10,
       },
     });
     expect(slotted.data?.deliverySettingsUpdate).toEqual({
@@ -222,6 +223,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
         ],
         slotDays: 3,
         slotLeadHours: 2,
+        slotCapacity: 10,
       },
       userErrors: [],
     });

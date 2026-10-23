@@ -1277,6 +1277,33 @@ export class OrderService {
   }
 
   /**
+   * How many orders, cancelled ones aside, are to be delivered in the slots starting at
+   * `startsAt` (CHK-15, ADR-772), by when each starts, in ms; slots with none are left out. In
+   * the caller's transaction `tx`; with `lock`, which holds a lock on the shop's slots until it
+   * ends, so that orders for a slot are counted and placed one at a time.
+   */
+  async deliverySlotsTakenIn(
+    tx: Tx,
+    shopId: string,
+    startsAt: readonly Date[],
+    options: { lock?: boolean } = {},
+  ): Promise<Map<number, number>> {
+    if (options.lock) {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`checkout:${shopId}:slots`}, 0))`,
+      );
+    }
+    if (startsAt.length === 0) return new Map();
+    const { rows } = await tx.execute<{ starts_at: string; taken: number }>(sql`
+      SELECT delivery_slot_starts_at AS starts_at, count(*)::int AS taken
+        FROM orders.orders
+       WHERE shop_id = ${shopId} AND cancelled_at IS NULL
+         AND delivery_slot_starts_at = ANY(${sql.param(startsAt.map((at) => at.toISOString()))}::timestamptz[])
+       GROUP BY delivery_slot_starts_at`);
+    return new Map(rows.map((row) => [new Date(row.starts_at).getTime(), row.taken]));
+  }
+
+  /**
    * The latest order the number placed in the shop since `since`, by any way, in the caller's
    * transaction `tx`: for checkout not to remind a shopper who ordered meanwhile (ADR-393).
    */

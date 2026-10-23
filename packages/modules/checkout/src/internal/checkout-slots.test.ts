@@ -108,6 +108,43 @@ describe.skipIf(!server)('Delivery time slots chosen at checkout (CHK-15, ADR-76
     expect(rows).toEqual([{ starts: `${second!.day}T00:00`, ends: '23:59' }]);
   });
 
+  it('no longer offers a slot with as many orders as the shop takes in it (ADR-772)', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        slots: [{ from: '00:00', until: '23:59' }],
+        slotDays: 3,
+        slotLeadHours: 0,
+        slotCapacity: 1,
+      }),
+    );
+    const first = await checkout();
+    const second = await checkout();
+    const [tomorrow, after] = first.view.deliverySlots;
+    const placed = await f.checkouts.place(first.secret, first.view.shown, {
+      ...FORM,
+      deliverySlot: tomorrow!.key,
+    });
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    // The page shown before it was taken: refused, and that slot no longer offered.
+    const refused = await f.checkouts.place(second.secret, second.view.shown, {
+      ...FORM,
+      phone: '0300-7654321',
+      deliverySlot: tomorrow!.key,
+    });
+    if (refused.kind !== 'open') throw new Error(`Expected it open, got ${refused.kind}`);
+    expect(refused.problem).toEqual({ kind: 'delivery_slot' });
+    expect(refused.deliverySlots.map((slot) => slot.key)).toEqual([after!.key]);
+    expect((await f.checkouts.view(second.secret)).kind === 'open').toBe(true);
+    const again = await checkout();
+    expect(again.view.deliverySlots.map((slot) => slot.key)).toEqual([after!.key]);
+    // Cancelled, its place is free again.
+    unwrap(await f.orders.cancel(f.a, placed.order.id, { reason: 'customer' }));
+    expect((await checkout()).view.deliverySlots.map((slot) => slot.key)).toEqual([
+      tomorrow!.key,
+      after!.key,
+    ]);
+  });
+
   it('asks nothing where the shop offers no slots, or none far enough ahead', async () => {
     const plain = await checkout();
     expect(plain.view.deliverySlots).toEqual([]);

@@ -89,6 +89,8 @@ interface DeliveryState {
   slotDays: string;
   /** "0" to "72", as typed. */
   slotLeadHours: string;
+  /** How many orders a time takes, as typed; "" for no limit (ADR-772). */
+  slotCapacity: string;
 }
 
 function daysState(days: DeliveryDaysValue | null): DaysState {
@@ -124,6 +126,10 @@ function stateOf(settings: DeliverySettingsValue): DeliveryState {
     slots: (settings.slots ?? []).map((slot, key) => ({ key, ...slot })),
     slotDays: String(settings.slotDays ?? 7),
     slotLeadHours: String(settings.slotLeadHours ?? 2),
+    slotCapacity:
+      settings.slotCapacity === undefined || settings.slotCapacity === null
+        ? ''
+        : String(settings.slotCapacity),
   };
 }
 
@@ -162,6 +168,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   until: 'delivery.slotUntil',
   slotDays: 'delivery.slotDays',
   slotLeadHours: 'delivery.slotLeadHours',
+  slotCapacity: 'delivery.slotCapacity',
 };
 
 /**
@@ -438,6 +445,7 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
     const zones = state.zones.map((zone) => ({ zone, days: daysInput(zone.days) }));
     const weights = state.weights.map((weight) => ({ weight, grams: gramsOf(weight.kg) }));
     const leadHours = parseWhole(state.slotLeadHours);
+    const capacity = parseWhole(state.slotCapacity);
     const badDays = [
       ...(days === 'bad' ? [`${t('delivery.days')}: ${t('delivery.badDays')}`] : []),
       ...zones.flatMap(({ days: zoneDays }, index) =>
@@ -452,6 +460,9 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
       ),
       ...(leadHours === null || Number.isNaN(leadHours) || leadHours > 72
         ? [`${t('delivery.slotLeadHours')}: ${t('delivery.badLeadHours')}`]
+        : []),
+      ...(Number.isNaN(capacity) || capacity === 0
+        ? [`${t('delivery.slotCapacity')}: ${t('delivery.badCapacity')}`]
         : []),
     ];
     if (badDays.length > 0) {
@@ -483,6 +494,7 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           slots: state.slots.map((slot) => ({ from: slot.from.trim(), until: slot.until.trim() })),
           slotDays: Number(state.slotDays),
           slotLeadHours: leadHours,
+          slotCapacity: capacity,
         },
       });
       if (deliverySettingsUpdate.userErrors.length > 0) {
@@ -708,6 +720,16 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
               onChange={(event) => setState({ ...state, slotLeadHours: event.target.value })}
             />
           </Pair>
+        )}
+        {state.slots.length > 0 && (
+          <TextField
+            label={t('delivery.slotCapacity')}
+            hint={t('delivery.slotCapacityHint')}
+            inputMode="numeric"
+            ltr
+            value={state.slotCapacity}
+            onChange={(event) => setState({ ...state, slotCapacity: event.target.value })}
+          />
         )}
       </FormSection>
       <Problems problems={problems} />

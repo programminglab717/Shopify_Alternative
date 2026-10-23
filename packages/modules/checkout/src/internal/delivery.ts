@@ -37,6 +37,11 @@ export interface DeliverySettingsRecord {
   slotDays?: number;
   /** How many hours ahead a slot must start to be offered: 0 to 72; 2 when left out. */
   slotLeadHours?: number;
+  /**
+   * How many orders a slot on a day takes (ADR-772), 1 to 1,000: one that has as many is no
+   * longer offered. Null or left out for no limit.
+   */
+  slotCapacity?: number | null;
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -97,6 +102,7 @@ export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   slots: [],
   slotDays: 7,
   slotLeadHours: 2,
+  slotCapacity: null,
   updatedAt: null,
 };
 
@@ -112,6 +118,7 @@ export const DELIVERY_LIMITS = {
   slots: 8,
   slotDays: 14,
   slotLeadHours: 72,
+  slotCapacity: 1000,
 } as const;
 
 /** Those left out stay as they are; `zones`, when given, replaces them all. */
@@ -135,6 +142,8 @@ export interface DeliverySettingsInput {
   slotDays?: number | null;
   /** 0 to 72. */
   slotLeadHours?: number | null;
+  /** 1 to 1,000; null for no limit. */
+  slotCapacity?: number | null;
 }
 
 export interface DeliveryValueRateInput {
@@ -349,6 +358,24 @@ export function checkDeliverySettings(
       message: `A slot starts 0 to ${DELIVERY_LIMITS.slotLeadHours} hours ahead`,
     },
   );
+  let slotCapacity = current.slotCapacity ?? null;
+  if (input.slotCapacity !== undefined) {
+    slotCapacity = input.slotCapacity;
+    if (
+      slotCapacity !== null &&
+      !(
+        Number.isInteger(slotCapacity) &&
+        slotCapacity >= 1 &&
+        slotCapacity <= DELIVERY_LIMITS.slotCapacity
+      )
+    ) {
+      check.addMessage(
+        ['slotCapacity'],
+        'INVALID',
+        `A slot takes 1 to ${DELIVERY_LIMITS.slotCapacity} orders, or no limit`,
+      );
+    }
+  }
   return check.errors.length > before
     ? null
     : {
@@ -362,6 +389,7 @@ export function checkDeliverySettings(
         slots,
         slotDays,
         slotLeadHours,
+        slotCapacity,
       };
 }
 
@@ -448,6 +476,20 @@ export function offeredSlots(settings: DeliverySettingsRecord, now: Date): Offer
     }
   }
   return offered;
+}
+
+/**
+ * The slots of `offered` with room for another order (ADR-772): those with fewer orders than the
+ * shop's slots take, by `taken`, the orders each has by when it starts, in ms; all without a limit.
+ */
+export function slotsWithRoom(
+  settings: DeliverySettingsRecord,
+  offered: readonly OfferedDeliverySlot[],
+  taken: ReadonlyMap<number, number>,
+): OfferedDeliverySlot[] {
+  const capacity = settings.slotCapacity ?? null;
+  if (capacity === null) return [...offered];
+  return offered.filter((slot) => (taken.get(slot.startsAt.getTime()) ?? 0) < capacity);
 }
 
 /** The offered slot `key` names, or null where it is not offered at `now`. */

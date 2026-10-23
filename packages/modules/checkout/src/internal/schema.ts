@@ -166,6 +166,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   slots: jsonb('slots').$type<{ from: string; until: string }[]>().notNull().default([]),
   slotDays: smallint('slot_days').notNull().default(7),
   slotLeadHours: smallint('slot_lead_hours').notNull().default(2),
+  /** How many orders a slot on a day takes (ADR-772); null for no limit. */
+  slotCapacity: smallint('slot_capacity'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
