@@ -146,6 +146,8 @@ export interface DraftOrderLink {
    * numbers whole, or to a chat the sender picks.
    */
   whatsappUrl: string;
+  /** The message carrying the link, in English and Urdu: for WhatsApp, or the inbox (ADR-765). */
+  message: string;
   expiresAt: Date;
 }
 
@@ -413,6 +415,7 @@ export class DraftOrderService {
           draftOrder: toDraftRecord(row!),
           url,
           whatsappUrl: whatsappUrl(message, phoneAccess(tenant) === 'full' ? draft.phone : null),
+          message,
           expiresAt,
         },
       };

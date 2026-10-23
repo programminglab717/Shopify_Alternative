@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### An order's link sent from a conversation
+
+* **Staff send a draft's link in the chat it came from:** from a customer's conversation, one of
+  the shop's open drafts is sent with a tap, from the number the customer wrote to; the customer
+  adds their address and confirms through it ([ADR-765](../architecture/13-decision-log.md#adr-765--a-draft-orders-link-is-sent-as-an-answer-in-the-customers-conversation-where-they-add-their-address-and-confirm-the-core-joins-orders-and-messaging-and-checks-the-window-first)).
+* 4165 tests (5 new).
+
 ### c0c2a93 · Labels on the inbox's conversations
 
 * **Staff sort the inbox by what customers write about:** a conversation is labelled "delivery",

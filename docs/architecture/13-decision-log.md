@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-764 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-765 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -772,6 +772,7 @@
 | 762 | A customer waiting past the shop's time to answer is pushed, once a wait, to whom the conversation is given or else all who answer, by a sweep of the worker | Accepted |
 | 763 | Each answer to a customer who waited is kept with how long they waited and who answered; the inbox's reply times are reported from them, for the shop and for each who answered | Accepted |
 | 764 | The inbox's conversations carry labels of what the customer writes about, written as the shop already writes them, and the inbox shows those with one label alone | Accepted |
+| 765 | A draft order's link is sent as an answer in the customer's conversation, where they add their address and confirm; the core joins orders and messaging, and checks the window first | Accepted |
 
 ---
 
@@ -25808,3 +25809,24 @@
 * **Consequences:** labels are the shop's own words, not a fixed list, so no settings page is
   needed; a label is gone when no conversation has it. Labels are not events: nothing is told
   of them, and the activity log does not keep them.
+
+## ADR-765 · A draft order's link is sent as an answer in the customer's conversation, where they add their address and confirm; the core joins orders and messaging, and checks the window first
+
+* **Context:** most orders in Pakistan begin in a WhatsApp chat (05 §7). Staff could draft an
+  order and make its link (ADR-031), but then copied the link into WhatsApp by hand, from a
+  phone that may not be the number the customer wrote to; agents who do not see numbers whole
+  could not send it to the customer at all (MSG-08).
+* **Decision:**
+  * **`conversationDraftLinkSend(id, draftOrderId, expiresInHours)`** in the core, with
+    `write_conversations` and `write_orders`: orders makes the draft's link and its message in
+    English and Urdu, as `draftOrderLinkCreate` does; messaging sends the message as an answer
+    from the number the customer wrote to, kept in the thread like any other answer. The draft
+    needs no address: its link asks the customer for it, and their number with it.
+  * **The window is checked first.** A new link replaces the one before, so the core refuses a
+    conversation past WhatsApp's day before it makes one, and a link sent before stays good.
+  * **The admin:** a conversation's page offers those who take drafts the shop's five latest
+    open drafts, each sent with a tap, and a way to a new draft, while WhatsApp lets the shop
+    answer.
+* **Consequences:** a refusal after the link is made (the number no longer connected) leaves the
+  new link unsent and the old one ended; staff send it again once the number works. Product
+  cards (an image and a price) are the next piece of MSG-08.

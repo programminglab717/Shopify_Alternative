@@ -2723,6 +2723,12 @@ type ConversationConnection {
   pageInfo: PageInfo!
 }
 
+type ConversationDraftLinkSendPayload {
+  """The conversation after: its last message is the one carrying the link."""
+  conversation: Conversation
+  userErrors: [UserError!]!
+}
+
 type ConversationEdge {
   cursor: String!
   node: Conversation!
@@ -8452,6 +8458,19 @@ type Mutation {
     """Their account: usr_…"""
     staffMemberId: ID
   ): ConversationAssignPayload!
+
+  """
+  Sends a draft order's link in a conversation, where the customer adds or corrects their address and confirms it (MSG-08): only within a day of their last message, as WhatsApp allows. A new link replaces the one before, as `draftOrderLinkCreate` does.
+  """
+  conversationDraftLinkSend(
+    draftOrderId: ID!
+
+    """How long the link works: 1 to 720 hours; default 72."""
+    expiresInHours: Int
+
+    """The conversation."""
+    id: ID!
+  ): ConversationDraftLinkSendPayload!
 
   """
   Labels the conversation with what the customer writes about, in place of its labels before: up to 10, of up to 40 characters each; none takes them all off (ADR-764). A label the shop already uses, in any case, is written as the shop writes it.

@@ -553,4 +553,104 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
     const readOnly = await gql(tokens.reader, label, { id: first, labels: [] });
     expect(readOnly.errors?.[0]).toMatchObject({ extensions: { code: 'ACCESS_DENIED' } });
   });
+
+  it("sends a draft order's link in the conversation, for the customer to add their address and confirm (ADR-765)", async () => {
+    await admin.query(
+      `INSERT INTO messaging.messages
+              (shop_id, kind, channel, recipient, language, dedupe_key, status, provider,
+               provider_message_id, sent_at)
+       VALUES ($1, 'order_placed', 'whatsapp', $2, 'en', 'test:draft', 'sent', 'whatsapp_cloud',
+               'wamid.ZARIDRAFT', now())`,
+      [shop, AYESHA],
+    );
+    await written(SHARED, [
+      {
+        from: AYESHA.slice(1),
+        id: 'wamid.IN30',
+        type: 'text',
+        timestamp: String(Math.floor(Date.now() / 1000) - 60),
+        context: { from: '15550001111', id: 'wamid.ZARIDRAFT' },
+        text: { body: 'Yeh suit chahiye' },
+      },
+    ]);
+    const [conversation] = (await data(tokens.reader, CONVERSATIONS, {})).nodes;
+    const draftId = newId();
+    await admin.query(
+      `INSERT INTO orders.draft_orders
+         (shop_id, id, number, source, payment_method, currency, lines, subtotal, discount,
+          shipping, total, advance_paid, actor_kind, actor_id)
+       VALUES ($1, $2, 901, 'whatsapp', 'cash_on_delivery', 'PKR', $4, 250000, 0, 0, 250000, 0,
+               'app', $3)`,
+      [
+        shop,
+        draftId,
+        newId(),
+        JSON.stringify([
+          {
+            variantId: newId(),
+            productId: newId(),
+            title: 'Lawn suit',
+            variantTitle: 'Medium',
+            sku: null,
+            quantity: 1,
+            unitPrice: '250000',
+          },
+        ]),
+      ],
+    );
+    const draft = toPublicId('draftOrder', draftId);
+    const send = `mutation ($id: ID!, $draftOrderId: ID!) {
+      conversationDraftLinkSend(id: $id, draftOrderId: $draftOrderId) {
+        conversation { id lastMessage { direction body status } }
+        userErrors { field code message }
+      } }`;
+    const both = await issueToken(shop, ['write_conversations', 'write_orders']);
+    const before = sent.length;
+
+    // It takes both scopes, and the shop's own conversation and draft.
+    const refused = await gql(tokens.writer, send, { id: conversation.id, draftOrderId: draft });
+    expect(refused.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect(
+      await data(both, send, {
+        id: conversation.id,
+        draftOrderId: toPublicId('draftOrder', newId()),
+      }),
+    ).toMatchObject({
+      conversation: null,
+      userErrors: [{ field: ['draftOrderId'], code: 'NOT_FOUND' }],
+    });
+    expect(sent).toHaveLength(before);
+
+    const done = await data(both, send, { id: conversation.id, draftOrderId: draft });
+    expect(done.userErrors).toEqual([]);
+    const body = done.conversation.lastMessage.body as string;
+    expect(done.conversation.lastMessage).toMatchObject({ direction: 'OUTBOUND', status: 'SENT' });
+    expect(body).toMatch(
+      /^Please add your address and confirm your order from Zari:\nhttps?:\/\/\S+\/d\/[A-Za-z0-9_-]{22}\n/,
+    );
+    expect(sent.slice(before).map((each) => each.body.text.body)).toEqual([body]);
+    const { rows } = await admin.query(
+      'SELECT link_token_hash IS NOT NULL AS linked FROM orders.draft_orders WHERE id = $1',
+      [draftId],
+    );
+    expect(rows[0]).toEqual({ linked: true });
+
+    // Past the day, no link is made, so the one sent stays good.
+    await admin.query(
+      `UPDATE messaging.conversations SET last_inbound_at = now() - interval '25 hours'`,
+    );
+    const { rows: hashBefore } = await admin.query(
+      'SELECT link_token_hash FROM orders.draft_orders WHERE id = $1',
+      [draftId],
+    );
+    expect(await data(both, send, { id: conversation.id, draftOrderId: draft })).toMatchObject({
+      conversation: null,
+      userErrors: [{ field: ['id'], code: 'WINDOW_CLOSED' }],
+    });
+    const { rows: hashAfter } = await admin.query(
+      'SELECT link_token_hash FROM orders.draft_orders WHERE id = $1',
+      [draftId],
+    );
+    expect(hashAfter).toEqual(hashBefore);
+  });
 });

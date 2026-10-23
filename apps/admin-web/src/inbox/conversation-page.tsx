@@ -52,6 +52,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { ConversationLabels } from './conversation-labels';
+import { ConversationOrder } from './conversation-order';
 import { mediaLabel, UnreadBadge, WORKS_INBOX } from './inbox-page';
 import { SavedReplyPicker } from './saved-replies';
 
@@ -427,6 +428,7 @@ export function ConversationPage() {
       </header>
       <ConversationAssignment conversation={conversation} works={works} />
       <ConversationLabels conversation={conversation} works={works} />
+      {works && <ConversationOrder conversation={conversation} />}
       {closed && <Alert tone="info">{t('inbox.closedNote')}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
       <Card className="flex flex-col gap-3 p-4">

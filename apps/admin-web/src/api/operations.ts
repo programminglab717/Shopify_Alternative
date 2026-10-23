@@ -10270,6 +10270,22 @@ export const ConversationLabelsQuery = /* GraphQL */ `
   }
 `;
 
+/** A draft's link sent as an answer in the conversation, to add the address and confirm (ADR-765). */
+export const ConversationDraftLinkSendMutation = /* GraphQL */ `
+  mutation ConversationDraftLinkSend($id: ID!, $draftOrderId: ID!) {
+    conversationDraftLinkSend(id: $id, draftOrderId: $draftOrderId) {
+      conversation {
+        ...ConversationFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONVERSATION}
+  ${USER_ERRORS}
+`;
+
 /** A conversation's labels, in place of those before (ADR-764). */
 export const ConversationLabelsSetMutation = /* GraphQL */ `
   mutation ConversationLabelsSet($id: ID!, $labels: [String!]!) {

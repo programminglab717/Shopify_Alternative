@@ -443,6 +443,7 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(message).toBe(
       `Please confirm your order from A:\n${first.url}\nاپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔`,
     );
+    expect(first.message).toBe(message);
     const second = unwrap(
       await f.drafts.createLink(staff('confirmation_agent'), open.id, { expiresInHours: 24 }),
     );
