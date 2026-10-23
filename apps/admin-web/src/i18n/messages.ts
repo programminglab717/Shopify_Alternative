@@ -4962,6 +4962,11 @@ const en = {
   'push.lowStockHint': 'A product running low, and when it runs out.',
   'push.contactMessage': 'Contact form messages',
   'push.contactMessageHint': 'A shopper writing to you from your online store’s contact page.',
+  'push.conversationMessage': 'Customers waiting on WhatsApp',
+  'push.conversationMessageHint':
+    'A customer writing to you once they wait for an answer; only you, if the conversation is yours.',
+  'push.conversationAssigned': 'Conversations given to you',
+  'push.conversationAssignedHint': 'A WhatsApp conversation given to you to answer.',
   'push.ordersOverdue': 'Orders not called in time',
   'push.ordersOverdueHint':
     'Orders waiting for their first call longer than your target, at most once an hour.',
@@ -10627,6 +10632,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'push.lowStockHint': 'کوئی پروڈکٹ کم ہو رہی ہو، اور جب ختم ہو جائے۔',
   'push.contactMessage': 'رابطہ فارم کے پیغامات',
   'push.contactMessageHint': 'جب کوئی خریدار آپ کے آن لائن اسٹور کے رابطہ صفحے سے لکھے۔',
+  'push.conversationMessage': 'واٹس ایپ پر انتظار کرتے گاہک',
+  'push.conversationMessageHint':
+    'جب کوئی گاہک لکھے اور جواب کا انتظار کرنے لگے؛ بات چیت آپ کی ہو تو صرف آپ کو۔',
+  'push.conversationAssigned': 'آپ کو دی گئی بات چیت',
+  'push.conversationAssignedHint': 'واٹس ایپ کی بات چیت جو آپ کو جواب دینے کے لیے دی گئی ہو۔',
   'push.ordersOverdue': 'وقت پر کال نہ ہونے والے آرڈرز',
   'push.ordersOverdueHint':
     'آپ کے ہدف سے زیادہ دیر سے پہلی کال کے منتظر آرڈرز، گھنٹے میں زیادہ سے زیادہ ایک بار۔',

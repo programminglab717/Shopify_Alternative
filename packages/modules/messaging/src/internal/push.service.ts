@@ -35,6 +35,9 @@ export const PUSH_KINDS = [
   // their role.
   'order_assigned',
   'order_mentioned',
+  // A customer began waiting on WhatsApp, and a conversation given to the member (ADR-761).
+  'conversation_message',
+  'conversation_assigned',
 ] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
@@ -50,6 +53,8 @@ export const PUSH_ROLES: Record<PushKind, readonly StaffRole[]> = {
   customer_refused: ['owner', 'manager', 'confirmation_agent'],
   order_assigned: STAFF_ROLES,
   order_mentioned: STAFF_ROLES,
+  conversation_message: ['owner', 'manager', 'confirmation_agent'],
+  conversation_assigned: ['owner', 'manager', 'confirmation_agent'],
 };
 
 /**
@@ -67,6 +72,8 @@ export const PUSH_NEEDS: Record<PushKind, AccessScope | StaffCapability> = {
   customer_refused: 'write_orders',
   order_assigned: 'read_orders',
   order_mentioned: 'read_orders',
+  conversation_message: 'write_conversations',
+  conversation_assigned: 'write_conversations',
 };
 
 /** Whether `recipient` is told of news of `kind`: their role's work, which they may do. */

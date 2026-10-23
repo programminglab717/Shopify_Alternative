@@ -310,6 +310,52 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
     ]);
   });
 
+  it('pushes a customer who began waiting on WhatsApp to whom it is given, else all who answer, and a conversation given to its member (ADR-761)', async () => {
+    await admin.query(
+      `UPDATE messaging.push_subscriptions
+          SET kinds = kinds || '{conversation_message,conversation_assigned}'::text[]`,
+    );
+    const notices = new PushNotices(database, push);
+    const conversationId = newId();
+    const url = `/${shop}/inbox/${toPublicId('conversation', conversationId)}`;
+    const wrote = (payload: Record<string, unknown>) =>
+      notices.handle(
+        event(MessagingEvents.ConversationMessageReceived, conversationId, {
+          messageId: newId(),
+          at: new Date().toISOString(),
+          assigneeId: null,
+          ...payload,
+        }),
+      );
+    await wrote({ startedWaiting: true });
+    expect(told()).toEqual([
+      { endpoint: endpoint('agent'), title: 'Zari: واٹس ایپ پر گاہک کا پیغام', url },
+      { endpoint: endpoint('owner'), title: 'Zari: a customer wrote on WhatsApp', url },
+    ]);
+    // Writing again while waiting is no news; an event of before says nothing of waiting.
+    await wrote({ startedWaiting: false });
+    await wrote({ startedWaiting: undefined });
+    expect(sender.sent).toHaveLength(2);
+    // Given to the agent, it is theirs alone.
+    sender.sent.length = 0;
+    await wrote({ startedWaiting: true, assigneeId: agent });
+    expect(told().map((each) => each.endpoint)).toEqual([endpoint('agent')]);
+
+    sender.sent.length = 0;
+    const given = (assigneeId: string | null, assignedBy: string | null) =>
+      notices.handle(
+        event(MessagingEvents.ConversationAssigned, conversationId, { assigneeId, assignedBy }),
+      );
+    // Taken for oneself, or given back: no one told.
+    await given(agent, agent);
+    await given(null, owner);
+    expect(sender.sent).toEqual([]);
+    await given(agent, owner);
+    expect(told()).toEqual([
+      { endpoint: endpoint('agent'), title: 'Zari: ایک بات چیت آپ کے سپرد', url },
+    ]);
+  });
+
   it('does nothing where Hatti has no VAPID keys', async () => {
     const off = new PushService(database, null);
     await new PushNotices(database, off).handle(created(newId()));

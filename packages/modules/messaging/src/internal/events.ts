@@ -15,6 +15,7 @@ export const MessagingEvents = {
   MarketingAutomationUpdated: 'marketing_automation.updated',
   ConversationMessageReceived: 'conversation.message_received',
   ConversationReplied: 'conversation.replied',
+  ConversationAssigned: 'conversation.assigned',
   ContactMessageReceived: 'contact_message.received',
 } as const;
 
@@ -26,6 +27,13 @@ export interface ConversationMessageReceivedPayload {
   messageId: string;
   /** When they wrote, as WhatsApp says. */
   at: string;
+  /**
+   * Whether this message began their wait for an answer (ADR-761): the first since the shop last
+   * answered. Absent from events before.
+   */
+  startedWaiting?: boolean;
+  /** The account of the member of staff the conversation is given to, if anyone. */
+  assigneeId?: string | null;
 }
 
 /**
@@ -35,6 +43,17 @@ export interface ConversationMessageReceivedPayload {
 export interface ConversationRepliedPayload {
   messageId: string;
   at: string;
+}
+
+/**
+ * A conversation was given to a member of staff to answer, or to no one (ADR-759, ADR-761). The
+ * aggregate is the conversation.
+ */
+export interface ConversationAssignedPayload {
+  /** The account it is given to; null for no one. */
+  assigneeId: string | null;
+  /** The account of the member of staff who gave it; null for an app. */
+  assignedBy: string | null;
 }
 
 /**

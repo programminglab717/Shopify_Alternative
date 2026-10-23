@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The inbox pushed to staff's phones
+
+* **Staff hear of customers on WhatsApp at once:** a customer who begins waiting is pushed to
+  whoever has their conversation, else to all who answer; a conversation given to someone is
+  pushed to them ([ADR-761](../architecture/13-decision-log.md#adr-761--the-inbox-pushed-to-staffs-phones-a-customer-who-begins-waiting-on-whatsapp-to-whom-the-conversation-is-given-or-else-all-who-answer-and-a-conversation-given-to-its-member)).
+* 4146 tests (1 new).
+
 ### 2d6d726 · A time to answer the inbox by
 
 * **The shop says how soon it answers:** a customer waiting longer shows as overdue in the

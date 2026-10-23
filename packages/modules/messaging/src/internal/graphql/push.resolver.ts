@@ -23,6 +23,8 @@ export enum PushNotificationKind {
   CUSTOMER_REFUSED = 'CUSTOMER_REFUSED',
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
   ORDER_MENTIONED = 'ORDER_MENTIONED',
+  CONVERSATION_MESSAGE = 'CONVERSATION_MESSAGE',
+  CONVERSATION_ASSIGNED = 'CONVERSATION_ASSIGNED',
 }
 
 registerEnumType(PushNotificationKind, {
@@ -37,7 +39,10 @@ registerEnumType(PushNotificationKind, {
     'agents; cash ' +
     'to owners, managers and accountants; stock to owners and managers; comments to owners, ' +
     "managers and marketers. And a member's own: an order given to them, ORDER_ASSIGNED, or " +
-    'a comment on an order naming them, ORDER_MENTIONED, whatever their role.',
+    'a comment on an order naming them, ORDER_MENTIONED, whatever their role. And, to those ' +
+    'who answer customers, a customer who began waiting on WhatsApp, CONVERSATION_MESSAGE, ' +
+    'to whom the conversation is given if anyone; and a conversation given to them by ' +
+    'another, CONVERSATION_ASSIGNED (ADR-761).',
 });
 
 @ObjectType({

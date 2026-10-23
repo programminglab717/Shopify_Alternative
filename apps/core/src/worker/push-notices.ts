@@ -8,6 +8,8 @@ import type { LowStockAlert } from '@hatti/inventory/public';
 import { LogisticsEvents, type CodRemittanceImportedPayload } from '@hatti/logistics/public';
 import {
   MessagingEvents,
+  type ConversationAssignedPayload,
+  type ConversationMessageReceivedPayload,
   type PushKind,
   type PushMessage,
   type PushRecipient,
@@ -65,8 +67,11 @@ async function recipientsIn(tx: Tx, shopId: string): Promise<PushRecipient[]> {
  * would carry; a comment held for the shop's approval (ADR-619), likewise, to those who write its
  * blogs, opening the article; a parcel its customer refused, of each other order of theirs
  * confirmed and not yet shipped (ADR-672), to who confirms orders, opening that order, to call
- * them before it ships. Low stock is pushed with the WhatsApp alert, which keeps its spells
- * ({@link lowStockNotice}). Nothing where Hatti has no VAPID keys.
+ * them before it ships. A customer who began waiting on WhatsApp (ADR-761), to whom their
+ * conversation is given, else to all who answer customers, once a wait, saying not what they
+ * wrote; and a conversation given to a member by another, to them. Low stock is pushed with the
+ * WhatsApp alert, which keeps its spells ({@link lowStockNotice}). Nothing where Hatti has no
+ * VAPID keys.
  */
 export class PushNotices {
   /** The events {@link handle} reads. */
@@ -74,6 +79,8 @@ export class PushNotices {
     OrderEvents.OrderCreated,
     LogisticsEvents.CodRemittanceImported,
     MessagingEvents.ContactMessageReceived,
+    MessagingEvents.ConversationMessageReceived,
+    MessagingEvents.ConversationAssigned,
     OnlineStoreEvents.CommentCreated,
     OrderEvents.FulfillmentUpdated,
   ];
@@ -181,6 +188,54 @@ export class PushNotices {
               url: `${base}/inbox?tab=form`,
             },
           } satisfies PushNotice;
+        case MessagingEvents.ConversationMessageReceived: {
+          const written = event.payload as Partial<ConversationMessageReceivedPayload>;
+          // Once a wait: not each message of a customer still waiting, nor of events before.
+          if (!written.startedWaiting) return null;
+          const given = written.assigneeId
+            ? recipients.filter((each) => each.userId === written.assigneeId)
+            : [];
+          return {
+            kind: 'conversation_message',
+            dedupeKey: `conversation_message:${written.messageId ?? event.id}`,
+            // To whom it is given while they work in the shop, else to all who answer.
+            recipients: given.length > 0 ? given : recipients,
+            message: {
+              en: {
+                title: `${shop.name}: a customer wrote on WhatsApp`,
+                body: 'They are waiting for an answer. Reply in the inbox.',
+              },
+              ur: {
+                title: `${shop.name}: واٹس ایپ پر گاہک کا پیغام`,
+                body: 'وہ جواب کا انتظار کر رہے ہیں۔ ان باکس میں جواب دیں۔',
+              },
+              url: `${base}/inbox/${toPublicId('conversation', event.aggregateId)}`,
+            },
+          } satisfies PushNotice;
+        }
+        case MessagingEvents.ConversationAssigned: {
+          const given = event.payload as Partial<ConversationAssignedPayload>;
+          // Given back, or taken for oneself: no one to tell.
+          if (!given.assigneeId || given.assigneeId === given.assignedBy) return null;
+          const to = recipients.filter((each) => each.userId === given.assigneeId);
+          if (to.length === 0) return null;
+          return {
+            kind: 'conversation_assigned',
+            dedupeKey: `conversation_assigned:${event.id}`,
+            recipients: to,
+            message: {
+              en: {
+                title: `${shop.name}: a conversation is yours`,
+                body: 'It was given to you to answer.',
+              },
+              ur: {
+                title: `${shop.name}: ایک بات چیت آپ کے سپرد`,
+                body: 'یہ آپ کو جواب دینے کے لیے دی گئی ہے۔',
+              },
+              url: `${base}/inbox/${toPublicId('conversation', event.aggregateId)}`,
+            },
+          } satisfies PushNotice;
+        }
         case OnlineStoreEvents.CommentCreated: {
           const comment = event.payload as Partial<CommentChangedPayload>;
           // Shown at once, or kept as spam: nothing waits.

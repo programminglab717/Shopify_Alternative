@@ -90,6 +90,17 @@ describe.skipIf(!server)('Conversations given to staff (MSG-06, ADR-759)', () =>
       [ids.first],
     );
     expect(rows[0]).toEqual({ assignee_id: null, assigned_at: null });
+    // Each change announced with who made it, for its push (ADR-761); a refusal not at all.
+    const { rows: events } = await admin.query<{ payload: object }>(
+      `SELECT payload FROM platform.outbox_events
+        WHERE event_type = 'conversation.assigned' AND aggregate_id = $1 ORDER BY id`,
+      [ids.first],
+    );
+    expect(events.map((each) => each.payload)).toEqual([
+      { assigneeId: sana, assignedBy: sana },
+      { assigneeId: bilal, assignedBy: bilal },
+      { assigneeId: null, assignedBy: bilal },
+    ]);
     expect(await inbox.assign(asSana, newId(), sana, { fromOthers: true })).toMatchObject({
       ok: false,
       errors: [{ code: 'NOT_FOUND' }],

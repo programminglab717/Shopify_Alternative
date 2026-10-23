@@ -7,6 +7,7 @@ import {
   MessagingEvents,
   type ConversationMessageReceivedPayload,
   type ConversationRepliedPayload,
+  type ConversationAssignedPayload,
 } from './events.js';
 import type { Page, StatusUpdate } from './messages.service.js';
 import { WHATSAPP_CLOUD, WhatsAppCloudProvider } from './providers.js';
@@ -182,6 +183,10 @@ export class ConversationsService {
         RETURNING id`);
       const messageId = kept.rows[0]?.id;
       if (!messageId) return;
+      // Locked by the insert above: whether they were waiting already, and for whom.
+      const before = await tx.execute<{ waiting: boolean; assignee_id: string | null }>(sql`
+        SELECT waiting_since IS NOT NULL AS waiting, assignee_id FROM messaging.conversations
+         WHERE shop_id = ${shopId} AND id = ${conversationId}`);
       await tx.execute(sql`
         UPDATE messaging.conversations
            SET unread = unread + 1, waiting_since = coalesce(waiting_since, ${at}::timestamptz)
@@ -190,7 +195,12 @@ export class ConversationsService {
         type: MessagingEvents.ConversationMessageReceived,
         aggregateType: 'conversation',
         aggregateId: conversationId,
-        payload: { messageId, at },
+        payload: {
+          messageId,
+          at,
+          startedWaiting: !before.rows[0]!.waiting,
+          assigneeId: before.rows[0]!.assignee_id,
+        },
       });
     });
     return shopId;
@@ -319,6 +329,12 @@ export class ConversationsService {
            SET assignee_id = ${assigneeId},
                assigned_at = ${assigneeId ? sql`now()` : sql`NULL`}
          WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
+      await appendEvent<ConversationAssignedPayload>(tx, tenant.shopId, {
+        type: MessagingEvents.ConversationAssigned,
+        aggregateType: 'conversation',
+        aggregateId: id,
+        payload: { assigneeId, assignedBy: self },
+      });
       return { ok: true as const, value: (await conversationIn(tx, tenant.shopId, id))! };
     });
   }

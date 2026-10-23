@@ -22,6 +22,7 @@ export {
   MessagingEvents,
   type ConversationMessageReceivedPayload,
   type ConversationRepliedPayload,
+  type ConversationAssignedPayload,
   type MessageRepliedPayload,
   type MessagingSettingsUpdatedPayload,
   type WhatsAppAccountConnectedPayload,

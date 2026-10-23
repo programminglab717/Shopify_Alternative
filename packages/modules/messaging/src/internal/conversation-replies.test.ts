@@ -169,6 +169,13 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     expect(await inbox.overdueCount(a)).toBe(1);
     expect(await inbox.overdueCount(a, new Date(first.getTime() + 29 * 60_000))).toBe(0);
     expect(await inbox.overdueCount(b)).toBe(0);
+    // Each message says whether it began the wait, for its push (ADR-761).
+    const { rows: received } = await admin.query<{ payload: { startedWaiting: boolean } }>(
+      `SELECT payload FROM platform.outbox_events
+        WHERE event_type = $1 AND aggregate_id = $2 ORDER BY id`,
+      [MessagingEvents.ConversationMessageReceived, id],
+    );
+    expect(received.map((each) => each.payload.startedWaiting)).toEqual([true, false]);
     const overdue = await inbox.list(a, { first: 10, after: null, overdue: true });
     expect(overdue.items.map((each) => each.id)).toEqual([id]);
 

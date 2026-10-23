@@ -103,7 +103,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
 
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const lowStock = await within(card).findByRole('checkbox', { name: /Low stock/ });
-    expect(within(card).getAllByRole('checkbox')).toHaveLength(10);
+    expect(within(card).getAllByRole('checkbox')).toHaveLength(12);
     fireEvent.click(lowStock);
     fireEvent.click(within(card).getByRole('button', { name: 'Turn on notifications' }));
     await waitFor(() =>
@@ -121,6 +121,8 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'ORDER_MENTIONED',
             'CASH_REMITTED',
             'CONTACT_MESSAGE',
+            'CONVERSATION_MESSAGE',
+            'CONVERSATION_ASSIGNED',
             'COMMENT_PENDING',
           ],
         },
@@ -142,6 +144,8 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'ORDER_ASSIGNED',
             'ORDER_MENTIONED',
             'CONTACT_MESSAGE',
+            'CONVERSATION_MESSAGE',
+            'CONVERSATION_ASSIGNED',
             'COMMENT_PENDING',
           ],
         },
@@ -184,6 +188,9 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
       expect.stringMatching(/^Orders given to you/),
       expect.stringMatching(/^Comments naming you/),
       'Contact form messagesA shopper writing to you from your online store’s contact page.',
+      // The inbox's own (ADR-761).
+      expect.stringMatching(/^Customers waiting on WhatsApp/),
+      'Conversations given to youA WhatsApp conversation given to you to answer.',
     ]);
   });
 

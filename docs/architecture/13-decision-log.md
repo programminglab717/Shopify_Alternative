@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-760 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-761 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -768,6 +768,7 @@
 | 758 | The inbox keeps the shop's saved replies, each a title and its words, at most 100, picked while answering and changed before sending | Accepted |
 | 759 | A conversation is given to a member of staff to answer, as an order is: those who give orders to others give it to anyone, others take one no one has, and whoever leaves gives theirs back | Accepted |
 | 760 | A shop says in how many minutes it answers the inbox; each conversation keeps since when its customer has waited, and those waiting past it are overdue | Accepted |
+| 761 | The inbox pushed to staff's phones: a customer who begins waiting on WhatsApp, to whom the conversation is given or else all who answer, and a conversation given to its member | Accepted |
 
 ---
 
@@ -25718,3 +25719,25 @@
 * **Consequences:** being overdue is a state read, not an event; telling staff when a
   conversation of theirs becomes overdue needs a sweep by the worker, which comes after. The
   target runs by the clock, not by the shop's opening hours.
+
+## ADR-761 · The inbox pushed to staff's phones: a customer who begins waiting on WhatsApp, to whom the conversation is given or else all who answer, and a conversation given to its member
+
+* **Context:** the contact form's messages were pushed (ADR-591), but not what customers write
+  on WhatsApp, where most of them write; staff learnt of it only on opening the inbox. Being
+  given a conversation (ADR-759) told no one.
+* **Decision:**
+  * **Two kinds of push of their own** (migration 0324), offered to owners, managers and
+    confirmation agents who may answer customers (`write_conversations`), and to a custom
+    role's member only if it holds that:
+    * **`conversation_message`:** a customer's message that begins their wait for an answer,
+      the first since the shop last answered (ADR-760), not each one after. To whom the
+      conversation is given while they work in the shop, else to all who answer. The message
+      event says whether it began the wait, and for whom.
+    * **`conversation_assigned`:** a conversation given to a member by another, to them. Taking
+      one for oneself, or giving it back, tells no one. Each change of whom it is given to is
+      now an event, `conversation.assigned`, with who made it.
+  * **Neither says the customer's number or words,** which push services would carry; each
+    opens the conversation in the admin, in the member's language.
+  * **The admin's notification settings** offer both with the inbox's other kinds.
+* **Consequences:** a conversation waiting past the shop's reply target pushes no one yet;
+  that needs a sweep by the worker, as orders overdue for their first call have (ADR-627).
