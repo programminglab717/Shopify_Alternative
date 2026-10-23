@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Past orders in the admin
+
+* **The old store's history, one tap away:** the orders page links to every order from the store
+  the shop moved from, each whole, with its customer (ONB-05, [ADR-788](../architecture/13-decision-log.md#adr-788--the-admin-lists-past-orders-whole-on-a-page-of-their-own-linked-from-the-orders-once-the-shop-has-any)).
+* 4236 tests (3 new).
+
 ### 1daa5c6 · A shopper's past orders in their account
 
 * **Their whole history:** a signed-in shopper sees their orders from the store the shop moved

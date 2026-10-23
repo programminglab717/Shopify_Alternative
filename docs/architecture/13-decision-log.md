@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-787 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-788 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -795,6 +795,7 @@
 | 785 | A collection shows one of the shop's files as its image, served as articles' are, and Shopify's are brought | Accepted |
 | 786 | A Shopify store's orders are kept as past orders, a history apart from Hatti's orders that nothing acts on | Accepted |
 | 787 | A shopper's account lists their past orders under their orders, with no page and nothing to buy again | Accepted |
+| 788 | The admin lists past orders whole on a page of their own, linked from the orders once the shop has any | Accepted |
 
 ---
 
@@ -26276,3 +26277,17 @@
 * **Consequences:** a returning shopper sees their whole history with the shop. Their totals are
   shown with the shop's currency, as the store priced them in it. Older cores give no
   `pastOrders`, and the storefront shows none.
+
+## ADR-788 · The admin lists past orders whole on a page of their own, linked from the orders once the shop has any
+
+* **Context:** ADR-786 shows a customer's past orders on their page, ten at a time and in
+  brief. Staff also look up an old order by its number, or one whose number found no customer,
+  which no customer's page shows.
+* **Decision:** `/orders/past` lists every past order, the latest placed first, fifty at a time,
+  each whole on its card: items with their prices, the store's statuses in words, where it went,
+  its note, and a link to its customer where it found one. There is no page per order, since a
+  card already holds all there is and nothing on it can be done. The orders page links to it
+  only once the shop has any, asking for one past order to know; a shop that never moved sees
+  nothing new.
+* **Consequences:** the history is one tap from the orders. It cannot be searched yet; the
+  browser's own find serves for the pages loaded.
