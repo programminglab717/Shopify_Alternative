@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### A Shopify store's metafields
+
+* **Themes keep their data:** moving a Shopify store sets its products', variants' and
+  collections' metafields on the shop's own; gift cards stay behind, since Shopify never gives
+  their codes (ONB-05, [ADR-789](../architecture/13-decision-log.md#adr-789--a-shopify-stores-metafields-are-set-on-the-shops-products-variants-and-collections-of-the-same-handles-gift-cards-stay-behind)).
+* 4240 tests (4 new).
+
 ### 9d800a8 · Past orders in the admin
 
 * **The old store's history, one tap away:** the orders page links to every order from the store

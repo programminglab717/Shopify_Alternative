@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-788 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-789 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -796,6 +796,7 @@
 | 786 | A Shopify store's orders are kept as past orders, a history apart from Hatti's orders that nothing acts on | Accepted |
 | 787 | A shopper's account lists their past orders under their orders, with no page and nothing to buy again | Accepted |
 | 788 | The admin lists past orders whole on a page of their own, linked from the orders once the shop has any | Accepted |
+| 789 | A Shopify store's metafields are set on the shop's products, variants and collections of the same handles; gift cards stay behind | Accepted |
 
 ---
 
@@ -26291,3 +26292,26 @@
   nothing new.
 * **Consequences:** the history is one tap from the orders. It cannot be searched yet; the
   browser's own find serves for the pages loaded.
+
+## ADR-789 · A Shopify store's metafields are set on the shop's products, variants and collections of the same handles; gift cards stay behind
+
+* **Context:** a store's themes and apps keep data in metafields: a product's fabric, a
+  variant's length, a collection's season. Hatti has metafields on products, variants and
+  collections (ADR-489), but moving a store (ONB-05) left them behind, so a theme brought from
+  Shopify showed less. Gift cards are the other thing the importer did not bring.
+* **Decision:** `metafieldsImportFromShopify` reads them in three bulk queries, one for each
+  kind of owner, one after another, as Shopify runs one at a time and a bulk query reads one
+  connection at its top: products and collections by handle, variants by their product's handle
+  and their title ("M / Maroon", or "Default Title"), which Hatti's variants carry the same way.
+  Each is set as `metafieldsSet` sets them, 25 at a time, all or none, then one at a time where a
+  batch is refused, so the rest go and each that will not is named. Types Hatti has not
+  (references to files, products or metaobjects, rich text, lists of other types), apps' own
+  namespaces, which Shopify writes with `$app:`, and Hatti's reserved namespaces are counted and
+  left out, as are metafields on owners the shop has not. Set again, a metafield takes the
+  store's value. The move page brings them after the products and collections. Gift cards are
+  not brought: Shopify's API gives only a card's last four characters, never its code, so a card
+  cannot keep working with the code its holder has; a shop issues its holders new cards
+  (CAT-12), which this leaves to the shop.
+* **Consequences:** themes moved from Shopify show what their metafields held. References are
+  the remaining gap, until Hatti has those types; gift card holders need the shop to reissue
+  their balances.
