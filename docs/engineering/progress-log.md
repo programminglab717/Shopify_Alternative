@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Redirects straight from a Shopify store
+### accc004 · Redirects straight from a Shopify store
 
 * **The old store's redirects come with its products.** Hatti reads them through the store's
   Admin API and imports them as a redirects file would be, each problem named by its path; the
