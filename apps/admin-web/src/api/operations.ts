@@ -2582,6 +2582,7 @@ const DELIVERY_SETTINGS = /* GraphQL */ `
     slotDays
     slotLeadHours
     slotCapacity
+    slotClosedWeekdays
     updatedAt
   }
 `;

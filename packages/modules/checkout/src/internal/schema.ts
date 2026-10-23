@@ -168,6 +168,8 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   slotLeadHours: smallint('slot_lead_hours').notNull().default(2),
   /** How many orders a slot on a day takes (ADR-772); null for no limit. */
   slotCapacity: smallint('slot_capacity'),
+  /** The days of the week it does not deliver on (ADR-773), 0 for Sunday. */
+  slotClosedWeekdays: smallint('slot_closed_weekdays').array().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -244,6 +244,7 @@ describe('Delivery charges', () => {
       slotDays: 7,
       slotLeadHours: 2,
       slotCapacity: null,
+      slotClosedWeekdays: [],
     });
     // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
@@ -258,6 +259,7 @@ describe('Delivery charges', () => {
       slotDays: 7,
       slotLeadHours: 2,
       slotCapacity: null,
+      slotClosedWeekdays: [],
     });
     expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
     expect(
@@ -477,6 +479,7 @@ describe.skipIf(!server)('DeliveryService', () => {
       slotDays: 7,
       slotLeadHours: 2,
       slotCapacity: null,
+      slotClosedWeekdays: [],
     });
     const slots = [
       { from: '10:00', until: '13:00' },
@@ -496,9 +499,18 @@ describe.skipIf(!server)('DeliveryService', () => {
     // How many orders a slot takes (ADR-772).
     unwrap(await f.delivery.update(f.a, { slotCapacity: 4 }));
     expect((await f.delivery.get(f.a)).slotCapacity).toBe(4);
+    // The days it does not deliver on (ADR-773).
+    unwrap(await f.delivery.update(f.a, { slotClosedWeekdays: [1] }));
+    expect((await f.delivery.get(f.a)).slotClosedWeekdays).toEqual([1]);
     expect(
       (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
-    ).toEqual([['slots', 'slotDays'], ['slotLeadHours'], ['slots'], ['slotCapacity']]);
+    ).toEqual([
+      ['slots', 'slotDays'],
+      ['slotLeadHours'],
+      ['slots'],
+      ['slotCapacity'],
+      ['slotClosedWeekdays'],
+    ]);
     await expect(
       f.admin.query(`UPDATE checkout.delivery_settings SET slot_days = 0 WHERE shop_id = $1`, [
         f.a.shopId,
@@ -633,6 +645,32 @@ describe('How many orders a delivery slot takes (CHK-15, ADR-772)', () => {
     expect(slotsWithRoom(settings, offered, taken)).toEqual([evening]);
     // Without a limit, however many it has.
     expect(slotsWithRoom({ ...settings, slotCapacity: null }, offered, taken)).toEqual(offered);
+  });
+});
+
+describe('Days a shop does not deliver on (CHK-15, ADR-773)', () => {
+  it('takes days of the week, kept in order once each, and offers no slots on them', () => {
+    expect(checked({ slotClosedWeekdays: [5, 1, 5] })).toMatchObject({
+      slotClosedWeekdays: [1, 5],
+    });
+    expect(checked({ slotClosedWeekdays: [7] })).toEqual([
+      ['slotClosedWeekdays', 'A day of the week is 0 for Sunday to 6 for Saturday'],
+    ]);
+    expect(checked({ slotClosedWeekdays: [0, 1, 2, 3, 4, 5, 6] })).toEqual([
+      ['slotClosedWeekdays', 'A shop that offers slots delivers on one day of the week at least'],
+    ]);
+    const settings: DeliverySettingsRecord = {
+      ...NO_DELIVERY_SETTINGS,
+      slots: [{ from: '16:00', until: '19:00' }],
+      slotDays: 4,
+      slotLeadHours: 0,
+      // Not on Saturdays and Sundays.
+      slotClosedWeekdays: [0, 6],
+    };
+    // 9 am in Karachi, Friday 23 October 2026: Friday, then Monday.
+    expect(
+      offeredSlots(settings, new Date('2026-10-23T04:00:00Z')).map((slot) => slot.day),
+    ).toEqual(['2026-10-23', '2026-10-26']);
   });
 });
 

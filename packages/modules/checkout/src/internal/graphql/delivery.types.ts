@@ -174,6 +174,13 @@ export class DeliverySettings {
   })
   slotCapacity!: number | null;
 
+  @Field(() => [Int], {
+    description:
+      'The days of the week the shop does not deliver on (ADR-773), 0 for Sunday to 6 for ' +
+      'Saturday: no slots are offered on them.',
+  })
+  slotClosedWeekdays!: number[];
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'null while the shop has set none.',
@@ -265,6 +272,12 @@ export class DeliverySettingsUpdateInput {
     description: 'How many orders a slot takes, 1 to 1,000; null for no limit.',
   })
   slotCapacity?: number | null;
+
+  @Field(() => [Int], {
+    nullable: true,
+    description: 'Replaces the days of the week without delivery, 0 (Sunday) to 6; empty for none.',
+  })
+  slotClosedWeekdays?: number[] | null;
 }
 
 @ObjectType()

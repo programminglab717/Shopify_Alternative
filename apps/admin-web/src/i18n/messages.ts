@@ -660,6 +660,7 @@ const en = {
     'A time is offered only if it starts at least this many hours from when the customer orders, 0 to 72.',
   'delivery.badLeadHours': 'type whole hours from 0 to 72',
   'delivery.slotCapacity': 'Orders per time',
+  'delivery.slotWeekdays': 'Days you deliver on',
   'delivery.slotCapacityHint':
     'How many orders you take in each time on a day; once it has as many, checkout offers it no more. Blank for no limit.',
   'delivery.badCapacity': 'type a whole number of orders, or leave it blank',
@@ -6397,6 +6398,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'کوئی وقت تبھی پیش ہوتا ہے جب وہ آرڈر کے وقت سے کم از کم اتنے گھنٹے بعد شروع ہو، 0 سے 72۔',
   'delivery.badLeadHours': '0 سے 72 تک پورے گھنٹے لکھیں',
   'delivery.slotCapacity': 'ہر وقت میں آرڈر',
+  'delivery.slotWeekdays': 'ڈیلیوری کے دن',
   'delivery.slotCapacityHint':
     'ایک دن کے ہر وقت میں آپ کتنے آرڈر لیتے ہیں؛ اتنے ہو جائیں تو چیک آؤٹ وہ وقت پیش نہیں کرتا۔ کوئی حد نہ ہو تو خالی چھوڑ دیں۔',
   'delivery.badCapacity': 'آرڈرز کی پوری تعداد لکھیں، یا خالی چھوڑ دیں',

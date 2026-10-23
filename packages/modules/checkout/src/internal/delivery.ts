@@ -42,6 +42,11 @@ export interface DeliverySettingsRecord {
    * longer offered. Null or left out for no limit.
    */
   slotCapacity?: number | null;
+  /**
+   * The days of the week the shop does not deliver on (ADR-773), 0 for Sunday to 6 for Saturday,
+   * the earliest first: no slots are offered on them. Left out or empty for none.
+   */
+  slotClosedWeekdays?: number[];
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -103,6 +108,7 @@ export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   slotDays: 7,
   slotLeadHours: 2,
   slotCapacity: null,
+  slotClosedWeekdays: [],
   updatedAt: null,
 };
 
@@ -144,6 +150,8 @@ export interface DeliverySettingsInput {
   slotLeadHours?: number | null;
   /** 1 to 1,000; null for no limit. */
   slotCapacity?: number | null;
+  /** 0 (Sunday) to 6 (Saturday), in any order; an empty list for none. */
+  slotClosedWeekdays?: number[] | null;
 }
 
 export interface DeliveryValueRateInput {
@@ -376,6 +384,24 @@ export function checkDeliverySettings(
       );
     }
   }
+  let slotClosedWeekdays = current.slotClosedWeekdays ?? [];
+  if (input.slotClosedWeekdays !== undefined) {
+    const days = input.slotClosedWeekdays ?? [];
+    if (days.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
+      check.addMessage(
+        ['slotClosedWeekdays'],
+        'INVALID',
+        'A day of the week is 0 for Sunday to 6 for Saturday',
+      );
+    } else if (new Set(days).size === 7) {
+      check.addMessage(
+        ['slotClosedWeekdays'],
+        'INVALID',
+        'A shop that offers slots delivers on one day of the week at least',
+      );
+    }
+    slotClosedWeekdays = [...new Set(days)].sort((a, b) => a - b);
+  }
   return check.errors.length > before
     ? null
     : {
@@ -390,6 +416,7 @@ export function checkDeliverySettings(
         slotDays,
         slotLeadHours,
         slotCapacity,
+        slotClosedWeekdays,
       };
 }
 
@@ -461,9 +488,13 @@ export function offeredSlots(settings: DeliverySettingsRecord, now: Date): Offer
   if (slots.length === 0) return [];
   const earliest = now.getTime() + (settings.slotLeadHours ?? 2) * 3_600_000;
   const today = Date.parse(`${pkDayOf(now)}T00:00:00Z`);
+  const closed = new Set(settings.slotClosedWeekdays ?? []);
   const offered: OfferedDeliverySlot[] = [];
   for (let ahead = 0; ahead < (settings.slotDays ?? 7); ahead++) {
-    const day = new Date(today + ahead * 86_400_000).toISOString().slice(0, 10);
+    const date = new Date(today + ahead * 86_400_000);
+    // Not on the days of the week the shop does not deliver on (ADR-773).
+    if (closed.has(date.getUTCDay())) continue;
+    const day = date.toISOString().slice(0, 10);
     for (const slot of slots) {
       const startsAt = pkTime(day, slot.from);
       if (startsAt.getTime() < earliest) continue;

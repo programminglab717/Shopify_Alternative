@@ -63,6 +63,10 @@ export class DeliveryService {
         ...(next.slotDays !== (before.slotDays ?? 7) ? ['slotDays'] : []),
         ...(next.slotLeadHours !== (before.slotLeadHours ?? 2) ? ['slotLeadHours'] : []),
         ...(next.slotCapacity !== (before.slotCapacity ?? null) ? ['slotCapacity'] : []),
+        ...(JSON.stringify(next.slotClosedWeekdays ?? []) !==
+        JSON.stringify(before.slotClosedWeekdays ?? [])
+          ? ['slotClosedWeekdays']
+          : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       const values = {
@@ -78,6 +82,7 @@ export class DeliveryService {
         slotDays: next.slotDays ?? 7,
         slotLeadHours: next.slotLeadHours ?? 2,
         slotCapacity: next.slotCapacity ?? null,
+        slotClosedWeekdays: next.slotClosedWeekdays ?? [],
       };
       await tx
         .insert(deliverySettings)
@@ -134,6 +139,7 @@ export class DeliveryService {
       slotDays: row.slotDays,
       slotLeadHours: row.slotLeadHours,
       slotCapacity: row.slotCapacity,
+      slotClosedWeekdays: row.slotClosedWeekdays,
       updatedAt: row.updatedAt,
     };
   }

@@ -1239,6 +1239,8 @@ export interface DeliverySettingsValue {
   slotLeadHours?: number;
   /** How many orders a slot takes (ADR-772); null for no limit, absent in old fakes. */
   slotCapacity?: number | null;
+  /** The days of the week it does not deliver on, 0 for Sunday (ADR-773); absent in old fakes. */
+  slotClosedWeekdays?: number[];
   updatedAt: string | null;
 }
 

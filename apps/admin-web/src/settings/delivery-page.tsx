@@ -9,6 +9,7 @@ import type {
   SettingsPayloadData,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
+import { formatWeekday } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -19,6 +20,7 @@ import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import {
   amountInput,
+  CheckField,
   Pair,
   parseList,
   parseWhole,
@@ -91,7 +93,12 @@ interface DeliveryState {
   slotLeadHours: string;
   /** How many orders a time takes, as typed; "" for no limit (ADR-772). */
   slotCapacity: string;
+  /** The days of the week it does not deliver on, 0 for Sunday (ADR-773). */
+  closedWeekdays: number[];
 }
+
+/** The days of the week as a Pakistani week runs, Monday first. */
+const WEEK = [1, 2, 3, 4, 5, 6, 0] as const;
 
 function daysState(days: DeliveryDaysValue | null): DaysState {
   return { min: days ? String(days.min) : '', max: days ? String(days.max) : '' };
@@ -130,6 +137,7 @@ function stateOf(settings: DeliverySettingsValue): DeliveryState {
       settings.slotCapacity === undefined || settings.slotCapacity === null
         ? ''
         : String(settings.slotCapacity),
+    closedWeekdays: settings.slotClosedWeekdays ?? [],
   };
 }
 
@@ -169,6 +177,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   slotDays: 'delivery.slotDays',
   slotLeadHours: 'delivery.slotLeadHours',
   slotCapacity: 'delivery.slotCapacity',
+  slotClosedWeekdays: 'delivery.slotWeekdays',
 };
 
 /**
@@ -423,7 +432,7 @@ function SlotFields({
 }
 
 function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const save = useAdminMutation<
     { deliverySettingsUpdate: SettingsPayloadData },
     { input: Record<string, unknown> }
@@ -495,6 +504,7 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
           slotDays: Number(state.slotDays),
           slotLeadHours: leadHours,
           slotCapacity: capacity,
+          slotClosedWeekdays: [...state.closedWeekdays].sort((a, b) => a - b),
         },
       });
       if (deliverySettingsUpdate.userErrors.length > 0) {
@@ -720,6 +730,28 @@ function DeliveryForm({ settings }: { settings: DeliverySettingsValue }) {
               onChange={(event) => setState({ ...state, slotLeadHours: event.target.value })}
             />
           </Pair>
+        )}
+        {state.slots.length > 0 && (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="font-medium">{t('delivery.slotWeekdays')}</legend>
+            <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-4">
+              {WEEK.map((day) => (
+                <CheckField
+                  key={day}
+                  label={formatWeekday(day, locale)}
+                  checked={!state.closedWeekdays.includes(day)}
+                  onChange={(delivers) =>
+                    setState({
+                      ...state,
+                      closedWeekdays: delivers
+                        ? state.closedWeekdays.filter((each) => each !== day)
+                        : [...state.closedWeekdays, day],
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </fieldset>
         )}
         {state.slots.length > 0 && (
           <TextField

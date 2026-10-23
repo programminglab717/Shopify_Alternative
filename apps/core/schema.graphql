@@ -4252,6 +4252,11 @@ type DeliverySettings {
   """
   slotCapacity: Int
 
+  """
+  The days of the week the shop does not deliver on (ADR-773), 0 for Sunday to 6 for Saturday: no slots are offered on them.
+  """
+  slotClosedWeekdays: [Int!]!
+
   """How many days ahead, today the first, slots are offered on."""
   slotDays: Int!
 
@@ -4296,6 +4301,11 @@ input DeliverySettingsUpdateInput {
 
   """How many orders a slot takes, 1 to 1,000; null for no limit."""
   slotCapacity: Int
+
+  """
+  Replaces the days of the week without delivery, 0 (Sunday) to 6; empty for none.
+  """
+  slotClosedWeekdays: [Int!]
 
   """Slots offered 1 to 14 days ahead."""
   slotDays: Int

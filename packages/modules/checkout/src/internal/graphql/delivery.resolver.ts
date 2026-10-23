@@ -80,6 +80,7 @@ function toDeliverySettings(
     slotDays: record.slotDays ?? 7,
     slotLeadHours: record.slotLeadHours ?? 2,
     slotCapacity: record.slotCapacity ?? null,
+    slotClosedWeekdays: record.slotClosedWeekdays ?? [],
     updatedAt: record.updatedAt,
   });
 }

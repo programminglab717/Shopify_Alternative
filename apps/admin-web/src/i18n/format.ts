@@ -76,6 +76,14 @@ export function formatSlot(startsAt: string, endsAt: string, locale: Locale): st
   return `${day}, ${clock(startsAt)} – ${clock(endsAt)}`;
 }
 
+/** A day of the week's name, 0 for Sunday to 6 for Saturday: "Monday". */
+export function formatWeekday(day: number, locale: Locale): string {
+  // 25 October 2026 is a Sunday.
+  return new Intl.DateTimeFormat(dateLocale(locale), { weekday: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(2026, 9, 25 + day)),
+  );
+}
+
 /** "October 2026", of a year and month written "2026-10". */
 export function formatMonth(month: string, locale: Locale): string {
   return new Intl.DateTimeFormat(dateLocale(locale), {

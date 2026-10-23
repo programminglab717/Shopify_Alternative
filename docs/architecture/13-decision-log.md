@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-772 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-773 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -780,6 +780,7 @@
 | 770 | An order's delivery slot is said in Pakistan's time on the thank-you page, the order's link page and its packing slip | Accepted |
 | 771 | The admin sets delivery times with the delivery charges, and an order's page says the slot its customer chose | Accepted |
 | 772 | A delivery slot takes as many orders as the shop says, counted again under a lock when an order is placed in it | Accepted |
+| 773 | A shop's delivery slots leave out the days of the week it does not deliver on | Accepted |
 
 ---
 
@@ -25958,3 +25959,18 @@
 * **Consequences:** a shop takes no more orders in a time than it can deliver. One lock per shop
   orders slot placements one at a time, only where a limit is set; a shop's checkouts are few
   enough a minute for that.
+
+## ADR-773 · A shop's delivery slots leave out the days of the week it does not deliver on
+
+* **Context:** a bakery closed on Mondays, a florist resting on Fridays: slots (ADR-768) were
+  offered every day, and such shops had to turn orders away by hand (CHK-15).
+* **Decision:** delivery settings get `slotClosedWeekdays`, the days of the week the shop does
+  not deliver on, 0 for Sunday to 6 for Saturday, kept in order once each; all seven are
+  refused, as a shop offering slots delivers on one day at least (migration 0331, checked by the
+  database too; `DeliverySettings.slotClosedWeekdays` in the Admin API). `offeredSlots` skips
+  those days within the days ahead, so a shop offering 4 days ahead and closed on weekends
+  offers Friday then Monday. Settings → Delivery shows "Days you deliver on" as a box for each
+  day, Monday first, ticked where the shop delivers.
+* **Consequences:** CHK-15 is whole for shops that deliver themselves: times, days ahead, hours
+  first, orders per time, days off, the choice kept and shown. Pakistan's public holidays are
+  not left out by themselves, as such shops often work them; a shop closes them by hand for now.

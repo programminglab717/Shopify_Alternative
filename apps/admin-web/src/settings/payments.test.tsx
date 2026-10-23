@@ -84,6 +84,7 @@ describe('Delivery and payment settings in the admin', () => {
         slotDays: 7,
         slotLeadHours: 2,
         slotCapacity: null,
+        slotClosedWeekdays: [],
       },
     });
   });
@@ -150,6 +151,8 @@ describe('Delivery and payment settings in the admin', () => {
       screen.getByText('Orders per time: type a whole number of orders, or leave it blank'),
     ).toBeTruthy();
     type('Orders per time', '6');
+    // Not on Fridays (ADR-773).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Friday' }));
     await press('Save');
     await screen.findByText('Saved. Checkout uses it from now on.');
     expect(
@@ -163,6 +166,7 @@ describe('Delivery and payment settings in the admin', () => {
         slotDays: 1,
         slotLeadHours: 24,
         slotCapacity: 6,
+        slotClosedWeekdays: [5],
       },
     });
 
