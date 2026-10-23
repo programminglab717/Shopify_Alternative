@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Saved replies in the inbox
+### bab0dee · Saved replies in the inbox
 
 * **Staff answer the same questions in a tap:** the shop keeps its answers, delivery charges,
   bank details, how to measure, in English or Urdu, and picks one while answering, to change
