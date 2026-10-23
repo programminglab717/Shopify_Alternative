@@ -8452,6 +8452,30 @@ type MetafieldsDeletePayload {
   userErrors: [UserError!]!
 }
 
+type MetafieldsImportFromShopifyPayload {
+  dryRun: Boolean!
+
+  """The first that could not be set."""
+  metafieldErrors: [StoreMetafieldImportError!]!
+
+  """Metafields on the store's products, variants and collections."""
+  metafields: Int!
+
+  """
+  Metafields on a product, variant or collection the shop has not, left out.
+  """
+  missing: Int!
+
+  """Metafields set, or that would be in a dry run."""
+  set: Int!
+
+  """
+  Metafields of a type Hatti has not, as a file or product reference, or of an app's own namespace, left out.
+  """
+  unsupported: Int!
+  userErrors: [UserError!]!
+}
+
 input MetafieldsSetInput {
   key: String!
   namespace: String!
@@ -9351,6 +9375,21 @@ type Mutation {
 
   """Deletes metafields, up to 25, by their owner, namespace and key."""
   metafieldsDelete(metafields: [MetafieldIdentifierInput!]!): MetafieldsDeletePayload!
+
+  """
+  Imports a Shopify store's metafields through its Admin API (ONB-05, ADR-789): those on its products, variants and collections, set on the shop's with the same handles, a variant by its product's handle and its title, as metafieldsSet sets them, so themes read them as they did. Metafields of a type Hatti has not, as references to files or products, or in an app's own namespace, are counted and left out; so are those whose product, variant or collection the shop has not, so bring products and collections first. Set again, a metafield takes the store's value. Give the store and its app as productsImportFromShopify takes them. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  metafieldsImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): MetafieldsImportFromShopifyPayload!
 
   """
   Sets metafields on products, variants and collections, up to 25, all or none, as Shopify's metafieldsSet: each made or changed in place, of its type, or its definition's.
@@ -17730,6 +17769,19 @@ enum StoreExportStatus {
   FAILED
   PENDING
   READY
+}
+
+"""A store's metafield that did not go in, and why."""
+type StoreMetafieldImportError {
+  message: String!
+
+  """namespace.key"""
+  metafield: String!
+
+  """
+  What it is on: a product or collection by its handle, a variant as handle / its title.
+  """
+  owner: String!
 }
 
 """A store's page that did not go in, and why."""

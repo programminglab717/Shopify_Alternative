@@ -11,6 +11,7 @@ import {
   PagesImportFromShopifyMutation,
   BlogsImportFromShopifyMutation,
   OrdersImportFromShopifyMutation,
+  MetafieldsImportFromShopifyMutation,
   CollectionsImportFromShopifyMutation,
   CustomersImportFromShopifyMutation,
   DiscountsImportFromShopifyMutation,
@@ -32,6 +33,8 @@ import type {
   BlogsImportFromShopifyResult,
   OrdersImportFromShopifyData,
   OrdersImportFromShopifyResult,
+  MetafieldsImportFromShopifyData,
+  MetafieldsImportFromShopifyResult,
   CollectionsImportFromShopifyData,
   CollectionsImportFromShopifyResult,
   CustomersImportFromShopifyData,
@@ -163,6 +166,10 @@ function ImportFromStore() {
   const moveOrders = useAdminMutation<OrdersImportFromShopifyData, Store & { dryRun: boolean }>(
     OrdersImportFromShopifyMutation,
   );
+  const moveMetafields = useAdminMutation<
+    MetafieldsImportFromShopifyData,
+    Store & { dryRun: boolean }
+  >(MetafieldsImportFromShopifyMutation);
   const { problem, attempt } = useAttempt();
   const [store, setStore] = useState('');
   const [access, setAccess] = useState<StoreAccess>('CLIENT');
@@ -171,6 +178,7 @@ function ImportFromStore() {
   const [clientSecret, setClientSecret] = useState('');
   const [overwrite, setOverwrite] = useState(false);
   const [withCollections, setWithCollections] = useState(true);
+  const [withMetafields, setWithMetafields] = useState(true);
   const [withRedirects, setWithRedirects] = useState(editsRedirects);
   const [withPages, setWithPages] = useState(writesPages);
   const [withBlogs, setWithBlogs] = useState(writesBlogs);
@@ -186,6 +194,7 @@ function ImportFromStore() {
     customers: CustomersImportFromShopifyResult | null;
     discounts: DiscountsImportFromShopifyResult | null;
     orders: OrdersImportFromShopifyResult | null;
+    metafields: MetafieldsImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
@@ -196,6 +205,7 @@ function ImportFromStore() {
     customers: CustomersImportFromShopifyResult | null;
     discounts: DiscountsImportFromShopifyResult | null;
     orders: OrdersImportFromShopifyResult | null;
+    metafields: MetafieldsImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
@@ -213,6 +223,7 @@ function ImportFromStore() {
       customers?: CustomersImportFromShopifyResult;
       discounts?: DiscountsImportFromShopifyResult;
       orders?: OrdersImportFromShopifyResult;
+      metafields?: MetafieldsImportFromShopifyResult;
     } = {};
     const ok = await attempt(async () => {
       answer.products = (
@@ -228,6 +239,16 @@ function ImportFromStore() {
           await moveCollections.mutateAsync({ ...given(), dryRun })
         ).collectionsImportFromShopify;
         return answer.collections;
+      });
+      if (!moved) return null;
+    }
+    // After the products and collections, which their metafields are on (ADR-789).
+    if (withMetafields) {
+      const moved = await attempt(async () => {
+        answer.metafields = (
+          await moveMetafields.mutateAsync({ ...given(), dryRun })
+        ).metafieldsImportFromShopify;
+        return answer.metafields;
       });
       if (!moved) return null;
     }
@@ -292,6 +313,7 @@ function ImportFromStore() {
       customers: answer.customers ?? null,
       discounts: answer.discounts ?? null,
       orders: answer.orders ?? null,
+      metafields: answer.metafields ?? null,
     };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
@@ -314,7 +336,8 @@ function ImportFromStore() {
     moveCollections.isPending ||
     moveCustomers.isPending ||
     moveDiscounts.isPending ||
-    moveOrders.isPending;
+    moveOrders.isPending ||
+    moveMetafields.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -374,6 +397,12 @@ function ImportFromStore() {
         hint={t('files.storeCollectionsHint')}
         checked={withCollections}
         onChange={changed(setWithCollections)}
+      />
+      <CheckField
+        label={t('files.storeMetafields')}
+        hint={t('files.storeMetafieldsHint')}
+        checked={withMetafields}
+        onChange={changed(setWithMetafields)}
       />
       {editsRedirects && (
         <CheckField
@@ -457,6 +486,14 @@ function ImportFromStore() {
               </p>
               <CollectionErrors result={checked.collections} />
             </>
+          )}
+          {checked.metafields && (
+            <p>
+              {t('files.metafieldsChecked', {
+                count: formatCount(checked.metafields.metafields),
+                unsupported: formatCount(checked.metafields.unsupported),
+              })}
+            </p>
           )}
           {checked.redirects && (
             <>
@@ -572,6 +609,18 @@ function ImportFromStore() {
                   created: formatCount(done.collections.created),
                   images: formatCount(done.collections.images),
                   skipped: formatCount(done.collections.skipped),
+                })}
+              </span>
+            )}
+            {done.metafields && (
+              <span>
+                {t('files.metafieldsImported', {
+                  set: formatCount(done.metafields.set),
+                  left: formatCount(
+                    done.metafields.unsupported +
+                      done.metafields.missing +
+                      done.metafields.metafieldErrors.length,
+                  ),
                 })}
               </span>
             )}

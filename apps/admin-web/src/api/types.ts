@@ -2988,6 +2988,21 @@ export interface PastOrdersData {
   };
 }
 
+/** What setting a Shopify store's metafields came to (ADR-789). */
+export interface MetafieldsImportFromShopifyResult {
+  dryRun: boolean;
+  metafields: number;
+  set: number;
+  unsupported: number;
+  missing: number;
+  metafieldErrors: { owner: string; metafield: string; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface MetafieldsImportFromShopifyData {
+  metafieldsImportFromShopify: MetafieldsImportFromShopifyResult;
+}
+
 /** What bringing a Shopify store's orders as past orders came to (ADR-786). */
 export interface OrdersImportFromShopifyResult {
   dryRun: boolean;

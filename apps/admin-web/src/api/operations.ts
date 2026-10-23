@@ -6503,6 +6503,41 @@ export const PastOrdersQuery = /* GraphQL */ `
   }
 `;
 
+/** A Shopify store's metafields set on the shop's products, variants and collections (ADR-789). */
+export const MetafieldsImportFromShopifyMutation = /* GraphQL */ `
+  mutation MetafieldsImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    metafieldsImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      metafields
+      set
+      unsupported
+      missing
+      metafieldErrors {
+        owner
+        metafield
+        message
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
 /** A Shopify store's orders kept as the shop's past orders (ADR-786). */
 export const OrdersImportFromShopifyMutation = /* GraphQL */ `
   mutation OrdersImportFromShopify(

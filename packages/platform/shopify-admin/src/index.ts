@@ -48,6 +48,14 @@ export {
   type StoreCustomers,
 } from './customers.js';
 export {
+  METAFIELDS_BULK_QUERIES,
+  readStoreMetafields,
+  type StoreMetafield,
+  type StoreMetafieldOwner,
+  type StoreMetafields,
+  type StoreOwnerMetafields,
+} from './metafields.js';
+export {
   ORDERS_BULK_QUERY,
   hundredthsOf,
   readStoreOrders,

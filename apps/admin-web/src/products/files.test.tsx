@@ -152,6 +152,18 @@ function core(role: StaffRole) {
             userErrors: [],
           },
         };
+      case 'MetafieldsImportFromShopify':
+        return {
+          metafieldsImportFromShopify: {
+            dryRun: variables.dryRun,
+            metafields: 12,
+            set: variables.dryRun ? 0 : 9,
+            unsupported: 2,
+            missing: variables.dryRun ? 10 : 1,
+            metafieldErrors: [],
+            userErrors: [],
+          },
+        };
       case 'OrdersImportFromShopify':
         return {
           ordersImportFromShopify: {
@@ -294,6 +306,9 @@ describe('Products and stock by file', () => {
     ).toBeTruthy();
     expect(screen.getByText('Pages to add: 2; to leave as they are: 1.')).toBeTruthy();
     expect(screen.getByText('Past orders to keep: 40; kept already: 0.')).toBeTruthy();
+    expect(
+      screen.getByText('Metafields: 12; of types Hatti has not, to leave out: 2.'),
+    ).toBeTruthy();
     expect(screen.getByText('untitled: Title is blank')).toBeTruthy();
     expect(
       screen.getByText('Blogs to add: 1. Articles to add: 4; to leave as they are: 1.'),
@@ -324,6 +339,8 @@ describe('Products and stock by file', () => {
       false,
     ]);
     expect(screen.getByText('Pages added: 2; left as they were: 1.')).toBeTruthy();
+    // Their metafields, after the products and collections they are on (ADR-789).
+    expect(screen.getByText('Metafields set: 9; left out: 3.')).toBeTruthy();
     // Its orders, as past orders, after its customers (ADR-786).
     expect(
       screen.getByText('Past orders kept: 38, 30 on their customers’ pages; kept already: 2.'),

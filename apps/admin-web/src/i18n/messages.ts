@@ -3072,6 +3072,12 @@ const en = {
     'Discount codes to add: {created}; already here: {skipped}. Discounts that ended: {expired}.',
   'files.discountsImported': 'Discount codes added: {created}; already here: {skipped}.',
   'files.discountError': '{discount}: {message}',
+  'files.storeMetafields': 'Bring their metafields too',
+  'files.storeMetafieldsHint':
+    'What its products, variants and collections keep in metafields, for themes that show it. References to files or products stay behind.',
+  'files.metafieldsChecked':
+    'Metafields: {count}; of types Hatti has not, to leave out: {unsupported}.',
+  'files.metafieldsImported': 'Metafields set: {set}; left out: {left}.',
   'files.storeOrders': 'Bring its orders too',
   'files.storeOrdersHint':
     'As past orders, on their customers’ pages: they take no stock and send nothing. The app needs the read_orders scope, and read_all_orders for those over 60 days old.',
@@ -8931,6 +8937,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'شامل کرنے کو ڈسکاؤنٹ کوڈز: {created}؛ پہلے سے موجود: {skipped}۔ ختم ہو چکے ڈسکاؤنٹس: {expired}۔',
   'files.discountsImported': 'شامل ڈسکاؤنٹ کوڈز: {created}؛ پہلے سے موجود: {skipped}۔',
   'files.discountError': '{discount}: {message}',
+  'files.storeMetafields': 'ان کے میٹافیلڈز بھی لائیں',
+  'files.storeMetafieldsHint':
+    'جو اس کی پروڈکٹس، ویریئنٹس اور کلیکشنز میٹافیلڈز میں رکھتی ہیں، ان تھیمز کے لیے جو انہیں دکھاتی ہیں۔ فائلوں یا پروڈکٹس کے حوالے پیچھے رہتے ہیں۔',
+  'files.metafieldsChecked':
+    'میٹافیلڈز: {count}؛ جن کی قسم ہٹی میں نہیں، چھوڑنے کو: {unsupported}۔',
+  'files.metafieldsImported': 'لگائے گئے میٹافیلڈز: {set}؛ چھوڑے گئے: {left}۔',
   'files.storeOrders': 'اس کے آرڈرز بھی لائیں',
   'files.storeOrdersHint':
     'پچھلے آرڈرز کے طور پر، اپنے کسٹمرز کے صفحات پر: نہ اسٹاک لیتے ہیں نہ کچھ بھیجتے ہیں۔ ایپ کو read_orders اسکوپ، اور 60 دن سے پرانے آرڈرز کے لیے read_all_orders چاہیے۔',
