@@ -23,6 +23,7 @@
     "@hatti/api": "workspace:*",
     "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",
+    "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/images": "workspace:*",

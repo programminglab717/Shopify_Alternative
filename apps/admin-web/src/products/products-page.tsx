@@ -9,6 +9,7 @@ import {
   FolderPlus,
   PackageOpen,
   Plus,
+  Printer,
   Search,
   Ruler,
   Star,
@@ -32,6 +33,7 @@ import { useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { CollectionPanel, DeletePanel, ProductTagsPanel, StatusPanel } from './bulk';
+import { LabelsPanel } from './labels';
 import { READS_GIFT_CARDS } from './gift-cards-page';
 import {
   EDITS_PRODUCTS,
@@ -143,7 +145,7 @@ function ProductRow({
 }
 
 /** The bulk actions' panels, one open at a time. */
-type Panel = 'status' | 'tags' | 'collection' | 'delete';
+type Panel = 'status' | 'tags' | 'collection' | 'labels' | 'delete';
 
 /**
  * The products list (CAT-04, docs/design/02 §2): a tab for each status, a search that knows Roman
@@ -351,6 +353,12 @@ export function ProductsPage() {
       {panel === 'status' && <StatusPanel ids={ids} names={names} onDone={closePanel} />}
       {panel === 'tags' && <ProductTagsPanel ids={ids} names={names} onDone={closePanel} />}
       {panel === 'collection' && <CollectionPanel ids={ids} names={names} onDone={closePanel} />}
+      {panel === 'labels' && (
+        <LabelsPanel
+          products={shown.filter((product) => selected.has(product.id))}
+          onDone={() => setPanel(null)}
+        />
+      )}
       {panel === 'delete' && <DeletePanel ids={ids} names={names} onDone={closePanel} />}
       {products.isPending ? (
         <Loading label={t('state.loading')} />
@@ -441,6 +449,13 @@ export function ProductsPage() {
             onClick={() => open('collection')}
           >
             {t('productBulk.collection.button', { count: formatCount(selected.size) })}
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Printer aria-hidden className="size-5" />}
+            onClick={() => open('labels')}
+          >
+            {t('productBulk.labels.button', { count: formatCount(selected.size) })}
           </Button>
           <Button
             variant="secondary"

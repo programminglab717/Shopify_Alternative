@@ -9364,6 +9364,11 @@ type Mutation {
   productUpdateMedia(media: [UpdateMediaInput!]!, productId: ID!): ProductPayload!
 
   """
+  Gives each variant of these products without a barcode one of the shop’s own (CAT-22, ADR-757): an EAN-13 starting 2, which GS1 keeps for numbers used within a business, none the same as another of the shop’s; variants with barcodes keep theirs. At most 250 products at once.
+  """
+  productVariantsBarcodesGive(productIds: [ID!]!): ProductVariantsBarcodesGivePayload!
+
+  """
   Adds variants. Option values the product lacks are added to its options.
   """
   productVariantsBulkCreate(productId: ID!, variants: [ProductVariantsBulkInput!]!): ProductVariantsBulkPayload!
@@ -12916,6 +12921,31 @@ type ProductImportRowError {
   row: Int!
 }
 
+input ProductLabelItemInput {
+  """Labels of it, from 1."""
+  copies: Int! = 1
+  variantId: ID!
+}
+
+"""What products’ labels are printed on."""
+enum ProductLabelPaper {
+  """A sheet of A4 cut into 24 labels of 70×37 mm, three across."""
+  A4_SHEET
+
+  """A roll of 50×25 mm labels, as label printers take them."""
+  ROLL_50X25
+}
+
+"""Labels for products, to print from the browser."""
+type ProductLabels {
+  """A complete HTML page, laid out for the paper asked for."""
+  html: String!
+  labels: Int!
+
+  """For the browser tab, such as "24 labels"."""
+  title: String!
+}
+
 """An image or a video of a product."""
 type ProductMedia {
   """Alternative text, for screen readers and search engines."""
@@ -13252,6 +13282,15 @@ input ProductVariantInput {
   """Whether its price includes the shop's sales tax; true unless false."""
   taxable: Boolean
   weightGrams: Int
+}
+
+type ProductVariantsBarcodesGivePayload {
+  """Variants given barcodes of the shop’s own."""
+  given: Int!
+
+  """Variants that had barcodes, which they keep."""
+  had: Int!
+  userErrors: [UserError!]!
 }
 
 input ProductVariantsBulkInput {
@@ -14539,6 +14578,11 @@ type Query {
   Whether the shop may ask for AI drafts of products’ copy (CAT-20), and how many it asked for in the last 24 hours.
   """
   productCopyDrafting: ProductCopyDrafting!
+
+  """
+  Price labels for variants, to stick on what the shop sells (CAT-22, ADR-757): each with its product’s title, its options, its price and what it was where that is more, and its barcode, or its SKU where it has none, as a Code 128 barcode; as many of each as asked, in the order asked, at most 1,000. On a sheet of A4, 24 to a page; on a roll, one to a label.
+  """
+  productLabels(items: [ProductLabelItemInput!]!, paper: ProductLabelPaper! = A4_SHEET): ProductLabels!
 
   """
   The shop's products' reviews, the latest first: those of a status or a product if given; `first` of them (50 unless given, 250 at most), older than the review `after` names.

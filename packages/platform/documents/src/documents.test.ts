@@ -94,6 +94,14 @@ describe('renderDocument', () => {
     expect(roll).toContain('.page { width: 72mm; margin-inline: auto; padding: 3mm 0; }');
     expect(roll).not.toContain('size: A4');
   });
+
+  it("fits a roll of products' labels, a label a page (ADR-757)", () => {
+    const labels = renderDocument({ title: 'x', paper: 'label_50x25', language: 'english', pages });
+    expect(root(labels)).toEqual(['en', 'ltr', 'label_50x25']);
+    expect(labels).toContain('@page { size: 50mm 25mm; margin: 0; }');
+    expect(labels).toContain('.page { width: 50mm; height: 25mm; overflow: hidden; }');
+    expect(labels.match(/<article class="page">/g)).toHaveLength(2);
+  });
 });
 
 describe('renderPage', () => {

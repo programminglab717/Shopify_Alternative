@@ -13,6 +13,8 @@ import { BundleService } from './bundles.js';
 import { ComplementService } from './complements.js';
 import { PriceSaleService } from './price-sales.js';
 import { ComplementResolver } from './graphql/complement.resolver.js';
+import { ProductLabelResolver } from './graphql/product-label.resolver.js';
+import { ProductLabelService } from './product-labels.js';
 import { PersonalisationResolver } from './graphql/personalisation.resolver.js';
 import { PersonalisationService } from './personalisation.js';
 import { PriceSaleResolver } from './graphql/price-sale.resolver.js';
@@ -71,6 +73,8 @@ import { MetafieldService } from './metafields.js';
     SearchSynonymResolver,
     BundleResolver,
     ComplementResolver,
+    ProductLabelService,
+    ProductLabelResolver,
     PersonalisationResolver,
     ProductScheduleResolver,
     PriceSaleResolver,

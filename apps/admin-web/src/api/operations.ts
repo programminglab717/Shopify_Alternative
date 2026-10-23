@@ -1908,6 +1908,31 @@ export const OrderDocumentQuery = /* GraphQL */ `
   }
 `;
 
+/** Price labels for variants, as many of each as asked, a page laid out for the paper (CAT-22). */
+export const ProductLabelsQuery = /* GraphQL */ `
+  query ProductLabels($items: [ProductLabelItemInput!]!, $paper: ProductLabelPaper!) {
+    productLabels(items: $items, paper: $paper) {
+      title
+      html
+      labels
+    }
+  }
+`;
+
+/** Each variant of these products without a barcode given one of the shop's own (CAT-22). */
+export const ProductVariantsBarcodesGiveMutation = /* GraphQL */ `
+  mutation ProductVariantsBarcodesGive($productIds: [ID!]!) {
+    productVariantsBarcodesGive(productIds: $productIds) {
+      given
+      had
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A courier account's load sheet: its parcels waiting for the rider, a page to print. */
 export const CourierLoadSheetQuery = /* GraphQL */ `
   query CourierLoadSheet($accountId: ID, $language: DocumentLanguage!, $pickupId: ID) {

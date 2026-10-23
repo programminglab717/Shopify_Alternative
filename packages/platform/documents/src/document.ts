@@ -2,10 +2,10 @@ import { FONTS_URL, TEXT_FONTS, URDU_FONTS } from './fonts.js';
 import { html, toMarkup, trusted, type Html } from './html.js';
 
 /**
- * Paper a document is set up for: A4 sheets, 4×6 inch thermal labels, or an 80 mm thermal
- * receipt roll.
+ * Paper a document is set up for: A4 sheets, 4×6 inch thermal labels, an 80 mm thermal receipt
+ * roll, or a roll of 50×25 mm labels for products (ADR-757).
  */
-export const PAPERS = ['a4', 'thermal_4x6', 'thermal_80mm'] as const;
+export const PAPERS = ['a4', 'thermal_4x6', 'thermal_80mm', 'label_50x25'] as const;
 export type Paper = (typeof PAPERS)[number];
 
 /** English, Urdu (right to left), or both, English first. */
@@ -65,7 +65,9 @@ export interface DocumentOptions {
 // Class names templates use: header, shop, title, meta, columns, label, box, banner, lines,
 // totals (with a grand row), num, strong, big, muted, small, stack (Urdu under English) and
 // footer; and for couriers' labels, barcode, huge, rule, and labels, a sheet of four on A4 whose
-// cells are shipping-label; and signatures, boxes to sign in.
+// cells are shipping-label; and signatures, boxes to sign in; and for products' labels, tags, a
+// sheet of 24 on A4 whose cells are tag, each with tag-title, tag-variant, tag-price (a was in
+// it struck through) and tag-code under its barcode.
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
 html {
@@ -145,6 +147,28 @@ table { width: 100%; border-collapse: collapse; }
 .shipping-label .pin { margin-top: 0.3em; }
 .shipping-label .qr { width: 18mm; height: 18mm; }
 .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5em; margin-top: 2em; }
+.tags {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 33.9mm;
+  gap: 0 2.5mm;
+}
+.tag {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2mm 3mm;
+  overflow: hidden;
+  text-align: center;
+  line-height: 1.2;
+}
+.tags > .tag { border: 1px dashed #d1d5db; }
+.tag-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag-variant { font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag-price { font-size: 1.25em; font-weight: 800; }
+.tag-price s { margin-inline-start: 0.4em; font-size: 0.7em; font-weight: 400; color: #4b5563; }
+.tag .barcode { height: 9mm; margin-top: 1mm; }
+.tag-code { font-size: 0.8em; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
 .signatures .box { min-height: 7em; }
 @media screen {
   html { background: #e5e7eb; }
@@ -180,6 +204,15 @@ html { font-size: 8.5pt; }
 ${NARROW}
 .page { width: 72mm; margin-inline: auto; padding: 3mm 0; }
 @media screen { .page { width: 80mm; padding: 3mm 4mm; } }
+`,
+  // A label a page: the printer's label setting cuts between them.
+  label_50x25: `
+@page { size: 50mm 25mm; margin: 0; }
+html { font-size: 7pt; }
+.page { width: 50mm; height: 25mm; overflow: hidden; }
+.page > .tag { height: 100%; padding: 1mm 2mm; }
+.tag .barcode { height: 7mm; }
+@media screen { .page { margin: 12px auto; } }
 `,
 };
 

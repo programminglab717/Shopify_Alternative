@@ -992,6 +992,17 @@ export interface OrderDocumentData {
   orderDocument: { title: string; html: string };
 }
 
+/** What products' price labels are printed on: a sheet of A4, or a label printer's roll. */
+export type ProductLabelPaper = 'A4_SHEET' | 'ROLL_50X25';
+
+export interface ProductLabelsData {
+  productLabels: { title: string; html: string; labels: number };
+}
+
+export interface ProductVariantsBarcodesGiveData {
+  productVariantsBarcodesGive: { given: number; had: number; userErrors: UserError[] };
+}
+
 export interface CourierDocumentData {
   title: string;
   html: string;

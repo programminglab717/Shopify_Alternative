@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Barcodes and price labels
+
+* **A shop prints its own price labels,** from the products list, on A4 sticker sheets or a
+  label printer's roll: each with its product, size or colour, price and a barcode to scan;
+  variants without a barcode are given one of the shop's own first ([ADR-757](../architecture/13-decision-log.md#adr-757--variants-get-barcodes-of-the-shops-own-ean-13-numbers-starting-2-and-price-labels-are-printed-from-the-products-list-24-to-a-sheet-of-a4-or-one-to-a-label-printers-5025-mm-roll-each-with-its-product-options-price-and-barcode)).
+* 4127 tests (7 new).
+
 ### 1e6a46d · Discount codes straight from a Shopify store
 
 * **The old store's discount codes come too,** so the codes on its cards and in its messages

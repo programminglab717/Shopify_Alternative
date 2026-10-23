@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-756 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-757 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -764,6 +764,7 @@
 | 754 | A Shopify store's collections come through its Admin API, each at its handle, a smart one with its rules and a hand-picked one with the shop's products of its products' handles in its order, and the admin's store card brings them after the products | Accepted |
 | 755 | A Shopify store's customers come through its Admin API, written as Shopify's customer export for the customer import a few thousand at a time, those with no phone number counted and left out | Accepted |
 | 756 | A Shopify store's discount codes come through its Admin API, a page of five at a time, each code made with its discount's value, minimum, dates, uses left and what it is for, and those the shop cannot give named | Accepted |
+| 757 | Variants get barcodes of the shop's own, EAN-13 numbers starting 2, and price labels are printed from the products list, 24 to a sheet of A4 or one to a label printer's 50×25 mm roll, each with its product, options, price and barcode | Accepted |
 
 ---
 
@@ -25616,3 +25617,32 @@
     by default for those who make codes.
 * **Consequences:** everything but a store's orders and customers' addresses, and its
   collections' and articles' images, comes from Shopify in one step.
+
+## ADR-757 · Variants get barcodes of the shop's own, EAN-13 numbers starting 2, and price labels are printed from the products list, 24 to a sheet of A4 or one to a label printer's 50×25 mm roll, each with its product, options, price and barcode
+
+* **Context:** shops that sell over the counter as well as online, and every shop that packs by
+  scanning (APP-04) or receives transfers by scanning (INV-04), need a barcode on what they sell
+  (CAT-22). Most of what Pakistan's small shops sell has none from its maker, and a price
+  sticker written by hand cannot be scanned.
+* **Decision:**
+  * **`productVariantsBarcodesGive`** gives each variant of up to 250 products that has no
+    barcode one of the shop's own: an EAN-13 starting 2, the prefix GS1 keeps for numbers used
+    within a business, so it never clashes with a maker's; its eleven digits drawn at random,
+    its check digit computed, none the same as another variant of the shop's. Variants with a
+    barcode keep it. No GS1 membership is needed for numbers used in the shop alone, which is
+    all a sticker is for.
+  * **`productLabels`** lays out labels for the variants asked, as many of each as asked, at
+    most 1,000, in `@hatti/documents` like every printed page: each with its product's title,
+    its options where the product has more than one variant, its price and what it was where
+    that is more, and its barcode, or its SKU where it has none, as a Code 128 barcode, which
+    takes EAN-13's digits and every scanner reads. On `A4_SHEET`, 24 to a page, three across,
+    for the sticker sheets every stationer sells; on `ROLL_50X25`, one to a page of 50×25 mm,
+    as thermal label printers take them. It is a query, so that staff who see products can
+    print them.
+  * **The admin's products list** has *Print labels* among its bulk actions: the paper, kept in
+    the browser for next time, how many of each variant with the count in all, a button to give
+    barcodes to those without, and the labels opened in a tab of their own to print, as packing
+    slips are (ADR-375).
+* **Consequences:** a shop prints scannable price labels from what it already has. Labels in
+  Urdu, labels from the product's page and from a purchase order as it is received, and ZPL for
+  printers that take no browser page, are left until shops ask.
