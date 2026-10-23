@@ -29,6 +29,7 @@ export {
   CustomerService,
   customerExistsIn,
   customerOfPhoneIn,
+  customerTagsOfPhoneIn,
   type CustomerCreateInput,
   type CustomerUpdateInput,
   type ListCustomersOptions,

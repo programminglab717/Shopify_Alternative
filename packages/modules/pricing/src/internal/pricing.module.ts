@@ -5,6 +5,8 @@ import { DiscountCustomerData } from './customer-data.js';
 import { DiscountCodeService } from './discount-code.service.js';
 import { AutomaticDiscountResolver } from './graphql/automatic-discount.resolver.js';
 import { DiscountCodeResolver } from './graphql/discount-code.resolver.js';
+import { PriceListResolver } from './graphql/price-list.resolver.js';
+import { PriceListService } from './price-lists.js';
 
 /**
  * Needs a {@link Database} provider from the host application. Adds codes' uses to merging and
@@ -18,7 +20,9 @@ import { DiscountCodeResolver } from './graphql/discount-code.resolver.js';
     AutomaticDiscountService,
     AutomaticDiscountResolver,
     DiscountCustomerData,
+    PriceListService,
+    PriceListResolver,
   ],
-  exports: [DiscountCodeService, AutomaticDiscountService],
+  exports: [DiscountCodeService, AutomaticDiscountService, PriceListService],
 })
 export class PricingModule {}

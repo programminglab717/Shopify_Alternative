@@ -9639,6 +9639,22 @@ type Mutation {
   ): PaymentSettlementImportPayload!
 
   """
+  Makes a price list for the customers with a tag: a shop keeps up to 20.
+  """
+  priceListCreate(input: PriceListInput!): PriceListPayload!
+
+  """Deletes a price list; its customers pay what anyone pays again."""
+  priceListDelete(id: ID!): PriceListDeletePayload!
+
+  """
+  Gives variants a price of their own in a price list, in place of its share off, or takes it away; the others' stay. Up to 2,000 variants in a list.
+  """
+  priceListPricesSet(id: ID!, prices: [PriceListPriceInput!]!): PriceListPricesSetPayload!
+
+  """Changes a price list; fields left out stay."""
+  priceListUpdate(id: ID!, input: PriceListInput!): PriceListPayload!
+
+  """
   Cancels a sale not yet started, or ends one running now, its prices put back as at its end.
   """
   priceSaleCancel(id: ID!): PriceSalePayload!
@@ -12888,6 +12904,89 @@ type PlatformTheme {
 }
 
 """
+A shop's wholesale prices, for the customers it gave a tag (CUS-06, ADR-778): a share off every item, prices of its own for some variants, and more off as more of a variant is bought. A customer's draft orders are priced from it.
+"""
+type PriceList {
+  """The customers it is for: those with this tag, in any letter case."""
+  customerTag: String!
+  id: ID!
+  name: String!
+
+  """Off every item without a price of its own, in percent: "10"."""
+  percentOff: String!
+
+  """How many variants have a price of their own in it."""
+  pricedVariants: Int!
+
+  """The fewest units first."""
+  quantityBreaks: [PriceListQuantityBreak!]!
+  updatedAt: DateTime!
+}
+
+type PriceListDeletePayload {
+  deletedPriceListId: ID
+  userErrors: [UserError!]!
+}
+
+input PriceListInput {
+  """
+  The tag of the customers it is for, up to 40 characters: one list to a tag, in any letter case.
+  """
+  customerTag: String
+
+  """Up to 100 characters."""
+  name: String
+
+  """0% to 90%, to two places; 0 for none."""
+  percentOff: String
+
+  """Up to five, the fewest units first; an empty list takes them all away."""
+  quantityBreaks: [PriceListQuantityBreakInput!]
+}
+
+type PriceListPayload {
+  priceList: PriceList
+  userErrors: [UserError!]!
+}
+
+"""A variant's price in a price list."""
+type PriceListPrice {
+  price: Money!
+  variantId: ID!
+}
+
+input PriceListPriceInput {
+  """
+  Its price in the list, as the shop writes it: "1850"; null takes it away.
+  """
+  price: String
+  variantId: ID!
+}
+
+type PriceListPricesSetPayload {
+  """The list's prices after."""
+  prices: [PriceListPrice!]
+  userErrors: [UserError!]!
+}
+
+"""More off as more of a variant is bought (ADR-778)."""
+type PriceListQuantityBreak {
+  """From this many units of a variant in an order."""
+  minQuantity: Int!
+
+  """Further off, in percent: "5"."""
+  percentOff: String!
+}
+
+input PriceListQuantityBreakInput {
+  """2 or more, each break more than the one before."""
+  minQuantity: Int!
+
+  """More than 0% and at most 90%, to two places."""
+  percentOff: String!
+}
+
+"""
 A percentage off the shop's chosen products from a time to a time (CAT-17, ADR-443): when it starts, each variant's price is cut to a whole unit and its old price shown as the compare-at price; when it ends, both come back, unless the price was changed by hand meanwhile.
 """
 type PriceSale {
@@ -15018,6 +15117,14 @@ type Query {
   Hatti's own themes a shop may begin a theme with, Hatti Base first (ADR-730).
   """
   platformThemes: [PlatformTheme!]!
+
+  """
+  The variants with a price of their own in a price list; null for no such list.
+  """
+  priceListPrices(id: ID!): [PriceListPrice!]
+
+  """The shop's price lists, in the order they were made."""
+  priceLists: [PriceList!]!
   priceSale(id: ID!): PriceSale
 
   """The shop's sales, those starting latest first; the newest hundred."""

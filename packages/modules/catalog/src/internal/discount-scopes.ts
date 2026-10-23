@@ -23,6 +23,19 @@ export async function productsAndCollectionsIn(
   };
 }
 
+/** Of `variantIds`, those the shop has: what a price list may give prices of (ADR-778). */
+export async function variantsIn(
+  tx: Tx,
+  shopId: string,
+  variantIds: readonly string[],
+): Promise<Set<string>> {
+  if (variantIds.length === 0) return new Set();
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM catalog.variants
+     WHERE shop_id = ${shopId} AND id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])`);
+  return new Set(rows.map((row) => row.id));
+}
+
 /**
  * Which of `collectionIds` each of `productIds` is in, in one query (ADR-517): what checkout asks
  * of a cart's products for discounts given to collections. Products in none are left out.

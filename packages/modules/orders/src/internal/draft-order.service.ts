@@ -17,7 +17,8 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
-import { redeemDiscountIn } from '@hatti/pricing/public';
+import { customerTagsOfPhoneIn } from '@hatti/customers/public';
+import { listPricesIn, redeemDiscountIn } from '@hatti/pricing/public';
 import { ObjectStorage } from '@hatti/storage';
 import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
@@ -834,9 +835,32 @@ export class DraftOrderService {
     }
     if (errors.length > 0) return { ok: false, errors };
 
+    const shippingAddress = pick(checked.address, current?.shippingAddress ?? null);
+    // A wholesale customer's lines are priced from their price list, where none is given
+    // (CUS-06, ADR-778).
+    if (lines && checked.lines && shippingAddress?.phone) {
+      const tags = await customerTagsOfPhoneIn(tx, shopId, shippingAddress.phone);
+      const listed = await listPricesIn(
+        tx,
+        shopId,
+        tags,
+        lines.map((line) => ({
+          variantId: line.variantId,
+          quantity: line.quantity,
+          price: BigInt(line.unitPrice),
+        })),
+      );
+      lines = lines.map((line, index) => {
+        const price = listed[index];
+        return price && checked.lines![index]!.price === null
+          ? { ...line, unitPrice: price.price.toString() }
+          : line;
+      });
+    }
+
     const next = {
       lines: lines ?? current!.lines,
-      shippingAddress: pick(checked.address, current?.shippingAddress ?? null),
+      shippingAddress,
       email: pick(checked.email, current?.email ?? null),
       source: checked.source ?? current?.source ?? defaultSource(tenant.actor),
       paymentMethod: checked.paymentMethod ?? current?.paymentMethod ?? 'cash_on_delivery',

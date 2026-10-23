@@ -29,6 +29,7 @@ export {
   type AutomaticDiscountChangedPayload,
   type DiscountCodeChangedPayload,
   type DiscountCodeRedeemedPayload,
+  type PriceListChangedPayload,
 } from '../internal/events.js';
 export { AutomaticDiscount } from '../internal/graphql/automatic-discount.types.js';
 export { toAutomaticDiscount } from '../internal/graphql/automatic-discount.resolver.js';
@@ -41,6 +42,14 @@ export {
   type ItemLine,
   type OrderItems,
 } from '../internal/items.js';
+export {
+  PRICE_LIST_LIMITS,
+  PriceListService,
+  listPricesIn,
+  type LineToPrice,
+  type ListPrice,
+  type PriceListRecord,
+} from '../internal/price-lists.js';
 export { PricingModule } from '../internal/pricing.module.js';
 export type {
   AutomaticDiscountRecord,

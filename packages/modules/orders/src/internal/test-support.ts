@@ -322,6 +322,7 @@ export async function ordersFixture(
         DELETE FROM orders.draft_orders;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;
+        DELETE FROM pricing.price_lists;
         DELETE FROM orders.orders;
         DELETE FROM orders.desk_duty;
         DELETE FROM orders.counters;

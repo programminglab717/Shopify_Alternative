@@ -135,6 +135,8 @@ export const ID_PREFIXES = {
   // Who sends a shop customers by a link or code of their own, and what they were paid (ADR-776).
   affiliate: 'afl',
   affiliatePayout: 'aflp',
+  // A shop's wholesale prices for the customers with a tag (ADR-778).
+  priceList: 'plst',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

@@ -3,6 +3,7 @@ import type { StaffRole, TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PriceListService } from '@hatti/pricing/public';
 import { draftLinkPage } from './link-pages.js';
 import type { DraftLinkView, DraftOrderInput } from './draft-order.service.js';
 import type { AddressForm } from './links.js';
@@ -968,5 +969,35 @@ describe.skipIf(!server)('Draft orders', () => {
     });
     expect(await orderCount()).toBe(before);
     expect((await f.drafts.get(f.a, again.id))?.status).toBe('open');
+  });
+
+  it("prices a wholesale customer's lines from their price list, where no price is given (CUS-06, ADR-778)", async () => {
+    const lists = new PriceListService(f.db);
+    const list = unwrap(
+      await lists.create(f.a, {
+        name: 'Wholesale',
+        customerTag: 'wholesale',
+        percentOff: '20',
+        quantityBreaks: [{ minQuantity: 2, percentOff: '5' }],
+      }),
+    );
+    unwrap(await lists.setPrices(f.a, list.id, [{ variantId: size9, price: '2,500' }]));
+    // Ayesha is no wholesale customer yet: she pays what anyone pays.
+    const before = await draft();
+    expect(before.lines.map((line) => line.unitPrice)).toEqual([180_000n, 349_900n]);
+    unwrap(await f.customers.create(f.a, { phone: ADDRESS.phone, tags: ['Wholesale'] }));
+    const wholesale = await draft({
+      lineItems: [
+        { variantId: kurta, quantity: 2 },
+        { variantId: size9, quantity: 1 },
+        { variantId: size8, quantity: 1, price: '3,000' },
+      ],
+    });
+    // The kurta 20% off and 5% more for two, the size 9 at its own price, and a price given
+    // stays as given.
+    expect(wholesale.lines.map((line) => line.unitPrice)).toEqual([152_000n, 250_000n, 300_000n]);
+    // A draft without her number is priced as anyone's.
+    const other = await draft({ shippingAddress: { ...ADDRESS, phone: '0321-7654321' } });
+    expect(other.lines[1]!.unitPrice).toBe(349_900n);
   });
 });

@@ -356,4 +356,73 @@ describe.skipIf(!server)('Admin GraphQL API: discount codes', () => {
       expect.objectContaining({ field: ['discountCode', 'getQuantity'], code: 'BLANK' }),
     ]);
   });
+
+  it("keeps price lists for wholesale customers, and a list's own prices (CUS-06, ADR-778)", async () => {
+    const products = await issueToken(['write_products']);
+    const [product, variant] = [newId(), newId()];
+    await admin.query(
+      `INSERT INTO catalog.products (shop_id, id, title, handle)
+       VALUES ($1, $2, 'Wholesale lawn', 'wholesale-lawn')`,
+      [shop, product],
+    );
+    await admin.query(
+      `INSERT INTO catalog.variants (shop_id, id, product_id, price) VALUES ($1, $2, $3, 300000)`,
+      [shop, variant, product],
+    );
+    const made = await gql(
+      products,
+      `mutation ($input: PriceListInput!) {
+        priceListCreate(input: $input) {
+          priceList { id name customerTag percentOff quantityBreaks { minQuantity percentOff } }
+          userErrors { field code }
+        }
+      }`,
+      {
+        input: {
+          name: 'Wholesale',
+          customerTag: 'wholesale',
+          percentOff: '20',
+          quantityBreaks: [{ minQuantity: 12, percentOff: '5' }],
+        },
+      },
+    );
+    const list = made.data?.priceListCreate.priceList;
+    expect(list).toMatchObject({
+      name: 'Wholesale',
+      percentOff: '20',
+      quantityBreaks: [{ minQuantity: 12, percentOff: '5' }],
+    });
+    expect(list.id).toMatch(/^plst_/);
+    const priced = await gql(
+      products,
+      `mutation ($id: ID!, $prices: [PriceListPriceInput!]!) {
+        priceListPricesSet(id: $id, prices: $prices) {
+          prices { variantId price { amount } } userErrors { field code }
+        }
+      }`,
+      { id: list.id, prices: [{ variantId: toPublicId('variant', variant), price: '1800' }] },
+    );
+    expect(priced.data?.priceListPricesSet).toEqual({
+      prices: [{ variantId: toPublicId('variant', variant), price: { amount: '1800.00' } }],
+      userErrors: [],
+    });
+    const listed = await gql(products, '{ priceLists { name pricedVariants } }');
+    expect(listed.data?.priceLists).toEqual([{ name: 'Wholesale', pricedVariants: 1 }]);
+    const taken = await gql(
+      products,
+      `mutation { priceListCreate(input: { name: "Again", customerTag: "WHOLESALE" }) {
+        userErrors { field code } } }`,
+    );
+    expect(taken.data?.priceListCreate.userErrors).toEqual([
+      { field: ['input', 'customerTag'], code: 'TAKEN' },
+    ]);
+    const denied = await gql(tokens.write, '{ priceLists { id } }');
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    const deleted = await gql(
+      products,
+      `mutation ($id: ID!) { priceListDelete(id: $id) { deletedPriceListId } }`,
+      { id: list.id },
+    );
+    expect(deleted.data?.priceListDelete.deletedPriceListId).toBe(list.id);
+  });
 });

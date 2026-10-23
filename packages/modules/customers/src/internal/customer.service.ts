@@ -707,6 +707,27 @@ export async function customerOfPhoneIn(
   return found ?? null;
 }
 
+/**
+ * The tags of the shop's customer with mobile number `phone`, as the shop wrote them; none when
+ * it has no customer with that number. Price lists name the customers they are for by a tag
+ * (CUS-06, ADR-778).
+ */
+export async function customerTagsOfPhoneIn(
+  tx: Tx,
+  shopId: string,
+  phone: string,
+): Promise<string[]> {
+  const [found] = await tx
+    .select({ tags: customers.tags })
+    .from(customerPhones)
+    .innerJoin(
+      customers,
+      and(eq(customers.shopId, customerPhones.shopId), eq(customers.id, customerPhones.customerId)),
+    )
+    .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, phone)));
+  return found?.tags ?? [];
+}
+
 /** Whether the shop has the customer `id` still: not merged into another, nor erased. */
 export async function customerExistsIn(tx: Tx, shopId: string, id: string): Promise<boolean> {
   const [found] = await tx

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-777 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-778 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -785,6 +785,7 @@
 | 775 | Analytics shows a cohort table: each month's new customers, and the share who ordered again each month after | Accepted |
 | 776 | Affiliates: people who bring a shop customers by a link or code of their own, earning a share of the orders once delivered | Accepted |
 | 777 | Marketing's affiliates page: each creator's link, code and figures, payouts recorded and their part ended | Accepted |
+| 778 | Price lists for wholesale customers: a share off, prices of their own and quantity breaks, by a tag the shop gives them | Accepted |
 
 ---
 
@@ -26057,3 +26058,28 @@
 * **Consequences:** a shop can hand a creator their link the minute it agrees terms, and settle
   up from one screen. A creator's own page of their figures, and paying them through Hatti,
   are left for later.
+
+## ADR-778 · Price lists for wholesale customers: a share off, prices of their own and quantity breaks, by a tag the shop gives them
+
+* **Context:** many Pakistani shops sell to resellers and boutiques as well as shoppers, at
+  wholesale prices and more off by the dozen; today they work the prices out by hand on each
+  WhatsApp order (CUS-06). Shopify keeps B2B to its Plus plan.
+* **Decision:** pricing keeps price lists (migration 0333): a name, the customer tag it is for
+  (one list to a tag, in any letter case), a share off every item (0% to 90%), up to five
+  quantity breaks (from so many units of a variant, so much more off, the quantities rising),
+  and prices of its own for up to 2,000 variants, in place of the share off. A customer belongs
+  to a list by carrying its tag, so the shop groups customers with the tags it already gives
+  them. `listPricesIn` prices lines for a customer's tags: a variant's own price in the list,
+  or else its price less the list's share; less again the largest break its quantity reaches;
+  rounded down to the paisa, never above the price anyone pays; where a customer has two lists,
+  the lower price wins, line by line. Draft orders use it: when a draft's lines are set and its
+  number is a customer's with a list's tag, lines given no price of their own are priced from
+  the list. The Admin API has `priceLists`, `priceListPrices`, `priceListCreate`,
+  `priceListUpdate`, `priceListDelete` and `priceListPricesSet`, under the products' scopes, as
+  Shopify's price lists are; changes are `price_list.*` events. A shop keeps up to 20 lists.
+* **Consequences:** an agent taking a reseller's order on WhatsApp gets the wholesale prices
+  without a calculator, and a price given by hand still wins. Lines are priced when they are
+  set, so a customer tagged after a draft is made gets the list's prices once its lines are set
+  again. The storefront and checkout do not use price lists yet: a signed-in wholesale
+  customer's cart is the next step, with the cached product pages showing retail prices and the
+  cart repricing.

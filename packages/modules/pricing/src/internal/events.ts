@@ -10,6 +10,9 @@ export const PricingEvents = {
   AutomaticDiscountCreated: 'automatic_discount.created',
   AutomaticDiscountUpdated: 'automatic_discount.updated',
   AutomaticDiscountDeleted: 'automatic_discount.deleted',
+  PriceListCreated: 'price_list.created',
+  PriceListUpdated: 'price_list.updated',
+  PriceListDeleted: 'price_list.deleted',
 } as const;
 
 /** An automatic discount made, changed or deleted. */
@@ -32,4 +35,11 @@ export interface DiscountCodeRedeemedPayload {
   orderId: string;
   /** Minor units, as a string. */
   amount: string;
+}
+
+/** A price list made, changed or deleted (CUS-06, ADR-778). */
+export interface PriceListChangedPayload {
+  name: string;
+  customerTag: string;
+  version: number;
 }

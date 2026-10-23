@@ -4,6 +4,7 @@ import {
   bigint,
   boolean,
   integer,
+  jsonb,
   pgSchema,
   primaryKey,
   text,
@@ -101,3 +102,42 @@ export const automaticDiscounts = pricingSchema.table(
 );
 
 export type AutomaticDiscountRow = typeof automaticDiscounts.$inferSelect;
+
+/** More off as more of a variant is bought (ADR-778). */
+export interface QuantityBreakValue {
+  minQuantity: number;
+  /** Hundredths of a percent. */
+  percentOffBps: number;
+}
+
+/** A shop's wholesale prices, for the customers with a tag (CUS-06, ADR-778). */
+export const priceLists = pricingSchema.table(
+  'price_lists',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    name: text('name').notNull(),
+    customerTag: text('customer_tag').notNull(),
+    /** Hundredths of a percent off every item without a price of its own. */
+    percentOffBps: integer('percent_off_bps').notNull().default(0),
+    quantityBreaks: jsonb('quantity_breaks').$type<QuantityBreakValue[]>().notNull().default([]),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type PriceListRow = typeof priceLists.$inferSelect;
+
+/** A variant's price in a list, in place of its share off (ADR-778). */
+export const priceListPrices = pricingSchema.table(
+  'price_list_prices',
+  {
+    shopId: uuid('shop_id').notNull(),
+    priceListId: uuid('price_list_id').notNull(),
+    variantId: uuid('variant_id').notNull(),
+    price: money('price').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.priceListId, table.variantId] })],
+);
