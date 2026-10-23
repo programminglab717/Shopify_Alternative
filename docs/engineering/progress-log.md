@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Conversations given to staff
+### e08c494 · Conversations given to staff
 
 * **Each conversation has someone to answer it:** a manager gives it to an agent, or an agent
   takes one no one has, and finds theirs under *Mine*; whoever leaves gives theirs back
