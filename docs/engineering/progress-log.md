@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A payment link in an answer
+### a5241cf · A payment link in an answer
 
 * **Paying in the chat:** staff put one of the shop's payment links still taking orders in a
   reply, with what it sells, so the customer pays from the conversation ([ADR-767](../architecture/13-decision-log.md#adr-767--a-payment-link-still-taking-orders-is-put-in-an-answer-as-its-title-what-it-sells-and-its-address)).
