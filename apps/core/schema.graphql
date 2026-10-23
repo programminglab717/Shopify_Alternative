@@ -15298,6 +15298,11 @@ type Query {
 
     """1 to 250; default 50."""
     first: Int
+
+    """
+    Words each order's name, email, number or the name it went to holds, in any case (ADR-790).
+    """
+    query: String
   ): PastOrderConnection!
 
   """

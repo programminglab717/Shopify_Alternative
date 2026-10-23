@@ -1,6 +1,8 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { PastOrdersQuery } from '../api/operations';
 import type { PastOrderValue, PastOrdersData } from '../api/types';
 import { useSessionStore } from '../auth/context';
@@ -100,15 +102,26 @@ export function PastOrdersPage() {
   const shop = useShop();
   const store = useSessionStore();
   const timezone = useShopTimezone();
+  const [words, setWords] = useState('');
+  const [query, setQuery] = useState<string | null>(null);
   const orders = useInfiniteQuery({
-    queryKey: ['admin', shop.id, 'pastOrders'],
+    queryKey: ['admin', shop.id, 'pastOrders', query],
     queryFn: ({ pageParam }) =>
-      store.graphql<PastOrdersData>(shop.id, PastOrdersQuery, { first: PAGE, after: pageParam }),
+      store.graphql<PastOrdersData>(shop.id, PastOrdersQuery, {
+        first: PAGE,
+        after: pageParam,
+        query,
+      }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
       last.pastOrders.pageInfo.hasNextPage ? last.pastOrders.pageInfo.endCursor : undefined,
   });
   const shown = orders.data?.pages.flatMap((page) => page.pastOrders.nodes) ?? [];
+  // Found by name, email, number or the name it went to (ADR-790).
+  const onSearch = (event: FormEvent) => {
+    event.preventDefault();
+    setQuery(words.trim() || null);
+  };
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-8">
@@ -127,6 +140,20 @@ export function PastOrdersPage() {
         </h1>
         <p className="text-secondary">{t('pastOrders.hint')}</p>
       </header>
+      <form onSubmit={onSearch} role="search" className="relative">
+        <Search
+          aria-hidden
+          className="pointer-events-none absolute start-3 top-1/2 size-5 -translate-y-1/2 text-secondary"
+        />
+        <input
+          type="search"
+          value={words}
+          onChange={(event) => setWords(event.target.value)}
+          aria-label={t('pastOrders.search')}
+          placeholder={t('pastOrders.searchHint')}
+          className="min-h-12 w-full rounded-control border border-line bg-surface ps-10 pe-3 md:min-h-10"
+        />
+      </form>
       {orders.isPending ? (
         <Loading label={t('state.loading')} />
       ) : orders.isError ? (
@@ -135,7 +162,7 @@ export function PastOrdersPage() {
           action={<Button onClick={() => void orders.refetch()}>{t('action.retry')}</Button>}
         />
       ) : shown.length === 0 ? (
-        <EmptyState title={t('pastOrders.none')} />
+        <EmptyState title={t(query ? 'pastOrders.noneFound' : 'pastOrders.none')} />
       ) : (
         <>
           <ul className="flex flex-col gap-3">

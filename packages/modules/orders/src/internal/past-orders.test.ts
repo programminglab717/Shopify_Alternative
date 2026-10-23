@@ -90,6 +90,15 @@ describe.skipIf(!server)('Past orders from the store a shop moved from (ONB-05, 
       shippingAddress: { city: 'Lahore', countryCode: 'PK' },
     });
     expect((await past.list(f.a, { first: 5, customerId: ayesha.id })).items).toHaveLength(1);
+    // Found by name, email, the name it went to, or the number however written (ADR-790).
+    const found = async (query: string) =>
+      (await past.list(f.a, { first: 5, query })).items.map((order) => order.name);
+    expect(await found('1001')).toEqual(['#1001']);
+    expect(await found('AYESHA@example')).toEqual(['#1001']);
+    expect(await found('ayesha khan')).toEqual(['#1001']);
+    expect(await found('0300-1234567')).toEqual(['#1001']);
+    expect(await found('#100')).toEqual(['#1002', '#1001']);
+    expect(await found('100%')).toEqual([]);
     expect((await past.get(f.a, first!.id))?.name).toBe('#1001');
     // Another shop's are not its.
     expect((await past.list(f.b, { first: 5 })).items).toEqual([]);

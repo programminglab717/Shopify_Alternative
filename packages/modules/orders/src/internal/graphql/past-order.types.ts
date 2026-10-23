@@ -151,4 +151,11 @@ export class PastOrdersArgs {
 
   @Field(() => ID, { nullable: true, description: "That customer's alone." })
   customerId?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Words each order's name, email, number or the name it went to holds, in any case (ADR-790).",
+  })
+  query?: string | null;
 }

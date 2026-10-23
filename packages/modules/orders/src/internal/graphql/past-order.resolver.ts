@@ -109,6 +109,7 @@ export class PastOrderResolver {
       first: pageSize(args.first),
       after: cursorAfter(args.after),
       customerId,
+      query: args.query ?? null,
     });
     return toConnection(page, tenant);
   }

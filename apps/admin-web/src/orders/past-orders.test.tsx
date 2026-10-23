@@ -27,7 +27,7 @@ const PAST = {
 
 /** A fake core with one order here, and `past` from the store the shop moved from. */
 function core(past: (typeof PAST)[]) {
-  return fakeCore('owner', (operation) => {
+  return fakeCore('owner', (operation, variables) => {
     switch (operation) {
       case 'Orders':
         return {
@@ -36,8 +36,12 @@ function core(past: (typeof PAST)[]) {
         };
       case 'FreshOrders':
         return { orders: { nodes: [], pageInfo: { hasNextPage: false } } };
-      case 'PastOrders':
-        return { pastOrders: { nodes: past, pageInfo: { hasNextPage: false, endCursor: null } } };
+      case 'PastOrders': {
+        const found = variables.query
+          ? past.filter((order) => order.name.includes(String(variables.query)))
+          : past;
+        return { pastOrders: { nodes: found, pageInfo: { hasNextPage: false, endCursor: null } } };
+      }
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -70,6 +74,11 @@ describe('Orders from the old store (ADR-786)', () => {
     expect(within(card).getByRole('link', { name: 'Ayesha Khan' }).getAttribute('href')).toBe(
       '/shop_1/customers/cus_1',
     );
+
+    // Searched (ADR-790).
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'S9999' } });
+    fireEvent.submit(screen.getByRole('search'));
+    expect(await screen.findByText('No orders from your old store match.')).toBeTruthy();
   });
 
   it('shows no link while the shop has none, and says so on the page', async () => {

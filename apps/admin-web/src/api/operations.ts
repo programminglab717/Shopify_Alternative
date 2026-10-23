@@ -6462,8 +6462,8 @@ export const DiscountsImportFromShopifyMutation = /* GraphQL */ `
 
 /** Orders from the store the shop moved from (ADR-786), the latest placed first. */
 export const PastOrdersQuery = /* GraphQL */ `
-  query PastOrders($first: Int, $after: String) {
-    pastOrders(first: $first, after: $after) {
+  query PastOrders($first: Int, $after: String, $query: String) {
+    pastOrders(first: $first, after: $after, query: $query) {
       nodes {
         id
         name

@@ -448,6 +448,9 @@ const en = {
   'pastOrders.hint':
     'Brought when the shop moved, to look back on: they take no stock, send nothing and count in no report.',
   'pastOrders.none': 'No orders from an old store. Bring them from Products › Import and export.',
+  'pastOrders.search': 'Search orders from your old store',
+  'pastOrders.searchHint': 'Order name, email, number or name',
+  'pastOrders.noneFound': 'No orders from your old store match.',
   'pastOrders.customer': 'Customer',
   'pastOrders.theirPage': 'Their page',
   'pastOrders.shippedTo': 'Sent to',
@@ -6312,6 +6315,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pastOrders.hint':
     'دکان منتقل ہوتے وقت لائے گئے، دیکھنے کے لیے: نہ اسٹاک لیتے ہیں، نہ کچھ بھیجتے ہیں، نہ کسی رپورٹ میں گنے جاتے ہیں۔',
   'pastOrders.none': 'پرانے اسٹور کا کوئی آرڈر نہیں۔ پروڈکٹس › امپورٹ اور ایکسپورٹ سے لائیں۔',
+  'pastOrders.search': 'پرانے اسٹور کے آرڈرز میں ڈھونڈیں',
+  'pastOrders.searchHint': 'آرڈر کا نام، ای میل، نمبر یا نام',
+  'pastOrders.noneFound': 'پرانے اسٹور کا کوئی آرڈر نہیں ملا۔',
   'pastOrders.customer': 'کسٹمر',
   'pastOrders.theirPage': 'ان کا صفحہ',
   'pastOrders.shippedTo': 'بھیجا گیا',

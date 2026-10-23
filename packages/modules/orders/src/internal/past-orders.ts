@@ -144,6 +144,21 @@ export function majorOf(minor: bigint, currency: string): string {
   return `${sign}${digits.slice(0, -places)}.${digits.slice(-places)}`;
 }
 
+/** The words of a search that count. */
+const SEARCH_WORDS = 5;
+
+/**
+ * Whether a past order `p` matches one word of a search: its name, email or the name it went
+ * to holding it, or its number being the mobile the word is.
+ */
+function matches(word: string) {
+  const like = `%${word.slice(0, TEXT_MOST).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const mobile = parsePkMobile(word)?.e164 ?? null;
+  return sql`(p.name ILIKE ${like} OR p.email ILIKE ${like}
+              OR p.shipping_address ->> 'name' ILIKE ${like}
+              ${mobile === null ? sql`` : sql`OR p.phone = ${mobile}`})`;
+}
+
 const cut = (value: string | null, most = TEXT_MOST): string | null =>
   value === null ? null : value.slice(0, most);
 
@@ -213,13 +228,21 @@ export class PastOrderService {
 
   /**
    * A page of the shop's past orders, the latest placed first (ADR-786): with `customerId`, that
-   * customer's alone. `after` is the last order of the page before.
+   * customer's alone; with `query`, those whose name at the store, email, number or the name they
+   * went to holds each of its words, in any case (ADR-790), a mobile number however it is written.
+   * `after` is the last order of the page before.
    */
   async list(
     tenant: TenantContext,
-    options: { first: number; after?: string | null; customerId?: string | null },
+    options: {
+      first: number;
+      after?: string | null;
+      customerId?: string | null;
+      query?: string | null;
+    },
   ): Promise<{ items: PastOrderRecord[]; hasNextPage: boolean }> {
     const { first, after = null, customerId = null } = options;
+    const words = (options.query ?? '').trim().split(/\s+/).filter(Boolean).slice(0, SEARCH_WORDS);
     if ((after !== null && !isUuid(after)) || (customerId !== null && !isUuid(customerId))) {
       return { items: [], hasNextPage: false };
     }
@@ -228,6 +251,10 @@ export class PastOrderService {
         SELECT * FROM orders.past_orders p
          WHERE p.shop_id = ${tenant.shopId}
            ${customerId === null ? sql`` : sql`AND p.customer_id = ${customerId}`}
+           ${sql.join(
+             words.map((word) => sql` AND ${matches(word)}`),
+             sql``,
+           )}
            ${
              after === null
                ? sql``
