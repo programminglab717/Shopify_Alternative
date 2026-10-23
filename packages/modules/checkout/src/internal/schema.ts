@@ -162,6 +162,10 @@ export const deliverySettings = checkoutSchema.table('delivery_settings', {
   weights: jsonb('weights').$type<StoredWeight[]>().notNull().default([]),
   /** What larger orders pay at most (ADR-721), the smallest first. */
   valueRates: jsonb('value_rates').$type<StoredValueRate[]>().notNull().default([]),
+  /** Times of the day the shop delivers in (ADR-768), the earliest first. */
+  slots: jsonb('slots').$type<{ from: string; until: string }[]>().notNull().default([]),
+  slotDays: smallint('slot_days').notNull().default(7),
+  slotLeadHours: smallint('slot_lead_hours').notNull().default(2),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

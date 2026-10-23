@@ -28,8 +28,33 @@ export interface DeliverySettingsRecord {
    * before what its weight adds. Left out for none.
    */
   valueRates?: DeliveryValueRateRecord[];
+  /**
+   * Times of the day the shop delivers in (CHK-15, ADR-768), in Pakistan's time, the earliest
+   * first: checkout asks the shopper for one. Left out or empty for none.
+   */
+  slots?: DeliverySlotRecord[];
+  /** How many days ahead, today the first, checkout offers slots on: 1 to 14; 7 when left out. */
+  slotDays?: number;
+  /** How many hours ahead a slot must start to be offered: 0 to 72; 2 when left out. */
+  slotLeadHours?: number;
   /** Null while the shop has set none. */
   updatedAt: Date | null;
+}
+
+/** A time of the day the shop delivers in, "HH:MM" in Pakistan's time, `from` before `until`. */
+export interface DeliverySlotRecord {
+  from: string;
+  until: string;
+}
+
+/** A slot on a day, as checkout offers it and an order keeps it (ADR-768). */
+export interface OfferedDeliverySlot {
+  /** "2026-10-24T10:00-13:00": the day and the slot, which checkout's form sends back. */
+  key: string;
+  /** The day, YYYY-MM-DD in Pakistan. */
+  day: string;
+  startsAt: Date;
+  endsAt: Date;
 }
 
 /** What an order weighing more than `aboveGrams` costs more to deliver, in minor units. */
@@ -69,6 +94,9 @@ export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   cutoffHour: null,
   weights: [],
   valueRates: [],
+  slots: [],
+  slotDays: 7,
+  slotLeadHours: 2,
   updatedAt: null,
 };
 
@@ -81,6 +109,9 @@ export const DELIVERY_LIMITS = {
   valueRates: 10,
   /** 1,000 kg: more than any courier takes as a parcel. */
   grams: 1_000_000,
+  slots: 8,
+  slotDays: 14,
+  slotLeadHours: 72,
 } as const;
 
 /** Those left out stay as they are; `zones`, when given, replaces them all. */
@@ -98,6 +129,12 @@ export interface DeliverySettingsInput {
   weights?: DeliveryWeightInput[] | null;
   /** Replaces them all, in any order; an empty list for none. */
   valueRates?: DeliveryValueRateInput[] | null;
+  /** Replaces them all, in any order; an empty list for none. */
+  slots?: DeliverySlotRecord[] | null;
+  /** 1 to 14. */
+  slotDays?: number | null;
+  /** 0 to 72. */
+  slotLeadHours?: number | null;
 }
 
 export interface DeliveryValueRateInput {
@@ -294,9 +331,141 @@ export function checkDeliverySettings(
   if (input.valueRates !== undefined) {
     valueRates = checkValueRates(check, input.valueRates ?? [], currency);
   }
+  let slots = current.slots ?? [];
+  if (input.slots !== undefined) slots = checkSlots(check, input.slots ?? []);
+  const slotDays = checkWhole(check, 'slotDays', input.slotDays, current.slotDays ?? 7, {
+    min: 1,
+    max: DELIVERY_LIMITS.slotDays,
+    message: `Slots are offered 1 to ${DELIVERY_LIMITS.slotDays} days ahead`,
+  });
+  const slotLeadHours = checkWhole(
+    check,
+    'slotLeadHours',
+    input.slotLeadHours,
+    current.slotLeadHours ?? 2,
+    {
+      min: 0,
+      max: DELIVERY_LIMITS.slotLeadHours,
+      message: `A slot starts 0 to ${DELIVERY_LIMITS.slotLeadHours} hours ahead`,
+    },
+  );
   return check.errors.length > before
     ? null
-    : { charge, freeAbove, days, zones, cutoffHour, weights, valueRates };
+    : {
+        charge,
+        freeAbove,
+        days,
+        zones,
+        cutoffHour,
+        weights,
+        valueRates,
+        slots,
+        slotDays,
+        slotLeadHours,
+      };
+}
+
+/** `input` where given and whole from `min` to `max`, else `current`, adding what is wrong. */
+function checkWhole(
+  check: InputChecker,
+  field: string,
+  input: number | null | undefined,
+  current: number,
+  limits: { min: number; max: number; message: string },
+): number {
+  if (input === undefined || input === null) return current;
+  if (!Number.isInteger(input) || input < limits.min || input > limits.max) {
+    check.addMessage([field], 'INVALID', limits.message);
+    return current;
+  }
+  return input;
+}
+
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Times of the day as "HH:MM", 00:00 to 23:59, each ending after it starts, none overlapping
+ * another, kept the earliest first; at most {@link DELIVERY_LIMITS.slots}.
+ */
+function checkSlots(check: InputChecker, inputs: readonly DeliverySlotRecord[]) {
+  if (inputs.length > DELIVERY_LIMITS.slots) {
+    check.addMessage(
+      ['slots'],
+      'INVALID',
+      `A shop offers at most ${DELIVERY_LIMITS.slots} delivery slots`,
+    );
+    return [];
+  }
+  const slots = inputs.map((input, index) => {
+    const at = ['slots', String(index)];
+    const from = input.from.trim();
+    const until = input.until.trim();
+    if (!CLOCK.test(from)) {
+      check.addMessage([...at, 'from'], 'INVALID', 'A time is HH:MM, from 00:00 to 23:59');
+    }
+    if (!CLOCK.test(until)) {
+      check.addMessage([...at, 'until'], 'INVALID', 'A time is HH:MM, from 00:00 to 23:59');
+    } else if (CLOCK.test(from) && until <= from) {
+      check.addMessage([...at, 'until'], 'INVALID', 'A slot must end after it starts');
+    }
+    return { from, until, index };
+  });
+  const sorted = [...slots].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+  sorted.forEach((slot, place) => {
+    const next = sorted[place + 1];
+    if (next && next.from < slot.until && CLOCK.test(next.from) && CLOCK.test(slot.until)) {
+      check.addMessage(
+        ['slots', String(next.index), 'from'],
+        'INVALID',
+        `This slot overlaps ${slot.from} to ${slot.until}`,
+      );
+    }
+  });
+  return sorted.map(({ from, until }) => ({ from, until }));
+}
+
+/**
+ * The slots checkout offers at `now` (ADR-768): each of the shop's slots on each of its slot days
+ * from today in Pakistan, those starting at least its lead hours from now. None without slots.
+ */
+export function offeredSlots(settings: DeliverySettingsRecord, now: Date): OfferedDeliverySlot[] {
+  const slots = settings.slots ?? [];
+  if (slots.length === 0) return [];
+  const earliest = now.getTime() + (settings.slotLeadHours ?? 2) * 3_600_000;
+  const today = Date.parse(`${pkDayOf(now)}T00:00:00Z`);
+  const offered: OfferedDeliverySlot[] = [];
+  for (let ahead = 0; ahead < (settings.slotDays ?? 7); ahead++) {
+    const day = new Date(today + ahead * 86_400_000).toISOString().slice(0, 10);
+    for (const slot of slots) {
+      const startsAt = pkTime(day, slot.from);
+      if (startsAt.getTime() < earliest) continue;
+      offered.push({
+        key: slotKey(day, slot),
+        day,
+        startsAt,
+        endsAt: pkTime(day, slot.until),
+      });
+    }
+  }
+  return offered;
+}
+
+/** The offered slot `key` names, or null where it is not offered at `now`. */
+export function offeredSlot(
+  settings: DeliverySettingsRecord,
+  key: string,
+  now: Date,
+): OfferedDeliverySlot | null {
+  return offeredSlots(settings, now).find((slot) => slot.key === key) ?? null;
+}
+
+function slotKey(day: string, slot: DeliverySlotRecord): string {
+  return `${day}T${slot.from}-${slot.until}`;
+}
+
+/** `clock` ("HH:MM") on `day` in Pakistan, which keeps UTC+5 all year. */
+function pkTime(day: string, clock: string): Date {
+  return new Date(`${day}T${clock}:00+05:00`);
 }
 
 /** Subtotals above nothing, each once, kept the smallest first; charges of nothing or more. */

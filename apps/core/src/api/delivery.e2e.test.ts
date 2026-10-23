@@ -198,6 +198,44 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
     expect(nothing.data?.deliverySettingsUpdate.userErrors).toEqual([
       { field: ['valueRates', '0', 'fromSubtotal'], code: 'INVALID' },
     ]);
+    // Times of the day the shop delivers in (ADR-768), kept the earliest first.
+    const SLOTS = `mutation ($input: DeliverySettingsUpdateInput!) {
+      deliverySettingsUpdate(input: $input) {
+        deliverySettings { slots { from until } slotDays slotLeadHours }
+        userErrors { field code }
+      }
+    }`;
+    const slotted = await gql(tokens.a, SLOTS, {
+      input: {
+        slots: [
+          { from: '16:00', until: '19:00' },
+          { from: '10:00', until: '13:00' },
+        ],
+        slotDays: 3,
+      },
+    });
+    expect(slotted.data?.deliverySettingsUpdate).toEqual({
+      deliverySettings: {
+        slots: [
+          { from: '10:00', until: '13:00' },
+          { from: '16:00', until: '19:00' },
+        ],
+        slotDays: 3,
+        slotLeadHours: 2,
+      },
+      userErrors: [],
+    });
+    const overlapping = await gql(tokens.a, SLOTS, {
+      input: {
+        slots: [
+          { from: '10:00', until: '13:00' },
+          { from: '12:00', until: '14:00' },
+        ],
+      },
+    });
+    expect(overlapping.data?.deliverySettingsUpdate.userErrors).toEqual([
+      { field: ['slots', '1', 'from'], code: 'INVALID' },
+    ]);
     // Another shop's are its own.
     expect((await read(tokens.b)).zones).toEqual([]);
 

@@ -13,6 +13,8 @@ import {
   deliveryDays,
   deliveryDaysRange,
   expectedDeliveryOn,
+  offeredSlot,
+  offeredSlots,
   type DeliverySettingsInput,
   type DeliverySettingsRecord,
 } from './delivery.js';
@@ -237,6 +239,9 @@ describe('Delivery charges', () => {
       cutoffHour: null,
       weights: [],
       valueRates: [],
+      slots: [],
+      slotDays: 7,
+      slotLeadHours: 2,
     });
     // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
@@ -247,6 +252,9 @@ describe('Delivery charges', () => {
       cutoffHour: null,
       weights: [],
       valueRates: [],
+      slots: [],
+      slotDays: 7,
+      slotLeadHours: 2,
     });
     expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
     expect(
@@ -458,6 +466,125 @@ describe.skipIf(!server)('DeliveryService', () => {
         f.a.shopId,
       ]),
     ).rejects.toThrow(/cutoff_hour/);
+  });
+
+  it('keeps the times of the day the shop delivers in, recording a change of them (ADR-768)', async () => {
+    expect(await f.delivery.get(f.a)).toMatchObject({ slots: [], slotDays: 7, slotLeadHours: 2 });
+    const slots = [
+      { from: '10:00', until: '13:00' },
+      { from: '16:00', until: '19:00' },
+    ];
+    const saved = unwrap(
+      await f.delivery.update(f.a, { slots: [...slots].reverse(), slotDays: 3 }),
+    );
+    expect(saved).toMatchObject({ slots, slotDays: 3, slotLeadHours: 2 });
+    expect(await f.delivery.get(f.a)).toEqual(saved);
+    // The same again changes nothing; kept when the rest changes; none with an empty list.
+    unwrap(await f.delivery.update(f.a, { slots, slotDays: 3, slotLeadHours: 2 }));
+    unwrap(await f.delivery.update(f.a, { slotLeadHours: 24 }));
+    expect(await f.delivery.get(f.a)).toMatchObject({ slots, slotDays: 3, slotLeadHours: 24 });
+    unwrap(await f.delivery.update(f.a, { slots: [] }));
+    expect((await f.delivery.get(f.a)).slots).toEqual([]);
+    expect(
+      (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([['slots', 'slotDays'], ['slotLeadHours'], ['slots']]);
+    await expect(
+      f.admin.query(`UPDATE checkout.delivery_settings SET slot_days = 0 WHERE shop_id = $1`, [
+        f.a.shopId,
+      ]),
+    ).rejects.toThrow(/slot_days/);
+    expect(await f.delivery.get(f.b)).toEqual(NO_DELIVERY_SETTINGS);
+  });
+});
+
+describe('Delivery time slots (CHK-15, ADR-768)', () => {
+  const SLOTS: DeliverySettingsRecord = {
+    ...NO_DELIVERY_SETTINGS,
+    slots: [
+      { from: '10:00', until: '13:00' },
+      { from: '16:00', until: '19:00' },
+    ],
+    slotDays: 2,
+    slotLeadHours: 3,
+  };
+
+  it('takes times of the day as HH:MM, kept the earliest first, none overlapping', () => {
+    expect(
+      checked({
+        slots: [
+          { from: '16:00', until: '19:00' },
+          { from: ' 09:30', until: '12:00 ' },
+        ],
+        slotDays: 3,
+        slotLeadHours: 0,
+      }),
+    ).toMatchObject({
+      slots: [
+        { from: '09:30', until: '12:00' },
+        { from: '16:00', until: '19:00' },
+      ],
+      slotDays: 3,
+      slotLeadHours: 0,
+    });
+    // Left out, they stay as they are.
+    expect(checked({ charge: '100' }, SLOTS)).toMatchObject({
+      slots: SLOTS.slots,
+      slotDays: 2,
+      slotLeadHours: 3,
+    });
+    expect(
+      checked({
+        slots: [
+          { from: '9:00', until: '12:00' },
+          { from: '13:00', until: '12:00' },
+          { from: '14:00', until: '24:00' },
+          { from: '10:00', until: '11:00' },
+          { from: '10:30', until: '12:00' },
+        ],
+        slotDays: 15,
+        slotLeadHours: -1,
+      }),
+    ).toEqual([
+      ['slots.0.from', 'A time is HH:MM, from 00:00 to 23:59'],
+      ['slots.1.until', 'A slot must end after it starts'],
+      ['slots.2.until', 'A time is HH:MM, from 00:00 to 23:59'],
+      ['slots.4.from', 'This slot overlaps 10:00 to 11:00'],
+      ['slotDays', 'Slots are offered 1 to 14 days ahead'],
+      ['slotLeadHours', 'A slot starts 0 to 72 hours ahead'],
+    ]);
+    expect(
+      checked({ slots: Array.from({ length: 9 }, () => ({ from: '10:00', until: '11:00' })) }),
+    ).toEqual([['slots', 'A shop offers at most 8 delivery slots']]);
+  });
+
+  it('offers each slot on the slot days from today in Pakistan, from the lead hours ahead', () => {
+    // 9 am in Karachi, Friday 23 October 2026: 10 am is too soon, with 3 hours to prepare.
+    const offered = offeredSlots(SLOTS, new Date('2026-10-23T04:00:00Z'));
+    expect(offered.map((slot) => slot.key)).toEqual([
+      '2026-10-23T16:00-19:00',
+      '2026-10-24T10:00-13:00',
+      '2026-10-24T16:00-19:00',
+    ]);
+    expect(offered[0]).toEqual({
+      key: '2026-10-23T16:00-19:00',
+      day: '2026-10-23',
+      startsAt: new Date('2026-10-23T11:00:00Z'),
+      endsAt: new Date('2026-10-23T14:00:00Z'),
+    });
+    // At 7 am exactly, 10 am is just far enough ahead; just after 7 pm in Karachi is still today.
+    expect(offeredSlots(SLOTS, new Date('2026-10-23T02:00:00Z'))[0]?.key).toBe(
+      '2026-10-23T10:00-13:00',
+    );
+    expect(offeredSlots(SLOTS, new Date('2026-10-23T14:01:00Z')).map((slot) => slot.key)).toEqual([
+      '2026-10-24T10:00-13:00',
+      '2026-10-24T16:00-19:00',
+    ]);
+    // One chosen is offered still, or not.
+    const now = new Date('2026-10-23T04:00:00Z');
+    expect(offeredSlot(SLOTS, '2026-10-24T10:00-13:00', now)?.day).toBe('2026-10-24');
+    expect(offeredSlot(SLOTS, '2026-10-23T10:00-13:00', now)).toBeNull();
+    expect(offeredSlot(SLOTS, '2026-10-25T10:00-13:00', now)).toBeNull();
+    expect(offeredSlots(NO_DELIVERY_SETTINGS, now)).toEqual([]);
   });
 });
 

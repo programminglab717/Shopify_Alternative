@@ -16,7 +16,8 @@ import { deliverySettings } from './schema.js';
  * What a shop charges to deliver an order (ADR-043): one charge for everywhere, zones of cities
  * with charges of their own, and a subtotal from which delivery is free; and how many working
  * days delivery takes, everywhere and in each zone (ADR-235); and what heavier orders cost more
- * (ADR-702), and what larger orders pay at most (ADR-721). Checkout adds the charge for the shopper's city and the cart's weight, and says how long delivery takes there; the storefront shows the charges and
+ * (ADR-702), and what larger orders pay at most (ADR-721); and the times of the day it delivers in
+ * (ADR-768). Checkout adds the charge for the shopper's city and the cart's weight, and says how long delivery takes there; the storefront shows the charges and
  * the days. A shop that set nothing charges nothing, and says nothing of the days.
  */
 @Injectable()
@@ -56,6 +57,11 @@ export class DeliveryService {
         JSON.stringify(storedValueRates(before.valueRates))
           ? ['valueRates']
           : []),
+        ...(JSON.stringify(next.slots ?? []) !== JSON.stringify(before.slots ?? [])
+          ? ['slots']
+          : []),
+        ...(next.slotDays !== (before.slotDays ?? 7) ? ['slotDays'] : []),
+        ...(next.slotLeadHours !== (before.slotLeadHours ?? 2) ? ['slotLeadHours'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       const values = {
@@ -67,6 +73,9 @@ export class DeliveryService {
         cutoffHour: next.cutoffHour ?? null,
         weights: storedWeights(next.weights),
         valueRates: storedValueRates(next.valueRates),
+        slots: next.slots ?? [],
+        slotDays: next.slotDays ?? 7,
+        slotLeadHours: next.slotLeadHours ?? 2,
       };
       await tx
         .insert(deliverySettings)
@@ -119,6 +128,9 @@ export class DeliveryService {
         fromSubtotal: BigInt(rate.fromSubtotal),
         charge: BigInt(rate.charge),
       })),
+      slots: row.slots.map((slot) => ({ from: slot.from, until: slot.until })),
+      slotDays: row.slotDays,
+      slotLeadHours: row.slotLeadHours,
       updatedAt: row.updatedAt,
     };
   }

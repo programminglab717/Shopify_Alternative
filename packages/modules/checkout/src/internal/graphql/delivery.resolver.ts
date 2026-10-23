@@ -8,6 +8,7 @@ import {
   DeliverySettings,
   DeliverySettingsUpdateInput,
   DeliverySettingsUpdatePayload,
+  DeliverySlot,
   DeliveryValueRate,
   DeliveryWeight,
   DeliveryZone,
@@ -73,6 +74,11 @@ function toDeliverySettings(
         charge: amount(rate.charge),
       }),
     ),
+    slots: (record.slots ?? []).map((slot) =>
+      Object.assign(new DeliverySlot(), { from: slot.from, until: slot.until }),
+    ),
+    slotDays: record.slotDays ?? 7,
+    slotLeadHours: record.slotLeadHours ?? 2,
     updatedAt: record.updatedAt,
   });
 }

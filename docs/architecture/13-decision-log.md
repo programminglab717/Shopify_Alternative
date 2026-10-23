@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-767 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-768 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -775,6 +775,7 @@
 | 765 | A draft order's link is sent as an answer in the customer's conversation, where they add their address and confirm; the core joins orders and messaging, and checks the window first | Accepted |
 | 766 | A product is put in an answer as its name, price and storefront link, which WhatsApp previews with the product's photo; only products on sale are offered | Accepted |
 | 767 | A payment link still taking orders is put in an answer as its title, what it sells and its address | Accepted |
+| 768 | Delivery time slots are times of the day in Pakistan's time, offered on the days ahead from the hours ahead the shop needs | Accepted |
 
 ---
 
@@ -25862,3 +25863,26 @@
 * **Consequences:** with drafts' links (ADR-765), products (ADR-766) and payment links, an order
   can begin, be shown and be paid for in the chat, which MSG-08 asks. A link closed or full is
   not offered, so a customer is not sent one that refuses them.
+
+## ADR-768 · Delivery time slots are times of the day in Pakistan's time, offered on the days ahead from the hours ahead the shop needs
+
+* **Context:** bakeries, grocers and florists deliver themselves, the same day or on a day the
+  customer chooses, and in a part of it: a cake for the evening, groceries before noon. CHK-15
+  asks for a delivery date and time slot at checkout. A promise in working days (ADR-594) says
+  when a courier will be done, not when the shop's rider comes.
+* **Decision:** checkout's delivery settings get `slots`: up to 8 times of the day as "HH:MM" in
+  Pakistan's time (which keeps UTC+5 all year), each ending after it starts, none overlapping,
+  kept the earliest first; `slotDays`, how many days ahead, today the first, they are offered on
+  (1 to 14, 7 by default); and `slotLeadHours`, how many hours ahead one must start to be offered
+  (0 to 72, 2 by default), the time the shop needs to bake or pack.
+  * **Offered slots:** `offeredSlots(settings, now)` makes each slot on each day; its key, such
+    as "2026-10-24T10:00-13:00", names the day and the slot, and `offeredSlot` checks one a form
+    sends back against what is offered now, so a slot that has become too near is refused.
+  * **Every day:** slots are offered on Sundays and holidays too, as such shops work them; days
+    the shop does not deliver, and how many orders a slot takes, come later if shops ask.
+  * **Storage** (migration 0328): `slots` (jsonb, at most 8), `slot_days` and
+    `slot_lead_hours` on `checkout.delivery_settings`, checked by the database too; a change is
+    named in `delivery_settings.updated`. In the Admin API as `DeliverySettings.slots`,
+    `slotDays` and `slotLeadHours`, and the same in `DeliverySettingsUpdateInput`.
+* **Consequences:** a shop without slots sees nothing change. The checkout page asking for one,
+  the order keeping it and the pages showing it follow.

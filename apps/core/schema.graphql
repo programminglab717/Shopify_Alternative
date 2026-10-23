@@ -4247,6 +4247,17 @@ type DeliverySettings {
   """Delivery is free for a subtotal of this or more; null for never."""
   freeAbove: Money
 
+  """How many days ahead, today the first, slots are offered on."""
+  slotDays: Int!
+
+  """How many hours ahead a slot must start to be offered."""
+  slotLeadHours: Int!
+
+  """
+  Times of the day the shop delivers in, the earliest first: checkout asks for one on each order not picked up, offered on the slot days from the lead hours ahead. Empty for none.
+  """
+  slots: [DeliverySlot!]!
+
   """null while the shop has set none."""
   updatedAt: DateTime
 
@@ -4278,6 +4289,17 @@ input DeliverySettingsUpdateInput {
   """Decimal, e.g. "5,000"; null or blank for no free delivery."""
   freeAbove: String
 
+  """Slots offered 1 to 14 days ahead."""
+  slotDays: Int
+
+  """A slot offered from 0 to 72 hours before it starts."""
+  slotLeadHours: Int
+
+  """
+  Replaces every delivery slot, in any order; an empty list for none. Up to 8.
+  """
+  slots: [DeliverySlotInput!]
+
   """
   Replaces every rate by value, in any order; an empty list for none. Up to 10.
   """
@@ -4293,6 +4315,25 @@ input DeliverySettingsUpdateInput {
 type DeliverySettingsUpdatePayload {
   deliverySettings: DeliverySettings
   userErrors: [UserError!]!
+}
+
+"""
+A time of the day the shop delivers in (CHK-15, ADR-768), in Pakistan's time: checkout asks the shopper for one.
+"""
+type DeliverySlot {
+  """"HH:MM", such as "10:00"."""
+  from: String!
+
+  """"HH:MM", after `from`, such as "13:00"."""
+  until: String!
+}
+
+input DeliverySlotInput {
+  """"HH:MM" in Pakistan's time, 00:00 to 23:59."""
+  from: String!
+
+  """"HH:MM", after `from`; slots may not overlap."""
+  until: String!
 }
 
 """

@@ -85,6 +85,28 @@ export class DeliveryValueRateInput {
 }
 
 @ObjectType({
+  description:
+    "A time of the day the shop delivers in (CHK-15, ADR-768), in Pakistan's time: checkout asks " +
+    'the shopper for one.',
+})
+export class DeliverySlot {
+  @Field({ description: '"HH:MM", such as "10:00".' })
+  from!: string;
+
+  @Field({ description: '"HH:MM", after `from`, such as "13:00".' })
+  until!: string;
+}
+
+@InputType()
+export class DeliverySlotInput {
+  @Field({ description: '"HH:MM" in Pakistan\'s time, 00:00 to 23:59.' })
+  from!: string;
+
+  @Field({ description: '"HH:MM", after `from`; slots may not overlap.' })
+  until!: string;
+}
+
+@ObjectType({
   description: 'What the shop charges to deliver an order, which checkout adds for its city.',
 })
 export class DeliverySettings {
@@ -130,6 +152,19 @@ export class DeliverySettings {
       'no more than its charge, the largest it reaches alone, before what its weight adds.',
   })
   valueRates!: DeliveryValueRate[];
+
+  @Field(() => [DeliverySlot], {
+    description:
+      'Times of the day the shop delivers in, the earliest first: checkout asks for one on each ' +
+      'order not picked up, offered on the slot days from the lead hours ahead. Empty for none.',
+  })
+  slots!: DeliverySlot[];
+
+  @Field(() => Int, { description: 'How many days ahead, today the first, slots are offered on.' })
+  slotDays!: number;
+
+  @Field(() => Int, { description: 'How many hours ahead a slot must start to be offered.' })
+  slotLeadHours!: number;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
@@ -201,6 +236,21 @@ export class DeliverySettingsUpdateInput {
     description: 'Replaces every rate by value, in any order; an empty list for none. Up to 10.',
   })
   valueRates?: DeliveryValueRateInput[] | null;
+
+  @Field(() => [DeliverySlotInput], {
+    nullable: true,
+    description: 'Replaces every delivery slot, in any order; an empty list for none. Up to 8.',
+  })
+  slots?: DeliverySlotInput[] | null;
+
+  @Field(() => Int, { nullable: true, description: 'Slots offered 1 to 14 days ahead.' })
+  slotDays?: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'A slot offered from 0 to 72 hours before it starts.',
+  })
+  slotLeadHours?: number | null;
 }
 
 @ObjectType()
