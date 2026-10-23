@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-751 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-752 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -759,6 +759,7 @@
 | 749 | A Shopify store's products come through its own Admin API, with its owner's app's token or client ID and secret, kept for nothing: one bulk query, written as Shopify's product export, which the product import takes as it takes a file | Accepted |
 | 750 | The admin's import page takes products straight from the owner's Shopify store: its address and their app's client ID and secret or token, checked first, each problem by its product's handle, the credentials held by the page alone and cleared once imported | Accepted |
 | 751 | A Shopify store's URL redirects come through its Admin API too, written as Shopify's redirects export for the redirect import, each problem by its path, and the admin's store card brings them with the products | Accepted |
+| 752 | A Shopify store's own pages come through its Admin API, each made as pageCreate makes one at its handle, shown as and since the store showed it, and the admin's store card brings them too | Accepted |
 
 ---
 
@@ -25501,3 +25502,20 @@
     makes them after the products.
 * **Consequences:** a shop moving from Shopify keeps both its products' addresses and the old
   store's redirects, in one step from the admin.
+
+## ADR-752 · A Shopify store's own pages come through its Admin API, each made as pageCreate makes one at its handle, shown as and since the store showed it, and the admin's store card brings them too
+
+* **Context:** a Shopify store's About us, Contact and delivery pages are part of what moves
+  (08 §5); Shopify's exports have no file of them, so a shop moving copied each by hand.
+* **Decision:**
+  * **`readStorePages`** in `@hatti/shopify-admin` asks the store first, then every page in one
+    bulk query: its handle, title, HTML body, whether and since when it is shown, and its
+    template. The app needs the read_online_store_pages scope, which Shopify's refusal is said as.
+  * **`pagesImportFromShopify`** makes each page the shop has no handle for as `pageCreate` makes
+    one, so its body is cleaned of anything that could run and its address stays
+    /pages/{handle}; a page Shopify shows is shown since when Shopify showed it, a hidden one
+    stays hidden; a page the shop has, by handle, is left as it is; each that fails is named by
+    its handle. Its dry run counts.
+  * **The admin's store card** brings the pages too, on by default for those who write pages.
+* **Consequences:** a shop moving from Shopify brings its products, redirects and pages in one
+  step. Blogs and articles, collections, customers, orders and discount codes are still to come.

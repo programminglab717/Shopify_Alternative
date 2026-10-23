@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Pages straight from a Shopify store
+
+* **The old store's About us, Contact and other pages come too,** each at its own address, its
+  body cleaned, shown as the store showed it; the admin's store card brings them with the
+  products and redirects ([ADR-752](../architecture/13-decision-log.md#adr-752--a-shopify-stores-own-pages-come-through-its-admin-api-each-made-as-pagecreate-makes-one-at-its-handle-shown-as-and-since-the-store-showed-it-and-the-admins-store-card-brings-them-too)).
+* 4105 tests (4 new).
+
 ### accc004 · Redirects straight from a Shopify store
 
 * **The old store's redirects come with its products.** Hatti reads them through the store's

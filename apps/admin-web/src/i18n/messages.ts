@@ -3003,6 +3003,12 @@ const en = {
   'files.redirectsChecked': 'Redirects to add: {created}; to leave as they are: {skipped}.',
   'files.redirectsImported': 'Redirects added: {created}; left as they were: {skipped}.',
   'files.redirectRowError': '{path}: {message}',
+  'files.storePages': 'Bring its pages too',
+  'files.storePagesHint':
+    'Its own pages, such as About us, at the same addresses. The app needs the read_online_store_pages scope too.',
+  'files.pagesChecked': 'Pages to add: {created}; to leave as they are: {skipped}.',
+  'files.pagesImported': 'Pages added: {created}; left as they were: {skipped}.',
+  'files.pageError': '{handle}: {message}',
   'files.checkStore': 'Check the store',
   'files.storeChecked':
     'In your Shopify store: products to add: {created}; to update: {updated}; to leave as they are: {skipped}. Variants to make: {variants}.',
@@ -8583,6 +8589,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.redirectsChecked': 'شامل کرنے کو ری ڈائریکٹس: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
   'files.redirectsImported': 'شامل ری ڈائریکٹس: {created}؛ ویسے ہی: {skipped}۔',
   'files.redirectRowError': '{path}: {message}',
+  'files.storePages': 'اس کے صفحات بھی لائیں',
+  'files.storePagesHint':
+    'اس کے اپنے صفحات، جیسے About us، انہی ایڈریسز پر۔ ایپ کو read_online_store_pages اسکوپ بھی چاہیے۔',
+  'files.pagesChecked': 'شامل کرنے کو صفحات: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
+  'files.pagesImported': 'شامل صفحات: {created}؛ ویسے ہی: {skipped}۔',
+  'files.pageError': '{handle}: {message}',
   'files.checkStore': 'اسٹور جانچیں',
   'files.storeChecked':
     'آپ کے شاپیفائی اسٹور میں: شامل کرنے کو پروڈکٹس: {created}؛ اپ ڈیٹ کرنے کو: {updated}؛ ویسے ہی چھوڑنے کو: {skipped}۔ بنانے کو اقسام: {variants}۔',

@@ -2819,6 +2819,20 @@ export interface UrlRedirectsImportResult {
   userErrors: UserError[];
 }
 
+/** What an import of a store's pages did, or would do in a dry run (ADR-752). */
+export interface PagesImportFromShopifyResult {
+  dryRun: boolean;
+  pages: number;
+  created: number;
+  skipped: number;
+  pageErrors: { handle: string; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface PagesImportFromShopifyData {
+  pagesImportFromShopify: PagesImportFromShopifyResult;
+}
+
 export interface UrlRedirectsImportFromShopifyData {
   urlRedirectsImportFromShopify: UrlRedirectsImportResult;
 }

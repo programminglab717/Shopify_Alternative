@@ -9053,6 +9053,21 @@ type Mutation {
   pageUpdate(id: ID!, page: PageUpdateInput!): PageUpdatePayload!
 
   """
+  Imports a Shopify store's own pages through its Admin API (ONB-05, ADR-752), such as About us and Contact, each keeping its handle and so its address at /pages/{handle}: its title, body, whether it is shown and since when, and its template. Give the store and its app as productsImportFromShopify takes them; the app needs the read_online_store_pages access scope. Pages whose handles the shop has are left as they are. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  pagesImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): PagesImportFromShopifyPayload!
+
+  """
   Archives a payment gateway account: no new payments through it. Payments customers started through it still count once the gateway says they are made.
   """
   paymentGatewayAccountArchive(id: ID!): PaymentGatewayAccountPayload!
@@ -11537,6 +11552,22 @@ input PageUpdateInput {
 
 type PageUpdatePayload {
   page: Page
+  userErrors: [UserError!]!
+}
+
+type PagesImportFromShopifyPayload {
+  """Pages made, or that would be in a dry run."""
+  created: Int!
+  dryRun: Boolean!
+  pageErrors: [StorePageImportError!]!
+
+  """Pages the store has."""
+  pages: Int!
+
+  """
+  Pages left as they are: the shop has a page with their handles already.
+  """
+  skipped: Int!
   userErrors: [UserError!]!
 }
 
@@ -16682,6 +16713,13 @@ enum StoreExportStatus {
   FAILED
   PENDING
   READY
+}
+
+"""A store's page that did not go in, and why."""
+type StorePageImportError {
+  """The page's handle at the store."""
+  handle: String!
+  message: String!
 }
 
 """A search on the online store, by its words (ADR-683)."""

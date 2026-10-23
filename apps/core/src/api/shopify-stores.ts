@@ -1,4 +1,10 @@
-import { ShopifyAdmin, type BulkQueryOptions, type ShopifyCredentials } from '@hatti/shopify-admin';
+import {
+  ShopifyAdmin,
+  shopDomainOf,
+  type BulkQueryOptions,
+  type ShopifyCredentials,
+  type ShopifyFailureKind,
+} from '@hatti/shopify-admin';
 
 /**
  * Where the core reaches the Shopify stores owners move from (ADR-749): through the process's
@@ -27,4 +33,56 @@ export function credentialsOf(
   const id = clientId?.trim() ?? '';
   const secret = clientSecret?.trim() ?? '';
   return id !== '' && secret !== '' ? { clientId: id, clientSecret: secret } : null;
+}
+
+/** What an import from a store refuses before reading it, in the API's terms. */
+export interface StoreRefusal {
+  field: string[] | null;
+  code: string;
+  message: string;
+}
+
+/** The store's address and the owner's app as given, or why they are refused. */
+export function storeGiven(
+  store: string,
+  accessToken?: string,
+  clientId?: string,
+  clientSecret?: string,
+): { ok: true; shop: string; credentials: ShopifyCredentials } | ({ ok: false } & StoreRefusal) {
+  const shop = shopDomainOf(store);
+  if (!shop) {
+    return {
+      ok: false,
+      field: ['store'],
+      code: 'INVALID',
+      message: "Give the store's address at Shopify, as zari.myshopify.com, or its admin's link",
+    };
+  }
+  const credentials = credentialsOf(accessToken, clientId, clientSecret);
+  if (!credentials) {
+    return {
+      ok: false,
+      field: ['accessToken'],
+      code: 'BLANK',
+      message: "Give the access token of the store's app, or the client ID and secret of its app",
+    };
+  }
+  return { ok: true, shop, credentials };
+}
+
+/** Why Shopify did not answer, in the API's terms: on the app, the store, or neither. */
+export function storeRefusalOf(failure: {
+  kind: ShopifyFailureKind;
+  message: string;
+}): StoreRefusal {
+  return {
+    field:
+      failure.kind === 'credentials' || failure.kind === 'scope'
+        ? ['accessToken']
+        : failure.kind === 'store'
+          ? ['store']
+          : null,
+    code: failure.kind === 'busy' ? 'UNAVAILABLE' : 'INVALID',
+    message: failure.message,
+  };
 }

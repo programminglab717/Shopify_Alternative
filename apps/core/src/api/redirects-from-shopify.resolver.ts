@@ -4,9 +4,9 @@ import {
   UrlRedirectService,
   UrlRedirectsImportPayload,
 } from '@hatti/online-store/public';
-import { readStoreRedirects, shopDomainOf } from '@hatti/shopify-admin';
+import { readStoreRedirects } from '@hatti/shopify-admin';
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
-import { ShopifyStores, credentialsOf } from './shopify-stores.js';
+import { ShopifyStores, storeGiven, storeRefusalOf } from './shopify-stores.js';
 
 /**
  * A Shopify store's URL redirects through its own Admin API (ONB-05, ADR-751): read as Shopify's
@@ -51,34 +51,15 @@ export class RedirectsFromShopifyResolver {
         dryRun: dryRun ?? false,
         userErrors: [UserError.of(field, code, message)],
       });
-    const shop = shopDomainOf(store);
-    if (!shop) {
-      return refused(
-        ['store'],
-        'INVALID',
-        "Give the store's address at Shopify, as zari.myshopify.com, or its admin's link",
-      );
-    }
-    const credentials = credentialsOf(accessToken, clientId, clientSecret);
-    if (!credentials) {
-      return refused(
-        ['accessToken'],
-        'BLANK',
-        "Give the access token of the store's app, or the client ID and secret of its app",
-      );
-    }
+    const given = storeGiven(store, accessToken, clientId, clientSecret);
+    if (!given.ok) return refused(given.field, given.code, given.message);
     const read = await readStoreRedirects(
-      this.shopify.connect(shop, credentials),
+      this.shopify.connect(given.shop, given.credentials),
       this.shopify.bulk,
     );
     if (!read.ok) {
-      const field =
-        read.kind === 'credentials' || read.kind === 'scope'
-          ? ['accessToken']
-          : read.kind === 'store'
-            ? ['store']
-            : null;
-      return refused(field, read.kind === 'busy' ? 'UNAVAILABLE' : 'INVALID', read.message);
+      const refusal = storeRefusalOf(read);
+      return refused(refusal.field, refusal.code, refusal.message);
     }
     if (read.value.redirects === 0) {
       return refused(['store'], 'BLANK', `${read.value.storeName} has no redirects`);

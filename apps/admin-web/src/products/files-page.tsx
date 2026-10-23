@@ -8,6 +8,7 @@ import {
   LocationsQuery,
   ProductsExportQuery,
   ProductsImportFromShopifyMutation,
+  PagesImportFromShopifyMutation,
   ProductsImportMutation,
   UrlRedirectsImportFromShopifyMutation,
 } from '../api/operations';
@@ -20,6 +21,8 @@ import type {
   ProductsExportData,
   ProductsImportData,
   ProductsImportFromShopifyData,
+  PagesImportFromShopifyData,
+  PagesImportFromShopifyResult,
   ProductsImportResult,
   UrlRedirectsImportFromShopifyData,
   UrlRedirectsImportResult,
@@ -36,6 +39,7 @@ import { Alert, EmptyState } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 import { EDITS_MENUS } from '../online-store/menus';
+import { WRITES_PAGES } from '../online-store/pages';
 import { EDITS_PRODUCTS } from './status';
 
 /** A file the browser saves, as an export does. */
@@ -100,6 +104,8 @@ function ImportFromStore() {
   const shop = useShop();
   // The shop's redirects are theirs who edit its navigation (ADR-751).
   const editsRedirects = permits(shop, EDITS_MENUS);
+  // And its pages theirs who write them (ADR-752).
+  const writesPages = permits(shop, WRITES_PAGES);
   type Store = { store: string; accessToken?: string; clientId?: string; clientSecret?: string };
   const run = useAdminMutation<
     ProductsImportFromShopifyData,
@@ -109,6 +115,9 @@ function ImportFromStore() {
     UrlRedirectsImportFromShopifyData,
     Store & { dryRun: boolean }
   >(UrlRedirectsImportFromShopifyMutation);
+  const movePages = useAdminMutation<PagesImportFromShopifyData, Store & { dryRun: boolean }>(
+    PagesImportFromShopifyMutation,
+  );
   const { problem, attempt } = useAttempt();
   const [store, setStore] = useState('');
   const [access, setAccess] = useState<StoreAccess>('CLIENT');
@@ -117,13 +126,16 @@ function ImportFromStore() {
   const [clientSecret, setClientSecret] = useState('');
   const [overwrite, setOverwrite] = useState(false);
   const [withRedirects, setWithRedirects] = useState(editsRedirects);
+  const [withPages, setWithPages] = useState(writesPages);
   const [checked, setChecked] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
+    pages: PagesImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
+    pages: PagesImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
@@ -132,7 +144,11 @@ function ImportFromStore() {
   });
   /** The products, then the redirects where asked for: null where either was refused. */
   const send = async (dryRun: boolean) => {
-    const answer: { products?: ProductsImportResult; redirects?: UrlRedirectsImportResult } = {};
+    const answer: {
+      products?: ProductsImportResult;
+      redirects?: UrlRedirectsImportResult;
+      pages?: PagesImportFromShopifyResult;
+    } = {};
     const ok = await attempt(async () => {
       answer.products = (
         await run.mutateAsync({ ...given(), dryRun, overwrite })
@@ -149,7 +165,18 @@ function ImportFromStore() {
       });
       if (!moved) return null;
     }
-    return { products: answer.products!, redirects: answer.redirects ?? null };
+    if (withPages && writesPages) {
+      const moved = await attempt(async () => {
+        answer.pages = (await movePages.mutateAsync({ ...given(), dryRun })).pagesImportFromShopify;
+        return answer.pages;
+      });
+      if (!moved) return null;
+    }
+    return {
+      products: answer.products!,
+      redirects: answer.redirects ?? null,
+      pages: answer.pages ?? null,
+    };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
   const changed =
@@ -163,7 +190,7 @@ function ImportFromStore() {
     (access === 'TOKEN'
       ? token.trim() !== ''
       : clientId.trim() !== '' && clientSecret.trim() !== '');
-  const busy = run.isPending || moveRedirects.isPending;
+  const busy = run.isPending || moveRedirects.isPending || movePages.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -226,6 +253,14 @@ function ImportFromStore() {
           onChange={changed(setWithRedirects)}
         />
       )}
+      {writesPages && (
+        <CheckField
+          label={t('files.storePages')}
+          hint={t('files.storePagesHint')}
+          checked={withPages}
+          onChange={changed(setWithPages)}
+        />
+      )}
       <Button
         variant="secondary"
         className="self-start"
@@ -261,7 +296,21 @@ function ImportFromStore() {
               <RedirectRowErrors result={checked.redirects} />
             </>
           )}
-          {checked.products.created + checked.products.updated + (checked.redirects?.created ?? 0) >
+          {checked.pages && (
+            <>
+              <p>
+                {t('files.pagesChecked', {
+                  created: formatCount(checked.pages.created),
+                  skipped: formatCount(checked.pages.skipped),
+                })}
+              </p>
+              <PageErrors result={checked.pages} />
+            </>
+          )}
+          {checked.products.created +
+            checked.products.updated +
+            (checked.redirects?.created ?? 0) +
+            (checked.pages?.created ?? 0) >
             0 && (
             <Button
               className="self-start"
@@ -303,11 +352,37 @@ function ImportFromStore() {
                 })}
               </span>
             )}
+            {done.pages && (
+              <span>
+                {t('files.pagesImported', {
+                  created: formatCount(done.pages.created),
+                  skipped: formatCount(done.pages.skipped),
+                })}
+              </span>
+            )}
           </span>
         </Alert>
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
+  );
+}
+
+/** A store's pages the shop could not take, each by its handle. */
+function PageErrors({ result }: { result: PagesImportFromShopifyResult }) {
+  const { t } = useLocale();
+  if (result.pageErrors.length === 0) return null;
+  return (
+    <Alert tone="warning">
+      <span className="flex flex-col gap-1">
+        <span>{t('moving.rowErrors', { count: result.pageErrors.length })}</span>
+        {result.pageErrors.slice(0, 5).map((error) => (
+          <span key={error.handle}>
+            {t('files.pageError', { handle: error.handle, message: error.message })}
+          </span>
+        ))}
+      </span>
+    </Alert>
   );
 }
 

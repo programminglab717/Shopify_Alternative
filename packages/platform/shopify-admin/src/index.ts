@@ -24,3 +24,4 @@ export {
   storeRedirectsCsv,
   type StoreRedirects,
 } from './redirects.js';
+export { PAGES_BULK_QUERY, readStorePages, type StorePage, type StorePages } from './pages.js';
