@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### The storefront's errors to GlitchTip too
+### 1432307 · The storefront's errors to GlitchTip too
 
 * **The storefront logs now,** JSON through Hatti's logger as the core does, and sends what it
   logs at error to the same self-hosted GlitchTip once `ERROR_TRACKING_DSN` is set ([ADR-744](../architecture/13-decision-log.md#adr-744--the-storefronts-errors-go-to-the-error-tracker-too-each-answer-that-failed-with-a-5xx-logged-at-error-by-fastifys-log-controller-by-its-route-and-the-first-part-of-its-path-never-its-address-requests-themselves-not-logged)).
