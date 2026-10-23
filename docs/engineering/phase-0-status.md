@@ -2585,6 +2585,8 @@ That is 4240 tests. They cover:
   from the orders shown only once the shop has any
 * A Shopify store's metafields (ADR-789): set on products, variants by title and collections,
   types Hatti has not and apps' namespaces left out, a refused value named
+* Past orders' search (ADR-790): by name, email, the name it went to, or a mobile however
+  written, a `%` taken as itself
 * Reports of stores (ADR-460): kept with the shopper's mobile number as E.164 and a hash of
   their address; refused without a reason or details, or with a number not a Pakistani
   mobile; a fourth of one store from one address in a day refused; listed with the store

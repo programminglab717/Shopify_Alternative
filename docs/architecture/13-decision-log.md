@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-789 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-790 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -797,6 +797,7 @@
 | 787 | A shopper's account lists their past orders under their orders, with no page and nothing to buy again | Accepted |
 | 788 | The admin lists past orders whole on a page of their own, linked from the orders once the shop has any | Accepted |
 | 789 | A Shopify store's metafields are set on the shop's products, variants and collections of the same handles; gift cards stay behind | Accepted |
+| 790 | Past orders are searched by their name, email, the name they went to, or a mobile number however written | Accepted |
 
 ---
 
@@ -26315,3 +26316,16 @@
 * **Consequences:** themes moved from Shopify show what their metafields held. References are
   the remaining gap, until Hatti has those types; gift card holders need the shop to reissue
   their balances.
+
+## ADR-790 · Past orders are searched by their name, email, the name they went to, or a mobile number however written
+
+* **Context:** ADR-788's page lists past orders fifty at a time with no search, and staff look
+  one up by the name a customer quotes ("#1042"), their email, their name, or their number.
+* **Decision:** `pastOrders(query:)` keeps orders that match each of the query's first five
+  words: the order's name at the old store, its email or the name it went to holding the word
+  in any case (`ILIKE`, its `%` and `_` taken as themselves), or its number being the mobile the
+  word is, written however the customer writes it (0300-1234567, +92 300…). The admin's page
+  searches with it.
+* **Consequences:** a lookup scans the shop's past orders; that is a few thousand rows for a
+  moved store, read once each search, with no index on purpose until a shop's history shows it
+  needs one.
