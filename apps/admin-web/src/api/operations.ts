@@ -6259,6 +6259,41 @@ export const PagesImportFromShopifyMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A Shopify store's blogs and articles through its Admin API (ADR-753), checked first. */
+export const BlogsImportFromShopifyMutation = /* GraphQL */ `
+  mutation BlogsImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    blogsImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      blogs
+      blogsCreated
+      articles
+      created
+      skipped
+      articleErrors {
+        blog
+        article
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** The shop's redirects as Shopify's CSV, to keep or to take elsewhere. */
 export const UrlRedirectsExportQuery = /* GraphQL */ `
   query UrlRedirectsExport {

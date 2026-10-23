@@ -84,6 +84,7 @@ import { InventoryFileResolver } from './inventory-file.resolver.js';
 import { BroadcastEstimateResolver } from './broadcast-estimate.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
+import { BlogsFromShopifyResolver } from './blogs-from-shopify.resolver.js';
 import { PagesFromShopifyResolver } from './pages-from-shopify.resolver.js';
 import { RedirectsFromShopifyResolver } from './redirects-from-shopify.resolver.js';
 import { ShopifyStores } from './shopify-stores.js';
@@ -371,6 +372,7 @@ export class ApiModule {
         ProductsImportResolver,
         RedirectsFromShopifyResolver,
         PagesFromShopifyResolver,
+        BlogsFromShopifyResolver,
         { provide: ShopifyStores, useValue: options.shopifyStores ?? new ShopifyStores() },
         ProductsExportResolver,
         BroadcastEstimateResolver,

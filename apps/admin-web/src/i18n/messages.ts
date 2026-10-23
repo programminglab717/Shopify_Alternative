@@ -3009,6 +3009,14 @@ const en = {
   'files.pagesChecked': 'Pages to add: {created}; to leave as they are: {skipped}.',
   'files.pagesImported': 'Pages added: {created}; left as they were: {skipped}.',
   'files.pageError': '{handle}: {message}',
+  'files.storeBlogs': 'Bring its blogs too',
+  'files.storeBlogsHint':
+    'Its blogs and their articles, at the same addresses, without their images. The app needs the read_content scope too.',
+  'files.blogsChecked':
+    'Blogs to add: {blogs}. Articles to add: {created}; to leave as they are: {skipped}.',
+  'files.blogsImported':
+    'Blogs added: {blogs}. Articles added: {created}; left as they were: {skipped}.',
+  'files.articleError': '{handle}: {message}',
   'files.checkStore': 'Check the store',
   'files.storeChecked':
     'In your Shopify store: products to add: {created}; to update: {updated}; to leave as they are: {skipped}. Variants to make: {variants}.',
@@ -8595,6 +8603,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.pagesChecked': 'شامل کرنے کو صفحات: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
   'files.pagesImported': 'شامل صفحات: {created}؛ ویسے ہی: {skipped}۔',
   'files.pageError': '{handle}: {message}',
+  'files.storeBlogs': 'اس کے بلاگز بھی لائیں',
+  'files.storeBlogsHint':
+    'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، تصاویر کے بغیر۔ ایپ کو read_content اسکوپ بھی چاہیے۔',
+  'files.blogsChecked':
+    'شامل کرنے کو بلاگز: {blogs}۔ شامل کرنے کو مضامین: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
+  'files.blogsImported': 'شامل بلاگز: {blogs}۔ شامل مضامین: {created}؛ ویسے ہی: {skipped}۔',
+  'files.articleError': '{handle}: {message}',
   'files.checkStore': 'اسٹور جانچیں',
   'files.storeChecked':
     'آپ کے شاپیفائی اسٹور میں: شامل کرنے کو پروڈکٹس: {created}؛ اپ ڈیٹ کرنے کو: {updated}؛ ویسے ہی چھوڑنے کو: {skipped}۔ بنانے کو اقسام: {variants}۔',

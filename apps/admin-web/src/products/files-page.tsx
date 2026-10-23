@@ -9,6 +9,7 @@ import {
   ProductsExportQuery,
   ProductsImportFromShopifyMutation,
   PagesImportFromShopifyMutation,
+  BlogsImportFromShopifyMutation,
   ProductsImportMutation,
   UrlRedirectsImportFromShopifyMutation,
 } from '../api/operations';
@@ -23,6 +24,8 @@ import type {
   ProductsImportFromShopifyData,
   PagesImportFromShopifyData,
   PagesImportFromShopifyResult,
+  BlogsImportFromShopifyData,
+  BlogsImportFromShopifyResult,
   ProductsImportResult,
   UrlRedirectsImportFromShopifyData,
   UrlRedirectsImportResult,
@@ -39,7 +42,7 @@ import { Alert, EmptyState } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 import { EDITS_MENUS } from '../online-store/menus';
-import { WRITES_PAGES } from '../online-store/pages';
+import { WRITES_BLOGS, WRITES_PAGES } from '../online-store/pages';
 import { EDITS_PRODUCTS } from './status';
 
 /** A file the browser saves, as an export does. */
@@ -106,6 +109,8 @@ function ImportFromStore() {
   const editsRedirects = permits(shop, EDITS_MENUS);
   // And its pages theirs who write them (ADR-752).
   const writesPages = permits(shop, WRITES_PAGES);
+  // And its blogs theirs who write those (ADR-753).
+  const writesBlogs = permits(shop, WRITES_BLOGS);
   type Store = { store: string; accessToken?: string; clientId?: string; clientSecret?: string };
   const run = useAdminMutation<
     ProductsImportFromShopifyData,
@@ -118,6 +123,9 @@ function ImportFromStore() {
   const movePages = useAdminMutation<PagesImportFromShopifyData, Store & { dryRun: boolean }>(
     PagesImportFromShopifyMutation,
   );
+  const moveBlogs = useAdminMutation<BlogsImportFromShopifyData, Store & { dryRun: boolean }>(
+    BlogsImportFromShopifyMutation,
+  );
   const { problem, attempt } = useAttempt();
   const [store, setStore] = useState('');
   const [access, setAccess] = useState<StoreAccess>('CLIENT');
@@ -127,27 +135,31 @@ function ImportFromStore() {
   const [overwrite, setOverwrite] = useState(false);
   const [withRedirects, setWithRedirects] = useState(editsRedirects);
   const [withPages, setWithPages] = useState(writesPages);
+  const [withBlogs, setWithBlogs] = useState(writesBlogs);
   const [checked, setChecked] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
     pages: PagesImportFromShopifyResult | null;
+    blogs: BlogsImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
     pages: PagesImportFromShopifyResult | null;
+    blogs: BlogsImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
     store,
     ...(access === 'TOKEN' ? { accessToken: token } : { clientId, clientSecret }),
   });
-  /** The products, then the redirects where asked for: null where either was refused. */
+  /** The products, then the redirects, pages and blogs where asked for: null where any is refused. */
   const send = async (dryRun: boolean) => {
     const answer: {
       products?: ProductsImportResult;
       redirects?: UrlRedirectsImportResult;
       pages?: PagesImportFromShopifyResult;
+      blogs?: BlogsImportFromShopifyResult;
     } = {};
     const ok = await attempt(async () => {
       answer.products = (
@@ -172,10 +184,18 @@ function ImportFromStore() {
       });
       if (!moved) return null;
     }
+    if (withBlogs && writesBlogs) {
+      const moved = await attempt(async () => {
+        answer.blogs = (await moveBlogs.mutateAsync({ ...given(), dryRun })).blogsImportFromShopify;
+        return answer.blogs;
+      });
+      if (!moved) return null;
+    }
     return {
       products: answer.products!,
       redirects: answer.redirects ?? null,
       pages: answer.pages ?? null,
+      blogs: answer.blogs ?? null,
     };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
@@ -190,7 +210,8 @@ function ImportFromStore() {
     (access === 'TOKEN'
       ? token.trim() !== ''
       : clientId.trim() !== '' && clientSecret.trim() !== '');
-  const busy = run.isPending || moveRedirects.isPending || movePages.isPending;
+  const busy =
+    run.isPending || moveRedirects.isPending || movePages.isPending || moveBlogs.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -261,6 +282,14 @@ function ImportFromStore() {
           onChange={changed(setWithPages)}
         />
       )}
+      {writesBlogs && (
+        <CheckField
+          label={t('files.storeBlogs')}
+          hint={t('files.storeBlogsHint')}
+          checked={withBlogs}
+          onChange={changed(setWithBlogs)}
+        />
+      )}
       <Button
         variant="secondary"
         className="self-start"
@@ -307,10 +336,24 @@ function ImportFromStore() {
               <PageErrors result={checked.pages} />
             </>
           )}
+          {checked.blogs && (
+            <>
+              <p>
+                {t('files.blogsChecked', {
+                  blogs: formatCount(checked.blogs.blogsCreated),
+                  created: formatCount(checked.blogs.created),
+                  skipped: formatCount(checked.blogs.skipped),
+                })}
+              </p>
+              <ArticleErrors result={checked.blogs} />
+            </>
+          )}
           {checked.products.created +
             checked.products.updated +
             (checked.redirects?.created ?? 0) +
-            (checked.pages?.created ?? 0) >
+            (checked.pages?.created ?? 0) +
+            (checked.blogs?.blogsCreated ?? 0) +
+            (checked.blogs?.created ?? 0) >
             0 && (
             <Button
               className="self-start"
@@ -360,11 +403,39 @@ function ImportFromStore() {
                 })}
               </span>
             )}
+            {done.blogs && (
+              <span>
+                {t('files.blogsImported', {
+                  blogs: formatCount(done.blogs.blogsCreated),
+                  created: formatCount(done.blogs.created),
+                  skipped: formatCount(done.blogs.skipped),
+                })}
+              </span>
+            )}
           </span>
         </Alert>
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
+  );
+}
+
+/** A store's articles, or whole blogs, the shop could not take, each by its blog's handle. */
+function ArticleErrors({ result }: { result: BlogsImportFromShopifyResult }) {
+  const { t } = useLocale();
+  if (result.articleErrors.length === 0) return null;
+  return (
+    <Alert tone="warning">
+      <span className="flex flex-col gap-1">
+        <span>{t('moving.rowErrors', { count: result.articleErrors.length })}</span>
+        {result.articleErrors.slice(0, 5).map((error) => {
+          const handle = error.article ? `${error.blog}/${error.article}` : error.blog;
+          return (
+            <span key={handle}>{t('files.articleError', { handle, message: error.message })}</span>
+          );
+        })}
+      </span>
+    </Alert>
   );
 }
 

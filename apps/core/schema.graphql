@@ -1166,6 +1166,29 @@ type BlogUpdatePayload {
   userErrors: [UserError!]!
 }
 
+type BlogsImportFromShopifyPayload {
+  articleErrors: [StoreArticleImportError!]!
+
+  """Articles the store has."""
+  articles: Int!
+
+  """Blogs the store has."""
+  blogs: Int!
+
+  """Blogs made, or that would be in a dry run."""
+  blogsCreated: Int!
+
+  """Articles made, or that would be in a dry run."""
+  created: Int!
+  dryRun: Boolean!
+
+  """
+  Articles left as they are: their blog has an article with their handles already.
+  """
+  skipped: Int!
+  userErrors: [UserError!]!
+}
+
 """
 A broadcast (MKT-01, ADR-421): one of the shop's approved templates to the customers of a segment who agreed to hear from it on WhatsApp, from its own number; or its own words by SMS to those who agreed to hear by SMS, from Hatti's shared sender (MKT-02, ADR-458).
 """
@@ -8121,6 +8144,21 @@ type Mutation {
   Changes the fields of a blog that are given; the others stay as they are.
   """
   blogUpdate(blog: BlogUpdateInput!, id: ID!): BlogUpdatePayload!
+
+  """
+  Imports a Shopify store's blogs and their articles through its Admin API (ONB-05, ADR-753), each keeping its handle and so its address at /blogs/{blog}/{article}: a blog's title and comment policy; an article's title, body, summary, author, tags, and whether it is shown and since when. A blog the shop has by handle takes the articles; articles whose handles their blog has are left as they are. Give the store and its app as productsImportFromShopify takes them; the app needs the read_content access scope. Articles' images are not brought. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  blogsImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): BlogsImportFromShopifyPayload!
 
   """
   Cancels a broadcast not yet sent: one being queued stops, and its messages not yet sent are not.
@@ -16458,6 +16496,16 @@ enum Stitching {
   SEMI_STITCHED
   STITCHED
   UNSTITCHED
+}
+
+"""A store's blog or article that did not go in, and why."""
+type StoreArticleImportError {
+  """The article's handle at the store; null for the blog itself."""
+  article: String
+
+  """The blog's handle at the store."""
+  blog: String!
+  message: String!
 }
 
 input StoreBuildInput {

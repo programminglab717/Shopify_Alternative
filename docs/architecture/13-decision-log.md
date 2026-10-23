@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-752 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-753 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -760,6 +760,7 @@
 | 750 | The admin's import page takes products straight from the owner's Shopify store: its address and their app's client ID and secret or token, checked first, each problem by its product's handle, the credentials held by the page alone and cleared once imported | Accepted |
 | 751 | A Shopify store's URL redirects come through its Admin API too, written as Shopify's redirects export for the redirect import, each problem by its path, and the admin's store card brings them with the products | Accepted |
 | 752 | A Shopify store's own pages come through its Admin API, each made as pageCreate makes one at its handle, shown as and since the store showed it, and the admin's store card brings them too | Accepted |
+| 753 | A Shopify store's blogs and their articles come through its Admin API, each at its handle, a blog the shop has taking the articles, and the admin's store card brings them too | Accepted |
 
 ---
 
@@ -25519,3 +25520,23 @@
   * **The admin's store card** brings the pages too, on by default for those who write pages.
 * **Consequences:** a shop moving from Shopify brings its products, redirects and pages in one
   step. Blogs and articles, collections, customers, orders and discount codes are still to come.
+
+## ADR-753 · A Shopify store's blogs and their articles come through its Admin API, each at its handle, a blog the shop has taking the articles, and the admin's store card brings them too
+
+* **Context:** a shop moving from Shopify keeps its blog for what search engines know of it (08
+  §5); Shopify's exports have no file of blogs, so each article was copied by hand.
+* **Decision:**
+  * **`readStoreBlogs`** in `@hatti/shopify-admin` asks the store first, then every blog and its
+    articles in one bulk query: a blog's handle, title, comment policy and template; an
+    article's handle, title, body, summary, author's name, tags, whether and since when it is
+    shown, and its template. The app needs the read_content scope, which Shopify's refusal is
+    said as.
+  * **`blogsImportFromShopify`** makes each blog the shop has no handle for, its comment policy
+    as Shopify's (closed, moderated or published at once); a blog the shop has by handle takes
+    the articles. Each article its blog has no handle for is made as `articleCreate` makes one,
+    so its body is cleaned and its address stays /blogs/{blog}/{article}; one Shopify shows
+    is shown since when Shopify showed it. A blog or article that fails is named by its handles.
+    Its dry run counts. Articles' images are not brought yet.
+  * **The admin's store card** brings the blogs too, on by default for those who write blogs.
+* **Consequences:** products, redirects, pages and blogs come from a Shopify store in one step.
+  Collections, customers, orders, discount codes and articles' images are still to come.
