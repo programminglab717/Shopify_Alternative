@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A reseller's own prices on cards
+### 482099d · A reseller's own prices on cards
 
 * **Across the store:** a reseller signed in sees their own price on Hatti Base's collection,
   search and other cards, every card's variants asked for together (CUS-06, [ADR-782](../architecture/13-decision-log.md#adr-782--a-signed-in-resellers-own-prices-on-hatti-bases-cards-every-cards-variants-asked-for-together)).
