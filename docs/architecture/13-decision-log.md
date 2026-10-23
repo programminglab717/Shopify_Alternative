@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-783 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-784 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -791,6 +791,7 @@
 | 781 | A signed-in reseller's own price on Hatti Base's product page, asked for once the cached page loads | Accepted |
 | 782 | A signed-in reseller's own prices on Hatti Base's cards, every card's variants asked for together | Accepted |
 | 783 | A Shopify store's articles' images are fetched from its CDN and kept as the shop's files | Accepted |
+| 784 | A Shopify store's customers' addresses fill their address books, only where a book is empty | Accepted |
 
 ---
 
@@ -26187,3 +26188,23 @@
   re-encoded. A slow CDN slows the import, one image at a time; a store with thousands of
   articles may take minutes. Collections have no image of their own yet, so theirs are not
   brought.
+
+## ADR-784 · A Shopify store's customers' addresses fill their address books, only where a book is empty
+
+* **Context:** moving a Shopify store's customers (ADR-755) brought their names, emails,
+  numbers, notes, tags and consent, but not the addresses they deliver to. Hatti keeps those in
+  each customer's address book (ADR-583), which their account and staff see, and checkout fills
+  from.
+* **Decision:** the customers' bulk query reads each customer's `addressesV2`, which Shopify
+  writes on lines of their own, and its default address's ID, so the default stays the
+  default. After the customers are made, and not in a dry run, the checkout module's
+  `AccountService.bringAddresses` finds each customer by their mobile number and, only where
+  their book is empty, saves their addresses in Pakistan through the same checks a shopper's
+  own are saved with (ADR-583), at most twenty. An address with no name or no mobile number
+  of its own takes the customer's; one in another country is left out. Each address that cannot
+  be kept is said in `addressErrors` by the customer's name, and `addresses` counts those kept.
+* **Consequences:** a returning customer finds their addresses at checkout and in their account
+  on the first day. A book with addresses is never touched, so bringing the store again adds
+  none, and a customer already here whose book is empty gets theirs. Shopify's province names
+  are read as checkout reads typed ones; an address whose province or postcode Hatti cannot
+  read is not kept, rather than kept wrong.
