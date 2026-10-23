@@ -864,3 +864,41 @@ export const savedSearches = ordersSchema.table(
 );
 
 export type SavedSearchRow = typeof savedSearches.$inferSelect;
+
+/** People who send a shop customers by a link or code of their own (MKT-08, ADR-776). */
+export const affiliates = ordersSchema.table(
+  'affiliates',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    name: text('name').notNull(),
+    phone: text('phone'),
+    /** What their link carries after ?ref=. */
+    ref: text('ref').notNull(),
+    /** One of the shop's discount codes, upper case; null for a link alone. */
+    discountCode: text('discount_code'),
+    /** Their share, in hundredths of a percent. */
+    commissionBps: integer('commission_bps').notNull(),
+    /** When the shop ended their part; orders placed after it earn them nothing. */
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type AffiliateRow = typeof affiliates.$inferSelect;
+
+/** What a shop paid an affiliate (ADR-776). */
+export const affiliatePayouts = ordersSchema.table(
+  'affiliate_payouts',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    affiliateId: uuid('affiliate_id').notNull(),
+    amount: bigint('amount', { mode: 'bigint' }).notNull(),
+    note: text('note').notNull().default(''),
+    paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);

@@ -64,6 +64,9 @@ export const OrderEvents = {
   SavedSearchUpdated: 'saved_search.updated',
   SavedSearchDeleted: 'saved_search.deleted',
   BankTransferSettingsUpdated: 'bank_transfer_settings.updated',
+  AffiliateCreated: 'affiliate.created',
+  AffiliateUpdated: 'affiliate.updated',
+  AffiliatePaid: 'affiliate.paid',
   /**
    * An order placed while the shop's plan limits its orders a month brought them to where the
    * shop is told (ADR-263): near the limit, or at it.
@@ -351,3 +354,13 @@ export interface SavedSearchUpdatedPayload {
 }
 
 export type SavedSearchDeletedPayload = Record<string, never>;
+
+/** An affiliate was added or changed (MKT-08, ADR-776): what changed, by name. */
+export interface AffiliateChangedPayload {
+  changed: string[];
+}
+
+/** The shop recorded paying an affiliate (ADR-776), in minor units. */
+export interface AffiliatePaidPayload {
+  amount: string;
+}

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-775 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-776 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -783,6 +783,7 @@
 | 773 | A shop's delivery slots leave out the days of the week it does not deliver on | Accepted |
 | 774 | Customers are put in cohorts by the month of their first order, and counted again in each month they come back | Accepted |
 | 775 | Analytics shows a cohort table: each month's new customers, and the share who ordered again each month after | Accepted |
+| 776 | Affiliates: people who bring a shop customers by a link or code of their own, earning a share of the orders once delivered | Accepted |
 
 ---
 
@@ -26006,3 +26007,34 @@
   page's own `read_orders`; before any customer it says nothing has come yet.
 * **Consequences:** an owner sees whether an Eid month's customers came back, without
   exporting orders. Cohorts by where customers came from, and RFM, can follow on the same table.
+
+## ADR-776 · Affiliates: people who bring a shop customers by a link or code of their own, earning a share of the orders once delivered
+
+* **Context:** Pakistani shops sell through Instagram and TikTok creators, and pay them a share
+  of what they bring; today they count it by hand from screenshots of codes (MKT-08). The shop
+  needs to know which orders each creator brought, what is owed once those orders are delivered
+  (COD orders that come back earn nothing), and what it has paid.
+* **Decision:** orders keeps `orders.affiliates` (migration 0332): a name, a mobile number, a
+  `ref` (2 to 40 letters, digits and hyphens, lower case, unique in the shop), an optional
+  discount code (upper case, unique in the shop), a share in hundredths of a percent (up to
+  50%), and when their part ended. `orders.affiliate_payouts` keeps what the shop paid them.
+  Which orders are an affiliate's is worked out when asked, nothing stored on the order: an
+  order placed with their code is theirs, in any letter case, whatever brought the customer;
+  otherwise one whose last visit began at a page with `?ref=` and their ref, or else whose first
+  visit did (ORD-13's attribution keeps the landing page with its query). Only orders placed
+  between their adding and the end of their part count, and cancelled orders never. An order's
+  base is what its items came to after discounts and refunds, and its commission their share,
+  rounded down. Delivered and completed orders earn; those still on their way are pending;
+  returned and lost ones earn nothing. Owed is earned less paid, and goes below zero where the
+  shop paid ahead. The Admin API has `affiliates` (each with its figures), `affiliateOrders`
+  (the latest 50, needing `read_orders` too), `affiliatePayouts`, `affiliateCreate`,
+  `affiliateUpdate` (`active: false` ends their part from now) and `affiliatePayoutRecord`,
+  under marketing's scopes; changes are `affiliate.created`, `affiliate.updated` and
+  `affiliate.paid` events. A shop keeps up to 500 affiliates.
+* **Consequences:** a creator's link and code work at once, with nothing for the storefront or
+  checkout to change, and the figures follow orders as they are delivered, returned or refunded.
+  A changed share counts for all the affiliate's orders, those before it too; the shop records
+  what it paid, so what is owed stays right for the new share. The code is not checked against
+  the shop's discount codes, which pricing keeps: the admin offers the shop's codes to choose
+  from. Paying affiliates through Hatti, and a page of their own for creators to see their
+  figures, are left for later.

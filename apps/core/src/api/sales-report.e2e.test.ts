@@ -51,7 +51,7 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
   let api: TestApi;
   let app: NestFastifyApplication;
   const shop = newId();
-  const tokens = { owner: '', products: '' };
+  const tokens = { owner: '', products: '', marketing: '' };
   // From one reading of the clock, so the period is two hours to the millisecond.
   const now = Date.now();
   const period = {
@@ -85,6 +85,7 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     await admin.connect();
     await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
     tokens.owner = await issueToken(['write_products', 'write_orders']);
+    tokens.marketing = await issueToken(['write_marketing_events', 'read_orders']);
     tokens.products = await issueToken(['write_products']);
     api = await startTestApi(testDb);
     app = api.app;
@@ -346,6 +347,87 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     const tooMany = await gql(tokens.owner, COHORTS, { months: 25 });
     expect(tooMany.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
     const denied = await gql(tokens.products, COHORTS, {});
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
+  it('keeps affiliates, what they earn and what the shop paid them (MKT-08, ADR-776)', async () => {
+    const created = await gql(
+      tokens.marketing,
+      `mutation ($input: AffiliateCreateInput!) {
+        affiliateCreate(input: $input) {
+          affiliate { id name phone ref discountCode commission active stats { orders } }
+          userErrors { field code }
+        }
+      }`,
+      {
+        input: {
+          name: 'Ayesha',
+          phone: '0300 1234567',
+          ref: 'Ayesha',
+          discountCode: 'ayesha10',
+          commission: '7.50',
+        },
+      },
+    );
+    const affiliate = created.data?.affiliateCreate.affiliate;
+    expect(affiliate).toMatchObject({
+      name: 'Ayesha',
+      phone: '+923001234567',
+      ref: 'ayesha',
+      discountCode: 'AYESHA10',
+      commission: '7.5',
+      active: true,
+      stats: { orders: 0 },
+    });
+    expect(affiliate.id).toMatch(/^afl_/);
+
+    const paid = await gql(
+      tokens.marketing,
+      `mutation ($input: AffiliatePayoutRecordInput!) {
+        affiliatePayoutRecord(input: $input) {
+          payout { id amount { amount } note }
+          userErrors { field code }
+        }
+      }`,
+      { input: { affiliateId: affiliate.id, amount: '1000', note: 'Advance' } },
+    );
+    expect(paid.data?.affiliatePayoutRecord).toMatchObject({
+      payout: { amount: { amount: '1000.00' }, note: 'Advance' },
+      userErrors: [],
+    });
+    const ended = await gql(
+      tokens.marketing,
+      `mutation ($input: AffiliateUpdateInput!) {
+        affiliateUpdate(input: $input) { affiliate { active endedAt } userErrors { code } }
+      }`,
+      { input: { id: affiliate.id, active: false } },
+    );
+    expect(ended.data?.affiliateUpdate.affiliate.active).toBe(false);
+
+    const listed = await gql(
+      tokens.marketing,
+      `query ($id: ID!) {
+        affiliates { ref stats { earned { amount } paid { amount } owed { amount } } }
+        affiliateOrders(id: $id) { orderId }
+        affiliatePayouts(id: $id) { note }
+      }`,
+      { id: affiliate.id },
+    );
+    expect(listed.data).toEqual({
+      affiliates: [
+        {
+          ref: 'ayesha',
+          stats: {
+            earned: { amount: '0.00' },
+            paid: { amount: '1000.00' },
+            owed: { amount: '-1000.00' },
+          },
+        },
+      ],
+      affiliateOrders: [],
+      affiliatePayouts: [{ note: 'Advance' }],
+    });
+    const denied = await gql(tokens.products, '{ affiliates { id } }', {});
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 });

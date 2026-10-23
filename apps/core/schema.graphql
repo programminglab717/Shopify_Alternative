@@ -166,6 +166,162 @@ enum AdSpendSource {
 }
 
 """
+Someone who sends the shop customers by a link of their own, the storefront with ?ref=, or one of its discount codes, and earns a share of the orders they bring (MKT-08, ADR-776).
+"""
+type Affiliate {
+  """False once the shop ended their part."""
+  active: Boolean!
+
+  """Their share of what an order's items came to, in percent: "7.5"."""
+  commission: String!
+
+  """Orders placed before it are not theirs."""
+  createdAt: DateTime!
+
+  """One of the shop's discount codes, upper case; null for a link alone."""
+  discountCode: String
+
+  """
+  When the shop ended their part: orders placed after it earn them nothing.
+  """
+  endedAt: DateTime
+  id: ID!
+  name: String!
+
+  """Their mobile number, in E.164."""
+  phone: String
+
+  """What their link carries after ?ref=."""
+  ref: String!
+  stats: AffiliateStats!
+}
+
+input AffiliateCreateInput {
+  """
+  Their share of what an order's items came to, in percent, to two places: "10".
+  """
+  commission: String!
+
+  """
+  One of the shop's discount codes: orders placed with it are theirs, whatever brought the customer. Unique among the shop's affiliates.
+  """
+  discountCode: String
+
+  """Up to 100 characters."""
+  name: String!
+
+  """A Pakistani mobile number."""
+  phone: String
+
+  """
+  What their link carries after ?ref=: 2 to 40 letters, digits and hyphens, kept in lower case, unique among the shop's affiliates.
+  """
+  ref: String!
+}
+
+type AffiliateCreatePayload {
+  affiliate: Affiliate
+  userErrors: [UserError!]!
+}
+
+"""One of an affiliate's orders, with what it earns them."""
+type AffiliateOrder {
+  """What its items came to, after discounts and refunds."""
+  base: Money!
+
+  """Their share of it: earned once delivered, nothing if it comes back."""
+  commission: Money!
+
+  """As the shop names its orders: "#1001"."""
+  name: String!
+  orderId: ID!
+  placedAt: DateTime!
+  source: AffiliateOrderSource!
+
+  """The order's stage, as `Order.stage` gives it, in lower case."""
+  stage: String!
+}
+
+"""By the affiliate's discount code, or by their link."""
+enum AffiliateOrderSource {
+  CODE
+  LINK
+}
+
+"""What the shop recorded paying an affiliate."""
+type AffiliatePayout {
+  amount: Money!
+  id: ID!
+  note: String!
+  paidAt: DateTime!
+}
+
+input AffiliatePayoutRecordInput {
+  affiliateId: ID!
+
+  """What was paid, as the shop writes it: "2500"."""
+  amount: String!
+
+  """Up to 200 characters: how it was paid."""
+  note: String
+}
+
+type AffiliatePayoutRecordPayload {
+  payout: AffiliatePayout
+  userErrors: [UserError!]!
+}
+
+"""
+What an affiliate's orders came to (ADR-776), worked out from the orders when asked: they earn their share of an order once it is delivered, and nothing if it comes back.
+"""
+type AffiliateStats {
+  """Of those, the ones delivered."""
+  delivered: Int!
+
+  """Their share of `sales`."""
+  earned: Money!
+
+  """Orders they brought, cancelled ones aside."""
+  orders: Int!
+
+  """What is earned and not paid; below zero where the shop paid ahead."""
+  owed: Money!
+
+  """What the shop recorded paying them."""
+  paid: Money!
+
+  """Their share of the orders still on their way, earned once delivered."""
+  pending: Money!
+
+  """What the delivered orders' items came to, after discounts and refunds."""
+  sales: Money!
+}
+
+input AffiliateUpdateInput {
+  """
+  False ends their part from now: orders placed after it earn them nothing. True takes them back.
+  """
+  active: Boolean
+
+  """A new share counts for all their orders, those before it too."""
+  commission: String
+
+  """Blank takes it off."""
+  discountCode: String
+  id: ID!
+  name: String
+
+  """Blank takes it off."""
+  phone: String
+  ref: String
+}
+
+type AffiliateUpdatePayload {
+  affiliate: Affiliate
+  userErrors: [UserError!]!
+}
+
+"""
 An article of one of the shop's blogs, which its storefront shows at /blogs/{blog}/{handle} once published.
 """
 type Article {
@@ -8294,6 +8450,21 @@ type Mutation {
   adSpendSet(entries: [AdSpendInput!]!): AdSpendSetPayload!
 
   """
+  Adds an affiliate: their link is the storefront with ?ref= and their `ref`, and orders placed with their discount code are theirs too. Only orders placed from now count.
+  """
+  affiliateCreate(input: AffiliateCreateInput!): AffiliateCreatePayload!
+
+  """
+  Records that the shop paid an affiliate, as it did it: what is owed them goes down by it.
+  """
+  affiliatePayoutRecord(input: AffiliatePayoutRecordInput!): AffiliatePayoutRecordPayload!
+
+  """
+  Changes an affiliate, or ends their part: orders placed after it earn them nothing. Their figures are left to `affiliates`.
+  """
+  affiliateUpdate(input: AffiliateUpdateInput!): AffiliateUpdatePayload!
+
+  """
   A new article, which the storefront shows a moment later unless it is not published. Its body and summary are cleaned of anything that could run.
   """
   articleCreate(article: ArticleCreateInput!): ArticleCreatePayload!
@@ -13891,6 +14062,21 @@ type Query {
     """The last day, as 2026-10-31."""
     to: String!
   ): [AdSpendEntry!]!
+
+  """
+  An affiliate's latest 50 orders, cancelled ones aside, with what each earns them.
+  """
+  affiliateOrders(id: ID!): [AffiliateOrder!]!
+
+  """
+  What the shop recorded paying an affiliate: the latest 50, the latest first.
+  """
+  affiliatePayouts(id: ID!): [AffiliatePayout!]!
+
+  """
+  The shop's affiliates, the latest added first, each with what their orders came to, worked out from the orders when asked.
+  """
+  affiliates: [Affiliate!]!
   article(id: ID!): Article
 
   """The articles of the shop's blogs, or of one, oldest first."""

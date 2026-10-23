@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Affiliates and influencers
+
+* **Creators' links and codes:** a shop adds the people who bring it customers, each with a
+  link (the storefront with `?ref=`) and a discount code, and a share; orders placed with
+  either are theirs, and earn once delivered (MKT-08, [ADR-776](../architecture/13-decision-log.md#adr-776--affiliates-people-who-bring-a-shop-customers-by-a-link-or-code-of-their-own-earning-a-share-of-the-orders-once-delivered)).
+* **What is owed:** each affiliate's orders, sales, earned, pending, paid and owed, worked out
+  from the orders; the shop records what it paid them.
+* 4191 tests (3 new).
+
 ### e732766 · Customers who came back, on Analytics
 
 * **Retention table:** Analytics shows each month's new customers and the share who ordered

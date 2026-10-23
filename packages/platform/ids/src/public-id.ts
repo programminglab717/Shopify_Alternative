@@ -132,6 +132,9 @@ export const ID_PREFIXES = {
   searchRule: 'srch',
   // What a shop's staff answer customers with in a tap (ADR-758).
   savedReply: 'srep',
+  // Who sends a shop customers by a link or code of their own, and what they were paid (ADR-776).
+  affiliate: 'afl',
+  affiliatePayout: 'aflp',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
