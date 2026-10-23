@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The outbox kept to a week
+
+* **Nothing deleted outbox events,** so the table grew with every change any shop made. The
+  worker now deletes events published more than seven days ago, a batch at a time ([ADR-746](../architecture/13-decision-log.md#adr-746--outbox-events-published-more-than-seven-days-ago-are-deleted-by-the-worker-a-batch-at-a-time-the-oldest-first-those-not-yet-published-or-parked-are-kept)).
+* **Kept:** events not yet published and those parked after failing, for someone to look at.
+* 4075 tests (3 new).
+
 ### bcdf815 · The admin's errors to GlitchTip, through the core
 
 * **What fails in the admin's browser is reported to the core** at `/admin/errors`, which logs it

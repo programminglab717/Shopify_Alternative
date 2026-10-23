@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-745 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-746 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -753,6 +753,7 @@
 | 743 | Errors the core logs go to a self-hosted GlitchTip, the open-source error tracker, in the protocol Sentry's SDKs speak, sent by Hatti's logger itself after redaction; no paid service | Accepted |
 | 744 | The storefront's errors go to the error tracker too: each answer that failed with a 5xx logged at error by Fastify's log controller, by its route and the first part of its path, never its address; requests themselves not logged | Accepted |
 | 745 | The admin's browser errors are reported to the core at /admin/errors, which logs them as the admin's for the error tracker after its redaction: no DSN in the browser, a limit for each browser and for all, numbers and emails taken out, IDs out of the page's path | Accepted |
+| 746 | Outbox events published more than seven days ago are deleted by the worker, a batch at a time, the oldest first; those not yet published or parked are kept | Accepted |
 
 ---
 
@@ -25357,3 +25358,24 @@
   tagged `admin-web`, with the browser and the page. Their stacks name the built, minified files
   until the build's source maps are given to GlitchTip (its sourcemap upload, open source too),
   which is left for when it is hosted; `VITE_RELEASE` names the build so that they can be matched.
+
+## ADR-746 · Outbox events published more than seven days ago are deleted by the worker, a batch at a time, the oldest first; those not yet published or parked are kept
+
+* **Context:** every change a shop makes writes an event to `platform.outbox_events`, which the
+  relay publishes and marks; nothing ever deleted one, so the outbox grew with every order, stock
+  change and message, without end, and with it the table's indexes, its backups and the relay's
+  scans. The data plan (03 §6.5) keeps the outbox seven days, by daily partitions; the outbox is
+  not partitioned, as the messages' tables are not (ADR-738).
+* **Decision:**
+  * **Seven days after it was published**, an event is deleted by the worker, where the relay
+    runs, at each sweep (`SWEEP_INTERVAL_MS`): a batch of 5,000 at a time, the oldest first,
+    until a batch comes back short, so each delete is a short statement that never holds the
+    outbox long; a batch another sweep holds is passed over.
+  * **What is kept:** an event not yet published, however old, and one parked after its attempts,
+    which waits for someone to look at it. Nothing else reads an event after it is published: its
+    consumers have it from the queue, and the activity and audit logs keep their own rows.
+  * **An index of the published** (`published_at`, where published) finds the events past their
+    days without reading the whole outbox.
+* **Consequences:** the outbox stays about a week of events. A week is left for looking into what
+  was published lately. When the outbox is partitioned by day (03 §6.5), a partition's events go
+  by dropping it and this sweep goes.

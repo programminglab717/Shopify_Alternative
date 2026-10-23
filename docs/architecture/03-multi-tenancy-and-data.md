@@ -389,7 +389,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 
 | Table | Strategy | Retention (hot) |
 |---|---|---|
-| `outbox_events` | Daily range partitions | 7 days |
+| `outbox_events` | Daily range partitions | 7 days. Built, unpartitioned: the worker deletes events published more than seven days ago, keeping those waiting or parked ([ADR-746](./13-decision-log.md#adr-746--outbox-events-published-more-than-seven-days-ago-are-deleted-by-the-worker-a-batch-at-a-time-the-oldest-first-those-not-yet-published-or-parked-are-kept)) |
 | `tracking_events` | Monthly range partitions | 18 months, then archived to R2 as Parquet |
 | `messages`, `conversation_messages` | Monthly range partitions | 12 months of content; metadata kept longer. Built, unpartitioned: the worker's sweep clears messages' content and deletes conversation and contact messages past 12 months ([ADR-738](./13-decision-log.md#adr-738--what-messages-said-is-kept-twelve-months-the-worker-then-clears-a-message-to-a-customers-variables-and-error-keeping-that-it-was-sent-and-deletes-what-customers-wrote-in-the-inbox-and-through-the-contact-form-with-conversations-left-empty)) |
 | `audit_log` | Monthly range partitions | 24 months hot, then archive |

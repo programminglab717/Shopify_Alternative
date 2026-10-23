@@ -128,6 +128,7 @@ import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
 import { MessageContentRetention } from './message-retention.js';
+import { OutboxRetention } from './outbox-retention.js';
 import { ClosedShopPurges } from './closed-shop-purges.js';
 import { ClosedShopData } from '../closed-shops.js';
 import { AccountDataFiles } from './account-data-files.js';
@@ -358,6 +359,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     });
     relay.start();
     closers.push(() => relay.stop());
+    // Events published more than seven days ago deleted, so the outbox stays a week (ADR-746).
+    const outboxRetention = new OutboxRetention(database.systemDb, logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => outboxRetention.stop());
   }
 
   if (config.WORKER_ROLES.includes('events')) {
