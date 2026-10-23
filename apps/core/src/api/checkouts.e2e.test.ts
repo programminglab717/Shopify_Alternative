@@ -599,11 +599,14 @@ describe.skipIf(!server)('Checkouts', () => {
       orders(first: 1) {
         nodes {
           deliveryExpectedOn
+          deliverySlot { startsAt endsAt }
           agreement { agreedAt ip userAgent policies { id type title body } }
         }
       }
     }`);
     expect(data.orders.nodes[0].deliveryExpectedOn).toBe(addPkWorkingDays(pkDayOf(new Date()), 3));
+    // The shop offers no times of the day to deliver in (ADR-769).
+    expect(data.orders.nodes[0].deliverySlot).toBeNull();
     expect(data.orders.nodes[0].agreement).toEqual({
       agreedAt: expect.any(String),
       ip: '203.0.113.7',

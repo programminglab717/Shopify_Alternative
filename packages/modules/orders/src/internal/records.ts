@@ -361,6 +361,11 @@ export interface OrderRecord {
   giftMessage: string | null;
   /** The day checkout said to expect delivery by (ADR-595), YYYY-MM-DD; null where it said none. */
   deliveryExpectedOn: string | null;
+  /**
+   * The time its customer chose at checkout to have it delivered in (CHK-15, ADR-769); null
+   * where they chose none.
+   */
+  deliverySlot: DeliverySlotValue | null;
   tags: string[];
   cancelReason: CancelReasonValue | null;
   /** The order it was merged into, cancelled as `merged` (ADR-132), by its ID and number. */
@@ -590,4 +595,10 @@ export interface SavedSearchRecord {
   version: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A time to deliver in, from `startsAt` to `endsAt` (ADR-769). */
+export interface DeliverySlotValue {
+  startsAt: Date;
+  endsAt: Date;
 }

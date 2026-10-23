@@ -72,6 +72,7 @@ import {
   OrderFinancialStatus,
   OrderFulfillmentStatus,
   OrderLineItem,
+  OrderDeliverySlot,
   OrderMergedInto,
   OrderRepeatOf,
   OrderPaymentMethod,
@@ -276,6 +277,12 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     note: record.note,
     giftMessage: record.giftMessage,
     deliveryExpectedOn: record.deliveryExpectedOn,
+    deliverySlot:
+      record.deliverySlot &&
+      Object.assign(new OrderDeliverySlot(), {
+        startsAt: record.deliverySlot.startsAt,
+        endsAt: record.deliverySlot.endsAt,
+      }),
     tags: record.tags,
     cancelReason: record.cancelReason ? upper<OrderCancelReason>(record.cancelReason) : null,
     mergedInto: record.mergedInto

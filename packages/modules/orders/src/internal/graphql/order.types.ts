@@ -1168,6 +1168,19 @@ export class Return {
   locationId!: string;
 }
 
+@ObjectType({
+  description:
+    'The time its customer chose at checkout to have an order delivered in (CHK-15, ADR-769), ' +
+    "of those the shop offers in Pakistan's time.",
+})
+export class OrderDeliverySlot {
+  @Field(() => GraphQLISODateTime)
+  startsAt!: Date;
+
+  @Field(() => GraphQLISODateTime)
+  endsAt!: Date;
+}
+
 @ObjectType({ description: 'The order another was merged into (ADR-132).' })
 export class OrderMergedInto {
   @Field(() => ID)
@@ -1402,6 +1415,14 @@ export class Order {
       'where it said none, as for orders staff take.',
   })
   deliveryExpectedOn!: string | null;
+
+  @Field(() => OrderDeliverySlot, {
+    nullable: true,
+    description:
+      'The time its customer chose at checkout to have it delivered in (CHK-15, ADR-769); null ' +
+      'where they chose none, as where the shop offers no slots.',
+  })
+  deliverySlot!: OrderDeliverySlot | null;
 
   @Field(() => [String])
   tags!: string[];

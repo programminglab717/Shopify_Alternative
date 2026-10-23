@@ -79,6 +79,8 @@ interface OrderJsonRow extends Record<string, unknown> {
   note: string;
   gift_message: string | null;
   delivery_expected_on: string | null;
+  delivery_slot_starts_at: string | null;
+  delivery_slot_ends_at: string | null;
   tags: string[];
   cancel_reason: OrderRecord['cancelReason'];
   merged_into_id: string | null;
@@ -266,6 +268,13 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     note: row.note,
     giftMessage: row.gift_message,
     deliveryExpectedOn: row.delivery_expected_on,
+    deliverySlot:
+      row.delivery_slot_starts_at && row.delivery_slot_ends_at
+        ? {
+            startsAt: new Date(row.delivery_slot_starts_at),
+            endsAt: new Date(row.delivery_slot_ends_at),
+          }
+        : null,
     tags: row.tags,
     cancelReason: row.cancel_reason,
     mergedInto: row.merged_into_id
@@ -453,7 +462,8 @@ export async function loadOrders(
            o.amount_refunded, o.cod_amount, o.advance_due, o.prepay_credit,
            o.prepay_credited_at, o.upsold_at, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.gift_message, o.tags,
-           o.delivery_expected_on::text AS delivery_expected_on, o.cancel_reason,
+           o.delivery_expected_on::text AS delivery_expected_on, o.delivery_slot_starts_at,
+           o.delivery_slot_ends_at, o.cancel_reason,
            o.merged_into_id,
            (SELECT m.number FROM orders.orders m
              WHERE m.shop_id = o.shop_id AND m.id = o.merged_into_id) AS merged_into_number,

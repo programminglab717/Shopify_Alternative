@@ -10547,6 +10547,11 @@ type Order {
   deliveryExpectedOn: String
   deliveryMethod: OrderDeliveryMethod!
 
+  """
+  The time its customer chose at checkout to have it delivered in (CHK-15, ADR-769); null where they chose none, as where the shop offers no slots.
+  """
+  deliverySlot: OrderDeliverySlot
+
   """The discount codes it was placed with, as the shop wrote them."""
   discountCodes: [String!]!
   email: String
@@ -10877,6 +10882,14 @@ enum OrderDeliveryMethod {
 
   """Sent to the address, by a courier or the shop."""
   SHIPPING
+}
+
+"""
+The time its customer chose at checkout to have an order delivered in (CHK-15, ADR-769), of those the shop offers in Pakistan's time.
+"""
+type OrderDeliverySlot {
+  endsAt: DateTime!
+  startsAt: DateTime!
 }
 
 """Packing slips or invoices, as one HTML page to print or save."""

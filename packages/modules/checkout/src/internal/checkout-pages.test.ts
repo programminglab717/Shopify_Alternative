@@ -179,6 +179,7 @@ function openView(
     paymentLink: null,
     pickup: [],
     gift: null,
+    deliverySlots: [],
     ...changes,
   };
 }

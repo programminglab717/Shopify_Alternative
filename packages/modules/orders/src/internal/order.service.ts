@@ -86,6 +86,7 @@ import {
 import { parcelWorth } from './parcel-claims.js';
 import type {
   CustomerOrderStats,
+  DeliverySlotValue,
   OrderAttributionRecord,
   OrderEventRecord,
   OrderHome,
@@ -226,6 +227,8 @@ export interface OrderToPlace {
   giftMessage?: string | null;
   /** The day checkout said to expect delivery by (ADR-595), YYYY-MM-DD; none when left out. */
   deliveryExpectedOn?: string | null;
+  /** The time the shopper chose at checkout to have it delivered in (ADR-769); none when left out. */
+  deliverySlot?: DeliverySlotValue | null;
   tags: string[];
   /**
    * What its customer agreed to, when they place it themselves: through checkout (ADR-057), or by
@@ -810,6 +813,8 @@ export class OrderService {
         note: order.note,
         giftMessage: giftMessageOf(order.giftMessage),
         deliveryExpectedOn: order.deliveryExpectedOn ?? null,
+        deliverySlotStartsAt: order.deliverySlot?.startsAt ?? null,
+        deliverySlotEndsAt: order.deliverySlot?.endsAt ?? null,
         tags: order.tags,
         searchText: searchTextOf(address, email),
         discountCodes: order.discountCodes ?? [],

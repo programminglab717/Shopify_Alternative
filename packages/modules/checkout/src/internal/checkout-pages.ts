@@ -75,6 +75,7 @@ import {
   valueRateCharge,
   type DeliveryDays,
   type DeliverySettingsRecord,
+  type OfferedDeliverySlot,
 } from './delivery.js';
 import type { AddressGap } from './address-quality.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
@@ -100,6 +101,7 @@ const LABELS = {
   giftWrap: { en: 'Gift wrap', ur: 'گفٹ ریپ' },
   addGiftWrap: { en: 'Add gift wrap', ur: 'گفٹ ریپ شامل کریں' },
   giftMessage: { en: 'Gift message', ur: 'تحفے کا پیغام' },
+  deliverySlot: { en: 'Delivery time', ur: 'ڈیلیوری کا وقت' },
   delivery: { en: 'Delivery', ur: 'ڈیلیوری' },
   free: { en: 'Free', ur: 'مفت' },
   byCity: { en: 'By city', ur: 'شہر کے مطابق' },
@@ -457,6 +459,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             view.map,
           )}
           ${mapLinkField(form.mapLink ?? '', errors)} ${giftMessageField(view.gift, form)}
+          ${deliverySlotField(view.deliverySlots, form, problem?.kind === 'delivery_slot')}
           ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
           ${
             view.storeCredit &&
@@ -1855,6 +1858,13 @@ function problemWords(
         en: 'Some of your cart is no longer available. Go back to your cart to change it.',
         ur: 'آپ کے کارٹ کی کچھ چیزیں اب دستیاب نہیں۔ کارٹ پر واپس جا کر تبدیلی کریں۔',
       };
+    case 'delivery_slot':
+      return {
+        en:
+          'Choose a time to have your order delivered: the one you chose may be too soon now. ' +
+          'See below.',
+        ur: 'آرڈر کی ڈیلیوری کا وقت منتخب کریں: آپ کا منتخب کردہ وقت شاید اب بہت قریب ہے۔ نیچے دیکھیں۔',
+      };
     case 'refused':
       return {
         en: "Sorry, the shop can't take orders right now. Please try again later.",
@@ -1934,6 +1944,76 @@ function giftWrapSection(gift: CheckoutGift | null): Html {
       </button>
     </form>
   </section>`;
+}
+
+/**
+ * The time to deliver the order in, where the shop offers times of the day (CHK-15, ADR-769): the
+ * slots on each day it offers, by day; not asked of an order picked up.
+ */
+function deliverySlotField(
+  slots: readonly OfferedDeliverySlot[],
+  form: CheckoutForm,
+  missing: boolean,
+): Html {
+  if (slots.length === 0) return html``;
+  const days = [...new Set(slots.map((slot) => slot.day))];
+  return html`<div class="field">
+    <label class="label" for="delivery_slot">${say('bilingual', LABELS.deliverySlot)}</label>
+    <select
+      id="delivery_slot"
+      name="delivery_slot"
+      aria-describedby="delivery_slot-hint"
+      ${missing && html`aria-invalid="true"`}
+    >
+      <option value="">Choose a time · وقت منتخب کریں</option>
+      ${days.map(
+        (day) =>
+          html`<optgroup label="${slotDayWords(day)}">
+            ${slots
+              .filter((slot) => slot.day === day)
+              .map(
+                (slot) =>
+                  html`<option
+                    value="${slot.key}"
+                    ${slot.key === form.deliverySlot && html`selected`}
+                  >
+                    ${slotTimesOf(slot)}
+                  </option>`,
+              )}
+          </optgroup>`,
+      )}
+    </select>
+    <div id="delivery_slot-hint">
+      ${paragraphs(
+        missing
+          ? {
+              en: 'Choose when to have your order delivered.',
+              ur: 'منتخب کریں کہ آپ کا آرڈر کب ڈیلیور ہو۔',
+            }
+          : {
+              en: 'When the shop delivers your order. Not needed if you pick it up.',
+              ur: 'دکان آپ کا آرڈر کب ڈیلیور کرے۔ خود وصول کرنے پر ضرورت نہیں۔',
+            },
+        missing ? 'error' : 'small muted',
+      )}
+    </div>
+  </div>`;
+}
+
+/** A slot's day, YYYY-MM-DD, as the field groups it: "Saturday 24 October". */
+function slotDayWords(day: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
+/** A slot's times as its key has them, in Pakistan's time: "10:00 – 13:00". */
+function slotTimesOf(slot: OfferedDeliverySlot): string {
+  const [from, until] = slot.key.slice(11).split('-');
+  return `${from} – ${until}`;
 }
 
 /** A message to go with the order as a gift, where the shop asks for one (ADR-413). */

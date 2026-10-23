@@ -318,6 +318,9 @@ export const orders = ordersSchema.table(
     giftMessage: text('gift_message'),
     /** The day checkout said to expect delivery by (ADR-595). */
     deliveryExpectedOn: date('delivery_expected_on'),
+    /** The time its customer chose to have it delivered in, at checkout (CHK-15, ADR-769). */
+    deliverySlotStartsAt: timestamp('delivery_slot_starts_at', { withTimezone: true }),
+    deliverySlotEndsAt: timestamp('delivery_slot_ends_at', { withTimezone: true }),
     tags: text('tags').array().notNull().default([]),
     searchText: text('search_text').notNull().default(''),
     cancelReason: text('cancel_reason', { enum: CANCEL_REASONS }),

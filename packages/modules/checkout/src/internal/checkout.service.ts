@@ -101,6 +101,8 @@ import { codRulesIn } from './cod-rules.service.js';
 import {
   deliveryCountsFrom,
   expectedDeliveryOn,
+  offeredSlots,
+  type OfferedDeliverySlot,
   highestDeliveryCharge,
   type DeliverySettingsRecord,
 } from './delivery.js';
@@ -221,6 +223,11 @@ export interface CheckoutForm {
   /** A message to go with the order as a gift, where the page asks for one (ADR-413). */
   giftMessage?: string;
   /**
+   * The time to deliver it in, by the key of one the page offered (ADR-769), such as
+   * "2026-10-24T10:00-13:00"; blank, or absent, while the page offered none.
+   */
+  deliverySlot?: string;
+  /**
    * The house and street the page asked more of (ADR-682), as it was then: posted again
    * unchanged, the order is placed as it is; blank, or absent, while the page asked nothing.
    */
@@ -306,6 +313,7 @@ export const EMPTY_FORM: CheckoutForm = {
   longitude: '',
   pickup: '',
   giftMessage: '',
+  deliverySlot: '',
 };
 
 /** The checkout's fields a cart permalink may fill in (ADR-709), each with the most it takes. */
@@ -389,6 +397,11 @@ export type CheckoutProblem =
   | { kind: 'vague_address'; gaps: AddressGap[]; hardToFind?: string }
   /** Some of the cart cannot be bought now, as when it sold out. */
   | { kind: 'unavailable' }
+  /**
+   * The shop delivers in times of the day (ADR-769), and the shopper chose none, or one no longer
+   * offered, as one too near now.
+   */
+  | { kind: 'delivery_slot' }
   /** It would collect more cash on delivery than the law allows an order (TAX-07). */
   | { kind: 'cod_limit' }
   /**
@@ -597,6 +610,11 @@ export type CheckoutView =
       heldUntil?: Date;
       /** The tiles of a map to move the address's pin on (ADR-719); absent for none. */
       map?: MapTiles;
+      /**
+       * The times to deliver in the page offers (CHK-15, ADR-769), the soonest first; none where
+       * the shop offers no slots, or none is far enough ahead now.
+       */
+      deliverySlots: OfferedDeliverySlot[];
     }
   | {
       kind: 'placed';
@@ -1116,6 +1134,14 @@ export class CheckoutService {
         ? (view.pickup.find((point) => point.id === form.pickup) ?? null)
         : null;
       if (form.pickup && !pickupAt) return { ...view, problem: { kind: 'changed' } };
+      // The time to deliver it in, of those the page offered (ADR-769): asked for where the shop
+      // offers slots, checked again now, as one may have become too near; none to collect it.
+      const slot = pickupAt
+        ? null
+        : (view.deliverySlots.find((each) => each.key === form.deliverySlot) ?? null);
+      if (!pickupAt && view.deliverySlots.length > 0 && !slot) {
+        return { ...view, problem: { kind: 'delivery_slot' } };
+      }
       const check = new InputChecker();
       const address = checkAddress(check, [], { ...formForPickup(form, pickupAt), zip: null });
       const email = check.email(['email'], form.email)?.toLowerCase() ?? null;
@@ -1343,15 +1369,19 @@ export class CheckoutService {
             note: orderNoteOf(view.cart),
             // A message to go with it as a gift, where the page asked for one (ADR-413).
             giftMessage: view.gift?.messages ? (form.giftMessage ?? null) : null,
-            // The day the page said to expect delivery by (ADR-595); none to collect it.
+            // The day the page said to expect delivery by (ADR-595), the slot's where the shopper
+            // chose one (ADR-769); none to collect it.
             deliveryExpectedOn: pickupAt
               ? null
-              : expectedDeliveryOn(
-                  view.delivery,
-                  address.city,
-                  deliveryCountsFrom(view.delivery, new Date()),
-                  view.cart.items,
-                ),
+              : slot
+                ? slot.day
+                : expectedDeliveryOn(
+                    view.delivery,
+                    address.city,
+                    deliveryCountsFrom(view.delivery, new Date()),
+                    view.cart.items,
+                  ),
+            deliverySlot: slot && { startsAt: slot.startsAt, endsAt: slot.endsAt },
             tags: [],
             agreement: {
               policyVersions: view.shop.policies.map((policy) => policy.versionId),
@@ -1670,6 +1700,7 @@ export class CheckoutService {
       gift: await this.#gift(tx, shopId, cart),
       giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
       countsFrom: deliveryCountsFrom(delivery, new Date()),
+      deliverySlots: offeredSlots(delivery, new Date()),
       ...(checkout.heldUntil &&
         checkout.heldUntil > new Date() && { heldUntil: checkout.heldUntil }),
       ...(this.mapTiles && { map: this.mapTiles }),

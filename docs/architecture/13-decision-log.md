@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-768 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-769 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -776,6 +776,7 @@
 | 766 | A product is put in an answer as its name, price and storefront link, which WhatsApp previews with the product's photo; only products on sale are offered | Accepted |
 | 767 | A payment link still taking orders is put in an answer as its title, what it sells and its address | Accepted |
 | 768 | Delivery time slots are times of the day in Pakistan's time, offered on the days ahead from the hours ahead the shop needs | Accepted |
+| 769 | Checkout asks for a delivery slot where the shop offers one, checks it again when placing, and the order keeps its start and end | Accepted |
 
 ---
 
@@ -25886,3 +25887,22 @@
     `slotDays` and `slotLeadHours`, and the same in `DeliverySettingsUpdateInput`.
 * **Consequences:** a shop without slots sees nothing change. The checkout page asking for one,
   the order keeping it and the pages showing it follow.
+
+## ADR-769 · Checkout asks for a delivery slot where the shop offers one, checks it again when placing, and the order keeps its start and end
+
+* **Context:** ADR-768 keeps the times of the day a shop delivers in; the shopper has to choose
+  one, and the shop has to know which (CHK-15).
+* **Decision:** the open checkout carries `deliverySlots`, the slots offered now (ADR-768), and
+  its page shows a "Delivery time" select of them grouped by day under the address, unless none
+  is offered. The form posts `delivery_slot`, the slot's key.
+  * **Placing:** where slots are offered and the order is not picked up, one of those offered at
+    that moment is required; none, or one no longer offered (too near now, or made up), shows the
+    page again with the `delivery_slot` problem. Picked up, none is asked.
+  * **None offered:** a shop whose slots are all too near or past its days ahead asks nothing,
+    and the order is placed as before, rather than refused.
+  * **The order** (migration 0329) keeps `delivery_slot_starts_at` and `delivery_slot_ends_at`,
+    both or neither, the end after the start; `Order.deliverySlot { startsAt endsAt }` in the
+    Admin API. Its `deliveryExpectedOn` is the slot's day in place of the working-days promise.
+* **Consequences:** shops that deliver themselves get the slot the shopper chose with each
+  order. Showing it on the thank-you and link pages, on packing slips and in the admin, and the
+  admin's settings for it, follow; so do limits on how many orders a slot takes.
