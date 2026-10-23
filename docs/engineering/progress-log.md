@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Collections' images
+### 3529c7d · Collections' images
 
 * **A picture for each collection:** a collection shows one of the shop's images, chosen on its
   admin page, at the top of Hatti Base's collection page and as Liquid's `collection.image` and
