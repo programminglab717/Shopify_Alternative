@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Old sign-ins forgotten
+### 883e5cd · Old sign-ins forgotten
 
 * **Staff's ended sessions and second-step challenges were kept forever,** each with the
   internet address and browser it came from. Sessions now go 90 days after they were last used,
