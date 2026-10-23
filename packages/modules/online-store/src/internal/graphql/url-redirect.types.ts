@@ -139,6 +139,14 @@ export class UrlRedirectImportRowError {
   })
   column!: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The redirect's path, where the import read it from a store: there is no file to look the " +
+      'row up in (ADR-751). Null for a file.',
+  })
+  path?: string | null;
+
   @Field()
   message!: string;
 }

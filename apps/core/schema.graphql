@@ -9631,6 +9631,21 @@ type Mutation {
   ): UrlRedirectsImportPayload!
 
   """
+  Imports a Shopify store's URL redirects through its own Admin API, as urlRedirectsImport imports Shopify's redirects export (ONB-05, ADR-751), so links to the old store's addresses keep working. Give the store and its app as productsImportFromShopify takes them; the app needs the read_online_store_navigation access scope. Paths the shop has a redirect from are left as they are; row errors name each path. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  urlRedirectsImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): UrlRedirectsImportPayload!
+
+  """
   Sends every redirect whose target another redirect sends on straight to where its chain ends, in one hop (ADR-612). A chain that loops is left as it is.
   """
   urlRedirectsStraighten: UrlRedirectsStraightenPayload!
@@ -17785,6 +17800,11 @@ type UrlRedirectImportRowError {
   """The column's heading in the file; null for the row as a whole."""
   column: String
   message: String!
+
+  """
+  The redirect's path, where the import read it from a store: there is no file to look the row up in (ADR-751). Null for a file.
+  """
+  path: String
 
   """Its row in the file, the headings being row 1."""
   row: Int!

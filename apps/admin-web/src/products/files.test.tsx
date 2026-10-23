@@ -75,6 +75,20 @@ function core(role: StaffRole) {
             userErrors: [],
           },
         };
+      case 'UrlRedirectsImportFromShopify':
+        return {
+          urlRedirectsImportFromShopify: {
+            dryRun: variables.dryRun,
+            rows: 3,
+            created: 2,
+            skipped: 0,
+            rowErrorCount: 1,
+            rowErrors: [
+              { row: 4, column: 'Redirect from', path: 'old page', message: 'is not a path' },
+            ],
+            userErrors: [],
+          },
+        };
       case 'ProductsExport':
         return { productsExport: { csv: PRODUCTS, productCount: 1, rowCount: 1 } };
       case 'Locations':
@@ -182,14 +196,21 @@ describe('Products and stock by file', () => {
         'In your Shopify store: products to add: 4; to update: 0; to leave as they are: 0. Variants to make: 9.',
       ),
     ).toBeTruthy();
-    // No file to look a row up in: the product is named by its handle.
+    // No file to look a row up in: the product is named by its handle, a redirect by its path.
     expect(screen.getByText('lawn-suit, Image Src: is not an https address')).toBeTruthy();
+    expect(await screen.findByText('Redirects to add: 2; to leave as they are: 0.')).toBeTruthy();
+    expect(screen.getByText('old page: is not a path')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Import them' }));
     expect(
       await screen.findByText(
         'Imported. Products added: 4; updated: 0; left as they were: 0. Images: 5. Variants given stock: 9.',
       ),
     ).toBeTruthy();
+    expect(screen.getByText('Redirects added: 2; left as they were: 0.')).toBeTruthy();
+    expect(sentOf(fake, 'UrlRedirectsImportFromShopify').map((sent) => sent.dryRun)).toEqual([
+      true,
+      false,
+    ]);
     expect((screen.getByLabelText('Client secret') as HTMLInputElement).value).toBe('');
     const sent = sentOf(fake, 'ProductsImportFromShopify');
     expect(sent.slice(1)).toEqual([
@@ -209,7 +230,8 @@ describe('Products and stock by file', () => {
       },
     ]);
 
-    // Or a custom app's access token.
+    // Or a custom app's access token, the products alone.
+    fireEvent.click(screen.getByLabelText(/Bring its URL redirects too/));
     fireEvent.change(screen.getByLabelText('Your app'), { target: { value: 'TOKEN' } });
     type('Access token', 'shpat_1');
     fireEvent.click(screen.getByRole('button', { name: 'Check the store' }));
@@ -220,6 +242,7 @@ describe('Products and stock by file', () => {
       dryRun: true,
       overwrite: false,
     });
+    expect(sentOf(fake, 'UrlRedirectsImportFromShopify')).toHaveLength(2);
   });
 
   it("checks a WooCommerce export as WooCommerce's when told the file is from it (ADR-482)", async () => {

@@ -169,6 +169,10 @@ export {
   type PolicyVersionRef,
 } from '../internal/policy.service.js';
 export {
+  UrlRedirectImportRowError,
+  UrlRedirectsImportPayload,
+} from '../internal/graphql/url-redirect.types.js';
+export {
   UrlRedirectService,
   redirectMoved,
   shopRedirectsOf,

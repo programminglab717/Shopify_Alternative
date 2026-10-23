@@ -18,3 +18,9 @@ export {
   type StoreVariant,
 } from './products.js';
 export { shopDomainOf } from './shop.js';
+export {
+  REDIRECTS_BULK_QUERY,
+  readStoreRedirects,
+  storeRedirectsCsv,
+  type StoreRedirects,
+} from './redirects.js';

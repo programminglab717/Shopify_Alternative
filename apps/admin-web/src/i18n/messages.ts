@@ -2997,6 +2997,12 @@ const en = {
   'files.storeOverwrite': 'Update the products I already have',
   'files.storeOverwriteHint':
     'Products whose handles you have are updated from the store, their options the same; otherwise they are left as they are.',
+  'files.storeRedirects': 'Bring its URL redirects too',
+  'files.storeRedirectsHint':
+    "So links to your Shopify store's old addresses keep working. The app needs the read_online_store_navigation scope too.",
+  'files.redirectsChecked': 'Redirects to add: {created}; to leave as they are: {skipped}.',
+  'files.redirectsImported': 'Redirects added: {created}; left as they were: {skipped}.',
+  'files.redirectRowError': '{path}: {message}',
   'files.checkStore': 'Check the store',
   'files.storeChecked':
     'In your Shopify store: products to add: {created}; to update: {updated}; to leave as they are: {skipped}. Variants to make: {variants}.',
@@ -8571,6 +8577,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.storeOverwrite': 'جو پروڈکٹس میرے پاس پہلے سے ہیں انہیں اپ ڈیٹ کریں',
   'files.storeOverwriteHint':
     'جن پروڈکٹس کے ہینڈل آپ کے پاس ہیں وہ اسٹور سے اپ ڈیٹ ہوتے ہیں، ان کے آپشنز وہی رہیں؛ ورنہ ویسے ہی چھوڑ دیے جاتے ہیں۔',
+  'files.storeRedirects': 'اس کے URL ری ڈائریکٹس بھی لائیں',
+  'files.storeRedirectsHint':
+    'تاکہ آپ کے شاپیفائی اسٹور کے پرانے ایڈریسز کے لنک چلتے رہیں۔ ایپ کو read_online_store_navigation اسکوپ بھی چاہیے۔',
+  'files.redirectsChecked': 'شامل کرنے کو ری ڈائریکٹس: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
+  'files.redirectsImported': 'شامل ری ڈائریکٹس: {created}؛ ویسے ہی: {skipped}۔',
+  'files.redirectRowError': '{path}: {message}',
   'files.checkStore': 'اسٹور جانچیں',
   'files.storeChecked':
     'آپ کے شاپیفائی اسٹور میں: شامل کرنے کو پروڈکٹس: {created}؛ اپ ڈیٹ کرنے کو: {updated}؛ ویسے ہی چھوڑنے کو: {skipped}۔ بنانے کو اقسام: {variants}۔',

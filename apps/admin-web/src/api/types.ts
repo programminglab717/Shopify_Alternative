@@ -2808,6 +2808,21 @@ export interface UrlRedirectsImportData {
   };
 }
 
+/** What an import of redirects did, or would do in a dry run. */
+export interface UrlRedirectsImportResult {
+  dryRun: boolean;
+  rows: number;
+  created: number;
+  skipped: number;
+  rowErrorCount: number;
+  rowErrors: { row: number; column: string | null; path?: string | null; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface UrlRedirectsImportFromShopifyData {
+  urlRedirectsImportFromShopify: UrlRedirectsImportResult;
+}
+
 export interface UrlRedirectsExportData {
   urlRedirectsExport: { count: number; csv: string };
 }

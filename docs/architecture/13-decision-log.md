@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-750 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-751 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -758,6 +758,7 @@
 | 748 | Comments on articles forget the internet address and browser they were posted from after 90 days, and the log of staff's sign-ins and account changes is kept two years | Accepted |
 | 749 | A Shopify store's products come through its own Admin API, with its owner's app's token or client ID and secret, kept for nothing: one bulk query, written as Shopify's product export, which the product import takes as it takes a file | Accepted |
 | 750 | The admin's import page takes products straight from the owner's Shopify store: its address and their app's client ID and secret or token, checked first, each problem by its product's handle, the credentials held by the page alone and cleared once imported | Accepted |
+| 751 | A Shopify store's URL redirects come through its Admin API too, written as Shopify's redirects export for the redirect import, each problem by its path, and the admin's store card brings them with the products | Accepted |
 
 ---
 
@@ -25483,3 +25484,20 @@
 * **Consequences:** an owner moving from Shopify moves their products from their phone, with no
   file. The file card stays beside it for WooCommerce, Instagram and stores too big for one
   import.
+
+## ADR-751 · A Shopify store's URL redirects come through its Admin API too, written as Shopify's redirects export for the redirect import, each problem by its path, and the admin's store card brings them with the products
+
+* **Context:** a shop that moves keeps its search rankings only if the old store's addresses still
+  lead somewhere (08 §5). Products keep their handles (ADR-749), but a Shopify store's own
+  redirects, from addresses it changed before, came only by its CSV export (ADR-054).
+* **Decision:**
+  * **`readStoreRedirects`** in `@hatti/shopify-admin` asks the store first, then every URL
+    redirect in one bulk query, and writes Shopify's redirects export of them; the app needs the
+    read_online_store_navigation scope, which Shopify's refusal is said as.
+  * **`urlRedirectsImportFromShopify`** gives that file to the redirect import, with its dry run,
+    paths the shop has kept as they are, and each row error naming its path; nothing given is kept.
+  * **The admin's store card** (ADR-750) brings the redirects too, a choice on by default for those
+    who edit the shop's navigation: the check counts them beside the products, and the import
+    makes them after the products.
+* **Consequences:** a shop moving from Shopify keeps both its products' addresses and the old
+  store's redirects, in one step from the admin.

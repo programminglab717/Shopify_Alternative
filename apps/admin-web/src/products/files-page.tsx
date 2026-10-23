@@ -9,6 +9,7 @@ import {
   ProductsExportQuery,
   ProductsImportFromShopifyMutation,
   ProductsImportMutation,
+  UrlRedirectsImportFromShopifyMutation,
 } from '../api/operations';
 import type {
   FileRowError,
@@ -20,6 +21,8 @@ import type {
   ProductsImportData,
   ProductsImportFromShopifyData,
   ProductsImportResult,
+  UrlRedirectsImportFromShopifyData,
+  UrlRedirectsImportResult,
 } from '../api/types';
 import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
@@ -32,6 +35,7 @@ import { Button } from '../ui/button';
 import { Alert, EmptyState } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
+import { EDITS_MENUS } from '../online-store/menus';
 import { EDITS_PRODUCTS } from './status';
 
 /** A file the browser saves, as an export does. */
@@ -93,17 +97,18 @@ type StoreAccess = 'CLIENT' | 'TOKEN';
  */
 function ImportFromStore() {
   const { t } = useLocale();
+  const shop = useShop();
+  // The shop's redirects are theirs who edit its navigation (ADR-751).
+  const editsRedirects = permits(shop, EDITS_MENUS);
+  type Store = { store: string; accessToken?: string; clientId?: string; clientSecret?: string };
   const run = useAdminMutation<
     ProductsImportFromShopifyData,
-    {
-      store: string;
-      accessToken?: string;
-      clientId?: string;
-      clientSecret?: string;
-      dryRun: boolean;
-      overwrite: boolean;
-    }
+    Store & { dryRun: boolean; overwrite: boolean }
   >(ProductsImportFromShopifyMutation);
+  const moveRedirects = useAdminMutation<
+    UrlRedirectsImportFromShopifyData,
+    Store & { dryRun: boolean }
+  >(UrlRedirectsImportFromShopifyMutation);
   const { problem, attempt } = useAttempt();
   const [store, setStore] = useState('');
   const [access, setAccess] = useState<StoreAccess>('CLIENT');
@@ -111,23 +116,40 @@ function ImportFromStore() {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [overwrite, setOverwrite] = useState(false);
-  const [checked, setChecked] = useState<ProductsImportResult | null>(null);
-  const [done, setDone] = useState<ProductsImportResult | null>(null);
+  const [withRedirects, setWithRedirects] = useState(editsRedirects);
+  const [checked, setChecked] = useState<{
+    products: ProductsImportResult;
+    redirects: UrlRedirectsImportResult | null;
+  } | null>(null);
+  const [done, setDone] = useState<{
+    products: ProductsImportResult;
+    redirects: UrlRedirectsImportResult | null;
+  } | null>(null);
 
+  const given = (): Store => ({
+    store,
+    ...(access === 'TOKEN' ? { accessToken: token } : { clientId, clientSecret }),
+  });
+  /** The products, then the redirects where asked for: null where either was refused. */
   const send = async (dryRun: boolean) => {
-    const answer: { value?: ProductsImportResult } = {};
+    const answer: { products?: ProductsImportResult; redirects?: UrlRedirectsImportResult } = {};
     const ok = await attempt(async () => {
-      answer.value = (
-        await run.mutateAsync({
-          store,
-          ...(access === 'TOKEN' ? { accessToken: token } : { clientId, clientSecret }),
-          dryRun,
-          overwrite,
-        })
+      answer.products = (
+        await run.mutateAsync({ ...given(), dryRun, overwrite })
       ).productsImportFromShopify;
-      return answer.value;
+      return answer.products;
     });
-    return ok ? answer.value! : null;
+    if (!ok) return null;
+    if (withRedirects && editsRedirects) {
+      const moved = await attempt(async () => {
+        answer.redirects = (
+          await moveRedirects.mutateAsync({ ...given(), dryRun })
+        ).urlRedirectsImportFromShopify;
+        return answer.redirects;
+      });
+      if (!moved) return null;
+    }
+    return { products: answer.products!, redirects: answer.redirects ?? null };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
   const changed =
@@ -141,6 +163,7 @@ function ImportFromStore() {
     (access === 'TOKEN'
       ? token.trim() !== ''
       : clientId.trim() !== '' && clientSecret.trim() !== '');
+  const busy = run.isPending || moveRedirects.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -195,12 +218,20 @@ function ImportFromStore() {
         checked={overwrite}
         onChange={changed(setOverwrite)}
       />
+      {editsRedirects && (
+        <CheckField
+          label={t('files.storeRedirects')}
+          hint={t('files.storeRedirectsHint')}
+          checked={withRedirects}
+          onChange={changed(setWithRedirects)}
+        />
+      )}
       <Button
         variant="secondary"
         className="self-start"
         icon={<Store aria-hidden className="size-5" />}
         disabled={!ready}
-        busy={run.isPending && !checked}
+        busy={busy && !checked}
         onClick={() => {
           setDone(null);
           void send(true).then(setChecked);
@@ -212,17 +243,29 @@ function ImportFromStore() {
         <div className="flex flex-col gap-2 rounded-control border border-line p-3">
           <p>
             {t('files.storeChecked', {
-              created: formatCount(checked.created),
-              updated: formatCount(checked.updated),
-              skipped: formatCount(checked.skipped),
-              variants: formatCount(checked.variants),
+              created: formatCount(checked.products.created),
+              updated: formatCount(checked.products.updated),
+              skipped: formatCount(checked.products.skipped),
+              variants: formatCount(checked.products.variants),
             })}
           </p>
-          <RowErrors count={checked.rowErrorCount} errors={checked.rowErrors} />
-          {checked.created + checked.updated > 0 && (
+          <RowErrors count={checked.products.rowErrorCount} errors={checked.products.rowErrors} />
+          {checked.redirects && (
+            <>
+              <p>
+                {t('files.redirectsChecked', {
+                  created: formatCount(checked.redirects.created),
+                  skipped: formatCount(checked.redirects.skipped),
+                })}
+              </p>
+              <RedirectRowErrors result={checked.redirects} />
+            </>
+          )}
+          {checked.products.created + checked.products.updated + (checked.redirects?.created ?? 0) >
+            0 && (
             <Button
               className="self-start"
-              busy={run.isPending}
+              busy={busy}
               onClick={() =>
                 void send(false).then((result) => {
                   if (result) {
@@ -242,17 +285,47 @@ function ImportFromStore() {
       )}
       {done && (
         <Alert tone="success">
-          {t('files.productsImported', {
-            created: formatCount(done.created),
-            updated: formatCount(done.updated),
-            skipped: formatCount(done.skipped),
-            images: formatCount(done.images),
-            stocked: formatCount(done.stocked),
-          })}
+          <span className="flex flex-col gap-1">
+            <span>
+              {t('files.productsImported', {
+                created: formatCount(done.products.created),
+                updated: formatCount(done.products.updated),
+                skipped: formatCount(done.products.skipped),
+                images: formatCount(done.products.images),
+                stocked: formatCount(done.products.stocked),
+              })}
+            </span>
+            {done.redirects && (
+              <span>
+                {t('files.redirectsImported', {
+                  created: formatCount(done.redirects.created),
+                  skipped: formatCount(done.redirects.skipped),
+                })}
+              </span>
+            )}
+          </span>
         </Alert>
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
+  );
+}
+
+/** The first of a store's redirects the shop could not take, each by its path. */
+function RedirectRowErrors({ result }: { result: UrlRedirectsImportResult }) {
+  const { t } = useLocale();
+  if (result.rowErrorCount === 0) return null;
+  return (
+    <Alert tone="warning">
+      <span className="flex flex-col gap-1">
+        <span>{t('moving.rowErrors', { count: result.rowErrorCount })}</span>
+        {result.rowErrors.slice(0, 5).map((error) => (
+          <span key={error.row}>
+            {t('files.redirectRowError', { path: error.path ?? '', message: error.message })}
+          </span>
+        ))}
+      </span>
+    </Alert>
   );
 }
 

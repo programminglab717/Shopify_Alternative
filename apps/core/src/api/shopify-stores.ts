@@ -15,3 +15,16 @@ export class ShopifyStores {
     return new ShopifyAdmin({ shop, credentials, fetch: this.fetchFn });
   }
 }
+
+/** What the owner gave of their store's app: its token, or its client ID and secret. */
+export function credentialsOf(
+  accessToken?: string,
+  clientId?: string,
+  clientSecret?: string,
+): ShopifyCredentials | null {
+  const token = accessToken?.trim() ?? '';
+  if (token !== '') return { accessToken: token };
+  const id = clientId?.trim() ?? '';
+  const secret = clientSecret?.trim() ?? '';
+  return id !== '' && secret !== '' ? { clientId: id, clientSecret: secret } : null;
+}

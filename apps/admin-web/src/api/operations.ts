@@ -6192,6 +6192,41 @@ export const UrlRedirectsImportMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A Shopify store's URL redirects through its Admin API (ADR-751), checked first in a dry run. */
+export const UrlRedirectsImportFromShopifyMutation = /* GraphQL */ `
+  mutation UrlRedirectsImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    urlRedirectsImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      rows
+      created
+      skipped
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        path
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** The shop's redirects as Shopify's CSV, to keep or to take elsewhere. */
 export const UrlRedirectsExportQuery = /* GraphQL */ `
   query UrlRedirectsExport {

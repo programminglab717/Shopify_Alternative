@@ -1,7 +1,7 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { ProductImportService, type ImportedStock } from '@hatti/catalog/public';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { readStoreProducts, shopDomainOf, type ShopifyCredentials } from '@hatti/shopify-admin';
+import { readStoreProducts, shopDomainOf } from '@hatti/shopify-admin';
 import {
   Args,
   Field,
@@ -11,7 +11,7 @@ import {
   Resolver,
   registerEnumType,
 } from '@nestjs/graphql';
-import { ShopifyStores } from './shopify-stores.js';
+import { ShopifyStores, credentialsOf } from './shopify-stores.js';
 
 /** Variants given their stock in one change, as `inventorySetQuantities` takes them. */
 const STOCK_BATCH = 250;
@@ -378,17 +378,4 @@ function payloadOf(dryRun: boolean, userErrors: UserError[]): ProductsImportPayl
     dryRun,
     userErrors,
   });
-}
-
-/** What the owner gave of their store's app: its token, or its client ID and secret. */
-function credentialsOf(
-  accessToken?: string,
-  clientId?: string,
-  clientSecret?: string,
-): ShopifyCredentials | null {
-  const token = accessToken?.trim() ?? '';
-  if (token !== '') return { accessToken: token };
-  const id = clientId?.trim() ?? '';
-  const secret = clientSecret?.trim() ?? '';
-  return id !== '' && secret !== '' ? { clientId: id, clientSecret: secret } : null;
 }

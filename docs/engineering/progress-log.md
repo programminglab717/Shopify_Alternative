@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Redirects straight from a Shopify store
+
+* **The old store's redirects come with its products.** Hatti reads them through the store's
+  Admin API and imports them as a redirects file would be, each problem named by its path; the
+  admin's store card brings them in the same step ([ADR-751](../architecture/13-decision-log.md#adr-751--a-shopify-stores-url-redirects-come-through-its-admin-api-too-written-as-shopifys-redirects-export-for-the-redirect-import-each-problem-by-its-path-and-the-admins-store-card-brings-them-with-the-products)).
+* 4101 tests (5 new).
+
 ### cc606c7 · The Shopify store import in the admin
 
 * **Products → Import and export now opens with "Import from your Shopify store":** the store's
