@@ -2264,6 +2264,28 @@ input CollectionUpdateInput {
   title: String
 }
 
+type CollectionsImportFromShopifyPayload {
+  collectionErrors: [StoreCollectionImportError!]!
+
+  """Collections the store has."""
+  collections: Int!
+
+  """Collections made, or that would be in a dry run."""
+  created: Int!
+  dryRun: Boolean!
+
+  """
+  Products of the store's hand-picked collections the shop has no product with the handle of, and which were left out of them; 0 in a dry run, which comes before the products do.
+  """
+  productsMissing: Int!
+
+  """
+  Collections left as they are: the shop has a collection with their handles.
+  """
+  skipped: Int!
+  userErrors: [UserError!]!
+}
+
 """
 A comment a shopper posted on an article from its page on the storefront (ADR-220), shown there once published, as its blog's comment policy says.
 """
@@ -8237,6 +8259,21 @@ type Mutation {
   """Moves products within a manual collection, one move after another."""
   collectionReorderProducts(id: ID!, moves: [MoveInput!]!): CollectionPayload!
   collectionUpdate(input: CollectionUpdateInput!): CollectionPayload!
+
+  """
+  Imports a Shopify store's collections through its Admin API (ONB-05, ADR-754), each keeping its handle and so its address at /collections/{handle}: its title, description, search listing and sort order; a smart collection its rules, a weight in grams and a price in the shop's currency; a hand-picked one the shop's products with the handles of its products, in its order, so its products come first. Collections whose handles the shop has are left as they are; one with a rule the catalog has not is named with why. Give the store and its app as productsImportFromShopify takes them. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  collectionsImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): CollectionsImportFromShopifyPayload!
 
   """Shows a comment on the storefront, as the shop approves it."""
   commentApprove(id: ID!): CommentApprovePayload!
@@ -16586,6 +16623,13 @@ type StoreBuildTheme {
   Whether it was published: so where the main theme held nothing of the shop's own but its accent; else it waits among the themes for the owner to look at and publish.
   """
   published: Boolean!
+}
+
+"""A store's collection that did not go in, and why."""
+type StoreCollectionImportError {
+  """The collection's handle at the store."""
+  handle: String!
+  message: String!
 }
 
 """

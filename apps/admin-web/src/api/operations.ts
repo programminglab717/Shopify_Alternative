@@ -6260,6 +6260,39 @@ export const PagesImportFromShopifyMutation = /* GraphQL */ `
 `;
 
 /** A Shopify store's blogs and articles through its Admin API (ADR-753), checked first. */
+export const CollectionsImportFromShopifyMutation = /* GraphQL */ `
+  mutation CollectionsImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    collectionsImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      collections
+      created
+      skipped
+      productsMissing
+      collectionErrors {
+        handle
+        message
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
 export const BlogsImportFromShopifyMutation = /* GraphQL */ `
   mutation BlogsImportFromShopify(
     $store: String!

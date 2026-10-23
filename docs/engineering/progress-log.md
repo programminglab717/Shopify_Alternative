@@ -16,12 +16,19 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Collections straight from a Shopify store
+
+* **The old store's collections come too,** each at its own address: a smart one with its
+  rules, a hand-picked one with its products in the same order; the admin's store card brings
+  them straight after the products ([ADR-754](../architecture/13-decision-log.md#adr-754--a-shopify-stores-collections-come-through-its-admin-api-each-at-its-handle-a-smart-one-with-its-rules-and-a-hand-picked-one-with-the-shops-products-of-its-products-handles-in-its-order-and-the-admins-store-card-brings-them-after-the-products)).
+* 4113 tests (4 new).
+
 ### 871e509 · Blogs straight from a Shopify store
 
 * **The old store's blogs and articles come too,** each at its own address, an article shown
   since when the store showed it; the admin's store card brings them with the products,
   redirects and pages ([ADR-753](../architecture/13-decision-log.md#adr-753--a-shopify-stores-blogs-and-their-articles-come-through-its-admin-api-each-at-its-handle-a-blog-the-shop-has-taking-the-articles-and-the-admins-store-card-brings-them-too)).
-* 4108 tests (3 new).
+* 4109 tests (4 new).
 
 ### a98cb93 · Pages straight from a Shopify store
 

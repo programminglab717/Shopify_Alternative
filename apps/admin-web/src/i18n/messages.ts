@@ -3009,6 +3009,13 @@ const en = {
   'files.pagesChecked': 'Pages to add: {created}; to leave as they are: {skipped}.',
   'files.pagesImported': 'Pages added: {created}; left as they were: {skipped}.',
   'files.pageError': '{handle}: {message}',
+  'files.storeCollections': 'Bring its collections too',
+  'files.storeCollectionsHint':
+    'Each at the same address, with its rules or its products in the same order.',
+  'files.collectionsChecked': 'Collections to add: {created}; to leave as they are: {skipped}.',
+  'files.collectionsImported': 'Collections added: {created}; left as they were: {skipped}.',
+  'files.collectionsMissing': 'Products not in your shop, left out of their collections: {count}.',
+  'files.collectionError': '{handle}: {message}',
   'files.storeBlogs': 'Bring its blogs too',
   'files.storeBlogsHint':
     'Its blogs and their articles, at the same addresses, without their images. The app needs the read_content scope too.',
@@ -8603,6 +8610,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.pagesChecked': 'شامل کرنے کو صفحات: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
   'files.pagesImported': 'شامل صفحات: {created}؛ ویسے ہی: {skipped}۔',
   'files.pageError': '{handle}: {message}',
+  'files.storeCollections': 'اس کے کلیکشنز بھی لائیں',
+  'files.storeCollectionsHint':
+    'ہر ایک انہی ایڈریسز پر، اپنے اصولوں یا اسی ترتیب میں اپنی پروڈکٹس کے ساتھ۔',
+  'files.collectionsChecked': 'شامل کرنے کو کلیکشنز: {created}؛ ویسے ہی چھوڑنے کو: {skipped}۔',
+  'files.collectionsImported': 'شامل کلیکشنز: {created}؛ ویسے ہی: {skipped}۔',
+  'files.collectionsMissing': 'جو پروڈکٹس آپ کی دکان میں نہیں، اپنے کلیکشنز سے باہر رہیں: {count}۔',
+  'files.collectionError': '{handle}: {message}',
   'files.storeBlogs': 'اس کے بلاگز بھی لائیں',
   'files.storeBlogsHint':
     'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، تصاویر کے بغیر۔ ایپ کو read_content اسکوپ بھی چاہیے۔',

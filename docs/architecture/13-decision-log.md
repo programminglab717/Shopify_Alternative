@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-753 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-754 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -761,6 +761,7 @@
 | 751 | A Shopify store's URL redirects come through its Admin API too, written as Shopify's redirects export for the redirect import, each problem by its path, and the admin's store card brings them with the products | Accepted |
 | 752 | A Shopify store's own pages come through its Admin API, each made as pageCreate makes one at its handle, shown as and since the store showed it, and the admin's store card brings them too | Accepted |
 | 753 | A Shopify store's blogs and their articles come through its Admin API, each at its handle, a blog the shop has taking the articles, and the admin's store card brings them too | Accepted |
+| 754 | A Shopify store's collections come through its Admin API, each at its handle, a smart one with its rules and a hand-picked one with the shop's products of its products' handles in its order, and the admin's store card brings them after the products | Accepted |
 
 ---
 
@@ -25540,3 +25541,27 @@
   * **The admin's store card** brings the blogs too, on by default for those who write blogs.
 * **Consequences:** products, redirects, pages and blogs come from a Shopify store in one step.
   Collections, customers, orders, discount codes and articles' images are still to come.
+
+## ADR-754 · A Shopify store's collections come through its Admin API, each at its handle, a smart one with its rules and a hand-picked one with the shop's products of its products' handles in its order, and the admin's store card brings them after the products
+
+* **Context:** a shop's collections are its storefront's aisles and menus' links (08 §5);
+  Shopify's product export does not carry them, so a shop moving made each again by hand.
+* **Decision:**
+  * **`readStoreCollections`** in `@hatti/shopify-admin` asks the store its name, currency and
+    unit of weight, then every collection in one bulk query: its handle, title, HTML
+    description, sort order, search listing and rules, and its products' handles in its own
+    order. The read_products scope the products need is enough.
+  * **`collectionsImportFromShopify`** makes each collection the shop has no handle for as
+    `collectionCreate` makes one. A smart collection keeps its rules, lower cased as the
+    catalog's; a weight is turned into grams from the store's unit; prices are kept only where
+    the store prices in the shop's currency. A rule the catalog has not, on stock, category or
+    metafields, names the collection with why, and the rest go on. A hand-picked collection
+    takes the shop's products with its products' handles, in its order, 250 at a time; those
+    the shop has not are counted, and left out. Best selling, which the catalog does not sort
+    by, keeps the store's order for a hand-picked collection and is newest first for a smart
+    one. Its dry run counts, saying nothing of missing products, which come with the import.
+  * **The catalog's `ProductService.idsByHandle`** gives the IDs of the shop's products by their
+    handles, in one query, for the collections' products.
+  * **The admin's store card** brings the collections straight after the products, on by default.
+* **Consequences:** products, collections, redirects, pages and blogs come from a Shopify store
+  in one step. Customers, orders, discount codes and collections' images are still to come.

@@ -10,6 +10,7 @@ import {
   ProductsImportFromShopifyMutation,
   PagesImportFromShopifyMutation,
   BlogsImportFromShopifyMutation,
+  CollectionsImportFromShopifyMutation,
   ProductsImportMutation,
   UrlRedirectsImportFromShopifyMutation,
 } from '../api/operations';
@@ -26,6 +27,8 @@ import type {
   PagesImportFromShopifyResult,
   BlogsImportFromShopifyData,
   BlogsImportFromShopifyResult,
+  CollectionsImportFromShopifyData,
+  CollectionsImportFromShopifyResult,
   ProductsImportResult,
   UrlRedirectsImportFromShopifyData,
   UrlRedirectsImportResult,
@@ -123,6 +126,10 @@ function ImportFromStore() {
   const movePages = useAdminMutation<PagesImportFromShopifyData, Store & { dryRun: boolean }>(
     PagesImportFromShopifyMutation,
   );
+  const moveCollections = useAdminMutation<
+    CollectionsImportFromShopifyData,
+    Store & { dryRun: boolean }
+  >(CollectionsImportFromShopifyMutation);
   const moveBlogs = useAdminMutation<BlogsImportFromShopifyData, Store & { dryRun: boolean }>(
     BlogsImportFromShopifyMutation,
   );
@@ -133,6 +140,7 @@ function ImportFromStore() {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [overwrite, setOverwrite] = useState(false);
+  const [withCollections, setWithCollections] = useState(true);
   const [withRedirects, setWithRedirects] = useState(editsRedirects);
   const [withPages, setWithPages] = useState(writesPages);
   const [withBlogs, setWithBlogs] = useState(writesBlogs);
@@ -141,12 +149,14 @@ function ImportFromStore() {
     redirects: UrlRedirectsImportResult | null;
     pages: PagesImportFromShopifyResult | null;
     blogs: BlogsImportFromShopifyResult | null;
+    collections: CollectionsImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
     pages: PagesImportFromShopifyResult | null;
     blogs: BlogsImportFromShopifyResult | null;
+    collections: CollectionsImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
@@ -160,6 +170,7 @@ function ImportFromStore() {
       redirects?: UrlRedirectsImportResult;
       pages?: PagesImportFromShopifyResult;
       blogs?: BlogsImportFromShopifyResult;
+      collections?: CollectionsImportFromShopifyResult;
     } = {};
     const ok = await attempt(async () => {
       answer.products = (
@@ -168,6 +179,16 @@ function ImportFromStore() {
       return answer.products;
     });
     if (!ok) return null;
+    // After the products, whose handles hand-picked collections name (ADR-754).
+    if (withCollections) {
+      const moved = await attempt(async () => {
+        answer.collections = (
+          await moveCollections.mutateAsync({ ...given(), dryRun })
+        ).collectionsImportFromShopify;
+        return answer.collections;
+      });
+      if (!moved) return null;
+    }
     if (withRedirects && editsRedirects) {
       const moved = await attempt(async () => {
         answer.redirects = (
@@ -196,6 +217,7 @@ function ImportFromStore() {
       redirects: answer.redirects ?? null,
       pages: answer.pages ?? null,
       blogs: answer.blogs ?? null,
+      collections: answer.collections ?? null,
     };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
@@ -211,7 +233,11 @@ function ImportFromStore() {
       ? token.trim() !== ''
       : clientId.trim() !== '' && clientSecret.trim() !== '');
   const busy =
-    run.isPending || moveRedirects.isPending || movePages.isPending || moveBlogs.isPending;
+    run.isPending ||
+    moveRedirects.isPending ||
+    movePages.isPending ||
+    moveBlogs.isPending ||
+    moveCollections.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -266,6 +292,12 @@ function ImportFromStore() {
         checked={overwrite}
         onChange={changed(setOverwrite)}
       />
+      <CheckField
+        label={t('files.storeCollections')}
+        hint={t('files.storeCollectionsHint')}
+        checked={withCollections}
+        onChange={changed(setWithCollections)}
+      />
       {editsRedirects && (
         <CheckField
           label={t('files.storeRedirects')}
@@ -314,6 +346,17 @@ function ImportFromStore() {
             })}
           </p>
           <RowErrors count={checked.products.rowErrorCount} errors={checked.products.rowErrors} />
+          {checked.collections && (
+            <>
+              <p>
+                {t('files.collectionsChecked', {
+                  created: formatCount(checked.collections.created),
+                  skipped: formatCount(checked.collections.skipped),
+                })}
+              </p>
+              <CollectionErrors result={checked.collections} />
+            </>
+          )}
           {checked.redirects && (
             <>
               <p>
@@ -350,6 +393,7 @@ function ImportFromStore() {
           )}
           {checked.products.created +
             checked.products.updated +
+            (checked.collections?.created ?? 0) +
             (checked.redirects?.created ?? 0) +
             (checked.pages?.created ?? 0) +
             (checked.blogs?.blogsCreated ?? 0) +
@@ -387,6 +431,21 @@ function ImportFromStore() {
                 stocked: formatCount(done.products.stocked),
               })}
             </span>
+            {done.collections && (
+              <span>
+                {t('files.collectionsImported', {
+                  created: formatCount(done.collections.created),
+                  skipped: formatCount(done.collections.skipped),
+                })}
+              </span>
+            )}
+            {done.collections && done.collections.productsMissing > 0 && (
+              <span>
+                {t('files.collectionsMissing', {
+                  count: formatCount(done.collections.productsMissing),
+                })}
+              </span>
+            )}
             {done.redirects && (
               <span>
                 {t('files.redirectsImported', {
@@ -417,6 +476,24 @@ function ImportFromStore() {
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
+  );
+}
+
+/** A store's collections the shop could not take, each by its handle. */
+function CollectionErrors({ result }: { result: CollectionsImportFromShopifyResult }) {
+  const { t } = useLocale();
+  if (result.collectionErrors.length === 0) return null;
+  return (
+    <Alert tone="warning">
+      <span className="flex flex-col gap-1">
+        <span>{t('moving.rowErrors', { count: result.collectionErrors.length })}</span>
+        {result.collectionErrors.slice(0, 5).map((error) => (
+          <span key={error.handle}>
+            {t('files.collectionError', { handle: error.handle, message: error.message })}
+          </span>
+        ))}
+      </span>
+    </Alert>
   );
 }
 

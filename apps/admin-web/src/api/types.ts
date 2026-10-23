@@ -2834,6 +2834,20 @@ export interface PagesImportFromShopifyData {
 }
 
 /** What an import of a store's blogs did, or would do in a dry run (ADR-753). */
+export interface CollectionsImportFromShopifyResult {
+  dryRun: boolean;
+  collections: number;
+  created: number;
+  skipped: number;
+  productsMissing: number;
+  collectionErrors: { handle: string; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface CollectionsImportFromShopifyData {
+  collectionsImportFromShopify: CollectionsImportFromShopifyResult;
+}
+
 export interface BlogsImportFromShopifyResult {
   dryRun: boolean;
   blogs: number;

@@ -32,3 +32,10 @@ export {
   type StoreBlog,
   type StoreBlogs,
 } from './blogs.js';
+export {
+  COLLECTIONS_BULK_QUERY,
+  readStoreCollections,
+  type StoreCollection,
+  type StoreCollectionRule,
+  type StoreCollections,
+} from './collections.js';

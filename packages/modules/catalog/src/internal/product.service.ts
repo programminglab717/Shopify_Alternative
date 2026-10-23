@@ -1030,6 +1030,20 @@ export class ProductService {
     });
   }
 
+  /** The IDs of the shop's products with these handles, by handle; those it has not are left out. */
+  async idsByHandle(
+    tenant: TenantContext,
+    handles: readonly string[],
+  ): Promise<Map<string, string>> {
+    if (handles.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ id: string; handle: string }>(sql`
+        SELECT id, handle FROM catalog.products
+         WHERE shop_id = ${tenant.shopId} AND handle = ANY(${sql.param([...handles])}::text[])`);
+      return new Map(rows.map((row) => [row.handle, row.id]));
+    });
+  }
+
   async list(tenant: TenantContext, options: ListProductsOptions): Promise<Page<ProductRecord>> {
     const conditions = [sql`true`, ...productSearchConditions(options.query ?? '')];
     if (options.after) conditions.push(sql`p.id < ${options.after}`);
