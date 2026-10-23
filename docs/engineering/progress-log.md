@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Wholesale prices in a signed-in customer's cart
+### d970c7b · Wholesale prices in a signed-in customer's cart
 
 * **Wholesale carts:** a reseller signed in to their account sees and pays their price list's
   prices in the cart, at checkout and on the order (CUS-06, [ADR-780](../architecture/13-decision-log.md#adr-780--a-signed-in-wholesale-customers-cart-and-checkout-priced-from-their-price-lists-while-their-session-lasts)).
