@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A Shopify store's orders, as past orders
+### 8498d4b · A Shopify store's orders, as past orders
 
 * **History comes along:** moving a Shopify store brings its orders as past orders, on their
   customers' pages, apart from the shop's own orders, so nothing acts on them; ONB-05's importer
