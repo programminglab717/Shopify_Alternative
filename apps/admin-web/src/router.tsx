@@ -26,6 +26,7 @@ import { AgentsPage } from './desk/agents-page';
 import { DeskPage } from './desk/desk-page';
 import { ConversationPage } from './inbox/conversation-page';
 import { InboxPage, validateInboxSearch } from './inbox/inbox-page';
+import { ReplyTimesPage } from './inbox/reply-times-page';
 import {
   ChangeEmailPage,
   ForgotPasswordPage,
@@ -278,6 +279,12 @@ const inbox = createRoute({
   path: 'inbox',
   validateSearch: validateInboxSearch,
   component: InboxPage,
+});
+
+const inboxReplyTimes = createRoute({
+  getParentRoute: () => shop,
+  path: 'inbox/times',
+  component: ReplyTimesPage,
 });
 
 const conversation = createRoute({
@@ -953,6 +960,7 @@ export const routeTree = root.addChildren([
     desk,
     deskAgents,
     inbox,
+    inboxReplyTimes,
     conversation,
     products,
     newProduct,

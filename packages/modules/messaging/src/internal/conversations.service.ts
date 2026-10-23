@@ -437,6 +437,14 @@ export class ConversationsService {
                   'sent', ${actor.actorKind}, ${actor.actorId})
           RETURNING id, direction, body, media_kind, at, status, error`);
         const message = rows[0]!;
+        // The customer waited for this answer: how long, and who gave it (ADR-763).
+        await tx.execute(sql`
+          INSERT INTO messaging.conversation_answers
+                 (shop_id, conversation_id, waited_from, answered_at, actor_kind, actor_id)
+          SELECT shop_id, id, waiting_since, greatest(waiting_since, ${at}::timestamptz),
+                 ${actor.actorKind}, ${actor.actorId}
+            FROM messaging.conversations
+           WHERE shop_id = ${tenant.shopId} AND id = ${id} AND waiting_since IS NOT NULL`);
         await tx.execute(sql`
           UPDATE messaging.conversations
              SET unread = 0, waiting_since = NULL,

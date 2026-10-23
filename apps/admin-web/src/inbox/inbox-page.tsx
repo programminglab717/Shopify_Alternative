@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, MessagesSquare } from 'lucide-react';
+import { ChevronRight, MessagesSquare, Timer } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ConversationsQuery } from '../api/operations';
 import type {
@@ -20,6 +20,7 @@ import { useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { ContactMessages } from './contact-messages';
+import { SEES_REPLY_TIMES } from './reply-times-page';
 import { SavedReplies } from './saved-replies';
 
 const PAGE = 50;
@@ -266,9 +267,21 @@ function InboxFrame({
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-          {t('inbox.title')}
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+            {t('inbox.title')}
+          </h1>
+          {permits(shop, SEES_REPLY_TIMES) && (
+            <Link
+              to="/$shopId/inbox/times"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-10 items-center gap-1 text-primary hover:underline"
+            >
+              <Timer aria-hidden className="size-5" />
+              {t('replyTimes.title')}
+            </Link>
+          )}
+        </div>
         <p className="text-secondary">
           {t(
             tab === 'form'

@@ -14,6 +14,8 @@ import {
 import { ContactMessageResolver } from './graphql/contact-message.resolver.js';
 import { SavedReplyResolver } from './graphql/saved-reply.resolver.js';
 import { SavedRepliesService } from './saved-replies.js';
+import { ReplyTimesService } from './reply-times.service.js';
+import { ReplyTimesResolver } from './graphql/reply-times.resolver.js';
 import { StockWatchService } from './stock-watches.service.js';
 import { BroadcastsService } from './broadcasts.service.js';
 import { MessagingCustomerData } from './customer-data.js';
@@ -91,6 +93,8 @@ export class MessagingModule {
         ContactMessageResolver,
         SavedRepliesService,
         SavedReplyResolver,
+        ReplyTimesService,
+        ReplyTimesResolver,
         MessagingCustomerData,
         WhatsAppAccountsService,
         WhatsAppAccountResolver,

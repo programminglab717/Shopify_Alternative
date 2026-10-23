@@ -4890,6 +4890,26 @@ export interface ConversationValue {
   answerBy: string | null;
 }
 
+/** How long customers waited for answers, of the shop or of one who answered (ADR-763). */
+export interface ReplyTimesFigures {
+  answered: number;
+  medianWaitSeconds: number | null;
+  withinTarget: number | null;
+}
+
+export interface InboxReplierValue extends ReplyTimesFigures {
+  id: string;
+  kind: 'STAFF' | 'APP';
+}
+
+export interface InboxReplyTimesData {
+  inboxReplyTimes: ReplyTimesFigures & {
+    replyTargetMinutes: number | null;
+    repliers: InboxReplierValue[];
+  };
+  staffMembers: { id: string; name: string }[] | null;
+}
+
 export interface ConversationsData {
   conversations: {
     nodes: ConversationValue[];

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### The inbox's reply times
+
+* **Owners see how fast the inbox answers:** how many customers who waited were answered, the
+  typical wait and the share in time, for the shop and for each member, today or over 7 or 30
+  days ([ADR-763](../architecture/13-decision-log.md#adr-763--each-answer-to-a-customer-who-waited-is-kept-with-how-long-they-waited-and-who-answered-the-inboxs-reply-times-are-reported-from-them-for-the-shop-and-for-each-who-answered)).
+* 4152 tests (5 new).
+
 ### 0d27093 · Customers waiting too long pushed
 
 * **No one waits unnoticed:** once a customer on WhatsApp passes the shop's time to answer, a

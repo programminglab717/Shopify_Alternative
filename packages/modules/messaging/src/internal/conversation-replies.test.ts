@@ -7,6 +7,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CONVERSATION_WINDOW_MS, ConversationsService } from './conversations.service.js';
 import { MessagingEvents } from './events.js';
+import { ReplyTimesService } from './reply-times.service.js';
 import { WHATSAPP_CLOUD } from './providers.js';
 import { FakeGraph, NUMBER, SHARED_NUMBER, SHARED_TOKEN, TOKEN, WABA } from './test-support.js';
 import type { WhatsAppAccountsService, WhatsAppSender } from './whatsapp-accounts.service.js';
@@ -188,6 +189,77 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     expect(await ayesha()).toMatchObject({ waitingSince: again });
     expect(await inbox.setStatus(a, id, 'closed')).toMatchObject({ waitingSince: null });
     expect(await inbox.setStatus(a, id, 'open')).toMatchObject({ waitingSince: null });
+  });
+
+  it('keeps how long each customer waited for an answer and who gave it, reported by period (ADR-763)', async () => {
+    const minutes = (n: number) => new Date(Date.now() + n * 60_000);
+    for (const phone of [AYESHA, BILAL]) {
+      await admin.query(
+        `INSERT INTO messaging.messages
+                (shop_id, kind, channel, recipient, language, dedupe_key, status, provider,
+                 provider_message_id, sent_at)
+         VALUES ($1, 'order_placed', 'whatsapp', $2, 'en', $3, 'sent', $4, $5, now())`,
+        [a.shopId, phone, `test:${newId()}`, WHATSAPP_CLOUD, `wamid.${newId()}`],
+      );
+    }
+    await admin.query(
+      `INSERT INTO messaging.settings (shop_id, reply_target_minutes) VALUES ($1, 30)
+           ON CONFLICT (shop_id) DO UPDATE SET reply_target_minutes = 30`,
+      [a.shopId],
+    );
+    await admin.query('DELETE FROM messaging.conversation_answers');
+    const other: TenantContext = {
+      ...a,
+      actor: {
+        ...(a.actor as Extract<TenantContext['actor'], { kind: 'staff' }>),
+        userId: newId(),
+      },
+    };
+    const idOf = async (phone: string) =>
+      (await inbox.list(a, { first: 10, after: null })).items.find(
+        (each) => each.customerPhone === phone,
+      )!.id;
+    // Ayesha waits 40 minutes; Bilal 5, answered by another; answering again is no new answer.
+    await inbox.recordInbound(inbound({ at: minutes(-60) }));
+    unwrap(await inbox.reply(a, await idOf(AYESHA), 'Ji', minutes(-20)));
+    await inbox.recordInbound(inbound({ from: BILAL, at: minutes(-15) }));
+    unwrap(await inbox.reply(other, await idOf(BILAL), 'Ji', minutes(-10)));
+    unwrap(await inbox.reply(other, await idOf(BILAL), 'Aur kuch?', minutes(-9)));
+
+    const times = new ReplyTimesService(db);
+    const report = unwrap(await times.report(a, { from: minutes(-120), before: minutes(1) }));
+    expect(report).toMatchObject({
+      answered: 2,
+      medianWaitSeconds: 1350,
+      withinTarget: 1,
+      replyTargetMinutes: 30,
+    });
+    expect(
+      report.byActor
+        .map((row) => [row.actor.id, row.answered, row.medianWaitSeconds, row.withinTarget])
+        .sort(),
+    ).toEqual(
+      [
+        [(a.actor as { userId: string }).userId, 1, 2400, 0],
+        [(other.actor as { userId: string }).userId, 1, 300, 1],
+      ].sort(),
+    );
+    // Another period, another shop: nothing.
+    expect(unwrap(await times.report(a, { from: minutes(-600), before: minutes(-300) }))).toEqual({
+      answered: 0,
+      medianWaitSeconds: null,
+      withinTarget: 0,
+      replyTargetMinutes: 30,
+      byActor: [],
+    });
+    expect(
+      unwrap(await times.report(b, { from: minutes(-120), before: minutes(1) })),
+    ).toMatchObject({ answered: 0, withinTarget: null });
+    expect(await times.report(a, { from: minutes(0), before: minutes(-1) })).toMatchObject({
+      ok: false,
+      errors: [{ field: ['before'], code: 'INVALID' }],
+    });
+    await admin.query('DELETE FROM messaging.settings WHERE shop_id = $1', [a.shopId]);
   });
 
   it('answers from the shared number the customer wrote to, and reads the conversation', async () => {

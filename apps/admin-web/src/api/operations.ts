@@ -3878,6 +3878,29 @@ export const PackersQuery = /* GraphQL */ `
   }
 `;
 
+/** How long customers waited for the inbox's answers, and whose (MSG-06, ADR-763). */
+export const InboxReplyTimesQuery = /* GraphQL */ `
+  query InboxReplyTimes($from: DateTime!, $before: DateTime!) {
+    inboxReplyTimes(from: $from, before: $before) {
+      answered
+      medianWaitSeconds
+      withinTarget
+      replyTargetMinutes
+      repliers {
+        id
+        kind
+        answered
+        medianWaitSeconds
+        withinTarget
+      }
+    }
+    staffMembers {
+      id
+      name
+    }
+  }
+`;
+
 export const ConfirmationAgentsQuery = /* GraphQL */ `
   query ConfirmationAgents($from: DateTime!, $before: DateTime!) {
     confirmationAgents(from: $from, before: $before) {

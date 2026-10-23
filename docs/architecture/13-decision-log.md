@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-762 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-763 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -770,6 +770,7 @@
 | 760 | A shop says in how many minutes it answers the inbox; each conversation keeps since when its customer has waited, and those waiting past it are overdue | Accepted |
 | 761 | The inbox pushed to staff's phones: a customer who begins waiting on WhatsApp, to whom the conversation is given or else all who answer, and a conversation given to its member | Accepted |
 | 762 | A customer waiting past the shop's time to answer is pushed, once a wait, to whom the conversation is given or else all who answer, by a sweep of the worker | Accepted |
+| 763 | Each answer to a customer who waited is kept with how long they waited and who answered; the inbox's reply times are reported from them, for the shop and for each who answered | Accepted |
 
 ---
 
@@ -25762,3 +25763,24 @@
 * **Consequences:** the target runs by the clock, not the shop's opening hours, so a message at
   night is pushed at night to whoever chose this push; a shop that does not want that leaves it
   off on its phones.
+
+## ADR-763 · Each answer to a customer who waited is kept with how long they waited and who answered; the inbox's reply times are reported from them, for the shop and for each who answered
+
+* **Context:** with a reply target (ADR-760) and pushes for those overdue (ADR-762), owners still
+  could not see how the inbox did: how long customers wait, and who answers fast (MSG-06). A
+  conversation keeps only its current wait, which an answer clears.
+* **Decision:**
+  * **`messaging.conversation_answers`** (migration 0326): each answer that ends a wait, with
+    when the wait began, when it was answered, and the staff member or app who answered. Not
+    the customer's number nor the words; kept like the shop's other figures, and purged with
+    the shop.
+  * **`inboxReplyTimes(from, before)`**, at most a year: the answers in the period, the median
+    wait, and how many came within the shop's reply target (none while it sets no target); for
+    the shop and for each who answered, worked out in one query with grouping sets. Who
+    answered how fast is staff performance, so staff see it only with `see_staff_performance`,
+    as agents' performance (COD-11); apps with `read_conversations`.
+  * **The admin's Reply times page,** linked from the inbox's heading for owners and managers:
+    today, 7 or 30 days, the shop's figures and each member's, by name, and former staff and
+    apps by what they were.
+* **Consequences:** answers before this change were not kept, so the report starts empty. Only
+  answers end waits, so a conversation closed without one is not counted as answered.

@@ -461,4 +461,52 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
     expect(closed.userErrors).toEqual([]);
     expect(await data(tokens.reader, '{ conversationsOverdueCount }')).toBe(0);
   });
+
+  it("reports how long customers waited for the shop's answers, to those who may see it (ADR-763)", async () => {
+    await admin.query('DELETE FROM messaging.conversation_answers');
+    await admin.query(
+      `INSERT INTO messaging.settings (shop_id, reply_target_minutes) VALUES ($1, 30)
+           ON CONFLICT (shop_id) DO UPDATE SET reply_target_minutes = 30`,
+      [shop],
+    );
+    const { rows } = await admin.query<{ id: string }>(
+      `INSERT INTO messaging.conversations (shop_id, customer_phone, last_message_at)
+       VALUES ($1, '+923001119999', now()) RETURNING id`,
+      [shop],
+    );
+    const staffMember = newId();
+    await admin.query(
+      `INSERT INTO messaging.conversation_answers
+              (shop_id, conversation_id, waited_from, answered_at, actor_kind, actor_id)
+       VALUES ($1, $2, now() - interval '10 minutes', now() - interval '6 minutes', 'staff', $3),
+              ($1, $2, now() - interval '50 minutes', now() - interval '10 minutes', 'staff', $3)`,
+      [shop, rows[0]!.id, staffMember],
+    );
+    const query = `query ($from: DateTime!, $before: DateTime!) {
+      inboxReplyTimes(from: $from, before: $before) {
+        answered medianWaitSeconds withinTarget replyTargetMinutes
+        repliers { kind id answered medianWaitSeconds withinTarget }
+      } }`;
+    const period = {
+      from: new Date(Date.now() - 86_400_000).toISOString(),
+      before: new Date(Date.now() + 60_000).toISOString(),
+    };
+    expect(await data(tokens.reader, query, period)).toEqual({
+      answered: 2,
+      medianWaitSeconds: 1320,
+      withinTarget: 1,
+      replyTargetMinutes: 30,
+      repliers: [
+        {
+          kind: 'STAFF',
+          id: toPublicId('user', staffMember),
+          answered: 2,
+          medianWaitSeconds: 1320,
+          withinTarget: 1,
+        },
+      ],
+    });
+    const refused = await gql(tokens.none, query, period);
+    expect(refused.errors?.[0]).toMatchObject({ extensions: { code: 'ACCESS_DENIED' } });
+  });
 });
