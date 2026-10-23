@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Past orders' search
+### 0292bb5 · Past orders' search
 
 * **Find the old order:** staff search the orders from the store the shop moved from by name,
   email, the customer's name or number ([ADR-790](../architecture/13-decision-log.md#adr-790--past-orders-are-searched-by-their-name-email-the-name-they-went-to-or-a-mobile-number-however-written)).
