@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A Shopify store's articles' images
+### f9ae3d8 · A Shopify store's articles' images
 
 * **Posts keep their pictures:** moving a Shopify store's blogs fetches each article's image from
   Shopify's CDN and keeps it as one of the shop's files, which the article shows; one that
