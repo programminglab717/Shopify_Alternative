@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Days without delivery
+### d7fc9b8 · Days without delivery
 
 * **Days off:** a shop ticks the days of the week it delivers on, and checkout offers no
   delivery slots on the others (CHK-15, [ADR-773](../architecture/13-decision-log.md#adr-773--a-shops-delivery-slots-leave-out-the-days-of-the-week-it-does-not-deliver-on)).
