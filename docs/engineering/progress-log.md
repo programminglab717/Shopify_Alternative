@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### A Shopify store's orders, as past orders
+
+* **History comes along:** moving a Shopify store brings its orders as past orders, on their
+  customers' pages, apart from the shop's own orders, so nothing acts on them; ONB-05's importer
+  now brings everything the catalog lists (ONB-05, [ADR-786](../architecture/13-decision-log.md#adr-786--a-shopify-stores-orders-are-kept-as-past-orders-a-history-apart-from-hattis-orders-that-nothing-acts-on)).
+* 4233 tests (8 new).
+
 ### 3529c7d · Collections' images
 
 * **A picture for each collection:** a collection shows one of the shop's images, chosen on its

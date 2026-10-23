@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-785 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-786 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -793,6 +793,7 @@
 | 783 | A Shopify store's articles' images are fetched from its CDN and kept as the shop's files | Accepted |
 | 784 | A Shopify store's customers' addresses fill their address books, only where a book is empty | Accepted |
 | 785 | A collection shows one of the shop's files as its image, served as articles' are, and Shopify's are brought | Accepted |
+| 786 | A Shopify store's orders are kept as past orders, a history apart from Hatti's orders that nothing acts on | Accepted |
 
 ---
 
@@ -26234,3 +26235,27 @@
   collections with images work. A file deleted or changed republishes every collection of the
   shop, which is more than needed but rare and cheap next to products. Other themes in the
   library show the image only once their own collection sections use it.
+
+## ADR-786 · A Shopify store's orders are kept as past orders, a history apart from Hatti's orders that nothing acts on
+
+* **Context:** the last part of ONB-05 is a store's orders. A shop moving from Shopify wants each
+  customer's history on their page, and the totals of what it sold there. Bringing them in as
+  Hatti's own orders would set off everything a new order does: stock committed, messages to
+  confirm and track, couriers booked, webhooks sent, and the reports, plan limits and fees counted
+  from orders. Their numbers would clash with the shop's own sequence, too.
+* **Decision:** they are kept in a table of their own, `orders.past_orders`, which nothing but
+  reading uses: each order's name at the store, items, amounts in the store's currency, how it
+  was paid and sent in the store's words, where it went, its note, and the customer its number is
+  when it is brought (Pakistani mobiles kept in E.164), unique by its ID at the store, so it is
+  brought once. `ordersImportFromShopify` reads them in one bulk query (`read_orders`, and
+  `read_all_orders` for those over 60 days old). They join customers' data like orders do
+  (ADR-102): a merge moves them, an erasure keeps their items, amounts, statuses, dates and city,
+  province and country but drops the number, email, name, street and note, and the customer's
+  own export gives them whole. `pastOrders` and `Customer.pastOrders` read them, numbers masked as
+  orders' are; the admin's move page brings them after the customers, so they find them, and a
+  customer's page lists what they bought at the old store.
+* **Consequences:** no order of the old store can act on anything, and the shop's own numbers,
+  reports and limits stay its own; a customer's order count and spend on Hatti stay Hatti's.
+  The statuses are Shopify's words, shown as they are, not translated. A past order has no page
+  of its own yet, and the storefront's account does not show past orders; both can follow from
+  the same table.
