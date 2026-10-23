@@ -326,4 +326,26 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
       { key: null, title: 'No campaign', confirmation: { placed: 1 } },
     ]);
   });
+
+  it('puts customers in cohorts by the month of their first order (ANL-04, ADR-774)', async () => {
+    const COHORTS = `query ($months: Int) {
+      customerCohorts(months: $months) { month customers returned orderedAgain }
+    }`;
+    const body = await gql(tokens.owner, COHORTS, { months: 2 });
+    const cohorts = body.data?.customerCohorts;
+    // This month, in Karachi, the last: its customers placed the orders above, one of them more
+    // than one.
+    const thisMonth = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 7);
+    expect(cohorts.map((cohort: Json) => cohort.month).at(-1)).toBe(thisMonth);
+    expect(cohorts).toHaveLength(2);
+    expect(cohorts[1]).toMatchObject({ returned: [] });
+    expect(cohorts[1].customers).toBeGreaterThan(0);
+    expect(cohorts[1].orderedAgain).toBeGreaterThan(0);
+    expect(cohorts[0].returned).toHaveLength(1);
+
+    const tooMany = await gql(tokens.owner, COHORTS, { months: 25 });
+    expect(tooMany.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+    const denied = await gql(tokens.products, COHORTS, {});
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
 });

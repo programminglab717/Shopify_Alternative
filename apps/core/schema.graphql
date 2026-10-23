@@ -3892,6 +3892,27 @@ enum CustomerCancellation {
   UNTIL_PACKED
 }
 
+"""
+The customers whose first order the shop took in one month, in its time zone (ANL-04), and how many of them ordered again in each month after.
+"""
+type CustomerCohort {
+  """
+  Customers whose first order, cancelled ones aside, was placed in the month.
+  """
+  customers: Int!
+
+  """The month, "2026-10"."""
+  month: String!
+
+  """How many of them have placed more than one order, at any time since."""
+  orderedAgain: Int!
+
+  """
+  How many of them ordered in each month after, the next first, up to this month: a customer counts once a month however many orders they placed in it.
+  """
+  returned: [Int!]!
+}
+
 type CustomerConnection {
   edges: [CustomerEdge!]!
   nodes: [Customer!]!
@@ -14284,6 +14305,14 @@ type Query {
 
   """A customer by ID, or null if not found."""
   customer(id: ID!): Customer
+
+  """
+  Customers in cohorts by the month of their first order, and how many came back each month after (ANL-04): the last `months` months in the shop's time zone, this month the last, worked out from the orders when asked.
+  """
+  customerCohorts(
+    """How many months, 1 to 24; 12 when left out."""
+    months: Int
+  ): [CustomerCohort!]!
 
   """
   Customers' erasures waiting to happen, the soonest first: who will be erased, and when, unless customerErasureCancel stops it (ADR-116).

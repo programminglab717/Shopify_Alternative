@@ -37,6 +37,8 @@ import { OrderResolver } from './graphql/order.resolver.js';
 import { RefundResolver } from './graphql/refund.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
 import { SalesReportResolver } from './graphql/sales-report.resolver.js';
+import { CustomerCohortsResolver } from './graphql/customer-cohorts.resolver.js';
+import { CustomerCohortsService } from './customer-cohorts.service.js';
 import { SavedSearchResolver } from './graphql/saved-search.resolver.js';
 import {
   RefundReceiptResolver,
@@ -98,6 +100,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderSettingsService,
     BankTransferService,
     SalesReportService,
+    CustomerCohortsService,
     TransferReceiptService,
     SavedSearchService,
     TodayService,
@@ -127,6 +130,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderSettingsResolver,
     BankTransferResolver,
     SalesReportResolver,
+    CustomerCohortsResolver,
     TransferReceiptResolver,
     RefundReceiptResolver,
     SavedSearchResolver,
@@ -158,6 +162,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderSettingsService,
     BankTransferService,
     SalesReportService,
+    CustomerCohortsService,
     TransferReceiptService,
     SavedSearchService,
     TodayService,

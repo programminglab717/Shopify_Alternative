@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-773 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-774 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -781,6 +781,7 @@
 | 771 | The admin sets delivery times with the delivery charges, and an order's page says the slot its customer chose | Accepted |
 | 772 | A delivery slot takes as many orders as the shop says, counted again under a lock when an order is placed in it | Accepted |
 | 773 | A shop's delivery slots leave out the days of the week it does not deliver on | Accepted |
+| 774 | Customers are put in cohorts by the month of their first order, and counted again in each month they come back | Accepted |
 
 ---
 
@@ -25974,3 +25975,20 @@
 * **Consequences:** CHK-15 is whole for shops that deliver themselves: times, days ahead, hours
   first, orders per time, days off, the choice kept and shown. Pakistan's public holidays are
   not left out by themselves, as such shops often work them; a shop closes them by hand for now.
+
+## ADR-774 · Customers are put in cohorts by the month of their first order, and counted again in each month they come back
+
+* **Context:** ANL-04 asks for cohorts and retention: whether the customers a shop wins in a
+  month, by an Eid sale or a lawn launch, come back, and how soon. The sales report (ANL-02)
+  says what orders came to, not who returned.
+* **Decision:** orders' `CustomerCohortsService` works it out from the orders when asked, nothing
+  stored: a customer's cohort is the month of their first order, cancelled ones aside, in the
+  shop's time zone; for each of the last `months` cohorts (1 to 24, this month the last), how
+  many customers it has, how many of them ordered in each month after up to this month (a
+  customer once a month however many orders), and how many have placed more than one order at
+  any time. Months without new customers are there with nothing, so the table is regular.
+  `customerCohorts(months: Int = 12): [CustomerCohort!]!` in the Admin API, for `read_orders`
+  as the sales report.
+* **Consequences:** shops see retention without exporting orders. Customers merged (ADR-130)
+  count as one, as their orders move to the one kept. RFM (recency, frequency, money) builds on
+  the same orders later; segments (CUS-03) already filter by orders and spend.

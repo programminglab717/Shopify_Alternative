@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Customer cohorts
+
+* **Who comes back:** customers grouped by the month of their first order, with how many came
+  back each month after and how many ordered more than once (ANL-04, [ADR-774](../architecture/13-decision-log.md#adr-774--customers-are-put-in-cohorts-by-the-month-of-their-first-order-and-counted-again-in-each-month-they-come-back)).
+* 4185 tests (3 new).
+
 ### d7fc9b8 · Days without delivery
 
 * **Days off:** a shop ticks the days of the week it delivers on, and checkout offers no
