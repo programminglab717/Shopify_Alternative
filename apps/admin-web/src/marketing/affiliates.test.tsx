@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AffiliateValue } from '../api/types';
 import { fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
 import { affiliateLink } from './affiliates-page';
 
 const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 
-const AYESHA = {
+const AYESHA: AffiliateValue = {
   id: 'afl_1',
   name: 'Ayesha Khan',
   phone: '+923001234567',
@@ -28,7 +29,7 @@ const AYESHA = {
 
 /** A fake core keeping the shop's affiliates as the core would, with Ayesha's orders. */
 function affiliatesCore() {
-  const affiliates = [JSON.parse(JSON.stringify(AYESHA)) as typeof AYESHA];
+  const affiliates: AffiliateValue[] = [JSON.parse(JSON.stringify(AYESHA)) as AffiliateValue];
   return fakeCore('marketer', (operation, variables) => {
     const input = (variables?.input ?? {}) as Record<string, unknown>;
     switch (operation) {
@@ -50,7 +51,7 @@ function affiliatesCore() {
           };
         }
         const made = {
-          ...(JSON.parse(JSON.stringify(AYESHA)) as typeof AYESHA),
+          ...(JSON.parse(JSON.stringify(AYESHA)) as AffiliateValue),
           id: 'afl_2',
           name: String(input.name),
           ref: String(input.ref),
