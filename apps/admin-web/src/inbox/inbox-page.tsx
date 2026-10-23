@@ -10,7 +10,7 @@ import type {
   ConversationValue,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
-import { gate } from '../auth/permissions';
+import { gate, permits } from '../auth/permissions';
 import { shownPhone } from '../customers/customers-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatRelative } from '../i18n/format';
@@ -20,6 +20,7 @@ import { useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { ContactMessages } from './contact-messages';
+import { SavedReplies } from './saved-replies';
 
 const PAGE = 50;
 
@@ -32,8 +33,11 @@ export const READS_INBOX = gate(
 /** Those who answer customers, mark conversations read and close them; marketers only read. */
 export const WORKS_INBOX = gate(['owner', 'manager', 'confirmation_agent'], 'write_conversations');
 
-/** The conversations' tabs, and the contact form's messages beside them (ADR-590). */
-type InboxTab = 'open' | 'unread' | 'closed' | 'form';
+/**
+ * The conversations' tabs, the contact form's messages beside them (ADR-590), and the saved
+ * replies (ADR-758).
+ */
+type InboxTab = 'open' | 'unread' | 'closed' | 'form' | 'replies';
 
 /** The inbox's search: which tab, the open conversations when none. */
 export interface InboxSearch {
@@ -42,12 +46,12 @@ export interface InboxSearch {
 
 export function validateInboxSearch(search: Record<string, unknown>): InboxSearch {
   const tab = search.tab;
-  return tab === 'unread' || tab === 'closed' || tab === 'form' ? { tab } : {};
+  return tab === 'unread' || tab === 'closed' || tab === 'form' || tab === 'replies' ? { tab } : {};
 }
 
 /** Each tab: its name, what it asks the API for, and what it says when empty. */
 const TABS: Record<
-  Exclude<InboxTab, 'form'>,
+  Exclude<InboxTab, 'form' | 'replies'>,
   {
     label: MessageKey;
     status: ConversationStatus | null;
@@ -160,9 +164,14 @@ function ConversationRow({
  */
 export function InboxPage() {
   const { tab = 'open' } = useSearch({ from: '/$shopId/inbox' });
+  const works = permits(useShop(), WORKS_INBOX);
   return tab === 'form' ? (
     <InboxFrame tab="form" unreadCount={null}>
       <ContactMessages />
+    </InboxFrame>
+  ) : tab === 'replies' ? (
+    <InboxFrame tab="replies" unreadCount={null}>
+      <SavedReplies works={works} />
     </InboxFrame>
   ) : (
     <Conversations tab={tab} />
@@ -183,11 +192,11 @@ function InboxFrame({
   const shop = useShop();
   const navigate = useNavigate();
   const tabs: [InboxTab, MessageKey][] = [
-    ...(Object.keys(TABS) as Exclude<InboxTab, 'form'>[]).map((each): [InboxTab, MessageKey] => [
-      each,
-      TABS[each].label,
-    ]),
+    ...(Object.keys(TABS) as Exclude<InboxTab, 'form' | 'replies'>[]).map(
+      (each): [InboxTab, MessageKey] => [each, TABS[each].label],
+    ),
     ['form', 'inbox.tab.FORM'],
+    ['replies', 'inbox.tab.REPLIES'],
   ];
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -196,7 +205,13 @@ function InboxFrame({
           {t('inbox.title')}
         </h1>
         <p className="text-secondary">
-          {t(tab === 'form' ? 'contactMessages.intro' : 'inbox.intro')}
+          {t(
+            tab === 'form'
+              ? 'contactMessages.intro'
+              : tab === 'replies'
+                ? 'savedReplies.intro'
+                : 'inbox.intro',
+          )}
           {unreadCount !== null &&
             unreadCount > 0 &&
             ` · ${t('inbox.unreadCount', { count: formatCount(unreadCount) })}`}
@@ -232,7 +247,7 @@ function InboxFrame({
 }
 
 /** The conversations of one of the inbox's tabs, a page at a time. */
-function Conversations({ tab }: { tab: Exclude<InboxTab, 'form'> }) {
+function Conversations({ tab }: { tab: Exclude<InboxTab, 'form' | 'replies'> }) {
   const { t } = useLocale();
   const store = useSessionStore();
   const shop = useShop();

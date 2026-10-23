@@ -4938,6 +4938,26 @@ export interface ConversationUpdatePayload {
   userErrors: UserError[];
 }
 
+/** A saved reply of the shop's (ADR-758). */
+export interface SavedReplyValue {
+  id: string;
+  title: string;
+  body: string;
+}
+
+export interface SavedRepliesData {
+  savedReplies: SavedReplyValue[];
+}
+
+export interface SavedReplyPayload {
+  savedReply: SavedReplyValue | null;
+  userErrors: UserError[];
+}
+
+export interface SavedReplyDeleteData {
+  savedReplyDelete: { deletedSavedReplyId: string | null; userErrors: UserError[] };
+}
+
 export interface ConversationReplyData {
   conversationReply: ConversationUpdatePayload & { message: ConversationMessageValue | null };
 }

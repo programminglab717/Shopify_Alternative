@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Saved replies in the inbox
+
+* **Staff answer the same questions in a tap:** the shop keeps its answers, delivery charges,
+  bank details, how to measure, in English or Urdu, and picks one while answering, to change
+  before sending ([ADR-758](../architecture/13-decision-log.md#adr-758--the-inbox-keeps-the-shops-saved-replies-each-a-title-and-its-words-at-most-100-picked-while-answering-and-changed-before-sending)).
+* 4136 tests (9 new).
+
 ### b991a73 · Barcodes and price labels
 
 * **A shop prints its own price labels,** from the products list, on A4 sticker sheets or a

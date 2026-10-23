@@ -9482,6 +9482,15 @@ type Mutation {
   """
   reviewSettingsUpdate(input: ReviewSettingsInput!): ReviewSettingsPayload!
 
+  """Keeps a saved reply: at most 100 a shop, each of its own title."""
+  savedReplyCreate(input: SavedReplyInput!): SavedReplyPayload!
+
+  """Deletes a saved reply."""
+  savedReplyDelete(id: ID!): SavedReplyDeletePayload!
+
+  """Changes a saved reply's title and words."""
+  savedReplyUpdate(id: ID!, input: SavedReplyInput!): SavedReplyPayload!
+
   """
   Keeps a search of one of the shop's lists by name, for all its staff: up to 100 of each list. Needs the scope that changes the list: write_orders, or write_products.
   """
@@ -14744,6 +14753,9 @@ type Query {
     topProducts: Int
   ): SalesReport!
 
+  """The shop's saved replies, by their titles."""
+  savedReplies: [SavedReply!]!
+
   """The shop's search rules, by their terms (ADR-692)."""
   searchRules: [SearchRule!]!
 
@@ -15605,6 +15617,40 @@ type SalesRow {
 
   """What to call it: "Instagram" for instagram, say."""
   title: String!
+}
+
+"""
+What the shop answers customers with in a tap (MSG-06, ADR-758): changed before sending, as any reply.
+"""
+type SavedReply {
+  """The words, in English, Urdu or both."""
+  body: String!
+  createdAt: DateTime!
+  id: ID!
+
+  """What staff find it by: "Delivery charges", "Bank details"."""
+  title: String!
+  updatedAt: DateTime!
+}
+
+type SavedReplyDeletePayload {
+  deletedSavedReplyId: ID
+  userErrors: [UserError!]!
+}
+
+input SavedReplyInput {
+  """At most 4,096 characters, as a WhatsApp reply."""
+  body: String!
+
+  """
+  At most 60 characters, none of the shop’s other replies’, whatever case.
+  """
+  title: String!
+}
+
+type SavedReplyPayload {
+  savedReply: SavedReply
+  userErrors: [UserError!]!
 }
 
 """

@@ -130,6 +130,8 @@ export const ID_PREFIXES = {
   contactMessage: 'cform',
   // What a storefront's search shows first, or leaves out, for a term (ADR-692).
   searchRule: 'srch',
+  // What a shop's staff answer customers with in a tap (ADR-758).
+  savedReply: 'srep',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

@@ -47,6 +47,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { mediaLabel, UnreadBadge, WORKS_INBOX } from './inbox-page';
+import { SavedReplyPicker } from './saved-replies';
 
 const PAGE = 50;
 
@@ -177,6 +178,11 @@ function ReplyBox({
         maxLength={REPLY_MAX}
         onChange={(event) => setBody(event.target.value)}
         className="rounded-control border border-line bg-surface px-3 py-2 text-text"
+      />
+      <SavedReplyPicker
+        onPick={(saved) =>
+          setBody((current) => (current.trim() ? `${current.trimEnd()}\n${saved}` : saved))
+        }
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">

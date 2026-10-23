@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-757 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-758 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -765,6 +765,7 @@
 | 755 | A Shopify store's customers come through its Admin API, written as Shopify's customer export for the customer import a few thousand at a time, those with no phone number counted and left out | Accepted |
 | 756 | A Shopify store's discount codes come through its Admin API, a page of five at a time, each code made with its discount's value, minimum, dates, uses left and what it is for, and those the shop cannot give named | Accepted |
 | 757 | Variants get barcodes of the shop's own, EAN-13 numbers starting 2, and price labels are printed from the products list, 24 to a sheet of A4 or one to a label printer's 50×25 mm roll, each with its product, options, price and barcode | Accepted |
+| 758 | The inbox keeps the shop's saved replies, each a title and its words, at most 100, picked while answering and changed before sending | Accepted |
 
 ---
 
@@ -25646,3 +25647,25 @@
 * **Consequences:** a shop prints scannable price labels from what it already has. Labels in
   Urdu, labels from the product's page and from a purchase order as it is received, and ZPL for
   printers that take no browser page, are left until shops ask.
+
+## ADR-758 · The inbox keeps the shop's saved replies, each a title and its words, at most 100, picked while answering and changed before sending
+
+* **Context:** a shop's staff answer the same questions on WhatsApp all day: what delivery
+  costs, which bank to transfer to, how to measure for a suit, whether cash on delivery reaches
+  a town (MSG-06). Typing each answer again is slow, and differs between agents.
+* **Decision:**
+  * **Saved replies** are kept by messaging, in migration 0321: a title of up to 60
+    characters, none the same as another of the shop's whatever its case, and words of up to
+    4,096, as long as a WhatsApp reply may be; at most 100 a shop. They are plain words, in
+    English, Urdu or both, with nothing filled in for them.
+  * **The Admin API** lists them by title (`savedReplies`) for all who read the inbox, and
+    keeps, changes and deletes them (`savedReplyCreate`, `savedReplyUpdate`,
+    `savedReplyDelete`) for those who answer it, with `write_conversations`.
+  * **The admin's inbox** has a Saved replies tab: each reply, kept, changed or deleted after
+    asking; marketers read them. Answering a conversation, *Saved replies* finds one by any of
+    its words and puts it in the reply, after what is written, to change before sending.
+* **Consequences:** a reply is still sent within WhatsApp's day, as any reply (ADR-546). A
+  reply's words filled in for the customer, such as their name or order, and conversations
+  given to staff with a time to answer by, are left for after this.
+* **Alternatives:** **WhatsApp Business's own quick replies** live in its app on one phone, not
+  with the shop's other staff in the inbox.

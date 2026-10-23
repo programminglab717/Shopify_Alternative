@@ -10308,6 +10308,62 @@ export const ConversationUpdateStatusMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** What the shop answers customers with in a tap (MSG-06, ADR-758). */
+export const SavedRepliesQuery = /* GraphQL */ `
+  query SavedReplies {
+    savedReplies {
+      id
+      title
+      body
+    }
+  }
+`;
+
+const SAVED_REPLY_PAYLOAD = /* GraphQL */ `
+  fragment SavedReplyPayloadFields on SavedReplyPayload {
+    savedReply {
+      id
+      title
+      body
+    }
+    userErrors {
+      ...Problems
+    }
+  }
+`;
+
+export const SavedReplyCreateMutation = /* GraphQL */ `
+  mutation SavedReplyCreate($input: SavedReplyInput!) {
+    savedReplyCreate(input: $input) {
+      ...SavedReplyPayloadFields
+    }
+  }
+  ${SAVED_REPLY_PAYLOAD}
+  ${USER_ERRORS}
+`;
+
+export const SavedReplyUpdateMutation = /* GraphQL */ `
+  mutation SavedReplyUpdate($id: ID!, $input: SavedReplyInput!) {
+    savedReplyUpdate(id: $id, input: $input) {
+      ...SavedReplyPayloadFields
+    }
+  }
+  ${SAVED_REPLY_PAYLOAD}
+  ${USER_ERRORS}
+`;
+
+export const SavedReplyDeleteMutation = /* GraphQL */ `
+  mutation SavedReplyDelete($id: ID!) {
+    savedReplyDelete(id: $id) {
+      deletedSavedReplyId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** The shop's answer in its own words, within the day WhatsApp allows (ADR-546). */
 export const ConversationReplyMutation = /* GraphQL */ `
   mutation ConversationReply($id: ID!, $body: String!) {
