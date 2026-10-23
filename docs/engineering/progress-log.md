@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Discount codes straight from a Shopify store
+### 1e6a46d · Discount codes straight from a Shopify store
 
 * **The old store's discount codes come too,** so the codes on its cards and in its messages
   still work: each with what it takes off, its minimum, dates and the uses it has left; those
