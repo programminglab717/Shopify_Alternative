@@ -8,6 +8,8 @@ import type { LowStockAlert } from '@hatti/inventory/public';
 import { LogisticsEvents, type CodRemittanceImportedPayload } from '@hatti/logistics/public';
 import {
   MessagingEvents,
+  overdueConversationsIn,
+  shopsWithReplyTargetIn,
   type ConversationAssignedPayload,
   type ConversationMessageReceivedPayload,
   type PushKind,
@@ -387,6 +389,82 @@ export class OverdueOrderPushes {
       () => this.sweep(),
       intervalMs,
       (error) => this.logger?.warn({ err: error }, 'overdue orders sweep failed'),
+    );
+  }
+}
+
+/**
+ * Pushes when a customer on WhatsApp has waited past the shop's time to answer (MSG-06, ADR-762):
+ * to whom the conversation is given while they work in the shop, else to the owners, managers and
+ * confirmation agents who answer customers; once a wait, while WhatsApp still lets the shop answer
+ * freely, saying neither the customer's number nor words, opening the conversation. Nothing for a
+ * shop without a target, and nothing where Hatti has no VAPID keys. The shops are found with the
+ * system role; each is read in its own transaction.
+ */
+export class OverdueConversationPushes {
+  constructor(
+    private readonly database: Database,
+    private readonly push: PushService,
+    private readonly logger?: Logger,
+  ) {}
+
+  /** One sweep at `at`: how many conversations were pushed. */
+  async sweep(at: Date = new Date()): Promise<number> {
+    if (this.push.publicKey === null) return 0;
+    const shops = await this.database.system((tx) => shopsWithReplyTargetIn(tx));
+    let pushed = 0;
+    for (const shopId of shops) {
+      try {
+        const notices = await this.database.tenant(shopId, async (tx) => {
+          const overdue = await overdueConversationsIn(tx, shopId, at);
+          if (overdue.length === 0) return [];
+          const shop = await shopProfile(tx, shopId);
+          const recipients = await recipientsIn(tx, shopId);
+          return overdue.map((conversation): PushNotice => {
+            const given = recipients.filter((each) => each.userId === conversation.assigneeId);
+            return {
+              kind: 'conversation_overdue',
+              // Once a wait: pushed again only if they wait again after an answer.
+              dedupeKey: `conversation_overdue:${conversation.id}:${conversation.waitingSince.toISOString()}`,
+              recipients: given.length > 0 ? given : recipients,
+              message: {
+                en: {
+                  title: `${shop.name}: a customer has waited too long`,
+                  body: 'Past your time to answer on WhatsApp. Reply in the inbox.',
+                },
+                ur: {
+                  title: `${shop.name}: گاہک بہت دیر سے انتظار میں`,
+                  body: 'واٹس ایپ پر جواب کا وقت گزر گیا۔ ان باکس میں جواب دیں۔',
+                },
+                url: `/${toPublicId('shop', shopId)}/inbox/${toPublicId('conversation', conversation.id)}`,
+              },
+            };
+          });
+        });
+        for (const notice of notices) {
+          await this.push.push(
+            shopId,
+            notice.kind,
+            notice.dedupeKey,
+            notice.recipients,
+            notice.message,
+          );
+          pushed += 1;
+        }
+      } catch (error) {
+        // One shop's failure is not the others': it is pushed on the next sweep.
+        this.logger?.warn({ err: error, shopId }, 'overdue conversations not pushed');
+      }
+    }
+    return pushed;
+  }
+
+  /** Sweeps now, then every `intervalMs`, a sweep never overlapping the last. */
+  start(intervalMs: number): { stop(): Promise<void> } {
+    return repeat(
+      () => this.sweep(),
+      intervalMs,
+      (error) => this.logger?.warn({ err: error }, 'overdue conversations sweep failed'),
     );
   }
 }

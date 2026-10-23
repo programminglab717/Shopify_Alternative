@@ -538,6 +538,56 @@ export class ConversationsService {
   }
 }
 
+/** A conversation whose customer has waited past the shop's reply target (ADR-762). */
+export interface OverdueConversation {
+  id: string;
+  waitingSince: Date;
+  /** The account of the member of staff it is given to; null for no one. */
+  assigneeId: string | null;
+}
+
+/** The most conversations a sweep tells of in one shop at once; the rest on the next. */
+export const OVERDUE_SWEEP_LIMIT = 100;
+
+/**
+ * The shops that set a time to answer the inbox by (ADR-760), for a sweep: read with the system
+ * role, which may read every shop's settings.
+ */
+export async function shopsWithReplyTargetIn(tx: Tx): Promise<string[]> {
+  const { rows } = await tx.execute<{ shop_id: string }>(sql`
+    SELECT shop_id FROM messaging.settings WHERE reply_target_minutes IS NOT NULL`);
+  return rows.map((row) => row.shop_id);
+}
+
+/**
+ * The shop's open conversations whose customer has waited past its reply target at `at`, while
+ * WhatsApp still lets the shop answer them freely: the longest waiting first, at most
+ * {@link OVERDUE_SWEEP_LIMIT}. In the shop's own transaction.
+ */
+export async function overdueConversationsIn(
+  tx: Tx,
+  shopId: string,
+  at: Date,
+): Promise<OverdueConversation[]> {
+  const now = at.toISOString();
+  const { rows } = await tx.execute<{
+    id: string;
+    waiting_since: string | Date;
+    assignee_id: string | null;
+  }>(sql`
+    SELECT c.id, c.waiting_since, c.assignee_id FROM messaging.conversations c
+     WHERE c.shop_id = ${shopId} AND c.status = 'open' AND c.waiting_since IS NOT NULL
+       AND ${ANSWER_BY} < ${now}::timestamptz
+       AND c.last_inbound_at > ${now}::timestamptz - ${`${CONVERSATION_WINDOW_MS} milliseconds`}::interval
+     ORDER BY c.waiting_since, c.id
+     LIMIT ${OVERDUE_SWEEP_LIMIT}`);
+  return rows.map((row) => ({
+    id: row.id,
+    waitingSince: toDate(row.waiting_since),
+    assigneeId: row.assignee_id,
+  }));
+}
+
 /** When a conversation is to be answered by: since it waits, plus its shop's reply target. */
 const ANSWER_BY = sql`(c.waiting_since + make_interval(mins => (
   SELECT s.reply_target_minutes FROM messaging.settings s WHERE s.shop_id = c.shop_id)))`;

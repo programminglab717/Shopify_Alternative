@@ -16,7 +16,7 @@ import { OnlineStoreEvents } from '@hatti/online-store/public';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { LowStockAlerts } from './low-stock-alerts.js';
-import { PushNotices } from './push-notices.js';
+import { OverdueConversationPushes, PushNotices } from './push-notices.js';
 
 const server = testDatabaseServer();
 
@@ -76,7 +76,12 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
 
   beforeAll(async () => {
     testDb = await createTestDatabase(server!);
-    database = new Database({ appUrl: testDb.appUrl, applicationName: 'push-notices-test' });
+    database = new Database({
+      appUrl: testDb.appUrl,
+      // The sweep of conversations waiting too long finds its shops with the system role.
+      systemUrl: testDb.systemUrl,
+      applicationName: 'push-notices-test',
+    });
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(`INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari')`, [
@@ -354,6 +359,60 @@ describe.skipIf(!server)("The shop's news pushed to its staff (APP-03, ADR-506)"
     expect(told()).toEqual([
       { endpoint: endpoint('agent'), title: 'Zari: ایک بات چیت آپ کے سپرد', url },
     ]);
+  });
+
+  it("pushes a customer waiting past the shop's time to answer, to whom it is given or all who answer, once a wait (ADR-762)", async () => {
+    await admin.query(
+      `UPDATE messaging.push_subscriptions SET kinds = kinds || '{conversation_overdue}'::text[]`,
+    );
+    const sweep = new OverdueConversationPushes(database, push);
+    const at = new Date();
+    const ago = (minutes: number) => new Date(at.getTime() - minutes * 60_000).toISOString();
+    // No target, no one late.
+    const conversation = async (phone: string, waited: number, assignee: string | null) => {
+      const { rows } = await admin.query<{ id: string }>(
+        `INSERT INTO messaging.conversations
+                (shop_id, customer_phone, last_message_at, last_inbound_at, waiting_since,
+                 assignee_id, assigned_at)
+         VALUES ($1, $2, $3, $3, $3, $4::uuid, CASE WHEN $4::uuid IS NULL THEN NULL ELSE now() END)
+         RETURNING id`,
+        [shopId, phone, ago(waited), assignee],
+      );
+      return rows[0]!.id;
+    };
+    const late = await conversation('+923001110001', 45, null);
+    await conversation('+923001110002', 10, null);
+    const theirs = await conversation('+923001110003', 50, agent);
+    // Past WhatsApp's day: no longer the shop's to answer freely.
+    await conversation('+923001110004', 2 * 24 * 60, null);
+    expect(await sweep.sweep(at)).toBe(0);
+
+    await admin.query(
+      `INSERT INTO messaging.settings (shop_id, reply_target_minutes) VALUES ($1, 30)
+           ON CONFLICT (shop_id) DO UPDATE SET reply_target_minutes = 30`,
+      [shopId],
+    );
+    expect(await sweep.sweep(at)).toBe(2);
+    const url = (id: string) => `/${shop}/inbox/${toPublicId('conversation', id)}`;
+    expect(told()).toEqual([
+      { endpoint: endpoint('agent'), title: 'Zari: گاہک بہت دیر سے انتظار میں', url: url(theirs) },
+      { endpoint: endpoint('agent'), title: 'Zari: گاہک بہت دیر سے انتظار میں', url: url(late) },
+      {
+        endpoint: endpoint('owner'),
+        title: 'Zari: a customer has waited too long',
+        url: url(late),
+      },
+    ]);
+    // The next sweep tells no one again; a new wait, after an answer, is told anew.
+    await sweep.sweep(at);
+    expect(sender.sent).toHaveLength(3);
+    await admin.query('UPDATE messaging.conversations SET waiting_since = $2 WHERE id = $1', [
+      theirs,
+      ago(40),
+    ]);
+    await sweep.sweep(at);
+    expect(sender.sent).toHaveLength(4);
+    await admin.query('DELETE FROM messaging.settings WHERE shop_id = $1', [shopId]);
   });
 
   it('does nothing where Hatti has no VAPID keys', async () => {

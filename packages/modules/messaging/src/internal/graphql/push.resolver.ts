@@ -25,6 +25,7 @@ export enum PushNotificationKind {
   ORDER_MENTIONED = 'ORDER_MENTIONED',
   CONVERSATION_MESSAGE = 'CONVERSATION_MESSAGE',
   CONVERSATION_ASSIGNED = 'CONVERSATION_ASSIGNED',
+  CONVERSATION_OVERDUE = 'CONVERSATION_OVERDUE',
 }
 
 registerEnumType(PushNotificationKind, {
@@ -42,7 +43,8 @@ registerEnumType(PushNotificationKind, {
     'a comment on an order naming them, ORDER_MENTIONED, whatever their role. And, to those ' +
     'who answer customers, a customer who began waiting on WhatsApp, CONVERSATION_MESSAGE, ' +
     'to whom the conversation is given if anyone; and a conversation given to them by ' +
-    'another, CONVERSATION_ASSIGNED (ADR-761).',
+    'another, CONVERSATION_ASSIGNED (ADR-761); and a customer who has waited past the ' +
+    "shop's time to answer, CONVERSATION_OVERDUE (ADR-762).",
 });
 
 @ObjectType({

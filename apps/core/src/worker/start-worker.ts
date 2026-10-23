@@ -103,7 +103,7 @@ import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { PartnerEarnings } from './partner-earnings.js';
 import { OverdueOrderMessages } from './overdue-order-messages.js';
-import { OverdueOrderPushes, PushNotices } from './push-notices.js';
+import { OverdueConversationPushes, OverdueOrderPushes, PushNotices } from './push-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { AutomationTriggers, WinBacks } from './automations.js';
 import { BroadcastQueue } from './broadcasts.js';
@@ -509,6 +509,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => overdue.stop());
+    // And of customers waiting on WhatsApp past the shop's time to answer, once a wait (ADR-762).
+    const waiting = new OverdueConversationPushes(
+      database,
+      new PushService(database, vapid && new WebPushSender(vapid)),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => waiting.stop());
     // And told at the shop's alerts number on WhatsApp, at most every three hours (ADR-680).
     const overdueMessages = new OverdueOrderMessages(
       database,

@@ -4967,6 +4967,9 @@ const en = {
     'A customer writing to you once they wait for an answer; only you, if the conversation is yours.',
   'push.conversationAssigned': 'Conversations given to you',
   'push.conversationAssignedHint': 'A WhatsApp conversation given to you to answer.',
+  'push.conversationOverdue': 'Customers waiting too long',
+  'push.conversationOverdueHint':
+    'A customer on WhatsApp past your time to answer, once each wait; only you, if it is yours.',
   'push.ordersOverdue': 'Orders not called in time',
   'push.ordersOverdueHint':
     'Orders waiting for their first call longer than your target, at most once an hour.',
@@ -10637,6 +10640,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'جب کوئی گاہک لکھے اور جواب کا انتظار کرنے لگے؛ بات چیت آپ کی ہو تو صرف آپ کو۔',
   'push.conversationAssigned': 'آپ کو دی گئی بات چیت',
   'push.conversationAssignedHint': 'واٹس ایپ کی بات چیت جو آپ کو جواب دینے کے لیے دی گئی ہو۔',
+  'push.conversationOverdue': 'بہت دیر سے انتظار کرتے گاہک',
+  'push.conversationOverdueHint':
+    'واٹس ایپ پر گاہک جسے آپ کے جواب کے وقت سے زیادہ ہو گیا ہو، ہر انتظار میں ایک بار؛ آپ کا ہو تو صرف آپ کو۔',
   'push.ordersOverdue': 'وقت پر کال نہ ہونے والے آرڈرز',
   'push.ordersOverdueHint':
     'آپ کے ہدف سے زیادہ دیر سے پہلی کال کے منتظر آرڈرز، گھنٹے میں زیادہ سے زیادہ ایک بار۔',

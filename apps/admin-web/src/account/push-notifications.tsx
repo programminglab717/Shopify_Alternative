@@ -37,7 +37,8 @@ type PushKind =
   | 'ORDER_ASSIGNED'
   | 'ORDER_MENTIONED'
   | 'CONVERSATION_MESSAGE'
-  | 'CONVERSATION_ASSIGNED';
+  | 'CONVERSATION_ASSIGNED'
+  | 'CONVERSATION_OVERDUE';
 
 /** A member's own orders and comments, whatever their role, if they may see orders (ADR-633). */
 const OWN_WORK = gate(
@@ -120,6 +121,12 @@ const KINDS: {
     gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_conversations'),
     label: 'push.conversationAssigned',
     hint: 'push.conversationAssignedHint',
+  },
+  {
+    kind: 'CONVERSATION_OVERDUE',
+    gate: gate(['owner', 'manager', 'confirmation_agent'], 'write_conversations'),
+    label: 'push.conversationOverdue',
+    hint: 'push.conversationOverdueHint',
   },
   {
     kind: 'COMMENT_PENDING',

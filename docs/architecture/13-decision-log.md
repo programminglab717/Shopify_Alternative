@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-761 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-762 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -769,6 +769,7 @@
 | 759 | A conversation is given to a member of staff to answer, as an order is: those who give orders to others give it to anyone, others take one no one has, and whoever leaves gives theirs back | Accepted |
 | 760 | A shop says in how many minutes it answers the inbox; each conversation keeps since when its customer has waited, and those waiting past it are overdue | Accepted |
 | 761 | The inbox pushed to staff's phones: a customer who begins waiting on WhatsApp, to whom the conversation is given or else all who answer, and a conversation given to its member | Accepted |
+| 762 | A customer waiting past the shop's time to answer is pushed, once a wait, to whom the conversation is given or else all who answer, by a sweep of the worker | Accepted |
 
 ---
 
@@ -25741,3 +25742,23 @@
   * **The admin's notification settings** offer both with the inbox's other kinds.
 * **Consequences:** a conversation waiting past the shop's reply target pushes no one yet;
   that needs a sweep by the worker, as orders overdue for their first call have (ADR-627).
+
+## ADR-762 · A customer waiting past the shop's time to answer is pushed, once a wait, to whom the conversation is given or else all who answer, by a sweep of the worker
+
+* **Context:** a conversation overdue (ADR-760) showed so in the inbox alone; staff away from it
+  were not told, though being overdue is what the target is for (MSG-06). Being overdue is a
+  state that time brings, not an event, so it needs a sweep.
+* **Decision:**
+  * **A push of its own, `conversation_overdue`** (migration 0325), to owners, managers and
+    confirmation agents who may answer customers, as the inbox's other pushes (ADR-761).
+  * **The worker sweeps** every shop that sets a reply target, found with the system role, each
+    read in its own transaction: open conversations past it, the longest waiting first, a
+    hundred at most a sweep. Each is pushed to whom it is given while they work in the shop,
+    else to all who answer, **once a wait**: the push's key holds when the wait began, so the
+    same wait is never pushed twice and a new one, after an answer, is.
+  * **Only while WhatsApp lets the shop answer freely,** a day from the customer's last message;
+    after that the shop needs a template, and the inbox says so.
+  * **The admin's notification settings** offer it with the inbox's other kinds.
+* **Consequences:** the target runs by the clock, not the shop's opening hours, so a message at
+  night is pushed at night to whoever chose this push; a shop that does not want that leaves it
+  off on its phones.

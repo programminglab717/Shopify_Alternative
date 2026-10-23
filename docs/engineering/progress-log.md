@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Customers waiting too long pushed
+
+* **No one waits unnoticed:** once a customer on WhatsApp passes the shop's time to answer, a
+  push goes to whoever has the conversation, else to all who answer, once each wait ([ADR-762](../architecture/13-decision-log.md#adr-762--a-customer-waiting-past-the-shops-time-to-answer-is-pushed-once-a-wait-to-whom-the-conversation-is-given-or-else-all-who-answer-by-a-sweep-of-the-worker)).
+* 4147 tests (1 new).
+
 ### 1d7abfd · The inbox pushed to staff's phones
 
 * **Staff hear of customers on WhatsApp at once:** a customer who begins waiting is pushed to

@@ -9,6 +9,10 @@ export {
 export {
   CONVERSATION_WINDOW_MS,
   ConversationsService,
+  OVERDUE_SWEEP_LIMIT,
+  overdueConversationsIn,
+  shopsWithReplyTargetIn,
+  type OverdueConversation,
   REPLY_MAX_LENGTH,
   WHATSAPP_REPLIES,
   type WhatsAppReplySettings,
