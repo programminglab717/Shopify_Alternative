@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Delivery time slots
+### d2fbda5 · Delivery time slots
 
 * **Times to deliver in:** a shop that delivers itself sets times of the day, the days ahead
   they are offered on and the hours it needs first; checkout can offer them (CHK-15, [ADR-768](../architecture/13-decision-log.md#adr-768--delivery-time-slots-are-times-of-the-day-in-pakistans-time-offered-on-the-days-ahead-from-the-hours-ahead-the-shop-needs)).
