@@ -4546,6 +4546,23 @@ enum DiscountStatus {
   SCHEDULED
 }
 
+type DiscountsImportFromShopifyPayload {
+  """Codes made, or that would be in a dry run."""
+  created: Int!
+  discountErrors: [StoreDiscountImportError!]!
+
+  """Discounts with codes the store has."""
+  discounts: Int!
+  dryRun: Boolean!
+
+  """Discounts left out because they ended, or were used up."""
+  expired: Int!
+
+  """Codes left as they are: the shop has codes of theirs."""
+  skipped: Int!
+  userErrors: [UserError!]!
+}
+
 """
 A document's wording. Names, addresses and products stay as they were typed.
 """
@@ -8547,6 +8564,21 @@ type Mutation {
   Changes what is given of the code; the rest stays. Orders placed with it keep what it took off them. Ending it now stops it.
   """
   discountCodeUpdate(discountCode: DiscountCodeInput!, id: ID!): DiscountCodeUpdatePayload!
+
+  """
+  Imports a Shopify store's discount codes through its Admin API (ONB-05, ADR-756): an amount or percentage off, free delivery, or buy X get Y at a percentage off; a minimum subtotal; its dates; once per customer; the uses it has left; and the shop's products and collections with the handles of those it is for, products bought before it comes. A discount that ended or was used up is left out; one the shop cannot give, such as an amount off each item or one made by an app, is named with why. Codes the shop has are left as they are. Give the store and its app as productsImportFromShopify takes them; the app needs the read_discounts access scope. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  discountsImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): DiscountsImportFromShopifyPayload!
 
   """
   Connects a domain of the shop's own. Point it at the `dnsTarget` the answer names, then `domainVerify` it: the storefront answers at it from then on. None on a plan without domains of its own, such as Free, which keeps those connected before (ADR-264).
@@ -16811,6 +16843,13 @@ enum StoreCreditSystemEvent {
 type StoreCustomerImportError {
   """The customer's name at the store, or its email or number."""
   customer: String!
+  message: String!
+}
+
+"""A store's discount that did not come, or not whole, and why."""
+type StoreDiscountImportError {
+  """The discount's title at the store."""
+  discount: String!
   message: String!
 }
 

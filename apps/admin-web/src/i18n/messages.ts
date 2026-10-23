@@ -3023,6 +3023,13 @@ const en = {
   'files.customersImported': 'Customers added: {created}; already here: {skipped}.',
   'files.customersWithoutPhone': 'Customers with no phone number, left out: {count}.',
   'files.customerError': '{customer}: {message}',
+  'files.storeDiscounts': 'Bring its discount codes too',
+  'files.storeDiscountsHint':
+    'Each code with what it takes off, its minimum, dates and the uses it has left. The app needs the read_discounts scope too.',
+  'files.discountsChecked':
+    'Discount codes to add: {created}; already here: {skipped}. Discounts that ended: {expired}.',
+  'files.discountsImported': 'Discount codes added: {created}; already here: {skipped}.',
+  'files.discountError': '{discount}: {message}',
   'files.storeBlogs': 'Bring its blogs too',
   'files.storeBlogsHint':
     'Its blogs and their articles, at the same addresses, without their images. The app needs the read_content scope too.',
@@ -8631,6 +8638,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.customersImported': 'شامل کسٹمرز: {created}؛ پہلے سے موجود: {skipped}۔',
   'files.customersWithoutPhone': 'جن کسٹمرز کا فون نمبر نہیں، باہر رہے: {count}۔',
   'files.customerError': '{customer}: {message}',
+  'files.storeDiscounts': 'اس کے ڈسکاؤنٹ کوڈز بھی لائیں',
+  'files.storeDiscountsHint':
+    'ہر کوڈ، جو وہ کم کرتا ہے، اس کی کم از کم رقم، تاریخوں اور باقی استعمال کے ساتھ۔ ایپ کو read_discounts اسکوپ بھی چاہیے۔',
+  'files.discountsChecked':
+    'شامل کرنے کو ڈسکاؤنٹ کوڈز: {created}؛ پہلے سے موجود: {skipped}۔ ختم ہو چکے ڈسکاؤنٹس: {expired}۔',
+  'files.discountsImported': 'شامل ڈسکاؤنٹ کوڈز: {created}؛ پہلے سے موجود: {skipped}۔',
+  'files.discountError': '{discount}: {message}',
   'files.storeBlogs': 'اس کے بلاگز بھی لائیں',
   'files.storeBlogsHint':
     'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، تصاویر کے بغیر۔ ایپ کو read_content اسکوپ بھی چاہیے۔',

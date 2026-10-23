@@ -130,6 +130,18 @@ function core(role: StaffRole) {
             userErrors: [],
           },
         };
+      case 'DiscountsImportFromShopify':
+        return {
+          discountsImportFromShopify: {
+            dryRun: variables.dryRun,
+            discounts: 4,
+            created: 2,
+            skipped: 1,
+            expired: 1,
+            discountErrors: [{ discount: 'By an app', message: 'An app made it' }],
+            userErrors: [],
+          },
+        };
       case 'BlogsImportFromShopify':
         return {
           blogsImportFromShopify: {
@@ -265,6 +277,10 @@ describe('Products and stock by file', () => {
     ).toBeTruthy();
     expect(screen.getByText('news/old-post: Title is blank')).toBeTruthy();
     expect(screen.getByText('Customers to add: 2; already here: 0.')).toBeTruthy();
+    expect(
+      screen.getByText('Discount codes to add: 2; already here: 1. Discounts that ended: 1.'),
+    ).toBeTruthy();
+    expect(screen.getByText('By an app: An app made it')).toBeTruthy();
     expect(screen.getByText('Customers with no phone number, left out: 2.')).toBeTruthy();
     expect(screen.getByText('Sara Ali: is not a Pakistani mobile number')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Import them' }));
@@ -287,6 +303,11 @@ describe('Products and stock by file', () => {
       screen.getByText('Blogs added: 1. Articles added: 4; left as they were: 1.'),
     ).toBeTruthy();
     expect(screen.getByText('Customers added: 2; already here: 0.')).toBeTruthy();
+    expect(screen.getByText('Discount codes added: 2; already here: 1.')).toBeTruthy();
+    expect(sentOf(fake, 'DiscountsImportFromShopify').map((sent) => sent.dryRun)).toEqual([
+      true,
+      false,
+    ]);
     expect(sentOf(fake, 'CustomersImportFromShopify').map((sent) => sent.dryRun)).toEqual([
       true,
       false,
@@ -328,6 +349,7 @@ describe('Products and stock by file', () => {
     fireEvent.click(screen.getByLabelText(/Bring its blogs too/));
     fireEvent.click(screen.getByLabelText(/Bring its collections too/));
     fireEvent.click(screen.getByLabelText(/Bring its customers too/));
+    fireEvent.click(screen.getByLabelText(/Bring its discount codes too/));
     fireEvent.change(screen.getByLabelText('Your app'), { target: { value: 'TOKEN' } });
     type('Access token', 'shpat_1');
     fireEvent.click(screen.getByRole('button', { name: 'Check the store' }));
@@ -343,6 +365,7 @@ describe('Products and stock by file', () => {
     expect(sentOf(fake, 'BlogsImportFromShopify')).toHaveLength(2);
     expect(sentOf(fake, 'CollectionsImportFromShopify')).toHaveLength(2);
     expect(sentOf(fake, 'CustomersImportFromShopify')).toHaveLength(2);
+    expect(sentOf(fake, 'DiscountsImportFromShopify')).toHaveLength(2);
   });
 
   it("checks a WooCommerce export as WooCommerce's when told the file is from it (ADR-482)", async () => {

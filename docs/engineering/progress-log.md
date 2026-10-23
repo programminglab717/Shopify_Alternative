@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Discount codes straight from a Shopify store
+
+* **The old store's discount codes come too,** so the codes on its cards and in its messages
+  still work: each with what it takes off, its minimum, dates and the uses it has left; those
+  the shop cannot give are named ([ADR-756](../architecture/13-decision-log.md#adr-756--a-shopify-stores-discount-codes-come-through-its-admin-api-a-page-of-five-at-a-time-each-code-made-with-its-discounts-value-minimum-dates-uses-left-and-what-it-is-for-and-those-the-shop-cannot-give-named)).
+* 4120 tests (3 new).
+
 ### 62cf9f0 · Customers straight from a Shopify store
 
 * **The old store's customers come too,** each by their mobile number, with their name, email,

@@ -12,6 +12,7 @@ import {
   BlogsImportFromShopifyMutation,
   CollectionsImportFromShopifyMutation,
   CustomersImportFromShopifyMutation,
+  DiscountsImportFromShopifyMutation,
   ProductsImportMutation,
   UrlRedirectsImportFromShopifyMutation,
 } from '../api/operations';
@@ -32,6 +33,8 @@ import type {
   CollectionsImportFromShopifyResult,
   CustomersImportFromShopifyData,
   CustomersImportFromShopifyResult,
+  DiscountsImportFromShopifyData,
+  DiscountsImportFromShopifyResult,
   ProductsImportResult,
   UrlRedirectsImportFromShopifyData,
   UrlRedirectsImportResult,
@@ -49,6 +52,7 @@ import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 import { EDITS_MENUS } from '../online-store/menus';
 import { MOVES_CUSTOMERS } from '../customers/transfer-page';
+import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
 import { WRITES_BLOGS, WRITES_PAGES } from '../online-store/pages';
 import { EDITS_PRODUCTS } from './status';
 
@@ -120,6 +124,8 @@ function ImportFromStore() {
   const writesBlogs = permits(shop, WRITES_BLOGS);
   // And its customers theirs who may bring customers in (ADR-755).
   const movesCustomers = permits(shop, MOVES_CUSTOMERS);
+  // And its discount codes theirs who make codes (ADR-756).
+  const managesDiscounts = permits(shop, MANAGES_DISCOUNTS);
   type Store = { store: string; accessToken?: string; clientId?: string; clientSecret?: string };
   const run = useAdminMutation<
     ProductsImportFromShopifyData,
@@ -140,6 +146,10 @@ function ImportFromStore() {
     CustomersImportFromShopifyData,
     Store & { dryRun: boolean }
   >(CustomersImportFromShopifyMutation);
+  const moveDiscounts = useAdminMutation<
+    DiscountsImportFromShopifyData,
+    Store & { dryRun: boolean }
+  >(DiscountsImportFromShopifyMutation);
   const moveBlogs = useAdminMutation<BlogsImportFromShopifyData, Store & { dryRun: boolean }>(
     BlogsImportFromShopifyMutation,
   );
@@ -155,6 +165,7 @@ function ImportFromStore() {
   const [withPages, setWithPages] = useState(writesPages);
   const [withBlogs, setWithBlogs] = useState(writesBlogs);
   const [withCustomers, setWithCustomers] = useState(movesCustomers);
+  const [withDiscounts, setWithDiscounts] = useState(managesDiscounts);
   const [checked, setChecked] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
@@ -162,6 +173,7 @@ function ImportFromStore() {
     blogs: BlogsImportFromShopifyResult | null;
     collections: CollectionsImportFromShopifyResult | null;
     customers: CustomersImportFromShopifyResult | null;
+    discounts: DiscountsImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
@@ -170,6 +182,7 @@ function ImportFromStore() {
     blogs: BlogsImportFromShopifyResult | null;
     collections: CollectionsImportFromShopifyResult | null;
     customers: CustomersImportFromShopifyResult | null;
+    discounts: DiscountsImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
@@ -185,6 +198,7 @@ function ImportFromStore() {
       blogs?: BlogsImportFromShopifyResult;
       collections?: CollectionsImportFromShopifyResult;
       customers?: CustomersImportFromShopifyResult;
+      discounts?: DiscountsImportFromShopifyResult;
     } = {};
     const ok = await attempt(async () => {
       answer.products = (
@@ -200,6 +214,16 @@ function ImportFromStore() {
           await moveCollections.mutateAsync({ ...given(), dryRun })
         ).collectionsImportFromShopify;
         return answer.collections;
+      });
+      if (!moved) return null;
+    }
+    // After the products and collections, which codes are for (ADR-756).
+    if (withDiscounts && managesDiscounts) {
+      const moved = await attempt(async () => {
+        answer.discounts = (
+          await moveDiscounts.mutateAsync({ ...given(), dryRun })
+        ).discountsImportFromShopify;
+        return answer.discounts;
       });
       if (!moved) return null;
     }
@@ -242,6 +266,7 @@ function ImportFromStore() {
       blogs: answer.blogs ?? null,
       collections: answer.collections ?? null,
       customers: answer.customers ?? null,
+      discounts: answer.discounts ?? null,
     };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
@@ -262,7 +287,8 @@ function ImportFromStore() {
     movePages.isPending ||
     moveBlogs.isPending ||
     moveCollections.isPending ||
-    moveCustomers.isPending;
+    moveCustomers.isPending ||
+    moveDiscounts.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -347,6 +373,14 @@ function ImportFromStore() {
           onChange={changed(setWithBlogs)}
         />
       )}
+      {managesDiscounts && (
+        <CheckField
+          label={t('files.storeDiscounts')}
+          hint={t('files.storeDiscountsHint')}
+          checked={withDiscounts}
+          onChange={changed(setWithDiscounts)}
+        />
+      )}
       {movesCustomers && (
         <CheckField
           label={t('files.storeCustomers')}
@@ -424,6 +458,18 @@ function ImportFromStore() {
               <ArticleErrors result={checked.blogs} />
             </>
           )}
+          {checked.discounts && (
+            <>
+              <p>
+                {t('files.discountsChecked', {
+                  created: formatCount(checked.discounts.created),
+                  skipped: formatCount(checked.discounts.skipped),
+                  expired: formatCount(checked.discounts.expired),
+                })}
+              </p>
+              <DiscountErrors result={checked.discounts} />
+            </>
+          )}
           {checked.customers && (
             <>
               <p>
@@ -442,7 +488,8 @@ function ImportFromStore() {
             (checked.pages?.created ?? 0) +
             (checked.blogs?.blogsCreated ?? 0) +
             (checked.blogs?.created ?? 0) +
-            (checked.customers?.created ?? 0) >
+            (checked.customers?.created ?? 0) +
+            (checked.discounts?.created ?? 0) >
             0 && (
             <Button
               className="self-start"
@@ -516,6 +563,14 @@ function ImportFromStore() {
                 })}
               </span>
             )}
+            {done.discounts && (
+              <span>
+                {t('files.discountsImported', {
+                  created: formatCount(done.discounts.created),
+                  skipped: formatCount(done.discounts.skipped),
+                })}
+              </span>
+            )}
             {done.customers && (
               <span>
                 {t('files.customersImported', {
@@ -529,6 +584,24 @@ function ImportFromStore() {
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </FormSection>
+  );
+}
+
+/** A store's discounts the shop could not take, or not whole, each by its title. */
+function DiscountErrors({ result }: { result: DiscountsImportFromShopifyResult }) {
+  const { t } = useLocale();
+  if (result.discountErrors.length === 0) return null;
+  return (
+    <Alert tone="warning">
+      <span className="flex flex-col gap-1">
+        <span>{t('moving.rowErrors', { count: result.discountErrors.length })}</span>
+        {result.discountErrors.slice(0, 5).map((error, index) => (
+          <span key={index}>
+            {t('files.discountError', { discount: error.discount, message: error.message })}
+          </span>
+        ))}
+      </span>
+    </Alert>
   );
 }
 

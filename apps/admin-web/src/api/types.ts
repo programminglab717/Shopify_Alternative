@@ -2863,6 +2863,20 @@ export interface CustomersImportFromShopifyData {
   customersImportFromShopify: CustomersImportFromShopifyResult;
 }
 
+export interface DiscountsImportFromShopifyResult {
+  dryRun: boolean;
+  discounts: number;
+  created: number;
+  skipped: number;
+  expired: number;
+  discountErrors: { discount: string; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface DiscountsImportFromShopifyData {
+  discountsImportFromShopify: DiscountsImportFromShopifyResult;
+}
+
 export interface BlogsImportFromShopifyResult {
   dryRun: boolean;
   blogs: number;

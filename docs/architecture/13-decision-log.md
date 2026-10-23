@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-755 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-756 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -763,6 +763,7 @@
 | 753 | A Shopify store's blogs and their articles come through its Admin API, each at its handle, a blog the shop has taking the articles, and the admin's store card brings them too | Accepted |
 | 754 | A Shopify store's collections come through its Admin API, each at its handle, a smart one with its rules and a hand-picked one with the shop's products of its products' handles in its order, and the admin's store card brings them after the products | Accepted |
 | 755 | A Shopify store's customers come through its Admin API, written as Shopify's customer export for the customer import a few thousand at a time, those with no phone number counted and left out | Accepted |
+| 756 | A Shopify store's discount codes come through its Admin API, a page of five at a time, each code made with its discount's value, minimum, dates, uses left and what it is for, and those the shop cannot give named | Accepted |
 
 ---
 
@@ -25591,3 +25592,27 @@
 * **Consequences:** products, collections, redirects, pages, blogs and customers come from a
   Shopify store in one step. Customers' addresses, and orders and discount codes, are still to
   come.
+
+## ADR-756 · A Shopify store's discount codes come through its Admin API, a page of five at a time, each code made with its discount's value, minimum, dates, uses left and what it is for, and those the shop cannot give named
+
+* **Context:** a shop's discount codes are printed on cards, in posts and in messages already
+  sent (08 §5); moving without them breaks every one of them.
+* **Decision:**
+  * **`readStoreDiscounts`** in `@hatti/shopify-admin` asks the store and its currency, then its
+    code discounts five at a time, each with up to 20 codes and how many it has, its value, its
+    minimum, its dates and uses, and the products, variants' products or collections it is for
+    and, for buy X get Y, those bought. A bulk query cannot hold these: they are connections
+    within kinds of discount. The app needs the read_discounts scope.
+  * **`discountsImportFromShopify`** makes each of a discount's codes as `discountCodeCreate`
+    makes one: a percentage or an amount off, free delivery, or buy X get Y at a percentage off
+    what is given, with its minimum subtotal, dates, once per customer, and the uses it had left
+    at Shopify; for its products or collections, those of the shop with their handles. A
+    discount that ended or was used up is counted and left out. One the shop cannot give is
+    named with why: an amount off each item, a minimum number of items, an amount bought for buy
+    X get Y, other items given than bought, one an app made, or amounts in another currency.
+    One with more codes than came is named too. Codes the shop has are left as they are; its
+    dry run counts, without looking for what the codes are for, which comes with the import.
+  * **The admin's store card** brings the discount codes after the products and collections, on
+    by default for those who make codes.
+* **Consequences:** everything but a store's orders and customers' addresses, and its
+  collections' and articles' images, comes from Shopify in one step.

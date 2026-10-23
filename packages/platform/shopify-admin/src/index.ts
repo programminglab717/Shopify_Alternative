@@ -46,3 +46,10 @@ export {
   type StoreCustomer,
   type StoreCustomers,
 } from './customers.js';
+export {
+  DISCOUNT_CODES_QUERY,
+  readStoreDiscounts,
+  type StoreDiscount,
+  type StoreDiscountItems,
+  type StoreDiscounts,
+} from './discounts.js';

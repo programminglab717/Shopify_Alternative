@@ -6327,6 +6327,39 @@ export const CustomersImportFromShopifyMutation = /* GraphQL */ `
   }
 `;
 
+export const DiscountsImportFromShopifyMutation = /* GraphQL */ `
+  mutation DiscountsImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    discountsImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      discounts
+      created
+      skipped
+      expired
+      discountErrors {
+        discount
+        message
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
 export const BlogsImportFromShopifyMutation = /* GraphQL */ `
   mutation BlogsImportFromShopify(
     $store: String!

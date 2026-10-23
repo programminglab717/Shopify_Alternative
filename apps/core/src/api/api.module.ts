@@ -87,6 +87,7 @@ import { ProductsImportResolver } from './products-import.resolver.js';
 import { BlogsFromShopifyResolver } from './blogs-from-shopify.resolver.js';
 import { CollectionsFromShopifyResolver } from './collections-from-shopify.resolver.js';
 import { CustomersFromShopifyResolver } from './customers-from-shopify.resolver.js';
+import { DiscountsFromShopifyResolver } from './discounts-from-shopify.resolver.js';
 import { PagesFromShopifyResolver } from './pages-from-shopify.resolver.js';
 import { RedirectsFromShopifyResolver } from './redirects-from-shopify.resolver.js';
 import { ShopifyStores } from './shopify-stores.js';
@@ -377,6 +378,7 @@ export class ApiModule {
         BlogsFromShopifyResolver,
         CollectionsFromShopifyResolver,
         CustomersFromShopifyResolver,
+        DiscountsFromShopifyResolver,
         { provide: ShopifyStores, useValue: options.shopifyStores ?? new ShopifyStores() },
         ProductsExportResolver,
         BroadcastEstimateResolver,
