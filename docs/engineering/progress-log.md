@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Addresses forgotten
+### ddba88a · Addresses forgotten
 
 * **Comments on articles kept the address and browser they came from forever, and so did the
   log of staff's sign-ins.** Comments now forget them after 90 days, swept by the worker, the
