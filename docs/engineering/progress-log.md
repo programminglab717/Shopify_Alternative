@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Errors to a self-hosted GlitchTip
+### a56143b · Errors to a self-hosted GlitchTip
 
 * **The owner's rule, nothing paid:** errors go to GlitchTip, the open-source error tracker
   Hatti hosts itself, not to Sentry's paid service ([ADR-743](../architecture/13-decision-log.md#adr-743--errors-the-core-logs-go-to-a-self-hosted-glitchtip-the-open-source-error-tracker-in-the-protocol-sentrys-sdks-speak-sent-by-hattis-logger-itself-after-redaction-no-paid-service)).
