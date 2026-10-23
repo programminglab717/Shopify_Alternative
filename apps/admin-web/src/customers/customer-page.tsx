@@ -209,6 +209,52 @@ function Orders({ customer, timezone }: { customer: CustomerDetail; timezone: st
   );
 }
 
+/**
+ * Their orders from the store the shop moved from (ADR-786), kept to look back on: what they
+ * bought there, and how it was paid and sent, as the store said.
+ */
+function PastOrders({ customer, timezone }: { customer: CustomerDetail; timezone: string }) {
+  const { t, locale } = useLocale();
+  const orders = customer.pastOrders?.nodes ?? [];
+  if (orders.length === 0) return null;
+  return (
+    <FormSection title={t('customer.pastOrders')} hint={t('customer.pastOrdersHint')}>
+      <ul className="-mx-4 divide-y divide-line border-t border-line">
+        {orders.map((order) => (
+          <li key={order.id} className="flex flex-col gap-1 px-4 py-3">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="num font-semibold">{order.name}</span>
+              <span className="flex-1 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                {formatDate(order.placedAt, timezone, locale)}
+              </span>
+              <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                {order.cancelledAt
+                  ? t('customer.pastCancelled')
+                  : [order.financialStatus, order.fulfillmentStatus]
+                      .filter(Boolean)
+                      .map((status) => status!.toLowerCase().replace(/_/g, ' '))
+                      .join(' · ')}
+              </span>
+              <span className="num font-medium">
+                {formatMoney(order.total.amount, order.total.currencyCode)}
+              </span>
+            </span>
+            <span className="text-secondary" dir="auto">
+              {order.lines
+                .map(
+                  (line) =>
+                    `${formatCount(line.quantity)} × ${line.title}` +
+                    (line.variantTitle ? ` (${line.variantTitle})` : ''),
+                )
+                .join(', ')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </FormSection>
+  );
+}
+
 /** The shop's own note and tags on them. */
 function NoteAndTags({ customer, edits }: { customer: CustomerDetail; edits: boolean }) {
   const { t } = useLocale();
@@ -439,6 +485,7 @@ export function CustomerPage() {
           {!wide && <Contact customer={customer} />}
           <Record customer={customer} />
           <Orders customer={customer} timezone={details.timezone} />
+          <PastOrders customer={customer} timezone={details.timezone} />
           {customer.addresses.length > 0 && (
             <FormSection title={t('customer.addresses')}>
               <ul className="flex flex-col gap-2">

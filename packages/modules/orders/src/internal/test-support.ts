@@ -40,6 +40,7 @@ import { OrderExportService } from './order-export.service.js';
 import { OrderLinkService } from './order-link.service.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { ORDER_CUSTOMER_DATA } from './order-customer-data.js';
+import { PAST_ORDER_CUSTOMER_DATA } from './past-orders.js';
 import { OrderService, type OrderCreateInput } from './order.service.js';
 import type { OrderRecord } from './records.js';
 import { RefundService } from './refund.service.js';
@@ -187,6 +188,7 @@ export async function ordersFixture(
   const segments = new SegmentService(db, registry);
   const dataRegistry = new CustomerDataRegistry();
   dataRegistry.register(ORDER_CUSTOMER_DATA);
+  dataRegistry.register(PAST_ORDER_CUSTOMER_DATA);
   const orders = new OrderService(
     db,
     variants,
@@ -324,6 +326,7 @@ export async function ordersFixture(
         DELETE FROM pricing.discount_codes;
         DELETE FROM pricing.price_lists;
         DELETE FROM orders.orders;
+        DELETE FROM orders.past_orders;
         DELETE FROM orders.desk_duty;
         DELETE FROM orders.counters;
         DELETE FROM orders.document_counters;

@@ -775,6 +775,22 @@ export interface CustomerDetail {
       totalPrice: MoneyValue;
     }[];
   };
+  /**
+   * Their orders from the store the shop moved from (ADR-786), the latest first; absent where a
+   * fake core leaves it out.
+   */
+  pastOrders?: {
+    nodes: {
+      id: string;
+      name: string;
+      placedAt: string;
+      cancelledAt: string | null;
+      financialStatus: string | null;
+      fulfillmentStatus: string | null;
+      total: { amount: string; currencyCode: string };
+      lines: { title: string; variantTitle: string | null; quantity: number }[];
+    }[];
+  };
 }
 
 export interface CustomerData {
@@ -2935,6 +2951,20 @@ export interface BlogsImportFromShopifyResult {
   images: number;
   articleErrors: { blog: string; article: string | null; message: string }[];
   userErrors: UserError[];
+}
+
+/** What bringing a Shopify store's orders as past orders came to (ADR-786). */
+export interface OrdersImportFromShopifyResult {
+  dryRun: boolean;
+  orders: number;
+  created: number;
+  skipped: number;
+  linked: number;
+  userErrors: UserError[];
+}
+
+export interface OrdersImportFromShopifyData {
+  ordersImportFromShopify: OrdersImportFromShopifyResult;
 }
 
 export interface BlogsImportFromShopifyData {

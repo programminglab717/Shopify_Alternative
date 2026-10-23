@@ -16,6 +16,7 @@ import type { BrowserIdsValue } from './browser-ids.js';
 import { toDraftRecord } from './draft-order.service.js';
 import { OrderEvents, type OrderReceiptsErasedPayload } from './events.js';
 import { actorColumns, loadOrders } from './order-store.js';
+import { PAST_ORDER_CUSTOMER_DATA } from './past-orders.js';
 import type { DraftOrderRecord, OrderRecord } from './records.js';
 import { draftName, orderName } from './rules.js';
 import { draftOrders, type StoredAddressValue } from './schema.js';
@@ -420,12 +421,14 @@ function exportedDraft(draft: DraftOrderRecord) {
   };
 }
 
-/** Adds orders to merges, erasure and exports when the application starts. */
+/** Adds orders, and past orders, to merges, erasure and exports when the application starts. */
 @Injectable()
 export class OrderCustomerData implements OnModuleInit {
   constructor(private readonly registry: CustomerDataRegistry) {}
 
   onModuleInit(): void {
     this.registry.register(ORDER_CUSTOMER_DATA);
+    // Orders from the store the shop moved from (ADR-786).
+    this.registry.register(PAST_ORDER_CUSTOMER_DATA);
   }
 }

@@ -1650,6 +1650,25 @@ export const CustomerQuery = /* GraphQL */ `
           }
         }
       }
+      pastOrders(first: 10) {
+        nodes {
+          id
+          name
+          placedAt
+          cancelledAt
+          financialStatus
+          fulfillmentStatus
+          total {
+            amount
+            currencyCode
+          }
+          lines {
+            title
+            variantTitle
+            quantity
+          }
+        }
+      }
     }
   }
   ${MONEY}
@@ -6432,6 +6451,36 @@ export const DiscountsImportFromShopifyMutation = /* GraphQL */ `
         discount
         message
       }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
+/** A Shopify store's orders kept as the shop's past orders (ADR-786). */
+export const OrdersImportFromShopifyMutation = /* GraphQL */ `
+  mutation OrdersImportFromShopify(
+    $store: String!
+    $accessToken: String
+    $clientId: String
+    $clientSecret: String
+    $dryRun: Boolean
+  ) {
+    ordersImportFromShopify(
+      store: $store
+      accessToken: $accessToken
+      clientId: $clientId
+      clientSecret: $clientSecret
+      dryRun: $dryRun
+    ) {
+      dryRun
+      orders
+      created
+      skipped
+      linked
       userErrors {
         field
         code

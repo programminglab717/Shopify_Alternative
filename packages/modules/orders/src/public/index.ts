@@ -181,6 +181,16 @@ export {
 } from '../internal/online-payments.js';
 export { OrderCommentService } from '../internal/order-comment.service.js';
 export {
+  PAST_ORDER_CUSTOMER_DATA,
+  PastOrderService,
+  majorOf,
+  type PastOrderAddress,
+  type PastOrderInput,
+  type PastOrderLine,
+  type PastOrderRecord,
+  type PastOrderSource,
+} from '../internal/past-orders.js';
+export {
   OrderEditService,
   type OrderChargesEdit,
   type OrderLineItemsEdit,

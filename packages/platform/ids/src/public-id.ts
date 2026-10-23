@@ -137,6 +137,8 @@ export const ID_PREFIXES = {
   affiliatePayout: 'aflp',
   // A shop's wholesale prices for the customers with a tag (ADR-778).
   priceList: 'plst',
+  // An order from the store a shop moved from, kept to look back on (ADR-786).
+  pastOrder: 'pord',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

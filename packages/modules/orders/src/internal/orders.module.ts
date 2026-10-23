@@ -16,6 +16,8 @@ import { OrderSegmentFacts } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { OrderCustomerData } from './order-customer-data.js';
+import { PastOrderService } from './past-orders.js';
+import { CustomerPastOrdersResolver, PastOrderResolver } from './graphql/past-order.resolver.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { AgentPerformanceResolver } from './graphql/agent-performance.resolver.js';
 import { PackerPerformanceResolver } from './graphql/packer-performance.resolver.js';
@@ -109,6 +111,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     TodayService,
     OrderTrackingService,
     OrderCommentService,
+    PastOrderService,
     OrderEditService,
     PostPurchaseOffers,
     ReturnService,
@@ -144,6 +147,8 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     ReturnRequestResolver,
     OrderSegmentFacts,
     OrderCustomerData,
+    PastOrderResolver,
+    CustomerPastOrdersResolver,
   ],
   exports: [
     OrderService,
@@ -173,6 +178,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderEditService,
     ReturnService,
     ReturnRequestService,
+    PastOrderService,
   ],
 })
 export class OrdersModule {}

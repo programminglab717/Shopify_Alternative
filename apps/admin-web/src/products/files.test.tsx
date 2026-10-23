@@ -152,6 +152,17 @@ function core(role: StaffRole) {
             userErrors: [],
           },
         };
+      case 'OrdersImportFromShopify':
+        return {
+          ordersImportFromShopify: {
+            dryRun: variables.dryRun,
+            orders: 40,
+            created: variables.dryRun ? 40 : 38,
+            skipped: variables.dryRun ? 0 : 2,
+            linked: 30,
+            userErrors: [],
+          },
+        };
       case 'BlogsImportFromShopify':
         return {
           blogsImportFromShopify: {
@@ -282,6 +293,7 @@ describe('Products and stock by file', () => {
       screen.getByText("in-stock: Hatti's smart collections have no rule on VARIANT_INVENTORY"),
     ).toBeTruthy();
     expect(screen.getByText('Pages to add: 2; to leave as they are: 1.')).toBeTruthy();
+    expect(screen.getByText('Past orders to keep: 40; kept already: 0.')).toBeTruthy();
     expect(screen.getByText('untitled: Title is blank')).toBeTruthy();
     expect(
       screen.getByText('Blogs to add: 1. Articles to add: 4; to leave as they are: 1.'),
@@ -312,6 +324,14 @@ describe('Products and stock by file', () => {
       false,
     ]);
     expect(screen.getByText('Pages added: 2; left as they were: 1.')).toBeTruthy();
+    // Its orders, as past orders, after its customers (ADR-786).
+    expect(
+      screen.getByText('Past orders kept: 38, 30 on their customers’ pages; kept already: 2.'),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'OrdersImportFromShopify').map((sent) => sent.dryRun)).toEqual([
+      true,
+      false,
+    ]);
     expect(
       screen.getByText(
         'Blogs added: 1. Articles added: 4, 3 with their images; left as they were: 1.',

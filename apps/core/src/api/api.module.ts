@@ -87,6 +87,7 @@ import { BroadcastEstimateResolver } from './broadcast-estimate.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { BlogsFromShopifyResolver } from './blogs-from-shopify.resolver.js';
+import { OrdersFromShopifyResolver } from './orders-from-shopify.resolver.js';
 import { CollectionsFromShopifyResolver } from './collections-from-shopify.resolver.js';
 import { CustomersFromShopifyResolver } from './customers-from-shopify.resolver.js';
 import { DiscountsFromShopifyResolver } from './discounts-from-shopify.resolver.js';
@@ -380,6 +381,7 @@ export class ApiModule {
         RedirectsFromShopifyResolver,
         PagesFromShopifyResolver,
         BlogsFromShopifyResolver,
+        OrdersFromShopifyResolver,
         CollectionsFromShopifyResolver,
         CustomersFromShopifyResolver,
         DiscountsFromShopifyResolver,

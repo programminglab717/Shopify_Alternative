@@ -48,6 +48,15 @@ export {
   type StoreCustomers,
 } from './customers.js';
 export {
+  ORDERS_BULK_QUERY,
+  hundredthsOf,
+  readStoreOrders,
+  type StoreOrder,
+  type StoreOrderAddress,
+  type StoreOrderLine,
+  type StoreOrders,
+} from './orders.js';
+export {
   DISCOUNT_CODES_QUERY,
   readStoreDiscounts,
   type StoreDiscount,

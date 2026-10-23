@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
@@ -39,6 +39,23 @@ function ayesha(phone: string) {
           createdAt: LAST,
           stage: 'DELIVERED',
           totalPrice: pkr('5599.00'),
+        },
+      ],
+    },
+    pastOrders: {
+      nodes: [
+        {
+          id: 'pord_1',
+          name: '#S1042',
+          placedAt: '2025-03-20T09:00:00Z',
+          cancelledAt: null,
+          financialStatus: 'PAID',
+          fulfillmentStatus: 'FULFILLED',
+          total: { amount: '9250.00', currencyCode: 'PKR' },
+          lines: [
+            { title: 'Lawn suit', variantTitle: 'M', quantity: 2 },
+            { title: 'Dupatta', variantTitle: null, quantity: 1 },
+          ],
         },
       ],
     },
@@ -120,6 +137,11 @@ describe('Customers in the admin', () => {
 
     await screen.findByText('Parcels they took: 2 of 3.');
     expect(screen.getByText('#1001')).toBeTruthy();
+    // What they bought at the store the shop moved from (ADR-786).
+    const past = screen.getByRole('region', { name: 'From your old store' });
+    expect(within(past).getByText('#S1042')).toBeTruthy();
+    expect(within(past).getByText('paid · fulfilled')).toBeTruthy();
+    expect(within(past).getByText('2 × Lawn suit (M), 1 × Dupatta')).toBeTruthy();
     // The book they keep on the storefront, the default first (ADR-588).
     expect(screen.getByText('Saved on the storefront')).toBeTruthy();
     expect(screen.getByText('Office 3, Shahrah-e-Faisal, Karachi').parentElement?.textContent).toBe(

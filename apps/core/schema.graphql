@@ -4038,6 +4038,11 @@ type Customer {
   otherPhones: [String!]!
 
   """
+  Their orders from the store the shop moved from (ADR-786), the latest first.
+  """
+  pastOrders(first: Int): PastOrderConnection!
+
+  """
   Their main mobile number in E.164 form, e.g. "+923001234567": who they are, and where marketing goes. Staff other than owners and managers see it masked, "0300 ••••567"; confirmation agents reveal it with customerPhoneReveal, which is logged.
   """
   phone: String!
@@ -9609,6 +9614,21 @@ type Mutation {
   ): OrdersExportPayload!
 
   """
+  Imports a Shopify store's orders through its Admin API (ONB-05, ADR-786) as the shop's past orders, which pastOrders gives: each with its name, items, amounts, how it was paid and sent, where it went, and the customer its number is, so their page shows what they bought before. Past orders take no stock, send no messages, book no parcels and count in no report. Orders brought already are left as they are; bring customers first, so the orders find them. Give the store and its app as productsImportFromShopify takes them; the app needs the read_orders access scope, read_all_orders for those over 60 days old, and Shopify's leave to read customers' details. Nothing given is kept. dryRun reads the store and counts, changing nothing.
+  """
+  ordersImportFromShopify(
+    accessToken: String
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): OrdersImportFromShopifyPayload!
+
+  """
   A new page, which the storefront shows a moment later unless it is not published. Its body is cleaned of anything that could run.
   """
   pageCreate(page: PageCreateInput!): PageCreatePayload!
@@ -12026,6 +12046,24 @@ type OrdersExportPayload {
   userErrors: [UserError!]!
 }
 
+type OrdersImportFromShopifyPayload {
+  """Past orders kept, or that would be in a dry run."""
+  created: Int!
+  dryRun: Boolean!
+
+  """
+  Of those kept, how many name one of the shop's customers by their number.
+  """
+  linked: Int!
+
+  """Orders the store has."""
+  orders: Int!
+
+  """Orders kept already, left as they are."""
+  skipped: Int!
+  userErrors: [UserError!]!
+}
+
 """
 How one packer did over a period (APP-04, COD-11): the orders they marked as packed, the units in them, and their hours at it.
 """
@@ -12217,6 +12255,89 @@ type ParcelHandOver {
   The courier's tracking still has it as only booked a day after it was handed over (ADR-379): the rider may never have scanned it in, or lost it.
   """
   unseen: Boolean!
+}
+
+"""
+An order from the store the shop moved from (ONB-05, ADR-786), kept to look back on: it takes no stock, sends no messages and counts in no report, and nothing changes it.
+"""
+type PastOrder {
+  cancelledAt: DateTime
+
+  """The customer its number was when it was brought, or since a merge."""
+  customerId: ID
+  discounts: PastOrderAmount!
+  email: String
+
+  """The store's words, as PAID or REFUNDED."""
+  financialStatus: String
+
+  """The store's words, as FULFILLED."""
+  fulfillmentStatus: String
+  id: ID!
+  lines: [PastOrderLine!]!
+
+  """Its name there, as #1001."""
+  name: String!
+  note: String!
+
+  """Masked as Order.phone is."""
+  phone: String
+  placedAt: DateTime!
+  shipping: PastOrderAmount!
+  shippingAddress: PastOrderAddress
+
+  """Where it was placed: SHOPIFY."""
+  source: String!
+  subtotal: PastOrderAmount!
+  total: PastOrderAmount!
+}
+
+"""Where a past order went, as the store wrote it."""
+type PastOrderAddress {
+  address1: String
+  address2: String
+  city: String
+
+  """ISO 3166, e.g. "PK"."""
+  countryCode: String
+  name: String
+
+  """Masked as Order.phone is."""
+  phone: String
+  province: String
+  zip: String
+}
+
+"""
+An amount of a past order (ADR-786), in the currency the store priced it in, which may be one Hatti does not take.
+"""
+type PastOrderAmount {
+  """Decimal amount in major units, e.g. "4500.00"."""
+  amount: String!
+
+  """ISO 4217, e.g. "PKR"."""
+  currencyCode: String!
+}
+
+type PastOrderConnection {
+  edges: [PastOrderEdge!]!
+  nodes: [PastOrder!]!
+  pageInfo: PageInfo!
+}
+
+type PastOrderEdge {
+  cursor: String!
+  node: PastOrder!
+}
+
+"""An item of a past order, as the store sold it."""
+type PastOrderLine {
+  """Each, before discounts."""
+  price: PastOrderAmount!
+  quantity: Int!
+  sku: String
+  title: String!
+  variantTitle: String
 }
 
 """
@@ -15125,6 +15246,20 @@ type Query {
     """Those in these states alone; all if left out."""
     status: [FulfillmentClaimStatus!]
   ): ClaimedParcelConnection!
+  pastOrder(id: ID!): PastOrder
+
+  """
+  Orders from the store the shop moved from (ONB-05, ADR-786), the latest placed first, as ordersImportFromShopify brought them; with customerId, that customer's alone.
+  """
+  pastOrders(
+    after: String
+
+    """That customer's alone."""
+    customerId: ID
+
+    """1 to 250; default 50."""
+    first: Int
+  ): PastOrderConnection!
 
   """
   The shop's payment gateway accounts, in the order its customers are offered them, as paymentGatewayAccountsReorder puts them; archived ones after them, if asked. Orders' pages and checkout offer each live one, for customers to choose among (ADR-219).

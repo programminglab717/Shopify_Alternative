@@ -10,6 +10,7 @@ import {
   ProductsImportFromShopifyMutation,
   PagesImportFromShopifyMutation,
   BlogsImportFromShopifyMutation,
+  OrdersImportFromShopifyMutation,
   CollectionsImportFromShopifyMutation,
   CustomersImportFromShopifyMutation,
   DiscountsImportFromShopifyMutation,
@@ -29,6 +30,8 @@ import type {
   PagesImportFromShopifyResult,
   BlogsImportFromShopifyData,
   BlogsImportFromShopifyResult,
+  OrdersImportFromShopifyData,
+  OrdersImportFromShopifyResult,
   CollectionsImportFromShopifyData,
   CollectionsImportFromShopifyResult,
   CustomersImportFromShopifyData,
@@ -39,7 +42,7 @@ import type {
   UrlRedirectsImportFromShopifyData,
   UrlRedirectsImportResult,
 } from '../api/types';
-import { permits } from '../auth/permissions';
+import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -107,6 +110,8 @@ function useChosenFile(onChosen: (file: { name: string; csv: string }) => void) 
 /** How the owner's app reaches their store: a Dev Dashboard app's ID and secret, or a token. */
 type StoreAccess = 'CLIENT' | 'TOKEN';
 
+/** Who may bring a store's orders in as past orders (ADR-786): as customers, with orders' scope. */
+export const MOVES_ORDERS = gate(['owner', 'manager'], 'write_orders');
 /**
  * Products straight from the owner's Shopify store, through its Admin API (ONB-05, ADR-749): its
  * address and their app's client ID and secret, or its access token, held by the page alone
@@ -126,6 +131,8 @@ function ImportFromStore() {
   const movesCustomers = permits(shop, MOVES_CUSTOMERS);
   // And its discount codes theirs who make codes (ADR-756).
   const managesDiscounts = permits(shop, MANAGES_DISCOUNTS);
+  // And its orders, as past orders, theirs who may bring customers in (ADR-786).
+  const movesOrders = permits(shop, MOVES_ORDERS);
   type Store = { store: string; accessToken?: string; clientId?: string; clientSecret?: string };
   const run = useAdminMutation<
     ProductsImportFromShopifyData,
@@ -153,6 +160,9 @@ function ImportFromStore() {
   const moveBlogs = useAdminMutation<BlogsImportFromShopifyData, Store & { dryRun: boolean }>(
     BlogsImportFromShopifyMutation,
   );
+  const moveOrders = useAdminMutation<OrdersImportFromShopifyData, Store & { dryRun: boolean }>(
+    OrdersImportFromShopifyMutation,
+  );
   const { problem, attempt } = useAttempt();
   const [store, setStore] = useState('');
   const [access, setAccess] = useState<StoreAccess>('CLIENT');
@@ -166,6 +176,7 @@ function ImportFromStore() {
   const [withBlogs, setWithBlogs] = useState(writesBlogs);
   const [withCustomers, setWithCustomers] = useState(movesCustomers);
   const [withDiscounts, setWithDiscounts] = useState(managesDiscounts);
+  const [withOrders, setWithOrders] = useState(movesOrders);
   const [checked, setChecked] = useState<{
     products: ProductsImportResult;
     redirects: UrlRedirectsImportResult | null;
@@ -174,6 +185,7 @@ function ImportFromStore() {
     collections: CollectionsImportFromShopifyResult | null;
     customers: CustomersImportFromShopifyResult | null;
     discounts: DiscountsImportFromShopifyResult | null;
+    orders: OrdersImportFromShopifyResult | null;
   } | null>(null);
   const [done, setDone] = useState<{
     products: ProductsImportResult;
@@ -183,6 +195,7 @@ function ImportFromStore() {
     collections: CollectionsImportFromShopifyResult | null;
     customers: CustomersImportFromShopifyResult | null;
     discounts: DiscountsImportFromShopifyResult | null;
+    orders: OrdersImportFromShopifyResult | null;
   } | null>(null);
 
   const given = (): Store => ({
@@ -199,6 +212,7 @@ function ImportFromStore() {
       collections?: CollectionsImportFromShopifyResult;
       customers?: CustomersImportFromShopifyResult;
       discounts?: DiscountsImportFromShopifyResult;
+      orders?: OrdersImportFromShopifyResult;
     } = {};
     const ok = await attempt(async () => {
       answer.products = (
@@ -259,6 +273,16 @@ function ImportFromStore() {
       });
       if (!moved) return null;
     }
+    // After the customers, whom past orders find by their numbers (ADR-786).
+    if (withOrders && movesOrders) {
+      const moved = await attempt(async () => {
+        answer.orders = (
+          await moveOrders.mutateAsync({ ...given(), dryRun })
+        ).ordersImportFromShopify;
+        return answer.orders;
+      });
+      if (!moved) return null;
+    }
     return {
       products: answer.products!,
       redirects: answer.redirects ?? null,
@@ -267,6 +291,7 @@ function ImportFromStore() {
       collections: answer.collections ?? null,
       customers: answer.customers ?? null,
       discounts: answer.discounts ?? null,
+      orders: answer.orders ?? null,
     };
   };
   // What is checked is for the store and app as typed: a change asks for a new check.
@@ -288,7 +313,8 @@ function ImportFromStore() {
     moveBlogs.isPending ||
     moveCollections.isPending ||
     moveCustomers.isPending ||
-    moveDiscounts.isPending;
+    moveDiscounts.isPending ||
+    moveOrders.isPending;
 
   return (
     <FormSection title={t('files.fromStore')} hint={t('files.fromStoreHint')}>
@@ -389,6 +415,14 @@ function ImportFromStore() {
           onChange={changed(setWithCustomers)}
         />
       )}
+      {movesOrders && (
+        <CheckField
+          label={t('files.storeOrders')}
+          hint={t('files.storeOrdersHint')}
+          checked={withOrders}
+          onChange={changed(setWithOrders)}
+        />
+      )}
       <Button
         variant="secondary"
         className="self-start"
@@ -481,6 +515,14 @@ function ImportFromStore() {
               <CustomerErrors result={checked.customers} />
             </>
           )}
+          {checked.orders && (
+            <p>
+              {t('files.ordersChecked', {
+                created: formatCount(checked.orders.created),
+                skipped: formatCount(checked.orders.skipped),
+              })}
+            </p>
+          )}
           {checked.products.created +
             checked.products.updated +
             (checked.collections?.created ?? 0) +
@@ -489,7 +531,8 @@ function ImportFromStore() {
             (checked.blogs?.blogsCreated ?? 0) +
             (checked.blogs?.created ?? 0) +
             (checked.customers?.created ?? 0) +
-            (checked.discounts?.created ?? 0) >
+            (checked.discounts?.created ?? 0) +
+            (checked.orders?.created ?? 0) >
             0 && (
             <Button
               className="self-start"
@@ -587,6 +630,15 @@ function ImportFromStore() {
                 {t('files.customerError', { customer: error.customer, message: error.message })}
               </span>
             ))}
+            {done.orders && (
+              <span>
+                {t('files.ordersImported', {
+                  created: formatCount(done.orders.created),
+                  linked: formatCount(done.orders.linked),
+                  skipped: formatCount(done.orders.skipped),
+                })}
+              </span>
+            )}
           </span>
         </Alert>
       )}

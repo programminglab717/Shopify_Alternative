@@ -444,6 +444,9 @@ const en = {
   'customer.inProgress': 'On their way',
   'customer.deliveryRate': 'Parcels they took: {delivered} of {finished}.',
   'customer.orders': 'Orders',
+  'customer.pastOrders': 'From your old store',
+  'customer.pastOrdersHint': 'Their orders there, brought when the shop moved, to look back on.',
+  'customer.pastCancelled': 'cancelled',
   'customer.noOrders': 'No orders yet.',
   'customer.addresses': 'Addresses',
   'customer.savedAddresses': 'Saved on the storefront',
@@ -3060,6 +3063,12 @@ const en = {
     'Discount codes to add: {created}; already here: {skipped}. Discounts that ended: {expired}.',
   'files.discountsImported': 'Discount codes added: {created}; already here: {skipped}.',
   'files.discountError': '{discount}: {message}',
+  'files.storeOrders': 'Bring its orders too',
+  'files.storeOrdersHint':
+    'As past orders, on their customers’ pages: they take no stock and send nothing. The app needs the read_orders scope, and read_all_orders for those over 60 days old.',
+  'files.ordersChecked': 'Past orders to keep: {created}; kept already: {skipped}.',
+  'files.ordersImported':
+    'Past orders kept: {created}, {linked} on their customers’ pages; kept already: {skipped}.',
   'files.storeBlogs': 'Bring its blogs too',
   'files.storeBlogsHint':
     'Its blogs and their articles, at the same addresses, with their images. The app needs the read_content scope too.',
@@ -6284,6 +6293,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'customer.inProgress': 'راستے میں',
   'customer.deliveryRate': 'وصول کیے گئے پارسل: {finished} میں سے {delivered}۔',
   'customer.orders': 'آرڈرز',
+  'customer.pastOrders': 'آپ کے پرانے اسٹور سے',
+  'customer.pastOrdersHint': 'وہاں ان کے آرڈرز، دکان منتقل ہوتے وقت لائے گئے، دیکھنے کے لیے۔',
+  'customer.pastCancelled': 'منسوخ',
   'customer.noOrders': 'ابھی کوئی آرڈر نہیں۔',
   'customer.addresses': 'پتے',
   'customer.savedAddresses': 'اسٹور فرنٹ پر محفوظ',
@@ -8901,6 +8913,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'شامل کرنے کو ڈسکاؤنٹ کوڈز: {created}؛ پہلے سے موجود: {skipped}۔ ختم ہو چکے ڈسکاؤنٹس: {expired}۔',
   'files.discountsImported': 'شامل ڈسکاؤنٹ کوڈز: {created}؛ پہلے سے موجود: {skipped}۔',
   'files.discountError': '{discount}: {message}',
+  'files.storeOrders': 'اس کے آرڈرز بھی لائیں',
+  'files.storeOrdersHint':
+    'پچھلے آرڈرز کے طور پر، اپنے کسٹمرز کے صفحات پر: نہ اسٹاک لیتے ہیں نہ کچھ بھیجتے ہیں۔ ایپ کو read_orders اسکوپ، اور 60 دن سے پرانے آرڈرز کے لیے read_all_orders چاہیے۔',
+  'files.ordersChecked': 'رکھنے کو پچھلے آرڈرز: {created}؛ پہلے سے رکھے: {skipped}۔',
+  'files.ordersImported':
+    'رکھے گئے پچھلے آرڈرز: {created}، {linked} اپنے کسٹمرز کے صفحات پر؛ پہلے سے رکھے: {skipped}۔',
   'files.storeBlogs': 'اس کے بلاگز بھی لائیں',
   'files.storeBlogsHint':
     'اس کے بلاگز اور ان کے مضامین، انہی ایڈریسز پر، اپنی تصاویر کے ساتھ۔ ایپ کو read_content اسکوپ بھی چاہیے۔',
