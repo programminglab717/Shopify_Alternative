@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### A reseller's own price on the product page
+### ecdec1d · A reseller's own price on the product page
 
 * **Your price:** a reseller signed in sees their own price under the product's price on Hatti
   Base's product page, for the variant they choose (CUS-06, [ADR-781](../architecture/13-decision-log.md#adr-781--a-signed-in-resellers-own-price-on-hatti-bases-product-page-asked-for-once-the-cached-page-loads)).
