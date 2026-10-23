@@ -167,7 +167,7 @@ flowchart LR
 | Traces | OpenTelemetry SDKs → OTel Collector → Tempo (tail sampling) |
 | Metrics | Prometheus-compatible (Mimir) + Grafana dashboards; SLO burn-rate alerts |
 | Logs | Structured JSON → Loki; PII scrubbing at the collector; security stream separated |
-| Errors | GlitchTip, self-hosted and open source, in Sentry's protocol (backend, admin, merchant app, storefront runtime); the core's API and worker send to it ([ADR-743](./13-decision-log.md#adr-743--errors-the-core-logs-go-to-a-self-hosted-glitchtip-the-open-source-error-tracker-in-the-protocol-sentrys-sdks-speak-sent-by-hattis-logger-itself-after-redaction-no-paid-service)) |
+| Errors | GlitchTip, self-hosted and open source, in Sentry's protocol (backend, admin, merchant app, storefront runtime); the core's API and worker send to it ([ADR-743](./13-decision-log.md#adr-743--errors-the-core-logs-go-to-a-self-hosted-glitchtip-the-open-source-error-tracker-in-the-protocol-sentrys-sdks-speak-sent-by-hattis-logger-itself-after-redaction-no-paid-service)), and the storefront its failed answers ([ADR-744](./13-decision-log.md#adr-744--the-storefronts-errors-go-to-the-error-tracker-too-each-answer-that-failed-with-a-5xx-logged-at-error-by-fastifys-log-controller-by-its-route-and-the-first-part-of-its-path-never-its-address-requests-themselves-not-logged)) |
 | RUM | Storefront Web Vitals beacon → ClickHouse |
 | Synthetics | Probes on Pakistani ISPs and mobile networks + external uptime checks |
 | On-call | Alertmanager → paging tool; runbooks linked from every alert |

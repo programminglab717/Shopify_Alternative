@@ -1,6 +1,5 @@
-import { createLogger } from '@hatti/logger';
+import { createLogger, errorTrackerOf, logUncaught } from '@hatti/logger';
 import { loadWorkerConfig } from './config.js';
-import { errorTrackerOf, logUncaught } from './logging.js';
 import { onShutdown } from './shutdown.js';
 import { startWorker } from './worker/start-worker.js';
 

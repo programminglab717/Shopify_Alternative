@@ -3,7 +3,7 @@ import { AiGateway } from '@hatti/ai';
 import { Database } from '@hatti/db';
 import { createRedis } from '@hatti/events';
 import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
-import { createLogger } from '@hatti/logger';
+import { createLogger, errorTrackerOf, logUncaught } from '@hatti/logger';
 import { MapTiles } from '@hatti/orders/public';
 import { LeakyBuckets, RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
@@ -15,7 +15,6 @@ import {
   vapidKeysOf,
 } from './config.js';
 import { couriersOf } from './couriers.js';
-import { errorTrackerOf, logUncaught } from './logging.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
 import {

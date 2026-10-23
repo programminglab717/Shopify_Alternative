@@ -1,5 +1,5 @@
 import { SecretBox } from '@hatti/crypto';
-import { ErrorTracker } from '@hatti/logger';
+import { ErrorTracker, errorTrackerOf } from '@hatti/logger';
 import { describe, expect, it } from 'vitest';
 import {
   hattiBankAccountOf,
@@ -21,7 +21,6 @@ import {
   queryCostLimitsOf,
   vapidKeysOf,
 } from './config.js';
-import { errorTrackerOf } from './logging.js';
 import { storageCorsRules } from './storage.js';
 
 const KEY = 'k'.repeat(32);

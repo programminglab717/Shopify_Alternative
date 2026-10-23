@@ -1,3 +1,4 @@
+import { createLogger, errorTrackerOf, logUncaught } from '@hatti/logger';
 import { StorefrontApiClient } from '@hatti/storefront-api';
 import { MemoryStore } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
@@ -19,8 +20,19 @@ import { allPlatformThemes } from '@hatti/themes';
 // no sample shop or placeholder images; STOREFRONT_URL, REDIS_URL, CORE_API_URL and
 // STOREFRONT_SERVICE_KEY must be set; TRUST_PROXY=true takes shoppers' addresses from the edge's
 // X-Forwarded-For; and SIGTERM lets the requests in flight finish before it exits.
+//
+// It logs JSON to stdout (ADR-744): answers that failed, and what nothing caught, at error and
+// fatal, which go to the error tracker too once ERROR_TRACKING_DSN is set, as the core's do
+// (ADR-743); a shop's theme's own faults at warn, which are the shop's to fix, not Hatti's.
 
 const production = process.env.NODE_ENV === 'production';
+const errorTracker = errorTrackerOf(process.env);
+const logger = createLogger({
+  name: 'storefront',
+  level: production ? 'info' : 'debug',
+  errorTracker,
+});
+logUncaught(logger, errorTracker);
 if (production) {
   const missing = ['STOREFRONT_URL', 'REDIS_URL', 'CORE_API_URL', 'STOREFRONT_SERVICE_KEY'].filter(
     (name) => !process.env[name],
@@ -33,7 +45,8 @@ const theme = platformThemes.get('hatti-base')!;
 const site = new URL(process.env.STOREFRONT_URL ?? 'http://localhost:4100');
 const renderer = new PageRenderer(theme, {
   platformUrl: site.origin,
-  onError: (render, error) => console.error(`${render.id} not shown:`, (error as Error).message),
+  onError: (render, error) =>
+    logger.warn({ section: render.id, err: error }, `${render.id} not shown`),
 });
 const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   lazyConnect: true,
@@ -43,7 +56,7 @@ const key = process.env.STOREFRONT_SERVICE_KEY;
 const core =
   key &&
   new StorefrontApiClient({ baseUrl: process.env.CORE_API_URL ?? 'http://localhost:4000', key });
-if (!core) console.warn('No STOREFRONT_SERVICE_KEY: carts cannot change (see .env.example).');
+if (!core) logger.warn('No STOREFRONT_SERVICE_KEY: carts cannot change (see .env.example).');
 const editorOrigins = (process.env.STOREFRONT_EDITOR_ORIGINS ?? '')
   .split(',')
   .map((origin) => origin.trim())
@@ -67,8 +80,9 @@ const app = createStorefrontServer({
   sample: production ? undefined : new MemoryStore(sampleStore()),
   placeholders: !production,
   onThemeFileRejected: (shopId, error) =>
-    console.error(`Shop ${shopId}'s theme file left out:`, error.message),
+    logger.warn({ shopId, err: error }, "a shop's theme file left out"),
   editorOrigins,
+  logger,
 });
 
 const port = Number(process.env.STOREFRONT_PORT ?? (site.port || 4100));
@@ -84,19 +98,20 @@ const stop = () => {
     .then(() => redis.quit())
     // Flush the last spans and metrics, or they are lost with the process.
     .then(() => shutdownTelemetry())
+    .then(() => errorTracker?.flush())
     .then(() => process.exit(0))
     .catch((error: unknown) => {
-      console.error('Shutdown failed:', (error as Error).message);
-      process.exit(1);
+      logger.error({ err: error }, 'shutdown failed');
+      void (errorTracker?.flush() ?? Promise.resolve()).finally(() => process.exit(1));
     });
 };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
 
 if (production) {
-  console.log(`Serving published shops on port ${port}, at their handles under ${site.hostname}`);
+  logger.info(`Serving published shops on port ${port}, at their handles under ${site.hostname}`);
 } else {
   const at = (handle?: string) =>
     `${site.protocol}//${handle ? `${handle}.` : ''}${site.hostname}:${port}/`;
-  console.log(`The sample shop at ${at()} (Urdu: /ur/), and published shops at ${at('<handle>')}`);
+  logger.info(`The sample shop at ${at()} (Urdu: /ur/), and published shops at ${at('<handle>')}`);
 }

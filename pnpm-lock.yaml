@@ -433,6 +433,9 @@ importers:
       '@hatti/documents':
         specifier: workspace:*
         version: link:../../packages/platform/documents
+      '@hatti/logger':
+        specifier: workspace:*
+        version: link:../../packages/platform/logger
       '@hatti/money':
         specifier: workspace:*
         version: link:../../packages/platform/money

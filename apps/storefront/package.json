@@ -14,6 +14,7 @@
   "dependencies": {
     "@hatti/crypto": "workspace:*",
     "@hatti/documents": "workspace:*",
+    "@hatti/logger": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
     "@hatti/storefront-api": "workspace:*",

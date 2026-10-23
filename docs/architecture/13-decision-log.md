@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-743 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-744 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -751,6 +751,7 @@
 | 741 | A closed shop's data is deleted 90 days after it closed, table by table from those its tenant isolation names, but a list of records the law has Hatti keep, and its files; the worker does it once counsel has confirmed the list, Hatti's people by hand till then | Accepted |
 | 742 | Every shop is told of a new version of Hatti's terms, policies or list of sub-processors, at its alerts number and by email to its owner, once: the worker records each version the first time it runs with it, and one that follows an earlier version is announced to the shops open before it | Accepted |
 | 743 | Errors the core logs go to a self-hosted GlitchTip, the open-source error tracker, in the protocol Sentry's SDKs speak, sent by Hatti's logger itself after redaction; no paid service | Accepted |
+| 744 | The storefront's errors go to the error tracker too: each answer that failed with a 5xx logged at error by Fastify's log controller, by its route and the first part of its path, never its address; requests themselves not logged | Accepted |
 
 ---
 
@@ -25301,3 +25302,28 @@
   and the admin in the browser do not send errors yet; GlitchTip's browser SDK support (Sentry's
   browser SDK, MIT) would serve the admin when it does. Performance tracing stays with
   OpenTelemetry and Tempo, not the tracker.
+
+## ADR-744 · The storefront's errors go to the error tracker too: each answer that failed with a 5xx logged at error by Fastify's log controller, by its route and the first part of its path, never its address; requests themselves not logged
+
+* **Context:** ADR-743 sent the core's errors to a self-hosted GlitchTip through Hatti's logger.
+  The storefront had no logger at all: its Fastify server was made without one, so an answer that
+  failed with a 500 (Valkey unreachable, a bug in a route) was lost, and its CLI wrote its
+  warnings to the console. It serves every shopper, so its failures matter most.
+* **Decision:**
+  * **The storefront logs as the core does**, JSON to stdout through `@hatti/logger`, as service
+    `storefront`, with the same error tracker: `ERROR_TRACKING_DSN`, `ERROR_TRACKING_ENVIRONMENT`
+    and `ERROR_TRACKING_RELEASE`, read from its environment; without a DSN nothing is sent. What
+    nothing caught is logged as fatal before it exits, and shutting down waits for the last events.
+    The tracker's helpers for a process (`errorTrackerOf`, `logUncaught`) moved from the core into
+    `@hatti/logger`, which both use.
+  * **Only what failed is logged of requests**, by a log controller of the storefront's own
+    (Fastify's `logController`): an answer that failed with a 5xx at error, with its error, its
+    status, its method, its route's pattern, the first part of its path (as `/products`) and its
+    host, so that it reaches the tracker. Never the whole address, which may hold an order's, a
+    payment's or a preview's token; never each request, which the edge's logs already hold.
+  * **A shop's theme's faults are warnings**, not errors: a section that failed to render and a
+    theme file left out are the shop's to fix, so they are logged at warn and not sent.
+* **Consequences:** the storefront's failures reach GlitchTip beside the core's, tagged
+  `storefront`. Errors after a page's head is sent (its sections stream) are Fastify's stream
+  warnings, not sent; a section's failure is shown as its absence and logged at warn. The admin in
+  the browser still sends nothing.

@@ -2,6 +2,7 @@ import { isSpanContextValid, trace } from '@opentelemetry/api';
 import { destination, pino, stdSerializers, stdTimeFunctions, symbols } from 'pino';
 import type { DestinationStream, Level, LevelWithSilent, Logger } from 'pino';
 import type { ErrorTracker } from './error-tracking.js';
+export { errorTrackerOf, logUncaught, type ErrorTrackingConfig } from './process.js';
 
 export type { Level, LevelWithSilent, Logger };
 export {

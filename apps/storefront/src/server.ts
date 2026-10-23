@@ -45,7 +45,12 @@ import {
   type ContentType,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import Fastify, {
+  type FastifyBaseLogger,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from 'fastify';
 import type { Redis } from 'ioredis';
 import {
   CART_COOKIE,
@@ -118,6 +123,7 @@ import {
   rightsTakenPage,
   takenDownPage,
 } from './report-page.js';
+import { StorefrontLogs } from './error-logs.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
@@ -167,6 +173,11 @@ export interface StorefrontServerOptions {
    * design mode.
    */
   editorOrigins?: readonly string[];
+  /**
+   * Where the server logs (ADR-744): each answer that failed with a 5xx at error, so that it
+   * reaches the error tracker. Without it, nothing is logged.
+   */
+  logger?: FastifyBaseLogger;
 }
 
 /**
@@ -689,7 +700,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const secure = options.secureCookies ?? false;
   const editorOrigins = options.editorOrigins ?? [];
   const previewed = (reply: FastifyReply) => previewedAnswer(reply, editorOrigins);
-  const app = Fastify({ trustProxy: options.trustProxy ?? false });
+  const app = Fastify({
+    trustProxy: options.trustProxy ?? false,
+    ...(options.logger
+      ? { loggerInstance: options.logger, logController: new StorefrontLogs() }
+      : {}),
+  });
   app.addHook('onReady', () => warmUp(renderer));
   // Kubernetes' probes (ADR-724), answered before any shop is looked for, whatever the host: the
   // process is up, and Valkey, where shops are found, answers.
