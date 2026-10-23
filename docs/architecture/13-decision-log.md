@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-784 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-785 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -792,6 +792,7 @@
 | 782 | A signed-in reseller's own prices on Hatti Base's cards, every card's variants asked for together | Accepted |
 | 783 | A Shopify store's articles' images are fetched from its CDN and kept as the shop's files | Accepted |
 | 784 | A Shopify store's customers' addresses fill their address books, only where a book is empty | Accepted |
+| 785 | A collection shows one of the shop's files as its image, served as articles' are, and Shopify's are brought | Accepted |
 
 ---
 
@@ -26208,3 +26209,28 @@
   none, and a customer already here whose book is empty gets theirs. Shopify's province names
   are read as checkout reads typed ones; an address whose province or postcode Hatti cannot
   read is not kept, rather than kept wrong.
+
+## ADR-785 · A collection shows one of the shop's files as its image, served as articles' are, and Shopify's are brought
+
+* **Context:** Shopify's collections have an image, which themes show at the top of a
+  collection's page and in collection lists (`collection.image`, `collection.featured_image`).
+  Hatti's collections had none: the storefront's collection documents carried an `image` that
+  was always null, and moving a store (ONB-05) lost every collection's picture.
+* **Decision:** `catalog.collections` keeps an `image_file_id` and `image_alt`, as articles do
+  (ADR-213): one of the shop's ready images, checked when given, with no key across schemas, so a
+  deleted file leaves the collection without one wherever it is shown. `collectionCreate` and
+  `collectionUpdate` take `image` (left out, it stays; null for none), and `Collection.image`
+  gives it. The API serves it at `/collection-images/{shop}/{collection}`, read as the shop and
+  sized as browsers ask (ADR-538); the publisher names it in the collection's document by an
+  address naming what its file holds (ADR-647), and rebuilds every collection when a file goes or
+  its alt text or bytes change. Liquid's `collection.image` shows it and `featured_image` is it,
+  else the first product's, as Shopify's. Hatti Base's collection page shows it above the
+  description, which a setting turns off. A file's uses name the collections showing it
+  (ADR-639). The admin's collection page chooses, shows and removes it with the field the article
+  page uses, now shared. The Shopify collections import reads each collection's
+  `image { url altText }` and keeps it through the same fetch and `FileService.createImage` as
+  articles' images (ADR-783), saying any that cannot be brought.
+* **Consequences:** collections arrive from Shopify with their pictures, and themes that list
+  collections with images work. A file deleted or changed republishes every collection of the
+  shop, which is more than needed but rare and cheap next to products. Other themes in the
+  library show the image only once their own collection sections use it.

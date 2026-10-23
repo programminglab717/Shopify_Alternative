@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Collections' images
+
+* **A picture for each collection:** a collection shows one of the shop's images, chosen on its
+  admin page, at the top of Hatti Base's collection page and as Liquid's `collection.image` and
+  `featured_image`; moving a Shopify store brings each collection's image (CAT, ONB-05, [ADR-785](../architecture/13-decision-log.md#adr-785--a-collection-shows-one-of-the-shops-files-as-its-image-served-as-articles-are-and-shopifys-are-brought)).
+* 4225 tests (5 new).
+
 ### 0268651 · A Shopify store's customers' addresses
 
 * **Addresses come along:** moving a Shopify store's customers fills their address books with
