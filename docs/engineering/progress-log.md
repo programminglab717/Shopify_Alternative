@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### The admin's price lists
+### 2e76ace · The admin's price lists
 
 * **Price lists in the admin:** under Products, a shop makes wholesale price lists, their
   quantity breaks and their own prices for some variants, found as a draft's items are
