@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### An order's link sent from a conversation
+### 8b1c918 · An order's link sent from a conversation
 
 * **Staff send a draft's link in the chat it came from:** from a customer's conversation, one of
   the shop's open drafts is sent with a tap, from the number the customer wrote to; the customer
