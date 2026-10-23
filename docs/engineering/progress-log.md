@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### The admin's errors to GlitchTip, through the core
+### bcdf815 · The admin's errors to GlitchTip, through the core
 
 * **What fails in the admin's browser is reported to the core** at `/admin/errors`, which logs it
   as the admin's and so sends it to the same self-hosted GlitchTip ([ADR-745](../architecture/13-decision-log.md#adr-745--the-admins-browser-errors-are-reported-to-the-core-at-adminerrors-which-logs-them-as-the-admins-for-the-error-tracker-after-its-redaction-no-dsn-in-the-browser-a-limit-for-each-browser-and-for-all-numbers-and-emails-taken-out-ids-out-of-the-pages-path)). No DSN is in the
