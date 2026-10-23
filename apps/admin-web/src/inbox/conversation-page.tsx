@@ -54,6 +54,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { ConversationLabels } from './conversation-labels';
 import { ConversationOrder } from './conversation-order';
 import { mediaLabel, UnreadBadge, WORKS_INBOX } from './inbox-page';
+import { PaymentLinkPicker } from './payment-link-picker';
 import { ProductCardPicker } from './product-card-picker';
 import { SavedReplyPicker } from './saved-replies';
 
@@ -148,6 +149,9 @@ function ReplyBox({
     ConversationReplyMutation,
   );
   const [body, setBody] = useState('');
+  /** Adds what a picker chose after what is written, `gap` between them. */
+  const append = (text: string, gap: string) =>
+    setBody((current) => (current.trim() ? `${current.trimEnd()}${gap}${text}` : text));
   const [problem, setProblem] = useState<string | null>(null);
   const until = conversation.replyableUntil;
   const text = body.trim();
@@ -188,16 +192,9 @@ function ReplyBox({
         className="rounded-control border border-line bg-surface px-3 py-2 text-text"
       />
       <div className="flex flex-wrap gap-2">
-        <SavedReplyPicker
-          onPick={(saved) =>
-            setBody((current) => (current.trim() ? `${current.trimEnd()}\n${saved}` : saved))
-          }
-        />
-        <ProductCardPicker
-          onPick={(card) =>
-            setBody((current) => (current.trim() ? `${current.trimEnd()}\n\n${card}` : card))
-          }
-        />
+        <SavedReplyPicker onPick={(saved) => append(saved, '\n')} />
+        <ProductCardPicker onPick={(card) => append(card, '\n\n')} />
+        <PaymentLinkPicker onPick={(link) => append(link, '\n\n')} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">

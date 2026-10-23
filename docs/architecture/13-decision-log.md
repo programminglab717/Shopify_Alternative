@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-766 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-767 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -774,6 +774,7 @@
 | 764 | The inbox's conversations carry labels of what the customer writes about, written as the shop already writes them, and the inbox shows those with one label alone | Accepted |
 | 765 | A draft order's link is sent as an answer in the customer's conversation, where they add their address and confirm; the core joins orders and messaging, and checks the window first | Accepted |
 | 766 | A product is put in an answer as its name, price and storefront link, which WhatsApp previews with the product's photo; only products on sale are offered | Accepted |
+| 767 | A payment link still taking orders is put in an answer as its title, what it sells and its address | Accepted |
 
 ---
 
@@ -25848,3 +25849,16 @@
 * **Consequences:** no media is uploaded to Meta and nothing new is kept; the preview is
   WhatsApp's, so it shows only once its crawler has read the page. An interactive product
   message needs a Meta catalog for the number and is left for later.
+
+## ADR-767 · A payment link still taking orders is put in an answer as its title, what it sells and its address
+
+* **Context:** payment links (PAY-04) are made for sharing, mostly in chats; staff copied them
+  from the payment links page into WhatsApp by hand (MSG-08).
+* **Decision:** the admin's reply box gets "Put in a payment link", beside saved replies and
+  products (ADR-766): the shop's links still taking orders, found by their title or what they
+  sell, and one picked adds its title, its items ("Lawn suit × 2, Dupatta") and its address to
+  what is written. For those who answer and read orders (`read_orders`), as the payment links
+  page reads them; nothing new in the core.
+* **Consequences:** with drafts' links (ADR-765), products (ADR-766) and payment links, an order
+  can begin, be shown and be paid for in the chat, which MSG-08 asks. A link closed or full is
+  not offered, so a customer is not sent one that refuses them.
