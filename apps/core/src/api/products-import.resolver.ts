@@ -1,6 +1,7 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { ProductImportService, type ImportedStock } from '@hatti/catalog/public';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
+import { readStoreProducts, shopDomainOf, type ShopifyCredentials } from '@hatti/shopify-admin';
 import {
   Args,
   Field,
@@ -10,6 +11,7 @@ import {
   Resolver,
   registerEnumType,
 } from '@nestjs/graphql';
+import { ShopifyStores } from './shopify-stores.js';
 
 /** Variants given their stock in one change, as `inventorySetQuantities` takes them. */
 const STOCK_BATCH = 250;
@@ -68,6 +70,14 @@ export class ProductImportRowError {
     description: "The column's heading in the file; null for the row as a whole.",
   })
   column!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The handle of the row's product, where the import read it from a store: there is no " +
+      'file to look the row up in (ADR-749). Null for a file.',
+  })
+  handle!: string | null;
 
   @Field()
   message!: string;
@@ -129,6 +139,7 @@ export class ProductsImportResolver {
     private readonly imports: ProductImportService,
     private readonly inventory: InventoryService,
     private readonly locations: LocationService,
+    private readonly shopify: ShopifyStores,
   ) {}
 
   @Mutation(() => ProductsImportPayload, {
@@ -162,36 +173,152 @@ export class ProductsImportResolver {
     })
     format?: ProductImportFormat,
   ): Promise<ProductsImportPayload> {
-    const from = format ?? ProductImportFormat.SHOPIFY;
-    const result = await this.imports.import(tenant, csv, {
+    return this.#import(tenant, csv, {
       dryRun: dryRun ?? false,
       overwrite: overwrite ?? false,
-      format: from,
+      format: format ?? ProductImportFormat.SHOPIFY,
     });
-    if (!result.ok) {
-      return Object.assign(new ProductsImportPayload(), {
-        rows: 0,
-        created: 0,
-        updated: 0,
-        variants: 0,
-        images: 0,
-        skipped: 0,
-        stocked: 0,
-        rowErrors: [],
-        rowErrorCount: 0,
+  }
+
+  @Mutation(() => ProductsImportPayload, {
+    description:
+      "Imports a Shopify store's products through its own Admin API, as productsImport imports " +
+      "Shopify's product export, so nothing is downloaded or uploaded by hand (ONB-05, ADR-749): " +
+      'their options, variants, prices, costs, SKUs, barcodes, weights, tags, status, SEO, ' +
+      'category and images, each keeping its handle, and the stock the store tracked at the ' +
+      "shop's primary location. Give the store's address and the Admin API access token of a " +
+      "custom app made in the store's admin, or the client ID and secret of an app made in " +
+      "Shopify's Dev Dashboard and installed on the store; the app needs the read_products and " +
+      'read_inventory access scopes. Nothing given is kept. Shopify exports the products in the ' +
+      'background, which is waited for up to 90 seconds. The store must price in rupees. Row ' +
+      "errors name each product's handle. dryRun reads the store and counts, changing nothing.",
+  })
+  @RequireScopes('write_products', 'write_inventory')
+  async productsImportFromShopify(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('store', {
+      description:
+        "The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.",
+    })
+    store: string,
+    @Args('accessToken', {
+      nullable: true,
+      description: "The Admin API access token of the store's custom app, shpat_ and the rest.",
+    })
+    accessToken?: string,
+    @Args('clientId', {
+      nullable: true,
+      description: "The client ID of the store's Dev Dashboard app, with its secret.",
+    })
+    clientId?: string,
+    @Args('clientSecret', { nullable: true }) clientSecret?: string,
+    @Args('dryRun', { nullable: true }) dryRun?: boolean,
+    @Args('overwrite', {
+      nullable: true,
+      description:
+        "Update the shop's products whose handles the store has, rather than leave them: their " +
+        'options must be the same. Default false.',
+    })
+    overwrite?: boolean,
+  ): Promise<ProductsImportPayload> {
+    const refused = (field: string[] | null, code: string, message: string) =>
+      payloadOf(dryRun ?? false, [UserError.of(field, code, message)]);
+    const shop = shopDomainOf(store);
+    if (!shop) {
+      return refused(
+        ['store'],
+        'INVALID',
+        "Give the store's address at Shopify, as zari.myshopify.com, or its admin's link",
+      );
+    }
+    const credentials = credentialsOf(accessToken, clientId, clientSecret);
+    if (!credentials) {
+      return refused(
+        ['accessToken'],
+        'BLANK',
+        "Give the access token of the store's app, or the client ID and secret of its app",
+      );
+    }
+    const read = await readStoreProducts(
+      this.shopify.connect(shop, credentials),
+      this.shopify.bulk,
+    );
+    if (!read.ok) {
+      const field =
+        read.kind === 'credentials' || read.kind === 'scope'
+          ? ['accessToken']
+          : read.kind === 'store'
+            ? ['store']
+            : null;
+      return refused(field, read.kind === 'busy' ? 'UNAVAILABLE' : 'INVALID', read.message);
+    }
+    const { currency, storeName, products, csv, rowHandles } = read.value;
+    if (currency !== 'PKR') {
+      return refused(
+        ['store'],
+        'INVALID',
+        `${storeName} prices in ${currency}, and Hatti's shops in rupees: export its products ` +
+          'as a CSV, change their prices to rupees and import the file',
+      );
+    }
+    if (products === 0) return refused(['store'], 'BLANK', `${storeName} has no products`);
+    return this.#import(
+      tenant,
+      csv,
+      {
         dryRun: dryRun ?? false,
-        userErrors: UserError.list(result.errors),
-      });
+        overwrite: overwrite ?? false,
+        format: ProductImportFormat.SHOPIFY,
+      },
+      {
+        reference: `hatti://imports/shopify-store/${shop}`,
+        rowHandles,
+        tooMuch:
+          `${storeName} has more products than one import takes: export them from Shopify as ` +
+          'CSV files of fewer products each, and import those',
+      },
+    );
+  }
+
+  /**
+   * Products from a file, or from a store as Shopify's export would give them; then the stock it
+   * tracked. Row errors name their products' handles where the rows came from a store.
+   */
+  async #import(
+    tenant: TenantContext,
+    csv: string,
+    options: { dryRun: boolean; overwrite: boolean; format: ProductImportFormat },
+    store?: { reference: string; rowHandles: readonly string[]; tooMuch: string },
+  ): Promise<ProductsImportPayload> {
+    const result = await this.imports.import(tenant, csv, options);
+    if (!result.ok) {
+      const errors = UserError.list(result.errors);
+      return payloadOf(
+        options.dryRun,
+        store
+          ? errors.map((error) =>
+              error.code === 'TOO_LONG' || error.code === 'TOO_MANY'
+                ? UserError.of(['store'], error.code, store.tooMuch)
+                : error,
+            )
+          : errors,
+      );
     }
     const { stock, rowErrors, rowErrorCount, ...counts } = result.value;
-    const stockErrors = await this.#stock(tenant, stock, IMPORTED[from]);
+    const imported = store
+      ? { ...IMPORTED[options.format], reference: store.reference }
+      : IMPORTED[options.format];
+    const stockErrors = await this.#stock(tenant, stock, imported);
     const errors = [...rowErrors, ...stockErrors].sort((a, b) => a.row - b.row);
     return Object.assign(new ProductsImportPayload(), {
       ...counts,
       stocked: stock.length - stockErrors.length,
-      rowErrors: errors
-        .slice(0, 100)
-        .map((error) => Object.assign(new ProductImportRowError(), error)),
+      rowErrors: errors.slice(0, 100).map((error) =>
+        Object.assign(new ProductImportRowError(), {
+          ...error,
+          handle: store?.rowHandles[error.row - 2] ?? null,
+        }),
+      ),
       rowErrorCount: rowErrorCount + stockErrors.length,
       userErrors: [],
     });
@@ -234,4 +361,34 @@ export class ProductsImportResolver {
     }
     return errors;
   }
+}
+
+/** A payload that imported nothing, for what was refused before anything was read. */
+function payloadOf(dryRun: boolean, userErrors: UserError[]): ProductsImportPayload {
+  return Object.assign(new ProductsImportPayload(), {
+    rows: 0,
+    created: 0,
+    updated: 0,
+    variants: 0,
+    images: 0,
+    skipped: 0,
+    stocked: 0,
+    rowErrors: [],
+    rowErrorCount: 0,
+    dryRun,
+    userErrors,
+  });
+}
+
+/** What the owner gave of their store's app: its token, or its client ID and secret. */
+function credentialsOf(
+  accessToken?: string,
+  clientId?: string,
+  clientSecret?: string,
+): ShopifyCredentials | null {
+  const token = accessToken?.trim() ?? '';
+  if (token !== '') return { accessToken: token };
+  const id = clientId?.trim() ?? '';
+  const secret = clientSecret?.trim() ?? '';
+  return id !== '' && secret !== '' ? { clientId: id, clientSecret: secret } : null;
 }

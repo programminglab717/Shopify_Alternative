@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Products straight from a Shopify store
+
+* **A shop moving from Shopify no longer downloads and uploads a CSV.** The owner gives their
+  store's address and their app's access token, or a Dev Dashboard app's client ID and secret;
+  Hatti asks Shopify for every product in one bulk query, writes Shopify's own product export
+  of them and imports it as a file is imported, its stock with it, each row error naming its
+  product. Nothing given is kept ([ADR-749](../architecture/13-decision-log.md#adr-749--a-shopify-stores-products-come-through-its-own-admin-api-with-its-owners-apps-token-or-client-id-and-secret-kept-for-nothing-one-bulk-query-written-as-shopifys-product-export-which-the-product-import-takes-as-it-takes-a-file)).
+* 4094 tests (13 new).
+
 ### ddba88a · Addresses forgotten
 
 * **Comments on articles kept the address and browser they came from forever, and so did the

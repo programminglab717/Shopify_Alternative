@@ -336,6 +336,9 @@ importers:
       '@hatti/ratelimit':
         specifier: workspace:*
         version: link:../../packages/platform/ratelimit
+      '@hatti/shopify-admin':
+        specifier: workspace:*
+        version: link:../../packages/platform/shopify-admin
       '@hatti/storage':
         specifier: workspace:*
         version: link:../../packages/platform/storage
@@ -2033,6 +2036,18 @@ importers:
       ioredis:
         specifier: 'catalog:'
         version: 6.0.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(happy-dom@20.14.5)(vite@8.3.2(@types/node@24.19.0)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/platform/shopify-admin:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

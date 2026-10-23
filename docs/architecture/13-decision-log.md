@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-748 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-749 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -756,6 +756,7 @@
 | 746 | Outbox events published more than seven days ago are deleted by the worker, a batch at a time, the oldest first; those not yet published or parked are kept | Accepted |
 | 747 | Staff's sessions unused for 90 days and second steps' challenges a month past their end are deleted as new ones are made, with the address and browser they hold | Accepted |
 | 748 | Comments on articles forget the internet address and browser they were posted from after 90 days, and the log of staff's sign-ins and account changes is kept two years | Accepted |
+| 749 | A Shopify store's products come through its own Admin API, with its owner's app's token or client ID and secret, kept for nothing: one bulk query, written as Shopify's product export, which the product import takes as it takes a file | Accepted |
 
 ---
 
@@ -25423,3 +25424,41 @@
   its use, but the records the law asks for: an order's agreement to the shop's policies keeps
   its address and browser as evidence of the contract (TAX-06), and so does an owner's agreement
   to Hatti's terms (ADR-737), as long as those records are kept.
+
+## ADR-749 · A Shopify store's products come through its own Admin API, with its owner's app's token or client ID and secret, kept for nothing: one bulk query, written as Shopify's product export, which the product import takes as it takes a file
+
+* **Context:** a shop moving from Shopify imports its products from the CSV its Shopify admin
+  exports (ONB-05), downloaded there and uploaded here. 08 §5 plans the importer to read the
+  store itself, through Shopify's Admin API with an app the merchant makes. Since January 2026
+  Shopify no longer lets a store's admin make a new custom app with a lasting token: a new app
+  is made in Shopify's Dev Dashboard, installed on the store, and its client ID and secret are
+  exchanged at the store for a token that lasts a day. Stores that made their custom apps
+  before keep their tokens. A store's GraphQL queries are limited by what they cost, and a page
+  of products with their variants and images costs too much to ask for more than a few at once.
+* **Decision:**
+  * **`@hatti/shopify-admin`**, a platform package, is all Hatti knows of Shopify's Admin API:
+    the store's own address, `{name}.myshopify.com`, read from what the owner types (its name,
+    that address, or its admin's link) and nothing else asked, so credentials go to Shopify
+    alone; a token as given, or one taken for the client ID and secret; queries Shopify
+    throttles asked again once the store has room; and Shopify's answers said in the owner's
+    terms: the credentials, the app's scopes, the store, or Shopify being busy. The API's
+    version is a constant, `2026-07`, moved forward each year as Shopify answers each for one.
+  * **One bulk query** asks for every product with its images and variants (their options,
+    prices, costs, SKUs, barcodes, weights, stock and own images), which no cost holds back:
+    Shopify writes them to a file and Hatti waits up to 90 seconds for it, then cancels and asks
+    the owner to try again. The store's name and currency are asked first, which proves the
+    credentials before an export is started.
+  * **Shopify's product export** is what Hatti writes of them, every cell quoted, and
+    `productsImportFromShopify` gives it to the import `productsImport` uses, with its dry run,
+    overwrite, stock at the primary location and row errors, so the two cannot drift. As there
+    is no file to look a row up in, each row error names its product's handle.
+  * **Refused:** a store that prices in another currency than rupees, as its prices would be
+    taken as rupees; a store with no products; a store with more than one import takes, told
+    to export CSV files of fewer products instead.
+  * **Nothing is kept:** the token, ID and secret are used for the one import and let go.
+* **Consequences:** an owner moves their products by pasting their store's address and their
+  app's token or ID and secret, needing read_products and read_inventory. Collections,
+  customers, orders, discount codes, pages, blogs and redirects through the API are still to
+  come, as are metafields and variants' images through `media` once Shopify leaves `image`;
+  the admin's screen for it is next. A store too big for one import's 5,000 rows is moved by
+  its CSV files.

@@ -52,6 +52,7 @@
     "@hatti/pk": "workspace:*",
     "@hatti/pricing": "workspace:*",
     "@hatti/ratelimit": "workspace:*",
+    "@hatti/shopify-admin": "workspace:*",
     "@hatti/storage": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "@hatti/storefront-data": "workspace:*",

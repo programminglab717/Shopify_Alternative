@@ -32,6 +32,7 @@ import type { QueryCostOptions } from '../api/query-cost.js';
 import { couriersOf } from '../couriers.js';
 import { hattiGatewayOf } from '../billing.js';
 import { paymentGatewaysOf } from '../payments.js';
+import type { ShopifyStores } from '../api/shopify-stores.js';
 
 export interface TestApi {
   app: NestFastifyApplication;
@@ -109,6 +110,8 @@ export async function startTestApi(
     queryCost?: QueryCostOptions;
     /** The tiles of checkout's map to move the pin on (ADR-719); without them, no map. */
     mapTiles?: MapTiles;
+    /** Shopify's stores, as owners move from them (ADR-749); the real ones unless given. */
+    shopifyStores?: ShopifyStores;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -161,6 +164,7 @@ export async function startTestApi(
     billingTax: options.billingTax ?? null,
     support: options.support ?? null,
     supportLine: options.supportLine ?? null,
+    ...(options.shopifyStores && { shopifyStores: options.shopifyStores }),
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

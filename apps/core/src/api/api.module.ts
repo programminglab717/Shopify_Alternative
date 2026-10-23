@@ -84,6 +84,7 @@ import { InventoryFileResolver } from './inventory-file.resolver.js';
 import { BroadcastEstimateResolver } from './broadcast-estimate.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
+import { ShopifyStores } from './shopify-stores.js';
 import { ShopResolver } from './shop.resolver.js';
 import { StaffResolver } from './staff.resolver.js';
 import {
@@ -193,6 +194,11 @@ export interface ApiModuleOptions {
   supportLine?: SupportLineSettings | null;
   /** The voice gateway's webhook (ADR-611); without it, /webhooks/voice answers 404. */
   voice?: VoiceWebhookSettings | null;
+  /**
+   * Where the Shopify stores owners move from are reached (ADR-749); the process's fetch, waiting
+   * Shopify's own time for exports, unless given.
+   */
+  shopifyStores?: ShopifyStores;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -361,6 +367,7 @@ export class ApiModule {
         ParcelHandOverResolver,
         OrderEventResolver,
         ProductsImportResolver,
+        { provide: ShopifyStores, useValue: options.shopifyStores ?? new ShopifyStores() },
         ProductsExportResolver,
         BroadcastEstimateResolver,
         InventoryFileResolver,

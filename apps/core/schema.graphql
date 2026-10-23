@@ -9233,6 +9233,31 @@ type Mutation {
   ): ProductsImportPayload!
 
   """
+  Imports a Shopify store's products through its own Admin API, as productsImport imports Shopify's product export, so nothing is downloaded or uploaded by hand (ONB-05, ADR-749): their options, variants, prices, costs, SKUs, barcodes, weights, tags, status, SEO, category and images, each keeping its handle, and the stock the store tracked at the shop's primary location. Give the store's address and the Admin API access token of a custom app made in the store's admin, or the client ID and secret of an app made in Shopify's Dev Dashboard and installed on the store; the app needs the read_products and read_inventory access scopes. Nothing given is kept. Shopify exports the products in the background, which is waited for up to 90 seconds. The store must price in rupees. Row errors name each product's handle. dryRun reads the store and counts, changing nothing.
+  """
+  productsImportFromShopify(
+    """
+    The Admin API access token of the store's custom app, shpat_ and the rest.
+    """
+    accessToken: String
+
+    """The client ID of the store's Dev Dashboard app, with its secret."""
+    clientId: String
+    clientSecret: String
+    dryRun: Boolean
+
+    """
+    Update the shop's products whose handles the store has, rather than leave them: their options must be the same. Default false.
+    """
+    overwrite: Boolean
+
+    """
+    The store's address at Shopify, as zari.myshopify.com, its name, or a link to its admin.
+    """
+    store: String!
+  ): ProductsImportPayload!
+
+  """
   Gives products a size chart in place of any they had, or takes theirs away with a null `sizeChartId`: up to 250 by their IDs, and those a collection has now. Products added to the collection later are given none.
   """
   productsSizeChartSet(collectionId: ID, productIds: [ID!], sizeChartId: ID): ProductsSizeChartSetPayload!
@@ -12690,6 +12715,11 @@ enum ProductImportFormat {
 type ProductImportRowError {
   """The column's heading in the file; null for the row as a whole."""
   column: String
+
+  """
+  The handle of the row's product, where the import read it from a store: there is no file to look the row up in (ADR-749). Null for a file.
+  """
+  handle: String
   message: String!
 
   """Its row in the file, the headings being row 1."""

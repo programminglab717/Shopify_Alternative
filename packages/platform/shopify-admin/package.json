@@ -1,0 +1,26 @@
+{
+  "name": "@hatti/shopify-admin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A Shopify store's own Admin API, as its owner gives Hatti access to move to it: the store's address checked, a token from its app, bulk queries, and its products as Shopify's product CSV.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
