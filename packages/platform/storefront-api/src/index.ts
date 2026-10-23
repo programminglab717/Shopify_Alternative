@@ -23,6 +23,7 @@ export {
   type AccountLoginVerifyRequest,
   type AccountLoginVerifyResponse,
   type AccountOrderJson,
+  type AccountPastOrderJson,
   type AccountOrderLineJson,
   type AccountOrderLinkResponse,
   type AccountResponse,

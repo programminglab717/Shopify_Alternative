@@ -521,6 +521,29 @@ export function customerObject(
         ? `${options.prefix}/account/orders/${encodeURIComponent(order.id)}/reorder`
         : null,
   }));
+  // Hatti's: their orders from the store the shop moved from (ADR-786), with no page, as kept.
+  const pastOrders = (account.pastOrders ?? []).map((order) => {
+    const status = (labelled: Record<string, string>, value: string | null) =>
+      value === null ? null : (labelled[value] ?? value.replace(/_/g, ' '));
+    return {
+      id: order.id,
+      name: order.name,
+      created_at: order.placedAt,
+      cancelled: order.cancelled,
+      financial_status: order.financialStatus,
+      financial_status_label: status(labels.financial, order.financialStatus),
+      fulfillment_status: order.fulfillmentStatus,
+      fulfillment_status_label: status(labels.fulfillment, order.fulfillmentStatus),
+      total_price: order.total,
+      currency: { iso_code: order.currency },
+      item_count: order.itemCount,
+      line_items: order.lines.map((line) => ({
+        title: line.title,
+        variant_title: line.variantTitle,
+        quantity: line.quantity,
+      })),
+    };
+  });
   const credit = account.storeCredit;
   const data = account.dataRequests;
   const addresses = (options.addresses ?? []).map((each) => addressObject(each, options.prefix));
@@ -533,6 +556,7 @@ export function customerObject(
     has_account: true,
     orders,
     orders_count: orders.length,
+    past_orders: pastOrders,
     // Their address book (ADR-584), as Shopify's: the default first; and the blank address the
     // form for a new one fills in.
     addresses,

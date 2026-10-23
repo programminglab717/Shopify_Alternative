@@ -12,7 +12,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { MESSAGING_CUSTOMER_DATA } from '@hatti/messaging/public';
-import { ORDER_CUSTOMER_DATA } from '@hatti/orders/public';
+import { ORDER_CUSTOMER_DATA, PastOrderService } from '@hatti/orders/public';
 import { ACCOUNT_ADDRESSES_MAX, type AccountAddressRequest } from '@hatti/storefront-api';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ACCOUNT_DATA } from './account-data.js';
@@ -181,6 +181,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       phone: ZONG,
       name: null,
       orders: [],
+      pastOrders: [],
       storeCredit: { balance: 0, currency: 'PKR', expiring: null, history: [] },
       dataRequests: { available: false, erasureWaitDays: 10, export: null, erasure: null },
     });
@@ -436,6 +437,43 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       status: 'cancelled',
       hasPage: false,
     });
+
+    // Under them, what she bought at the store the shop moved from (ADR-786).
+    expect(after.pastOrders).toEqual([]);
+    await new PastOrderService(f.db).bring(f.a, 'shopify', [
+      {
+        sourceId: 'gid://shopify/Order/1',
+        name: '#S1001',
+        phone: '0300 1234567',
+        email: null,
+        placedAt: new Date('2025-03-20T09:00:00Z'),
+        cancelledAt: null,
+        currency: 'PKR',
+        subtotal: 900_000n,
+        shipping: 0n,
+        discounts: 0n,
+        total: 900_000n,
+        financialStatus: 'PAID',
+        fulfillmentStatus: 'FULFILLED',
+        lines: [{ title: 'Lawn suit', variantTitle: 'M', sku: null, quantity: 2, price: 450_000n }],
+        shippingAddress: null,
+        note: '',
+      },
+    ]);
+    expect((await f.accounts.account(f.a.shopId, token))!.pastOrders).toEqual([
+      {
+        id: expect.stringMatching(/^pord_/) as unknown,
+        name: '#S1001',
+        placedAt: '2025-03-20T09:00:00.000Z',
+        cancelled: false,
+        financialStatus: 'paid',
+        fulfillmentStatus: 'fulfilled',
+        total: 900_000,
+        currency: 'PKR',
+        itemCount: 2,
+        lines: [{ title: 'Lawn suit', variantTitle: 'M', quantity: 2 }],
+      },
+    ]);
   });
 
   it('offers what each order sold again, saying what the cart would take now (ADR-574)', async () => {

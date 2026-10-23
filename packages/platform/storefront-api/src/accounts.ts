@@ -189,6 +189,27 @@ export interface AccountOrderJson {
   lines: AccountOrderLineJson[];
 }
 
+/** An order of the shopper's from the store the shop moved from (ADR-786), as it was there. */
+export interface AccountPastOrderJson {
+  /** "pord_…". */
+  id: string;
+  /** Its name there, "#1001". */
+  name: string;
+  /** ISO 8601. */
+  placedAt: string;
+  cancelled: boolean;
+  /** The store's words, lower case: "paid", "refunded"; null for none. */
+  financialStatus: string | null;
+  /** The store's words, lower case: "fulfilled", "unfulfilled"; null for none. */
+  fulfillmentStatus: string | null;
+  /** Minor units, in `currency`. */
+  total: number;
+  currency: string;
+  /** Units of everything it had. */
+  itemCount: number;
+  lines: { title: string; variantTitle: string | null; quantity: number }[];
+}
+
 /** A line of an order of the shopper's, as their account offers it again (ADR-574). */
 export interface AccountOrderLineJson {
   /**
@@ -284,6 +305,11 @@ export interface AccountJson {
    * number is now, with the numbers merged into them. None for a number no customer has.
    */
   orders: AccountOrderJson[];
+  /**
+   * Their latest orders from the store the shop moved from (ADR-786), the newest first, at most
+   * 20: kept to look back on, with no page and nothing to buy again. Absent from older cores.
+   */
+  pastOrders?: AccountPastOrderJson[];
   /** Their store credit in the shop's currency: what they have, and what of it expires soonest. */
   storeCredit: {
     /** Minor units. */

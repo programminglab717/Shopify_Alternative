@@ -318,3 +318,21 @@ export const PAST_ORDER_CUSTOMER_DATA: CustomerDataHandler = {
     };
   },
 };
+
+/**
+ * The customer `customerId`'s latest past orders, at most `most`, in the caller's transaction
+ * (ADR-786): for their own account on the storefront, which lists them under their orders.
+ */
+export async function pastOrdersOfCustomerIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  most: number,
+): Promise<PastOrderRecord[]> {
+  const { rows } = await tx.execute<PastOrderRow>(sql`
+    SELECT * FROM orders.past_orders
+     WHERE shop_id = ${shopId} AND customer_id = ${customerId}
+     ORDER BY placed_at DESC, id DESC
+     LIMIT ${most}`);
+  return rows.map(toRecord);
+}

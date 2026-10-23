@@ -316,6 +316,8 @@
       "store_credit_expired": "Expired",
       "store_credit_expires": "expires on {{ date }}",
       "orders": "Your orders",
+      "past_orders": "From our old store",
+      "past_orders_hint": "Your orders before we moved here, to look back on.",
       "no_orders": "You haven't placed an order with us yet.",
       "start_shopping": "Start shopping",
       "view_order": "View order {{ name }}",

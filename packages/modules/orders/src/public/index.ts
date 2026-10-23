@@ -184,6 +184,7 @@ export {
   PAST_ORDER_CUSTOMER_DATA,
   PastOrderService,
   majorOf,
+  pastOrdersOfCustomerIn,
   type PastOrderAddress,
   type PastOrderInput,
   type PastOrderLine,

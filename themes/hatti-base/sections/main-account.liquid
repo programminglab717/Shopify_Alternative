@@ -168,6 +168,55 @@
       </ul>
     {%- endif -%}
 
+    {%- comment -%} Their orders from the store the shop moved from (ADR-786): no page, nothing to buy again. {%- endcomment -%}
+    {%- if customer.past_orders.size > 0 -%}
+      <section class="account__past" aria-labelledby="past-orders-title">
+        <h2 id="past-orders-title">{{ 'customer.account.past_orders' | t }}</h2>
+        <p class="account__muted">{{ 'customer.account.past_orders_hint' | t }}</p>
+        <ul class="account__orders" role="list">
+          {%- for order in customer.past_orders -%}
+            <li class="account__order">
+              <div class="account__order-head">
+                <bdi>{{ order.name | escape }}</bdi>
+                <span class="account__muted">{{ order.created_at | time_tag: format: 'day_month_year' }}</span>
+              </div>
+              <dl class="account__order-details">
+                <div>
+                  <dt>{{ 'customer.account.payment' | t }}</dt>
+                  <dd>
+                    {%- if order.cancelled -%}
+                      {{ 'customer.account.cancelled' | t }}
+                    {%- else -%}
+                      {{ order.financial_status_label | escape }}
+                    {%- endif -%}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ 'customer.account.delivery' | t }}</dt>
+                  <dd>{{ order.fulfillment_status_label | escape }}</dd>
+                </div>
+                <div>
+                  <dt>{{ 'customer.account.items' | t: count: order.item_count }}</dt>
+                  <dd>{{ order.total_price | money }}</dd>
+                </div>
+              </dl>
+              {%- if order.line_items.size > 0 -%}
+                <ul class="account__order-items" role="list" aria-label="{{ 'customer.account.order_items' | t: name: order.name }}">
+                  {%- for item in order.line_items -%}
+                    <li>
+                      <span dir="auto">{{ item.title | escape }}</span>
+                      {%- if item.variant_title %} <span class="account__muted" dir="auto">{{ item.variant_title | escape }}</span>{% endif %}
+                      <bdi>× {{ item.quantity }}</bdi>
+                    </li>
+                  {%- endfor -%}
+                </ul>
+              {%- endif -%}
+            </li>
+          {%- endfor -%}
+        </ul>
+      </section>
+    {%- endif -%}
+
     {%- assign data = customer.data_requests -%}
     <section class="account__data" id="your-data" aria-labelledby="your-data-title">
       <h2 id="your-data-title">{{ 'customer.account.data.title' | t }}</h2>

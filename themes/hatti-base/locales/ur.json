@@ -316,6 +316,8 @@
       "store_credit_expired": "میعاد ختم ہو گئی",
       "store_credit_expires": "میعاد {{ date }} کو ختم ہو گی",
       "orders": "آپ کے آرڈرز",
+      "past_orders": "ہمارے پرانے اسٹور سے",
+      "past_orders_hint": "یہاں آنے سے پہلے کے آپ کے آرڈرز، دیکھنے کے لیے۔",
       "no_orders": "آپ نے ابھی تک ہم سے کوئی آرڈر نہیں دیا۔",
       "start_shopping": "خریداری شروع کریں",
       "view_order": "آرڈر {{ name }} دیکھیں",

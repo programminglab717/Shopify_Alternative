@@ -3915,6 +3915,21 @@ const ORDERED = sampleStore().products.map((product) => product.variants[0]!.id)
 const ACCOUNT: AccountJson = {
   phone: '+923217654321',
   name: 'Ayesha Khan',
+  // One from the store the shop moved from (ADR-786).
+  pastOrders: [
+    {
+      id: 'pord_01jb7k2m3n4p5q6r7s8t9v0w1x',
+      name: '#S1042',
+      placedAt: '2025-03-20T09:00:00.000Z',
+      cancelled: false,
+      financialStatus: 'paid',
+      fulfillmentStatus: 'fulfilled',
+      total: 925_000,
+      currency: 'PKR',
+      itemCount: 2,
+      lines: [{ title: 'Lawn suit', variantTitle: 'M', quantity: 2 }],
+    },
+  ],
   orders: [
     {
       id: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1x',
@@ -4345,6 +4360,13 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(html).toMatch(/<bdi>#1001<\/bdi>\s*<span/);
     expect(html).toContain('<dd>Cancelled</dd>');
     expect(html).toContain('<form method="post" action="/account/logout">');
+    // Under them, what they bought at the store the shop moved from, with no page (ADR-786).
+    const past = html.slice(html.indexOf('<section class="account__past"'));
+    expect(past).toContain('<h2 id="past-orders-title">From our old store</h2>');
+    expect(past).toMatch(/<bdi>#S1042<\/bdi>\s*<span/);
+    expect(past).toContain('<dd>Paid</dd>');
+    expect(past).toContain('<dd>Rs 9,250</dd>');
+    expect(past).toContain('<span dir="auto">Lawn suit</span>');
 
     // In Urdu, the words and the statuses are Urdu, and the links stay in it.
     const urdu = await app.inject({
@@ -4357,6 +4379,7 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(urdu.body).toContain('<dd>ادائیگی باقی</dd>');
     expect(urdu.body).toContain('<dd>روانہ ہو گیا</dd>');
     expect(urdu.body).toContain('<dd>منسوخ</dd>');
+    expect(urdu.body).toContain('<h2 id="past-orders-title">ہمارے پرانے اسٹور سے</h2>');
     expect(urdu.body).toContain('<h3>اس کی تفصیل</h3>');
     expect(urdu.body).toContain('href="/ur/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x"');
     expect(urdu.body).toContain('<form method="post" action="/ur/account/logout">');

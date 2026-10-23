@@ -28,6 +28,7 @@ import {
   ORDER_LINK_PATH,
   accountOrderLinkIn,
   accountOrdersIn,
+  pastOrdersOfCustomerIn,
   type AccountOrderItemFacts,
 } from '@hatti/orders/public';
 import { maskPkMobile, parsePkMobile } from '@hatti/pk';
@@ -264,6 +265,10 @@ export class AccountService {
             lines: ACCOUNT_SESSION.lines,
           })
         : [];
+      // Theirs from the store the shop moved from (ADR-786).
+      const past = session.customerId
+        ? await pastOrdersOfCustomerIn(tx, shopId, session.customerId, ACCOUNT_SESSION.orders)
+        : [];
       const lines = await this.#linesIn(
         tx,
         shopId,
@@ -306,6 +311,22 @@ export class AccountService {
           itemCount: order.itemCount,
           hasPage: order.hasPage,
           lines: lines[index]!,
+        })),
+        pastOrders: past.map((order) => ({
+          id: toPublicId('pastOrder', order.id),
+          name: order.name,
+          placedAt: order.placedAt.toISOString(),
+          cancelled: order.cancelledAt !== null,
+          financialStatus: order.financialStatus?.toLowerCase() ?? null,
+          fulfillmentStatus: order.fulfillmentStatus?.toLowerCase() ?? null,
+          total: Number(order.total),
+          currency: order.currency,
+          itemCount: order.lines.reduce((sum, line) => sum + line.quantity, 0),
+          lines: order.lines.map(({ title, variantTitle, quantity }) => ({
+            title,
+            variantTitle,
+            quantity,
+          })),
         })),
         storeCredit: {
           balance: Number(credit.balance),
