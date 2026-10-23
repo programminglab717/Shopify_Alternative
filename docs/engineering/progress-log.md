@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Affiliates in the admin
+### cab6107 · Affiliates in the admin
 
 * **Marketing → Affiliates:** add a creator with their link name, code and share; each card
   has their link to copy, what their orders came to, what they earned and what is owed; record
