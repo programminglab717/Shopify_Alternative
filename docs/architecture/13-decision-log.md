@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-747 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-748 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -755,6 +755,7 @@
 | 745 | The admin's browser errors are reported to the core at /admin/errors, which logs them as the admin's for the error tracker after its redaction: no DSN in the browser, a limit for each browser and for all, numbers and emails taken out, IDs out of the page's path | Accepted |
 | 746 | Outbox events published more than seven days ago are deleted by the worker, a batch at a time, the oldest first; those not yet published or parked are kept | Accepted |
 | 747 | Staff's sessions unused for 90 days and second steps' challenges a month past their end are deleted as new ones are made, with the address and browser they hold | Accepted |
+| 748 | Comments on articles forget the internet address and browser they were posted from after 90 days, and the log of staff's sign-ins and account changes is kept two years | Accepted |
 
 ---
 
@@ -25400,3 +25401,25 @@
 * **Consequences:** identity holds a sign-in's address and browser three months at most after
   the session was last used. An account no one signs in to keeps its last sessions until someone
   else's sign-in sweeps them, which any does, across accounts.
+
+## ADR-748 · Comments on articles forget the internet address and browser they were posted from after 90 days, and the log of staff's sign-ins and account changes is kept two years
+
+* **Context:** after ADR-747 two places still kept an internet address forever. A comment on an
+  article keeps the address and browser it was posted from (ADR-176), shown to the shop as it
+  judges the comment; the spam filter goes by the comment's email, 90 days back at most
+  (ADR-671), and needs neither. And
+  `identity.auth_events`, the log of each account's sign-ins, codes, passkeys and changes, keeps
+  the address and browser of each, and was never trimmed.
+* **Decision:**
+  * **Comments** forget their address and browser 90 days after they were posted, cleared by the
+    worker's sweep across shops, a thousand at a time, the oldest first. The comment itself, its
+    author and words, is the shop's and is kept until the shop deletes it.
+  * **The sign-in log** keeps two years, as the audit log does (03 §6.5), to look into an
+    account taken over; older events are deleted as each new session begins, as sessions are
+    (ADR-747). Counsel confirms the period with the others (OWN-40).
+  * **Indexes**: comments still holding an address by when they were posted, and the log by when
+    each event happened, find what is past its time without reading the tables.
+* **Consequences:** no table of Hatti's holds a visitor's or staff member's address longer than
+  its use, but the records the law asks for: an order's agreement to the shop's policies keeps
+  its address and browser as evidence of the contract (TAX-06), and so does an owner's agreement
+  to Hatti's terms (ADR-737), as long as those records are kept.

@@ -605,6 +605,29 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         clock + LIFETIMES.mfaChallengeMs,
       ]);
     });
+
+    it('forgets the sign-in log past two years as a session begins, with where each came from (ADR-748)', async () => {
+      const gone = await signUp();
+      const kept = await signUp();
+      await admin.query('UPDATE identity.auth_events SET occurred_at = $2 WHERE user_id = $1', [
+        gone.userId,
+        ago(ENDED_KEPT.authEventDays + 1),
+      ]);
+      await admin.query('UPDATE identity.auth_events SET occurred_at = $2 WHERE user_id = $1', [
+        kept.userId,
+        ago(ENDED_KEPT.authEventDays - 1),
+      ]);
+      await signUp();
+      const left = async (userId: string) =>
+        (
+          await admin.query<{ n: number }>(
+            'SELECT count(*)::int AS n FROM identity.auth_events WHERE user_id = $1',
+            [userId],
+          )
+        ).rows[0]!.n;
+      expect(await left(gone.userId)).toBe(0);
+      expect(await left(kept.userId)).toBeGreaterThan(0);
+    });
   });
 
   describe('two-step verification', () => {

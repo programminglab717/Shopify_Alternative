@@ -19,6 +19,11 @@ export const COMMENT_LIMITS = {
   userAgent: 512,
   /** The latest published comments an article's document carries, shown the oldest first. */
   shown: 100,
+  /**
+   * Days a comment keeps the internet address and browser it was posted from (ADR-748): long
+   * enough for the shop to judge it and for spam to show itself, then cleared.
+   */
+  addressDays: 90,
 } as const;
 
 /** A shopper's comment as the storefront's form posts it, on the article its address names. */
@@ -245,6 +250,27 @@ export class CommentService {
       shown.set(row.article_id, entry);
     }
     return shown;
+  }
+
+  /**
+   * Clears the internet address and browser of up to `limit` comments posted more than
+   * {@link COMMENT_LIMITS.addressDays} days before `at`, across shops, the oldest first, and
+   * says how many (ADR-748). The comment stays, as its shop published, held or marked it.
+   */
+  async forgetAddresses(at: Date = new Date(), limit = 1_000): Promise<number> {
+    const before = new Date(at.getTime() - COMMENT_LIMITS.addressDays * 86_400_000);
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ id: string }>(sql`
+        UPDATE online_store.comments SET ip = NULL, user_agent = NULL
+         WHERE (shop_id, id) IN (
+           SELECT shop_id, id FROM online_store.comments
+            WHERE (ip IS NOT NULL OR user_agent IS NOT NULL) AND created_at <= ${before}
+            ORDER BY created_at
+            LIMIT ${limit}
+              FOR UPDATE SKIP LOCKED)
+        RETURNING id`),
+    );
+    return rows.length;
   }
 
   /** Whether the shop took a comment of this very text, not a short one, within the day (ADR-619). */

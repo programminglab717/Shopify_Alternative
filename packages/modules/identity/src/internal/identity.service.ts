@@ -200,6 +200,11 @@ export const LIFETIMES = {
 export const ENDED_KEPT = {
   sessionDays: SIGN_IN_ALERT.knownDays,
   challengeDays: 30,
+  /**
+   * The log of sign-ins and account changes, with where each came from, is kept two years, as
+   * the audit log is, to look into an account taken over (ADR-748); counsel confirms (OWN-40).
+   */
+  authEventDays: 730,
 } as const;
 
 const MAX_CHALLENGE_ATTEMPTS = 5;
@@ -3433,6 +3438,14 @@ export class IdentityService {
       .delete(sessions)
       .where(
         lt(sessions.lastUsedAt, new Date(now.getTime() - ENDED_KEPT.sessionDays * 24 * 3_600_000)),
+      );
+    await tx
+      .delete(authEvents)
+      .where(
+        lt(
+          authEvents.occurredAt,
+          new Date(now.getTime() - ENDED_KEPT.authEventDays * 24 * 3_600_000),
+        ),
       );
     await tx.insert(sessions).values({
       id,

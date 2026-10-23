@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
+### Addresses forgotten
+
+* **Comments on articles kept the address and browser they came from forever, and so did the
+  log of staff's sign-ins.** Comments now forget them after 90 days, swept by the worker, the
+  comment kept; the sign-in log keeps two years, as the audit log, older events deleted as
+  sessions begin ([ADR-748](../architecture/13-decision-log.md#adr-748--comments-on-articles-forget-the-internet-address-and-browser-they-were-posted-from-after-90-days-and-the-log-of-staffs-sign-ins-and-account-changes-is-kept-two-years)).
+* 4081 tests (4 new).
+
 ### 883e5cd · Old sign-ins forgotten
 
 * **Staff's ended sessions and second-step challenges were kept forever,** each with the

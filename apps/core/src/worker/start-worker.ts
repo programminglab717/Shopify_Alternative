@@ -69,6 +69,7 @@ import {
 } from '@hatti/logistics/public';
 import {
   ArticleService,
+  CommentService,
   DomainService,
   LinkTapsService,
   PageService,
@@ -127,6 +128,7 @@ import { DomainNotices } from './domain-notices.js';
 import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
+import { CommentAddressRetention } from './comment-retention.js';
 import { MessageContentRetention } from './message-retention.js';
 import { OutboxRetention } from './outbox-retention.js';
 import { ClosedShopPurges } from './closed-shop-purges.js';
@@ -525,6 +527,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => messageRetention.stop());
+    // Comments on articles forget the address and browser they came from after 90 days (ADR-748).
+    const commentAddresses = new CommentAddressRetention(
+      new CommentService(database),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => commentAddresses.stop());
     // Closed shops' data deleted 90 days after they closed, but the records kept, once counsel has
     // confirmed what is kept (ADR-741).
     if (config.CLOSED_SHOP_PURGE) {

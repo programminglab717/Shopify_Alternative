@@ -351,4 +351,33 @@ describe.skipIf(!server)('Comments on articles (ADR-220)', () => {
     const left = await f.db.tenant(f.a.shopId, (tx) => tx.select().from(comments));
     expect(left.map((row) => row.author)).toEqual(['Old']);
   });
+
+  it("forgets a comment's address and browser after 90 days, and keeps the comment (ADR-748)", async () => {
+    const { blog } = await blogWithArticles();
+    unwrap(await f.blogs.update(f.a, blog.id, { commentPolicy: 'auto_published' }));
+    const old = unwrap(await f.comments.post(f.a.shopId, { ...POST, author: 'Old' }));
+    const recent = unwrap(await f.comments.post(f.a.shopId, { ...POST, author: 'Recent' }));
+    await f.admin.query(
+      `UPDATE online_store.comments SET created_at = now() - interval '91 days' WHERE id = $1`,
+      [old.id],
+    );
+    expect(COMMENT_LIMITS.addressDays).toBe(90);
+
+    expect(await f.comments.forgetAddresses()).toBe(1);
+    expect(await f.comments.get(f.a, old.id)).toMatchObject({
+      author: 'Old',
+      status: 'published',
+      ip: null,
+      userAgent: null,
+    });
+    expect(await f.comments.get(f.a, recent.id)).toMatchObject({
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0',
+    });
+    // What was forgotten is not looked at again; a batch stops at its limit.
+    expect(await f.comments.forgetAddresses()).toBe(0);
+    const later = new Date(Date.now() + 92 * 86_400_000);
+    expect(await f.comments.forgetAddresses(later, 1)).toBe(1);
+    expect(await f.comments.forgetAddresses(later, 1)).toBe(0);
+  });
 });
