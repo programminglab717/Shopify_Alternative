@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-23
 
-### Collections straight from a Shopify store
+### 9e9046b · Collections straight from a Shopify store
 
 * **The old store's collections come too,** each at its own address: a smart one with its
   rules, a hand-picked one with its products in the same order; the admin's store card brings
