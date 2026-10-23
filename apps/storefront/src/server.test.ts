@@ -725,6 +725,22 @@ class FakeCore {
   readonly wishlists = new Map<string, string[]>();
   readonly wishlistAsked: ['read' | 'add' | 'remove', string, string[]][] = [];
 
+  /** A signed-in shopper's own prices (ADR-781), by variant, and the variants asked of. */
+  readonly ownPrices = new Map<string, number>();
+  readonly pricesAsked: string[][] = [];
+
+  async accountPrices(
+    _shopId: string,
+    token: string | null,
+    variantIds: readonly string[],
+  ): Promise<Record<string, number> | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    this.pricesAsked.push([...variantIds]);
+    return Object.fromEntries(
+      variantIds.flatMap((id) => (this.ownPrices.has(id) ? [[id, this.ownPrices.get(id)!]] : [])),
+    );
+  }
+
   async accountWishlist(_shopId: string, token: string | null): Promise<string[] | null> {
     if (!token || !this.accounts.has(token)) return null;
     this.wishlistAsked.push(['read', token, []]);
@@ -5235,6 +5251,50 @@ describe("Shoppers' accounts (ADR-571)", () => {
     'sec-fetch-site': 'same-origin',
     'content-type': 'application/json',
   };
+
+  it("answers a signed-in shopper's own prices for a product page's script (ADR-781)", async () => {
+    const app = server();
+    const cookie = signedIn();
+    const [lawn] = sampleStore().products as [ProductDoc];
+    const [first, second] = lawn.variants.map((variant) => variant.id) as [string, string];
+    core.ownPrices.set(first, 160_000);
+    const ask = (url: string, headers: Record<string, string> = WISHLIST) =>
+      app.inject({ method: 'GET', url, headers: { ...headers, cookie } });
+
+    const priced = await ask(`/account/prices.json?variants=${first},${second},${first}`);
+    expect([priced.statusCode, priced.json()]).toEqual([
+      200,
+      { prices: { [first]: { amount: 160_000, formatted: 'Rs 1,600' } } },
+    ]);
+    expect(priced.headers['cache-control']).toBe('private, no-store');
+    expect(core.pricesAsked).toEqual([[first, second]]);
+
+    // What is not variants' IDs is not asked of the core; nor is another site's page.
+    expect((await ask('/account/prices.json?variants=a%20lawn')).statusCode).toBe(422);
+    const many = Array.from({ length: 101 }, (_, index) => `v${index}`).join(',');
+    expect((await ask(`/account/prices.json?variants=${many}`)).statusCode).toBe(422);
+    expect(
+      (
+        await ask(`/account/prices.json?variants=${first}`, {
+          ...WISHLIST,
+          origin: 'https://evil.example',
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(core.pricesAsked).toHaveLength(1);
+
+    // Signed out: 401, and the sign of being signed in gone.
+    const over = await app.inject({
+      method: 'GET',
+      url: `/account/prices.json?variants=${first}`,
+      headers: { ...WISHLIST, cookie: 'hatti_account=sEsSiOn_SeCrEt-EnDeD-0123456789abcdef' },
+    });
+    expect(over.statusCode).toBe(401);
+    expect(over.headers['set-cookie']).toContain(
+      'hatti_signed_in=; Path=/; Max-Age=0; SameSite=Lax',
+    );
+    await app.close();
+  });
 
   it("keeps a signed-in shopper's wishlist with their account, by the products' handles (ADR-575)", async () => {
     const app = server();

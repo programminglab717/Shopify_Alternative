@@ -31,10 +31,35 @@ async function sessionPhoneIn(tx: Tx, shopId: string, id: string): Promise<strin
 }
 
 /**
+ * The prices of `wanted` variants, each with how many of it are bought and its price to anyone,
+ * for the shopper signed in with account session `sessionId` (CUS-06, ADR-780): from the price
+ * lists of the tags their customer has, as drafts are (ADR-778), only those a list makes lower.
+ * Empty without a session that lasts, a customer, tags or a list.
+ */
+export async function listedPricesIn(
+  tx: Tx,
+  shopId: string,
+  sessionId: string | null,
+  wanted: readonly { variantId: string; quantity: number; price: bigint }[],
+): Promise<Map<string, bigint>> {
+  if (sessionId === null || wanted.length === 0) return new Map();
+  const phone = await sessionPhoneIn(tx, shopId, sessionId);
+  if (phone === null) return new Map();
+  const tags = await customerTagsOfPhoneIn(tx, shopId, phone);
+  if (tags.length === 0) return new Map();
+  const prices = await listPricesIn(tx, shopId, tags, wanted);
+  return new Map(
+    wanted.flatMap((each, index) => {
+      const listed = prices[index];
+      return listed ? [[each.variantId, listed.price] as const] : [];
+    }),
+  );
+}
+
+/**
  * `facts` with each variant of `lines` priced for the shopper signed in with account session
- * `sessionId` (CUS-06, ADR-780): from the price lists of the tags their customer has, by how many
- * of the variant the lines hold together, as drafts are (ADR-778). A list never prices above the
- * price to anyone; without a session that lasts, a customer, tags or a list, `facts` as they are.
+ * `sessionId` (ADR-780), by how many of the variant the lines hold together; `facts` as they
+ * are where no list prices them.
  */
 export async function wholesaleFactsIn(
   tx: Tx,
@@ -44,31 +69,25 @@ export async function wholesaleFactsIn(
   facts: ReadonlyMap<string, VariantFacts>,
 ): Promise<ReadonlyMap<string, VariantFacts>> {
   if (sessionId === null || lines.length === 0) return facts;
-  const phone = await sessionPhoneIn(tx, shopId, sessionId);
-  if (phone === null) return facts;
-  const tags = await customerTagsOfPhoneIn(tx, shopId, phone);
-  if (tags.length === 0) return facts;
   const quantities = new Map<string, number>();
   for (const line of lines) {
     if (!facts.has(line.variantId)) continue;
     quantities.set(line.variantId, (quantities.get(line.variantId) ?? 0) + line.quantity);
   }
-  const wanted = [...quantities];
-  const prices = await listPricesIn(
+  const listed = await listedPricesIn(
     tx,
     shopId,
-    tags,
-    wanted.map(([variantId, quantity]) => ({
+    sessionId,
+    [...quantities].map(([variantId, quantity]) => ({
       variantId,
       quantity,
       price: facts.get(variantId)!.price,
     })),
   );
-  if (prices.every((each) => each === null)) return facts;
+  if (listed.size === 0) return facts;
   const priced = new Map(facts);
-  wanted.forEach(([variantId], index) => {
-    const listed = prices[index];
-    if (listed) priced.set(variantId, { ...facts.get(variantId)!, price: listed.price });
-  });
+  for (const [variantId, price] of listed) {
+    priced.set(variantId, { ...facts.get(variantId)!, price });
+  }
   return priced;
 }

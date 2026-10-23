@@ -83,7 +83,8 @@
       "price": {
         "from": "From {{ price }}",
         "regular": "Regular price",
-        "sale": "Sale price"
+        "sale": "Sale price",
+        "yours": "Your price: {{ price }}"
       },
       "free_delivery_from": "Free delivery on orders of {{ amount }} or more",
       "delivery_from": "Delivery from {{ amount }}",

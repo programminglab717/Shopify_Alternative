@@ -21,6 +21,7 @@ import {
   type AccountSessionJson,
   type AccountSessionResponse,
   type AccountWishlistAddRequest,
+  type AccountPricesResponse,
   type AccountWishlistResponse,
 } from './accounts.js';
 import {
@@ -658,6 +659,30 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return (await response.json()) as AccountDataEraseResponse;
+  }
+
+  /**
+   * What one of each of `variantIds` costs the shopper the cookie's `token` names (ADR-781): those
+   * their price lists make lower, in minor units; null without a session.
+   */
+  async accountPrices(
+    shopId: string,
+    token: string | null,
+    variantIds: readonly string[],
+  ): Promise<Record<string, number> | null> {
+    if (!token) return null;
+    const query = new URLSearchParams({ variants: variantIds.join(',') });
+    const response = await this.#request(
+      'GET',
+      `${accountPath(shopId, 'prices')}?${query}`,
+      null,
+      undefined,
+      { [ACCOUNT_TOKEN_HEADER]: token },
+    );
+    if (response.status === 404) return null;
+    if (response.status !== 200)
+      throw new StorefrontApiError(response.status, await response.text());
+    return ((await response.json()) as AccountPricesResponse).prices;
   }
 
   /**

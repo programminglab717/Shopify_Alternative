@@ -58,6 +58,11 @@
           <div {{ block.shopify_attributes }}>
             {% render 'price', product: product, variant: current %}
             {%- comment -%}
+              A signed-in reseller's own price (CUS-06, ADR-781), where their price list makes it
+              lower: the page is the same for every shopper, so its script asks once it loads.
+            {%- endcomment -%}
+            <p class="product__own-price" data-own-price data-words="{{ 'products.product.price.yours' | t: price: '{price}' | escape }}" hidden></p>
+            {%- comment -%}
               The sale it is in now (ADR-445): when it ends, counted down by the second where
               JavaScript runs, and said as a day where it does not. Gone once it ends.
             {%- endcomment -%}
@@ -386,6 +391,7 @@
   .product__verified { font-weight: 600; }
   .product__sale-ends { margin: 0.25rem 0 0; color: var(--color-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
   .product__low-stock { margin: 0; color: #b45309; font-weight: 600; }
+  .product__own-price { margin: 0.25rem 0 0; color: var(--color-accent); font-weight: 600; }
   .back-in-stock__form { display: grid; gap: 0.5rem; margin-block-end: 1rem; }
   .back-in-stock__label { font-weight: 600; }
   .back-in-stock__fields { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -411,6 +417,7 @@
     const variant = variants.find((each) => each.options.every((value, index) => value === picked[index]));
     if (!variant) return;
     form.elements.id.value = variant.id;
+    showOwnPrice(variant.id);
     // WhatsApp's messages name the variant picked, and link to it.
     for (const link of document.querySelectorAll('[data-whatsapp-template]')) {
       link.href = link.dataset.whatsappTemplate
@@ -431,6 +438,31 @@
     fields['contact[variant_id]'].value = variant.id;
     fields.return_to.value = fields.return_to.value.replace(/variant=[^#&]+/, `variant=${variant.id}`);
   });
+
+  // A signed-in shopper's own prices (ADR-781), those their price list makes lower, asked for
+  // once the page loads; signed out, nothing is asked and nothing shown.
+  const ownPrice = document.querySelector('[data-own-price]');
+  let ownPrices = {};
+  function showOwnPrice(variantId) {
+    if (!ownPrice) return;
+    const price = ownPrices[variantId];
+    ownPrice.hidden = !price;
+    ownPrice.textContent = price ? ownPrice.dataset.words.replace('{price}', price.formatted) : '';
+  }
+  if (ownPrice && variants.length > 0 && /(?:^|;\s*)hatti_signed_in=1(?:;|$)/.test(document.cookie)) {
+    const ids = variants.map((variant) => variant.id).slice(0, 100).join(',');
+    fetch(`/account/prices.json?variants=${encodeURIComponent(ids)}`, {
+      headers: { accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!body || typeof body.prices !== 'object') return;
+        ownPrices = body.prices;
+        showOwnPrice(form?.elements.id.value);
+      })
+      .catch(() => {});
+  }
 
   // A sale's end counted down by the second (ADR-445); gone once it ends.
   for (const sale of document.querySelectorAll('[data-sale-ends]')) {

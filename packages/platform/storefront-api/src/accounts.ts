@@ -42,7 +42,8 @@ export type AccountRoute =
   | 'data/export'
   | 'data/erase'
   | 'wishlist'
-  | 'addresses';
+  | 'addresses'
+  | 'prices';
 
 /**
  * A shop's accounts: GET `…/account` reads the account of the session `x-hatti-account` names;
@@ -53,7 +54,9 @@ export type AccountRoute =
  * erasure, an {@link AccountDataEraseResponse} (ADR-572). GET `…/account/wishlist` reads the
  * account's wishlist and POST adds to it, an {@link AccountWishlistResponse} (ADR-575). GET
  * `…/account/addresses` reads the account's address book and POST adds to it, an
- * {@link AccountAddressesResponse} (ADR-583). Each is 404 without a session.
+ * {@link AccountAddressesResponse} (ADR-583). GET `…/account/prices?variants=…` reads what the
+ * shopper's price lists make one of each variant cost, an {@link AccountPricesResponse} (ADR-781).
+ * Each is 404 without a session.
  */
 export function accountPath(shopId: string, route?: AccountRoute): string {
   return `${STOREFRONT_API_PREFIX}shops/${shopId}/account${route ? `/${route}` : ''}`;
@@ -341,6 +344,18 @@ export interface AccountWishlistAddRequest {
  */
 export interface AccountWishlistResponse {
   productIds: string[];
+}
+
+/** The most variants `…/account/prices` is asked of at once: a product's, as the catalog keeps. */
+export const ACCOUNT_PRICES_MAX = 100;
+
+/**
+ * What one of each variant asked of costs the shopper signed in, in minor units (CUS-06,
+ * ADR-781): only those their price lists make lower than the price to anyone, by the catalog's
+ * IDs; a variant left out costs what it costs anyone.
+ */
+export interface AccountPricesResponse {
+  prices: Record<string, number>;
 }
 
 /**

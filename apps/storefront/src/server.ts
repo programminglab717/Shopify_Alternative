@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { checkPassword } from '@hatti/crypto';
 import { metrics } from '@opentelemetry/api';
+import { formatMoney, money } from '@hatti/money';
 import {
   MemoryStore,
   RedisStore,
@@ -29,6 +30,7 @@ import {
 import { RateLimiter } from '@hatti/ratelimit';
 import {
   ACCOUNT_ADDRESSES_MAX,
+  ACCOUNT_PRICES_MAX,
   ACCOUNT_WISHLIST_MAX,
   CONTENT_TYPES,
   NUMBER_PROOF_COOKIE,
@@ -285,6 +287,15 @@ const ACCOUNT_REORDERS = { name: 'account-reorders', limit: 10, windowMs: 60_000
  * for many shoppers behind one mobile network's address, but not for a script.
  */
 const ACCOUNT_WISHLISTS = { name: 'account-wishlists', limit: 60, windowMs: 60_000 };
+
+/**
+ * What an address may ask of signed-in shoppers' own prices a minute (ADR-781): a product page's
+ * script asks once as it loads; room for a reseller browsing quickly, and many behind one network.
+ */
+const ACCOUNT_PRICES = { name: 'account-prices', limit: 120, windowMs: 60_000 };
+
+/** What could be a variant's ID as the storefront's documents give it. */
+const VARIANT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * Changes an address may make to shoppers' address books a minute (ADR-584): a shopper adds an
@@ -3311,6 +3322,52 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     };
 
   /**
+   * A signed-in shopper's own prices (CUS-06, ADR-781), for the theme's script, the product pages
+   * being the same for every shopper: `GET /account/prices.json?variants=…`, at most
+   * {@link ACCOUNT_PRICES_MAX} variants' IDs by commas, answers `{ "prices": { id: { "amount",
+   * "formatted" } } }`, the variants their price lists make lower, in paisa and as `money` writes
+   * them. From the shop's own pages alone, at most {@link ACCOUNT_PRICES} a minute from an
+   * address, and never kept. 401 without a session: a session that is over takes its cookies.
+   */
+  const accountPrices = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    accountAnswer(reply);
+    const refuse = (status: number, message: string) => reply.code(status).send({ message });
+    if (!fromShopItself(request)) return refuse(403, "Prices are read from the shop's own pages.");
+    const asked = new URL(request.url, 'http://storefront').searchParams.get('variants') ?? '';
+    const ids = [...new Set(asked.split(',').map((each) => each.trim()))];
+    if (ids.length > ACCOUNT_PRICES_MAX || !ids.every((each) => VARIANT_ID.test(each))) {
+      return refuse(422, `Ask of at most ${ACCOUNT_PRICES_MAX} variants' IDs, by commas.`);
+    }
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no accounts');
+      const token = accountTokenOf(request.headers.cookie);
+      if (!token) return await refuse(401, 'Sign in to see your own prices.');
+      if (limiter !== null && !(await limiter.hit(ACCOUNT_PRICES, request.ip)).allowed) {
+        return await refuse(429, 'Too many requests. Please wait a moment.');
+      }
+      const prices = await core.accountPrices(found.shopId, token, ids);
+      if (!prices) {
+        signOutCookies(request, reply);
+        return await refuse(401, 'Sign in to see your own prices.');
+      }
+      return await reply.send({
+        prices: Object.fromEntries(
+          Object.entries(prices).map(([id, amount]) => [
+            id,
+            { amount, formatted: formatMoney(money(BigInt(amount), 'PKR')) },
+          ]),
+        ),
+      });
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return refuse(503, 'Your prices cannot be reached just now. Please try again in a minute.');
+    }
+  };
+
+  /**
    * The address book's page (ADR-584), `/account/addresses`, in the theme's `customers/addresses`
    * template: `customer` with `customer.addresses`, the default first, and `form` showing again
    * an address that was just posted and refused. Without a session, on to sign in, and back.
@@ -3468,6 +3525,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.get(`${prefix}/account/data/export`, dataDownload);
     app.post(`${prefix}/account/data/erase`, dataErase);
     app.get(`${prefix}/account/wishlist.json`, wishlist('read'));
+    app.get(`${prefix}/account/prices.json`, accountPrices);
     app.post(`${prefix}/account/wishlist`, wishlist('add'));
     app.post(`${prefix}/account/wishlist/remove`, wishlist('remove'));
     app.get(`${prefix}/account/addresses`, addressesPage);

@@ -37,6 +37,7 @@ export type CoreBackend = Pick<
   | 'accountLoginStart'
   | 'accountLoginVerify'
   | 'accountSession'
+  | 'accountPrices'
   | 'account'
   | 'accountOrderLink'
   | 'accountLogout'

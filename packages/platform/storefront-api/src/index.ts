@@ -31,6 +31,8 @@ export {
   type AccountSessionResponse,
   type AccountWishlistAddRequest,
   type AccountWishlistResponse,
+  ACCOUNT_PRICES_MAX,
+  type AccountPricesResponse,
   type AccountAddress,
   type AccountAddressRequest,
   type AccountAddressesResponse,

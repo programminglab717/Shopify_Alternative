@@ -83,7 +83,8 @@
       "price": {
         "from": "{{ price }} سے شروع",
         "regular": "اصل قیمت",
-        "sale": "سیل قیمت"
+        "sale": "سیل قیمت",
+        "yours": "آپ کی قیمت: {{ price }}"
       },
       "free_delivery_from": "{{ amount }} یا اس سے زیادہ کے آرڈر پر مفت ڈیلیوری",
       "delivery_from": "ڈیلیوری {{ amount }} سے",

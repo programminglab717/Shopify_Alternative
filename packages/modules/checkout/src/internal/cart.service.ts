@@ -41,7 +41,7 @@ import type { CodProduct } from './cod-rules.js';
 import { orderItemsIn } from './discount-items.js';
 import { carts } from './schema.js';
 import { heldForCartIn } from './stock-holds.js';
-import { accountSessionIdIn, wholesaleFactsIn } from './wholesale.js';
+import { accountSessionIdIn, listedPricesIn, wholesaleFactsIn } from './wholesale.js';
 
 /** A cart's secret: 128 random bits in base64url, as customers' links have. */
 const TOKEN_BYTES = 16;
@@ -275,6 +275,32 @@ export class CartService {
   }
 
   /** The cart whose secret hashes to `hash`; prepared (ADR-111) when read, not locked. */
+  /**
+   * What one of each of `variantIds` costs the shopper signed in with the account session
+   * `account` names (ADR-781), for the product pages every shopper is served alike: those their
+   * price lists make lower than the price to anyone, in minor units; null for no session that
+   * lasts. Variants the shop lacks, or not for sale, are left out.
+   */
+  async listedPrices(
+    shopId: string,
+    account: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, bigint> | null> {
+    return this.db.tenant(shopId, async (tx) => {
+      const sessionId = await accountSessionIdIn(tx, shopId, account);
+      if (sessionId === null) return null;
+      const snapshots = await this.variants.snapshotsOf(tx, shopId, [...new Set(variantIds)]);
+      return listedPricesIn(
+        tx,
+        shopId,
+        sessionId,
+        [...snapshots]
+          .filter(([, snapshot]) => snapshot.productStatus === 'active')
+          .map(([variantId, snapshot]) => ({ variantId, quantity: 1, price: snapshot.price })),
+      );
+    });
+  }
+
   /**
    * The account session the cart is priced for (ADR-780): the one `account` names, kept on the
    * cart, where it is a session that lasts; else the one the cart keeps. Signing out ends it.

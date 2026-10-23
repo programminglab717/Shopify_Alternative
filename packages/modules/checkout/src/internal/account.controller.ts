@@ -1,5 +1,6 @@
 import type { FieldError } from '@hatti/api';
 import {
+  ACCOUNT_PRICES_MAX,
   ACCOUNT_TOKEN_HEADER,
   ACCOUNT_WISHLIST_MAX,
   CLIENT_IP_HEADER,
@@ -15,6 +16,7 @@ import {
   type AccountOrderLinkResponse,
   type AccountResponse,
   type AccountSessionResponse,
+  type AccountPricesResponse,
   type AccountWishlistResponse,
 } from '@hatti/storefront-api';
 import {
@@ -29,9 +31,11 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { AccountService, toSessionJson } from './account.service.js';
+import { CartService } from './cart.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -48,12 +52,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
  * adds to it, and `DELETE …/account/wishlist/{productId}` takes one off, each answering it as it
  * is then; IDs that name no product of the shop's are left out. Their address book (ADR-583):
  * `GET …/account/addresses` reads it, `POST` adds an address to it, `PUT …/account/addresses/{id}`
- * changes one and `DELETE` takes one out, each answering the book as it is then. 422 says what was
+ * changes one and `DELETE` takes one out, each answering the book as it is then. Their prices
+ * (ADR-781): `GET …/account/prices?variants=…`, at most {@link ACCOUNT_PRICES_MAX} variants' IDs
+ * by commas, what one of each costs them where their price lists make it lower. 422 says what was
  * wrong with what was typed or sent; 404, that there is no session, or nothing to link to. The host application checks the storefront key before any of this runs.
  */
 @Controller(accountPath(':shopId').slice(1))
 export class StorefrontAccountController {
-  constructor(private readonly accounts: AccountService) {}
+  constructor(
+    private readonly accounts: AccountService,
+    private readonly carts: CartService,
+  ) {}
 
   @Post('login')
   @HttpCode(200)
@@ -181,6 +190,29 @@ export class StorefrontAccountController {
     const erasure = token ? await this.accounts.dataErase(shopId, token, locale) : null;
     if (!erasure) throw new NotFoundException();
     return erasure;
+  }
+
+  @Get('prices')
+  @Header('cache-control', 'no-store')
+  async prices(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+    @Query('variants') variants: string | undefined,
+  ): Promise<AccountPricesResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const asked = [...new Set((variants ?? '').split(',').map((each) => each.trim()))];
+    if (asked.length > ACCOUNT_PRICES_MAX) {
+      throw new UnprocessableEntityException(
+        `variants must be at most ${ACCOUNT_PRICES_MAX} variants' IDs, by commas`,
+      );
+    }
+    // One that could not be a variant's has no price of its own.
+    const ids = asked.filter((each) => UUID.test(each));
+    const prices = token ? await this.carts.listedPrices(shopId, token.slice(0, 128), ids) : null;
+    if (!prices) throw new NotFoundException();
+    return {
+      prices: Object.fromEntries([...prices].map(([id, price]) => [id, Number(price)])),
+    };
   }
 
   @Get('wishlist')

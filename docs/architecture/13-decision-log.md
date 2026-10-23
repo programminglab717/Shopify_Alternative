@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-780 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-781 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -788,6 +788,7 @@
 | 778 | Price lists for wholesale customers: a share off, prices of their own and quantity breaks, by a tag the shop gives them | Accepted |
 | 779 | The admin's price lists under Products, a list's own prices named by their variants | Accepted |
 | 780 | A signed-in wholesale customer's cart and checkout priced from their price lists, while their session lasts | Accepted |
+| 781 | A signed-in reseller's own price on Hatti Base's product page, asked for once the cached page loads | Accepted |
 
 ---
 
@@ -26128,3 +26129,22 @@
   same device while the session lasts, which is the shopper's own device. Product pages are
   cached for everyone and still show the price to anyone; showing a signed-in reseller their own
   prices there is the next step.
+
+## ADR-781 · A signed-in reseller's own price on Hatti Base's product page, asked for once the cached page loads
+
+* **Context:** since ADR-780 a reseller signed in pays their price list's prices in the cart,
+  but product pages, cached and the same for every shopper, still show the price to anyone; a
+  reseller cannot see what they will pay until they add to the cart (CUS-06).
+* **Decision:** the core answers `GET …/account/prices?variants=…` with the account session in
+  `x-hatti-account`: for at most 100 variants, what one of each costs the shopper, only those
+  their price lists make lower than the price to anyone, priced as the cart prices one unit;
+  404 without a session, variants not for sale and IDs that could not be a variant's left out.
+  The storefront serves it as `/account/prices.json`, from the shop's own pages alone, at most
+  120 a minute from an address, never cached, with each price in paisa and as `money` writes
+  it; 401 and the signed-in cookies cleared once the session is over. Hatti Base's product page
+  asks only when the `hatti_signed_in` cookie says the shopper is signed in, and shows "Your
+  price" under the price for the variant chosen, changing with it; signed out, nothing is asked.
+  Themes that extend Hatti Base get it with its product section.
+* **Consequences:** cached pages stay cached, and the one request per page view is made only for
+  shoppers signed in. The page still shows the price to anyone, as the shop's price; the
+  reseller's own price is said beside it. Collection and search cards do not show it yet.

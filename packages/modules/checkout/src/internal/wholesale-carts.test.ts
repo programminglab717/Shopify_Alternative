@@ -136,4 +136,20 @@ describe.skipIf(!server)("A wholesale customer's cart and checkout (CUS-06, ADR-
     );
     expect(elsewhere.ok && elsewhere.cart.items[0]!.price).toBe(200_000);
   });
+
+  it('answers what one of each variant costs her, for the product pages (ADR-781)', async () => {
+    const [shawl] = (await f.variantsOf(f.a, 'Shawl', { price: '1,000' })) as [string];
+    const account = await signIn();
+    expect(await f.carts.listedPrices(f.a.shopId, account, [kurta, shawl, kurta])).toEqual(
+      new Map([
+        [kurta, 160_000n],
+        [shawl, 80_000n],
+      ]),
+    );
+    // A dozen's break is not one's price; a draft product, nor a session that is not one.
+    await f.admin.query(`UPDATE catalog.products SET status = 'draft' WHERE title = 'Shawl'`);
+    expect(await f.carts.listedPrices(f.a.shopId, account, [shawl])).toEqual(new Map());
+    expect(await f.carts.listedPrices(f.a.shopId, 'x'.repeat(43), [kurta])).toBeNull();
+    expect(await f.carts.listedPrices(f.b.shopId, account, [kurta])).toBeNull();
+  });
 });
