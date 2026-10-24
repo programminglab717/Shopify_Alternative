@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
-### Custom fields changed
+### 3a2bf34 · Custom fields changed
 
 * **Change on a field:** the shop's custom fields are renamed and described in place in
   Settings → Custom data, their keys and types kept (CAT-06, [ADR-796](../architecture/13-decision-log.md#adr-796--the-admin-renames-and-describes-the-shops-custom-fields-in-place-their-keys-and-types-kept)).
