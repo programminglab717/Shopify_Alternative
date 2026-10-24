@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
-### An iPhone's HEVC videos
+### 96ad3aa · An iPhone's HEVC videos
 
 * **Filmed on an iPhone, added as they are:** the worker's ffmpeg makes HEVC videos H.264 rather
   than refuse them (CAT-02, [ADR-792](../architecture/13-decision-log.md#adr-792--an-iphones-hevc-video-is-made-h264-by-the-workers-ffmpeg-at-no-more-than-1080-pixels-rather-than-refused)).
