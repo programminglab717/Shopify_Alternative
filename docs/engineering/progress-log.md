@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
-### Shopify's product videos
+### e011e10 · Shopify's product videos
 
 * **Videos moved:** the importer brings a Shopify store's product videos, its own by the URL of
   an MP4 the worker fetches and YouTube's and Vimeo's by their addresses; a video may now be
