@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-794 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-795 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -802,6 +802,7 @@
 | 792 | An iPhone's HEVC video is made H.264 by the worker's ffmpeg, at no more than 1080 pixels, rather than refused | Accepted |
 | 793 | A video uploaded without a preview image shows a frame of itself the worker's ffmpeg takes | Accepted |
 | 794 | The importer brings a Shopify store's product videos: its own by the URL of an MP4 the worker fetches, YouTube's and Vimeo's by their addresses | Accepted |
+| 795 | The admin changes a gift card's last day, note and customer, sending only what changed | Accepted |
 
 ---
 
@@ -26428,3 +26429,16 @@
   them. A video is fetched from Shopify's CDN while its URL is good, so an import's videos are
   ready minutes after it; one whose fetch keeps failing shows in the product's media as failed,
   to upload by hand. A product imported with overwrite does not have its videos replaced.
+
+## ADR-795 · The admin changes a gift card's last day, note and customer, sending only what changed
+
+* **Context:** the Admin API changes a gift card's expiry, customer or note as Shopify's
+  `giftCardUpdate` does, but the admin's gift cards page (ADR-450) only issued, adjusted and
+  deactivated cards, so a card given to the wrong customer, or one to extend, needed the API.
+* **Decision:** owners and managers open Change on an active card: its last day as a date, empty
+  for never; its note; and, for those who read customers, who it was given to, found by name or
+  number or taken away. Only the fields changed are sent, so an untouched form sends nothing.
+  The list asks for each card's customer only where the member reads customers
+  (`@include(if: $customers)`), and names it under the card.
+* **Consequences:** shops correct and extend cards from the admin. A card's value and code still
+  cannot change, as Shopify's cannot; its balance changes by adding to or taking from it.
