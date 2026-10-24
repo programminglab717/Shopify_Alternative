@@ -30,6 +30,63 @@ describe('Custom data in settings (CAT-06, ADR-489)', () => {
     expect(keyOf('  Fabric (weight)  ')).toBe('fabric_weight');
   });
 
+  it('renames a field and describes it, sending only what changed, or says why not (ADR-796)', async () => {
+    let current: Omit<typeof CARE, 'description'> & { description: string | null } = { ...CARE };
+    const core = fakeCore('owner', (operation, variables) => {
+      switch (operation) {
+        case 'MetafieldDefinitions':
+          return { metafieldDefinitions: [current] };
+        case 'MetafieldDefinitionUpdate': {
+          const definition = variables.definition as { name?: string; description?: string | null };
+          if (definition.name === 'x'.repeat(5)) {
+            return {
+              metafieldDefinitionUpdate: {
+                updatedDefinition: null,
+                userErrors: [
+                  { field: ['name'], code: 'INVALID', message: 'Name must be 1 to 100 characters' },
+                ],
+              },
+            };
+          }
+          current = { ...current, ...definition };
+          return { metafieldDefinitionUpdate: { updatedDefinition: current, userErrors: [] } };
+        }
+        default:
+          throw new Error(`unexpected ${operation}`);
+      }
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/custom-data');
+
+    await screen.findByText('Care instructions');
+    await press('Change Care instructions');
+    type('Its name', 'xxxxx');
+    await press('Save');
+    await screen.findByText(/Name must be 1 to 100 characters/);
+    type('Its name', 'Care instructions');
+    type('Its description', ' How to wash it ');
+    await press('Save');
+    await screen.findByText('Care instructions is saved.');
+    expect(screen.getByText('How to wash it')).toBeTruthy();
+
+    // Unchanged, nothing is sent; the description emptied, it is taken away.
+    await press('Change Care instructions');
+    await press('Save');
+    await press('Change Care instructions');
+    type('Its description', '');
+    await press('Save');
+    await waitFor(() => expect(screen.queryByText('How to wash it')).toBeNull());
+    expect(
+      core.sent
+        .filter((each) => each.operation === 'MetafieldDefinitionUpdate')
+        .map((each) => each.variables),
+    ).toEqual([
+      { id: 'mfd_1', definition: { name: 'xxxxx' } },
+      { id: 'mfd_1', definition: { description: 'How to wash it' } },
+      { id: 'mfd_1', definition: { description: null } },
+    ]);
+  });
+
   it("lists the shop's fields by what they are for, adds one keyed from its name, and deletes one", async () => {
     const core = fakeCore('owner', (operation) => {
       switch (operation) {

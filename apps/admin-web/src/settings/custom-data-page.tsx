@@ -1,10 +1,11 @@
-import { Braces, Plus, Trash2 } from 'lucide-react';
+import { Braces, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   MetafieldDefinitionCreateMutation,
   MetafieldDefinitionDeleteMutation,
   MetafieldDefinitionsQuery,
+  MetafieldDefinitionUpdateMutation,
 } from '../api/operations';
 import type {
   MetafieldDefinition,
@@ -54,9 +55,92 @@ export function keyOf(name: string): string {
 }
 
 /**
+ * A field renamed or described anew (ADR-796): only what changed is sent, an emptied description
+ * taken away; its key and type stay, so themes and the values filled in keep working.
+ */
+function EditDefinition({
+  definition,
+  onDone,
+}: {
+  definition: MetafieldDefinition;
+  onDone: (saved: string | null) => void;
+}) {
+  const { t } = useLocale();
+  const update = useAdminMutation<
+    {
+      metafieldDefinitionUpdate: {
+        updatedDefinition: MetafieldDefinition | null;
+        userErrors: UserError[];
+      };
+    },
+    { id: string; definition: { name?: string; description?: string | null } }
+  >(MetafieldDefinitionUpdateMutation);
+  const [name, setName] = useState(definition.name);
+  const [description, setDescription] = useState(definition.description ?? '');
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    const changes = {
+      ...(name.trim() !== definition.name && { name: name.trim() }),
+      ...(description.trim() !== (definition.description ?? '') && {
+        description: description.trim() || null,
+      }),
+    };
+    if (Object.keys(changes).length === 0) {
+      onDone(null);
+      return;
+    }
+    try {
+      const { metafieldDefinitionUpdate } = await update.mutateAsync({
+        id: definition.id,
+        definition: changes,
+      });
+      const [failed] = metafieldDefinitionUpdate.userErrors;
+      if (failed) setProblem(problemText(failed, t));
+      else onDone(metafieldDefinitionUpdate.updatedDefinition?.name ?? name.trim());
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void onSave(event)} className="flex w-full flex-col gap-3">
+      <TextField
+        label={t('customData.editName')}
+        maxLength={100}
+        dir="auto"
+        required
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
+      <TextField
+        label={t('customData.editDescription')}
+        hint={t('customData.editHint')}
+        maxLength={300}
+        dir="auto"
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <span className="flex flex-wrap gap-2">
+        <Button type="submit" busy={update.isPending}>
+          {t('customData.editSave')}
+        </Button>
+        <Button variant="tertiary" onClick={() => onDone(null)}>
+          {t('action.back')}
+        </Button>
+      </span>
+    </form>
+  );
+}
+
+/**
  * Custom data (CAT-06, ADR-489): the shop's own fields of products, variants and collections, each
  * a name, a key in the `custom` namespace and the type its values take, which the product page
- * fills in and themes show with `product.metafields.custom.key`. Deleted with their values.
+ * fills in and themes show with `product.metafields.custom.key`. Renamed or described anew
+ * (ADR-796), and deleted with their values.
  */
 export function CustomDataPage() {
   const { t } = useLocale();
@@ -93,6 +177,7 @@ export function CustomDataPage() {
   const [type, setType] = useState<MetafieldTypeValue>('single_line_text_field');
   const [description, setDescription] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
@@ -172,44 +257,78 @@ export function CustomDataPage() {
             ) : (
               <Card>
                 <ul className="divide-y divide-line">
-                  {mine.map((definition) => (
-                    <li key={definition.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="font-medium" dir="auto">
-                          {definition.name}
-                        </span>
-                        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                          <code dir="ltr">
-                            {definition.namespace}.{definition.key}
-                          </code>{' '}
-                          · {t(`customData.type.${definition.type}`)} ·{' '}
-                          {t('customData.filled', { count: definition.metafieldsCount })}
-                        </span>
-                      </span>
-                      {deleting === definition.id ? (
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span>{t('customData.deleteSure')}</span>
-                          <Button
-                            variant="destructive"
-                            busy={remove.isPending}
-                            onClick={() => void onDelete(definition)}
-                          >
-                            {t('customData.deleteYes')}
-                          </Button>
-                          <Button variant="tertiary" onClick={() => setDeleting(null)}>
-                            {t('action.back')}
-                          </Button>
-                        </span>
-                      ) : (
-                        <Button
-                          variant="danger"
-                          icon={<Trash2 aria-hidden className="size-5" />}
-                          aria-label={t('customData.delete', { name: definition.name })}
-                          onClick={() => setDeleting(definition.id)}
+                  {mine.map((definition) =>
+                    editing === definition.id ? (
+                      <li key={definition.id} className="px-4 py-3">
+                        <EditDefinition
+                          definition={definition}
+                          onDone={(saved) => {
+                            setEditing(null);
+                            if (saved) {
+                              setProblem(null);
+                              setDone(t('customData.updated', { name: saved }));
+                            }
+                          }}
                         />
-                      )}
-                    </li>
-                  ))}
+                      </li>
+                    ) : (
+                      <li
+                        key={definition.id}
+                        className="flex flex-wrap items-center gap-3 px-4 py-3"
+                      >
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="font-medium" dir="auto">
+                            {definition.name}
+                          </span>
+                          <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                            <code dir="ltr">
+                              {definition.namespace}.{definition.key}
+                            </code>{' '}
+                            · {t(`customData.type.${definition.type}`)} ·{' '}
+                            {t('customData.filled', { count: definition.metafieldsCount })}
+                          </span>
+                          {definition.description && (
+                            <span className="text-secondary" dir="auto">
+                              {definition.description}
+                            </span>
+                          )}
+                        </span>
+                        {deleting === definition.id ? (
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span>{t('customData.deleteSure')}</span>
+                            <Button
+                              variant="destructive"
+                              busy={remove.isPending}
+                              onClick={() => void onDelete(definition)}
+                            >
+                              {t('customData.deleteYes')}
+                            </Button>
+                            <Button variant="tertiary" onClick={() => setDeleting(null)}>
+                              {t('action.back')}
+                            </Button>
+                          </span>
+                        ) : (
+                          <span className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              icon={<Pencil aria-hidden className="size-5" />}
+                              aria-label={t('customData.edit', { name: definition.name })}
+                              onClick={() => {
+                                setDeleting(null);
+                                setEditing(definition.id);
+                              }}
+                            />
+                            <Button
+                              variant="danger"
+                              icon={<Trash2 aria-hidden className="size-5" />}
+                              aria-label={t('customData.delete', { name: definition.name })}
+                              onClick={() => setDeleting(definition.id)}
+                            />
+                          </span>
+                        )}
+                      </li>
+                    ),
+                  )}
                 </ul>
               </Card>
             )}

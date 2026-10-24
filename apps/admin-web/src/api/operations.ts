@@ -2338,6 +2338,22 @@ export const MetafieldDefinitionCreateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A field of the shop's own renamed or described anew; its key and type stay (ADR-796). */
+export const MetafieldDefinitionUpdateMutation = /* GraphQL */ `
+  mutation MetafieldDefinitionUpdate($id: ID!, $definition: MetafieldDefinitionUpdateInput!) {
+    metafieldDefinitionUpdate(id: $id, definition: $definition) {
+      updatedDefinition {
+        ...MetafieldDefinitionParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${METAFIELD_DEFINITION}
+  ${USER_ERRORS}
+`;
+
 /** A field of the shop's own deleted, with its values. */
 export const MetafieldDefinitionDeleteMutation = /* GraphQL */ `
   mutation MetafieldDefinitionDelete($id: ID!) {
