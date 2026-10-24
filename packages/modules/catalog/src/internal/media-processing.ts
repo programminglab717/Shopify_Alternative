@@ -2,7 +2,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { and, eq, sql } from 'drizzle-orm';
 import { CatalogEvents, type ProductUpdatedPayload } from './events.js';
-import type { MediaCropRecord, VideoRecord } from './records.js';
+import type { MediaCropRecord, VideoRecord, VideoSizeRecord } from './records.js';
 import { products, type ImageFormatValue, type MediaTypeValue } from './schema.js';
 import type { VideoHostValue } from './videos.js';
 
@@ -45,6 +45,14 @@ export interface ProcessedImage {
   height: number;
   /** In bytes. */
   size: number;
+}
+
+/** A video the worker took to make its smaller copies (ADR-791): its frame as shown. */
+export interface ClaimedVideo {
+  id: string;
+  productId: string;
+  width: number;
+  height: number;
 }
 
 /** What came of marking an image ready: done, already settled by another try, or gone. */
@@ -172,7 +180,7 @@ export class MediaProcessing {
     shopId: string,
     mediaId: string,
     image: ProcessedImage,
-    video: VideoRecord | null = null,
+    video: Omit<VideoRecord, 'sizes'> | null = null,
     crop: MediaCropRecord | null = null,
   ): Promise<ReadyOutcome> {
     return this.db.tenant(shopId, async (tx) => {
@@ -182,7 +190,11 @@ export class MediaProcessing {
                width = ${image.width}, height = ${image.height}, next_attempt_at = NULL,
                video_size = ${video?.size ?? null}, video_width = ${video?.width ?? null},
                video_height = ${video?.height ?? null},
-               video_duration_ms = ${video?.durationMs ?? null}, crop_left = ${crop?.left ?? null},
+               video_duration_ms = ${video?.durationMs ?? null},
+               -- A video's smaller copies are made after (ADR-791): due now.
+               video_sizes = NULL,
+               video_sizes_at = ${video ? sql`now()` : sql`NULL`},
+               crop_left = ${crop?.left ?? null},
                crop_top = ${crop?.top ?? null}, crop_width = ${crop?.width ?? null},
                crop_height = ${crop?.height ?? null}, crop_turns = ${crop?.turns ?? 0},
                updated_at = now()
@@ -218,6 +230,77 @@ export class MediaProcessing {
          WHERE shop_id = ${shopId} AND id = ${mediaId} AND status = 'processing'
         RETURNING product_id`);
       if (rows[0]) await imagesChanged(tx, shopId, rows[0].product_id);
+    });
+  }
+
+  /** Shops with videos due for their smaller copies at `at` (ADR-791), across shops. */
+  async videoShops(at: Date, limit = 100): Promise<string[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM catalog.product_media
+         WHERE video_sizes_at <= ${at.toISOString()}
+         LIMIT ${limit}`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Takes up to `limit` of the shop's ready videos due for their smaller copies at `at`, the
+   * longest waiting first: not due again for `leaseMs` unless settled before, so a worker that
+   * stops has them made again after it.
+   */
+  async claimVideos(
+    shopId: string,
+    at: Date,
+    limit: number,
+    leaseMs: number,
+  ): Promise<ClaimedVideo[]> {
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<{ id: string; product_id: string; video_width: number; video_height: number }>(sql`
+        WITH due AS MATERIALIZED (
+          SELECT id FROM catalog.product_media
+           WHERE shop_id = ${shopId} AND video_sizes_at <= ${at.toISOString()}
+             AND status = 'ready' AND video_size IS NOT NULL
+           ORDER BY video_sizes_at, id
+           LIMIT ${limit}
+             FOR UPDATE SKIP LOCKED)
+        UPDATE catalog.product_media m
+           SET video_sizes_at = ${new Date(at.getTime() + leaseMs).toISOString()}
+          FROM due
+         WHERE m.shop_id = ${shopId} AND m.id = due.id
+        RETURNING m.id, m.product_id, m.video_width, m.video_height`),
+    );
+    return rows
+      .map((row) => ({
+        id: row.id,
+        productId: row.product_id,
+        width: row.video_width,
+        height: row.video_height,
+      }))
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+
+  /**
+   * Keeps what was made of a taken video's smaller copies (ADR-791), none where none was worth
+   * making or ffmpeg could not: its product's pages offer them where there are any. False for a
+   * video gone, or made ready again meanwhile, whose copies the caller removes.
+   */
+  async videoSized(
+    shopId: string,
+    mediaId: string,
+    sizes: readonly VideoSizeRecord[],
+  ): Promise<boolean> {
+    return this.db.tenant(shopId, async (tx) => {
+      const { rows } = await tx.execute<{ product_id: string }>(sql`
+        UPDATE catalog.product_media
+           SET video_sizes = ${JSON.stringify(sizes)}::jsonb, video_sizes_at = NULL,
+               updated_at = now()
+         WHERE shop_id = ${shopId} AND id = ${mediaId} AND status = 'ready'
+           AND video_size IS NOT NULL AND video_sizes_at IS NOT NULL
+        RETURNING product_id`);
+      if (!rows[0]) return false;
+      if (sizes.length > 0) await imagesChanged(tx, shopId, rows[0].product_id);
+      return true;
     });
   }
 

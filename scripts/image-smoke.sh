@@ -42,6 +42,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The core's image makes videos' smaller sizes with its ffmpeg, which has H.264's encoder (ADR-791).
+run "$core" ffmpeg -hide_banner -encoders | grep -q libx264
 run "$core" node /app/packages/platform/db/dist/cli/setup.js
 run "$core" node /app/packages/platform/db/dist/cli/migrate.js
 handle=$(run "$core" node dist/seed.js | grep -o 'hatti-demo-bazaar-[0-9a-f]*' | head -n 1)

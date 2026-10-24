@@ -1211,8 +1211,8 @@ export class StorefrontPublisher {
           },
           translations,
           // Videos the shop uploaded, at the same site as its images (ADR-258).
-          (media, handle) => {
-            const path = videoPathOf(shopId, media, handle);
+          (media, handle, short) => {
+            const path = videoPathOf(shopId, media, handle, short ?? null);
             return path && images.url(path);
           },
           reviews.get(record.id),

@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestApi, type TestApi } from '../testing/api.js';
 import { phoneVideo } from '../testing/videos.js';
 import { ProductImages } from '../worker/product-images.js';
+import { VideoSizes } from '../worker/video-sizes.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
 const server = testDatabaseServer();
@@ -584,6 +585,54 @@ describe.skipIf(!server)("Products' images: uploaded or fetched, checked, served
     expect((await ranged(`bytes=${video.length}-`)).statusCode).toBe(416);
     expect((await get(`/videos/${shop}/${newId()}/chikankari-kurta.mp4`)).statusCode).toBe(404);
 
+    // Its smaller copies, made by the worker (ADR-791), listed after it and served beside it.
+    const copyOf = (short: 720 | 480, width: number, height: number) => ({
+      short,
+      width,
+      height,
+      body: Buffer.from(`a ${short}p copy`),
+    });
+    expect(
+      await new VideoSizes({
+        processing: new MediaProcessing(worker),
+        storage: api.storage,
+        sizer: { copies: async () => [copyOf(720, 720, 1280), copyOf(480, 480, 854)] },
+      }).sweep(new Date(Date.now() + 60_000)),
+    ).toBe(1);
+    const sized = (
+      await gql(
+        `query ($id: ID!) { product(id: $id) { media {
+          video { sources { url width height fileSize } } } } }`,
+        { id: product.id },
+      )
+    ).media[0];
+    expect(sized.video.sources).toEqual([
+      expect.objectContaining({ url, width: 1080, height: 1920 }),
+      {
+        url: `http://localhost:4000/videos/${shop}/${uuid}/720p/chikankari-kurta.mp4`,
+        width: 720,
+        height: 1280,
+        fileSize: 11,
+      },
+      {
+        url: `http://localhost:4000/videos/${shop}/${uuid}/480p/chikankari-kurta.mp4`,
+        width: 480,
+        height: 854,
+        fileSize: 11,
+      },
+    ]);
+    const small = await get(sized.video.sources[2].url);
+    expect([small.statusCode, small.headers['content-type'], small.body]).toEqual([
+      200,
+      'video/mp4',
+      'a 480p copy',
+    ]);
+    // Only the sizes made: none other, nor a size with no copy.
+    expect((await get(`/videos/${shop}/${uuid}/360p/chikankari-kurta.mp4`)).statusCode).toBe(404);
+    expect((await get(`/videos/${shop}/${newId()}/480p/chikankari-kurta.mp4`)).statusCode).toBe(
+      404,
+    );
+
     // Gone with its media.
     await gql(
       `mutation ($id: ID!, $ids: [ID!]!) {
@@ -592,5 +641,6 @@ describe.skipIf(!server)("Products' images: uploaded or fetched, checked, served
     );
     await images({}).remove();
     expect((await get(url)).statusCode).toBe(404);
+    expect((await get(sized.video.sources[2].url)).statusCode).toBe(404);
   });
 });

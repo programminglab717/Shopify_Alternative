@@ -62,16 +62,25 @@ export class ProductMediaResolver {
     const { record } = media;
     const path = videoPathOf(tenant.shopId, record, media.handle);
     if (path === null || record.video === null) return null;
+    const source = (url: string, frame: { width: number; height: number; size: number }) =>
+      Object.assign(new VideoSource(), {
+        url,
+        mimeType: 'video/mp4',
+        format: 'mp4',
+        width: frame.width,
+        height: frame.height,
+        fileSize: frame.size,
+      });
     return Object.assign(new ProductVideo(), {
+      // The original, then its smaller copies, the largest first (ADR-791).
       sources: [
-        Object.assign(new VideoSource(), {
-          url: this.site.url(path),
-          mimeType: 'video/mp4',
-          format: 'mp4',
-          width: record.video.width,
-          height: record.video.height,
-          fileSize: record.video.size,
-        }),
+        source(this.site.url(path), record.video),
+        ...record.video.sizes.map((copy) =>
+          source(
+            this.site.url(videoPathOf(tenant.shopId, record, media.handle, copy.short)!),
+            copy,
+          ),
+        ),
       ],
       duration: record.video.durationMs,
     });

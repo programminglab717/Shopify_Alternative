@@ -64,7 +64,12 @@ export const LOW_STOCK_SHOWN = 5;
 export type ImageAddress = (media: MediaRecord, handle: string) => string | null;
 
 /** Where a ready video the shop uploaded is served (ADR-258), by its media and product's handle. */
-export type VideoAddress = (media: MediaRecord, handle: string) => string | null;
+/** Where a video the shop uploaded is served; with `short`, its smaller copy (ADR-791). */
+export type VideoAddress = (
+  media: MediaRecord,
+  handle: string,
+  short?: number | null,
+) => string | null;
 
 /**
  * Where the storefront shows an image from: Hatti's own copy once ready (ADR-158); meanwhile an
@@ -326,13 +331,20 @@ function mediaDocs(
     const file = media.video && videoAddress(media, record.handle);
     if (!media.video || !file) return [];
     const { width, height, durationMs } = media.video;
+    // The original, then its smaller copies, the largest first (ADR-791).
+    const copies = media.video.sizes.flatMap((copy) => {
+      const src = videoAddress(media, record.handle, copy.short);
+      return src
+        ? [{ src, mimeType: 'video/mp4', format: 'mp4', width: copy.width, height: copy.height }]
+        : [];
+    });
     return [
       {
         type: 'video',
         id: media.id,
         alt,
         preview,
-        sources: [{ src: file, mimeType: 'video/mp4', format: 'mp4', width, height }],
+        sources: [{ src: file, mimeType: 'video/mp4', format: 'mp4', width, height }, ...copies],
         durationMs,
       },
     ];

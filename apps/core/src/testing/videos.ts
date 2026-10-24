@@ -1,4 +1,10 @@
-// Videos as phones record them, made box by box for tests (ADR-258). Not part of the build.
+// Videos as phones record them, made box by box for tests (ADR-258), or by ffmpeg where a test
+// plays them (ADR-791). Not part of the build.
+
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /** A box of `type` holding `parts`, as MP4 files are made of. */
 function box(type: string, ...parts: Buffer[]): Buffer {
@@ -52,4 +58,44 @@ export function phoneVideo(codec: string): Buffer {
       box('udta', box('xyz ', Buffer.from('+24.8607+067.0011/'))),
     ),
   ]);
+}
+
+/** Whether this machine has ffmpeg with H.264's encoder, as CI and the worker's image do. */
+export const HAS_FFMPEG = /\blibx264\b/.test(
+  spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' }).stdout ?? '',
+);
+
+/** A second of real video, `width` by `height`, H.264 with AAC sound, recorded by ffmpeg. */
+export async function recordedVideo(width: number, height: number): Promise<Buffer> {
+  const directory = await mkdtemp(join(tmpdir(), 'hatti-recorded-'));
+  try {
+    const file = join(directory, 'phone.mp4');
+    const made = spawnSync('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      `testsrc=size=${width}x${height}:rate=24:duration=1`,
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=1',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      '-c:a',
+      'aac',
+      '-shortest',
+      file,
+    ]);
+    if (made.status !== 0) throw new Error(made.stderr.toString());
+    return await readFile(file);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }

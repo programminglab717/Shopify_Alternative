@@ -44,6 +44,13 @@ ENV NODE_ENV=production
 USER node
 
 FROM runtime AS core
+# ffmpeg, the open-source encoder, with which the worker makes products' videos' smaller sizes
+# (ADR-791): Debian's, without what it recommends, its package lists not kept.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+USER node
 COPY --from=build /out/core /app
 WORKDIR /app/apps/core
 EXPOSE 4000

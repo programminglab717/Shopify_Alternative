@@ -42,6 +42,7 @@ export {
 export {
   MediaProcessing,
   type ClaimedMedia,
+  type ClaimedVideo,
   type CopiedMedia,
   type ProcessedImage,
   type ReadyOutcome,
@@ -124,6 +125,7 @@ export type {
   MediaErrorRecord,
   MediaRecord,
   VideoRecord,
+  VideoSizeRecord,
   OptionRecord,
   ProductRecord,
   VariantRecord,

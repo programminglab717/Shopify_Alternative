@@ -64,15 +64,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Start PgBouncer
+      - name: Start PgBouncer, install ffmpeg
         timeout-minutes: 8
         run: |
+          # ffmpeg makes products' videos' smaller sizes (ADR-791), as in the core's image; its
+          # tests run where it is.
           # A package mirror that stops answering ends a try, not the job's twenty minutes (runs
           # 306 and 307 waited on one until they were cancelled); the next try may reach another.
           # The update says where it is, so that a stall names the source.
           for attempt in 1 2 3; do
             if timeout 90 sudo apt-get update &&
-              timeout 90 sudo apt-get install -y -qq pgbouncer; then
+              timeout 90 sudo apt-get install -y -qq pgbouncer &&
+              timeout 180 sudo apt-get install -y -qq --no-install-recommends ffmpeg; then
               break
             fi
             if [ "$attempt" = 3 ]; then exit 1; fi

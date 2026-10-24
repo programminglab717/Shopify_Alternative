@@ -8,7 +8,8 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 /**
  * Serves the videos shops uploaded for their products (ADR-258) at
- * /videos/{shop}/{media}/{name}.mp4: the clean copy the worker kept, whole, or the range of it a
+ * /videos/{shop}/{media}/{name}.mp4, and their smaller copies at
+ * /videos/{shop}/{media}/{720p|480p}/{name}.mp4 (ADR-791): the clean copy the worker kept, whole, or the range of it a
  * browser asks for as it plays, read from storage as it is sent and never held whole. Kept a year
  * by browsers and the edge, tagged with the media as its images are, so its removal forgets it.
  * Nothing else of storage is served here.
@@ -18,7 +19,7 @@ export function serveVideos(fastify: FastifyInstance, storage: ObjectStorage): v
     const [path = ''] = request.url.split('?', 1);
     const video = parseVideoPath(path);
     if (!video) return notFound(reply);
-    const key = videoKeyOf(video.shopId, video.mediaId);
+    const key = videoKeyOf(video.shopId, video.mediaId, video.short);
     const stored = await storage.head(key);
     if (!stored || stored.size === 0) return notFound(reply);
     const range = rangeOf(request.headers.range, stored.size);

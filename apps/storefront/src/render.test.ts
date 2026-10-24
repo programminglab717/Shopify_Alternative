@@ -2103,6 +2103,21 @@ describe('Storefront rendering', () => {
               width: 1080,
               height: 1920,
             },
+            // Its smaller copies (ADR-791).
+            {
+              src: 'https://api.hatti.test/videos/s1/m-video/720p/kurta.mp4',
+              mimeType: 'video/mp4',
+              format: 'mp4',
+              width: 720,
+              height: 1280,
+            },
+            {
+              src: 'https://api.hatti.test/videos/s1/m-video/480p/kurta.mp4',
+              mimeType: 'video/mp4',
+              format: 'mp4',
+              width: 480,
+              height: 854,
+            },
           ],
           durationMs: 12_000,
         },
@@ -2141,7 +2156,13 @@ describe('Storefront rendering', () => {
     expect(video).toBe(
       '<video playsinline="playsinline" controls="controls" preload="metadata" ' +
         'poster="https://api.hatti.test/images/s1/m-video/kurta.jpg?width=540" ' +
-        'aria-label="Kurta, turning"><source src="https://api.hatti.test/videos/s1/m-video/kurta.mp4" ' +
+        'aria-label="Kurta, turning">' +
+        // The smallest copy for phones, then the next, then the original (ADR-791).
+        '<source src="https://api.hatti.test/videos/s1/m-video/480p/kurta.mp4" type="video/mp4" ' +
+        'media="(max-width: 767px)">' +
+        '<source src="https://api.hatti.test/videos/s1/m-video/720p/kurta.mp4" type="video/mp4" ' +
+        'media="(max-width: 1279px)">' +
+        '<source src="https://api.hatti.test/videos/s1/m-video/kurta.mp4" ' +
         'type="video/mp4"><img src="https://api.hatti.test/images/s1/m-video/kurta.jpg?width=540" ' +
         'alt="Kurta, turning"></video>',
     );

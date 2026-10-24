@@ -102,6 +102,17 @@ export interface VideoRecord {
   width: number;
   height: number;
   durationMs: number;
+  /** Its smaller copies the worker made (ADR-791), the largest first; none until it has. */
+  sizes: VideoSizeRecord[];
+}
+
+/** A smaller copy of a video (ADR-791): its short side, as its address names it, and its frame. */
+export interface VideoSizeRecord {
+  short: number;
+  width: number;
+  height: number;
+  /** In bytes. */
+  size: number;
 }
 
 /** The part of an image shown, in its clean copy's pixels from its top left. */

@@ -200,7 +200,9 @@ export async function queryProducts(
                                    THEN json_build_object('size', m.video_size,
                                                           'width', m.video_width,
                                                           'height', m.video_height,
-                                                          'durationMs', m.video_duration_ms) END)
+                                                          'durationMs', m.video_duration_ms,
+                                                          'sizes', COALESCE(m.video_sizes,
+                                                                            '[]'::jsonb)) END)
                      ORDER BY m.position), '[]'::json)
               FROM catalog.product_media m
              WHERE m.shop_id = p.shop_id AND m.product_id = p.id) AS media

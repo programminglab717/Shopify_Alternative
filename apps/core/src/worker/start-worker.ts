@@ -30,7 +30,7 @@ import {
   createRedis,
 } from '@hatti/events';
 import { StoreExportService } from '@hatti/files/public';
-import { ImageFetcher } from '@hatti/images';
+import { ImageFetcher, VideoSizer } from '@hatti/images';
 import { InventoryService, LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
@@ -149,6 +149,7 @@ import { ParcelSteps } from './parcel-steps.js';
 import { PaymentInquiries } from './payment-inquiries.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
+import { VideoSizes } from './video-sizes.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 import { ScheduledExports } from './scheduled-exports.js';
@@ -626,6 +627,22 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     }).start(config.IMAGES_INTERVAL_MS);
     closers.push(() => images.stop());
+    // Their videos' smaller sizes, where the worker has ffmpeg (ADR-791).
+    const sizer = new VideoSizer({ ffmpeg: config.FFMPEG_PATH });
+    if (await sizer.available()) {
+      const videoSizes = new VideoSizes({
+        processing: new MediaProcessing(database),
+        storage: workerStorage(config),
+        sizer,
+        logger,
+      }).start(config.VIDEO_SIZES_INTERVAL_MS);
+      closers.push(() => videoSizes.stop());
+    } else {
+      logger.warn(
+        { ffmpeg: config.FFMPEG_PATH },
+        "no ffmpeg with H.264: products' videos play as uploaded, with no smaller sizes",
+      );
+    }
     // The storefronts' counts of each day's sessions, and of its taps on link pages' links, kept in
     // Postgres (ADR-180, ADR-204).
     const sessionsRedis = createRedis(config.REDIS_URL, 'worker');

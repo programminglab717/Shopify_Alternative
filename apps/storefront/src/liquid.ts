@@ -28,6 +28,7 @@ import {
   ImageDrop,
   PAGINATE,
   VideoDrop,
+  VideoSourceDrop,
   handleize,
   type Paginable,
 } from './objects.js';
@@ -564,9 +565,18 @@ function imageTag(url: unknown, options: Record<string, unknown>): string {
 }
 
 /**
+ * The widest screen, in CSS pixels, a video's smaller copy is for, by its short side (ADR-791):
+ * a 480p copy for phones, a 720p one for tablets and small laptops; wider screens play the
+ * original.
+ */
+const VIDEO_SCREENS: Readonly<Record<number, number>> = { 480: 767, 720: 1279 };
+
+/**
  * A `<video>` for a video the shop uploaded (ADR-258), as Shopify's video_tag: its preview image
  * the poster, at `image_size`'s width; with controls, playing in its place on phones; loading no
- * more than its length until played, as shoppers pay for their data.
+ * more than its length until played, as shoppers pay for their data. Its smaller copies come
+ * first, each for the screens it suits, the smallest first, then the original for the rest
+ * (ADR-791): a browser plays the first source whose screens are its own.
  */
 function videoTag(video: unknown, options: Record<string, unknown>): string {
   if (!(video instanceof VideoDrop)) return '';
@@ -583,11 +593,23 @@ function videoTag(video: unknown, options: Record<string, unknown>): string {
     'aria-label': options.alt ?? video.alt ?? null,
     class: options.class ?? null,
   };
-  const sources = video.sources
-    .map(
-      (source) => `<source src="${attribute(source.url)}" type="${attribute(source.mime_type)}">`,
+  const [original, ...copies] = video.sources;
+  const smaller = copies
+    .map((source) => ({ source, screen: VIDEO_SCREENS[Math.min(source.width, source.height)] }))
+    .filter(
+      (each): each is { source: VideoSourceDrop; screen: number } => each.screen !== undefined,
     )
-    .join('');
+    .sort((a, b) => a.screen - b.screen);
+  const sources = [
+    ...smaller.map(
+      ({ source, screen }) =>
+        `<source src="${attribute(source.url)}" type="${attribute(source.mime_type)}" ` +
+        `media="(max-width: ${screen}px)">`,
+    ),
+    ...(original
+      ? [`<source src="${attribute(original.url)}" type="${attribute(original.mime_type)}">`]
+      : []),
+  ].join('');
   const fallback = `<img src="${attribute(poster)}" alt="${attribute(video.alt ?? '')}">`;
   return `<video ${markupOf(attributes)}>${sources}${fallback}</video>`;
 }

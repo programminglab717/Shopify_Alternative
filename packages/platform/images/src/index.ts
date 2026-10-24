@@ -55,3 +55,13 @@ export {
   type SubjectCrop,
   type SubjectProblem,
 } from './subject.js';
+export {
+  VIDEO_SIZES,
+  VideoSizeError,
+  VideoSizer,
+  sizedFrame,
+  videoSizesFor,
+  type VideoCopy,
+  type VideoSizeValue,
+  type VideoSizerOptions,
+} from './video-sizes.js';

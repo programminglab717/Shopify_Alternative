@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { ProductCondition } from './taxonomy.js';
 import type { EasternWear } from './eastern-wear.js';
+import type { VideoSizeRecord } from './records.js';
 
 export const catalogSchema = pgSchema('catalog');
 
@@ -163,6 +164,10 @@ export const productMedia = catalogSchema.table(
     videoWidth: integer('video_width'),
     videoHeight: integer('video_height'),
     videoDurationMs: integer('video_duration_ms'),
+    /** Its smaller copies (ADR-791): null until tried. */
+    videoSizes: jsonb('video_sizes').$type<VideoSizeRecord[] | null>(),
+    /** When it is due for them; null once tried. */
+    videoSizesAt: timestamp('video_sizes_at', { withTimezone: true }),
     copiedFrom: uuid('copied_from'),
     ...timestamps,
   },

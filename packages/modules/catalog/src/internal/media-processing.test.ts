@@ -598,7 +598,33 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       const facts = { size: 4_000_000, width: 1080, height: 1920, durationMs: 12_000 };
       expect(await processing.ready(f.a.shopId, uploaded!, preview, facts)).toBe('ready');
       const ready = (await mediaOf(id))[2]!;
-      expect([ready.status, ready.video, ready.width]).toEqual(['ready', facts, 1080]);
+      expect([ready.status, ready.video, ready.width]).toEqual([
+        'ready',
+        { ...facts, sizes: [] },
+        1080,
+      ]);
+
+      // Ready, it is due for its smaller copies (ADR-791), taken once while the worker has it.
+      expect(await processing.videoShops(now)).toEqual([f.a.shopId]);
+      expect(await processing.claimVideos(f.a.shopId, now, 10, LEASE)).toEqual([
+        { id: uploaded, productId: id, width: 1080, height: 1920 },
+      ]);
+      expect(await processing.claimVideos(f.a.shopId, now, 10, LEASE)).toEqual([]);
+      const before = (await f.outbox()).length;
+      const sizes = [
+        { short: 720, width: 720, height: 1280, size: 1_500_000 },
+        { short: 480, width: 480, height: 854, size: 700_000 },
+      ];
+      expect(await processing.videoSized(f.a.shopId, uploaded!, sizes)).toBe(true);
+      expect((await mediaOf(id))[2]!.video?.sizes).toEqual(sizes);
+      // Its product's pages are told; made once, it is not made again.
+      expect((await f.outbox()).slice(before)).toMatchObject([
+        { event_type: 'product.updated', payload: { changed: ['media'] } },
+      ]);
+      expect(await processing.videoSized(f.a.shopId, uploaded!, sizes)).toBe(false);
+      expect(
+        await processing.claimVideos(f.a.shopId, new Date(now.getTime() + 2 * LEASE), 10, LEASE),
+      ).toEqual([]);
 
       // A video is neither cropped, nor marked, nor a variant's image.
       expect(

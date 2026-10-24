@@ -13,7 +13,9 @@ export type VideoHostValue = 'youtube' | 'vimeo';
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
 const VIMEO_ID = /^\d{1,12}$/;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const VIDEO_PATH = new RegExp(`^${VIDEOS_PATH}/(${UUID})/(${UUID})/[a-z0-9-]{1,100}\\.mp4$`);
+const VIDEO_PATH = new RegExp(
+  `^${VIDEOS_PATH}/(${UUID})/(${UUID})/(?:(720|480)p/)?[a-z0-9-]{1,100}\\.mp4$`,
+);
 
 /**
  * A YouTube or Vimeo video, from its address as people copy it: a watch page, a short, a share
@@ -80,26 +82,36 @@ export function vimeoOembedUrl(id: string): string {
   return `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(`https://vimeo.com/${id}`)}&width=1280`;
 }
 
-/** Where storage keeps a video the shop uploaded, once ready: in its media's folder. */
-export function videoKeyOf(shopId: string, mediaId: string): string {
-  return `${imagesPrefixOf(shopId, mediaId)}video.mp4`;
+/**
+ * Where storage keeps a video the shop uploaded, once ready: in its media's folder; with `short`,
+ * its smaller copy of that short side (ADR-791), beside it.
+ */
+export function videoKeyOf(shopId: string, mediaId: string, short: number | null = null): string {
+  return `${imagesPrefixOf(shopId, mediaId)}${short === null ? 'video' : `video-${short}`}.mp4`;
 }
 
 /**
  * The path a video the shop uploaded is served at once ready, named after its product's handle:
- * /videos/{shop}/{media}/lawn-suit.mp4. Null for anything else.
+ * /videos/{shop}/{media}/lawn-suit.mp4; with `short`, its smaller copy's (ADR-791),
+ * /videos/{shop}/{media}/480p/lawn-suit.mp4. Null for anything else.
  */
 export function videoPathOf(
   shopId: string,
   media: Pick<MediaRecord, 'id' | 'mediaType' | 'video'>,
   handle: string,
+  short: number | null = null,
 ): string | null {
   if (media.mediaType !== 'video' || media.video === null) return null;
-  return `${VIDEOS_PATH}/${shopId}/${media.id}/${handle || 'video'}.mp4`;
+  const size = short === null ? '' : `${short}p/`;
+  return `${VIDEOS_PATH}/${shopId}/${media.id}/${size}${handle || 'video'}.mp4`;
 }
 
-/** The shop and media `path` names, if it is a video's path. */
-export function parseVideoPath(path: string): { shopId: string; mediaId: string } | null {
+/** The shop, media and smaller copy `path` names, if it is a video's path; null for the original. */
+export function parseVideoPath(
+  path: string,
+): { shopId: string; mediaId: string; short: number | null } | null {
   const match = VIDEO_PATH.exec(path);
-  return match ? { shopId: match[1]!, mediaId: match[2]! } : null;
+  return match
+    ? { shopId: match[1]!, mediaId: match[2]!, short: match[3] ? Number(match[3]) : null }
+    : null;
 }

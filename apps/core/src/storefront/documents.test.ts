@@ -222,7 +222,14 @@ describe("products' documents", () => {
           alt: 'Kurta, turning',
           width: 1080,
           height: 1920,
-          video: { size: 4_000_000, width: 1080, height: 1920, durationMs: 12_000 },
+          video: {
+            size: 4_000_000,
+            width: 1080,
+            height: 1920,
+            durationMs: 12_000,
+            // Its smaller copies (ADR-791).
+            sizes: [{ short: 480, width: 480, height: 854, size: 900_000 }],
+          },
         }),
         media('youtube', {
           ...ready,
@@ -247,7 +254,10 @@ describe("products' documents", () => {
       (each, handle) =>
         each.imageFormat ? `https://hatti.pk/images/s1/${each.id}/${handle}.jpg` : null,
       new Map(),
-      (each, handle) => (each.video ? `https://hatti.pk/videos/s1/${each.id}/${handle}.mp4` : null),
+      (each, handle, short) =>
+        each.video
+          ? `https://hatti.pk/videos/s1/${each.id}/${short ? `${short}p/` : ''}${handle}.mp4`
+          : null,
     );
     expect(doc.images.map((image) => image.src)).toEqual([
       'https://hatti.pk/images/s1/front/lawn-kurta.jpg',
@@ -272,6 +282,13 @@ describe("products' documents", () => {
             format: 'mp4',
             width: 1080,
             height: 1920,
+          },
+          {
+            src: 'https://hatti.pk/videos/s1/film/480p/lawn-kurta.mp4',
+            mimeType: 'video/mp4',
+            format: 'mp4',
+            width: 480,
+            height: 854,
           },
         ],
         durationMs: 12_000,
