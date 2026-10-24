@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-792 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-793 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -800,6 +800,7 @@
 | 790 | Past orders are searched by their name, email, the name they went to, or a mobile number however written | Accepted |
 | 791 | The worker makes 720p and 480p copies of products' videos with ffmpeg, which pages offer to smaller screens | Accepted |
 | 792 | An iPhone's HEVC video is made H.264 by the worker's ffmpeg, at no more than 1080 pixels, rather than refused | Accepted |
+| 793 | A video uploaded without a preview image shows a frame of itself the worker's ffmpeg takes | Accepted |
 
 ---
 
@@ -26390,3 +26391,18 @@
   re-encoded, so a little less sharp than the upload, and capped at 1080 pixels; HEVC's smaller
   files become H.264's larger ones, which the smaller copies offset on phones. The image sweep
   takes longer on such a video, during which the shop's other images wait a round.
+
+## ADR-793 · A video uploaded without a preview image shows a frame of itself the worker's ffmpeg takes
+
+* **Context:** ADR-258 asks for a preview image with every uploaded video, which the admin
+  takes as a frame in the browser; apps calling the Admin API, as Shopify's do, give videos
+  without one and were refused. With ffmpeg on the worker (ADR-791) the server can take it.
+* **Decision:** `previewImageSource` is optional for a `VIDEO` (migration 0338 drops the
+  constraint that wanted one). Where none is given, the image sweep has ffmpeg take a frame of
+  the checked video, a second in or halfway through a shorter one, turned as shown, as a JPEG
+  (`VideoSizer.frameOf`), and makes it the preview as it would one given: cleaned, sized and
+  served as images are. Where the worker has no ffmpeg, or ffmpeg takes none, the video fails
+  saying no preview was given and none could be taken.
+* **Consequences:** a video added through the API plays with a preview of itself; the admin
+  still sends the frame the merchant chose. A frame a second in may be a fade from black on some
+  videos, which the merchant replaces by giving one.
