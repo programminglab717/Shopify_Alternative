@@ -566,6 +566,7 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
               mediaContentType: 'VIDEO',
               previewImageSource: 'https://cdn.example.pk/cover.jpg',
             },
+            // Without a preview image, which the worker takes a frame for (ADR-793): not refused.
             { originalSource: upload('kurta.mp4'), mediaContentType: 'VIDEO' },
             {
               originalSource: upload('photo.jpg'),
@@ -581,7 +582,6 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       ).toEqual([
         ['media.0.originalSource', 'INVALID'],
         ['media.1.originalSource', 'INVALID'],
-        ['media.2.previewImageSource', 'BLANK'],
         ['media.3.originalSource', 'INVALID'],
         ['media.4.previewImageSource', 'INVALID'],
       ]);

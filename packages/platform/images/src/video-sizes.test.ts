@@ -110,6 +110,20 @@ describe('Smaller sizes of a video (ADR-791)', () => {
     120_000,
   );
 
+  it.skipIf(!FFMPEG)(
+    'takes a frame of a video, as the image shown before it plays (ADR-793)',
+    async () => {
+      const video = cleanVideo(await recorded(640, 360));
+      if (!video.ok) throw new Error(video.problem.message);
+      const frame = await new VideoSizer().frameOf(video.video);
+      // A JPEG's signature.
+      expect([...frame.subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]);
+      await expect(
+        new VideoSizer().frameOf({ body: Buffer.from('not a video'), durationMs: 1_000 }),
+      ).rejects.toBeInstanceOf(VideoSizeError);
+    },
+  );
+
   it('says so where there is no ffmpeg', async () => {
     const missing = new VideoSizer({ ffmpeg: '/nowhere/ffmpeg' });
     expect(await missing.available()).toBe(false);

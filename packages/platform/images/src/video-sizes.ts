@@ -113,6 +113,43 @@ export class VideoSizer {
   }
 
   /**
+   * A frame of `video` as a JPEG, for the image shown before it plays where its uploader gave
+   * none (ADR-793): a second in, or halfway through a shorter one, turned as shown. Throws
+   * {@link VideoSizeError} where ffmpeg fails.
+   */
+  async frameOf(video: Pick<CleanVideo, 'body' | 'durationMs'>): Promise<Buffer> {
+    const directory = await mkdtemp(join(tmpdir(), 'hatti-video-'));
+    try {
+      const input = join(directory, 'in.mp4');
+      const output = join(directory, 'frame.jpg');
+      await writeFile(input, video.body);
+      const at = Math.min(1_000, Math.floor(video.durationMs / 2)) / 1_000;
+      await this.#run([
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-nostdin',
+        '-y',
+        '-ss',
+        at.toFixed(3),
+        '-i',
+        input,
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        output,
+      ]);
+      return await readFile(output);
+    } catch (error) {
+      if (error instanceof VideoSizeError) throw error;
+      throw new VideoSizeError(`ffmpeg took no frame: ${(error as Error).message}`);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  /**
    * The smaller copies of `video` worth making, the largest first; none for one whose short side
    * is 480 pixels or fewer. Throws {@link VideoSizeError} where ffmpeg fails or makes what Hatti
    * would not keep.

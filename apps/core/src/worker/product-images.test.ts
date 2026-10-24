@@ -38,7 +38,7 @@ describe.skipIf(!server)(
     let answers: Record<string, () => Promise<FetchResult>> = {};
     const fetched: string[] = [];
 
-    const worker = (converter?: Pick<VideoSizer, 'toH264'>) =>
+    const worker = (converter?: Pick<VideoSizer, 'toH264' | 'frameOf'>) =>
       new ProductImages({
         processing: new MediaProcessing(database),
         storage,
@@ -400,7 +400,8 @@ describe.skipIf(!server)(
     /** A product with one uploaded video of `body`, made ready by the worker: its media's ID. */
     async function readyVideo(
       body: Buffer,
-      converter?: Pick<VideoSizer, 'toH264'>,
+      converter?: Pick<VideoSizer, 'toH264' | 'frameOf'>,
+      previewed = true,
     ): Promise<string> {
       const product = await products.create(tenant, { title: 'Lawn Kurta' });
       if (!product.ok) throw new Error('no product');
@@ -418,7 +419,7 @@ describe.skipIf(!server)(
         {
           originalSource: await put('kurta.mp4', body, 'video/mp4'),
           mediaContentType: 'VIDEO',
-          previewImageSource: await put('frame.jpg', frame, 'image/jpeg'),
+          ...(previewed && { previewImageSource: await put('frame.jpg', frame, 'image/jpeg') }),
         },
       ]);
       if (!created.ok) throw new Error(JSON.stringify(created.errors));
@@ -525,11 +526,34 @@ describe.skipIf(!server)(
       120_000,
     );
 
+    it.skipIf(!HAS_FFMPEG)(
+      'takes a frame of a video uploaded without a preview image, as its preview (ADR-793)',
+      async () => {
+        const id = await readyVideo(await recordedVideo(640, 360), new VideoSizer(), false);
+        const { rows } = await admin.query<{ status: string; width: number; height: number }>(
+          'SELECT status, width, height FROM catalog.product_media WHERE id = $1',
+          [id],
+        );
+        expect(rows).toEqual([{ status: 'ready', width: 640, height: 360 }]);
+      },
+      120_000,
+    );
+
+    it('fails a video with no preview image where the worker cannot take a frame (ADR-793)', async () => {
+      const id = await readyVideo(phoneVideo('avc1'), undefined, false);
+      expect(await videoRow(id)).toMatchObject({
+        status: 'failed',
+        error_message:
+          'Its preview image: none was given, and no frame of it could be taken: give the image that shows before it plays',
+      });
+    });
+
     it('refuses an HEVC video ffmpeg cannot make H.264, saying why (ADR-792)', async () => {
       const id = await readyVideo(phoneVideo('hvc1'), {
         toH264: async () => {
           throw new VideoSizeError('ffmpeg failed: Invalid data found when processing input');
         },
+        frameOf: async () => Buffer.alloc(0),
       });
       expect(await videoRow(id)).toMatchObject({
         status: 'failed',

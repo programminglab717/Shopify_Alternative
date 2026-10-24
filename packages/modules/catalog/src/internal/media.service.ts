@@ -432,14 +432,9 @@ export class MediaService {
               'give its resourceUrl',
           );
         }
-        if (!given && !input.previewImageSource?.trim()) {
-          check.addMessage(
-            [...field, 'previewImageSource'],
-            'BLANK',
-            'Give the image that shows before the video plays: a frame of it, or its cover',
-          );
-        }
-        return upload && given
+        // Without a preview image, the worker takes a frame of it (ADR-793).
+        const previewed = given !== null || !input.previewImageSource?.trim();
+        return upload && previewed
           ? {
               mediaType: 'video' as const,
               sourceUrl: upload.url,

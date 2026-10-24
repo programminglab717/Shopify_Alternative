@@ -56,8 +56,11 @@ export interface ProductImagesOptions {
   processing: MediaProcessing;
   storage: ObjectStorage;
   fetcher: Pick<ImageFetcher, 'fetch'>;
-  /** ffmpeg, where the worker has it, which makes an HEVC video H.264 (ADR-792). */
-  converter?: Pick<VideoSizer, 'toH264'>;
+  /**
+   * ffmpeg, where the worker has it, which makes an HEVC video H.264 (ADR-792) and takes a frame
+   * of one uploaded without a preview image (ADR-793).
+   */
+  converter?: Pick<VideoSizer, 'toH264' | 'frameOf'>;
   /** The edge in front of the images, which forgets those removed. */
   edge?: EdgeCache;
   logger?: Pick<Logger, 'warn'>;
@@ -166,7 +169,7 @@ export class ProductImages {
     // A video's preview, said as its own.
     const about = (message: string) =>
       media.mediaType === 'image' ? message : `Its preview image: ${message}`;
-    const source = await this.#imageOf(shopId, media);
+    const source = await this.#imageOf(shopId, media, video);
     if (!source.ok) {
       if (source.transient && media.attempts < IMAGE_ATTEMPTS) {
         const next = new Date(at.getTime() + imageRetryDelayMs(media.attempts));
@@ -222,10 +225,10 @@ export class ProductImages {
   }
 
   /**
-   * The image a media shows: an image's own; a video's preview, as given, else a YouTube video's
-   * largest its host has, or the one Vimeo names.
+   * The image a media shows: an image's own; a video's preview, as given, else a frame of an
+   * uploaded one (ADR-793), a YouTube video's largest its host has, or the one Vimeo names.
    */
-  async #imageOf(shopId: string, media: ClaimedMedia): Promise<Read> {
+  async #imageOf(shopId: string, media: ClaimedMedia, video: CleanVideo | null): Promise<Read> {
     // A copy's, from the clean copy kept of the one it copies, while it is there (ADR-343).
     const copyOf = media.copyOf;
     const kept =
@@ -237,6 +240,8 @@ export class ProductImages {
     if (media.previewSourceUrl !== null) {
       return this.#read(shopId, { url: media.previewSourceUrl, key: media.previewSourceKey });
     }
+    // An uploaded video given none: a frame of it, by ffmpeg (ADR-793).
+    if (video) return this.#frameOf(video);
     const external = media.externalVideo;
     if (external?.host === 'youtube') {
       for (const url of hostPreviewsOf('youtube', external.id)) {
@@ -253,6 +258,34 @@ export class ProductImages {
     }
     if (external?.host === 'vimeo') return this.#vimeoPreview(external.id);
     return { ok: false, transient: false, code: 'UNKNOWN', message: 'It has no preview image' };
+  }
+
+  /** A frame of an uploaded video, taken by ffmpeg where the worker has it (ADR-793). */
+  async #frameOf(video: CleanVideo): Promise<Read> {
+    const { converter } = this.options;
+    if (!converter) {
+      return {
+        ok: false,
+        transient: false,
+        code: 'UNKNOWN',
+        message:
+          'none was given, and no frame of it could be taken: give the image that shows before it plays',
+      };
+    }
+    try {
+      return { ok: true, body: await converter.frameOf(video) };
+    } catch (error) {
+      if (!(error instanceof VideoSizeError)) throw error;
+      return {
+        ok: false,
+        transient: false,
+        code: 'UNKNOWN',
+        message: `none was given, and no frame of it could be taken: ${error.message}`.slice(
+          0,
+          500,
+        ),
+      };
+    }
   }
 
   /** The image Vimeo names for a video of its, as its oEmbed says. */

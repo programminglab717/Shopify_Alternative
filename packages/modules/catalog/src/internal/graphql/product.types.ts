@@ -822,8 +822,8 @@ export class CreateMediaInput {
     nullable: true,
     description:
       'The image that shows before a video plays: an https URL, or the resourceUrl of an image ' +
-      "staged. A VIDEO needs one, as a frame of it the admin takes; an EXTERNAL_VIDEO's own is " +
-      'taken where none is given.',
+      'staged. Where none is given, a VIDEO shows a frame of itself the worker takes (ADR-793) ' +
+      "and an EXTERNAL_VIDEO its host's image.",
   })
   previewImageSource?: string | null;
 }
