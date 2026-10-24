@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
-### Smaller sizes of products' videos
+### e30b9cb · Smaller sizes of products' videos
 
 * **Less data on phones:** the worker makes 720p and 480p copies of each uploaded video with
   ffmpeg, now in the core's image and CI, and pages offer phones the smallest; the owner chose
