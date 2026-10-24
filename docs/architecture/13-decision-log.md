@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-796 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-797 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -804,6 +804,7 @@
 | 794 | The importer brings a Shopify store's product videos: its own by the URL of an MP4 the worker fetches, YouTube's and Vimeo's by their addresses | Accepted |
 | 795 | The admin changes a gift card's last day, note and customer, sending only what changed | Accepted |
 | 796 | The admin renames and describes the shop's custom fields in place, their keys and types kept | Accepted |
+| 797 | The admin changes where an app's webhook is sent, its topic kept | Accepted |
 
 ---
 
@@ -26456,3 +26457,15 @@
   each field's description under its key.
 * **Consequences:** a field is renamed without losing its values. A field of the wrong type or
   key is still deleted and made again.
+
+## ADR-797 · The admin changes where an app's webhook is sent, its topic kept
+
+* **Context:** the apps page (ADR-398) added and removed an app's webhooks; an app that moved its
+  server had each removed and added again, losing its deliveries' history. The Admin API's
+  `webhookSubscriptionUpdate` already posts a subscription's topic to another https address.
+* **Decision:** each webhook has a Change button that edits its address in place and sends it to
+  `webhookSubscriptionUpdate`; the topic is not offered, as Shopify's admin offers none either. An
+  address left as it was sends nothing. The core's checks of the address, https on the public
+  internet, are said as they are on adding one.
+* **Consequences:** a webhook keeps its deliveries when its app moves. Deliveries queued before
+  the change go to the new address from their next try on.

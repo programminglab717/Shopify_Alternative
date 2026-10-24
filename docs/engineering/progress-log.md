@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
+### Webhooks sent elsewhere
+
+* **Change on a webhook:** an app's webhook is sent to another https address from the apps page,
+  its topic and deliveries kept (DEV-03, [ADR-797](../architecture/13-decision-log.md#adr-797--the-admin-changes-where-an-apps-webhook-is-sent-its-topic-kept)).
+* 4258 tests (1 new).
+
 ### 3a2bf34 · Custom fields changed
 
 * **Change on a field:** the shop's custom fields are renamed and described in place in
