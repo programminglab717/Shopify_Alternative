@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
-### Gift cards changed
+### 3f78c02 · Gift cards changed
 
 * **Change on a card:** owners and managers change a gift card's last day, note and the customer
   it was given to from the admin, only what changed sent (CAT-12, [ADR-795](../architecture/13-decision-log.md#adr-795--the-admin-changes-a-gift-cards-last-day-note-and-customer-sending-only-what-changed)).
