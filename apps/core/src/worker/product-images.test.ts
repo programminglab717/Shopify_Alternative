@@ -7,7 +7,7 @@ import { MediaProcessing, MediaService, ProductService } from '@hatti/catalog/pu
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { VideoSizeError, VideoSizer, type FetchResult } from '@hatti/images';
+import { VideoSizeError, VideoSizer, cleanVideo, type FetchResult } from '@hatti/images';
 import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import sharp from 'sharp';
@@ -38,10 +38,11 @@ describe.skipIf(!server)(
     let answers: Record<string, () => Promise<FetchResult>> = {};
     const fetched: string[] = [];
 
-    const worker = () =>
+    const worker = (converter?: Pick<VideoSizer, 'toH264'>) =>
       new ProductImages({
         processing: new MediaProcessing(database),
         storage,
+        ...(converter && { converter }),
         fetcher: {
           fetch: async (url) => {
             fetched.push(url);
@@ -397,7 +398,10 @@ describe.skipIf(!server)(
     });
 
     /** A product with one uploaded video of `body`, made ready by the worker: its media's ID. */
-    async function readyVideo(body: Buffer): Promise<string> {
+    async function readyVideo(
+      body: Buffer,
+      converter?: Pick<VideoSizer, 'toH264'>,
+    ): Promise<string> {
       const product = await products.create(tenant, { title: 'Lawn Kurta' });
       if (!product.ok) throw new Error('no product');
       const put = async (name: string, bytes: Buffer, type: string) => {
@@ -418,7 +422,7 @@ describe.skipIf(!server)(
         },
       ]);
       if (!created.ok) throw new Error(JSON.stringify(created.errors));
-      await worker().sweep(new Date(Date.now() + 60_000));
+      await worker(converter).sweep(new Date(Date.now() + 60_000));
       return created.value.mediaIds[0]!;
     }
 
@@ -488,6 +492,49 @@ describe.skipIf(!server)(
       expect(await sizesOf(other)).toMatchObject({
         video_sizes: null,
         video_sizes_at: expect.any(Date),
+      });
+    });
+
+    const videoRow = async (id: string) =>
+      (
+        await admin.query<{
+          status: string;
+          video_width: number | null;
+          video_height: number | null;
+          error_message: string | null;
+        }>(
+          `SELECT status, video_width, video_height, error_message
+             FROM catalog.product_media WHERE id = $1`,
+          [id],
+        )
+      ).rows[0];
+
+    it.skipIf(!HAS_FFMPEG)(
+      "makes an iPhone's HEVC video H.264 with ffmpeg rather than refuse it (ADR-792)",
+      async () => {
+        const id = await readyVideo(await recordedVideo(1080, 1920, 'libx265'), new VideoSizer());
+        expect(await videoRow(id)).toEqual({
+          status: 'ready',
+          video_width: 1080,
+          video_height: 1920,
+          error_message: null,
+        });
+        const kept = await storage.read(`shops/${tenant.shopId}/images/${id}/video.mp4`);
+        expect(kept && cleanVideo(Buffer.from(kept.body)).ok).toBe(true);
+      },
+      120_000,
+    );
+
+    it('refuses an HEVC video ffmpeg cannot make H.264, saying why (ADR-792)', async () => {
+      const id = await readyVideo(phoneVideo('hvc1'), {
+        toH264: async () => {
+          throw new VideoSizeError('ffmpeg failed: Invalid data found when processing input');
+        },
+      });
+      expect(await videoRow(id)).toMatchObject({
+        status: 'failed',
+        error_message:
+          'It is HEVC video, and could not be made H.264: ffmpeg failed: Invalid data found when processing input',
       });
     });
   },

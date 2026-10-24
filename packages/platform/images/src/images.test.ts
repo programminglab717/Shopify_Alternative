@@ -409,6 +409,8 @@ describe('videos', () => {
       message:
         'It is HEVC video, which many browsers cannot play: record or export it as H.264, ' +
         '"Most Compatible" in an iPhone\'s camera formats, and add it again',
+      // The worker's ffmpeg makes it H.264, where it has one (ADR-792).
+      convertible: true,
     });
     expect(refused(phoneVideo({ sound: 'ac-3' }))?.message).toBe(
       'Its sound is ac-3, not AAC: export it again as MP4 with AAC sound',

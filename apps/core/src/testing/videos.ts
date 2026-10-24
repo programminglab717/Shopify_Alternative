@@ -65,8 +65,15 @@ export const HAS_FFMPEG = /\blibx264\b/.test(
   spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' }).stdout ?? '',
 );
 
-/** A second of real video, `width` by `height`, H.264 with AAC sound, recorded by ffmpeg. */
-export async function recordedVideo(width: number, height: number): Promise<Buffer> {
+/**
+ * A second of real video, `width` by `height`, H.264, or HEVC as an iPhone records it with
+ * `libx265`, with AAC sound, recorded by ffmpeg.
+ */
+export async function recordedVideo(
+  width: number,
+  height: number,
+  codec: 'libx264' | 'libx265' = 'libx264',
+): Promise<Buffer> {
   const directory = await mkdtemp(join(tmpdir(), 'hatti-recorded-'));
   try {
     const file = join(directory, 'phone.mp4');
@@ -83,7 +90,8 @@ export async function recordedVideo(width: number, height: number): Promise<Buff
       '-i',
       'sine=frequency=440:duration=1',
       '-c:v',
-      'libx264',
+      codec,
+      ...(codec === 'libx265' ? ['-tag:v', 'hvc1'] : []),
       '-preset',
       'ultrafast',
       '-pix_fmt',

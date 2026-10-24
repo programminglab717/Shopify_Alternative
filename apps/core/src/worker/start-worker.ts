@@ -619,17 +619,20 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     ).start(config.SCHEDULED_INTERVAL_MS);
     closers.push(() => scheduledContent.stop());
     // Products' images made ready, and those of media gone removed (ADR-158).
+    // ffmpeg, where the worker has it, for HEVC uploads (ADR-792) and smaller sizes (ADR-791).
+    const sizer = new VideoSizer({ ffmpeg: config.FFMPEG_PATH });
+    const hasFfmpeg = await sizer.available();
     const images = new ProductImages({
       processing: new MediaProcessing(database),
       storage: workerStorage(config),
       fetcher: new ImageFetcher(),
+      ...(hasFfmpeg && { converter: sizer }),
       edge: edgeCacheOf(config),
       logger,
     }).start(config.IMAGES_INTERVAL_MS);
     closers.push(() => images.stop());
     // Their videos' smaller sizes, where the worker has ffmpeg (ADR-791).
-    const sizer = new VideoSizer({ ffmpeg: config.FFMPEG_PATH });
-    if (await sizer.available()) {
+    if (hasFfmpeg) {
       const videoSizes = new VideoSizes({
         processing: new MediaProcessing(database),
         storage: workerStorage(config),
@@ -640,7 +643,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     } else {
       logger.warn(
         { ffmpeg: config.FFMPEG_PATH },
-        "no ffmpeg with H.264: products' videos play as uploaded, with no smaller sizes",
+        "no ffmpeg with H.264: products' videos play as uploaded, with no smaller sizes, and HEVC ones are refused",
       );
     }
     // The storefronts' counts of each day's sessions, and of its taps on link pages' links, kept in

@@ -20,6 +20,8 @@ export interface VideoProblem {
   code: VideoProblemCode;
   /** For the merchant: what is wrong with it, and what to do. */
   message: string;
+  /** HEVC, which the worker's ffmpeg makes H.264 where it has it (ADR-792). */
+  convertible?: true;
 }
 
 /** A video as Hatti keeps it. */
@@ -109,11 +111,16 @@ export function cleanVideo(bytes: Buffer): CleanVideoResult {
     if (!track) return problem('VIDEO_METADATA_READ_ERROR', 'Its tracks could not be read');
     if (track.handler === 'vide') {
       if (HEVC.has(track.codec)) {
-        return problem(
-          'VIDEO_INVALID_FILETYPE_ERROR',
-          'It is HEVC video, which many browsers cannot play: record or export it as H.264, ' +
-            '"Most Compatible" in an iPhone\'s camera formats, and add it again',
-        );
+        return {
+          ok: false,
+          problem: {
+            code: 'VIDEO_INVALID_FILETYPE_ERROR',
+            message:
+              'It is HEVC video, which many browsers cannot play: record or export it as H.264, ' +
+              '"Most Compatible" in an iPhone\'s camera formats, and add it again',
+            convertible: true,
+          },
+        };
       }
       if (!H264.has(track.codec)) {
         return problem(

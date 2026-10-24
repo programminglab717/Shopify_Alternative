@@ -16,8 +16,10 @@ import {
   cleanImage,
   cleanVideo,
   cropImage,
+  VideoSizeError,
   type CleanVideo,
   type ImageFetcher,
+  type VideoSizer,
 } from '@hatti/images';
 import type { Logger } from '@hatti/logger';
 import type { ObjectStorage } from '@hatti/storage';
@@ -33,8 +35,11 @@ const REMOVALS = 100;
  * before, which still names it, while the storefront is down (`stale-if-error`).
  */
 export const REPLACED_CROP_KEPT_MS = 8 * 24 * 60 * 60_000;
-/** How long a taken image is the taker's: longer than the slowest fetch and check. */
-const LEASE_MS = 5 * 60_000;
+/**
+ * How long a taken image is the taker's: longer than the slowest fetch and check, and than an
+ * HEVC video made H.264 (ADR-792).
+ */
+const LEASE_MS = 15 * 60_000;
 /** Tries at a source that does not answer, over about half an hour, before the image fails. */
 export const IMAGE_ATTEMPTS = 6;
 
@@ -51,6 +56,8 @@ export interface ProductImagesOptions {
   processing: MediaProcessing;
   storage: ObjectStorage;
   fetcher: Pick<ImageFetcher, 'fetch'>;
+  /** ffmpeg, where the worker has it, which makes an HEVC video H.264 (ADR-792). */
+  converter?: Pick<VideoSizer, 'toH264'>;
   /** The edge in front of the images, which forgets those removed. */
   edge?: EdgeCache;
   logger?: Pick<Logger, 'warn'>;
@@ -62,8 +69,9 @@ export interface ProductImagesOptions {
  * keeps its clean copy, which the API makes every size and format of as browsers ask. An image
  * that is not one to show fails at once, saying why; a source that does not answer is tried
  * again, for about half an hour. A video the shop uploaded is checked and kept as browsers play
- * it, with its preview image; a YouTube or Vimeo video's preview is its host's where the shop gave
- * none (ADR-258). Media gone have their images and videos removed from storage and the edge.
+ * it, with its preview image, an iPhone's HEVC made H.264 where the worker has ffmpeg (ADR-792); a
+ * YouTube or Vimeo video's preview is its host's where the shop gave none (ADR-258). Media gone
+ * have their images and videos removed from storage and the edge.
  */
 export class ProductImages {
   constructor(private readonly options: ProductImagesOptions) {}
@@ -293,8 +301,23 @@ export class ProductImages {
     }
     const file = await this.options.storage.read(key);
     if (!file) return gone;
+    const original = Buffer.from(file.body);
     const cleaned = cleanVideo(file.body);
-    return cleaned.ok ? cleaned : { ok: false, ...cleaned.problem };
+    if (cleaned.ok) return cleaned;
+    const { code, message, convertible } = cleaned.problem;
+    const { converter } = this.options;
+    if (!convertible || !converter) return { ok: false, code, message };
+    // An iPhone's HEVC, made H.264, which every browser plays (ADR-792).
+    try {
+      return { ok: true, video: await converter.toH264(original) };
+    } catch (error) {
+      if (!(error instanceof VideoSizeError)) throw error;
+      return {
+        ok: false,
+        code,
+        message: `It is HEVC video, and could not be made H.264: ${error.message}`.slice(0, 500),
+      };
+    }
   }
 
   /** A file's bytes: from the shop's own upload, or fetched from its URL. */

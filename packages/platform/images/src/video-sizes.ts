@@ -82,6 +82,37 @@ export class VideoSizer {
   }
 
   /**
+   * `video`, HEVC as an iPhone records it, made H.264 and AAC (ADR-792): at most 1080 pixels on
+   * its short side, turned as shown, its index at the front, read back as an upload is. Throws
+   * {@link VideoSizeError} where ffmpeg fails or makes what Hatti would not keep.
+   */
+  async toH264(video: Buffer): Promise<CleanVideo> {
+    const directory = await mkdtemp(join(tmpdir(), 'hatti-video-'));
+    try {
+      const input = join(directory, 'in.mov');
+      const output = join(directory, 'h264.mp4');
+      await writeFile(input, video);
+      await this.#run(
+        this.#encode(
+          input,
+          // Its short side as it is, or 1080 where it has more, as a phone's 4K has.
+          "scale='if(gte(iw,ih),-2,min(1080,iw))':'if(gte(iw,ih),min(1080,ih),-2)',setsar=1",
+          output,
+          // What is kept as the original: closer to it than its smaller copies are.
+          23,
+        ),
+      );
+      const cleaned = cleanVideo(await readFile(output));
+      if (!cleaned.ok) {
+        throw new VideoSizeError(`Made H.264, it will not play: ${cleaned.problem.message}`);
+      }
+      return cleaned.video;
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  /**
    * The smaller copies of `video` worth making, the largest first; none for one whose short side
    * is 480 pixels or fewer. Throws {@link VideoSizeError} where ffmpeg fails or makes what Hatti
    * would not keep.
@@ -97,42 +128,9 @@ export class VideoSizer {
       for (const short of sizes) {
         const frame = sizedFrame(video.width, video.height, short);
         const output = join(directory, `${short}.mp4`);
-        await this.#run([
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          '-nostdin',
-          '-y',
-          '-i',
-          input,
-          '-map',
-          '0:v:0',
-          '-map',
-          '0:a:0?',
-          '-map_metadata',
-          '-1',
-          '-vf',
-          `scale=${frame.width}:${frame.height},setsar=1`,
-          '-c:v',
-          'libx264',
-          '-preset',
-          'veryfast',
-          '-crf',
-          '26',
-          '-pix_fmt',
-          'yuv420p',
-          '-c:a',
-          'aac',
-          '-b:a',
-          '96k',
-          '-ac',
-          '2',
-          '-threads',
-          String(this.#threads),
-          '-movflags',
-          '+faststart',
-          output,
-        ]);
+        await this.#run(
+          this.#encode(input, `scale=${frame.width}:${frame.height},setsar=1`, output),
+        );
         const cleaned = cleanVideo(await readFile(output));
         if (!cleaned.ok) {
           throw new VideoSizeError(`The ${short}p copy will not play: ${cleaned.problem.message}`);
@@ -144,6 +142,49 @@ export class VideoSizer {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * ffmpeg's arguments to make `input` H.264 and AAC through the filter `scale`, at quality
+   * `crf`, the original's metadata dropped, its index at the front.
+   */
+  #encode(input: string, scale: string, output: string, crf = 26): string[] {
+    return [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-nostdin',
+      '-y',
+      '-i',
+      input,
+      '-map',
+      '0:v:0',
+      '-map',
+      '0:a:0?',
+      '-map_metadata',
+      '-1',
+      '-vf',
+      scale,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      String(crf),
+      '-pix_fmt',
+      'yuv420p',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '96k',
+      '-ac',
+      '2',
+      '-threads',
+      String(this.#threads),
+      '-movflags',
+      '+faststart',
+      output,
+    ];
   }
 
   /** Runs ffmpeg, its errors the last of what it said. */

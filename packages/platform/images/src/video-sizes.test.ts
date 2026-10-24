@@ -11,8 +11,13 @@ const FFMPEG = /\blibx264\b/.test(
   spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' }).stdout ?? '',
 );
 
+/** Whether ffmpeg can also record HEVC, as an iPhone does, for the tests that convert it. */
+const HEVC_ENCODER = /\blibx265\b/.test(
+  spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' }).stdout ?? '',
+);
+
 /** A second of video as a phone would record one, `width` by `height`, with sound. */
-async function recorded(width: number, height: number): Promise<Buffer> {
+async function recorded(width: number, height: number, codec = 'libx264'): Promise<Buffer> {
   const directory = await mkdtemp(join(tmpdir(), 'hatti-video-test-'));
   try {
     const file = join(directory, 'phone.mp4');
@@ -29,7 +34,8 @@ async function recorded(width: number, height: number): Promise<Buffer> {
       '-i',
       'sine=frequency=440:duration=1',
       '-c:v',
-      'libx264',
+      codec,
+      ...(codec === 'libx265' ? ['-tag:v', 'hvc1'] : []),
       '-preset',
       'ultrafast',
       '-pix_fmt',
@@ -88,6 +94,21 @@ describe('Smaller sizes of a video (ADR-791)', () => {
       new VideoSizer().copies({ body: Buffer.from('not a video'), width: 1280, height: 720 }),
     ).rejects.toBeInstanceOf(VideoSizeError);
   });
+
+  it.skipIf(!HEVC_ENCODER)(
+    'makes an HEVC video, as an iPhone records one, H.264 at no more than 1080 pixels (ADR-792)',
+    async () => {
+      const hevc = await recorded(2160, 3840, 'libx265');
+      const refused = cleanVideo(Buffer.from(hevc));
+      expect(refused.ok || refused.problem).toMatchObject({ convertible: true });
+      const made = await new VideoSizer().toH264(hevc);
+      expect([made.width, made.height]).toEqual([1080, 1920]);
+      expect(Math.abs(made.durationMs - 1_000)).toBeLessThan(100);
+      // What Hatti keeps as an upload: H.264, which every browser plays.
+      expect(cleanVideo(Buffer.from(made.body)).ok).toBe(true);
+    },
+    120_000,
+  );
 
   it('says so where there is no ffmpeg', async () => {
     const missing = new VideoSizer({ ffmpeg: '/nowhere/ffmpeg' });
