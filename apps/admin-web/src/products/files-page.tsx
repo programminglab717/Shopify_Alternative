@@ -603,6 +603,11 @@ function ImportFromStore() {
                 stocked: formatCount(done.products.stocked),
               })}
             </span>
+            {Boolean(done.products.videos) && (
+              <span>
+                {t('files.videosImported', { videos: formatCount(done.products.videos ?? 0) })}
+              </span>
+            )}
             {done.collections && (
               <span>
                 {t('files.collectionsImported', {

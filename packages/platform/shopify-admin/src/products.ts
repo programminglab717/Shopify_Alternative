@@ -15,7 +15,13 @@ export const PRODUCTS_BULK_QUERY = `{
         category { fullName }
         options { name position }
         media {
-          edges { node { ... on MediaImage { id image { url altText } } } }
+          edges {
+            node {
+              ... on MediaImage { id image { url altText } }
+              ... on Video { id alt sources { url mimeType height } }
+              ... on ExternalVideo { id alt originUrl }
+            }
+          }
         }
         variants {
           edges {
@@ -70,7 +76,26 @@ export interface StoreProduct {
   category: { fullName: string } | null;
   options: { name: string; position: number }[];
   images: { url: string; altText: string | null }[];
+  /** Its videos (ADR-794): those Shopify keeps, by an MP4 of them, and YouTube's or Vimeo's. */
+  videos: StoreVideo[];
   variants: StoreVariant[];
+}
+
+/** A product's video at the store: one Shopify keeps, by its MP4's URL, or a YouTube or Vimeo one. */
+export interface StoreVideo {
+  type: 'video' | 'external_video';
+  url: string;
+  alt: string | null;
+}
+
+/** The tallest MP4 of a video Shopify keeps up to 1080 pixels, else its shortest: one to bring. */
+function mp4Of(
+  sources: readonly { url?: string; mimeType?: string; height?: number }[],
+): string | null {
+  const mp4s = sources
+    .filter((source) => source.mimeType === 'video/mp4' && typeof source.url === 'string')
+    .sort((a, b) => (b.height ?? 0) - (a.height ?? 0));
+  return (mp4s.find((source) => (source.height ?? 0) <= 1080) ?? mp4s.at(-1))?.url ?? null;
 }
 
 /** The products in a bulk query's file, each with the images and variants that name it. */
@@ -94,6 +119,7 @@ export function storeProductsOf(text: string): StoreProduct[] {
         category: node.category ?? null,
         options: [...(node.options ?? [])].sort((a, b) => a.position - b.position),
         images: [],
+        videos: [],
         variants: [],
       });
     } else if (parent && id.startsWith('gid://shopify/ProductVariant/')) {
@@ -102,8 +128,24 @@ export function storeProductsOf(text: string): StoreProduct[] {
       const image = (line as { image?: { url?: string; altText?: string | null } | null }).image;
       // An image Shopify has not finished processing has no address yet.
       if (image?.url) parent.images.push({ url: image.url, altText: image.altText ?? null });
+    } else if (parent && id.startsWith('gid://shopify/Video/')) {
+      const video = line as {
+        alt?: string | null;
+        sources?: { url?: string; mimeType?: string; height?: number }[];
+      };
+      const url = mp4Of(video.sources ?? []);
+      if (url) parent.videos.push({ type: 'video', url, alt: video.alt || null });
+    } else if (parent && id.startsWith('gid://shopify/ExternalVideo/')) {
+      const video = line as { alt?: string | null; originUrl?: string };
+      if (video.originUrl) {
+        parent.videos.push({
+          type: 'external_video',
+          url: video.originUrl,
+          alt: video.alt || null,
+        });
+      }
     }
-    // Videos and 3D models come as their parents' IDs alone, and are left.
+    // 3D models come as their parents' IDs alone, and are left.
   }
   return [...products.values()];
 }
@@ -248,6 +290,8 @@ export interface StoreProducts extends StoreProductsCsv {
   /** The currency the store prices in, ISO 4217. */
   currency: string;
   products: number;
+  /** The videos of the products that have any, by their handles (ADR-794), which no CSV holds. */
+  videos: { handle: string; videos: StoreVideo[] }[];
 }
 
 /**
@@ -275,6 +319,9 @@ export async function readStoreProducts(
       storeName: shop.value.shop.name,
       currency: shop.value.shop.currencyCode,
       products: products.length,
+      videos: products
+        .filter((product) => product.videos.length > 0)
+        .map(({ handle, videos }) => ({ handle, videos })),
       ...storeProductsCsv(products),
     },
   };

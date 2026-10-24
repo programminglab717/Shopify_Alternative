@@ -29,6 +29,28 @@ const LINES = [
     __parentId: 'gid://shopify/Product/1',
   },
   { __parentId: 'gid://shopify/Product/1' },
+  // A video Shopify keeps, at its sizes and as HLS; and a YouTube one (ADR-794).
+  {
+    id: 'gid://shopify/Video/13',
+    alt: 'Kurta, turning',
+    sources: [
+      {
+        url: 'https://cdn.shopify.com/kurta.m3u8',
+        mimeType: 'application/x-mpegURL',
+        height: 1920,
+      },
+      { url: 'https://cdn.shopify.com/kurta-480.mp4', mimeType: 'video/mp4', height: 480 },
+      { url: 'https://cdn.shopify.com/kurta-1080.mp4', mimeType: 'video/mp4', height: 1080 },
+      { url: 'https://cdn.shopify.com/kurta-2160.mp4', mimeType: 'video/mp4', height: 2160 },
+    ],
+    __parentId: 'gid://shopify/Product/1',
+  },
+  {
+    id: 'gid://shopify/ExternalVideo/14',
+    alt: '',
+    originUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    __parentId: 'gid://shopify/Product/1',
+  },
   {
     id: 'gid://shopify/MediaImage/12',
     image: { url: 'https://cdn.shopify.com/kurta-blue.jpg', altText: null },
@@ -118,6 +140,12 @@ describe("A store's products as Shopify's product export (ADR-749)", () => {
       { url: 'https://cdn.shopify.com/kurta-blue.jpg', altText: null },
     ]);
     expect(products[0]!.variants.map((variant) => variant.sku)).toEqual(['KUR-M', 'KUR-L']);
+    // Its videos: the tallest MP4 up to 1080 pixels, and YouTube's by its address (ADR-794).
+    expect(products[0]!.videos).toEqual([
+      { type: 'video', url: 'https://cdn.shopify.com/kurta-1080.mp4', alt: 'Kurta, turning' },
+      { type: 'external_video', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', alt: null },
+    ]);
+    expect(products[1]!.videos).toEqual([]);
   });
 
   it("writes Shopify's rows: product and first variant and image, then a row for each further one", () => {

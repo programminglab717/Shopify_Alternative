@@ -3118,6 +3118,7 @@ const en = {
   'files.importProductsConfirm': 'Import them',
   'files.productsImported':
     'Imported. Products added: {created}; updated: {updated}; left as they were: {skipped}. Images: {images}. Variants given stock: {stocked}.',
+  'files.videosImported': 'Videos added to products: {videos}.',
   'files.exportProducts': 'Export products',
   'files.exportProductsHint':
     "As Shopify's product CSV, for a backup, an edit in a spreadsheet, or another shop. Up to 5,000 rows a file.",
@@ -8986,6 +8987,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.importProductsConfirm': 'امپورٹ کریں',
   'files.productsImported':
     'امپورٹ ہو گیا۔ شامل پروڈکٹس: {created}؛ اپ ڈیٹ: {updated}؛ ویسے ہی: {skipped}۔ تصاویر: {images}۔ اسٹاک والی اقسام: {stocked}۔',
+  'files.videosImported': 'پروڈکٹس میں شامل ویڈیوز: {videos}۔',
   'files.exportProducts': 'پروڈکٹس ایکسپورٹ کریں',
   'files.exportProductsHint':
     'شاپیفائی کی پروڈکٹ CSV میں، بیک اپ، اسپریڈشیٹ میں ترمیم یا کسی اور دکان کے لیے۔ ایک فائل میں 5,000 قطاروں تک۔',

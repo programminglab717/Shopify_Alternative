@@ -539,6 +539,42 @@ describe.skipIf(!server)(
       120_000,
     );
 
+    it("fetches a video given by its URL, as a Shopify store's come, trying one that does not answer again (ADR-794)", async () => {
+      const product = await products.create(tenant, { title: 'Lawn Kurta' });
+      if (!product.ok) throw new Error('no product');
+      const film = 'https://cdn.shopify.com/kurta-1080.mp4';
+      const cover = 'https://cdn.shopify.com/kurta.jpg';
+      const created = await media.create(tenant, product.value.id, [
+        { originalSource: film, mediaContentType: 'VIDEO', previewImageSource: cover },
+      ]);
+      if (!created.ok) throw new Error(JSON.stringify(created.errors));
+      const [id] = created.value.mediaIds;
+      const jpeg = await sharp({
+        create: { width: 90, height: 160, channels: 3, background: '#7a1f3d' },
+      })
+        .jpeg()
+        .toBuffer();
+      answers[cover] = async () => ({ ok: true, body: jpeg });
+      answers[film] = async () => ({
+        ok: false,
+        transient: true,
+        code: 'IMAGE_DOWNLOAD_FAILURE',
+        message: 'Its server answered 503 Service Unavailable',
+      });
+      const at = new Date(Date.now() + 60_000);
+      await worker().sweep(at);
+      expect(await row(id!)).toMatchObject({ status: 'processing', attempts: 1 });
+      answers[film] = async () => ({ ok: true, body: phoneVideo('avc1') });
+      await worker().sweep(new Date(at.getTime() + 2 * 60_000));
+      expect(await videoRow(id!)).toMatchObject({
+        status: 'ready',
+        video_width: 1080,
+        video_height: 1920,
+      });
+      // Kept as an upload is, in its media's folder.
+      expect(await storage.head(`shops/${tenant.shopId}/images/${id}/video.mp4`)).not.toBeNull();
+    });
+
     it('fails a video with no preview image where the worker cannot take a frame (ADR-793)', async () => {
       const id = await readyVideo(phoneVideo('avc1'), undefined, false);
       expect(await videoRow(id)).toMatchObject({

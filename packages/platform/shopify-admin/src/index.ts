@@ -14,6 +14,7 @@ export {
   storeProductsOf,
   type StoreProduct,
   type StoreProducts,
+  type StoreVideo,
   type StoreProductsCsv,
   type StoreVariant,
 } from './products.js';

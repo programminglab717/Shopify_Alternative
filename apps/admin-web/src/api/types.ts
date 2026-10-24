@@ -3851,6 +3851,8 @@ export interface ProductsImportResult {
   skipped: number;
   variants: number;
   images: number;
+  /** Products' videos brought from a Shopify store (ADR-794); not asked of a CSV's import. */
+  videos?: number;
   stocked: number;
   rowErrorCount: number;
   rowErrors: FileRowError[];

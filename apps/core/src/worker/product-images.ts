@@ -56,6 +56,8 @@ export interface ProductImagesOptions {
   processing: MediaProcessing;
   storage: ObjectStorage;
   fetcher: Pick<ImageFetcher, 'fetch'>;
+  /** What fetches videos given by URL, up to 100 MB (ADR-794): `fetcher` unless given. */
+  videoFetcher?: Pick<ImageFetcher, 'fetch'>;
   /**
    * ffmpeg, where the worker has it, which makes an HEVC video H.264 (ADR-792) and takes a frame
    * of one uploaded without a preview image (ADR-793).
@@ -161,7 +163,13 @@ export class ProductImages {
     if (media.mediaType === 'video') {
       const checked = await this.#video(shopId, media);
       if (!checked.ok) {
-        await processing.failed(shopId, media.id, checked);
+        // A video's address that does not answer is tried again, as an image's is (ADR-794).
+        if (checked.transient && media.attempts < IMAGE_ATTEMPTS) {
+          const next = new Date(at.getTime() + imageRetryDelayMs(media.attempts));
+          await processing.retryAt(shopId, media.id, next);
+        } else {
+          await processing.failed(shopId, media.id, checked);
+        }
         return false;
       }
       video = checked.video;
@@ -316,7 +324,10 @@ export class ProductImages {
   async #video(
     shopId: string,
     media: ClaimedMedia,
-  ): Promise<{ ok: true; video: CleanVideo } | { ok: false; code: string; message: string }> {
+  ): Promise<
+    | { ok: true; video: CleanVideo }
+    | { ok: false; code: string; message: string; transient?: boolean }
+  > {
     const gone = {
       ok: false as const,
       code: 'GENERIC_FILE_DOWNLOAD_FAILURE',
@@ -325,15 +336,41 @@ export class ProductImages {
     // A copy's, from the video kept of the one it copies, while it is there (ADR-343).
     const kept = media.copyOf?.video ? videoKeyOf(shopId, media.copyOf.id) : null;
     const key = kept && (await this.options.storage.head(kept)) ? kept : media.sourceKey;
-    // The database checks it too: the shop's own files alone.
-    if (key === null || (key !== kept && !key.startsWith(`shops/${shopId}/files/`))) return gone;
-    const stored = await this.options.storage.head(key);
-    if (!stored) return gone;
-    if (stored.size > MAX_VIDEO_BYTES) {
-      return { ok: false, code: 'GENERIC_FILE_INVALID_SIZE', message: 'The video is over 100 MB' };
+    let file: { body: Buffer };
+    if (key === null) {
+      // Given by its URL, as a Shopify store's come (ADR-794): fetched, never from a private
+      // network, up to 100 MB.
+      const fetched = await (this.options.videoFetcher ?? this.options.fetcher).fetch(
+        media.sourceUrl,
+      );
+      if (!fetched.ok) {
+        return {
+          ok: false,
+          code:
+            fetched.code === 'INVALID_IMAGE_FILE_SIZE'
+              ? 'GENERIC_FILE_INVALID_SIZE'
+              : 'GENERIC_FILE_DOWNLOAD_FAILURE',
+          message: fetched.message,
+          transient: fetched.transient,
+        };
+      }
+      file = fetched;
+    } else {
+      // The database checks it too: the shop's own files alone.
+      if (key !== kept && !key.startsWith(`shops/${shopId}/files/`)) return gone;
+      const stored = await this.options.storage.head(key);
+      if (!stored) return gone;
+      if (stored.size > MAX_VIDEO_BYTES) {
+        return {
+          ok: false,
+          code: 'GENERIC_FILE_INVALID_SIZE',
+          message: 'The video is over 100 MB',
+        };
+      }
+      const read = await this.options.storage.read(key);
+      if (!read) return gone;
+      file = read;
     }
-    const file = await this.options.storage.read(key);
-    if (!file) return gone;
     const original = Buffer.from(file.body);
     const cleaned = cleanVideo(file.body);
     if (cleaned.ok) return cleaned;

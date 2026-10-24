@@ -3799,7 +3799,7 @@ input CreateMediaInput {
   alt: String
 
   """
-  IMAGE; VIDEO, its originalSource the resourceUrl of a video staged as video/mp4 or video/quicktime, H.264 and AAC, up to 100 MB and 10 minutes; EXTERNAL_VIDEO, a YouTube or Vimeo video's address (ADR-258).
+  IMAGE; VIDEO, its originalSource the resourceUrl of a video staged as video/mp4 or video/quicktime, or an https URL of one the worker fetches (ADR-794), H.264 and AAC, or HEVC the worker makes H.264, up to 100 MB and 10 minutes; EXTERNAL_VIDEO, a YouTube or Vimeo video's address (ADR-258).
   """
   mediaContentType: MediaContentType = IMAGE
 
@@ -9897,7 +9897,7 @@ type Mutation {
   ): ProductsImportPayload!
 
   """
-  Imports a Shopify store's products through its own Admin API, as productsImport imports Shopify's product export, so nothing is downloaded or uploaded by hand (ONB-05, ADR-749): their options, variants, prices, costs, SKUs, barcodes, weights, tags, status, SEO, category and images, each keeping its handle, and the stock the store tracked at the shop's primary location. Give the store's address and the Admin API access token of a custom app made in the store's admin, or the client ID and secret of an app made in Shopify's Dev Dashboard and installed on the store; the app needs the read_products and read_inventory access scopes. Nothing given is kept. Shopify exports the products in the background, which is waited for up to 90 seconds. The store must price in rupees. Row errors name each product's handle. dryRun reads the store and counts, changing nothing.
+  Imports a Shopify store's products through its own Admin API, as productsImport imports Shopify's product export, so nothing is downloaded or uploaded by hand (ONB-05, ADR-749): their options, variants, prices, costs, SKUs, barcodes, weights, tags, status, SEO, category, images and videos (ADR-794), each keeping its handle, and the stock the store tracked at the shop's primary location. Give the store's address and the Admin API access token of a custom app made in the store's admin, or the client ID and secret of an app made in Shopify's Dev Dashboard and installed on the store; the app needs the read_products and read_inventory access scopes. Nothing given is kept. Shopify exports the products in the background, which is waited for up to 90 seconds. The store must price in rupees. Row errors name each product's handle. dryRun reads the store and counts, changing nothing.
   """
   productsImportFromShopify(
     """
@@ -14114,6 +14114,11 @@ type ProductsImportPayload {
 
   """Variants made: of new products, and new to those updated."""
   variants: Int!
+
+  """
+  Videos added to products from a Shopify store's, its own by their MP4s and YouTube's or Vimeo's by their addresses (ADR-794), those the store's products have in a dry run; none from a file, which has no videos.
+  """
+  videos: Int!
 }
 
 type ProductsSizeChartSetPayload {

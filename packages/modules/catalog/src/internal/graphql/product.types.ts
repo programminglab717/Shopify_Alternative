@@ -814,7 +814,9 @@ export class CreateMediaInput {
     defaultValue: MediaContentType.IMAGE,
     description:
       'IMAGE; VIDEO, its originalSource the resourceUrl of a video staged as video/mp4 or ' +
-      "video/quicktime, H.264 and AAC, up to 100 MB and 10 minutes; EXTERNAL_VIDEO, a YouTube or Vimeo video's address (ADR-258).",
+      'video/quicktime, or an https URL of one the worker fetches (ADR-794), H.264 and AAC, or ' +
+      'HEVC the worker makes H.264, up to 100 MB and 10 minutes; EXTERNAL_VIDEO, a YouTube or ' +
+      "Vimeo video's address (ADR-258).",
   })
   mediaContentType?: MediaContentType | null;
 

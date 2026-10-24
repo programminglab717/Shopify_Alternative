@@ -19,7 +19,7 @@ const IMPORT = `mutation ($store: String!, $accessToken: String, $clientId: Stri
     $clientSecret: String, $dryRun: Boolean) {
   productsImportFromShopify(store: $store, accessToken: $accessToken, clientId: $clientId,
       clientSecret: $clientSecret, dryRun: $dryRun) {
-    rows created variants images stocked rowErrorCount dryRun
+    rows created variants images videos stocked rowErrorCount dryRun
     rowErrors { row column handle message }
     userErrors { field code message }
   }
@@ -49,6 +49,21 @@ const LINES = [
   {
     id: 'gid://shopify/MediaImage/12',
     image: { url: 'http://old.example/kurta-back.jpg', altText: null },
+    __parentId: 'gid://shopify/Product/1',
+  },
+  // Its videos: one Shopify keeps, and a YouTube one (ADR-794).
+  {
+    id: 'gid://shopify/Video/13',
+    alt: 'Kurta, turning',
+    sources: [
+      { url: 'https://cdn.shopify.com/kurta-1080.mp4', mimeType: 'video/mp4', height: 1080 },
+    ],
+    __parentId: 'gid://shopify/Product/1',
+  },
+  {
+    id: 'gid://shopify/ExternalVideo/14',
+    alt: null,
+    originUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     __parentId: 'gid://shopify/Product/1',
   },
   ...[
@@ -194,6 +209,7 @@ describe.skipIf(!server)("Admin GraphQL API: products from a Shopify store's Adm
       created: 2,
       variants: 3,
       images: 1,
+      videos: 2,
       stocked: 0,
       dryRun: true,
       userErrors: [],
@@ -206,6 +222,7 @@ describe.skipIf(!server)("Admin GraphQL API: products from a Shopify store's Adm
       created: 2,
       variants: 3,
       images: 1,
+      videos: 2,
       stocked: 2,
       rowErrorCount: 1,
       dryRun: false,
@@ -230,6 +247,16 @@ describe.skipIf(!server)("Admin GraphQL API: products from a Shopify store's Adm
         } } }`,
     );
     const byHandle = (a: Json, b: Json) => String(a.handle).localeCompare(String(b.handle));
+    // Its videos after its image, waiting on the worker: Shopify's by its MP4 (ADR-794).
+    const kurta = (
+      await gql(`{ productByHandle(handle: "cotton-kurta") {
+        media { mediaContentType alt status } } }`)
+    ).data?.productByHandle;
+    expect(kurta.media).toEqual([
+      { mediaContentType: 'IMAGE', alt: 'Kurta', status: 'UPLOADED' },
+      { mediaContentType: 'VIDEO', alt: 'Kurta, turning', status: 'UPLOADED' },
+      { mediaContentType: 'EXTERNAL_VIDEO', alt: '', status: 'UPLOADED' },
+    ]);
     expect([...(data?.products.nodes ?? [])].sort(byHandle)).toEqual([
       {
         handle: 'chai-mug',
@@ -276,7 +303,12 @@ describe.skipIf(!server)("Admin GraphQL API: products from a Shopify store's Adm
       clientId: 'client',
       clientSecret: 'secret',
     });
-    expect(again.data?.productsImportFromShopify).toMatchObject({ created: 0, userErrors: [] });
+    // Its videos are not added again.
+    expect(again.data?.productsImportFromShopify).toMatchObject({
+      created: 0,
+      videos: 0,
+      userErrors: [],
+    });
     expect(store.tokens).toEqual(['shpat_from_client', 'shpat_from_client', 'shpat_from_client']);
   });
 

@@ -62,6 +62,7 @@ function core(role: StaffRole) {
             skipped: 0,
             variants: 9,
             images: 5,
+            videos: 2,
             stocked: 9,
             rowErrorCount: 1,
             rowErrors: [
@@ -327,6 +328,7 @@ describe('Products and stock by file', () => {
         'Imported. Products added: 4; updated: 0; left as they were: 0. Images: 5. Variants given stock: 9.',
       ),
     ).toBeTruthy();
+    expect(screen.getByText('Videos added to products: 2.')).toBeTruthy();
     expect(screen.getByText('Redirects added: 2; left as they were: 0.')).toBeTruthy();
     expect(
       screen.getByText('Collections added: 2, 2 with their images; left as they were: 0.'),

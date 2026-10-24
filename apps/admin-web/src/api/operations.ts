@@ -7955,6 +7955,7 @@ export const ProductsImportFromShopifyMutation = /* GraphQL */ `
       skipped
       variants
       images
+      videos
       stocked
       rowErrorCount
       rowErrors {

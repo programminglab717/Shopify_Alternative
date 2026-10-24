@@ -423,13 +423,22 @@ export class MediaService {
         };
       }
       case 'VIDEO': {
-        const upload = this.#uploadOf(shopId, input.originalSource);
-        if (!upload || !/\.(?:mp4|mov)$/.test(upload.key)) {
+        // A staged upload, or an https URL the worker fetches, as Shopify's (ADR-794).
+        const staged = this.#uploadOf(shopId, input.originalSource ?? '');
+        const address = input.originalSource?.trim() ?? '';
+        const upload = staged
+          ? /\.(?:mp4|mov)$/.test(staged.key)
+            ? staged
+            : null
+          : /^https:\/\//i.test(address) && address.length <= LIMITS.url
+            ? { url: address, key: null }
+            : null;
+        if (!upload) {
           check.addMessage(
             [...field, 'originalSource'],
             'INVALID',
             'Upload the video through stagedUploadsCreate, as video/mp4 or video/quicktime, and ' +
-              'give its resourceUrl',
+              'give its resourceUrl, or give an https URL of an MP4',
           );
         }
         // Without a preview image, the worker takes a frame of it (ADR-793).

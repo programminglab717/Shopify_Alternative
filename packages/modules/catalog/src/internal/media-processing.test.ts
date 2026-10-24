@@ -555,14 +555,16 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
           video: null,
         },
       ]);
-      // Refused: another site's video, a video by URL or an upload not a video, one without its
-      // preview, and an image with one.
+      // Refused: another site's video, a video by an address not https or an upload not a video,
+      // and an image with a preview.
       expect(
         errorsOf(
           await media.create(f.a, id, [
             { originalSource: 'https://example.com/watch?v=1', mediaContentType: 'EXTERNAL_VIDEO' },
+            // By an https URL, which the worker fetches, as Shopify's (ADR-794), not refused; by
+            // another, refused.
             {
-              originalSource: 'https://cdn.example.pk/kurta.mp4',
+              originalSource: 'http://cdn.example.pk/kurta.mp4',
               mediaContentType: 'VIDEO',
               previewImageSource: 'https://cdn.example.pk/cover.jpg',
             },

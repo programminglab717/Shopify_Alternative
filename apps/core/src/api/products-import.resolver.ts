@@ -1,7 +1,12 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
-import { ProductImportService, type ImportedStock } from '@hatti/catalog/public';
+import {
+  MediaService,
+  ProductImportService,
+  ProductService,
+  type ImportedStock,
+} from '@hatti/catalog/public';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { readStoreProducts, shopDomainOf } from '@hatti/shopify-admin';
+import { readStoreProducts, shopDomainOf, type StoreVideo } from '@hatti/shopify-admin';
 import {
   Args,
   Field,
@@ -105,6 +110,14 @@ export class ProductsImportPayload {
 
   @Field(() => Int, {
     description:
+      "Videos added to products from a Shopify store's, its own by their MP4s and YouTube's or " +
+      "Vimeo's by their addresses (ADR-794), those the store's products have in a dry run; " +
+      'none from a file, which has no videos.',
+  })
+  videos!: number;
+
+  @Field(() => Int, {
+    description:
       'Products left as they are: the shop has products with their handles already, and the ' +
       'import was not told to overwrite them.',
   })
@@ -137,6 +150,8 @@ export class ProductsImportPayload {
 export class ProductsImportResolver {
   constructor(
     private readonly imports: ProductImportService,
+    private readonly products: ProductService,
+    private readonly media: MediaService,
     private readonly inventory: InventoryService,
     private readonly locations: LocationService,
     private readonly shopify: ShopifyStores,
@@ -185,7 +200,8 @@ export class ProductsImportResolver {
       "Imports a Shopify store's products through its own Admin API, as productsImport imports " +
       "Shopify's product export, so nothing is downloaded or uploaded by hand (ONB-05, ADR-749): " +
       'their options, variants, prices, costs, SKUs, barcodes, weights, tags, status, SEO, ' +
-      'category and images, each keeping its handle, and the stock the store tracked at the ' +
+      'category, images and videos (ADR-794), each keeping its handle, and the stock the store ' +
+      'tracked at the ' +
       "shop's primary location. Give the store's address and the Admin API access token of a " +
       "custom app made in the store's admin, or the client ID and secret of an app made in " +
       "Shopify's Dev Dashboard and installed on the store; the app needs the read_products and " +
@@ -262,7 +278,7 @@ export class ProductsImportResolver {
       );
     }
     if (products === 0) return refused(['store'], 'BLANK', `${storeName} has no products`);
-    return this.#import(
+    const payload = await this.#import(
       tenant,
       csv,
       {
@@ -278,6 +294,49 @@ export class ProductsImportResolver {
           'CSV files of fewer products each, and import those',
       },
     );
+    // Its products' videos, which Shopify's file has not (ADR-794), once the products are made.
+    const videos = read.value.videos;
+    if (payload.userErrors.length > 0) return payload;
+    payload.videos =
+      (dryRun ?? false)
+        ? videos.reduce((sum, product) => sum + product.videos.length, 0)
+        : await this.#videos(tenant, videos);
+    return payload;
+  }
+
+  /**
+   * Adds the store's products' videos to the shop's products of the same handles (ADR-794), after
+   * their images: a video Shopify keeps by its MP4, which the worker fetches and checks, and a
+   * YouTube or Vimeo one by its address. A product with a video already is left as it is, so
+   * importing again adds none. How many were added.
+   */
+  async #videos(
+    tenant: TenantContext,
+    stored: readonly { handle: string; videos: StoreVideo[] }[],
+  ): Promise<number> {
+    if (stored.length === 0) return 0;
+    const ids = await this.products.idsByHandle(
+      tenant,
+      stored.map((product) => product.handle),
+    );
+    let added = 0;
+    for (const { handle, videos } of stored) {
+      const id = ids.get(handle);
+      const product = id && (await this.products.get(tenant, id));
+      if (!product || product.media.some((media) => media.mediaType !== 'image')) continue;
+      const made = await this.media.create(
+        tenant,
+        product.id,
+        videos.map((video) => ({
+          originalSource: video.url,
+          mediaContentType:
+            video.type === 'video' ? ('VIDEO' as const) : ('EXTERNAL_VIDEO' as const),
+          alt: video.alt,
+        })),
+      );
+      if (made.ok) added += videos.length;
+    }
+    return added;
   }
 
   /**
@@ -371,6 +430,7 @@ function payloadOf(dryRun: boolean, userErrors: UserError[]): ProductsImportPayl
     updated: 0,
     variants: 0,
     images: 0,
+    videos: 0,
     skipped: 0,
     stocked: 0,
     rowErrors: [],

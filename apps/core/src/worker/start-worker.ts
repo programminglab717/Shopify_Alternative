@@ -30,7 +30,7 @@ import {
   createRedis,
 } from '@hatti/events';
 import { StoreExportService } from '@hatti/files/public';
-import { ImageFetcher, VideoSizer } from '@hatti/images';
+import { ImageFetcher, MAX_VIDEO_BYTES, VideoSizer } from '@hatti/images';
 import { InventoryService, LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
@@ -626,6 +626,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       processing: new MediaProcessing(database),
       storage: workerStorage(config),
       fetcher: new ImageFetcher(),
+      // Videos given by URL, as a Shopify store's come (ADR-794).
+      videoFetcher: new ImageFetcher({ maxBytes: MAX_VIDEO_BYTES, timeoutMs: 5 * 60_000 }),
       ...(hasFfmpeg && { converter: sizer }),
       edge: edgeCacheOf(config),
       logger,
