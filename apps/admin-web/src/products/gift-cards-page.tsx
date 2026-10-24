@@ -6,27 +6,33 @@ import {
   Copy,
   Gift,
   Minus,
+  Pencil,
   Plus,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { OrderStage } from '@hatti/tokens';
 import {
+  CustomersQuery,
   GiftCardCreateMutation,
   GiftCardCreditMutation,
   GiftCardDeactivateMutation,
   GiftCardDebitMutation,
   GiftCardsQuery,
+  GiftCardUpdateMutation,
 } from '../api/operations';
 import type {
+  CustomersData,
   GiftCard,
   GiftCardCreateData,
   GiftCardCreateInput,
   GiftCardPayloadData,
   GiftCardsData,
+  GiftCardUpdateInput,
 } from '../api/types';
-import { gate, permits } from '../auth/permissions';
+import { can, gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -247,15 +253,180 @@ function Adjust({
   );
 }
 
-/** A card as the list shows it, adjusted or deactivated by those who may. */
-function CardRow({ card, edits }: { card: GiftCard; edits: boolean }) {
+/**
+ * A card's last day, note and, for those who read customers, who it was given to, changed as
+ * Shopify's giftCardUpdate changes them (ADR-795): only what was changed is sent, an empty day
+ * making it never expire.
+ */
+function Change({
+  card,
+  customers,
+  onDone,
+}: {
+  card: GiftCard;
+  customers: boolean;
+  onDone: () => void;
+}) {
+  const { t } = useLocale();
+  const update = useAdminMutation<GiftCardPayloadData, { id: string; input: GiftCardUpdateInput }>(
+    GiftCardUpdateMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const [expires, setExpires] = useState(card.expiresOn ?? '');
+  const [note, setNote] = useState(card.note);
+  const [customer, setCustomer] = useState(card.customer ?? null);
+  const [words, setWords] = useState('');
+  const [searched, setSearched] = useState<string | null>(null);
+  const found = useAdminQuery<CustomersData>(
+    ['customers', 'giftCard', searched],
+    CustomersQuery,
+    { first: 10, query: searched },
+    { enabled: customers && searched !== null },
+  );
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const input: GiftCardUpdateInput = {
+      ...(expires !== (card.expiresOn ?? '') && { expiresOn: expires || null }),
+      ...(note.trim() !== card.note && { note: note.trim() }),
+      ...(customers &&
+        (customer?.id ?? null) !== (card.customer?.id ?? null) && {
+          customerId: customer?.id ?? null,
+        }),
+    };
+    if (Object.keys(input).length === 0) {
+      onDone();
+      return;
+    }
+    const ok = await attempt(async () => {
+      const data = await update.mutateAsync({ id: card.id, input });
+      return Object.values(data)[0]!;
+    });
+    if (ok) onDone();
+  };
+
+  const onSearch = () => {
+    setSearched(words.trim() || null);
+  };
+
+  return (
+    <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
+      <TextField
+        label={t('giftCards.lastDayLabel')}
+        hint={t('giftCards.expiresHint')}
+        type="date"
+        ltr
+        value={expires}
+        onChange={(event) => setExpires(event.target.value)}
+      />
+      <TextField
+        label={t('giftCards.noteLabel')}
+        dir="auto"
+        maxLength={500}
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+      />
+      {customers && (
+        <div className="flex flex-col gap-2">
+          <span className="font-medium">{t('giftCards.customer')}</span>
+          {customer ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="min-w-0 flex-1" dir="auto">
+                {t('giftCards.givenTo', { name: customer.displayName })}
+              </span>
+              <Button variant="tertiary" onClick={() => setCustomer(null)}>
+                {t('giftCards.removeCustomer')}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <span className="text-secondary">{t('giftCards.noCustomer')}</span>
+              <div className="flex flex-wrap items-end gap-2">
+                <TextField
+                  label={t('giftCards.findCustomer')}
+                  type="search"
+                  dir="auto"
+                  className="min-w-48 flex-1"
+                  value={words}
+                  onChange={(event) => setWords(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    onSearch();
+                  }}
+                />
+                <Button
+                  variant="secondary"
+                  icon={<Search aria-hidden className="size-5" />}
+                  onClick={onSearch}
+                >
+                  {t('giftCards.findCustomerButton')}
+                </Button>
+              </div>
+              {searched !== null &&
+                (found.isPending ? (
+                  <Loading label={t('state.loading')} />
+                ) : found.isError ? (
+                  <Alert tone="danger">{errorText(found.error, t)}</Alert>
+                ) : found.data.customers.nodes.length === 0 ? (
+                  <p className="text-secondary">{t('giftCards.noCustomerFound')}</p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {found.data.customers.nodes.map((each) => (
+                      <li key={each.id}>
+                        <Button
+                          variant="tertiary"
+                          onClick={() => {
+                            setCustomer({ id: each.id, displayName: each.displayName });
+                            setSearched(null);
+                            setWords('');
+                          }}
+                        >
+                          <span dir="auto">{each.displayName}</span>
+                          {each.phone && (
+                            <span className="num text-secondary" dir="ltr">
+                              {each.phone}
+                            </span>
+                          )}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ))}
+            </>
+          )}
+        </div>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" busy={update.isPending}>
+          {t('giftCards.save')}
+        </Button>
+        <Button variant="tertiary" onClick={onDone}>
+          {t('returns.cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** A card as the list shows it, adjusted, changed or deactivated by those who may. */
+function CardRow({
+  card,
+  edits,
+  customers,
+}: {
+  card: GiftCard;
+  edits: boolean;
+  customers: boolean;
+}) {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
   const deactivate = useAdminMutation<GiftCardPayloadData, { id: string }>(
     GiftCardDeactivateMutation,
   );
   const { problem, attempt } = useAttempt();
-  const [open, setOpen] = useState<'add' | 'take' | 'deactivate' | null>(null);
+  const [open, setOpen] = useState<'add' | 'take' | 'change' | 'deactivate' | null>(null);
   const state = stateOf(card);
   const { colour, icon } = STATE[state];
 
@@ -285,6 +456,11 @@ function CardRow({ card, edits }: { card: GiftCard; edits: boolean }) {
         {t('giftCards.issuedOn', { date: formatDate(card.createdAt, timezone, locale) })}
         {card.expiresOn && ` · ${t('giftCards.lastDay', { date: card.expiresOn })}`}
       </span>
+      {card.customer && (
+        <span className="text-secondary" dir="auto">
+          {t('giftCards.givenTo', { name: card.customer.displayName })}
+        </span>
+      )}
       {card.note && (
         <span className="text-secondary" dir="auto">
           {card.note}
@@ -309,6 +485,13 @@ function CardRow({ card, edits }: { card: GiftCard; edits: boolean }) {
               {t('giftCards.take')}
             </Button>
           )}
+          <Button
+            variant="secondary"
+            icon={<Pencil aria-hidden className="size-5" />}
+            onClick={() => setOpen('change')}
+          >
+            {t('giftCards.change')}
+          </Button>
           <Button variant="tertiary" onClick={() => setOpen('deactivate')}>
             {t('giftCards.deactivate')}
           </Button>
@@ -316,6 +499,9 @@ function CardRow({ card, edits }: { card: GiftCard; edits: boolean }) {
       )}
       {(open === 'add' || open === 'take') && (
         <Adjust card={card} way={open} onDone={() => setOpen(null)} />
+      )}
+      {open === 'change' && (
+        <Change card={card} customers={customers} onDone={() => setOpen(null)} />
       )}
       {open === 'deactivate' && (
         <div className="flex flex-col gap-2">
@@ -338,16 +524,18 @@ function CardRow({ card, edits }: { card: GiftCard; edits: boolean }) {
 
 /**
  * Gift cards (CAT-12, PAY-13, ADR-448): issued by owners and managers, each code shown once;
- * found by its last characters; added to, taken from or deactivated; looked up by accountants
- * and confirmation agents.
+ * found by its last characters; added to, taken from, changed (ADR-795) or deactivated; looked
+ * up by accountants and confirmation agents.
  */
 export function GiftCardsPage() {
   const { t } = useLocale();
   const shop = useShop();
   const [typed, setTyped] = useState('');
   const [query, setQuery] = useState('');
+  const customers = can(shop, 'read_customers');
   const cards = useAdminQuery<GiftCardsData>(['giftCards', query], GiftCardsQuery, {
     query: query || null,
+    customers,
   });
   const edits = permits(shop, EDITS_GIFT_CARDS);
 
@@ -395,7 +583,7 @@ export function GiftCardsPage() {
         <ul className="flex flex-col gap-3">
           {cards.data.giftCards.nodes.map((card) => (
             <li key={card.id}>
-              <CardRow card={card} edits={edits} />
+              <CardRow card={card} edits={edits} customers={customers} />
             </li>
           ))}
         </ul>

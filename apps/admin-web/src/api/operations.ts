@@ -10065,10 +10065,14 @@ const GIFT_CARD = /* GraphQL */ `
 `;
 
 export const GiftCardsQuery = /* GraphQL */ `
-  query GiftCards($query: String) {
+  query GiftCards($query: String, $customers: Boolean!) {
     giftCards(first: 50, query: $query) {
       nodes {
         ...GiftCardFields
+        customer @include(if: $customers) {
+          id
+          displayName
+        }
       }
     }
   }
@@ -10082,6 +10086,22 @@ export const GiftCardCreateMutation = /* GraphQL */ `
         ...GiftCardFields
       }
       giftCardCode
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GIFT_CARD}
+  ${USER_ERRORS}
+`;
+
+/** A card's last day, note or customer changed, as Shopify's giftCardUpdate (ADR-795). */
+export const GiftCardUpdateMutation = /* GraphQL */ `
+  mutation GiftCardUpdate($id: ID!, $input: GiftCardUpdateInput!) {
+    giftCardUpdate(id: $id, input: $input) {
+      giftCard {
+        ...GiftCardFields
+      }
       userErrors {
         ...Problems
       }

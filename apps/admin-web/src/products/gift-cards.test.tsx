@@ -16,6 +16,8 @@ const EID: GiftCard = {
   createdAt: '2026-10-01T09:00:00Z',
 };
 
+const SARA = { id: 'cus_1', displayName: 'Sara Ali' };
+
 function core(role: StaffRole, cards: GiftCard[]) {
   let current = cards;
   const change = (id: string, next: (card: GiftCard) => GiftCard) => {
@@ -75,6 +77,45 @@ function core(role: StaffRole, cards: GiftCard[]) {
             ...card,
             balance: { amount: '3300.0' },
           })),
+        };
+      case 'GiftCardUpdate': {
+        const input = variables.input as {
+          expiresOn?: string | null;
+          note?: string;
+          customerId?: string | null;
+        };
+        if (input.expiresOn === '2020-01-01') {
+          return {
+            giftCardUpdate: {
+              giftCard: null,
+              userErrors: [
+                {
+                  field: ['input', 'expiresOn'],
+                  code: 'INVALID',
+                  message: 'It must expire today or later',
+                },
+              ],
+            },
+          };
+        }
+        return {
+          giftCardUpdate: change(variables.id as string, (card) => ({
+            ...card,
+            ...(input.expiresOn !== undefined && { expiresOn: input.expiresOn }),
+            ...(input.note !== undefined && { note: input.note }),
+            ...(input.customerId !== undefined && {
+              customer: input.customerId ? SARA : null,
+            }),
+          })),
+        };
+      }
+      case 'Customers':
+        return {
+          customers: {
+            nodes:
+              (variables.query as string) === 'sara' ? [{ ...SARA, phone: '+923001234567' }] : [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
         };
       case 'GiftCardDeactivate':
         return {
@@ -182,6 +223,53 @@ describe("The admin's gift cards (CAT-12, PAY-13, ADR-450)", () => {
     expect(screen.queryByRole('button', { name: 'Add to it' })).toBeNull();
   });
 
+  it("changes a card's last day, note and customer, sending only what changed (ADR-795)", async () => {
+    const fake = core('owner', [EID]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products/gift-cards');
+
+    expect(await screen.findByText('Issued 1 Oct 2026 · last day 2026-12-31')).toBeTruthy();
+    expect(sentOf(fake, 'GiftCards')[0]).toEqual({ query: null, customers: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.getByText('Given to no customer.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Last day it can be used'), {
+      target: { value: '2020-01-01' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('It must expire today or later')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Last day it can be used'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: ' Eid gift ' } });
+    fireEvent.change(screen.getByLabelText('Find a customer by name or number'), {
+      target: { value: 'nobody' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find customer' }));
+    expect(await screen.findByText('No customer found')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Find a customer by name or number'), {
+      target: { value: 'sara' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find customer' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Sara Ali/ }));
+    expect(screen.getByText('Given to Sara Ali')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Issued 1 Oct 2026')).toBeTruthy();
+    expect(screen.getByText('Given to Sara Ali')).toBeTruthy();
+    expect(screen.getByText('Eid gift')).toBeTruthy();
+
+    // Unchanged, nothing is sent; the customer taken away, only that.
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Change' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove customer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.queryByText('Given to Sara Ali')).toBeNull());
+    expect(sentOf(fake, 'GiftCardUpdate')).toEqual([
+      { id: 'gc_1', input: { expiresOn: '2020-01-01' } },
+      { id: 'gc_1', input: { expiresOn: null, note: 'Eid gift', customerId: 'cus_1' } },
+      { id: 'gc_1', input: { customerId: null } },
+    ]);
+  });
+
   it('shows cards to accountants and confirmation agents, with nothing to change', async () => {
     vi.stubGlobal('fetch', core('accountant', [{ ...EID, expired: true }]).fetcher);
     renderAdmin('/shop_1/products/gift-cards');
@@ -190,5 +278,6 @@ describe("The admin's gift cards (CAT-12, PAY-13, ADR-450)", () => {
     expect(screen.getByText('Issued 1 Oct 2026 · last day 2026-12-31')).toBeTruthy();
     expect(screen.queryByLabelText('Value')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add to it' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change' })).toBeNull();
   });
 });

@@ -4794,6 +4794,15 @@ export interface GiftCard {
   enabled: boolean;
   note: string;
   createdAt: string;
+  /** Who it was given to, asked only of those who read customers (ADR-795). */
+  customer?: { id: string; displayName: string } | null;
+}
+
+/** What giftCardUpdate changes: each left out stays as it is; null takes it away. */
+export interface GiftCardUpdateInput {
+  expiresOn?: string | null;
+  note?: string;
+  customerId?: string | null;
 }
 
 export interface GiftCardsData {
