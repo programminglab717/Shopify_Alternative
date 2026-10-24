@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-790 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-791 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -798,6 +798,7 @@
 | 788 | The admin lists past orders whole on a page of their own, linked from the orders once the shop has any | Accepted |
 | 789 | A Shopify store's metafields are set on the shop's products, variants and collections of the same handles; gift cards stay behind | Accepted |
 | 790 | Past orders are searched by their name, email, the name they went to, or a mobile number however written | Accepted |
+| 791 | The worker makes 720p and 480p copies of products' videos with ffmpeg, which pages offer to smaller screens | Accepted |
 
 ---
 
@@ -26329,3 +26330,44 @@
 * **Consequences:** a lookup scans the shop's past orders; that is a few thousand rows for a
   moved store, read once each search, with no index on purpose until a shop's history shows it
   needs one.
+
+## ADR-791 · The worker makes 720p and 480p copies of products' videos with ffmpeg, which pages offer to smaller screens
+
+* **Context:** ADR-258 serves a video as it was uploaded, up to 100 MB, since no video service ran;
+  a shopper on a phone fetches a 1080p or 4K file for a screen a few hundred pixels wide, on
+  data they pay for. Hosted video services are priced by the minute. ffmpeg is open source and
+  free, and Debian packages it with H.264's encoder; the owner chose it (2026-10-24).
+* **Decision:**
+  * **Made after, apart:** a video ready (ADR-258) is due for its smaller copies at once
+    (`video_sizes_at`, migration 0337, which makes videos already ready due), so readiness never
+    waits on encoding. A sweep of the worker's own takes two a shop at a time on a 30-minute
+    lease and, for each short side below the video's own of 720 and 480, has ffmpeg make a copy
+    (`VideoSizer`, `@hatti/images`): turned as shown, scaled with square pixels, H.264 at CRF 26
+    `veryfast` and AAC at 96 kb/s, its index at the front (`+faststart`), the original's metadata
+    dropped, two threads, five minutes at most. Each copy is read back with `cleanVideo` as an
+    upload is, so only what Hatti would keep is kept, beside the original in its media's folder
+    (`video-720.mp4`, `video-480.mp4`), removed with it. What was made is kept on the media
+    (`video_sizes`) and its product's pages are republished; a video ffmpeg cannot make smaller
+    keeps none, said in the log, and plays as uploaded; a failure that is not the video's, as
+    storage's, leaves it to the next sweep after its lease.
+  * **Served beside it:** `/videos/{shop}/{media}/{720p|480p}/{handle}.mp4`, a range at a time
+    as the original is. The Admin API's `video.sources` and the product's document list the
+    original, then its copies, the largest first.
+  * **Chosen by the screen:** `video_tag` writes the copies first, the 480p one for screens up
+    to 767 CSS pixels wide and the 720p one up to 1,279, each a `<source media>`, then the
+    original: a browser plays the first source whose screen is its own.
+  * **Where ffmpeg is:** the core's image installs Debian's ffmpeg without what it recommends;
+    the worker checks it has `libx264` when it starts and otherwise says so and makes no copies.
+    CI installs it too, its tests making real copies; the image smoke test checks its encoder.
+* **Consequences:**
+  * Phones fetch a fraction of a video's bytes; the original still plays on wide screens.
+  * The core's image grows by ffmpeg's libraries, and the worker spends CPU, two threads a video
+    at a time; a long queue after many uploads drains a couple of videos a shop each round.
+  * Browsers that ignore `media` on a video's sources, as Chrome did between 2014 and its version
+    120, play the first: the 480p copy, everywhere.
+  * ffmpeg built with x264 is GPL software; Hatti runs it on its own servers and gives it to no
+    one, which the licence allows.
+  * With ffmpeg on the worker, an iPhone's HEVC video can be made H.264 rather than refused.
+* **Alternatives:** HLS with adaptive bitrate (more files and a player script, for videos a
+  minute or so long); a hosted video service (priced by the minute, which the owner ruled out);
+  encoding in the merchant's browser (slow on the phones they use, and battery-hungry).

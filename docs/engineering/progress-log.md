@@ -14,6 +14,15 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-24
+
+### Smaller sizes of products' videos
+
+* **Less data on phones:** the worker makes 720p and 480p copies of each uploaded video with
+  ffmpeg, now in the core's image and CI, and pages offer phones the smallest; the owner chose
+  ffmpeg (CAT-02, [ADR-791](../architecture/13-decision-log.md#adr-791--the-worker-makes-720p-and-480p-copies-of-products-videos-with-ffmpeg-which-pages-offer-to-smaller-screens)).
+* 4246 tests (6 new).
+
 ## 2026-10-23
 
 ### 0292bb5 · Past orders' search
