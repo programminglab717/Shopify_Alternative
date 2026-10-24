@@ -4396,6 +4396,13 @@ export interface WebhookSubscriptionCreateData {
   };
 }
 
+export interface WebhookSubscriptionUpdateData {
+  webhookSubscriptionUpdate: {
+    webhookSubscription: { id: string; callbackUrl: string } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface WebhookSubscriptionDeleteData {
   webhookSubscriptionDelete: {
     deletedWebhookSubscriptionId: string | null;

@@ -9382,6 +9382,22 @@ export const WebhookSubscriptionCreateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Where a webhook is sent, changed; its topic stays (ADR-797). */
+export const WebhookSubscriptionUpdateMutation = /* GraphQL */ `
+  mutation WebhookSubscriptionUpdate($id: ID!, $callbackUrl: String!) {
+    webhookSubscriptionUpdate(id: $id, webhookSubscription: { callbackUrl: $callbackUrl }) {
+      webhookSubscription {
+        id
+        callbackUrl
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const WebhookSubscriptionDeleteMutation = /* GraphQL */ `
   mutation WebhookSubscriptionDelete($id: ID!) {
     webhookSubscriptionDelete(id: $id) {

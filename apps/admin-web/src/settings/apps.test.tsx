@@ -153,6 +153,30 @@ function core() {
           return {
             webhookSubscriptionCreate: { webhookSubscription: { id: 'whs_2' }, userErrors: [] },
           };
+        case 'WebhookSubscriptionUpdate':
+          if (!String(variables.callbackUrl).startsWith('https://')) {
+            return {
+              webhookSubscriptionUpdate: {
+                webhookSubscription: null,
+                userErrors: [
+                  {
+                    field: ['webhookSubscription', 'callbackUrl'],
+                    code: 'INVALID',
+                    message: 'Give an https address',
+                  },
+                ],
+              },
+            };
+          }
+          subscriptions = subscriptions.map((each) =>
+            each.id === variables.id ? { ...each, callbackUrl: variables.callbackUrl } : each,
+          );
+          return {
+            webhookSubscriptionUpdate: {
+              webhookSubscription: { id: variables.id, callbackUrl: variables.callbackUrl },
+              userErrors: [],
+            },
+          };
         case 'WebhookSubscriptionDelete':
           subscriptions = subscriptions.filter((each) => each.id !== variables.id);
           return {
@@ -310,6 +334,27 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
       callbackUrl: 'https://sheets.example.pk/hooks/paid',
       appId: 'tok_1',
     });
+
+    // Sent elsewhere, its topic kept; left as it was, nothing is sent (ADR-797).
+    const change = () =>
+      within(hooks).getByRole('button', {
+        name: 'Change where the webhook for An order is placed is sent',
+      });
+    fireEvent.click(change());
+    fireEvent.click(within(hooks).getByRole('button', { name: 'Save' }));
+    expect(within(hooks).getByText('https://sheets.example.pk/hooks/orders')).toBeTruthy();
+    fireEvent.click(change());
+    const instead = within(hooks).getByLabelText('Send it to instead');
+    fireEvent.change(instead, { target: { value: 'ftp://sheets.example.pk/hooks' } });
+    fireEvent.submit(instead.closest('form')!);
+    expect(await within(hooks).findByText(/Give an https address/)).toBeTruthy();
+    fireEvent.change(instead, { target: { value: 'https://new.example.pk/hooks/orders' } });
+    fireEvent.click(within(hooks).getByRole('button', { name: 'Save' }));
+    expect(await within(hooks).findByText('https://new.example.pk/hooks/orders')).toBeTruthy();
+    expect(sentOf(fake, 'WebhookSubscriptionUpdate')).toEqual([
+      { id: 'whs_1', callbackUrl: 'ftp://sheets.example.pk/hooks' },
+      { id: 'whs_1', callbackUrl: 'https://new.example.pk/hooks/orders' },
+    ]);
 
     fireEvent.click(
       within(hooks).getByRole('button', { name: 'Remove the webhook for An order is placed' }),

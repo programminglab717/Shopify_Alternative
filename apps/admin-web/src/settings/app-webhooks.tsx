@@ -1,10 +1,11 @@
-import { Plus, Trash2, Webhook } from 'lucide-react';
+import { Pencil, Plus, Trash2, Webhook } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   WebhookDeliveriesQuery,
   WebhookSubscriptionCreateMutation,
   WebhookSubscriptionDeleteMutation,
+  WebhookSubscriptionUpdateMutation,
 } from '../api/operations';
 import type {
   CustomApp,
@@ -13,6 +14,7 @@ import type {
   WebhookSubscription,
   WebhookSubscriptionCreateData,
   WebhookSubscriptionDeleteData,
+  WebhookSubscriptionUpdateData,
   WebhookTopic,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
@@ -118,9 +120,73 @@ function Deliveries({ subscription }: { subscription: WebhookSubscription }) {
 }
 
 /**
+ * Where a webhook is sent, changed in place (ADR-797), as when an app moves its server: its topic
+ * stays, and an address left as it was sends nothing.
+ */
+function ChangeAddress({
+  subscription,
+  onDone,
+}: {
+  subscription: WebhookSubscription;
+  onDone: () => void;
+}) {
+  const { t } = useLocale();
+  const update = useAdminMutation<
+    WebhookSubscriptionUpdateData,
+    { id: string; callbackUrl: string }
+  >(WebhookSubscriptionUpdateMutation);
+  const [url, setUrl] = useState(subscription.callbackUrl);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    if (url.trim() === subscription.callbackUrl) {
+      onDone();
+      return;
+    }
+    try {
+      const { webhookSubscriptionUpdate } = await update.mutateAsync({
+        id: subscription.id,
+        callbackUrl: url.trim(),
+      });
+      const error = webhookSubscriptionUpdate.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else onDone();
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-3">
+      <TextField
+        label={t('webhooks.newUrl')}
+        hint={t('webhooks.urlHint')}
+        ltr
+        type="url"
+        required
+        maxLength={2000}
+        value={url}
+        onChange={(event) => setUrl(event.target.value)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" busy={update.isPending}>
+          {t('webhooks.save')}
+        </Button>
+        <Button variant="tertiary" onClick={onDone}>
+          {t('action.back')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
  * An app's webhooks (DEV-03, ADR-397), on the shop's apps page: each topic it is sent, where, and
  * how its latest delivery went, with its recent ones to open; one added for a topic the app may
- * hear, at an https address, or removed.
+ * hear, at an https address, sent elsewhere (ADR-797), or removed.
  */
 export function AppWebhooks({
   app,
@@ -142,6 +208,7 @@ export function AppWebhooks({
   const [topic, setTopic] = useState<WebhookTopic>(topics[0]!);
   const [url, setUrl] = useState('');
   const [open, setOpen] = useState<string | null>(null);
+  const [changing, setChanging] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const onAdd = async (event: FormEvent) => {
@@ -193,17 +260,29 @@ export function AppWebhooks({
           <li key={subscription.id} className="flex flex-col gap-1">
             <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{topicWords(subscription.topic)}</span>
-              <Button
-                variant="danger"
-                icon={<Trash2 aria-hidden className="size-5" />}
-                aria-label={t('webhooks.remove', { topic: topicWords(subscription.topic) })}
-                busy={remove.isPending && remove.variables?.id === subscription.id}
-                onClick={() => void onRemove(subscription)}
-              />
+              <span className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  icon={<Pencil aria-hidden className="size-5" />}
+                  aria-label={t('webhooks.change', { topic: topicWords(subscription.topic) })}
+                  onClick={() => setChanging(subscription.id)}
+                />
+                <Button
+                  variant="danger"
+                  icon={<Trash2 aria-hidden className="size-5" />}
+                  aria-label={t('webhooks.remove', { topic: topicWords(subscription.topic) })}
+                  busy={remove.isPending && remove.variables?.id === subscription.id}
+                  onClick={() => void onRemove(subscription)}
+                />
+              </span>
             </span>
-            <code className="num break-all text-secondary" dir="ltr">
-              {subscription.callbackUrl}
-            </code>
+            {changing === subscription.id ? (
+              <ChangeAddress subscription={subscription} onDone={() => setChanging(null)} />
+            ) : (
+              <code className="num break-all text-secondary" dir="ltr">
+                {subscription.callbackUrl}
+              </code>
+            )}
             <span className="flex flex-wrap items-center gap-x-3">
               <DeliveryWords delivery={subscription.lastDelivery} />
               {subscription.lastDelivery && (
