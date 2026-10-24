@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-795 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-796 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -803,6 +803,7 @@
 | 793 | A video uploaded without a preview image shows a frame of itself the worker's ffmpeg takes | Accepted |
 | 794 | The importer brings a Shopify store's product videos: its own by the URL of an MP4 the worker fetches, YouTube's and Vimeo's by their addresses | Accepted |
 | 795 | The admin changes a gift card's last day, note and customer, sending only what changed | Accepted |
+| 796 | The admin renames and describes the shop's custom fields in place, their keys and types kept | Accepted |
 
 ---
 
@@ -26442,3 +26443,16 @@
   (`@include(if: $customers)`), and names it under the card.
 * **Consequences:** shops correct and extend cards from the admin. A card's value and code still
   cannot change, as Shopify's cannot; its balance changes by adding to or taking from it.
+
+## ADR-796 · The admin renames and describes the shop's custom fields in place, their keys and types kept
+
+* **Context:** Settings → Custom data (ADR-490) added and deleted the shop's fields; a field
+  named badly could only be deleted, with every value filled in, and made again. The Admin API's
+  `metafieldDefinitionUpdate` already renames a definition and changes its description.
+* **Decision:** each field has a Change button that edits its name and description in place.
+  Only what changed is sent, an emptied description taken away; an untouched form sends
+  nothing. Its key and type are not offered, as changing them would break themes reading the
+  key and values of the old type, as Shopify's admin does not offer them either. The list shows
+  each field's description under its key.
+* **Consequences:** a field is renamed without losing its values. A field of the wrong type or
+  key is still deleted and made again.
