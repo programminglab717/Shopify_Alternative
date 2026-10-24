@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
-### Videos' frames
+### 45cebc8 · Videos' frames
 
 * **No preview needed:** a video uploaded through the API without a preview image shows a frame
   of itself the worker's ffmpeg takes (CAT-02, [ADR-793](../architecture/13-decision-log.md#adr-793--a-video-uploaded-without-a-preview-image-shows-a-frame-of-itself-the-workers-ffmpeg-takes)).
