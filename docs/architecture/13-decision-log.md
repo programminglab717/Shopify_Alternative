@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-793 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-794 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -801,6 +801,7 @@
 | 791 | The worker makes 720p and 480p copies of products' videos with ffmpeg, which pages offer to smaller screens | Accepted |
 | 792 | An iPhone's HEVC video is made H.264 by the worker's ffmpeg, at no more than 1080 pixels, rather than refused | Accepted |
 | 793 | A video uploaded without a preview image shows a frame of itself the worker's ffmpeg takes | Accepted |
+| 794 | The importer brings a Shopify store's product videos: its own by the URL of an MP4 the worker fetches, YouTube's and Vimeo's by their addresses | Accepted |
 
 ---
 
@@ -26406,3 +26407,24 @@
 * **Consequences:** a video added through the API plays with a preview of itself; the admin
   still sends the frame the merchant chose. A frame a second in may be a fade from black on some
   videos, which the merchant replaces by giving one.
+
+## ADR-794 · The importer brings a Shopify store's product videos: its own by the URL of an MP4 the worker fetches, YouTube's and Vimeo's by their addresses
+
+* **Context:** the importer through a store's Admin API (ADR-749) brought products' images but
+  not their videos, which Shopify keeps as `Video` media, hosted by Shopify with MP4s at several
+  heights, and `ExternalVideo`, a YouTube or Vimeo address. A video media could only be an
+  upload staged in Hatti (ADR-258), and Shopify gives no file to stage, only URLs.
+* **Decision:** the products' bulk query reads each product's videos. A Shopify-hosted video is
+  added as a `VIDEO` by the URL of its tallest MP4 up to 1080 pixels (the shortest where all are
+  taller); an external one as an `EXTERNAL_VIDEO` by its address, with its alt text. A `VIDEO`
+  may now be given by an https URL (migration 0339 drops the constraint that wanted a staged
+  upload): the worker fetches it, up to the videos' limit of 100 MB, without reaching a private
+  network, and checks it as an upload; a failed fetch is retried as an image's is, then fails in
+  Shopify's codes. Its preview is the frame the worker takes (ADR-793), and its smaller copies
+  are made as an upload's (ADR-791). A product that already has videos or external videos is
+  left as it is, so importing again adds none twice. `ProductsImportPayload.videos` counts what
+  was added, or what the store has in a dry run, and the admin's move page says it.
+* **Consequences:** a shop moving from Shopify keeps its products' videos without downloading
+  them. A video is fetched from Shopify's CDN while its URL is good, so an import's videos are
+  ready minutes after it; one whose fetch keeps failing shows in the product's media as failed,
+  to upload by hand. A product imported with overwrite does not have its videos replaced.

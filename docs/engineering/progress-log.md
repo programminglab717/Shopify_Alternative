@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-24
 
+### Shopify's product videos
+
+* **Videos moved:** the importer brings a Shopify store's product videos, its own by the URL of
+  an MP4 the worker fetches and YouTube's and Vimeo's by their addresses; a video may now be
+  given to `productCreateMedia` by an https URL (ONB-05, [ADR-794](../architecture/13-decision-log.md#adr-794--the-importer-brings-a-shopify-stores-product-videos-its-own-by-the-url-of-an-mp4-the-worker-fetches-youtubes-and-vimeos-by-their-addresses)).
+* **CI fix:** the schema regenerated for ADR-793's reworded preview description (f953712).
+* 4253 tests (1 new).
+
 ### 45cebc8 · Videos' frames
 
 * **No preview needed:** a video uploaded through the API without a preview image shows a frame
