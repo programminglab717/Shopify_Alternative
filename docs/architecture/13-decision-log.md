@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-791 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-792 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -799,6 +799,7 @@
 | 789 | A Shopify store's metafields are set on the shop's products, variants and collections of the same handles; gift cards stay behind | Accepted |
 | 790 | Past orders are searched by their name, email, the name they went to, or a mobile number however written | Accepted |
 | 791 | The worker makes 720p and 480p copies of products' videos with ffmpeg, which pages offer to smaller screens | Accepted |
+| 792 | An iPhone's HEVC video is made H.264 by the worker's ffmpeg, at no more than 1080 pixels, rather than refused | Accepted |
 
 ---
 
@@ -26371,3 +26372,21 @@
 * **Alternatives:** HLS with adaptive bitrate (more files and a player script, for videos a
   minute or so long); a hosted video service (priced by the minute, which the owner ruled out);
   encoding in the merchant's browser (slow on the phones they use, and battery-hungry).
+
+## ADR-792 · An iPhone's HEVC video is made H.264 by the worker's ffmpeg, at no more than 1080 pixels, rather than refused
+
+* **Context:** ADR-258 refuses HEVC, which an iPhone records by default and which Firefox and
+  many Android phones' browsers cannot play, telling the merchant to switch their camera to "Most
+  Compatible" and film again; many merchants film on iPhones and meet that refusal first. With
+  ffmpeg on the worker (ADR-791), the video can be made H.264 instead.
+* **Decision:** `cleanVideo` still refuses HEVC, marking the problem `convertible`. Where the
+  worker has ffmpeg, the image sweep gives such an upload to `VideoSizer.toH264`: H.264 at CRF 23
+  and AAC, turned as shown, at its own short side or 1080 pixels where it has more (a phone's
+  4K), square pixels, its index first, its metadata dropped; read back with `cleanVideo` and kept
+  as the video, which its smaller copies are then made from (ADR-791). One ffmpeg cannot make
+  H.264 fails, saying so with ffmpeg's words. Without ffmpeg, HEVC is refused as before. A taken
+  media's lease is fifteen minutes, longer than such a conversion of a ten-minute video.
+* **Consequences:** merchants add the videos their iPhones made, as they are. The kept video is
+  re-encoded, so a little less sharp than the upload, and capped at 1080 pixels; HEVC's smaller
+  files become H.264's larger ones, which the smaller copies offset on phones. The image sweep
+  takes longer on such a video, during which the shop's other images wait a round.
