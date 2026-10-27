@@ -3453,6 +3453,41 @@ export interface CustomReportExportData {
   };
 }
 
+export type DropStatus = 'SCHEDULED' | 'LIVE' | 'ENDED';
+
+/** A drop of products on sale together (ADR-820). */
+export interface DropValue {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: DropStatus;
+  perCustomerLimit: number | null;
+  admitPerMinute: number | null;
+  products: { id: string; title: string; status: string }[];
+}
+
+export interface DropInput {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  productIds: string[];
+  perCustomerLimit: number | null;
+  admitPerMinute: number | null;
+}
+
+export interface DropsData {
+  drops: DropValue[];
+}
+
+export interface DropCreateData {
+  dropCreate: { drop: DropValue | null; userErrors: UserError[] };
+}
+
+export interface DropDeleteData {
+  dropDelete: { deletedId: string | null };
+}
+
 export interface OrderExportSchedulesData {
   orderExportSchedules: ExportSchedule[];
 }

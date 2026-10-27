@@ -9981,6 +9981,56 @@ const PRICE_SALE = /* GraphQL */ `
   }
 `;
 
+const DROP = /* GraphQL */ `
+  fragment DropFields on Drop {
+    id
+    name
+    startsAt
+    endsAt
+    status
+    perCustomerLimit
+    admitPerMinute
+    products {
+      id
+      title
+      status
+    }
+  }
+`;
+
+/** The shop's drops (INV-09, OS-17, ADR-823). */
+export const DropsQuery = /* GraphQL */ `
+  query Drops {
+    drops {
+      ...DropFields
+    }
+  }
+  ${DROP}
+`;
+
+export const DropCreateMutation = /* GraphQL */ `
+  mutation DropCreate($input: DropInput!) {
+    dropCreate(input: $input) {
+      drop {
+        ...DropFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DROP}
+  ${USER_ERRORS}
+`;
+
+export const DropDeleteMutation = /* GraphQL */ `
+  mutation DropDelete($id: ID!) {
+    dropDelete(id: $id) {
+      deletedId
+    }
+  }
+`;
+
 export const PriceSalesQuery = /* GraphQL */ `
   query PriceSales {
     priceSales {

@@ -14,6 +14,7 @@ import {
   Search,
   Ruler,
   Star,
+  Rocket,
   Tag,
   Tags,
   ToggleRight,
@@ -239,6 +240,14 @@ export function ProductsPage() {
           >
             <Tag aria-hidden className="size-5" />
             {t('sales.title')}
+          </Link>
+          <Link
+            to="/$shopId/products/drops"
+            params={{ shopId: shop.id }}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+          >
+            <Rocket aria-hidden className="size-5" />
+            {t('drops.title')}
           </Link>
           {permits(shop, READS_GIFT_CARDS) && (
             <Link
