@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-826 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-827 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -834,6 +834,7 @@
 | 824 | A shop's own riders each have a page opened from a secret link, with no account; a packed order handed to one ships with them, and its customer is sent a code on WhatsApp to give the rider at the door | Accepted |
 | 825 | A rider's page lists what they carry with its address, map and the customer's number; delivered with the customer's code and the cash collected, received on its order, or not delivered with why, its parcel coming back | Accepted |
 | 826 | The cash a rider hands over is recorded by those who reconcile payments, at most what the rider holds, and what they hold is what they collected less what they handed over | Accepted |
+| 827 | Riders in the admin: a Riders tab on Shipping, each rider's link shown once to send on WhatsApp, packed orders handed to a rider from the list, and cash handed over recorded | Accepted |
 
 ---
 
@@ -27131,3 +27132,21 @@
 * **Consequences:** a rider short at the end of the day shows as holding cash until it comes; the
   orders were paid when delivered, so the shortfall is the rider's, not the customers'. A
   hand-over is not undone; a wrong one is set right by the rider's next.
+
+## ADR-827 · Riders in the admin: a Riders tab on Shipping, each rider's link shown once to send on WhatsApp, packed orders handed to a rider from the list, and cash handed over recorded
+
+* **Context:** riders, their hand-outs, pages and cash (ADR-824 to ADR-826) were reachable
+  through the Admin API and the riders' own links alone.
+* **Decision:**
+  * **Shipping's Riders tab:** each rider who rides now, with what they carry and the cash they
+    hold; opened, their deliveries, each with its order, cash and whether the customer's code was
+    given, and the cash they handed over. Riders not riding now are shown when asked.
+  * **Owners and managers** add a rider by name and mobile; their page's link is shown once,
+    with a button that sends it to the rider on WhatsApp through `wa.me`, in English and Urdu, so
+    the secret never passes through Hatti's messages. They give a rider a new link, shown once
+    likewise, and say whether they ride now.
+  * **Those who reconcile payments** record cash a rider hands over, with a note.
+  * **Handing out:** packed orders chosen on the list are handed to a rider who rides now beside
+    shipping them by hand, those the core refuses named and left packed.
+* **Consequences:** SHP-10 and APP-06 are done in code, but for the Meta template (OWN-23). Zones
+  on a map and routing several stops wait for shops to ask.
