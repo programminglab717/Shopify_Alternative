@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Custom reports scheduled
+### b8e6002 · Custom reports scheduled
 
 * **On a schedule:** a scheduled export may send a custom report in place of the orders, run
   over the period that ended and emailed as a workbook to the member who scheduled it
