@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Stitching
+### 20f7655 · Stitching
 
 * **Stitched to measurements:** an unstitched product may be offered stitched for what the shop
   charges, the days it adds and the measurements it asks for, in inches; the cart prices a
