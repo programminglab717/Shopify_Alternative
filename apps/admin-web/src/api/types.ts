@@ -605,6 +605,8 @@ export interface ProductDetail {
    * core leaves it out.
    */
   personalisationFields?: PersonalisationFieldValue[];
+  /** The stitching it is offered with (ADR-802); absent where a fake core leaves it out. */
+  stitching?: ProductStitching | null;
   /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */
   sizeChart?: { id: string; name: string } | null;
   /** What it is made of, where it is a bundle (ADR-409); absent where a fake core leaves it out. */
@@ -4571,6 +4573,17 @@ export interface CombinedListingSetData {
 
 export interface CombinedListingDeleteData {
   combinedListingDelete: { deletedCombinedListingId: string | null; userErrors: UserError[] };
+}
+
+/** Stitching offered with a product (ADR-802). */
+export interface ProductStitching {
+  price: { amount: string };
+  leadDays: number;
+  measurements: { key: string }[];
+}
+
+export interface ProductStitchingSetData {
+  productStitchingSet: { stitching: ProductStitching | null; userErrors: UserError[] };
 }
 
 export interface ProductComplementsSetData {

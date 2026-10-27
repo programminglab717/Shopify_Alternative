@@ -1030,6 +1030,15 @@ const PRODUCT = /* GraphQL */ `
         currencyCode
       }
     }
+    stitching {
+      price {
+        amount
+      }
+      leadDays
+      measurements {
+        key
+      }
+    }
     sizeChart {
       id
       name
@@ -9670,6 +9679,27 @@ export const CombinedListingDeleteMutation = /* GraphQL */ `
   mutation CombinedListingDelete($id: ID!) {
     combinedListingDelete(id: $id) {
       deletedCombinedListingId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Stitching offered with an unstitched product (CAT-09, ADR-802). */
+export const ProductStitchingSetMutation = /* GraphQL */ `
+  mutation ProductStitchingSet($productId: ID!, $stitching: ProductStitchingInput) {
+    productStitchingSet(productId: $productId, stitching: $stitching) {
+      stitching {
+        price {
+          amount
+        }
+        leadDays
+        measurements {
+          key
+        }
+      }
       userErrors {
         ...Problems
       }

@@ -57,6 +57,7 @@ import { EasternWearCard } from './eastern-wear';
 import { ProductMetafieldsCard } from './metafields';
 import { GiftCardProduct } from './gift-card-product';
 import { ProductPersonalisationCard } from './personalisation';
+import { ProductStitchingCard } from './stitching';
 import { ProductPreorder } from './preorder';
 import { ProductSizeChart } from './size-charts';
 import { StockRules } from './stock-rules';
@@ -628,6 +629,7 @@ function ProductView() {
       {/* Shown afresh when the core's day changes. */}
       {edits && <ProductPreorder product={product} />}
       {edits && <ProductPersonalisationCard product={product} />}
+      {edits && <ProductStitchingCard key={`stitching-${product.id}`} product={product} />}
       {edits && <CategoryCard product={product} />}
       {edits && <ProductSearchListing product={product} storefront={storefront?.url ?? ''} />}
       {edits && <EasternWearCard product={product} />}
@@ -642,7 +644,7 @@ function ProductView() {
         />
       )}
       {edits && <ProductPairingsCard product={product} />}
-      {edits && <ProductCombinedListingCard key={product.id} product={product} />}
+      {edits && <ProductCombinedListingCard key={`combined-${product.id}`} product={product} />}
       <ProductUrduCard product={product} />
     </div>
   );
