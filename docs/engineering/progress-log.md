@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Digital products in the admin
+
+* **Set up from its page:** a product is made digital, its files uploaded and its licence keys
+  added from the product page; keys added go at once to the paid orders waiting for them
+  (CAT-13, [ADR-816](../architecture/13-decision-log.md#adr-816--a-product-is-made-digital-from-its-page-its-files-uploaded-and-its-keys-added-there-keys-added-are-given-at-once-to-the-paid-orders-whose-units-were-sold-none)). CAT-13 is done in code.
+* **Fix (df0892c):** CI failed after the delivery slice: a test counted Hatti's WhatsApp
+  templates as 42, and the download link and licence key templates make 44.
+* **Count corrected:** the admin row of the status page counted 10 fewer tests than its suite
+  runs; it counts what the suite runs now, 1266.
+* 4343 tests (12 counted anew: 2 new, 10 uncounted before).
+
 ### 4995262 · Digital checkouts
 
 * **Nothing to deliver:** a cart of digital products alone checks out with no address,
