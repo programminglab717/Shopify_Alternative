@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Referrals
+
+* **Referral programme:** each customer has a code; a friend's first order from their link
+  gives both store credit once it is delivered and paid, unless the checks against fraud
+  refuse it: own order, same device or address, a repeat customer, an unproven referrer, a
+  small order, or ten in 30 days (MKT-07, [ADR-807](../architecture/13-decision-log.md#adr-807--referrals-a-code-for-each-customer-read-from-the-orders-landing-page-and-both-sides-given-store-credit-once-the-friends-first-order-arrives-unless-the-checks-against-fraud-refuse-it)). Set and listed through the Admin API; the
+  admin page and the storefront's share link come next.
+* 4304 tests (9 new).
+
 ### 17667ea · Cashback tiers
 
 * **Tiers:** cashback gives a larger share to customers who spent more on their other orders,

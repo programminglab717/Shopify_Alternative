@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-806 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-807 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -814,6 +814,7 @@
 | 804 | The admin offers a product stitched from its page: what stitching adds, its days and the measurements to ask for, the usual ones chosen to begin with | Accepted |
 | 805 | Cashback leaves gift cards out, and a refund takes back the share of it the refund took, from what is left of that credit alone | Accepted |
 | 806 | Cashback has up to three tiers by what a customer spent on their other orders, each giving back more | Accepted |
+| 807 | Referrals: a code for each customer, read from the order's landing page, and both sides given store credit once the friend's first order arrives, unless the checks against fraud refuse it | Accepted |
 
 ---
 
@@ -26671,3 +26672,29 @@
 * **Consequences:** no tier is shown to the shopper on the storefront, nor is a customer told
   when they reach one: the WhatsApp of their cashback says how much they got. With ADR-805,
   MKT-06 is done.
+
+## ADR-807 · Referrals: a code for each customer, read from the order's landing page, and both sides given store credit once the friend's first order arrives, unless the checks against fraud refuse it
+
+* **Context:** MKT-07 asks for a referral programme with fraud checks by phone, device and
+  address. Shopify leaves it to apps. Fake referrals are the usual abuse: a shopper refers
+  themselves with a second number, or orders for a friend from their own phone.
+* **Decision:** a shop's programme is its own record, not one of the automations' recipes: on
+  or off (on only with a plan that includes loyalty, as cashback, ADR-523), what the referrer
+  is given, what the friend is given (none at all if the shop says so), the days the credit
+  lasts, and what the friend's goods must come to. Each customer has a code of eight letters
+  and digits, none mistaken for another, made the first time it is asked for. The online
+  store's link with `?ref=` and the code brings their friend; the order keeps its landing
+  page (ORD-13, ADR-139), so checkout needs no change. Once that order is delivered, paid in
+  full and not cancelled, the worker gives both sides store credit, which checkout spends and
+  WhatsApp tells them of (ADR-192), as it gives cashback (ADR-453). It refuses, and keeps
+  why: the referrer's own order (by phone, as customers are); a friend who ordered before; an
+  order from the referrer's device, the same address online and browser as one of theirs; an
+  order to one of the referrer's addresses, compared whatever its case, spaces or commas; a
+  referrer with no order of their own delivered and paid; goods below the minimum; or a
+  referrer rewarded ten times in 30 days already. Each order is dealt with once. Merging
+  customers carries a duplicate's code, where the customer has none, and its referrals;
+  erasing one removes theirs.
+* **Consequences:** a shopper on another network and browser at another address still gets
+  past the checks; ten a month bounds what one gains. Credit already given is not taken back
+  if the friend's order is refunded later. The admin's page and the storefront's link to share
+  follow (ADR-808).
