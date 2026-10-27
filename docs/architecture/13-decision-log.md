@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-803 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-804 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -811,6 +811,7 @@
 | 801 | Blog articles are drafted with AI from what the shop wants them to say, never kept, thirty a day, each spending an AI credit | Accepted |
 | 802 | An unstitched product may be offered stitched to the shopper's measurements, in inches: the cart adds what stitching costs to a stitched line and asks for every measurement | Accepted |
 | 803 | A line sold stitched keeps the day it ships by: the day it was sold, or its pre-order's if later, and the days its stitching takes | Accepted |
+| 804 | The admin offers a product stitched from its page: what stitching adds, its days and the measurements to ask for, the usual ones chosen to begin with | Accepted |
 
 ---
 
@@ -26622,3 +26623,17 @@
 * **Consequences:** a stitched order says when it ships wherever its lines are shown. The day is
   calendar days, not working days, as a tailor's days are. A shop that changes its stitching's
   days changes no order placed before.
+
+## ADR-804 · The admin offers a product stitched from its page: what stitching adds, its days and the measurements to ask for, the usual ones chosen to begin with
+
+* **Context:** stitching was offered through the Admin API alone (ADR-802); a shop decides it
+  product by product, as it adds its unstitched suits.
+* **Decision:** each product's page has a Stitching service card, beside its personalisation
+  (ADR-690), for those who change products. Ticked, it asks what stitching adds in rupees, the
+  days it adds before shipping, and which of the twelve measurements to ask for, those a shirt
+  and trouser are usually stitched to chosen until the shop says otherwise; saved together, sent
+  in the order tailors take them. Unticked and saved, the product is sold unstitched alone. The
+  card is called a service, as the product's own "Stitching" says whether it comes stitched
+  (ADR-477).
+* **Consequences:** a shop offers stitching where it lists the product. Measurements are the
+  twelve Hatti knows; a tailor's own beyond them waits for shops to ask.

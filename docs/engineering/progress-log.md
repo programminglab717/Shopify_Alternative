@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Stitching in the admin
+
+* **Stitching service card:** a product is offered stitched from its page in the admin, with
+  what stitching adds, its days and the measurements to ask for (CAT-09, [ADR-804](../architecture/13-decision-log.md#adr-804--the-admin-offers-a-product-stitched-from-its-page-what-stitching-adds-its-days-and-the-measurements-to-ask-for-the-usual-ones-chosen-to-begin-with)). CAT-09 is
+  done.
+* **Fix:** the stitching and combined listing cards shared a React key, so a card showed twice
+  after a save.
+* 4289 tests (3 new).
+
 ### 3b2c937 · Stitched lines' days
 
 * **Ships by:** an order's line sold stitched keeps the day it ships by, after the days its
