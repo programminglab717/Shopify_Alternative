@@ -45,6 +45,7 @@ import {
 } from './product-form';
 import type { DetailsState } from './product-form';
 import { ProductBundleCard } from './bundle';
+import { ProductCombinedListingCard } from './combined-listing';
 import { ProductPairingsCard } from './pairings';
 import { ProductSchedule } from './schedule';
 import { ProductSearchListing } from './search-listing';
@@ -641,6 +642,7 @@ function ProductView() {
         />
       )}
       {edits && <ProductPairingsCard product={product} />}
+      {edits && <ProductCombinedListingCard key={product.id} product={product} />}
       <ProductUrduCard product={product} />
     </div>
   );

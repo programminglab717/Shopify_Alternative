@@ -1047,6 +1047,17 @@ const PRODUCT = /* GraphQL */ `
       id
       title
     }
+    combinedListing {
+      id
+      optionName
+      products {
+        productId
+        value
+        product {
+          title
+        }
+      }
+    }
     publishAt
     options {
       id
@@ -9592,6 +9603,41 @@ export const ProductSchedulePublishMutation = /* GraphQL */ `
         status
         publishAt
       }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Products shown as one listing, each a value of its option (CAT-23, ADR-799). */
+export const CombinedListingSetMutation = /* GraphQL */ `
+  mutation CombinedListingSet($id: ID, $input: CombinedListingInput!) {
+    combinedListingSet(id: $id, input: $input) {
+      combinedListing {
+        id
+        optionName
+        products {
+          productId
+          value
+          product {
+            title
+          }
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const CombinedListingDeleteMutation = /* GraphQL */ `
+  mutation CombinedListingDelete($id: ID!) {
+    combinedListingDelete(id: $id) {
+      deletedCombinedListingId
       userErrors {
         ...Problems
       }

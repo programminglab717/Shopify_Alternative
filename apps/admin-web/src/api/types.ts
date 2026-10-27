@@ -612,6 +612,8 @@ export interface ProductDetail {
    * out.
    */
   complementaryProducts?: { id: string; title: string }[];
+  /** The combined listing it is in (ADR-799); absent where a fake core leaves it out. */
+  combinedListing?: CombinedListing | null;
   /** When the draft goes on sale by itself (ADR-441); absent where a fake core leaves it out. */
   publishAt?: string | null;
   /**
@@ -4529,6 +4531,21 @@ export interface ProductSchedulePublishData {
     product: { id: string; status: string; publishAt: string | null } | null;
     userErrors: UserError[];
   };
+}
+
+/** Products shown as one listing, each a value of its option (ADR-799). */
+export interface CombinedListing {
+  id: string;
+  optionName: string;
+  products: { productId: string; value: string; product: { title: string } | null }[];
+}
+
+export interface CombinedListingSetData {
+  combinedListingSet: { combinedListing: CombinedListing | null; userErrors: UserError[] };
+}
+
+export interface CombinedListingDeleteData {
+  combinedListingDelete: { deletedCombinedListingId: string | null; userErrors: UserError[] };
 }
 
 export interface ProductComplementsSetData {
