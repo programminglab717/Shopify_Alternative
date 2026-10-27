@@ -94,6 +94,37 @@ export interface DeliveryRecord {
   createdAt: Date;
 }
 
+/** Cash a rider handed over, as recorded by who took it. */
+export interface HandoverRecord {
+  id: string;
+  riderId: string;
+  amount: bigint;
+  note: string;
+  receivedByKind: 'staff' | 'app';
+  receivedBy: string;
+  createdAt: Date;
+}
+
+type HandoverRow = {
+  id: string;
+  rider_id: string;
+  amount: string;
+  note: string;
+  received_by_kind: 'staff' | 'app';
+  received_by: string;
+  created_at: string | Date;
+};
+
+const toHandover = (row: HandoverRow): HandoverRecord => ({
+  id: row.id,
+  riderId: row.rider_id,
+  amount: BigInt(row.amount),
+  note: row.note,
+  receivedByKind: row.received_by_kind,
+  receivedBy: row.received_by,
+  createdAt: new Date(row.created_at),
+});
+
 /** What handing an order to a rider came to: its delivery, or why not. */
 export type HandOutResult =
   { orderId: string; delivery: DeliveryRecord } | { orderId: string; problem: string };
@@ -393,6 +424,84 @@ export class RiderService {
       });
       return { orderId, delivery: toDelivery(rows[0]!) };
     });
+  }
+
+  /**
+   * Records cash rider `riderId` handed over (ADR-826): at most what they hold, collected and not
+   * yet handed over, with a note; by whoever took it.
+   */
+  async handOver(
+    tenant: TenantContext,
+    riderId: string,
+    input: { amount: bigint; note?: string | null },
+  ): Promise<MutationResult<HandoverRecord>> {
+    const { shopId, actor } = tenant;
+    const note = (input.note ?? '').trim();
+    if (note.length > RIDER_LIMITS.note) {
+      return failOne(
+        ['input', 'note'],
+        'TOO_LONG',
+        `A note is ${RIDER_LIMITS.note} characters at most`,
+      );
+    }
+    if (input.amount <= 0n) {
+      return failOne(
+        ['input', 'amount'],
+        'INVALID',
+        'Give the cash handed over, more than nothing',
+      );
+    }
+    if (actor.kind !== 'staff' && actor.kind !== 'app') {
+      return failOne(['input'], 'INVALID', 'Only staff and apps take cash from riders');
+    }
+    return this.db.tenant(shopId, async (tx) => {
+      // One hand-over of a rider's at a time, so that two can't both take what they hold.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rider-cash:' || ${riderId}))`);
+      const { rows } = await tx.execute<RiderRow>(sql`
+        SELECT ${RIDER_COLUMNS} FROM logistics.riders r
+         WHERE r.shop_id = ${shopId} AND r.id = ${riderId}`);
+      const rider = rows[0] ? toRider(rows[0]) : null;
+      if (!rider) return failOne(['riderId'], 'NOT_FOUND', 'Rider not found');
+      if (input.amount > rider.cashHeld) {
+        return failOne(
+          ['input', 'amount'],
+          'INVALID',
+          `${rider.name} holds less than that: what they collected and have not handed over`,
+        );
+      }
+      const by = actor.kind === 'staff' ? actor.userId : actor.tokenId;
+      const { rows: made } = await tx.execute<HandoverRow>(sql`
+        INSERT INTO logistics.rider_handovers
+               (shop_id, rider_id, amount, note, received_by_kind, received_by)
+        VALUES (${shopId}, ${riderId}, ${input.amount.toString()}::bigint, ${note}, ${actor.kind},
+                ${by})
+        RETURNING id, rider_id, amount::text AS amount, note, received_by_kind, received_by,
+                  created_at`);
+      const handover = toHandover(made[0]!);
+      await recordAudit(tx, shopId, {
+        action: 'rider.cash_handed_over',
+        subjectType: 'rider',
+        subjectId: riderId,
+        ...actorColumnsOf(actor),
+        details: { amount: input.amount.toString(), handover: handover.id },
+      });
+      return { ok: true, value: handover };
+    });
+  }
+
+  /** What rider `riderId` handed over, the latest first: 100 at most. */
+  async handovers(tenant: TenantContext, riderId: string): Promise<HandoverRecord[]> {
+    const { shopId } = tenant;
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<HandoverRow>(sql`
+        SELECT id, rider_id, amount::text AS amount, note, received_by_kind, received_by,
+               created_at
+          FROM logistics.rider_handovers
+         WHERE shop_id = ${shopId} AND rider_id = ${riderId}
+         ORDER BY created_at DESC, id
+         LIMIT 100`),
+    );
+    return rows.map(toHandover);
   }
 
   /** The deliveries of rider `riderId`, or all the shop's, the latest first: 100 at most. */

@@ -150,3 +150,45 @@ export class RiderHandOutPayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({ description: 'Cash a rider handed over to the shop (ADR-826).' })
+export class RiderHandover {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID)
+  riderId!: string;
+
+  @Field(() => Money)
+  amount!: Money;
+
+  @Field()
+  note!: string;
+
+  @Field(() => ID, { description: 'Who took it: usr_… for staff, an app token for an app.' })
+  receivedBy!: string;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
+@InputType()
+export class RiderHandOverInput {
+  @Field({ description: 'Rupees handed over: "4000". At most what the rider holds.' })
+  amount!: string;
+
+  @Field(() => String, { nullable: true, description: `${RIDER_LIMITS.note} characters at most.` })
+  note?: string | null;
+}
+
+@ObjectType()
+export class RiderHandOverPayload {
+  @Field(() => RiderHandover, { nullable: true })
+  handover!: RiderHandover | null;
+
+  @Field(() => Rider, { nullable: true, description: 'The rider, holding less now.' })
+  rider!: Rider | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}

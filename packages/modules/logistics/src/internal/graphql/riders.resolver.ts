@@ -5,18 +5,20 @@ import {
   RequireScopes,
   UserError,
   deniedToRole,
+  failOne,
   hasCapability,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
-import { money, type CurrencyCode } from '@hatti/money';
+import { fromMajor, money, type CurrencyCode } from '@hatti/money';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   RIDER_LINK_PATH,
   RiderService,
   type DeliveryRecord,
   type DeliveryStatus,
+  type HandoverRecord,
   type RiderRecord,
 } from '../riders.js';
 import { uuidOf } from './couriers.resolver.js';
@@ -27,8 +29,39 @@ import {
   RiderHandOutPayload,
   RiderHandOutResult,
   RiderInput,
+  RiderHandOverInput,
+  RiderHandOverPayload,
+  RiderHandover,
   RiderPayload,
 } from './riders.types.js';
+
+/** Riders' cash is the shop's to reconcile: owners, managers and accountants take it. */
+function takesRidersCash(tenant: TenantContext): void {
+  if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'reconcile_payments')) {
+    throw deniedToRole("Access denied. Only owners, managers and accountants take riders' cash.");
+  }
+}
+
+/** Minor units of an amount typed in rupees: null for none that is one. */
+function rupeesOf(text: string, currency: string): bigint | null {
+  try {
+    return fromMajor(text, currency as CurrencyCode).amount;
+  } catch {
+    return null;
+  }
+}
+
+function toHandover(record: HandoverRecord, currency: string): RiderHandover {
+  return Object.assign(new RiderHandover(), {
+    id: toPublicId('riderHandover', record.id),
+    riderId: toPublicId('rider', record.riderId),
+    amount: Money.from(money(record.amount, currency as CurrencyCode)),
+    note: record.note,
+    receivedBy:
+      record.receivedByKind === 'staff' ? toPublicId('user', record.receivedBy) : record.receivedBy,
+    createdAt: record.createdAt,
+  });
+}
 
 /** Riders are the shop's people: owners and managers, and custom roles that manage staff, keep them. */
 function managesRiders(tenant: TenantContext): void {
@@ -196,6 +229,46 @@ export class RiderResolver {
             }),
           )
         : [],
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Query(() => [RiderHandover], {
+    description: 'The cash a rider handed over, the latest first: 100 at most.',
+  })
+  @RequireScopes('read_orders')
+  async riderHandovers(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('riderId', { type: () => ID }) riderId: string,
+  ): Promise<RiderHandover[]> {
+    takesRidersCash(tenant);
+    return (await this.service.handovers(tenant, uuidOf('rider', riderId))).map((each) =>
+      toHandover(each, tenant.currency),
+    );
+  }
+
+  @Mutation(() => RiderHandOverPayload, {
+    description:
+      'Records cash a rider handed over (ADR-826), at most what they hold: what they collected ' +
+      'and have not handed over. Staff need to be an owner, a manager or an accountant.',
+  })
+  @RequireScopes('write_orders')
+  async riderHandOver(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('riderId', { type: () => ID }) riderId: string,
+    @Args('input') input: RiderHandOverInput,
+  ): Promise<RiderHandOverPayload> {
+    takesRidersCash(tenant);
+    const id = uuidOf('rider', riderId);
+    const amount = rupeesOf(input.amount, tenant.currency);
+    const result: MutationResult<HandoverRecord> =
+      amount !== null
+        ? await this.service.handOver(tenant, id, { amount, note: input.note })
+        : failOne(['input', 'amount'], 'INVALID', 'Give rupees, such as 4000');
+    const rider = result.ok ? await this.service.get(tenant, id) : null;
+    return Object.assign(new RiderHandOverPayload(), {
+      handover: result.ok ? toHandover(result.value, tenant.currency) : null,
+      rider: rider && toRider(rider, tenant.currency),
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

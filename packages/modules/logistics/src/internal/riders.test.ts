@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { Tx } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { RiderPageService } from './rider-page.js';
 import { DeliveryCodeSender, RIDER_LIMITS, RiderService } from './riders.js';
 import { errorsOf, logisticsFixture, unwrap, type LogisticsFixture } from './test-support.js';
 
@@ -175,5 +176,51 @@ describe.skipIf(!server)("The shop's own riders (SHP-10, ADR-824)", () => {
     const order = await f.confirmed(f.a, kurta);
     const [result] = unwrap(await plain.handOut(f.a, rider.id, [order.orderId]));
     expect(result).toMatchObject({ delivery: { codeSent: false } });
+  });
+
+  it('records the cash a rider hands over, at most what they hold (ADR-826)', async () => {
+    const { rider, link } = unwrap(
+      await riders.create(f.a, { name: 'Asif', phone: '03001112223' }),
+    );
+    const order = await f.confirmed(f.a, kurta, { quantity: 2 });
+    const [handed] = unwrap(await riders.handOut(f.a, rider.id, [order.orderId]));
+    if (!handed || !('delivery' in handed)) throw new Error(JSON.stringify(handed));
+    const pages = new RiderPageService(f.db, f.fulfillments);
+    expect(await pages.deliver(link, handed.delivery.id, { code: '', cash: '4000' })).toEqual({
+      ok: true,
+    });
+    expect((await riders.get(f.a, rider.id))!.cashHeld).toBe(4_000_00n);
+
+    expect(errorsOf(await riders.handOver(f.a, rider.id, { amount: 5_000_00n }))).toEqual([
+      ['input.amount', 'INVALID'],
+    ]);
+    expect(errorsOf(await riders.handOver(f.a, rider.id, { amount: 0n }))).toEqual([
+      ['input.amount', 'INVALID'],
+    ]);
+    const first = unwrap(
+      await riders.handOver(f.a, rider.id, { amount: 3_000_00n, note: ' Evening run ' }),
+    );
+    expect(first).toMatchObject({
+      riderId: rider.id,
+      amount: 3_000_00n,
+      note: 'Evening run',
+      receivedByKind: 'app',
+    });
+    expect((await riders.get(f.a, rider.id))!.cashHeld).toBe(1_000_00n);
+    // Two at once take no more than they hold.
+    const both = await Promise.all([
+      riders.handOver(f.a, rider.id, { amount: 1_000_00n }),
+      riders.handOver(f.a, rider.id, { amount: 1_000_00n }),
+    ]);
+    expect(both.filter((each) => each.ok)).toHaveLength(1);
+    expect((await riders.get(f.a, rider.id))!.cashHeld).toBe(0n);
+    expect((await riders.handovers(f.a, rider.id)).map((each) => each.amount)).toEqual([
+      1_000_00n,
+      3_000_00n,
+    ]);
+    // Another shop's rider is none of this one's.
+    expect(errorsOf(await riders.handOver(f.b, rider.id, { amount: 1n }))).toEqual([
+      ['riderId', 'NOT_FOUND'],
+    ]);
   });
 });

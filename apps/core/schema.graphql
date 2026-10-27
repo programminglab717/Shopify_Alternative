@@ -10598,6 +10598,11 @@ type Mutation {
   riderHandOut(orderIds: [ID!]!, riderId: ID!): RiderHandOutPayload!
 
   """
+  Records cash a rider handed over (ADR-826), at most what they hold: what they collected and have not handed over. Staff need to be an owner, a manager or an accountant.
+  """
+  riderHandOver(input: RiderHandOverInput!, riderId: ID!): RiderHandOverPayload!
+
+  """
   A new link for a rider's page, given this once; the old one works no more.
   """
   riderNewLink(id: ID!): RiderPayload!
@@ -16273,6 +16278,9 @@ type Query {
   """
   riderDeliveries(riderId: ID, status: RiderDeliveryStatus): [RiderDelivery!]!
 
+  """The cash a rider handed over, the latest first: 100 at most."""
+  riderHandovers(riderId: ID!): [RiderHandover!]!
+
   """The shop's riders, by name, those who ride now first."""
   riders: [Rider!]!
 
@@ -17120,6 +17128,34 @@ type RiderHandOutResult {
   delivery: RiderDelivery
   orderId: ID!
   problem: String
+}
+
+input RiderHandOverInput {
+  """Rupees handed over: "4000". At most what the rider holds."""
+  amount: String!
+
+  """500 characters at most."""
+  note: String
+}
+
+type RiderHandOverPayload {
+  handover: RiderHandover
+
+  """The rider, holding less now."""
+  rider: Rider
+  userErrors: [UserError!]!
+}
+
+"""Cash a rider handed over to the shop (ADR-826)."""
+type RiderHandover {
+  amount: Money!
+  createdAt: DateTime!
+  id: ID!
+  note: String!
+
+  """Who took it: usr_… for staff, an app token for an app."""
+  receivedBy: ID!
+  riderId: ID!
 }
 
 input RiderInput {

@@ -170,6 +170,25 @@ describe.skipIf(!server)(
         riders: [{ out: 0, cashHeld: { amount: '2000.00' } }],
         riderDeliveries: [{ status: 'DELIVERED', codeGiven: false }],
       });
+
+      // The cash handed over (ADR-826): at most what the rider holds.
+      const HAND_OVER = `mutation ($rider: ID!, $amount: String!) {
+      riderHandOver(riderId: $rider, input: { amount: $amount }) {
+        handover { amount { amount } } rider { cashHeld { amount } } userErrors { code }
+      }
+    }`;
+      expect(
+        (await gql(tokens.owner, HAND_OVER, { rider: made.rider.id, amount: '2,500' })).data
+          ?.riderHandOver.userErrors,
+      ).toEqual([{ code: 'INVALID' }]);
+      expect(
+        (await gql(tokens.owner, HAND_OVER, { rider: made.rider.id, amount: '2000' })).data
+          ?.riderHandOver,
+      ).toEqual({
+        handover: { amount: { amount: '2000.00' } },
+        rider: { cashHeld: { amount: '0.00' } },
+        userErrors: [],
+      });
       expect(
         (await app.inject({ method: 'GET', url: `/rider/${'x'.repeat(22)}` })).statusCode,
       ).toBe(404);
