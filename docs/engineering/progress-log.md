@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Store locator
+### 4404998 · Store locator
 
 * **Locations:** a location in use with its street and city may be listed on the store locator,
   with its opening hours as the shop writes them; the shop's document carries those listed
