@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import {
   Banknote,
+  BellRing,
   CalendarDays,
   ChevronRight,
   CircleAlert,
@@ -536,6 +537,20 @@ export function BroadcastsPage() {
             <span className="font-medium">{t('referrals.title')}</span>
             <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
               {t('referrals.linkHint')}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+        </Link>
+        <Link
+          to="/$shopId/marketing/pushes"
+          params={{ shopId }}
+          className="flex min-h-16 items-center gap-3 border-t border-line px-4 py-3"
+        >
+          <BellRing aria-hidden className="size-6 shrink-0 text-secondary" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="font-medium">{t('pushes.title')}</span>
+            <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t('pushes.linkHint')}
             </span>
           </span>
           <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />

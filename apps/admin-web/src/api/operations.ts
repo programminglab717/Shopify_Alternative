@@ -11981,3 +11981,48 @@ export const PriceListPricesSetMutation = /* GraphQL */ `
   ${PRICE_LIST_PRICE}
   ${USER_ERRORS}
 `;
+
+/** The shop's pushes to shoppers (OS-14, ADR-835): who has them on, and the campaigns sent. */
+const PUSH_CAMPAIGN = /* GraphQL */ `
+  fragment PushCampaignFields on PushCampaign {
+    id
+    title
+    body
+    path
+    status
+    sent
+    failed
+    gone
+    createdAt
+    sentAt
+  }
+`;
+
+export const ShopperPushesQuery = /* GraphQL */ `
+  query ShopperPushes {
+    shopperPushes {
+      available
+      subscribers
+      perDay
+      campaigns {
+        ...PushCampaignFields
+      }
+    }
+  }
+  ${PUSH_CAMPAIGN}
+`;
+
+export const PushCampaignSendMutation = /* GraphQL */ `
+  mutation PushCampaignSend($input: PushCampaignInput!) {
+    pushCampaignSend(input: $input) {
+      campaign {
+        ...PushCampaignFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PUSH_CAMPAIGN}
+  ${USER_ERRORS}
+`;

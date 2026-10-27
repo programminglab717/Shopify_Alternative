@@ -5764,3 +5764,30 @@ export interface PriceListPayload {
   priceList: PriceListValue | null;
   userErrors: UserError[];
 }
+
+/** A push the shop sent to shoppers' browsers (ADR-834). */
+export interface PushCampaignValue {
+  id: string;
+  title: string;
+  body: string;
+  path: string;
+  status: 'SENDING' | 'SENT';
+  sent: number;
+  failed: number;
+  gone: number;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export interface ShopperPushesData {
+  shopperPushes: {
+    available: boolean;
+    subscribers: number;
+    perDay: number;
+    campaigns: PushCampaignValue[];
+  };
+}
+
+export interface PushCampaignSendData {
+  pushCampaignSend: { campaign: PushCampaignValue | null; userErrors: UserError[] };
+}

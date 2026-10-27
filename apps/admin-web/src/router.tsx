@@ -99,6 +99,7 @@ import {
 } from './marketing/google-ads-account';
 import { AutomationsPage } from './marketing/automations-page';
 import { ReferralsPage } from './marketing/referrals-page';
+import { PushPage } from './marketing/push-page';
 import { BroadcastsPage } from './marketing/broadcasts-page';
 import { CalendarPage } from './marketing/calendar-page';
 import { TemplatesPage } from './marketing/templates-page';
@@ -844,6 +845,12 @@ const marketingReferrals = createRoute({
   component: ReferralsPage,
 });
 
+const marketingPushes = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing/pushes',
+  component: PushPage,
+});
+
 const marketingAffiliates = createRoute({
   getParentRoute: () => shop,
   path: 'marketing/affiliates',
@@ -1104,6 +1111,7 @@ export const routeTree = root.addChildren([
     marketingAdSpend,
     marketingAffiliates,
     marketingReferrals,
+    marketingPushes,
     settingsTax,
     settingsMessages,
     settingsOrders,
