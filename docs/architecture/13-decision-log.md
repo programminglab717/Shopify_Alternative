@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-808 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-809 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -816,6 +816,7 @@
 | 806 | Cashback has up to three tiers by what a customer spent on their other orders, each giving back more | Accepted |
 | 807 | Referrals: a code for each customer, read from the order's landing page, and both sides given store credit once the friend's first order arrives, unless the checks against fraud refuse it | Accepted |
 | 808 | Referrals are set and seen in Marketing, and a customer's link carries ?invite=, apart from affiliates' ?ref= | Accepted |
+| 809 | A signed-in shopper finds their invite link on their account, with what each side is given, to share on WhatsApp | Accepted |
 
 ---
 
@@ -26715,3 +26716,18 @@
   who shared the link and the friend.
 * **Consequences:** shops see why a referral was refused and can look at the order. Shoppers
   find their link on the online store next (ADR-809).
+
+## ADR-809 · A signed-in shopper finds their invite link on their account, with what each side is given, to share on WhatsApp
+
+* **Context:** referrals need customers to have their link (ADR-807, ADR-808). Shoppers sign
+  in to the online store with a code to their mobile (ADR-570); WhatsApp is how they share.
+* **Decision:** while the shop's referral programme is on, the storefront API's account
+  carries the customer's code, made the first time it is asked for, and what they and a friend
+  are given; null while it is off or for a number no customer has. The storefront gives themes
+  `customer.referral`, with the link's path, `/?invite=` and the code. Hatti Base's account
+  page shows "Bring a friend": what each side is given (or theirs alone where the friend is
+  given none), the link on the shop's own address, and a button that opens WhatsApp with a
+  message carrying it, in English and Urdu.
+* **Consequences:** a customer finds their link once signed in; one who never signs in has
+  none, though the shop can see their code through the Admin API. With ADR-807 and ADR-808,
+  MKT-07 is done.
