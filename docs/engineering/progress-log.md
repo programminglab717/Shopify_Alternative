@@ -21,8 +21,10 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 * **Blog with AI:** a blog article's title and body are written with AI from what the shop wants
   it to say, in English, Urdu or Roman Urdu, never kept, thirty a day, each spending an AI credit
   (MKT-15, [ADR-801](../architecture/13-decision-log.md#adr-801--blog-articles-are-drafted-with-ai-from-what-the-shop-wants-them-to-say-never-kept-thirty-a-day-each-spending-an-ai-credit)).
-* **CI:** ffmpeg's install gives up on a mirror silent for 20 seconds, after a stalled mirror
-  ran out the step's eight minutes before any test (the re-run passed).
+* **CI:** Ubuntu's mirror served ffmpeg's 63 MB at about 55 KB/s, running out the step's
+  minutes before any test, twice (one re-run passed). ffmpeg is now installed best effort from
+  packages a run that installed them all keeps in the cache, warning and going on without it,
+  as its tests skip where it is not; PgBouncer stays required.
 * 4278 tests (7 new).
 
 ### 86a0fc5 · Combined listings in the admin

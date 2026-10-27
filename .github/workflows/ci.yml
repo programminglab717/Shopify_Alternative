@@ -64,30 +64,53 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # ffmpeg's packages are kept between runs once one has installed them all: the mirror can
+      # be slow, as 55 KB/s on 27 October 2026, too slow for its 63 MB in the step's minutes.
+      - name: Restore ffmpeg's packages
+        id: ffmpeg-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/apt-ffmpeg
+          key: apt-ffmpeg-ubuntu-noble-v1
+
       - name: Start PgBouncer, install ffmpeg
-        timeout-minutes: 8
+        id: tools
+        timeout-minutes: 10
         run: |
-          # ffmpeg makes products' videos' smaller sizes (ADR-791), as in the core's image; its
-          # tests run where it is.
           # A package mirror that stops answering ends a try, not the job's twenty minutes (runs
           # 306 and 307 waited on one until they were cancelled); the next try may reach another.
-          # The update says where it is, so that a stall names the source; ffmpeg's install says
-          # what it fetches, and gives up on a connection silent for 20 seconds, trying it twice
-          # more, rather than waiting out its three minutes (run 40440076365's first attempt).
+          # The update says where it is, so that a stall names the source.
           for attempt in 1 2 3; do
-            if timeout 90 sudo apt-get update &&
-              timeout 90 sudo apt-get install -y -qq pgbouncer &&
-              timeout 180 sudo apt-get install -y -q -o Acquire::http::Timeout=20 \
-                -o Acquire::Retries=2 --no-install-recommends ffmpeg; then
+            if timeout 90 sudo apt-get update && timeout 90 sudo apt-get install -y -qq pgbouncer; then
               break
             fi
             if [ "$attempt" = 3 ]; then exit 1; fi
             sleep 5
           done
+          # ffmpeg makes products' videos' smaller sizes (ADR-791), as in the core's image; its
+          # tests run where it is, and skip where it is not, so a mirror too slow for it warns
+          # and goes on. Its packages come from the cache restored above where they can; the
+          # install says what it fetches and drops a connection silent for 20 seconds.
+          mkdir -p "$HOME/apt-ffmpeg/partial"
+          if timeout 300 sudo apt-get install -y -q -o Dir::Cache::Archives="$HOME/apt-ffmpeg" \
+            -o Acquire::http::Timeout=20 -o Acquire::Retries=2 --no-install-recommends ffmpeg; then
+            echo "ffmpeg=installed" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::ffmpeg was not installed in time: its tests are skipped in this run"
+          fi
+          sudo rm -rf "$HOME/apt-ffmpeg/partial" "$HOME/apt-ffmpeg/lock"
+          sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-ffmpeg"
           # The package starts its own instance on port 6432; run ours instead.
           sudo systemctl disable --now pgbouncer
           nohup pgbouncer db/pgbouncer/pgbouncer.ini > "$RUNNER_TEMP/pgbouncer.log" 2>&1 &
           timeout 20 bash -c 'until (echo > /dev/tcp/127.0.0.1/6432) 2>/dev/null; do sleep 0.5; done'
+
+      - name: Keep ffmpeg's packages
+        if: steps.tools.outputs.ffmpeg == 'installed' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/apt-ffmpeg
+          key: apt-ffmpeg-ubuntu-noble-v1
 
       - name: Format
         run: pnpm format:check
