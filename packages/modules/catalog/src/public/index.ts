@@ -311,3 +311,14 @@ export {
   type StitchingOffer,
   type StitchingProblem,
 } from '../internal/stitching.js';
+export {
+  DIGITAL_LIMITS,
+  DigitalProductEvents,
+  DigitalProductService,
+  digitalFilesIn,
+  digitalIn,
+  digitalProductIdsIn,
+  issueLicenceKeyIn,
+  type DigitalFileRecord,
+  type DigitalProductRecord,
+} from '../internal/digital-products.js';

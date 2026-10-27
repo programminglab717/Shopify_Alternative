@@ -4863,6 +4863,104 @@ type DeskDutyStartPayload {
   userErrors: [UserError!]!
 }
 
+type DigitalDeletePayload {
+  """Null where there was nothing to delete."""
+  deletedId: ID
+}
+
+"""A file a digital product sells (ADR-813), kept privately."""
+type DigitalFile {
+  """What kind of file it is: "application/pdf"."""
+  contentType: String!
+  createdAt: DateTime!
+  filename: String!
+  id: ID!
+
+  """Whether it is uploaded and sold: false while its upload is staged."""
+  ready: Boolean!
+
+  """Bytes."""
+  size: Float!
+}
+
+type DigitalFilePayload {
+  file: DigitalFile
+  userErrors: [UserError!]!
+}
+
+input DigitalFileStageInput {
+  """Its MIME type: "application/zip"."""
+  contentType: String!
+
+  """Its name, as the buyer downloads it."""
+  filename: String!
+
+  """Bytes: 2 GB at most."""
+  size: Float!
+}
+
+type DigitalFileStagePayload {
+  file: DigitalFile
+  upload: DigitalFileUpload
+  userErrors: [UserError!]!
+}
+
+"""Where to upload a staged file: PUT it there with these headers."""
+type DigitalFileUpload {
+  headers: [DigitalUploadHeader!]!
+  method: String!
+  url: String!
+}
+
+"""
+A product sold as files to download or licence keys, needing no delivery (CAT-13, ADR-813): once an order is paid, each unit's buyer is sent a link to its files, and a key where it gives them.
+"""
+type DigitalProduct {
+  """How many times a unit's link downloads each file."""
+  downloadLimit: Int!
+
+  """Its files, the oldest first."""
+  files: [DigitalFile!]!
+
+  """Its licence keys given."""
+  keysIssued: Int!
+
+  """Its licence keys not yet given."""
+  keysLeft: Int!
+
+  """Whether each unit is given one of its licence keys."""
+  licenceKeys: Boolean!
+
+  """How many days a unit's link lasts."""
+  linkDays: Int!
+}
+
+input DigitalProductInput {
+  """1 to 50; 5 unless set."""
+  downloadLimit: Int
+
+  """Whether each unit is given a key; false unless set."""
+  licenceKeys: Boolean
+
+  """1 to 365 days; 30 unless set."""
+  linkDays: Int
+}
+
+type DigitalProductRemovePayload {
+  """Whether it was digital."""
+  removed: Boolean!
+}
+
+type DigitalProductSetPayload {
+  digitalProduct: DigitalProduct
+  userErrors: [UserError!]!
+}
+
+type DigitalUploadHeader {
+  name: String!
+  value: String!
+}
+
 """
 A code shoppers enter for a percentage or an amount off an order's items, or for free delivery, as Shopify's basic and free-shipping discount codes are (CHK-06).
 """
@@ -6991,6 +7089,28 @@ type InventoryValue {
   """Units of variants with no cost: not valued."""
   unitsWithoutCost: Int!
   value: Money!
+}
+
+"""A licence key of a digital product: never the key, but its end."""
+type LicenceKey {
+  """Its last four characters."""
+  hint: String!
+  id: ID!
+
+  """When it was given."""
+  issuedAt: DateTime
+
+  """The order it was given for."""
+  orderId: ID
+}
+
+type LicenceKeysAddPayload {
+  """Keys added."""
+  added: Int!
+
+  """Keys given that the product had already, left out."""
+  already: Int!
+  userErrors: [UserError!]!
 }
 
 """A bundle an order's lines were sold as (ADR-410)."""
@@ -9182,6 +9302,27 @@ type Mutation {
   """
   deliverySettingsUpdate(input: DeliverySettingsUpdateInput!): DeliverySettingsUpdatePayload!
 
+  """A staged file, once its upload is in: sold with its product from now."""
+  digitalFileCreate(id: ID!): DigitalFilePayload!
+
+  """Removes a file a digital product sells."""
+  digitalFileDelete(id: ID!): DigitalDeletePayload!
+
+  """
+  Stages the upload of a file a digital product sells: PUT it to the URL within the hour, then digitalFileCreate.
+  """
+  digitalFileStage(input: DigitalFileStageInput!, productId: ID!): DigitalFileStagePayload!
+
+  """
+  Makes a digital product goods again: its files go, and its keys not given.
+  """
+  digitalProductRemove(productId: ID!): DigitalProductRemovePayload!
+
+  """
+  Makes a product digital, needing no delivery, or changes how it reaches the buyer. A gift card cannot be.
+  """
+  digitalProductSet(input: DigitalProductInput!, productId: ID!): DigitalProductSetPayload!
+
   """
   A discount code, which works from its start until its end or its last use.
   """
@@ -9449,6 +9590,14 @@ type Mutation {
   Stock that arrived: each line's quantity added to on hand at the destination, in one adjustment with the reason "movement_received" naming the transfer, never more than is still on the way. Received in full, the transfer is RECEIVED. Needs an Idempotency-Key header.
   """
   inventoryTransferReceive(id: ID!, input: InventoryTransferReceiveInput!): InventoryTransferPayload!
+
+  """Removes a licence key not yet given."""
+  licenceKeyDelete(id: ID!): DigitalDeletePayload!
+
+  """
+  Adds licence keys to a digital product's pool, each kept encrypted and given once: 1000 at most at once, those it has already left out.
+  """
+  licenceKeysAdd(keys: [String!]!, productId: ID!): LicenceKeysAddPayload!
   locationActivate(locationId: ID!): LocationActivatePayload!
 
   """Adds a location. A shop's first location is its primary one."""
@@ -13507,6 +13656,11 @@ type Product {
   description: String!
 
   """
+  How it reaches the buyer, where it is digital (ADR-813); null for goods.
+  """
+  digital: DigitalProduct
+
+  """
   Whether it comes stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where none is said.
   """
   easternWear: EasternWear
@@ -15319,6 +15473,11 @@ type Query {
 
   """What the shop's stock on hand is worth at what it costs the shop."""
   inventoryValue: InventoryValue!
+
+  """
+  A digital product's licence keys, the latest added first: never the keys.
+  """
+  licenceKeys(first: Int! = 50, productId: ID!): [LicenceKey!]!
 
   """
   Taps on the links of the shop's link page over a period (CH-07, ADR-204): which of its links bring shoppers, its chat on WhatsApp among them. Robots and staff previews are left out. Kept from the storefronts every minute.

@@ -141,6 +141,9 @@ export const ID_PREFIXES = {
   pastOrder: 'pord',
   // Products shown as one listing, each a value of its option, as colours are (ADR-799).
   combinedListing: 'cmbl',
+  // A file a digital product sells, and one of its licence keys (ADR-813).
+  digitalFile: 'dfile',
+  licenceKey: 'lkey',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
