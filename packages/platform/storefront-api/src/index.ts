@@ -91,6 +91,7 @@ export {
   type ReportResult,
   type SignUpResult,
   type ContactMessageResult,
+  type WebChatResult,
   type StockWatchResult,
   type StorefrontApiOptions,
 } from './client.js';
@@ -153,3 +154,15 @@ export {
   type ThemePreviewResponse,
 } from './theme.js';
 export { robotsTxt, robotsVerdict, type RobotsVerdict } from './robots.js';
+export {
+  WEB_CHAT_LIMITS,
+  webChatMessagesPath,
+  webChatPath,
+  webChatReadPath,
+  type WebChatErrorResponse,
+  type WebChatMessageJson,
+  type WebChatReadRequest,
+  type WebChatResponse,
+  type WebChatStartRequest,
+  type WebChatWriteRequest,
+} from './web-chat.js';

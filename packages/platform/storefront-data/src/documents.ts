@@ -502,6 +502,11 @@ export interface ShopDoc {
    * before shops could.
    */
   backInStock?: true;
+  /**
+   * The chat its pages offer shoppers (MSG-10, ADR-810), with what it says before they write;
+   * null for Hatti's words. Absent while it is off, as in documents written before shops could.
+   */
+  webChat?: { greeting: string | null };
   /** Cash on delivery: whether it is offered, its fee and its limit, in minor units. */
   cod: { available: boolean; fee: number; limit: number | null };
   /**

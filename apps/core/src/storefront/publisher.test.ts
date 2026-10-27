@@ -299,6 +299,10 @@ describe('What storefront documents an event makes stale', () => {
     ).toEqual([]);
   });
 
+  it('rebuilds the shop when its web chat is turned on or off (ADR-810)', () => {
+    expect(itemsFor(event('web_chat.updated', { enabled: true }))).toEqual(['shop']);
+  });
+
   it('rebuilds the shop when its own domains change, which its document and the directory name', () => {
     for (const type of ['domain.created', 'domain.updated', 'domain.deleted']) {
       expect(itemsFor(event(type, { host: 'www.zari.pk' })), type).toEqual(['shop']);

@@ -70,9 +70,12 @@ export const WHATSAPP_REPLIES = Symbol('WHATSAPP_REPLIES');
 /** A conversation with a customer, as the inbox lists it. */
 export interface ConversationRecord {
   id: string;
-  channel: 'whatsapp';
+  /** Where the customer wrote: WhatsApp, or the online store's chat (ADR-810). */
+  channel: 'whatsapp' | 'web';
   /** E.164: the API masks it as the caller may see it. */
   customerPhone: string;
+  /** The name they gave to chat on the online store; null on WhatsApp. */
+  customerName: string | null;
   /** Whether the customer last wrote to the shop's own number, not Hatti's shared one. */
   viaOwnNumber: boolean;
   status: ConversationStatusValue;
@@ -121,7 +124,9 @@ export type ConversationLabelRecord = {
 
 type ConversationRow = {
   id: string;
+  channel: 'whatsapp' | 'web';
   customer_phone: string;
+  customer_name: string | null;
   via_phone_number_id: string | null;
   status: ConversationStatusValue;
   unread: number;
@@ -462,7 +467,8 @@ export class ConversationsService {
   /**
    * Answers the customer in `body`, from the number they last wrote to, while WhatsApp lets the
    * shop write freely: within a day of their last message. Sent at once; kept, and the
-   * conversation read, once WhatsApp takes it. What WhatsApp refuses is not kept.
+   * conversation read, once WhatsApp takes it. What WhatsApp refuses is not kept. A chat from the
+   * online store is answered there (ADR-810): kept for the shopper's chat to read, at any time.
    */
   async reply(
     tenant: TenantContext,
@@ -479,37 +485,42 @@ export class ConversationsService {
     }
     const found = await this.db.tenant(tenant.shopId, (tx) =>
       tx.execute<{
+        channel: 'whatsapp' | 'web';
         customer_phone: string;
         via_phone_number_id: string | null;
         last_inbound_at: string | Date | null;
       }>(sql`
-        SELECT customer_phone, via_phone_number_id, last_inbound_at
+        SELECT channel, customer_phone, via_phone_number_id, last_inbound_at
           FROM messaging.conversations
          WHERE shop_id = ${tenant.shopId} AND id = ${id}`),
     );
     const conversation = found.rows[0];
     if (!conversation) return failOne(['id'], 'NOT_FOUND', 'No such conversation');
-    const lastInbound = toDateOrNull(conversation.last_inbound_at);
-    if (!lastInbound || now.getTime() - lastInbound.getTime() >= CONVERSATION_WINDOW_MS) {
-      return failOne(
-        ['id'],
-        'WINDOW_CLOSED',
-        'WhatsApp lets a shop answer only within a day of the customer’s last message',
-      );
-    }
-    const provider = await this.#replyingNumber(tenant.shopId, conversation.via_phone_number_id);
-    if (!provider) {
-      return failOne(
-        ['id'],
-        'UNAVAILABLE',
-        conversation.via_phone_number_id
-          ? 'The number the customer wrote to is no longer connected'
-          : 'WhatsApp is not set up to send replies',
-      );
-    }
-    const sent = await provider.sendText(conversation.customer_phone, text);
-    if (!sent.ok) {
-      return failOne(['body'], sent.outcome === 'retry' ? 'UNAVAILABLE' : 'NOT_SENT', sent.error);
+    let providerMessageId: string | null = null;
+    if (conversation.channel === 'whatsapp') {
+      const lastInbound = toDateOrNull(conversation.last_inbound_at);
+      if (!lastInbound || now.getTime() - lastInbound.getTime() >= CONVERSATION_WINDOW_MS) {
+        return failOne(
+          ['id'],
+          'WINDOW_CLOSED',
+          'WhatsApp lets a shop answer only within a day of the customer’s last message',
+        );
+      }
+      const provider = await this.#replyingNumber(tenant.shopId, conversation.via_phone_number_id);
+      if (!provider) {
+        return failOne(
+          ['id'],
+          'UNAVAILABLE',
+          conversation.via_phone_number_id
+            ? 'The number the customer wrote to is no longer connected'
+            : 'WhatsApp is not set up to send replies',
+        );
+      }
+      const sent = await provider.sendText(conversation.customer_phone, text);
+      if (!sent.ok) {
+        return failOne(['body'], sent.outcome === 'retry' ? 'UNAVAILABLE' : 'NOT_SENT', sent.error);
+      }
+      providerMessageId = sent.providerMessageId;
     }
     const actor = actorColumnsOf(tenant.actor);
     return {
@@ -520,7 +531,7 @@ export class ConversationsService {
           INSERT INTO messaging.conversation_messages
                  (shop_id, conversation_id, direction, body, provider_message_id, at, status,
                   actor_kind, actor_id)
-          VALUES (${tenant.shopId}, ${id}, 'outbound', ${text}, ${sent.providerMessageId}, ${at},
+          VALUES (${tenant.shopId}, ${id}, 'outbound', ${text}, ${providerMessageId}, ${at},
                   'sent', ${actor.actorKind}, ${actor.actorId})
           RETURNING id, direction, body, media_kind, at, status, error`);
         const message = rows[0]!;
@@ -689,7 +700,8 @@ const ANSWER_BY = sql`(c.waiting_since + make_interval(mins => (
 
 function conversationSelect(shopId: string) {
   return sql`
-    SELECT c.id, c.customer_phone, c.via_phone_number_id, c.status, c.unread, c.last_message_at,
+    SELECT c.id, c.channel, c.customer_phone, c.customer_name, c.via_phone_number_id, c.status,
+           c.unread, c.last_message_at,
            c.last_inbound_at, c.created_at, c.assignee_id, c.waiting_since, c.labels,
            ${ANSWER_BY} AS answer_by,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
@@ -717,8 +729,9 @@ async function conversationIn(
 function toConversation(row: ConversationRow): ConversationRecord {
   return {
     id: row.id,
-    channel: 'whatsapp',
+    channel: row.channel,
     customerPhone: row.customer_phone,
+    customerName: row.customer_name,
     viaOwnNumber: row.via_phone_number_id !== null,
     status: row.status,
     unread: row.unread,

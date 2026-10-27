@@ -17,6 +17,7 @@ export const MessagingEvents = {
   ConversationReplied: 'conversation.replied',
   ConversationAssigned: 'conversation.assigned',
   ContactMessageReceived: 'contact_message.received',
+  WebChatUpdated: 'web_chat.updated',
 } as const;
 
 /**
@@ -141,6 +142,13 @@ export interface BroadcastSentPayload {
  */
 export interface MarketingAutomationUpdatedPayload {
   kind: string;
+  enabled: boolean;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop's web chat was turned on or off, or its greeting changed (ADR-810). */
+export interface WebChatUpdatedPayload {
   enabled: boolean;
   actorKind: 'app' | 'staff';
   actorId: string;

@@ -674,6 +674,8 @@ export function shopDoc(
   filters: readonly StorefrontFilterRecord[] | null = null,
   /** What its theme's pictures hold, by their files' IDs (ADR-670). */
   pictures: Readonly<Record<string, string>> = {},
+  /** The chat its pages offer, while it is on (ADR-810). */
+  webChat: { greeting: string | null } | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -686,6 +688,8 @@ export function shopDoc(
     whatsapp: preferences.whatsappNumber,
     // Left out while off, so a shop that never turned it on keeps its document as it was.
     ...(backInStock && { backInStock: true as const }),
+    // Left out while off, as back in stock is.
+    ...(webChat && { webChat: { greeting: webChat.greeting } }),
     cod: { available: true, fee: 0, limit: null },
     delivery: {
       charge: Number(delivery.charge),

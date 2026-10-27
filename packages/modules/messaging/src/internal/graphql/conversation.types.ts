@@ -9,6 +9,20 @@ import {
   registerEnumType,
 } from '@nestjs/graphql';
 
+export enum ConversationChannel {
+  WHATSAPP = 'WHATSAPP',
+  WEB = 'WEB',
+}
+
+registerEnumType(ConversationChannel, {
+  name: 'ConversationChannel',
+  description: 'Where a customer wrote to the shop.',
+  valuesMap: {
+    WHATSAPP: { description: "On WhatsApp, to the shop's own number or Hatti's shared one." },
+    WEB: { description: "In the chat on the shop's online store (MSG-10, ADR-810)." },
+  },
+});
+
 export enum ConversationStatus {
   OPEN = 'OPEN',
   CLOSED = 'CLOSED',
@@ -104,11 +118,21 @@ export class ConversationMessageConnection {
 @ObjectType({
   description:
     "A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to the shop's " +
-    "own number, or to Hatti's shared one in answer to the shop.",
+    "own number, or to Hatti's shared one in answer to the shop; or in the chat on its online " +
+    'store (ADR-810).',
 })
 export class Conversation {
   @Field(() => ID)
   id!: string;
+
+  @Field(() => ConversationChannel, { description: 'Where they wrote.' })
+  channel!: ConversationChannel;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The name they gave to chat on the online store; null on WhatsApp.',
+  })
+  customerName!: string | null;
 
   @Field({ description: "The customer's number, masked as the caller may see it." })
   customerPhone!: string;
@@ -135,7 +159,8 @@ export class Conversation {
     nullable: true,
     description:
       'Until when the shop may answer in its own words: a day after the customer last wrote ' +
-      '(ADR-546). Null if they never wrote.',
+      '(ADR-546). Null if they never wrote, and for a chat on the online store, answered at any ' +
+      'time.',
   })
   replyableUntil!: Date | null;
 

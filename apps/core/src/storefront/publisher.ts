@@ -47,6 +47,7 @@ import { CheckoutEvents, DeliveryService } from '@hatti/checkout/public';
 import {
   MessagingEvents,
   automationOnIn,
+  webChatIn,
   type MarketingAutomationUpdatedPayload,
 } from '@hatti/messaging/public';
 import type { Database, Tx } from '@hatti/db';
@@ -322,6 +323,9 @@ export function itemsFor(event: DomainEvent): string[] {
         'back_in_stock'
         ? [Items.shop]
         : [];
+    case MessagingEvents.WebChatUpdated:
+      // Whether its pages offer the chat, and what it says (ADR-810).
+      return [Items.shop];
     case OnlineStoreEvents.DomainCreated:
     case OnlineStoreEvents.DomainUpdated:
     case OnlineStoreEvents.DomainDeleted:
@@ -525,6 +529,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.TranslationsUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
   MessagingEvents.MarketingAutomationUpdated,
+  MessagingEvents.WebChatUpdated,
   MarketingEvents.MetaConversionsUpdated,
   MarketingEvents.MetaConversionsDeleted,
   MarketingEvents.TikTokEventsUpdated,
@@ -1003,6 +1008,7 @@ export class StorefrontPublisher {
       googleMeasurementId,
       await this.services.filters.shownStorefrontFiltersOf(tx, shopId),
       theme ? await this.#pictures(tx, shopId, theme) : {},
+      await webChatIn(tx, shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

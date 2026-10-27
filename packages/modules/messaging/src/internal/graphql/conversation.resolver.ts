@@ -30,6 +30,7 @@ import {
   ConversationMessagesArgs,
   ConversationReplyPayload,
   ConversationReplyStatus,
+  ConversationChannel,
   ConversationStatus,
   ConversationsArgs,
   ConversationUpdatePayload,
@@ -249,6 +250,8 @@ function payload(
 export function toConversation(tenant: TenantContext, record: ConversationRecord): Conversation {
   return Object.assign(new Conversation(), {
     id: toPublicId('conversation', record.id),
+    channel: record.channel.toUpperCase() as ConversationChannel,
+    customerName: record.customerName,
     customerPhone: shownPhone(tenant, record.customerPhone),
     viaOwnNumber: record.viaOwnNumber,
     status: record.status.toUpperCase() as ConversationStatus,
@@ -256,7 +259,9 @@ export function toConversation(tenant: TenantContext, record: ConversationRecord
     lastMessageAt: record.lastMessageAt,
     lastInboundAt: record.lastInboundAt,
     replyableUntil:
-      record.lastInboundAt && new Date(record.lastInboundAt.getTime() + CONVERSATION_WINDOW_MS),
+      record.channel === 'whatsapp' && record.lastInboundAt
+        ? new Date(record.lastInboundAt.getTime() + CONVERSATION_WINDOW_MS)
+        : null,
     waitingSince: record.waitingSince,
     answerBy: record.answerBy,
     labels: record.labels,

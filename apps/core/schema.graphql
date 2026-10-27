@@ -2988,7 +2988,7 @@ type ContactMessageUpdatePayload {
 }
 
 """
-A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to the shop's own number, or to Hatti's shared one in answer to the shop.
+A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to the shop's own number, or to Hatti's shared one in answer to the shop; or in the chat on its online store (ADR-810).
 """
 type Conversation {
   """
@@ -3000,7 +3000,13 @@ type Conversation {
   The member of staff it is given to, to answer; null while no one has it, and once they leave the shop.
   """
   assignee: ConversationAssignee
+
+  """Where they wrote."""
+  channel: ConversationChannel!
   createdAt: DateTime!
+
+  """The name they gave to chat on the online store; null on WhatsApp."""
+  customerName: String
 
   """The customer's number, masked as the caller may see it."""
   customerPhone: String!
@@ -3019,7 +3025,7 @@ type Conversation {
   lastMessageAt: DateTime!
 
   """
-  Until when the shop may answer in its own words: a day after the customer last wrote (ADR-546). Null if they never wrote.
+  Until when the shop may answer in its own words: a day after the customer last wrote (ADR-546). Null if they never wrote, and for a chat on the online store, answered at any time.
   """
   replyableUntil: DateTime
   status: ConversationStatus!
@@ -3048,6 +3054,15 @@ type ConversationAssignee {
   """Their account: usr_…"""
   id: ID!
   name: String!
+}
+
+"""Where a customer wrote to the shop."""
+enum ConversationChannel {
+  """In the chat on the shop's online store (MSG-10, ADR-810)."""
+  WEB
+
+  """On WhatsApp, to the shop's own number or Hatti's shared one."""
+  WHATSAPP
 }
 
 type ConversationConnection {
@@ -10506,6 +10521,11 @@ type Mutation {
   urlRedirectsStraighten: UrlRedirectsStraightenPayload!
 
   """
+  Turns the chat on the shop's online store on or off, or changes its greeting.
+  """
+  webChatSettingsUpdate(input: WebChatSettingsInput!): WebChatSettingsUpdatePayload!
+
+  """
   Subscribes an app to a topic at an https address: the calling app, or for the owner and managers the app `appId` names. The app must be able to read what the topic tells of.
   """
   webhookSubscriptionCreate(appId: ID, topic: WebhookSubscriptionTopic!, webhookSubscription: WebhookSubscriptionInput!): WebhookSubscriptionPayload!
@@ -16024,6 +16044,9 @@ type Query {
   """
   urlRedirectsExport: UrlRedirectsExport!
 
+  """The chat on the shop's online store."""
+  webChatSettings: WebChatSettings!
+
   """
   A webhook subscription's deliveries of the last 30 days, the latest first, `first` of them (20 unless given, 100 at most).
   """
@@ -19428,6 +19451,34 @@ enum VitalRating {
   GOOD
   NEEDS_IMPROVEMENT
   POOR
+}
+
+"""
+The chat on the shop's online store (MSG-10, ADR-810): shoppers write from its pages, giving their name and mobile number, and its staff answer in the inbox.
+"""
+type WebChatSettings {
+  """Whether the online store offers the chat."""
+  enabled: Boolean!
+
+  """What the chat says before the shopper writes; null for Hatti's words."""
+  greeting: String
+
+  """When the shop last changed it; null for one never set."""
+  updatedAt: DateTime
+}
+
+input WebChatSettingsInput {
+  enabled: Boolean
+
+  """
+  Up to 200 characters; null or blank for Hatti's words. Left out, it stays.
+  """
+  greeting: String
+}
+
+type WebChatSettingsUpdatePayload {
+  userErrors: [UserError!]!
+  webChatSettings: WebChatSettings
 }
 
 """A measurement of how fast a page was for a shopper (ADR-485)."""

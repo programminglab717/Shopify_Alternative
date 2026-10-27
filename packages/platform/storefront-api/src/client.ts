@@ -75,6 +75,15 @@ import {
   type RightsComplaintRequest,
 } from './reports.js';
 import {
+  webChatMessagesPath,
+  webChatPath,
+  webChatReadPath,
+  type WebChatErrorResponse,
+  type WebChatResponse,
+  type WebChatStartRequest,
+  type WebChatWriteRequest,
+} from './web-chat.js';
+import {
   contactMessagesPath,
   type ContactMessageErrorResponse,
   type ContactMessageRequest,
@@ -115,6 +124,13 @@ export type CartActionResult =
 
 export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
 export type ReportResult = ({ ok: true } & ReportResponse) | ({ ok: false } & ReportErrorResponse);
+/**
+ * What a web chat said back (ADR-810): its messages, and its token when it starts; what was
+ * wrong; or null while the shop's chat is off, or for a session that is none.
+ */
+export type WebChatResult =
+  ({ ok: true } & WebChatResponse) | ({ ok: false } & WebChatErrorResponse) | null;
+
 export type ContactMessageResult =
   ({ ok: true } & ContactMessageResponse) | ({ ok: false } & ContactMessageErrorResponse);
 
@@ -382,6 +398,33 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return { ok: true, ...((await response.json()) as ContactMessageResponse) };
+  }
+
+  /** Starts a shopper's chat with the shop (ADR-810): its token and messages. */
+  async webChatStart(shopId: string, request: WebChatStartRequest): Promise<WebChatResult> {
+    return this.#webChat(webChatPath(shopId), request);
+  }
+
+  /** Another message of a shopper's chat: its messages after. */
+  async webChatWrite(shopId: string, request: WebChatWriteRequest): Promise<WebChatResult> {
+    return this.#webChat(webChatMessagesPath(shopId), request);
+  }
+
+  /** A shopper's chat's messages, the shop's answers among them read from now. */
+  async webChatRead(shopId: string, token: string): Promise<WebChatResult> {
+    return this.#webChat(webChatReadPath(shopId), { token });
+  }
+
+  async #webChat(path: string, request: object): Promise<WebChatResult> {
+    const response = await this.#request('POST', path, null, request);
+    if (response.status === 404) return null;
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as WebChatErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as WebChatResponse) };
   }
 
   /** A shopper's report of the store (ADR-460): its number, or what was wrong with it. */

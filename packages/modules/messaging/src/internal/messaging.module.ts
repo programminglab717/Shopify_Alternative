@@ -9,6 +9,8 @@ import { Module, type DynamicModule } from '@nestjs/common';
 import { AutomationsService } from './automations.service.js';
 import { ReferralResolver } from './graphql/referral.resolver.js';
 import { ReferralProgramService } from './referrals.service.js';
+import { StorefrontWebChatController, WebChatService } from './web-chat.service.js';
+import { WebChatResolver } from './graphql/web-chat.resolver.js';
 import {
   ContactMessagesService,
   StorefrontContactMessagesController,
@@ -75,6 +77,8 @@ export class MessagingModule {
         StopLinkController,
         // Messages through the online store's contact form (ADR-589).
         StorefrontContactMessagesController,
+        // Shoppers' chats from the online store (ADR-810).
+        StorefrontWebChatController,
       ],
       providers: [
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
@@ -109,6 +113,8 @@ export class MessagingModule {
         AutomationResolver,
         ReferralProgramService,
         ReferralResolver,
+        WebChatService,
+        WebChatResolver,
         SmsSendersService,
         SmsSenderResolver,
         PushService,
@@ -125,6 +131,7 @@ export class MessagingModule {
         AutomationsService,
         StockWatchService,
         ReferralProgramService,
+        WebChatService,
         PushService,
       ],
     };

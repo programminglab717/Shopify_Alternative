@@ -33,6 +33,7 @@ export {
   type WhatsAppAccountDisconnectedPayload,
   type BroadcastChangedPayload,
   type MarketingAutomationUpdatedPayload,
+  type WebChatUpdatedPayload,
   type WhatsAppTemplateChangedPayload,
   type WhatsAppTemplateStatusPayload,
 } from '../internal/events.js';
@@ -211,6 +212,13 @@ export {
   type AutomationKind,
   type AutomationRecord,
 } from '../internal/automations.service.js';
+export {
+  WebChatService,
+  webChatIn,
+  type WebChatMessageRecord,
+  type WebChatSettingsInput,
+  type WebChatSettingsRecord,
+} from '../internal/web-chat.service.js';
 export {
   REFERRALS,
   REFERRAL_REFUSALS,
