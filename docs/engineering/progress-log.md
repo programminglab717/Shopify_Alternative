@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Invite links on the account page
+### 8ba84d1 · Invite links on the account page
 
 * **Bring a friend:** a signed-in shopper sees their invite link on their account, what each
   side is given, and a button to share it on WhatsApp (MKT-07, [ADR-809](../architecture/13-decision-log.md#adr-809--a-signed-in-shopper-finds-their-invite-link-on-their-account-with-what-each-side-is-given-to-share-on-whatsapp)). MKT-07 is done.
