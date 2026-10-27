@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-813 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-814 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -821,6 +821,7 @@
 | 811 | Hatti Base offers the chat from a button on every page, its session in a cookie the page's script never reads | Accepted |
 | 812 | The admin turns the chat on in Customer messages, and its inbox shows chats from the online store by name, answered at any time | Accepted |
 | 813 | A product made digital sells files kept privately and licence keys kept sealed, each key given once to one unit of an order's line | Accepted |
+| 814 | A digital product is delivered once its order is paid: each line a link of its own to the files, counted by file, and each unit a key, both sent on WhatsApp | Accepted |
 
 ---
 
@@ -26810,3 +26811,27 @@
   delivery, and once the order is paid its buyer is sent their links and keys (ADR-814 on).
   Building this found two optional services Nest had left out since they were written, typed
   as unions with null; a test now walks every provider of the running API for that.
+
+## ADR-814 · A digital product is delivered once its order is paid: each line a link of its own to the files, counted by file, and each unit a key, both sent on WhatsApp
+
+* **Context:** a digital product keeps its files privately and its keys sealed (ADR-813).
+  Buyers must get them once they have paid, as a gift card's code is sent (ADR-451), and the
+  files must not be passed around for ever.
+* **Decision:** the worker hears an order paid. Once it is paid in full and not cancelled, each
+  of its lines of a digital product with files ready is given a link of its own,
+  `/dl/<secret>`: 32 random bytes kept only as their SHA-256, lasting the product's days, each
+  file downloading as many times as the product allows for each unit of the line. Its
+  customer is sent it on WhatsApp in `hatti_digital_download`, its button the link. Each unit
+  of a line of one that gives keys is given a key from its pool and sent it in
+  `hatti_licence_key`, a secret dropped from the message once sent. Both are sent whatever the
+  shop's settings: they are what the customer bought. Each is given once, however often the
+  payment is heard. The link's page names the shop and the product and lists the files with
+  the downloads each has left; a download is counted first, then storage signs the file for
+  five minutes as an attachment, saved rather than shown. The page is plain HTML with nothing
+  to load, never cached, indexed, framed or referred; its secret is found before any shop is
+  known, an active shop's alone, as an order's link is (migration 0019).
+* **Consequences:** a buyer with the link can share it, as with any download, within its
+  downloads and days. The link's secret is not kept: one lost is not sent again yet. A unit
+  sold when no key is left is given none until the shop adds more (ADR-816). The two templates
+  are Hatti's, approved by Meta with the rest (OWN-23). A checkout of digital products alone
+  still asks for an address and offers cash on delivery until ADR-815.

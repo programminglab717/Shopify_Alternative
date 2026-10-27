@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Digital products delivered
+
+* **Once paid:** each line of a digital product gets a link of its own to the files, counted
+  by file and lasting the product's days, and each unit a licence key, both on WhatsApp
+  (CAT-13, [ADR-814](../architecture/13-decision-log.md#adr-814--a-digital-product-is-delivered-once-its-order-is-paid-each-line-a-link-of-its-own-to-the-files-counted-by-file-and-each-unit-a-key-both-sent-on-whatsapp)). Two new Hatti templates for Meta to approve with the rest (OWN-23).
+* 4329 tests (6 new).
+
 ### 9a3231c · Digital products, and two services Nest left out
 
 * **Digital products:** a product is made digital, with files kept privately and licence keys
