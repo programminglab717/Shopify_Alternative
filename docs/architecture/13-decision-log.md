@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-817 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-818 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -825,6 +825,7 @@
 | 815 | A checkout of digital products alone asks for no address, charges no delivery and takes no cash on delivery; a line given all it sells is fulfilled and delivered at once | Accepted |
 | 816 | A product is made digital from its page, its files uploaded and its keys added there; keys added are given at once to the paid orders whose units were sold none | Accepted |
 | 817 | A shop saves reports of its own over the sales report: broken down one way, the columns chosen in order, over a period that moves with the day, run when asked and exported as a workbook | Accepted |
+| 818 | A scheduled export may send a custom report in place of the orders: run over the period that ended, true profit as the plan has it, and emailed as a workbook named for the report and the period | Accepted |
 
 ---
 
@@ -26910,3 +26911,23 @@
 * **Consequences:** a report answers its question again each time with no dates typed. Filters
   (one channel's products, say) and reports of customers or stock are left for shops to ask
   for; the inventory and cohort reports stay as they are. Scheduling them follows (ADR-818).
+
+## ADR-818 · A scheduled export may send a custom report in place of the orders: run over the period that ended, true profit as the plan has it, and emailed as a workbook named for the report and the period
+
+* **Context:** custom reports (ADR-817) answer a question again each time they are run, but
+  ANL-06 asks for them on a schedule too, as accountants and owners want last week's or last
+  month's figures in their inbox. Scheduled exports (ADR-183) already send a file by email each
+  day, week or month to the member of staff who asked, with leases, retries and a check that
+  they may still export.
+* **Decision:** a schedule may name a custom report (`customReportId` on
+  `orderExportScheduleCreate`), and then sends it in place of the orders: the report run over
+  the day, week or month that ended, not its own period, as a workbook (ADR-817) whatever
+  format was asked, with no search. The rules of scheduled exports hold: only staff who export
+  orders schedule one, to their proved email, and it goes as them while they still may. True
+  profit's columns are left out where the shop's plan has none, asked as each period is sent.
+  The file is named for the report and the period ("net-sales-2026-09-28-to-2026-10-04.xlsx");
+  the email names the report and the period, in the member's language. Deleting the report
+  deletes its schedules. A worker that cannot run reports leaves them unsent, saying so.
+* **Consequences:** ANL-06 is done in code but for the admin's page (ADR-819). A report goes to
+  the member who scheduled it alone; sending to others, such as an outside accountant, waits
+  for a way to prove their email.

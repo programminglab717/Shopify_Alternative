@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Custom reports scheduled
+
+* **On a schedule:** a scheduled export may send a custom report in place of the orders, run
+  over the period that ended and emailed as a workbook to the member who scheduled it
+  (ANL-06, [ADR-818](../architecture/13-decision-log.md#adr-818--a-scheduled-export-may-send-a-custom-report-in-place-of-the-orders-run-over-the-period-that-ended-true-profit-as-the-plan-has-it-and-emailed-as-a-workbook-named-for-the-report-and-the-period)). The admin's page follows.
+* 4363 tests (2 new).
+
 ### cb3cafc · Custom reports
 
 * **Saved reports:** a shop saves reports of its own over the sales report, broken down one
