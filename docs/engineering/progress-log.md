@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Sales for the accountant
+### 01a259d · Sales for the accountant
 
 * **Sales report as Excel:** `salesReportExport` gives the report as a workbook of its days,
   weeks or months with their total, the products that sold most and each channel's sales, which
