@@ -29,6 +29,7 @@ import { TextField } from '../ui/field';
 import { CheckField, Problems, SelectField, settingProblem } from './settings-form';
 import { BackToSettings } from './settings-page';
 import { SmsSenderCard } from './sms-sender';
+import { WebChatCard } from './web-chat';
 
 /** What the shop's customers hear of their orders, which it may turn off (MSG-01). */
 const TO_CUSTOMERS = [
@@ -493,6 +494,7 @@ export function MessagesPage() {
         />
       )}
       <SmsSenderCard />
+      <WebChatCard />
       <SentMessages />
     </div>
   );

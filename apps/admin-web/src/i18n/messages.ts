@@ -2722,6 +2722,18 @@ const en = {
   'settings.messagesHint': 'WhatsApp or SMS, which messages go, and alerts to you',
   'settings.whatsapp': 'Your WhatsApp number',
   'settings.whatsappHint': "Your shop's own number, which your broadcasts go from",
+  'webChat.title': 'Chat on your online store',
+  'webChat.hint':
+    'Shoppers write to you from a button on every page, giving their name and mobile number. Their chats come to your inbox beside WhatsApp, and you answer them there.',
+  'webChat.on': 'Offer the chat on your online store',
+  'webChat.greeting': 'What the chat says first (optional)',
+  'webChat.greetingHint':
+    'Up to {max} characters. Left blank, it says: Ask us anything, and we will answer here.',
+  'webChat.save': 'Save',
+  'webChat.saved': 'Saved.',
+  'inbox.webChat': 'Web chat',
+  'inbox.wroteOnWeb':
+    'Wrote in the chat on your online store. Answer here at any time: they read it when they open the chat again.',
   'messages.title': 'Customer messages',
   'messages.how': 'How they go',
   'messages.howHint':
@@ -8707,6 +8719,18 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'settings.messagesHint': 'واٹس ایپ یا SMS، کون سے میسج جائیں، اور آپ کو الرٹس',
   'settings.whatsapp': 'آپ کا واٹس ایپ نمبر',
   'settings.whatsappHint': 'آپ کی دکان کا اپنا نمبر، جس سے آپ کے براڈکاسٹ جاتے ہیں',
+  'webChat.title': 'آپ کے آن لائن اسٹور پر چیٹ',
+  'webChat.hint':
+    'خریدار ہر صفحے پر ایک بٹن سے، اپنا نام اور موبائل نمبر دے کر آپ کو لکھتے ہیں۔ ان کی چیٹس واٹس ایپ کے ساتھ آپ کے ان باکس میں آتی ہیں، اور آپ وہیں جواب دیتے ہیں۔',
+  'webChat.on': 'اپنے آن لائن اسٹور پر چیٹ پیش کریں',
+  'webChat.greeting': 'چیٹ پہلے کیا کہے (اختیاری)',
+  'webChat.greetingHint':
+    'زیادہ سے زیادہ {max} حروف۔ خالی چھوڑیں تو یہ کہے گی: کچھ بھی پوچھیں، ہم یہیں جواب دیں گے۔',
+  'webChat.save': 'محفوظ کریں',
+  'webChat.saved': 'محفوظ ہو گیا۔',
+  'inbox.webChat': 'ویب چیٹ',
+  'inbox.wroteOnWeb':
+    'آپ کے آن لائن اسٹور کی چیٹ میں لکھا۔ یہاں کسی بھی وقت جواب دیں: وہ چیٹ دوبارہ کھولنے پر پڑھ لیں گے۔',
   'messages.title': 'کسٹمر میسجز',
   'messages.how': 'کیسے جاتے ہیں',
   'messages.howHint':

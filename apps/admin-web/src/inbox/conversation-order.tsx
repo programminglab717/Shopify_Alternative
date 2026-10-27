@@ -25,7 +25,8 @@ export function ConversationOrder({ conversation }: { conversation: Conversation
   const shop = useShop();
   const takes = permits(shop, TAKES_DRAFTS);
   const open =
-    conversation.replyableUntil !== null && new Date(conversation.replyableUntil) > new Date();
+    conversation.channel === 'WEB' ||
+    (conversation.replyableUntil !== null && new Date(conversation.replyableUntil) > new Date());
   const drafts = useAdminQuery<DraftOrdersData>(
     ['draftOrders', 'OPEN', ''],
     DraftOrdersQuery,

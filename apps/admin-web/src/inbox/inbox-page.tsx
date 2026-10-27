@@ -196,12 +196,20 @@ function ConversationRow({
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-baseline gap-2">
             <span className={`num ${unread ? 'font-semibold' : 'font-medium'}`}>
-              {shownPhone(conversation.customerPhone)}
+              {conversation.channel === 'WEB' && conversation.customerName
+                ? `${conversation.customerName} · ${shownPhone(conversation.customerPhone)}`
+                : shownPhone(conversation.customerPhone)}
             </span>
-            {!conversation.viaOwnNumber && (
+            {conversation.channel === 'WEB' ? (
               <span className="text-secondary text-[length:var(--hatti-type-caption-size)]">
-                {t('inbox.viaHatti')}
+                {t('inbox.webChat')}
               </span>
+            ) : (
+              !conversation.viaOwnNumber && (
+                <span className="text-secondary text-[length:var(--hatti-type-caption-size)]">
+                  {t('inbox.viaHatti')}
+                </span>
+              )
             )}
             <span className="ms-auto shrink-0 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
               {formatRelative(conversation.lastMessageAt, timezone, locale)}

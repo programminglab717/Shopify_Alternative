@@ -154,6 +154,8 @@ function ReplyBox({
     setBody((current) => (current.trim() ? `${current.trimEnd()}${gap}${text}` : text));
   const [problem, setProblem] = useState<string | null>(null);
   const until = conversation.replyableUntil;
+  // A chat from the online store is answered at any time (ADR-810).
+  const web = conversation.channel === 'WEB';
   const text = body.trim();
 
   const onSend = async (event: FormEvent) => {
@@ -169,7 +171,7 @@ function ReplyBox({
     }
   };
 
-  if (!until || new Date(until).getTime() <= Date.now()) {
+  if (!web && (!until || new Date(until).getTime() <= Date.now())) {
     return (
       <div className="flex flex-col gap-2">
         {problem && <Alert tone="danger">{problem}</Alert>}
@@ -209,9 +211,11 @@ function ReplyBox({
           {t('inbox.send')}
         </Button>
       </div>
-      <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-        {t('inbox.replyUntil', { time: formatDateTime(until, timezone, locale) })}
-      </p>
+      {until && !web && (
+        <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('inbox.replyUntil', { time: formatDateTime(until, timezone, locale) })}
+        </p>
+      )}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </form>
   );
@@ -407,11 +411,19 @@ export function ConversationPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="num flex items-center gap-2 text-[length:var(--hatti-type-display-size)] font-semibold">
-            {shownPhone(conversation.customerPhone)}
+            {conversation.channel === 'WEB' && conversation.customerName
+              ? `${conversation.customerName} · ${shownPhone(conversation.customerPhone)}`
+              : shownPhone(conversation.customerPhone)}
             {conversation.unread > 0 && <UnreadBadge count={conversation.unread} />}
           </h1>
           <p className="text-secondary">
-            {t(conversation.viaOwnNumber ? 'inbox.wroteToOwn' : 'inbox.wroteToHatti')}
+            {t(
+              conversation.channel === 'WEB'
+                ? 'inbox.wroteOnWeb'
+                : conversation.viaOwnNumber
+                  ? 'inbox.wroteToOwn'
+                  : 'inbox.wroteToHatti',
+            )}
           </p>
         </div>
         {works && (

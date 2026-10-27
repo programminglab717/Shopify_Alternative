@@ -5072,8 +5072,27 @@ export interface ConversationMessageValue {
   error: string | null;
 }
 
+/** The chat on the shop's online store (ADR-810). */
+export interface WebChatSettingsValue {
+  enabled: boolean;
+  greeting: string | null;
+  updatedAt: string | null;
+}
+
+export interface WebChatSettingsData {
+  webChatSettings: WebChatSettingsValue;
+}
+
+export interface WebChatSettingsUpdateData {
+  webChatSettingsUpdate: { webChatSettings: WebChatSettingsValue | null; userErrors: UserError[] };
+}
+
 export interface ConversationValue {
   id: string;
+  /** Where they wrote (ADR-810); absent from a fake core: WhatsApp. */
+  channel?: 'WHATSAPP' | 'WEB';
+  /** The name they gave to chat on the online store; null on WhatsApp. */
+  customerName?: string | null;
   customerPhone: string;
   viaOwnNumber: boolean;
   status: ConversationStatus;

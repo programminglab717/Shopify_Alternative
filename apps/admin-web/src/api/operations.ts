@@ -10004,6 +10004,40 @@ export const WhatsAppTemplatesQuery = /* GraphQL */ `
   ${WHATSAPP_TEMPLATE}
 `;
 
+const WEB_CHAT_SETTINGS = /* GraphQL */ `
+  fragment WebChatSettingsFields on WebChatSettings {
+    enabled
+    greeting
+    updatedAt
+  }
+`;
+
+/** The chat on the shop's online store (MSG-10, ADR-812). */
+export const WebChatSettingsQuery = /* GraphQL */ `
+  query WebChatSettings {
+    webChatSettings {
+      ...WebChatSettingsFields
+    }
+  }
+  ${WEB_CHAT_SETTINGS}
+`;
+
+export const WebChatSettingsUpdateMutation = /* GraphQL */ `
+  mutation WebChatSettingsUpdate($input: WebChatSettingsInput!) {
+    webChatSettingsUpdate(input: $input) {
+      webChatSettings {
+        ...WebChatSettingsFields
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+  ${WEB_CHAT_SETTINGS}
+`;
+
 const MARKETING_AUTOMATION = /* GraphQL */ `
   fragment AutomationFields on MarketingAutomation {
     kind
@@ -10529,6 +10563,8 @@ const CONVERSATION_MESSAGE = /* GraphQL */ `
 const CONVERSATION = /* GraphQL */ `
   fragment ConversationFields on Conversation {
     id
+    channel
+    customerName
     customerPhone
     viaOwnNumber
     status

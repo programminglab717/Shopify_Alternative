@@ -68,19 +68,27 @@ function inboxCore(
     replyableUntil = LATER,
     replyErrors = [],
     empty = false,
+    web = false,
   }: {
     phone?: string;
     replyableUntil?: string;
     /** What the core refuses each reply with, in turn; a reply past them is sent. */
     replyErrors?: UserError[][];
     empty?: boolean;
+    /** The first written in the chat on the online store (ADR-810), answered at any time. */
+    web?: boolean;
   } = {},
 ) {
   const thread = THREAD.map((each) => ({ ...each }));
   const conversations = empty
     ? []
     : [
-        conversation('conv_1', phone, { unread: 2, replyableUntil, lastMessage: thread.at(-1)! }),
+        conversation('conv_1', phone, {
+          unread: 2,
+          replyableUntil: web ? null : replyableUntil,
+          lastMessage: thread.at(-1)!,
+          ...(web && { channel: 'WEB', customerName: 'Ayesha Khan' }),
+        }),
         conversation('conv_2', '+923211234567', {
           viaOwnNumber: false,
           lastMessage: message('x', 'OUTBOUND', 'Your parcel left today'),
@@ -375,6 +383,30 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
     ).toBeTruthy();
     expect(screen.queryByLabelText('Reply')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+  });
+
+  it('shows a chat from the online store by the name given, answered at any time (ADR-812)', async () => {
+    const core = inboxCore('owner', { web: true });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/inbox');
+    const item = (await screen.findByText(/^Ayesha Khan · /)).closest('a')!;
+    expect(within(item).getByText('Web chat')).toBeTruthy();
+
+    cleanup();
+    renderAdmin('/shop_1/inbox/conv_1');
+    expect(
+      await screen.findByText(
+        'Wrote in the chat on your online store. Answer here at any time: they read it when they open the chat again.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Ayesha Khan · /);
+    // No day to answer within, and nothing said of one.
+    expect(screen.queryByText(/You can answer in your own words until/)).toBeNull();
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Yes, in medium' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() =>
+      expect(sentOf(core, 'ConversationReply')).toEqual([{ id: 'conv_1', body: 'Yes, in medium' }]),
+    );
   });
 
   it('closes a conversation and opens it again', async () => {

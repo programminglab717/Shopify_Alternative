@@ -72,8 +72,20 @@ function core(role: StaffRole, requests: Request[] = []) {
   let settings: Record<string, unknown> = SETTINGS;
   const kept = [...requests];
   const at = { createdAt: '2026-10-08T09:00:00Z', decidedAt: null };
+  let webChat = {
+    enabled: false,
+    greeting: null as string | null,
+    updatedAt: null as string | null,
+  };
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'WebChatSettings':
+        return { webChatSettings: webChat };
+      case 'WebChatSettingsUpdate': {
+        const input = variables.input as { enabled: boolean; greeting: string | null };
+        webChat = { ...input, updatedAt: '2026-10-27T09:00:00Z' };
+        return { webChatSettingsUpdate: { webChatSettings: webChat, userErrors: [] } };
+      }
       case 'SmsSender':
         return {
           smsSender: {
@@ -311,6 +323,29 @@ describe('Customer messages', () => {
       within(card).getByText('The shop’s owner and managers ask for a name of its own.'),
     ).toBeTruthy();
     expect(within(card).queryByRole('button', { name: 'Ask Hatti' })).toBeNull();
+  });
+
+  it('turns the chat on the online store on with a greeting of its own (ADR-812)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const card = await screen.findByRole('region', { name: 'Chat on your online store' });
+    const on = (await within(card).findByLabelText(
+      'Offer the chat on your online store',
+    )) as HTMLInputElement;
+    expect(on.checked).toBe(false);
+    const save = within(card).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(on);
+    fireEvent.change(within(card).getByLabelText('What the chat says first (optional)'), {
+      target: { value: ' Ask us about sizes! ' },
+    });
+    fireEvent.click(save);
+    expect(await within(card).findByText('Saved.')).toBeTruthy();
+    expect(sentOf(fake, 'WebChatSettingsUpdate')).toEqual([
+      { input: { enabled: true, greeting: 'Ask us about sizes!' } },
+    ]);
   });
 
   it('lists the messages sent, by status, with their orders and why one failed', async () => {
