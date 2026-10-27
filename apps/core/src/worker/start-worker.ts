@@ -457,6 +457,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new MessagesService(database),
           new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
           config.ENCRYPTION_KEYS ?? null,
+          new FulfillmentService(database, new StockService()),
         ),
         cashback: new CashbackRewards(database),
         referrals: new ReferralRewards(database),

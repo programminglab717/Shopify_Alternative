@@ -55,6 +55,7 @@ import {
 } from './cod-rules.js';
 import type { TrustBadgeValue } from './trust-badges.js';
 import {
+  DIGITAL_ADDRESS,
   itemName,
   shownProperties,
   type CheckoutDiscount,
@@ -389,9 +390,10 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
               : (pastLimit ?? 0n)
             : 0n,
           giftCard: view.giftCard?.refusal ? null : view.giftCard,
+          digital: view.digital === true,
         },
         view.tax,
-        view.countsFrom ?? null,
+        view.digital ? null : (view.countsFrom ?? null),
       ),
       discountSection(discount, problem?.kind === 'discount' ? problem : null, discounts),
       orderable && giftCardSection(view.giftCard, problem?.kind === 'gift_card' ? problem : null),
@@ -413,10 +415,15 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             autocomplete: 'tel',
             required: true,
             kind: 'tel',
-            hint: {
-              en: 'The shop and the courier call this number.',
-              ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
-            },
+            hint: view.digital
+              ? {
+                  en: 'Your downloads and keys come to this number on WhatsApp.',
+                  ur: 'آپ کی ڈاؤن لوڈز اور کیز اس نمبر پر واٹس ایپ پر آئیں گی۔',
+                }
+              : {
+                  en: 'The shop and the courier call this number.',
+                  ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
+                },
           })}
           ${field('email', LABELS.email, form, errors, {
             autocomplete: 'email',
@@ -427,40 +434,45 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             },
           })}
           ${marketingChoices(shop.name, view.marketing, form.marketing)}
-          ${pickupChoices(view.pickup, pickupAt)}
-          ${field('city', LABELS.city, form, errors, {
-            autocomplete: 'address-level2',
-            required: true,
-            list: 'cities',
-          })}
-          <datalist id="cities">
-            ${PK_CITIES.map((city) => html`<option value="${city.name}"></option>`)}
-          </datalist>
-          ${field('address1', LABELS.address1, form, errors, {
-            autocomplete: 'address-line1',
-            required: true,
-          })}
-          ${field('address2', LABELS.address2, form, errors, {
-            autocomplete: 'address-line2',
-            list: 'areas',
-          })}
-          ${areaList(form.city)}
-          ${field('landmark', LABELS.landmark, form, errors, {
-            autocomplete: 'address-line3',
-            hint: {
-              en: 'A mosque, school or shop near you that the rider can ask for.',
-              ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
-            },
-          })}
-          ${provinceField(form.province, errors)}
-          ${locationField(
-            { latitude: form.latitude ?? '', longitude: form.longitude ?? '' },
-            errors,
-            form.city,
-            view.map,
-          )}
-          ${mapLinkField(form.mapLink ?? '', errors)} ${giftMessageField(view.gift, form)}
-          ${deliverySlotField(view.deliverySlots, form, problem?.kind === 'delivery_slot')}
+          ${
+            // Digital products alone: nowhere to deliver them (ADR-815).
+            !view.digital &&
+            html`${pickupChoices(view.pickup, pickupAt)}
+              ${field('city', LABELS.city, form, errors, {
+                autocomplete: 'address-level2',
+                required: true,
+                list: 'cities',
+              })}
+              <datalist id="cities">
+                ${PK_CITIES.map((city) => html`<option value="${city.name}"></option>`)}
+              </datalist>
+              ${field('address1', LABELS.address1, form, errors, {
+                autocomplete: 'address-line1',
+                required: true,
+              })}
+              ${field('address2', LABELS.address2, form, errors, {
+                autocomplete: 'address-line2',
+                list: 'areas',
+              })}
+              ${areaList(form.city)}
+              ${field('landmark', LABELS.landmark, form, errors, {
+                autocomplete: 'address-line3',
+                hint: {
+                  en: 'A mosque, school or shop near you that the rider can ask for.',
+                  ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
+                },
+              })}
+              ${provinceField(form.province, errors)}
+              ${locationField(
+                { latitude: form.latitude ?? '', longitude: form.longitude ?? '' },
+                errors,
+                form.city,
+                view.map,
+              )}
+              ${mapLinkField(form.mapLink ?? '', errors)}
+              ${deliverySlotField(view.deliverySlots, form, problem?.kind === 'delivery_slot')}`
+          }
+          ${giftMessageField(view.gift, form)}
           ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
           ${
             view.storeCredit &&
@@ -1178,8 +1190,21 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
             'small muted',
           )}
         </section>`,
+      // Digital products alone, sent to the number rather than delivered (ADR-815).
+      !view.pickup &&
+        to.address1 === DIGITAL_ADDRESS.address1 &&
+        html`<section class="section">
+          ${paragraphs(
+            {
+              en: 'Once it is paid, your downloads and keys come to your number on WhatsApp.',
+              ur: 'ادائیگی کے بعد آپ کی ڈاؤن لوڈز اور کیز آپ کے نمبر پر واٹس ایپ پر آئیں گی۔',
+            },
+            'small muted',
+          )}
+        </section>`,
       !view.pickup &&
         to.name &&
+        to.address1 !== DIGITAL_ADDRESS.address1 &&
         html`<section class="section">
           <h2 class="label">${say('bilingual', LABELS.deliverTo)}</h2>
           <p>
@@ -1219,6 +1244,8 @@ function cartSummary(
     advance: bigint;
     /** The gift card applied that can pay (ADR-449). */
     giftCard?: CheckoutGiftCard | null;
+    /** Digital products alone, which no one delivers (ADR-815): no row for delivery. */
+    digital?: boolean;
   },
   tax: TaxRates,
   today: string | null,
@@ -1287,14 +1314,17 @@ function cartSummary(
           `−${amount(off)}`,
         )
       }
-      ${row(
-        LABELS.delivery,
-        totals.freeDelivery || charge === 0n
-          ? LABELS.free
-          : charge === null
-            ? LABELS.byCity
-            : amount(charge),
-      )}
+      ${
+        !pay.digital &&
+        row(
+          LABELS.delivery,
+          totals.freeDelivery || charge === 0n
+            ? LABELS.free
+            : charge === null
+              ? LABELS.byCity
+              : amount(charge),
+        )
+      }
       ${fee > 0n && row(LABELS.codFee, amount(fee))}
       ${
         totals.total !== null &&
@@ -1575,6 +1605,17 @@ function codRefusalWords(refusal: CodRefusal, ways: PrepaidWays): Sentence {
         : {
             en: `Cash on delivery isn't available for this order.${instead.en}`,
             ur: `اس آرڈر کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
+          };
+    // Files and keys, which no rider brings (ADR-815).
+    case 'digital':
+      return by
+        ? {
+            en: `Downloads and keys are paid in advance, and sent to your number once paid. Pay ${by.en}.`,
+            ur: `ڈاؤن لوڈز اور کیز کی ادائیگی پیشگی ہوتی ہے، اور ادائیگی کے بعد آپ کے نمبر پر بھیجی جاتی ہیں۔ ${by.ur} ادائیگی کریں۔`,
+          }
+        : {
+            en: `Downloads and keys are paid in advance.${instead.en}`,
+            ur: `ڈاؤن لوڈز اور کیز کی ادائیگی پیشگی ہوتی ہے۔${instead.ur}`,
           };
   }
 }

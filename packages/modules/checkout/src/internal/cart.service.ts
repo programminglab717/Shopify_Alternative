@@ -2,6 +2,7 @@ import {
   VariantService,
   bundleSellable,
   bundlesOfVariantsIn,
+  digitalProductIdsIn,
   personalisationIn,
   stitchingIn,
   type PersonalisationField,
@@ -229,6 +230,23 @@ export class CartService {
    * their lines come to, in the caller's transaction `tx`: for the shop's rules for cash on
    * delivery.
    */
+  /**
+   * Whether every item of the cart is a digital product (ADR-815), needing no delivery: its
+   * checkout asks for no address, charges nothing to deliver and takes no cash on delivery.
+   */
+  async digitalOnlyIn(tx: Tx, shopId: string, cart: CartJson): Promise<boolean> {
+    if (cart.items.length === 0) return false;
+    const snapshots = await this.variants.snapshotsOf(
+      tx,
+      shopId,
+      cart.items.map((item) => item.variantId),
+    );
+    const productIds = cart.items.map((item) => snapshots.get(item.variantId)?.productId);
+    if (productIds.some((id) => id === undefined)) return false;
+    const digital = await digitalProductIdsIn(tx, shopId, productIds as string[]);
+    return productIds.every((id) => digital.has(id!));
+  }
+
   async productsIn(tx: Tx, shopId: string, cart: CartJson): Promise<CodProduct[]> {
     const snapshots = await this.variants.snapshotsOf(
       tx,

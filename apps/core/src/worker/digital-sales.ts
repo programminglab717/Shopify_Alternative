@@ -9,7 +9,7 @@ import type { SecretBox } from '@hatti/crypto';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import type { MessagesService } from '@hatti/messaging/public';
-import { OrderEvents, orderGiftCardFactsIn } from '@hatti/orders/public';
+import { OrderEvents, orderGiftCardFactsIn, type FulfillmentService } from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -18,7 +18,8 @@ import { sql } from 'drizzle-orm';
  * link of its own to them, sent to its customer on WhatsApp; and each unit of one that gives
  * licence keys is given a key, sent the same way, kept nowhere in the message once sent. Each is
  * given once, however often its order's payment is heard. A unit sold when none of its product's
- * keys are left is given none: the shop sends it once it adds more (ADR-816).
+ * keys are left is given none: the shop sends it once it adds more (ADR-816). A line given all it
+ * sells is fulfilled and delivered at once, as no courier carries it (ADR-815).
  */
 export class DigitalSales {
   /** The events {@link handle} reads. */
@@ -30,20 +31,24 @@ export class DigitalSales {
     private readonly site: PublicSite,
     /** Opens licence keys; without it, none are given. */
     private readonly box: SecretBox | null,
+    /** Fulfils the lines given all they sell; without it, they wait for the shop. */
+    private readonly fulfillments: FulfillmentService | null = null,
   ) {}
 
   async handle(event: DomainEvent, at: Date = new Date()): Promise<void> {
     const { shopId } = event;
-    await this.database.tenant(shopId, async (tx) => {
+    const done = await this.database.tenant(shopId, async (tx) => {
+      /** The lines given all they sell, to fulfil. */
+      const given: { id: string; quantity: number }[] = [];
       const order = await orderGiftCardFactsIn(tx, shopId, event.aggregateId);
-      if (!order || order.status === 'cancelled' || order.amountPaid < order.total) return;
+      if (!order || order.status === 'cancelled' || order.amountPaid < order.total) return null;
       const digital = await digitalIn(
         tx,
         shopId,
         order.lines.map((line) => line.productId),
       );
       const lines = order.lines.filter((line) => digital.has(line.productId));
-      if (lines.length === 0) return;
+      if (lines.length === 0) return null;
       const { name: shop } = await shopProfile(tx, shopId);
       const { rows: titles } = await tx.execute<{ id: string; title: string }>(
         sql`SELECT id, title FROM catalog.products
@@ -90,26 +95,48 @@ export class DigitalSales {
             }
           }
         }
-        if (!product.licenceKeys || !this.box) continue;
-        for (let unit = 1; unit <= line.quantity; unit++) {
-          const key = await issueLicenceKeyIn(
-            tx,
-            shopId,
-            line.productId,
-            { orderId: order.id, lineItemId: line.id, lineUnit: unit },
-            this.box,
-            at,
-          );
-          if (!key) break;
-          if (!order.phone) continue;
-          await this.messages.queueIn(tx, shopId, {
-            ...message,
-            kind: 'licence_key',
-            dedupeKey: `licence_key:${line.id}:${unit}`,
-            variables: { shop, product: titleOf(line.productId), code: key },
-          });
+        let keys = 0;
+        if (product.licenceKeys && this.box) {
+          for (let unit = 1; unit <= line.quantity; unit++) {
+            const key = await issueLicenceKeyIn(
+              tx,
+              shopId,
+              line.productId,
+              { orderId: order.id, lineItemId: line.id, lineUnit: unit },
+              this.box,
+              at,
+            );
+            if (!key) break;
+            keys += 1;
+            if (!order.phone) continue;
+            await this.messages.queueIn(tx, shopId, {
+              ...message,
+              kind: 'licence_key',
+              dedupeKey: `licence_key:${line.id}:${unit}`,
+              variables: { shop, product: titleOf(line.productId), code: key },
+            });
+          }
+        }
+        // Given all it sells: its files, where it has any, and a key for each unit, where it
+        // gives them.
+        const files = product.files.some((file) => file.status === 'ready');
+        const keyed = !product.licenceKeys || (this.box !== null && keys === line.quantity);
+        if ((files || product.licenceKeys) && keyed) {
+          given.push({ id: line.id, quantity: line.quantity });
         }
       }
+      return { orderId: order.id, given };
     });
+    if (!done || done.given.length === 0 || !this.fulfillments) return;
+    // A line fulfilled already, as when the payment is heard again, is refused: nothing to do.
+    const fulfilled = await this.fulfillments.fulfill({ shopId, actor: 'system' }, done.orderId, {
+      lineItems: done.given,
+    });
+    if (fulfilled.ok) {
+      await this.fulfillments.markDelivered(
+        { shopId, actor: 'system' },
+        fulfilled.value.fulfillmentId,
+      );
+    }
   }
 }

@@ -99,6 +99,7 @@ import {
 } from './cod-rules.js';
 import { codRulesIn } from './cod-rules.service.js';
 import {
+  NO_DELIVERY_SETTINGS,
   deliveryCountsFrom,
   expectedDeliveryOn,
   offeredSlots,
@@ -269,6 +270,25 @@ function pickupPointOf(location: LocationRecord): PickupPoint | null {
     address2,
     city,
     instructions: location.localPickup?.instructions ?? null,
+  };
+}
+
+/** What an order of digital products alone keeps as its address: delivered online (ADR-815). */
+export const DIGITAL_ADDRESS = { address1: 'Delivered online', city: 'Online' } as const;
+
+/**
+ * The form as placing reads it for digital products alone, which no one delivers: online in
+ * place of the street and city the page did not ask for.
+ */
+export function formForDigital(form: CheckoutForm): CheckoutForm {
+  return {
+    ...form,
+    address1: DIGITAL_ADDRESS.address1,
+    address2: '',
+    landmark: '',
+    city: DIGITAL_ADDRESS.city,
+    province: '',
+    mapLink: '',
   };
 }
 
@@ -585,6 +605,8 @@ export type CheckoutView =
       paymentLink: { id: string; title: string } | null;
       /** Where the shopper may pick the order up instead (ADR-391): none, where nowhere offers it. */
       pickup: PickupPoint[];
+      /** It holds digital products alone (ADR-815): no address, delivery or cash on delivery. */
+      digital?: true;
       /** Gift wrap and a gift message (ADR-413); null where the shop offers neither. */
       gift: CheckoutGift | null;
       /** The gift card applied (ADR-449); null for none. */
@@ -1158,10 +1180,13 @@ export class CheckoutService {
         }
       }
       const check = new InputChecker();
-      const address = checkAddress(check, [], { ...formForPickup(form, pickupAt), zip: null });
+      const address = checkAddress(check, [], {
+        ...(view.digital ? formForDigital(form) : formForPickup(form, pickupAt)),
+        zip: null,
+      });
       const email = check.email(['email'], form.email)?.toLowerCase() ?? null;
       // A map's link that named no place, nor led to one (ADR-718).
-      if (!pickupAt && form.mapLink?.trim()) {
+      if (!pickupAt && !view.digital && form.mapLink?.trim()) {
         check.addMessage(['mapLink'], 'INVALID', 'The link names no place on the map');
       }
       if (!address || !check.ok) {
@@ -1172,7 +1197,11 @@ export class CheckoutService {
       }
       // An address a rider could not find the house by is asked about once (ADR-682): posted
       // again as it was, it is placed as it is. Nothing for an order picked up.
-      if (!pickupAt && (form.addressChecked ?? '').trim() !== form.address1.trim()) {
+      if (
+        !pickupAt &&
+        !view.digital &&
+        (form.addressChecked ?? '').trim() !== form.address1.trim()
+      ) {
         const gaps = addressGaps(form);
         if (isVague(gaps)) return { ...view, problem: { kind: 'vague_address', gaps } };
         // In an area where riders have lately struggled to find houses, by the shop's own parcels,
@@ -1607,7 +1636,9 @@ export class CheckoutService {
     if (!cart) return { kind: 'empty', shop };
     const priced = await this.carts.priceIn(tx, shopId, cart);
     if (priced.items.length === 0) return { kind: 'empty', shop };
-    const delivery = await this.delivery.settingsOf(tx, shopId);
+    // Digital products alone (ADR-815): nothing to deliver, nowhere to deliver it.
+    const digital = await this.carts.digitalOnlyIn(tx, shopId, priced);
+    const delivery = digital ? NO_DELIVERY_SETTINGS : await this.delivery.settingsOf(tx, shopId);
     const [typed] = cart.discountCodes;
     const record = typed === undefined ? null : await discountCodeIn(tx, shopId, typed);
     // With the shop's automatic discounts that run, as they combine with the code (ADR-515), each
@@ -1674,9 +1705,11 @@ export class CheckoutService {
       // A link the shop takes prepaid alone (ADR-248) offers no cash on delivery at all.
       codRefusal: link?.prepaidOnly
         ? { reason: 'link' }
-        : overLimit && !account
-          ? { reason: 'law' }
-          : codRefusalOf(codRules, { total: items, products }),
+        : digital
+          ? { reason: 'digital' }
+          : overLimit && !account
+            ? { reason: 'law' }
+            : codRefusalOf(codRules, { total: items, products }),
       codRules,
       bankTransfer: transfer?.account ?? null,
       transferDiscount: transfer?.discount ?? null,
@@ -1711,7 +1744,8 @@ export class CheckoutService {
       ...(provedCredit !== null && { creditBalance: provedCredit }),
       marketing: await checkoutMarketingIn(tx, shopId),
       paymentLink: link && { id: link.id, title: link.title },
-      pickup: await this.#pickupPoints(tx, shopId),
+      pickup: digital ? [] : await this.#pickupPoints(tx, shopId),
+      ...(digital && { digital: true as const }),
       gift: await this.#gift(tx, shopId, cart),
       giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
       countsFrom: deliveryCountsFrom(delivery, new Date()),

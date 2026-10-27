@@ -6,9 +6,9 @@ import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { InventoryService, LocationService } from '@hatti/inventory/public';
+import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { MessagesService } from '@hatti/messaging/public';
-import { OrderEvents, type OrderService } from '@hatti/orders/public';
+import { FulfillmentService, OrderEvents, type OrderService } from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DigitalSales } from './digital-sales.js';
@@ -59,6 +59,8 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
         paymentMethod: 'cash_on_delivery',
       }),
     );
+    // Confirmed, as an order is before the shop hands any of it over.
+    unwrap(await orders.confirm(SHOP, order.id));
     return order.id;
   }
 
@@ -83,6 +85,17 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
       )
     ).rows;
 
+  const fulfilledOf = async (orderId: string) => {
+    const { rows } = await admin.query<{ fulfilled: number; parcels: string[] }>(
+      `SELECT (SELECT coalesce(sum(fulfilled_quantity), 0)::int FROM orders.lines
+                WHERE order_id = $1) AS fulfilled,
+              coalesce((SELECT array_agg(status) FROM orders.fulfillments WHERE order_id = $1),
+                       '{}') AS parcels`,
+      [orderId],
+    );
+    return rows[0]!;
+  };
+
   beforeAll(async () => {
     testDb = await createTestDatabase(server!);
     database = new Database({
@@ -99,6 +112,7 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
       new MessagesService(database),
       new PublicSite('https://api.hatti.pk'),
       box,
+      new FulfillmentService(database, new StockService()),
     );
     const products = new ProductService(database);
     const digital = new DigitalProductService(database, null, box);
@@ -169,6 +183,9 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
     );
     // One link for the line, five downloads of each file for its one unit, for seven days.
     expect(rows).toEqual([{ units: 1, download_limit: 5, week: true }]);
+    // Both lines given all they sell, fulfilled and delivered at once (ADR-815); the kurta waits
+    // for its courier.
+    expect(await fulfilledOf(orderId)).toEqual({ fulfilled: 3, parcels: ['delivered'] });
   });
 
   it('gives what keys are left, and none past them', async () => {
@@ -177,5 +194,7 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
     await paid(orderId);
     // One left of three after the first order's two.
     expect((await messagesOf(orderId)).map((each) => each.variables.code)).toEqual(['KEY-0003']);
+    // Not all its keys given: not fulfilled, until the shop adds more.
+    expect(await fulfilledOf(orderId)).toEqual({ fulfilled: 0, parcels: [] });
   });
 });
