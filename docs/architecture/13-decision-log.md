@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-802 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-803 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -810,6 +810,7 @@
 | 800 | The admin combines products into one listing from a product's page, that product always among them | Accepted |
 | 801 | Blog articles are drafted with AI from what the shop wants them to say, never kept, thirty a day, each spending an AI credit | Accepted |
 | 802 | An unstitched product may be offered stitched to the shopper's measurements, in inches: the cart adds what stitching costs to a stitched line and asks for every measurement | Accepted |
+| 803 | A line sold stitched keeps the day it ships by: the day it was sold, or its pre-order's if later, and the days its stitching takes | Accepted |
 
 ---
 
@@ -26604,3 +26605,20 @@
   page, the tailor reading them on the packing slip. A stitched line's later shipping is said on
   the page; its order's day to ship by, and the admin's card, follow. Measurements are inches
   alone, as Pakistani tailors measure.
+
+## ADR-803 · A line sold stitched keeps the day it ships by: the day it was sold, or its pre-order's if later, and the days its stitching takes
+
+* **Context:** a stitched piece ships the days its tailoring takes later (ADR-802). Staff pack by
+  what is due, and shoppers ask when theirs comes; a promise the order did not keep would be
+  worked out again from an offer the shop may have changed since.
+* **Decision:**
+  * **An order's line sold stitched keeps the day it ships by** (migration 0343), as a pre-order
+    line keeps its own (ADR-403): the day it was sold in Pakistan, or its pre-order's day if
+    that is later, and the days the product's stitching takes then. Edits keep it with the line.
+  * **`LineItem.stitchedShipsOn`** gives it; the admin's order says "Stitched to measurements:
+    ships by", and the customer's order page says it in English and Urdu.
+  * **A cart line stitched carries the days its stitching adds** (`stitchedDays`), and checkout
+    promises no day of delivery for a cart with one, as for one waiting on a pre-order (ADR-594).
+* **Consequences:** a stitched order says when it ships wherever its lines are shown. The day is
+  calendar days, not working days, as a tailor's days are. A shop that changes its stitching's
+  days changes no order placed before.

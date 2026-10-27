@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Stitched lines' days
+
+* **Ships by:** an order's line sold stitched keeps the day it ships by, after the days its
+  stitching takes, said in the admin and on the customer's order page; checkout promises no
+  delivery day for a stitched cart (CAT-09, [ADR-803](../architecture/13-decision-log.md#adr-803--a-line-sold-stitched-keeps-the-day-it-ships-by-the-day-it-was-sold-or-its-pre-orders-if-later-and-the-days-its-stitching-takes)).
+* 4286 tests (2 new).
+
 ### 20f7655 · Stitching
 
 * **Stitched to measurements:** an unstitched product may be offered stitched for what the shop
