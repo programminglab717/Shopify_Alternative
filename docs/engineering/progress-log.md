@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Custom reports
+### cb3cafc · Custom reports
 
 * **Saved reports:** a shop saves reports of its own over the sales report, broken down one
   way with the columns it chooses, over a period such as last month that moves with the day;
