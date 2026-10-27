@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Drop token pools
+### ee8346f · Drop token pools
 
 * **The rush stopped at Valkey:** during a live drop, checkout takes each line's units from a
   pool of tokens first and refuses at once once it is empty; the order still takes its stock,
