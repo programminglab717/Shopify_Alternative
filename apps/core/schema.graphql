@@ -15066,7 +15066,7 @@ type Query {
   ): CustomerErasureRequestConnection!
 
   """
-  A customer's referral code, made the first time it is asked for: the online store's link with `?ref=` and it brings their friends. Null for no such customer.
+  A customer's referral code, made the first time it is asked for: the online store's link with `?invite=` and it brings their friends. Null for no such customer.
   """
   customerReferralCode(customerId: ID!): String
 
