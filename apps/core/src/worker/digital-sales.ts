@@ -1,15 +1,22 @@
 import { shopProfile, type PublicSite } from '@hatti/api';
 import {
   DOWNLOAD_LINK_PATH,
+  DigitalProductEvents,
   deliverDigitalIn,
   digitalIn,
   issueLicenceKeyIn,
+  keysIssuedIn,
 } from '@hatti/catalog/public';
 import type { SecretBox } from '@hatti/crypto';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import type { MessagesService } from '@hatti/messaging/public';
-import { OrderEvents, orderGiftCardFactsIn, type FulfillmentService } from '@hatti/orders/public';
+import {
+  OrderEvents,
+  orderGiftCardFactsIn,
+  paidOrdersWithProductIn,
+  type FulfillmentService,
+} from '@hatti/orders/public';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -18,12 +25,16 @@ import { sql } from 'drizzle-orm';
  * link of its own to them, sent to its customer on WhatsApp; and each unit of one that gives
  * licence keys is given a key, sent the same way, kept nowhere in the message once sent. Each is
  * given once, however often its order's payment is heard. A unit sold when none of its product's
- * keys are left is given none: the shop sends it once it adds more (ADR-816). A line given all it
- * sells is fulfilled and delivered at once, as no courier carries it (ADR-815).
+ * keys are left is given none until the shop adds more, when the paid orders waiting for them
+ * are delivered again (ADR-816). A line given all it sells is fulfilled and delivered at once, as
+ * no courier carries it (ADR-815).
  */
 export class DigitalSales {
   /** The events {@link handle} reads. */
-  static readonly EVENTS: readonly string[] = [OrderEvents.OrderPaid];
+  static readonly EVENTS: readonly string[] = [
+    OrderEvents.OrderPaid,
+    DigitalProductEvents.KeysAdded,
+  ];
 
   constructor(
     private readonly database: Database,
@@ -36,11 +47,32 @@ export class DigitalSales {
   ) {}
 
   async handle(event: DomainEvent, at: Date = new Date()): Promise<void> {
+    if (event.type !== DigitalProductEvents.KeysAdded) {
+      await this.#deliver(event.shopId, event.aggregateId, at);
+      return;
+    }
+    // Keys added: the paid orders with units of the product still owed one.
     const { shopId } = event;
+    const waiting = await this.database.tenant(shopId, async (tx) => {
+      const orders = await paidOrdersWithProductIn(tx, shopId, event.aggregateId);
+      const given = await keysIssuedIn(
+        tx,
+        shopId,
+        orders.flatMap((order) => order.lines.map((line) => line.id)),
+      );
+      return orders
+        .filter((order) => order.lines.some((line) => (given.get(line.id) ?? 0) < line.quantity))
+        .map((order) => order.orderId);
+    });
+    for (const orderId of waiting) await this.#deliver(shopId, orderId, at);
+  }
+
+  /** Delivers what order `orderId` sold of digital products and has not had: once paid. */
+  async #deliver(shopId: string, orderId: string, at: Date): Promise<void> {
     const done = await this.database.tenant(shopId, async (tx) => {
       /** The lines given all they sell, to fulfil. */
       const given: { id: string; quantity: number }[] = [];
-      const order = await orderGiftCardFactsIn(tx, shopId, event.aggregateId);
+      const order = await orderGiftCardFactsIn(tx, shopId, orderId);
       if (!order || order.status === 'cancelled' || order.amountPaid < order.total) return null;
       const digital = await digitalIn(
         tx,

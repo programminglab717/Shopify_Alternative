@@ -607,6 +607,8 @@ export interface ProductDetail {
   personalisationFields?: PersonalisationFieldValue[];
   /** The stitching it is offered with (ADR-802); absent where a fake core leaves it out. */
   stitching?: ProductStitching | null;
+  /** How it reaches its buyer, where it is digital (ADR-813); absent where a fake core leaves it out. */
+  digital?: DigitalProductValue | null;
   /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */
   sizeChart?: { id: string; name: string } | null;
   /** What it is made of, where it is a bundle (ADR-409); absent where a fake core leaves it out. */
@@ -4580,6 +4582,51 @@ export interface ProductStitching {
   price: { amount: string };
   leadDays: number;
   measurements: { key: string }[];
+}
+
+/** A digital product's downloads and keys (ADR-813). */
+export interface DigitalProductValue {
+  downloadLimit: number;
+  linkDays: number;
+  licenceKeys: boolean;
+  keysLeft: number;
+  keysIssued: number;
+  files: DigitalFileValue[];
+}
+
+export interface DigitalFileValue {
+  id: string;
+  filename: string;
+  size: number;
+  ready: boolean;
+}
+
+export interface DigitalProductSetData {
+  digitalProductSet: { digitalProduct: DigitalProductValue | null; userErrors: UserError[] };
+}
+
+export interface DigitalProductRemoveData {
+  digitalProductRemove: { removed: boolean };
+}
+
+export interface DigitalFileStageData {
+  digitalFileStage: {
+    file: DigitalFileValue | null;
+    upload: { url: string; method: string; headers: { name: string; value: string }[] } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface DigitalFileCreateData {
+  digitalFileCreate: { file: DigitalFileValue | null; userErrors: UserError[] };
+}
+
+export interface DigitalFileDeleteData {
+  digitalFileDelete: { deletedId: string | null };
+}
+
+export interface LicenceKeysAddData {
+  licenceKeysAdd: { added: number; already: number; userErrors: UserError[] };
 }
 
 export interface ProductStitchingSetData {

@@ -41,6 +41,8 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
     kurta: '',
   };
   let phones = 0;
+  let digital: DigitalProductService;
+  const productIds: Record<'ebook' | 'software', string> = { ebook: '', software: '' };
 
   /** An order of these, paid by cash on delivery. */
   async function ordered(lines: Partial<Record<keyof typeof variants, number>>): Promise<string> {
@@ -115,7 +117,7 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
       new FulfillmentService(database, new StockService()),
     );
     const products = new ProductService(database);
-    const digital = new DigitalProductService(database, null, box);
+    digital = new DigitalProductService(database, null, box);
     const location = await new LocationService(database).primary(SHOP);
     const inventory = new InventoryService(database, new VariantService(database));
     for (const [name, title] of [
@@ -127,6 +129,7 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
         await products.create(SHOP, { title, status: 'active', variants: [{ price: '1,000' }] }),
       );
       variants[name] = product.variants[0]!.id;
+      if (name !== 'kurta') productIds[name] = product.id;
       unwrap(
         await inventory.setQuantities(SHOP, {
           name: 'on_hand',
@@ -196,5 +199,29 @@ describe.skipIf(!server)('Digital products delivered once paid (CAT-13, ADR-814)
     expect((await messagesOf(orderId)).map((each) => each.variables.code)).toEqual(['KEY-0003']);
     // Not all its keys given: not fulfilled, until the shop adds more.
     expect(await fulfilledOf(orderId)).toEqual({ fulfilled: 0, parcels: [] });
+
+    // Two more added (ADR-816): the waiting units are given them, and the line fulfilled.
+    unwrap(await digital.keysAdd(SHOP, productIds.software, ['KEY-0004', 'KEY-0005']));
+    const { rows: added } = await admin.query<{ aggregate_id: string; payload: object }>(
+      `SELECT aggregate_id, payload FROM platform.outbox_events
+        WHERE shop_id = $1 AND event_type = 'licence_keys.added' ORDER BY id DESC LIMIT 1`,
+      [SHOP.shopId],
+    );
+    expect(added).toEqual([{ aggregate_id: productIds.software, payload: { added: 2 } }]);
+    await sales.handle({
+      id: newId(),
+      type: 'licence_keys.added',
+      shopId: SHOP.shopId,
+      aggregateType: 'product',
+      aggregateId: productIds.software,
+      payload: { added: 2 },
+      occurredAt: new Date().toISOString(),
+    });
+    expect((await messagesOf(orderId)).map((each) => each.variables.code)).toEqual([
+      'KEY-0003',
+      'KEY-0004',
+      'KEY-0005',
+    ]);
+    expect(await fulfilledOf(orderId)).toEqual({ fulfilled: 3, parcels: ['delivered'] });
   });
 });

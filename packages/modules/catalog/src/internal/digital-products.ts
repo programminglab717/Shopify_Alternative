@@ -16,6 +16,8 @@ import { sql } from 'drizzle-orm';
 export const DigitalProductEvents = {
   /** A product was made digital, changed, or made physical again. */
   Updated: 'digital_product.updated',
+  /** Licence keys were added to a product's pool: for the units waiting for one (ADR-816). */
+  KeysAdded: 'licence_keys.added',
 } as const;
 
 export const DIGITAL_LIMITS = {
@@ -321,12 +323,20 @@ export class DigitalProductService {
       let added = 0;
       for (const key of typed) {
         const { rows } = await tx.execute(sql`
-          INSERT INTO catalog.licence_keys (shop_id, product_id, sealed, hint, digest)
+          INSERT INTO catalog.licence_keys (shop_id, product_id, sealed, hint, digest, created_at)
           VALUES (${shopId}, ${productId}, ${box.encrypt(key, keyContext(shopId, productId))},
-                  ${key.slice(-4)}, ${digestOf(key)})
+                  ${key.slice(-4)}, ${digestOf(key)}, clock_timestamp())
           ON CONFLICT (shop_id, product_id, digest) DO NOTHING
           RETURNING id`);
         added += rows.length;
+      }
+      if (added > 0) {
+        await appendEvent(tx, shopId, {
+          type: DigitalProductEvents.KeysAdded,
+          aggregateType: 'product',
+          aggregateId: productId,
+          payload: { added },
+        });
       }
       return { ok: true, value: { added, already: typed.length - added } };
     });
@@ -506,4 +516,18 @@ export async function issueLicenceKeyIn(
     sealed = rows[0]?.sealed;
   }
   return sealed ? box.decrypt(sealed, keyContext(shopId, productId)).toString('utf8') : null;
+}
+
+/** How many keys each of `lineItemIds` was given. */
+export async function keysIssuedIn(
+  tx: Tx,
+  shopId: string,
+  lineItemIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (lineItemIds.length === 0) return new Map();
+  const { rows } = await tx.execute<{ line_item_id: string; count: number }>(sql`
+    SELECT line_item_id, count(*)::int AS count FROM catalog.licence_keys
+     WHERE shop_id = ${shopId} AND line_item_id = ANY(${sql.param([...lineItemIds])}::uuid[])
+     GROUP BY line_item_id`);
+  return new Map(rows.map((row) => [row.line_item_id, row.count]));
 }

@@ -115,7 +115,11 @@ export {
   orderNotificationFactsIn,
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';
-export { orderGiftCardFactsIn, type OrderGiftCardFacts } from '../internal/gift-card-facts.js';
+export {
+  orderGiftCardFactsIn,
+  paidOrdersWithProductIn,
+  type OrderGiftCardFacts,
+} from '../internal/gift-card-facts.js';
 export { orderCashbackFactsIn, type OrderCashbackFacts } from '../internal/cashback-facts.js';
 export {
   customerOrderTracesIn,

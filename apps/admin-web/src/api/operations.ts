@@ -991,6 +991,23 @@ export const ProductsQuery = /* GraphQL */ `
   }
 `;
 
+/** How a digital product reaches its buyer (CAT-13, ADR-813). */
+const DIGITAL_PRODUCT = /* GraphQL */ `
+  fragment DigitalProductFields on DigitalProduct {
+    downloadLimit
+    linkDays
+    licenceKeys
+    keysLeft
+    keysIssued
+    files {
+      id
+      filename
+      size
+      ready
+    }
+  }
+`;
+
 const PRODUCT = /* GraphQL */ `
   fragment ProductDetail on Product {
     id
@@ -1038,6 +1055,9 @@ const PRODUCT = /* GraphQL */ `
       measurements {
         key
       }
+    }
+    digital {
+      ...DigitalProductFields
     }
     sizeChart {
       id
@@ -1131,6 +1151,7 @@ const PRODUCT = /* GraphQL */ `
       }
     }
   }
+  ${DIGITAL_PRODUCT}
 `;
 
 /** One product, for its page, with the location its stock is counted at. */
@@ -9685,6 +9706,97 @@ export const CombinedListingDeleteMutation = /* GraphQL */ `
     }
   }
   ${USER_ERRORS}
+`;
+
+/** Makes a product digital, or changes how it reaches the buyer (CAT-13, ADR-816). */
+export const DigitalProductSetMutation = /* GraphQL */ `
+  mutation DigitalProductSet($productId: ID!, $input: DigitalProductInput!) {
+    digitalProductSet(productId: $productId, input: $input) {
+      digitalProduct {
+        ...DigitalProductFields
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+  ${DIGITAL_PRODUCT}
+`;
+
+export const DigitalProductRemoveMutation = /* GraphQL */ `
+  mutation DigitalProductRemove($productId: ID!) {
+    digitalProductRemove(productId: $productId) {
+      removed
+    }
+  }
+`;
+
+export const DigitalFileStageMutation = /* GraphQL */ `
+  mutation DigitalFileStage($productId: ID!, $input: DigitalFileStageInput!) {
+    digitalFileStage(productId: $productId, input: $input) {
+      file {
+        id
+        filename
+        size
+        ready
+      }
+      upload {
+        url
+        method
+        headers {
+          name
+          value
+        }
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
+export const DigitalFileCreateMutation = /* GraphQL */ `
+  mutation DigitalFileCreate($id: ID!) {
+    digitalFileCreate(id: $id) {
+      file {
+        id
+        filename
+        size
+        ready
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;
+
+export const DigitalFileDeleteMutation = /* GraphQL */ `
+  mutation DigitalFileDelete($id: ID!) {
+    digitalFileDelete(id: $id) {
+      deletedId
+    }
+  }
+`;
+
+export const LicenceKeysAddMutation = /* GraphQL */ `
+  mutation LicenceKeysAdd($productId: ID!, $keys: [String!]!) {
+    licenceKeysAdd(productId: $productId, keys: $keys) {
+      added
+      already
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
 `;
 
 /** Stitching offered with an unstitched product (CAT-09, ADR-802). */

@@ -319,6 +319,7 @@ export {
   digitalIn,
   digitalProductIdsIn,
   issueLicenceKeyIn,
+  keysIssuedIn,
   type DigitalFileRecord,
   type DigitalProductRecord,
 } from '../internal/digital-products.js';

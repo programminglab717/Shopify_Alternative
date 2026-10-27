@@ -58,6 +58,7 @@ import { ProductMetafieldsCard } from './metafields';
 import { GiftCardProduct } from './gift-card-product';
 import { ProductPersonalisationCard } from './personalisation';
 import { ProductStitchingCard } from './stitching';
+import { DigitalProductCard } from './digital';
 import { ProductPreorder } from './preorder';
 import { ProductSizeChart } from './size-charts';
 import { StockRules } from './stock-rules';
@@ -630,6 +631,7 @@ function ProductView() {
       {edits && <ProductPreorder product={product} />}
       {edits && <ProductPersonalisationCard product={product} />}
       {edits && <ProductStitchingCard key={`stitching-${product.id}`} product={product} />}
+      {edits && <DigitalProductCard key={`digital-${product.id}`} product={product} />}
       {edits && <CategoryCard product={product} />}
       {edits && <ProductSearchListing product={product} storefront={storefront?.url ?? ''} />}
       {edits && <EasternWearCard product={product} />}

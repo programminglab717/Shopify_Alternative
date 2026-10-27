@@ -60,3 +60,31 @@ export async function orderGiftCardFactsIn(
     lines: row.lines.map((line) => ({ ...line, unitPrice: BigInt(line.unitPrice) })),
   };
 }
+
+/**
+ * The orders paid in full and not cancelled with a line of product `productId`, the oldest first,
+ * with those lines: for the units still owed a digital product's keys (ADR-816).
+ */
+export async function paidOrdersWithProductIn(
+  tx: Tx,
+  shopId: string,
+  productId: string,
+  limit = 200,
+): Promise<{ orderId: string; lines: { id: string; quantity: number }[] }[]> {
+  const { rows } = await tx.execute<{ order_id: string; line_id: string; quantity: number }>(sql`
+    SELECT o.id AS order_id, l.id AS line_id, l.quantity
+      FROM orders.orders o
+      JOIN orders.lines l ON l.shop_id = o.shop_id AND l.order_id = o.id
+     WHERE o.shop_id = ${shopId} AND l.product_id = ${productId}
+       AND o.status <> 'cancelled' AND o.amount_paid >= o.total
+     ORDER BY o.created_at, o.id
+     LIMIT ${limit}`);
+  const orders = new Map<string, { id: string; quantity: number }[]>();
+  for (const row of rows) {
+    orders.set(row.order_id, [
+      ...(orders.get(row.order_id) ?? []),
+      { id: row.line_id, quantity: row.quantity },
+    ]);
+  }
+  return [...orders].map(([orderId, lines]) => ({ orderId, lines }));
+}
