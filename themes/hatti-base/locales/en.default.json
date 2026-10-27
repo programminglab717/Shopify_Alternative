@@ -317,7 +317,10 @@
     "rights": "© {{ year }} {{ shop }}",
     "cod": "Pay cash when your order arrives",
     "report": "Report this store to Hatti",
-    "verified": "Verified by Hatti"
+    "verified": "Verified by Hatti",
+    "notifications_on": "Get our offers as notifications",
+    "notifications_done": "Notifications are on. We'll tell you of our offers.",
+    "notifications_denied": "Notifications are blocked: allow them in your browser's settings for this site."
   },
   "customer": {
     "login": {

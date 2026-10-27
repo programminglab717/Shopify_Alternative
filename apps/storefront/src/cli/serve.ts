@@ -19,7 +19,8 @@ import { allPlatformThemes } from '@hatti/themes';
 // With NODE_ENV=production, as its container runs it (ADR-724), it serves published shops alone:
 // no sample shop or placeholder images; STOREFRONT_URL, REDIS_URL, CORE_API_URL and
 // STOREFRONT_SERVICE_KEY must be set; TRUST_PROXY=true takes shoppers' addresses from the edge's
-// X-Forwarded-For; and SIGTERM lets the requests in flight finish before it exits.
+// X-Forwarded-For; and SIGTERM lets the requests in flight finish before it exits. With
+// VAPID_PUBLIC_KEY, the core's, shoppers may turn on shops' notifications (ADR-833).
 //
 // It logs JSON to stdout (ADR-744): answers that failed, and what nothing caught, at error and
 // fatal, which go to the error tracker too once ERROR_TRACKING_DSN is set, as the core's do
@@ -43,8 +44,14 @@ if (production) {
 const platformThemes = await allPlatformThemes();
 const theme = platformThemes.get('hatti-base')!;
 const site = new URL(process.env.STOREFRONT_URL ?? 'http://localhost:4100');
+// Shoppers' browsers subscribe to shops' pushes with the core's VAPID public key (ADR-833).
+const pushPublicKey = process.env.VAPID_PUBLIC_KEY?.trim();
+if (pushPublicKey && !/^[A-Za-z0-9_-]{86,88}$/.test(pushPublicKey)) {
+  throw new Error('VAPID_PUBLIC_KEY must be the public key the core pushes with, base64url');
+}
 const renderer = new PageRenderer(theme, {
   platformUrl: site.origin,
+  ...(pushPublicKey && { pushPublicKey }),
   onError: (render, error) =>
     logger.warn({ section: render.id, err: error }, `${render.id} not shown`),
 });

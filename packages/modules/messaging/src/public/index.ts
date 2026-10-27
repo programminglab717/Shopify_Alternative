@@ -275,6 +275,15 @@ export {
   type PushRecipient,
   type PushSubscriptionRecord,
 } from '../internal/push.service.js';
+// Pushes to shoppers from the online store, and the shop's campaigns (OS-14, ADR-833, ADR-834).
+export {
+  SHOPPER_PUSH_LIMITS,
+  ShopperPushService,
+  isPushServiceEndpoint,
+  type PushCampaignInput,
+  type PushCampaignRecord,
+  type PushCampaignRound,
+} from '../internal/shopper-push.service.js';
 export {
   WEB_PUSH,
   WebPushSender,

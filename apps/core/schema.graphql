@@ -10563,6 +10563,11 @@ type Mutation {
   purchaseOrderUpdate(id: ID!, input: PurchaseOrderUpdateInput!): PurchaseOrderPayload!
 
   """
+  Sends a push to every shopper's browser with notifications on for the shop: its title, its words and the page it opens. The worker pushes it in marketing hours, 10 am to 9 pm in the shop's time zone; at most 3 a day.
+  """
+  pushCampaignSend(input: PushCampaignInput!): PushCampaignSendPayload!
+
+  """
   Turns the shop's news on in a browser of the signed-in member of staff, for the kinds given, or changes them: the PushSubscription its push service gave. A browser someone else signed in on before is theirs no more.
   """
   pushSubscribe(input: PushSubscribeInput!): PushSubscribePayload!
@@ -15006,6 +15011,56 @@ input PurchaseOrderUpdateInput {
 }
 
 """
+A push the shop sent to shoppers' browsers with notifications on (OS-14, ADR-834).
+"""
+type PushCampaign {
+  body: String!
+  createdAt: DateTime!
+
+  """Browsers it failed to reach, tried again next time."""
+  failed: Int!
+
+  """Browsers whose notifications were off, forgotten."""
+  gone: Int!
+  id: ID!
+
+  """The page of the shop it opens: "/collections/eid"."""
+  path: String!
+
+  """Browsers whose push service took it."""
+  sent: Int!
+  sentAt: DateTime
+  status: PushCampaignStatus!
+  title: String!
+}
+
+input PushCampaignInput {
+  """Up to 180 characters."""
+  body: String!
+
+  """
+  A page of the shop, from its root: "/collections/eid"; its home page if left out.
+  """
+  path: String
+
+  """Up to 60 characters."""
+  title: String!
+}
+
+type PushCampaignSendPayload {
+  campaign: PushCampaign
+  userErrors: [UserError!]!
+}
+
+"""
+SENDING while the worker pushes it, in marketing hours; SENT once every browser was tried.
+"""
+enum PushCampaignStatus {
+  SENDING
+  SENT
+}
+
+"""
 News pushed to staff: a NEW_ORDER, an order that NEEDS_REVIEW for its risk, CASH_REMITTED by a courier, LOW_STOCK, a CONTACT_MESSAGE through the online store, or a comment on an article that waits for the shop's approval, COMMENT_PENDING, or orders waiting for their first call longer than the shop's target, ORDERS_OVERDUE, or a customer who refused a parcel while another of their orders waits to ship, CUSTOMER_REFUSED. Each goes to the roles whose work it is: orders and contact messages to owners, managers and confirmation agents; cash to owners, managers and accountants; stock to owners and managers; comments to owners, managers and marketers. And a member's own: an order given to them, ORDER_ASSIGNED, or a comment on an order naming them, ORDER_MENTIONED, whatever their role. And, to those who answer customers, a customer who began waiting on WhatsApp, CONVERSATION_MESSAGE, to whom the conversation is given if anyone; and a conversation given to them by another, CONVERSATION_ASSIGNED (ADR-761); and a customer who has waited past the shop's time to answer, CONVERSATION_OVERDUE (ADR-762).
 """
 enum PushNotificationKind {
@@ -16389,6 +16444,11 @@ type Query {
 
   """The shop's verification by Hatti: its level, and its requests."""
   shopVerification: ShopVerification!
+
+  """
+  The shop's pushes to shoppers: how many have them on, and its campaigns.
+  """
+  shopperPushes(first: Int! = 20): ShopperPushes!
   sizeChart(id: ID!): SizeChart
 
   """The shop's size charts, by name; 50 at most."""
@@ -17992,6 +18052,21 @@ input ShopVerificationInput {
 type ShopVerificationSubmitPayload {
   request: VerificationRequest
   userErrors: [UserError!]!
+}
+
+"""The shop's pushes to shoppers (OS-14, ADR-833, ADR-834)."""
+type ShopperPushes {
+  """Whether Hatti pushes at all: false until it has its VAPID keys."""
+  available: Boolean!
+
+  """The latest campaigns, the newest first."""
+  campaigns: [PushCampaign!]!
+
+  """Campaigns a shop may send in a day."""
+  perDay: Int!
+
+  """Browsers with notifications on for the shop."""
+  subscribers: Int!
 }
 
 """

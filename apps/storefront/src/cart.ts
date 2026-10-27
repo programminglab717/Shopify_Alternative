@@ -36,6 +36,8 @@ export type CoreBackend = Pick<
   | 'webChatStart'
   | 'webChatWrite'
   | 'webChatRead'
+  | 'pushSubscribe'
+  | 'pushUnsubscribe'
   | 'complainOfRights'
   | 'accountLoginStart'
   | 'accountLoginVerify'

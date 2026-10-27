@@ -30,6 +30,10 @@
       "settings": {
         "menu": {
           "label": "Menu"
+        },
+        "notifications": {
+          "label": "Offer notifications of your offers",
+          "info": "Shoppers turn them on from the footer; you send them from Marketing → Push notifications."
         }
       }
     },

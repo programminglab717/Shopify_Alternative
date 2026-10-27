@@ -49,7 +49,7 @@ nothing secret is ever committed. Shortcuts are the numbered rows of
 | OWN-29 | An Apple developer account | Sign in with Apple and the iOS app | — | open |
 | OWN-30 | Hatti's own details for its invoices and support: bank account and IBAN, Raast ID, NTN and sales tax registration, support phone, WhatsApp, email and hours | Shops paying Hatti by transfer, Hatti's tax invoices, the Help page; the legal name, registration number, address and privacy contact the legal documents leave blank (ADR-736) | `BILLING_BANK_*`, `BILLING_RAAST_ID`, `BILLING_NTN`, `BILLING_TAX_*`, `SUPPORT_*` | open |
 | OWN-31 | The storefronts' domain submitted to the Public Suffix List, once the domain is final (OWN-01) | Pixels and cookies safe at shops' subdomains; the code editor (OWN-08) | — | open |
-| OWN-32 | Web Push keys generated for production (`pnpm --filter @hatti/core vapid-keys`) and kept in the secret manager | Staff's push alerts in production | `VAPID_*` | open |
+| OWN-32 | Web Push keys generated for production (`pnpm --filter @hatti/core vapid-keys`) and kept in the secret manager; the public key given to the storefront too | Staff's push alerts in production; shoppers' notifications and shops' push campaigns (OS-14, ADR-833) | `VAPID_*` (API and worker); `VAPID_PUBLIC_KEY` (storefront) | open |
 | OWN-33 | Asked of the launch couriers (OWN-20, OWN-22): whether a parcel already booked, out for delivery, can have its cash to collect lowered or set to nothing through their API or portal, and how soon the rider is told | A link to pay a cash-on-delivery parcel online at the door (PAY-09): until the rider is told, a customer who pays online would be asked for the cash again | — | open |
 
 ## Legal

@@ -144,16 +144,64 @@ self.addEventListener("notificationclick", (event) => {
 });
 `;
 
+/** Where a page's script turns the shopper's notifications on and off (ADR-833). */
+export const PUSH_PATHS = {
+  subscribe: '/push/subscribe',
+  unsubscribe: '/push/unsubscribe',
+} as const;
+
+/**
+ * Notifications from the shop (ADR-833), for themes to offer: `window.HattiPush.supported`,
+ * whether the browser can have them; `subscribed()`, whether they are on; `subscribe()`, which
+ * asks the shopper's leave, as only a tap may, and turns them on, answering "subscribed",
+ * "denied" or "unsupported"; and `unsubscribe()`. Each change is told as a `hatti:push` event on
+ * the document, `detail.subscribed` saying which.
+ */
+function pushScript(publicKey: string): string {
+  return (
+    '<script data-hatti-push>(function(){' +
+    `var key=${JSON.stringify(publicKey)};` +
+    'var ok="serviceWorker"in navigator&&"PushManager"in window&&"Notification"in window;' +
+    'function bytes(){var b=key.replace(/-/g,"+").replace(/_/g,"/");' +
+    'var raw=atob(b+"===".slice((b.length+3)%4));var out=new Uint8Array(raw.length);' +
+    'for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}' +
+    'function told(on){document.dispatchEvent(new CustomEvent("hatti:push",{detail:{subscribed:on}}))}' +
+    'function post(path,body){return fetch(path,{method:"POST",credentials:"same-origin",' +
+    'headers:{"content-type":"application/json"},body:JSON.stringify(body)}).then(function(r){' +
+    'if(!r.ok)throw new Error("Notifications could not be turned on")})}' +
+    'function current(){return navigator.serviceWorker.ready.then(function(r){' +
+    'return r.pushManager.getSubscription()})}' +
+    'window.HattiPush={supported:ok,' +
+    'subscribed:function(){return ok?current().then(function(s){return!!s}):Promise.resolve(false)},' +
+    'subscribe:function(){if(!ok)return Promise.resolve("unsupported");' +
+    'return Notification.requestPermission().then(function(p){if(p!=="granted")return"denied";' +
+    'return navigator.serviceWorker.ready.then(function(r){' +
+    'return r.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes()})})' +
+    '.then(function(s){var j=s.toJSON();' +
+    `return post(${JSON.stringify(PUSH_PATHS.subscribe)},{endpoint:j.endpoint,` +
+    'p256dh:j.keys&&j.keys.p256dh,auth:j.keys&&j.keys.auth,' +
+    'locale:document.documentElement.lang==="ur"?"ur":"en"})})' +
+    '.then(function(){told(true);return"subscribed"})})},' +
+    'unsubscribe:function(){if(!ok)return Promise.resolve();return current().then(function(s){' +
+    'if(!s)return;var endpoint=s.endpoint;return s.unsubscribe().then(function(){' +
+    `return post(${JSON.stringify(PUSH_PATHS.unsubscribe)},{endpoint:endpoint})})})` +
+    '.then(function(){told(false)})}}' +
+    '})()</script>'
+  );
+}
+
 /**
  * What every shopper's page carries for it: the manifest, and the worker registered once the
- * page has loaded, where the browser has service workers.
+ * page has loaded, where the browser has service workers; and, where Hatti pushes, the script
+ * that turns the shop's notifications on (ADR-833).
  */
-export function pwaHead(urdu: boolean): string {
+export function pwaHead(urdu: boolean, pushPublicKey?: string): string {
   return (
     `<link rel="manifest" href="${PWA_PATHS.manifest}${urdu ? '?locale=ur' : ''}">` +
     '<script data-hatti-pwa>if("serviceWorker"in navigator)addEventListener("load",function(){' +
     `navigator.serviceWorker.register(${JSON.stringify(PWA_PATHS.worker)}).catch(function(){})` +
-    '})</script>'
+    '})</script>' +
+    (pushPublicKey ? pushScript(pushPublicKey) : '')
   );
 }
 

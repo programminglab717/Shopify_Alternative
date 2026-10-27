@@ -54,6 +54,7 @@ import {
   MessageRetention,
   MessagesService,
   PushService,
+  ShopperPushService,
   SmsSendersService,
   StockWatchService,
   WebPushSender,
@@ -109,6 +110,7 @@ import { OverdueConversationPushes, OverdueOrderPushes, PushNotices } from './pu
 import { BillingRenewals } from './billing-renewals.js';
 import { AutomationTriggers, WinBacks } from './automations.js';
 import { BroadcastQueue } from './broadcasts.js';
+import { PushCampaigns } from './push-campaigns.js';
 import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
@@ -548,6 +550,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => waiting.stop());
+    // Shops' push campaigns to their shoppers' browsers, in marketing hours (ADR-834).
+    const pushCampaigns = new PushCampaigns(
+      new ShopperPushService(database, vapid && new WebPushSender(vapid)),
+      logger,
+    ).start(config.SCHEDULED_INTERVAL_MS);
+    closers.push(() => pushCampaigns.stop());
     // And told at the shop's alerts number on WhatsApp, at most every three hours (ADR-680).
     const overdueMessages = new OverdueOrderMessages(
       database,

@@ -29,6 +29,8 @@ import { MessagingResolver } from './graphql/messaging.resolver.js';
 import { PushResolver } from './graphql/push.resolver.js';
 import { MessagesService } from './messages.service.js';
 import { PUSH_SENDER, PushService } from './push.service.js';
+import { ShopperPushService, StorefrontPushController } from './shopper-push.service.js';
+import { ShopperPushResolver } from './graphql/shopper-push.resolver.js';
 import { SmsSenderResolver } from './graphql/sms-sender.resolver.js';
 import { SmsSendersService } from './sms-senders.service.js';
 import { StopLinkController } from './stop.controller.js';
@@ -79,6 +81,8 @@ export class MessagingModule {
         StorefrontContactMessagesController,
         // Shoppers' chats from the online store (ADR-810).
         StorefrontWebChatController,
+        // Shoppers' push subscriptions from the online store (ADR-833).
+        StorefrontPushController,
       ],
       providers: [
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
@@ -119,6 +123,8 @@ export class MessagingModule {
         SmsSenderResolver,
         PushService,
         PushResolver,
+        ShopperPushService,
+        ShopperPushResolver,
       ],
       exports: [
         MessagesService,
@@ -133,6 +139,7 @@ export class MessagingModule {
         ReferralProgramService,
         WebChatService,
         PushService,
+        ShopperPushService,
       ],
     };
   }

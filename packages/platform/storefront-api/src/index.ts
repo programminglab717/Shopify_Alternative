@@ -91,6 +91,7 @@ export {
   type ReportResult,
   type SignUpResult,
   type ContactMessageResult,
+  type PushSubscribeResult,
   type WebChatResult,
   type StockWatchResult,
   type StorefrontApiOptions,
@@ -154,6 +155,13 @@ export {
   type ThemePreviewResponse,
 } from './theme.js';
 export { robotsTxt, robotsVerdict, type RobotsVerdict } from './robots.js';
+export {
+  pushSubscriptionsPath,
+  pushUnsubscribePath,
+  type PushSubscribeErrorResponse,
+  type PushSubscribeRequest,
+  type PushUnsubscribeRequest,
+} from './push.js';
 export {
   WEB_CHAT_LIMITS,
   webChatMessagesPath,

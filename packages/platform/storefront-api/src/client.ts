@@ -84,6 +84,12 @@ import {
   type WebChatWriteRequest,
 } from './web-chat.js';
 import {
+  pushSubscriptionsPath,
+  pushUnsubscribePath,
+  type PushSubscribeErrorResponse,
+  type PushSubscribeRequest,
+} from './push.js';
+import {
   contactMessagesPath,
   type ContactMessageErrorResponse,
   type ContactMessageRequest,
@@ -130,6 +136,13 @@ export type ReportResult = ({ ok: true } & ReportResponse) | ({ ok: false } & Re
  */
 export type WebChatResult =
   ({ ok: true } & WebChatResponse) | ({ ok: false } & WebChatErrorResponse) | null;
+
+/**
+ * What keeping a shopper's push subscription said (ADR-833): kept; what was wrong; or null while
+ * Hatti pushes nothing.
+ */
+export type PushSubscribeResult =
+  { ok: true } | ({ ok: false } & PushSubscribeErrorResponse) | null;
 
 export type ContactMessageResult =
   ({ ok: true } & ContactMessageResponse) | ({ ok: false } & ContactMessageErrorResponse);
@@ -425,6 +438,27 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return { ok: true, ...((await response.json()) as WebChatResponse) };
+  }
+
+  /** Keeps a shopper's browser's push subscription for the shop (ADR-833). */
+  async pushSubscribe(shopId: string, request: PushSubscribeRequest): Promise<PushSubscribeResult> {
+    const response = await this.#request('POST', pushSubscriptionsPath(shopId), null, request);
+    if (response.status === 404) return null;
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as PushSubscribeErrorResponse) };
+    }
+    if (response.status !== 204) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true };
+  }
+
+  /** Forgets a shopper's browser's push subscription. */
+  async pushUnsubscribe(shopId: string, endpoint: string): Promise<void> {
+    const response = await this.#request('POST', pushUnsubscribePath(shopId), null, { endpoint });
+    if (response.status !== 204) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
   }
 
   /** A shopper's report of the store (ADR-460): its number, or what was wrong with it. */

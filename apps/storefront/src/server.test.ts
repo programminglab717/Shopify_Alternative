@@ -52,6 +52,8 @@ import {
   type CommentResult,
   type ContactMessageRequest,
   type ContactMessageResult,
+  type PushSubscribeRequest,
+  type PushSubscribeResult,
   type WebChatResult,
   type SignUpRequest,
   type SignUpResult,
@@ -572,6 +574,19 @@ class FakeCore {
     return this.chatting && this.chatting.ok
       ? { ...this.chatting, token: undefined }
       : this.chatting;
+  }
+
+  /** The push subscriptions the storefront passed on, and what the core says back (ADR-833). */
+  readonly pushes: { shopId: string; action: string; request: object }[] = [];
+  pushing: PushSubscribeResult = { ok: true };
+
+  async pushSubscribe(shopId: string, request: PushSubscribeRequest): Promise<PushSubscribeResult> {
+    this.pushes.push({ shopId, action: 'subscribe', request });
+    return this.pushing;
+  }
+
+  async pushUnsubscribe(shopId: string, endpoint: string): Promise<void> {
+    this.pushes.push({ shopId, action: 'unsubscribe', request: { endpoint } });
   }
 
   async contactMessage(
@@ -3690,6 +3705,96 @@ describe('Carts', () => {
       payload: form({ name: 'A', phone: '0300 1234567', body: 'Hi' }),
     });
     expect(formed.statusCode).toBe(415);
+  });
+
+  it("offers the shop's notifications where Hatti pushes, and passes subscriptions on (ADR-833)", async () => {
+    const KEY = `B${'A'.repeat(86)}`;
+    // Without Hatti's key, pages offer none.
+    const plain = await server().inject({
+      method: 'GET',
+      url: '/',
+      headers: { host: 'localhost' },
+    });
+    expect(plain.body).not.toContain('data-hatti-push');
+    const app = server({
+      renderer: new PageRenderer(theme, { limits: { timeMs: 10_000 }, pushPublicKey: KEY }),
+    });
+    const page = await app.inject({ method: 'GET', url: '/', headers: { host: 'localhost' } });
+    expect(page.body).toContain(`<script data-hatti-push>(function(){var key="${KEY}";`);
+    // Hatti Base offers them in its footer, once its script finds them off (ADR-836).
+    expect(page.body).toContain('<hatti-notifications class="footer__notifications" hidden>');
+    expect(page.body).toContain('Get our offers as notifications');
+
+    const JSON_POST = { host: 'localhost', 'content-type': 'application/json' };
+    const subscription = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
+      p256dh: 'B'.repeat(87),
+      auth: 'a'.repeat(22),
+      locale: 'ur',
+    };
+    const on = await app.inject({
+      method: 'POST',
+      url: '/push/subscribe',
+      headers: JSON_POST,
+      payload: subscription,
+    });
+    expect([on.statusCode, on.headers['cache-control']]).toEqual([204, 'private, no-store']);
+    expect(core.pushes.at(-1)).toEqual({
+      shopId: expect.any(String) as unknown,
+      action: 'subscribe',
+      request: subscription,
+    });
+    // What the core refuses, said by field; nothing while Hatti pushes nothing.
+    core.pushing = { ok: false, errors: [{ field: 'endpoint', message: 'Not a push service' }] };
+    const wrong = await app.inject({
+      method: 'POST',
+      url: '/push/subscribe',
+      headers: JSON_POST,
+      payload: { ...subscription, endpoint: 'https://evil.example/' },
+    });
+    expect([wrong.statusCode, wrong.json()]).toEqual([
+      422,
+      { errors: [{ field: 'endpoint', message: 'Not a push service' }] },
+    ]);
+    core.pushing = null;
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/push/subscribe',
+          headers: JSON_POST,
+          payload: subscription,
+        })
+      ).statusCode,
+    ).toBe(404);
+    const off = await app.inject({
+      method: 'POST',
+      url: '/push/unsubscribe',
+      headers: JSON_POST,
+      payload: { endpoint: subscription.endpoint },
+    });
+    expect(off.statusCode).toBe(204);
+    expect(core.pushes.at(-1)).toEqual({
+      shopId: expect.any(String) as unknown,
+      action: 'unsubscribe',
+      request: { endpoint: subscription.endpoint },
+    });
+    // From another site, or not JSON: refused, and nothing asked of the core.
+    const asked = core.pushes.length;
+    const across = await app.inject({
+      method: 'POST',
+      url: '/push/subscribe',
+      headers: { ...JSON_POST, 'sec-fetch-site': 'cross-site' },
+      payload: subscription,
+    });
+    const form = await app.inject({
+      method: 'POST',
+      url: '/push/subscribe',
+      headers: { host: 'localhost', 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'endpoint=x',
+    });
+    expect([across.statusCode, form.statusCode]).toEqual([403, 415]);
+    expect(core.pushes).toHaveLength(asked);
   });
 
   it("sends Shopify's contact form on to the core, then back to its page saying how it went (ADR-589)", async () => {

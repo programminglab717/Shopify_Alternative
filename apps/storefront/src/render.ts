@@ -233,6 +233,11 @@ export interface RendererOptions {
    * alternate links, and what search engines and link previews are told, are absolute with it.
    */
   platformUrl?: string;
+  /**
+   * Hatti's VAPID public key (ADR-506), which shoppers' browsers subscribe to the shop's pushes
+   * with (ADR-833). Without it, pages offer no pushes.
+   */
+  pushPublicKey?: string;
 }
 
 /** What a page's renders share, once its shop, theme and resource are known. */
@@ -554,7 +559,7 @@ export class PageRenderer {
             `<script data-hatti-vitals data-template="${vitalTemplateOf(templateFile)}">` +
             `${VITALS_SCRIPT}</script>${prepared.pixel}${prepared.pausedBar}` +
             prepared.searchReport +
-            pwaHead(locale === 'ur'));
+            pwaHead(locale === 'ur', this.options.pushPublicKey));
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,

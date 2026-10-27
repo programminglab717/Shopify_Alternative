@@ -115,7 +115,14 @@ import {
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { developmentPage, maintenancePage, retryAfterOf } from './maintenance.js';
-import { PWA_PATHS, SERVICE_WORKER, initialIcon, offlinePage, webManifest } from './pwa.js';
+import {
+  PUSH_PATHS,
+  PWA_PATHS,
+  SERVICE_WORKER,
+  initialIcon,
+  offlinePage,
+  webManifest,
+} from './pwa.js';
 import { ROOM_LIMITS, WaitingRooms, waitingPage } from './waiting-room.js';
 import {
   EMPTY_REPORT,
@@ -232,6 +239,12 @@ const SEARCHES = { name: 'searches', limit: 240, windowMs: 60_000 };
  * behind one mobile network's address to mistype, too few to guess.
  */
 const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
+
+/**
+ * Notifications an address may turn on or off a minute (ADR-833): a shopper does it once, so few,
+ * but room for many behind one mobile network's address.
+ */
+const PUSH_CHANGES = { name: 'push-changes', limit: 20, windowMs: 60_000 };
 
 /**
  * Sign-ups an address may make a minute through shops' forms (ADR-189): a shopper signs up once,
@@ -3714,6 +3727,55 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.post(`${prefix}/account/addresses/:id`, addressChange);
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/logout`, handler: logout });
   }
+  /**
+   * Notifications from the shop (OS-14, ADR-833), for the platform's script: `POST /push/subscribe`
+   * with the browser's subscription, `{ "endpoint", "p256dh", "auth", "locale" }`, turns them on,
+   * answered 204, or 422 with `{ "errors": [{ "field", "message" }] }` for a subscription that is
+   * none; `POST /push/unsubscribe` with `{ "endpoint" }` turns them off. 404 while Hatti pushes
+   * nothing. JSON alone, from the shop's own pages alone, at most {@link PUSH_CHANGES} a minute
+   * from an address, never kept.
+   */
+  const pushChange =
+    (action: 'subscribe' | 'unsubscribe') =>
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      accountAnswer(reply);
+      const refuse = (status: number, message: string) => reply.code(status).send({ message });
+      if (!fromShopItself(request)) {
+        return refuse(403, "Notifications are turned on from the shop's own pages.");
+      }
+      if (!isJson(request)) return refuse(415, 'Send JSON.');
+      if (limiter !== null && !(await limiter.hit(PUSH_CHANGES, request.ip)).allowed) {
+        return refuse(429, 'Too many changes. Please wait a minute.');
+      }
+      const body = paramsOf(request);
+      const text = (name: string) => (typeof body[name] === 'string' ? body[name] : '');
+      try {
+        if (!core) throw new StorefrontApiError(503, 'This storefront pushes nothing');
+        if (action === 'unsubscribe') {
+          await core.pushUnsubscribe(found.shopId, text('endpoint'));
+          return await reply.code(204).send();
+        }
+        const result = await core.pushSubscribe(found.shopId, {
+          endpoint: text('endpoint'),
+          p256dh: text('p256dh'),
+          auth: text('auth'),
+          locale: text('locale') === 'ur' ? 'ur' : 'en',
+        });
+        if (!result) return await refuse(404, 'This shop sends no notifications.');
+        if (!result.ok) return await reply.code(422).send({ errors: result.errors });
+        return await reply.code(204).send();
+      } catch (error) {
+        if (error instanceof StoreMissingError)
+          return notFound(reply, 'This shop is not open yet.');
+        if (!unreachable(request, error)) throw error;
+        return refuse(503, 'Notifications cannot be turned on just now. Please try again soon.');
+      }
+    };
+  app.post(PUSH_PATHS.subscribe, pushChange('subscribe'));
+  app.post(PUSH_PATHS.unsubscribe, pushChange('unsubscribe'));
+
   // The chat on the shop's pages, the same whatever the page's language (ADR-811).
   app.post('/chat', chat('start'));
   app.post('/chat/messages', chat('write'));
