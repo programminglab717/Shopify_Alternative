@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-807 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-808 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -815,6 +815,7 @@
 | 805 | Cashback leaves gift cards out, and a refund takes back the share of it the refund took, from what is left of that credit alone | Accepted |
 | 806 | Cashback has up to three tiers by what a customer spent on their other orders, each giving back more | Accepted |
 | 807 | Referrals: a code for each customer, read from the order's landing page, and both sides given store credit once the friend's first order arrives, unless the checks against fraud refuse it | Accepted |
+| 808 | Referrals are set and seen in Marketing, and a customer's link carries ?invite=, apart from affiliates' ?ref= | Accepted |
 
 ---
 
@@ -26698,3 +26699,19 @@
   past the checks; ten a month bounds what one gains. Credit already given is not taken back
   if the friend's order is refunded later. The admin's page and the storefront's link to share
   follow (ADR-808).
+
+## ADR-808 · Referrals are set and seen in Marketing, and a customer's link carries ?invite=, apart from affiliates' ?ref=
+
+* **Context:** the referral programme was set through the Admin API alone (ADR-807), and its
+  links carried `?ref=`, which affiliates' links already use (ADR-777). Affiliates' refs are
+  matched whatever their case, so a customer's code could be taken for an affiliate's, and an
+  order credited to both.
+* **Decision:** a customer's link carries `?invite=` and their code; `?ref=` stays the
+  affiliates'. This supersedes ADR-807's `?ref=`, never released. Marketing → Referrals sets
+  the programme: what the customer who shared the link is given, what the friend is given (0
+  for none), the days the credit lasts, the friend's minimum order, and whether it is on, with
+  the checks against fraud said beside it. Below, the referrals so far, latest first: rewarded
+  with what each side was given, or refused with why, each linking to its order, the customer
+  who shared the link and the friend.
+* **Consequences:** shops see why a referral was refused and can look at the order. Shoppers
+  find their link on the online store next (ADR-809).

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Referrals in the admin
+
+* **Marketing → Referrals:** the programme set, and the referrals listed, rewarded or refused
+  with why (MKT-07, [ADR-808](../architecture/13-decision-log.md#adr-808--referrals-are-set-and-seen-in-marketing-and-a-customers-link-carries-invite-apart-from-affiliates-ref)).
+* **`?invite=`:** a customer's link carries `?invite=`, apart from affiliates' `?ref=`, so
+  one is never taken for the other.
+* 4307 tests (3 new).
+
 ### d35a07e · Referrals
 
 * **Referral programme:** each customer has a code; a friend's first order from their link
