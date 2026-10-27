@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Riders' pages
+### 0622eb1 · Riders' pages
 
 * **Rider mode:** a rider's page from their own link lists what they carry, with a map and the
   customer's number, and takes each delivery with the customer's code and the cash collected,
