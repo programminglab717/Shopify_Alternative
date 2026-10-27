@@ -357,6 +357,15 @@ export {
   type RefundResult,
 } from '../internal/refund.service.js';
 export {
+  CUSTOM_REPORT_LIMITS,
+  CustomReportService,
+  REPORT_BREAKDOWNS,
+  REPORT_PERIODS,
+  type CustomReportRecord,
+  type ReportBreakdown,
+  type ReportPeriod,
+} from '../internal/custom-reports.js';
+export {
   SALES_DIMENSIONS,
   SALES_INTERVALS,
   SalesReportService,

@@ -144,6 +144,8 @@ export const ID_PREFIXES = {
   // A file a digital product sells, and one of its licence keys (ADR-813).
   digitalFile: 'dfile',
   licenceKey: 'lkey',
+  // A report a shop saves of its own (ADR-817).
+  customReport: 'crep',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

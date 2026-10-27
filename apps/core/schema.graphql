@@ -4057,6 +4057,146 @@ type CustomAppUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""A report the shop saved of its own (ANL-06, ADR-817)."""
+type CustomReport {
+  breakdown: CustomReportBreakdown!
+
+  """Its columns, in order, by their keys."""
+  columns: [String!]!
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+  period: CustomReportPeriod!
+  updatedAt: DateTime!
+}
+
+"""What a custom report's rows are (ADR-817)."""
+enum CustomReportBreakdown {
+  """The campaign of each order's last visit from elsewhere."""
+  CAMPAIGN
+
+  """Each day, in the shop's time zone."""
+  DAY
+
+  """Each month."""
+  MONTH
+
+  """The 250 products that sold most, their sales first."""
+  PRODUCT
+
+  """The channel each order came through."""
+  SOURCE
+
+  """Where each order's last visit from elsewhere came from."""
+  VISIT_SOURCE
+
+  """Each week, from Monday."""
+  WEEK
+}
+
+"""A custom report's column."""
+type CustomReportColumn {
+  """"net_sales", as a report's columns name it."""
+  key: String!
+  kind: CustomReportColumnKind!
+
+  """"Net sales"."""
+  title: String!
+
+  """A line of true profit: shown only on the plans that have it (ADR-529)."""
+  trueProfit: Boolean!
+}
+
+"""What a custom report's column holds."""
+enum CustomReportColumnKind {
+  """An amount in the shop's currency, in major units: "3500.00"."""
+  AMOUNT
+
+  """A count: "3"."""
+  NUMBER
+
+  """A ratio to four places: "0.6571" is 65.71%."""
+  RATIO
+}
+
+type CustomReportDeletePayload {
+  """Null where there was nothing to delete."""
+  deletedId: ID
+}
+
+type CustomReportExportPayload {
+  """
+  "monthly-sales.xlsx", an Excel workbook of one sheet: its rows, and their total last for a report of sales. Null where refused.
+  """
+  file: OrderExportFile
+  userErrors: [UserError!]!
+}
+
+input CustomReportInput {
+  breakdown: CustomReportBreakdown!
+
+  """
+  1 to 20 of the columns customReportColumns gives the breakdown, in the order shown.
+  """
+  columns: [String!]!
+
+  """1 to 80 characters."""
+  name: String!
+  period: CustomReportPeriod!
+}
+
+type CustomReportPayload {
+  customReport: CustomReport
+  userErrors: [UserError!]!
+}
+
+"""
+The period a custom report covers, as of the day it is run in the shop's time zone: the "last" days, weeks and months are whole ones before today; "this" week, month or year runs to the end of today.
+"""
+enum CustomReportPeriod {
+  LAST_7_DAYS
+  LAST_12_MONTHS
+  LAST_30_DAYS
+  LAST_90_DAYS
+  LAST_MONTH
+  LAST_WEEK
+  THIS_MONTH
+  THIS_WEEK
+  THIS_YEAR
+  TODAY
+  YESTERDAY
+}
+
+"""What a custom report shows when run."""
+type CustomReportResult {
+  """Its columns shown: true profit's are left out on the plans without it."""
+  columns: [CustomReportColumn!]!
+  placedBefore: DateTime!
+  placedFrom: DateTime!
+  rows: [CustomReportRow!]!
+
+  """
+  The period's total of each column, for a report of sales; null by product.
+  """
+  totals: [String]
+}
+
+"""A row of a custom report's."""
+type CustomReportRow {
+  """
+  The product's ID, the channel as OrderSource names it, or the visit source or campaign as the sales report keys them; null by day, week or month.
+  """
+  key: String
+
+  """
+  "2026-10-01" for a day or the week from it, "2026-10" for a month; else its name.
+  """
+  label: String!
+
+  """Each column's value, as its kind says; null for none."""
+  values: [String]!
+}
+
 """
 A shop's own staff role (ADM-01, ADR-578): made from a preset other than the owner's, for good, holding some of its scopes and capabilities, never more. Its members' role is the preset, which says the rest, such as whether they need a second factor.
 """
@@ -9199,6 +9339,28 @@ type Mutation {
 
   """Renames an app or changes its scopes, from its next request on."""
   customAppUpdate(id: ID!, input: CustomAppInput!): CustomAppUpdatePayload!
+
+  """Saves a custom report (ANL-06, ADR-817). A shop keeps up to 50."""
+  customReportCreate(input: CustomReportInput!): CustomReportPayload!
+
+  """Deletes a custom report."""
+  customReportDelete(id: ID!): CustomReportDeletePayload!
+
+  """
+  A custom report as an Excel workbook, over its own period or one given. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
+  """
+  customReportExport(
+    id: ID!
+    placedBefore: DateTime
+
+    """
+    With placedBefore, a period of the caller's in place of the report's own.
+    """
+    placedFrom: DateTime
+  ): CustomReportExportPayload!
+
+  """Changes a custom report, all of it."""
+  customReportUpdate(id: ID!, input: CustomReportInput!): CustomReportPayload!
 
   """
   Makes a custom role (ADR-578) from a preset, with some of its scopes and capabilities, never more; a shop has 50 at most. The owner makes them from any preset but its own; managers, from those below them.
@@ -15222,6 +15384,28 @@ type Query {
 
   """The shop's custom apps, the latest first (DEV-04, ADR-395)."""
   customApps: [CustomApp!]!
+  customReport(id: ID!): CustomReport
+
+  """
+  The columns a custom report of `breakdown` may show, in the order offered.
+  """
+  customReportColumns(breakdown: CustomReportBreakdown!): [CustomReportColumn!]!
+
+  """
+  What a custom report shows, worked out from the orders now: over its own period as of today, or over one given of a year at most. Null for no such report.
+  """
+  customReportRun(
+    id: ID!
+    placedBefore: DateTime
+
+    """
+    With placedBefore, a period of the caller's in place of the report's own.
+    """
+    placedFrom: DateTime
+  ): CustomReportResult
+
+  """The shop's custom reports, by name (ANL-06)."""
+  customReports: [CustomReport!]!
 
   """
   The shop's custom roles (ADR-578), by name. Staff need to be the owner or a manager.

@@ -32,6 +32,7 @@ import { CustomerOrdersResolver } from './graphql/customer-orders.resolver.js';
 import { OrderDocumentResolver } from './graphql/document.resolver.js';
 import { OrderLinkResolver } from './graphql/order-link.resolver.js';
 import { DraftOrderResolver } from './graphql/draft-order.resolver.js';
+import { CustomReportResolver } from './graphql/custom-report.resolver.js';
 import { ExportScheduleResolver } from './graphql/export-schedule.resolver.js';
 import { OrderExportResolver } from './graphql/export.resolver.js';
 import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
@@ -53,6 +54,7 @@ import {
   OrderLinkController,
   StorefrontTrackingController,
 } from './links.controller.js';
+import { CustomReportService } from './custom-reports.js';
 import { ExportScheduleService } from './export-schedule.service.js';
 import { OrderExportService } from './order-export.service.js';
 import { OrderLinkService } from './order-link.service.js';
@@ -92,6 +94,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     RiskSettingsService,
     OrderDocumentService,
     OrderExportService,
+    CustomReportService,
     ExportScheduleService,
     RefundService,
     CodHealthService,
@@ -124,6 +127,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     RiskResolver,
     OrderDocumentResolver,
     OrderExportResolver,
+    CustomReportResolver,
     ExportScheduleResolver,
     RefundResolver,
     DraftOrderResolver,
@@ -160,6 +164,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     RiskSettingsService,
     OrderDocumentService,
     OrderExportService,
+    CustomReportService,
     ExportScheduleService,
     RefundService,
     CodHealthService,
