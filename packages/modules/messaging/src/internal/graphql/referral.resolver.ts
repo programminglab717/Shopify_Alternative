@@ -75,7 +75,7 @@ export class ReferralResolver {
     nullable: true,
     description:
       "A customer's referral code, made the first time it is asked for: the online store's " +
-      'link with `?ref=` and it brings their friends. Null for no such customer.',
+      'link with `?invite=` and it brings their friends. Null for no such customer.',
   })
   @RequireScopes('read_customers')
   async customerReferralCode(

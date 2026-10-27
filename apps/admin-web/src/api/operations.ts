@@ -11265,6 +11265,64 @@ const AFFILIATE = /* GraphQL */ `
 `;
 
 /** The shop's affiliates with their figures, and its address their links begin with (ADR-777). */
+const REFERRAL_PROGRAM = /* GraphQL */ `
+  fragment ReferralProgramFields on ReferralProgram {
+    enabled
+    referrerCredit {
+      amount
+    }
+    friendCredit {
+      amount
+    }
+    creditDays
+    minimumOrder {
+      amount
+    }
+    perMonth
+    updatedAt
+  }
+`;
+
+/** The shop's referral programme, and the referrals its codes brought (MKT-07, ADR-807). */
+export const ReferralsQuery = /* GraphQL */ `
+  query Referrals {
+    referralProgram {
+      ...ReferralProgramFields
+    }
+    referrals(first: 50) {
+      orderId
+      referrerId
+      friendId
+      outcome
+      reason
+      referrerCredit {
+        amount
+      }
+      friendCredit {
+        amount
+      }
+      createdAt
+    }
+  }
+  ${REFERRAL_PROGRAM}
+`;
+
+export const ReferralProgramUpdateMutation = /* GraphQL */ `
+  mutation ReferralProgramUpdate($input: ReferralProgramInput!) {
+    referralProgramUpdate(input: $input) {
+      referralProgram {
+        ...ReferralProgramFields
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+  ${REFERRAL_PROGRAM}
+`;
+
 export const AffiliatesQuery = /* GraphQL */ `
   query Affiliates {
     shop {

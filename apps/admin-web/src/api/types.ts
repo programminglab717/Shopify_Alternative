@@ -5406,6 +5406,47 @@ export interface AffiliateValue {
   };
 }
 
+/** The shop's referral programme (MKT-07, ADR-807). */
+export interface ReferralProgramValue {
+  enabled: boolean;
+  referrerCredit: { amount: string };
+  friendCredit: { amount: string };
+  creditDays: number;
+  minimumOrder: { amount: string };
+  perMonth: number;
+  updatedAt: string | null;
+}
+
+export type ReferralRefusal =
+  | 'OWN_CODE'
+  | 'NOT_FIRST_ORDER'
+  | 'SAME_DEVICE'
+  | 'SAME_ADDRESS'
+  | 'REFERRER_UNPROVEN'
+  | 'MONTHLY_LIMIT'
+  | 'BELOW_MINIMUM';
+
+/** A friend's order a customer's code brought, and what became of it (ADR-807). */
+export interface ReferralValue {
+  orderId: string;
+  referrerId: string;
+  friendId: string;
+  outcome: 'REWARDED' | 'REFUSED';
+  reason: ReferralRefusal | null;
+  referrerCredit: { amount: string };
+  friendCredit: { amount: string };
+  createdAt: string;
+}
+
+export interface ReferralsData {
+  referralProgram: ReferralProgramValue;
+  referrals: ReferralValue[];
+}
+
+export interface ReferralProgramUpdateData {
+  referralProgramUpdate: { referralProgram: ReferralProgramValue | null; userErrors: UserError[] };
+}
+
 export interface AffiliatesData {
   shop: { url: string };
   affiliates: AffiliateValue[];

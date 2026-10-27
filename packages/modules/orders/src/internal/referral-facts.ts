@@ -28,7 +28,7 @@ export interface OrderReferralFacts extends OrderTrace {
   customerId: string;
   /** Whether its customer was erased since. */
   erased: boolean;
-  /** The code of the link that brought it: `ref` of its last visit's landing page, or its first. */
+  /** The code of the link that brought it: `invite` of its last visit's landing page, or its first. */
   referralCode: string | null;
   /** How many orders its customer placed before it, not cancelled. */
   otherOrders: number;
@@ -41,12 +41,15 @@ export interface CustomerOrderTraces {
   received: boolean;
 }
 
-/** The code in a landing page's `ref`, in capitals; null where it has none. */
+/**
+ * The code in a landing page's `invite`, in capitals: apart from the `ref` of affiliates' links
+ * (ADR-777), so that one is never taken for the other. Null where it has none.
+ */
 export function referralCodeOf(attribution: AttributionValue | null): string | null {
   for (const visit of attribution ? [attribution.last, attribution.first] : []) {
     if (!visit.landingPage) continue;
     try {
-      const code = new URL(visit.landingPage).searchParams.get('ref')?.trim().toUpperCase();
+      const code = new URL(visit.landingPage).searchParams.get('invite')?.trim().toUpperCase();
       if (code && /^[A-Z0-9]{4,16}$/.test(code)) return code;
     } catch {
       // Not an address: no code.

@@ -97,6 +97,7 @@ import {
   validateGrantSearch,
 } from './marketing/google-ads-account';
 import { AutomationsPage } from './marketing/automations-page';
+import { ReferralsPage } from './marketing/referrals-page';
 import { BroadcastsPage } from './marketing/broadcasts-page';
 import { CalendarPage } from './marketing/calendar-page';
 import { TemplatesPage } from './marketing/templates-page';
@@ -817,6 +818,12 @@ const marketingCalendar = createRoute({
   component: CalendarPage,
 });
 
+const marketingReferrals = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing/referrals',
+  component: ReferralsPage,
+});
+
 const marketingAffiliates = createRoute({
   getParentRoute: () => shop,
   path: 'marketing/affiliates',
@@ -1073,6 +1080,7 @@ export const routeTree = root.addChildren([
     marketingCalendar,
     marketingAdSpend,
     marketingAffiliates,
+    marketingReferrals,
     settingsTax,
     settingsMessages,
     settingsOrders,

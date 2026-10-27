@@ -64,7 +64,7 @@ describe.skipIf(!server)(
           paymentMethod: 'cash_on_delivery',
         }),
       );
-      const landing = `https://zari.example/products/kurta${from.ref ? `?ref=${from.ref}` : ''}`;
+      const landing = `https://zari.example/products/kurta${from.ref ? `?invite=${from.ref}` : ''}`;
       const visit = {
         at: new Date().toISOString(),
         source: 'whatsapp',

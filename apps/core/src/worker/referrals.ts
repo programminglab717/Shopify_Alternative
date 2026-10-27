@@ -52,7 +52,7 @@ const sameDevice = (a: OrderTrace, b: OrderTrace) =>
 
 /**
  * Referrals (MKT-07, ADR-807): while the shop's programme is on, once an order placed from a
- * customer's link (its landing page's `ref`) is delivered, paid in full and not cancelled, the
+ * customer's link (its landing page's `invite`) is delivered, paid in full and not cancelled, the
  * customer whose code it was and the friend who placed it are each given the programme's store
  * credit, lasting its days; checkout spends it, and WhatsApp tells them of it (ADR-192). The
  * checks against fraud refuse it where the order is the referrer's own, the friend ordered
