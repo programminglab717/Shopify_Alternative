@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-831 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-836 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -839,6 +839,11 @@
 | 829 | Liquid has the shop's listed locations as `shop.stores`, each with its address as lines, its number to call written as Pakistan writes it, its hours, whether orders may be collected there and a Google Maps search link that needs no key | Accepted |
 | 830 | Hatti Base's store locator, a section on a page with the stores template, lists the shop's stores, filters them by city once its script runs, and tells search engines of each as schema.org's Store | Accepted |
 | 831 | The admin's location settings list a location on the store locator with its opening hours, change them, and take it off | Accepted |
+| 832 | Every shop's online store is installable: its pages name a web app manifest of its own and register one service worker, which keeps the offline page alone and leaves everything else to the network | Accepted |
+| 833 | Shoppers turn on a shop's notifications from its pages, and the storefront passes their browser's subscription to the core, which takes only the push services browsers use | Accepted |
+| 834 | A shop sends push campaigns, a title, words and a page of its own, at most three a day, which the worker pushes to every subscribed browser in marketing hours a batch at a time | Accepted |
+| 835 | The admin's Push notifications page under Marketing shows who has them on, sends a push to all of them and lists those sent | Accepted |
+| 836 | Hatti Base's footer offers the shop's notifications once the browser can have them and they are off | Accepted |
 
 ---
 
@@ -27218,3 +27223,96 @@
   off. A refusal, such as a location without its address, is said there. English and Urdu.
 * **Consequences:** OS-18 is done in code. The pickup points were done already (ADR-389 to
   ADR-391), and the store locator is now done too. Nothing waits on the owner.
+
+## ADR-832 · Every shop's online store is installable: its pages name a web app manifest of its own and register one service worker, which keeps the offline page alone and leaves everything else to the network
+
+* **Context:** OS-14 asks for an installable storefront with an offline page and web push.
+  Pakistani shoppers often browse on weak mobile networks, and an app on the home screen brings
+  them back.
+* **Decision:**
+  * **Every shopper's page** carries `<link rel="manifest">` and a few lines registering
+    `/sw.js`, with the platform's other scripts in `content_for_header`, so every theme has them.
+    Staff's previews and the editor don't.
+  * **`/manifest.webmanifest`** names the shop, a short name cut at a word for the home screen,
+    its home page in the page's language (`?locale=ur` starts at `/ur`), standing alone, and its
+    icons: its square logo at the image service's widths of 192 and 540, so neither is made
+    larger than asked, else `/pwa-icon.svg`, its initial on a colour picked by its name.
+  * **The worker keeps one page, `/offline`,** the platform's page in English and Urdu, which it
+    shows for a page asked for while there is no network. It caches nothing else, so prices,
+    stock and carts are always current; forms, scripts and images are the network's alone. A new
+    cache name drops the old one.
+  * **`/sw.js` is asked for afresh** (`no-cache`), so a new worker reaches browsers at once. The
+    manifest, icon and offline page are kept at the edge an hour and purged with the shop's
+    document.
+  * **These routes stay open** while a shop is paused or a drop's waiting room is live, so the
+    worker installs and updates whatever the shop is doing.
+  * **The worker shows pushes** (ADR-833), and a push's click opens only the shop's own pages,
+    never another site's.
+  * Checked in Chromium: the worker registers, the manifest has no installability errors, and a
+    page asked for offline shows the offline page.
+* **Consequences:** a shop that is closed behind its password is not installable until it opens.
+
+## ADR-833 · Shoppers turn on a shop's notifications from its pages, and the storefront passes their browser's subscription to the core, which takes only the push services browsers use
+
+* **Context:** web push needs a browser's subscription with its push service, kept for the shop,
+  and Hatti already signs pushes with its VAPID keys for staff (ADR-506).
+* **Decision:**
+  * **`window.HattiPush`**, in the pages' head only where the storefront has Hatti's VAPID public
+    key (`VAPID_PUBLIC_KEY`, the core's): `supported`; `subscribed()`; `subscribe()`, which asks
+    the shopper's leave, as only a tap may, subscribes and passes the subscription on, answering
+    "subscribed", "denied" or "unsupported"; and `unsubscribe()`. Each change is told as a
+    `hatti:push` event.
+  * **`POST /push/subscribe` and `/push/unsubscribe`** on the storefront: JSON from the shop's own
+    pages alone, at most 20 a minute from an address, never kept at the edge. They pass the
+    subscription to the core's storefront API, `…/push-subscriptions`, behind the storefront key.
+  * **The core keeps it for the shop** (migration 0354), one per endpoint, with the page's
+    language. It is kept only where the endpoint is one of the push services browsers use: Google's,
+    Mozilla's, Apple's and Microsoft's, https, on their standard port. A subscription comes from an
+    anonymous browser and the worker posts to it, so any other address would let a stranger aim the
+    worker at a server of their choosing. The endpoint is checked again before each push.
+  * Without the VAPID keys the core answers 404, and nothing is kept.
+* **Consequences:** a subscription is the browser's, not a customer's: pushes about a shopper's
+  own orders would need it tied to their account, which waits for shops to ask.
+
+## ADR-834 · A shop sends push campaigns, a title, words and a page of its own, at most three a day, which the worker pushes to every subscribed browser in marketing hours a batch at a time
+
+* **Context:** subscriptions (ADR-833) are worth something only if the shop can reach them.
+* **Decision:**
+  * **`pushCampaignSend`**, with `write_marketing_events`: a title of up to 60 characters, words of
+    up to 180, and a page of the shop, a path from its root, never `//` or another site; its home
+    page if left out. At most three a day in the shop's own time zone, so that shoppers keep them
+    on, counted under a lock so two at once can't pass it. It is audited.
+  * **`shopperPushes`**, with `read_marketing_events`: whether Hatti pushes at all, how many
+    browsers have them on, the day's limit, and the latest campaigns.
+  * **The worker's sweep** pushes each campaign still sending, in marketing hours alone (10 am to
+    9 pm, ADR-422), 500 browsers a round, each round in its own transaction and going on from the
+    last subscription it reached, so a sweep cut short loses nothing and pushes no browser twice.
+    16 go at once. A campaign is sent once a round finds fewer than 500 left.
+  * **What became of each push is counted**: sent, failed, and gone. A subscription its push
+    service says is gone is forgotten, and so is one that failed five times in a row.
+  * The push carries a tag of the campaign, so a browser shows it once.
+* **Consequences:** pushes are free to send: Web Push costs nothing, and no third-party service
+  is used. Scheduling a push for later, and pushes in each shopper's language, wait for shops to
+  ask.
+
+## ADR-835 · The admin's Push notifications page under Marketing shows who has them on, sends a push to all of them and lists those sent
+
+* **Context:** campaigns (ADR-834) were sent through the Admin API alone.
+* **Decision:** Marketing links to a Push notifications page, which those who send marketing
+  see. It shows how many browsers have the shop's notifications on, the hours and the day's
+  limit, and a form with the title, the message and the page it opens, sent to everyone. What
+  the core refuses is said there. The pushes sent are listed with when, the page and how many
+  each reached, sending or sent. It sends nothing while no browser has them on, and says so
+  while Hatti has no VAPID keys. English and Urdu.
+* **Consequences:** none beyond OS-14's.
+
+## ADR-836 · Hatti Base's footer offers the shop's notifications once the browser can have them and they are off
+
+* **Context:** shoppers need a place to turn the notifications on (ADR-833), and browsers ask
+  their leave only on a tap.
+* **Decision:** Hatti Base's footer has a setting, on by default, that offers "Get our offers as
+  notifications". It shows only once `HattiPush` says the browser can have them and they are off.
+  A tap asks the shopper's leave; it then says they are on, or that the browser blocked them and
+  where to allow them. English and Urdu.
+* **Consequences:** OS-14 is done in code. The only thing left is the storefront's
+  `VAPID_PUBLIC_KEY` in production (OWN-32).

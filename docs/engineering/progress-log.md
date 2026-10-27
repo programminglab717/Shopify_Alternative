@@ -16,6 +16,20 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Installable storefront and pushes to shoppers
+
+* **Installable:** every shop's pages name a manifest of its own and register a service worker
+  that keeps the offline page alone; Chromium finds the shop installable and shows the offline
+  page without a network (OS-14, [ADR-832](../architecture/13-decision-log.md#adr-832--every-shops-online-store-is-installable-its-pages-name-a-web-app-manifest-of-its-own-and-register-one-service-worker-which-keeps-the-offline-page-alone-and-leaves-everything-else-to-the-network)).
+* **Notifications:** shoppers turn them on from Hatti Base's footer; the storefront passes their
+  browser's subscription to the core, which takes only the push services browsers use, so the
+  worker can't be aimed at another server ([ADR-833](../architecture/13-decision-log.md#adr-833--shoppers-turn-on-a-shops-notifications-from-its-pages-and-the-storefront-passes-their-browsers-subscription-to-the-core-which-takes-only-the-push-services-browsers-use), [ADR-836](../architecture/13-decision-log.md#adr-836--hatti-bases-footer-offers-the-shops-notifications-once-the-browser-can-have-them-and-they-are-off)).
+* **Campaigns:** the shop sends a push, at most three a day, from Marketing → Push notifications;
+  the worker pushes it in marketing hours, a batch at a time, forgetting browsers that are gone
+  ([ADR-834](../architecture/13-decision-log.md#adr-834--a-shop-sends-push-campaigns-a-title-words-and-a-page-of-its-own-at-most-three-a-day-which-the-worker-pushes-to-every-subscribed-browser-in-marketing-hours-a-batch-at-a-time), [ADR-835](../architecture/13-decision-log.md#adr-835--the-admins-push-notifications-page-under-marketing-shows-who-has-them-on-sends-a-push-to-all-of-them-and-lists-those-sent)). OS-14 is done in code; the storefront needs the core's
+  `VAPID_PUBLIC_KEY` in production (OWN-32).
+* 4433 tests (16 new: 14, and 2 checks of the admin's new operations).
+
 ### 4404998 · Store locator
 
 * **Locations:** a location in use with its street and city may be listed on the store locator,
