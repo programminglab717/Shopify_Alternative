@@ -59,7 +59,7 @@ export class CopyDraftService {
     /** The AI gateway, where the host configured one (ADR-463): without it, no drafts. */
     @Optional() @Inject(AiGateway) private readonly ai?: AiGateway | null,
     /** Where products' images are kept, to show the AI their photos. */
-    @Optional() private readonly storage?: ObjectStorage | null,
+    @Optional() @Inject(ObjectStorage) private readonly storage?: ObjectStorage | null,
     /** The AI credits of the shop's plan (ADR-533); without them, drafts are not counted. */
     @Optional() @Inject(AiCredits) private readonly credits?: AiCredits | null,
   ) {}

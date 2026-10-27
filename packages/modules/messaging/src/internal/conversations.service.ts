@@ -172,7 +172,9 @@ export class ConversationsService {
     @Optional()
     @Inject(WHATSAPP_REPLIES)
     private readonly replies: WhatsAppReplySettings | null = null,
-    @Optional() private readonly accounts: WhatsAppAccountsService | null = null,
+    @Optional()
+    @Inject(WhatsAppAccountsService)
+    private readonly accounts: WhatsAppAccountsService | null = null,
   ) {}
 
   /**
