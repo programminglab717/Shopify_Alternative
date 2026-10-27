@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-822 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-823 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -830,6 +830,7 @@
 | 820 | A shop on Pro schedules drops: products on sale together from a time to an end, selling to no one before, its drafts on sale at its start, and so many units of each to a customer by their number while it is live | Accepted |
 | 821 | During a live drop, checkout takes each line's units from a token pool in Valkey first, refusing at once once it is empty; the order still takes its stock, so a pool that is wrong never oversells | Accepted |
 | 822 | A drop's waiting room lets shoppers in a minute's worth at a time in the order they came, each place kept by a secret in a cookie and its digest in Valkey, ten places at most from one internet address | Accepted |
+| 823 | A drop's products count down to its start on their pages, saying how many a customer may buy, and owners and managers schedule and delete drops from the admin | Accepted |
 
 ---
 
@@ -27037,3 +27038,24 @@
   as 12 §5 sketches, and a challenge such as Turnstile for anomalies (OWN-27), wait for the load
   spike (OWN-14). Shoppers who arrive before the start see the shop, its drop's products not yet
   for sale (ADR-820); at the start, their pages' next loads take places in the order they come.
+
+## ADR-823 · A drop's products count down to its start on their pages, saying how many a customer may buy, and owners and managers schedule and delete drops from the admin
+
+* **Context:** drops (ADR-820), their token pools (ADR-821) and waiting rooms (ADR-822) were
+  reachable through the Admin API alone, and shoppers saw a drop's products as any others until
+  the cart refused them before the start.
+* **Decision:**
+  * **A product's document carries the drop it is in** until the drop ends: its name, start,
+    end and limit for each customer, published again as drops change. The storefront gives
+    themes `product.drop` (`name`, `starts_at`, `ends_at`, `per_customer_limit`), Hatti's own.
+  * **Hatti Base counts down to the start** on the product's page by the second, as it counts
+    down a sale's end (ADR-445), the add button off until it comes and on again then where the
+    variant is for sale; without JavaScript it says the day, and the cart refuses it before
+    then all the same. It says how many a customer may buy, in English and Urdu.
+  * **The admin's Drops page**, linked from Products: owners and managers schedule a drop by its
+    name, start, end, the most each customer may buy (optional), a waiting room's rate where
+    they want one, and products found by name; each drop shows whether it is scheduled, live
+    or ended, its limit, its waiting room and its products, and is deleted after asking. The
+    core's refusals are named, a plan without drops among them. Others read the list.
+* **Consequences:** INV-09 and OS-17 are done in code, but for the load spike (OWN-14). A drop
+  is not changed from the admin yet, only deleted and scheduled again; the API changes it.

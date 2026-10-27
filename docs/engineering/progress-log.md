@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Drops on the storefront and in the admin
+
+* **Countdown and admin:** a drop's products count down to its start on Hatti Base with the
+  limit for each customer, and owners and managers schedule and delete drops from the admin
+  (INV-09, OS-17, [ADR-823](../architecture/13-decision-log.md#adr-823--a-drops-products-count-down-to-its-start-on-their-pages-saying-how-many-a-customer-may-buy-and-owners-and-managers-schedule-and-delete-drops-from-the-admin)). Drop Mode is done in code; the load spike waits for staging
+  (OWN-14).
+* 4392 tests (6 new: 3, and 3 checks of the admin's new operations).
+
 ### 0c93756 · Drop waiting rooms
 
 * **Waiting room:** while a drop with one is live, the storefront lets shoppers in a minute's
