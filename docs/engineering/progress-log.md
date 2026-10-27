@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Drops on the storefront and in the admin
+### fa1e622 · Drops on the storefront and in the admin
 
 * **Countdown and admin:** a drop's products count down to its start on Hatti Base with the
   limit for each customer, and owners and managers schedule and delete drops from the admin
