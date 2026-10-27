@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Web chat
+### b09477c · Web chat
 
 * **Chat on the online store:** shoppers give their name and number and write to the shop;
   the chat is a conversation of the inbox, answered there at any time; each browser reads only
