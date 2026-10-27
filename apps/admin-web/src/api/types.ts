@@ -3367,11 +3367,90 @@ export interface ExportSchedule {
   layout: OrderExportLayout;
   query: string;
   staffMemberId: string;
+  /** The custom report it sends in place of the orders (ADR-818). */
+  customReportId?: string | null;
   nextSendAt: string;
   nextPeriodFirstDay: string;
   nextPeriodLastDay: string;
   lastSentAt: string | null;
   lastError: string | null;
+}
+
+export type CustomReportBreakdown =
+  'DAY' | 'WEEK' | 'MONTH' | 'PRODUCT' | 'SOURCE' | 'VISIT_SOURCE' | 'CAMPAIGN';
+
+export type CustomReportPeriod =
+  | 'TODAY'
+  | 'YESTERDAY'
+  | 'LAST_7_DAYS'
+  | 'LAST_30_DAYS'
+  | 'LAST_90_DAYS'
+  | 'THIS_WEEK'
+  | 'LAST_WEEK'
+  | 'THIS_MONTH'
+  | 'LAST_MONTH'
+  | 'LAST_12_MONTHS'
+  | 'THIS_YEAR';
+
+/** A report the shop saved of its own (ADR-817). */
+export interface CustomReportValue {
+  id: string;
+  name: string;
+  breakdown: CustomReportBreakdown;
+  columns: string[];
+  period: CustomReportPeriod;
+}
+
+export interface CustomReportColumnValue {
+  key: string;
+  title: string;
+  kind: 'NUMBER' | 'AMOUNT' | 'RATIO';
+  trueProfit?: boolean;
+}
+
+export interface CustomReportResultValue {
+  placedFrom: string;
+  placedBefore: string;
+  columns: CustomReportColumnValue[];
+  rows: { key: string | null; label: string; values: (string | null)[] }[];
+  totals: (string | null)[] | null;
+}
+
+export interface CustomReportsData {
+  customReports: CustomReportValue[];
+}
+
+export interface CustomReportData {
+  customReport: CustomReportValue | null;
+  customReportRun: CustomReportResultValue | null;
+}
+
+export interface CustomReportColumnsData {
+  customReportColumns: CustomReportColumnValue[];
+}
+
+export interface CustomReportSaveData {
+  customReport: CustomReportValue | null;
+  userErrors: UserError[];
+}
+
+export interface CustomReportCreateData {
+  customReportCreate: CustomReportSaveData;
+}
+
+export interface CustomReportUpdateData {
+  customReportUpdate: CustomReportSaveData;
+}
+
+export interface CustomReportDeleteData {
+  customReportDelete: { deletedId: string | null };
+}
+
+export interface CustomReportExportData {
+  customReportExport: {
+    file: { filename: string; contentType: string; content: string } | null;
+    userErrors: UserError[];
+  };
 }
 
 export interface OrderExportSchedulesData {

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Download, Gauge } from 'lucide-react';
+import { Download, Gauge, Table2 } from 'lucide-react';
 import { useState } from 'react';
 import { SalesQuery, SalesReportExportMutation } from '../api/operations';
 import type { MoneyValue, SalesData, SalesReportExportData, SalesTotalsValue } from '../api/types';
@@ -279,6 +279,14 @@ export function AnalyticsPage() {
       <CodHealth from={from} before={before} />
       <CourierPerformance from={from} before={before} />
       <StockReport days={days} />
+      <Link
+        to="/$shopId/analytics/reports"
+        params={{ shopId: shop.id }}
+        className="inline-flex min-h-10 items-center gap-2 self-start rounded-control border border-line bg-surface px-3 hover:bg-canvas"
+      >
+        <Table2 aria-hidden className="size-5" />
+        {t('reports.title')}
+      </Link>
       {permits(shop, SEES_AGENTS) && (
         <Link
           to="/$shopId/desk/agents"

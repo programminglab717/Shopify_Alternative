@@ -34,6 +34,7 @@ import {
   VerifyEmailPage,
 } from './auth/email-link-pages';
 import { AnalyticsPage } from './analytics/analytics-page';
+import { ReportPage, ReportsPage } from './analytics/custom-reports';
 import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { PayoutsPage } from './cash/payouts-page';
@@ -445,6 +446,18 @@ const analytics = createRoute({
   getParentRoute: () => shop,
   path: 'analytics',
   component: AnalyticsPage,
+});
+
+const customReports = createRoute({
+  getParentRoute: () => shop,
+  path: 'analytics/reports',
+  component: ReportsPage,
+});
+
+const customReport = createRoute({
+  getParentRoute: () => shop,
+  path: 'analytics/reports/$reportId',
+  component: ReportPage,
 });
 
 const returns = createRoute({
@@ -1014,6 +1027,8 @@ export const routeTree = root.addChildren([
     discounts,
     paymentLinks,
     analytics,
+    customReports,
+    customReport,
     cash,
     statement,
     settlements,

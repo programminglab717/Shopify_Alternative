@@ -7223,6 +7223,7 @@ const EXPORT_SCHEDULE = /* GraphQL */ `
     layout
     query
     staffMemberId
+    customReportId
     nextSendAt
     nextPeriodFirstDay
     nextPeriodLastDay
@@ -7254,6 +7255,118 @@ export const OrderExportScheduleCreateMutation = /* GraphQL */ `
     }
   }
   ${EXPORT_SCHEDULE}
+  ${USER_ERRORS}
+`;
+
+const CUSTOM_REPORT = /* GraphQL */ `
+  fragment CustomReportFields on CustomReport {
+    id
+    name
+    breakdown
+    columns
+    period
+  }
+`;
+
+/** The shop's custom reports, by name (ANL-06, ADR-819). */
+export const CustomReportsQuery = /* GraphQL */ `
+  query CustomReports {
+    customReports {
+      ...CustomReportFields
+    }
+  }
+  ${CUSTOM_REPORT}
+`;
+
+/** One custom report, the columns its breakdown offers, and what it shows over its period. */
+export const CustomReportQuery = /* GraphQL */ `
+  query CustomReport($id: ID!) {
+    customReport(id: $id) {
+      ...CustomReportFields
+    }
+    customReportRun(id: $id) {
+      placedFrom
+      placedBefore
+      columns {
+        key
+        title
+        kind
+      }
+      rows {
+        key
+        label
+        values
+      }
+      totals
+    }
+  }
+  ${CUSTOM_REPORT}
+`;
+
+/** The columns a report of a breakdown may show. */
+export const CustomReportColumnsQuery = /* GraphQL */ `
+  query CustomReportColumns($breakdown: CustomReportBreakdown!) {
+    customReportColumns(breakdown: $breakdown) {
+      key
+      title
+      kind
+      trueProfit
+    }
+  }
+`;
+
+export const CustomReportCreateMutation = /* GraphQL */ `
+  mutation CustomReportCreate($input: CustomReportInput!) {
+    customReportCreate(input: $input) {
+      customReport {
+        ...CustomReportFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_REPORT}
+  ${USER_ERRORS}
+`;
+
+export const CustomReportUpdateMutation = /* GraphQL */ `
+  mutation CustomReportUpdate($id: ID!, $input: CustomReportInput!) {
+    customReportUpdate(id: $id, input: $input) {
+      customReport {
+        ...CustomReportFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_REPORT}
+  ${USER_ERRORS}
+`;
+
+export const CustomReportDeleteMutation = /* GraphQL */ `
+  mutation CustomReportDelete($id: ID!) {
+    customReportDelete(id: $id) {
+      deletedId
+    }
+  }
+`;
+
+/** A custom report as a workbook, over its own period. */
+export const CustomReportExportMutation = /* GraphQL */ `
+  mutation CustomReportExport($id: ID!) {
+    customReportExport(id: $id) {
+      file {
+        filename
+        contentType
+        content
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
   ${USER_ERRORS}
 `;
 

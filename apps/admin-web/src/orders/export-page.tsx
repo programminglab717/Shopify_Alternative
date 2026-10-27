@@ -195,6 +195,7 @@ function DownloadNow({ search }: { search: OrdersSearch }) {
 /** One scheduled export: how often, at what hour, of which orders, and when it goes next. */
 function ScheduleRow({ schedule, mine }: { schedule: ExportSchedule; mine: boolean }) {
   const { t, locale } = useLocale();
+  const shopId = useShop().id;
   const timezone = useShopTimezone();
   const remove = useAdminMutation<OrderExportScheduleDeleteData, { id: string }>(
     OrderExportScheduleDeleteMutation,
@@ -217,8 +218,15 @@ function ScheduleRow({ schedule, mine }: { schedule: ExportSchedule; mine: boole
           {t(`exports.every.${schedule.frequency}` as MessageKey, {
             hour: String(schedule.hour).padStart(2, '0'),
           })}{' '}
-          · {t(`exports.format.${schedule.format}` as MessageKey)} ·{' '}
-          {t(`exports.layout.${schedule.layout}` as MessageKey)}
+          ·{' '}
+          {schedule.customReportId ? (
+            t('exports.report')
+          ) : (
+            <>
+              {t(`exports.format.${schedule.format}` as MessageKey)} ·{' '}
+              {t(`exports.layout.${schedule.layout}` as MessageKey)}
+            </>
+          )}
         </span>
         <Button
           variant="danger"
@@ -229,7 +237,15 @@ function ScheduleRow({ schedule, mine }: { schedule: ExportSchedule; mine: boole
         />
       </span>
       <span className="text-secondary">
-        {schedule.query ? (
+        {schedule.customReportId ? (
+          <Link
+            to="/$shopId/analytics/reports/$reportId"
+            params={{ shopId, reportId: schedule.customReportId }}
+            className="underline"
+          >
+            {t('reports.open')}
+          </Link>
+        ) : schedule.query ? (
           <span dir="ltr" className="num">
             {schedule.query}
           </span>
