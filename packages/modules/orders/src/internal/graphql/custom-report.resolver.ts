@@ -191,7 +191,7 @@ export class CustomReportResolver {
   }
 
   @Mutation(() => CustomReportDeletePayload, {
-    description: 'Deletes a custom report.',
+    description: 'Deletes a custom report, and the scheduled exports that send it (ADR-818).',
   })
   @RequireScopes('read_orders')
   async customReportDelete(

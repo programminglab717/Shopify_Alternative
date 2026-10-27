@@ -9343,7 +9343,9 @@ type Mutation {
   """Saves a custom report (ANL-06, ADR-817). A shop keeps up to 50."""
   customReportCreate(input: CustomReportInput!): CustomReportPayload!
 
-  """Deletes a custom report."""
+  """
+  Deletes a custom report, and the scheduled exports that send it (ADR-818).
+  """
   customReportDelete(id: ID!): CustomReportDeletePayload!
 
   """
@@ -11939,6 +11941,11 @@ An export of the shop's orders a member of staff scheduled (ORD-11, ADR-183): ev
 """
 type OrderExportSchedule {
   createdAt: DateTime!
+
+  """
+  The custom report it sends in place of the orders, as a workbook over the period that ended (ADR-818): crep_….
+  """
+  customReportId: ID
   format: OrderExportFormat!
   frequency: OrderExportFrequency!
 
@@ -11980,6 +11987,11 @@ type OrderExportScheduleDeletePayload {
 }
 
 input OrderExportScheduleInput {
+  """
+  A custom report to send in place of the orders, run over the period that ended, as a workbook (ADR-818): its format is then XLSX and its query none.
+  """
+  customReportId: ID
+
   """An Excel workbook unless said."""
   format: OrderExportFormat! = XLSX
   frequency: OrderExportFrequency!

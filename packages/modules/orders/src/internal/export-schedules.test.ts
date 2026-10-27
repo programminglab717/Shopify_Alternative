@@ -1,5 +1,11 @@
 import 'reflect-metadata';
-import { staffCapabilities, type StaffRole, type TenantContext } from '@hatti/api';
+import {
+  PlanAllowance,
+  staffCapabilities,
+  type PlanFeature,
+  type StaffRole,
+  type TenantContext,
+} from '@hatti/api';
 import { Database } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
@@ -11,9 +17,12 @@ import {
   exportPeriod,
   periodFilename,
   scheduledExportEmail,
+  scheduledReportEmail,
   type ScheduledExportEmail,
 } from './export-schedule-email.js';
 import { EXPORT_SCHEDULE_LIMITS, ExportScheduleService } from './export-schedule.service.js';
+import { CustomReportService } from './custom-reports.js';
+import { SalesReportService } from './sales-report.service.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -30,6 +39,14 @@ class KeptEmails extends ScheduledExportSender {
 }
 
 const FILE = { filename: 'x', contentType: 'text/csv', content: Buffer.from('') };
+
+/** A plan without true profit (ADR-529). */
+class Free extends PlanAllowance {
+  limitOf = async () => null;
+  limitIn = async () => null;
+  excludes = async (_shopId: string, feature: PlanFeature) =>
+    feature === 'trueProfit' ? 'The Free plan leaves true profit out' : null;
+}
 
 describe("Scheduled exports' periods and words", () => {
   it('names each period by its days, and its file for them', () => {
@@ -105,6 +122,30 @@ describe("Scheduled exports' periods and words", () => {
     });
     expect(monthly.subject).toBe('Orders from Zari: September 2026');
     expect(monthly.text).toContain('placed in September 2026: no orders, in');
+  });
+
+  it('says which custom report, for which period, and why it came (ADR-818)', () => {
+    const email = (language: 'en' | 'ur') =>
+      scheduledReportEmail({
+        to: 'sana@example.pk',
+        name: 'Sana',
+        shop: 'Zari',
+        report: 'Net sales\nby channel',
+        frequency: 'weekly',
+        period: exportPeriod('weekly', '2026-10-05'),
+        file: { ...FILE, filename: 'net-sales-2026-09-28-to-2026-10-04.xlsx' },
+        language,
+      });
+    expect(email('en')).toMatchObject({
+      subject: 'Net sales by channel from Zari: 28 Sept to 4 Oct 2026',
+      text:
+        'Assalam o alaikum Sana,\n\n' +
+        `Zari's report "Net sales by channel" for 28 Sept to 4 Oct 2026, in the attached ` +
+        'net-sales-2026-09-28-to-2026-10-04.xlsx.\n\n' +
+        "You get this every week because you scheduled it in Hatti. To stop it, delete the schedule in Hatti's admin.",
+    });
+    expect(email('ur').subject).toBe('Zari: Net sales by channel، 28 ستمبر سے 4 اکتوبر، 2026 تک');
+    expect(email('ur').html).toMatch(/^<!doctype html><html lang="ur" dir="rtl">/);
   });
 
   it("says it in the member's own language, Urdu right to left (ADR-194)", () => {
@@ -481,6 +522,80 @@ describe.skipIf(!server)('Scheduled exports (ADR-183)', () => {
       "Not sent: its member of staff's role no longer exports orders",
     );
     expect(emails.sent).toHaveLength(1);
+  });
+
+  it('sends a custom report over the period that ended, true profit as the plan has it, and goes with the report (ADR-818)', async () => {
+    const reports = new CustomReportService(db, new SalesReportService(db));
+    const withReports = new ExportScheduleService(db, f.exports, reports, new Free());
+    const report = unwrap(
+      await reports.create(f.a, {
+        name: 'Net sales',
+        breakdown: 'day',
+        columns: ['orders', 'net_sales', 'profit'],
+        period: 'this_month',
+      }),
+    );
+    // A report's schedule goes as a workbook, filtered by nothing but its period.
+    const theirs = unwrap(
+      await withReports.create(
+        as(owner, 'owner'),
+        {
+          frequency: 'weekly',
+          layout: 'orders',
+          format: 'csv',
+          query: 'stage:new',
+          reportId: report.id,
+        },
+        MONDAY,
+      ),
+    );
+    expect(theirs).toMatchObject({ reportId: report.id, format: 'xlsx', query: '' });
+    expect(
+      errorsOf(
+        await withReports.create(as(owner, 'owner'), {
+          frequency: 'weekly',
+          layout: 'orders',
+          format: 'xlsx',
+          reportId: newId(),
+        }),
+      ),
+    ).toEqual([['input.customReportId', 'NOT_FOUND']]);
+
+    // A kurta on Sunday 4 October, in the week that ended; one the Monday before, in it too.
+    await placed('2026-10-04T05:00:00Z');
+    await placed('2026-09-28T05:00:00Z');
+    await placed('2026-09-27T05:00:00Z');
+    const emails = new KeptEmails();
+    const at = new Date('2026-10-05T03:00:00Z');
+    expect(await withReports.run(f.a.shopId, theirs.id, at, emails)).toBe('sent');
+    const [email] = emails.sent;
+    expect(email).toMatchObject({
+      subject: 'Net sales from A: 28 Sept to 4 Oct 2026',
+      attachment: { filename: 'net-sales-2026-09-28-to-2026-10-04.xlsx' },
+    });
+    const rows = xlsxRows(email!.attachment.content);
+    // On Free, profit is left out.
+    expect(rows[0]).toEqual(['Day', 'Orders', 'Net sales']);
+    expect(rows.slice(1)).toEqual([
+      ['2026-09-28', 1, 2000],
+      ['2026-09-29', 0, 0],
+      ['2026-09-30', 0, 0],
+      ['2026-10-01', 0, 0],
+      ['2026-10-02', 0, 0],
+      ['2026-10-03', 0, 0],
+      ['2026-10-04', 1, 2000],
+      ['Total', 2, 4000],
+    ]);
+
+    // Without reports run here, it goes unsent, saying so.
+    const later = new Date('2026-10-12T03:00:00Z');
+    expect(await schedules.run(f.a.shopId, theirs.id, later, emails)).toBe('skipped');
+    expect((await schedules.list(f.a))[0]!.lastError).toBe(
+      'Not sent: custom reports are not run here',
+    );
+    // Deleted with its report.
+    expect(await reports.delete(f.a, report.id)).toBe(true);
+    expect(await schedules.list(f.a)).toEqual([]);
   });
 
   it("lists the shop's schedules, and deletes a member's own, or any for owners and apps", async () => {

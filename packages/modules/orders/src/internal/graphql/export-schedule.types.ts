@@ -58,6 +58,14 @@ export class OrderExportSchedule {
   @Field({ description: 'As `orders(query:)` takes it; empty for every order.' })
   query!: string;
 
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'The custom report it sends in place of the orders, as a workbook over the period that ' +
+      'ended (ADR-818): crep_….',
+  })
+  customReportId!: string | null;
+
   @Field(() => GraphQLISODateTime, { description: 'When it next goes.' })
   nextSendAt!: Date;
 
@@ -105,6 +113,14 @@ export class OrderExportScheduleInput {
     description: 'As `orders(query:)` takes it, such as "stage:delivered"; none for every order.',
   })
   query?: string | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'A custom report to send in place of the orders, run over the period that ended, as a ' +
+      'workbook (ADR-818): its format is then XLSX and its query none.',
+  })
+  customReportId?: string | null;
 }
 
 @ObjectType()

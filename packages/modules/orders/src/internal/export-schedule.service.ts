@@ -1,5 +1,6 @@
 import {
   InputChecker,
+  PlanAllowance,
   actorColumnsOf,
   failOne,
   hasCapability,
@@ -13,14 +14,18 @@ import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { CustomReportService, reportFilename } from './custom-reports.js';
 import {
   exportPeriod,
   periodFilename,
+  periodPart,
   scheduledExportEmail,
+  scheduledReportEmail,
   type ExportFrequencyValue,
   type ExportPeriod,
+  type ScheduledExportEmail,
   type ScheduledExportSender,
 } from './export-schedule-email.js';
 import {
@@ -35,7 +40,8 @@ import { parseOrderSearch } from './order-filter.js';
 // emailed to them as an attachment at the hour they chose, in the shop's time zone. Each
 // schedule names its member by their account; whom it goes to is asked of identity as it is
 // sent, so that one who left the shop, may no longer export, or has no proved email, gets
-// nothing. The worker sends them.
+// nothing. The worker sends them. A schedule may send one of the shop's custom reports in place
+// of its orders, run over the period that ended (ANL-06, ADR-818).
 
 export { EXPORT_FREQUENCIES, type ExportFrequencyValue } from './export-schedule-email.js';
 
@@ -61,6 +67,11 @@ export interface ExportScheduleInput {
   format: ExportFormatValue;
   /** As orders(query:) takes it; none for every order. */
   query?: string | null;
+  /**
+   * A custom report to send in place of the orders, as a workbook (ADR-818): its format is then
+   * a workbook's, and its query none.
+   */
+  reportId?: string | null;
 }
 
 export interface ExportScheduleRecord {
@@ -72,6 +83,8 @@ export interface ExportScheduleRecord {
   layout: ExportLayoutValue;
   format: ExportFormatValue;
   query: string;
+  /** The custom report it sends in place of the orders (ADR-818). */
+  reportId: string | null;
   /** When it next goes, and the period it sends then. */
   nextRunAt: Date;
   nextPeriod: ExportPeriod;
@@ -92,6 +105,7 @@ type ScheduleRow = {
   layout: ExportLayoutValue;
   format: ExportFormatValue;
   query: string;
+  report_id: string | null;
   period_end: string;
   next_run_at: string | Date;
   attempts: number;
@@ -102,7 +116,8 @@ type ScheduleRow = {
 
 /** A schedule's columns as a row has them: its period's end as text, a day of no time zone. */
 const COLUMNS = sql.raw(
-  'id, user_id, frequency, hour, layout, format, query, period_end::text AS period_end, ' +
+  'id, user_id, frequency, hour, layout, format, query, report_id, ' +
+    'period_end::text AS period_end, ' +
     'next_run_at, attempts, last_sent_at, last_error, created_at',
 );
 
@@ -129,6 +144,12 @@ export class ExportScheduleService {
   constructor(
     private readonly db: Database,
     private readonly exports: OrderExportService,
+    /** Runs the custom reports schedules send; without it, they go unsent. */
+    @Optional()
+    @Inject(CustomReportService)
+    private readonly reports: CustomReportService | null = null,
+    /** Whether a shop's plan includes true profit (ADR-529); without it, all do. */
+    @Optional() @Inject(PlanAllowance) private readonly allowance: PlanAllowance | null = null,
   ) {}
 
   /**
@@ -152,7 +173,10 @@ export class ExportScheduleService {
     if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
       check.add(['input', 'hour'], 'INVALID', 'must be an hour of the day, 0 to 23');
     }
-    const query = input.query?.trim() ?? '';
+    const reportId = input.reportId ?? null;
+    // A report's schedule is filtered by nothing but its period, and goes as a workbook.
+    const query = reportId ? '' : (input.query?.trim() ?? '');
+    const format = reportId ? 'xlsx' : input.format;
     if (query.length > 1_000) {
       check.add(['input', 'query'], 'TOO_LONG', 'is too long (maximum is 1000 characters)');
     } else {
@@ -163,6 +187,13 @@ export class ExportScheduleService {
     const unit = UNITS[input.frequency];
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { shopId } = tenant;
+      if (reportId) {
+        const { rows: found } = await tx.execute(sql`
+          SELECT 1 FROM orders.custom_reports WHERE shop_id = ${shopId} AND id = ${reportId}`);
+        if (found.length === 0) {
+          return failOne(['input', 'customReportId'], 'NOT_FOUND', 'Report not found');
+        }
+      }
       if (!(await recipientIn(tx, shopId, actor.userId))) {
         return failOne(
           ['input'],
@@ -195,10 +226,10 @@ export class ExportScheduleService {
                            ELSE (boundary + ${`1 ${unit}`}::interval)::date END AS period_end
                  FROM start)
         INSERT INTO orders.export_schedules
-               (shop_id, id, user_id, frequency, hour, layout, format, query, period_end,
-                next_run_at)
+               (shop_id, id, user_id, frequency, hour, layout, format, query, report_id,
+                period_end, next_run_at)
         SELECT ${shopId}, ${newId()}, ${actor.userId}, ${input.frequency}, ${hour},
-               ${input.layout}, ${input.format}, ${query}, period_end,
+               ${input.layout}, ${format}, ${query}, ${reportId}, period_end,
                (period_end::timestamp + make_interval(hours => ${hour})) AT TIME ZONE ${timezone}
           FROM first
         RETURNING ${COLUMNS}`);
@@ -214,6 +245,7 @@ export class ExportScheduleService {
           layout: schedule.layout.toUpperCase(),
           format: schedule.format.toUpperCase(),
           query: query || null,
+          ...(reportId ? { customReport: toPublicId('customReport', reportId) } : {}),
         },
       });
       return { ok: true, value: schedule };
@@ -322,35 +354,56 @@ export class ExportScheduleService {
     if (!capabilities.has('export_orders')) {
       return unsent("Not sent: its member of staff's role no longer exports orders");
     }
-    const exported = await this.exports.export(
-      {
-        shopId,
-        currency: shop.currency as CurrencyCode,
-        scopes: new Set(['read_orders']),
-        // As the member of staff it goes to, who sees customers' numbers as their role does.
-        actor: {
-          kind: 'staff',
-          userId: row.user_id,
-          sessionId: row.id,
-          role: recipient.role,
-          capabilities,
-          authenticatedAt: at,
-        },
+    const tenant: TenantContext = {
+      shopId,
+      currency: shop.currency as CurrencyCode,
+      scopes: new Set(['read_orders']),
+      // As the member of staff it goes to, who sees customers' numbers as their role does.
+      actor: {
+        kind: 'staff',
+        userId: row.user_id,
+        sessionId: row.id,
+        role: recipient.role,
+        capabilities,
+        authenticatedAt: at,
       },
-      {
+    };
+    const over = {
+      placedFrom: toDate(bounds.placed_from),
+      placedBefore: toDate(bounds.placed_before),
+    };
+    const period = exportPeriod(row.frequency, row.period_end);
+    let email: ScheduledExportEmail;
+    if (row.report_id) {
+      if (!this.reports) return unsent('Not sent: custom reports are not run here');
+      const trueProfit = !(await this.allowance?.excludes(shopId, 'trueProfit'));
+      const exported = await this.reports.export(tenant, row.report_id, trueProfit, at, over);
+      if (!exported.ok) return unsent(`Not sent: ${exported.errors[0]!.message}`);
+      const { name, ...file } = exported.value;
+      email = scheduledReportEmail({
+        to: recipient.email,
+        name: recipient.name,
+        language: recipient.language,
+        shop: shop.name,
+        report: name,
+        frequency: row.frequency,
+        period,
+        file: {
+          ...file,
+          filename: `${reportFilename(name)}-${periodPart(row.frequency, period)}.xlsx`,
+        },
+      });
+    } else {
+      const exported = await this.exports.export(tenant, {
         layout: row.layout,
         format: row.format,
         query: row.query || null,
-        placedFrom: toDate(bounds.placed_from),
-        placedBefore: toDate(bounds.placed_before),
+        ...over,
         scheduleId: row.id,
-      },
-    );
-    if (!exported.ok) return unsent(`Not sent: ${exported.errors[0]!.message}`);
-    const period = exportPeriod(row.frequency, row.period_end);
-    const { file, rowCount } = exported.value;
-    const outcome = await sender.send(
-      scheduledExportEmail({
+      });
+      if (!exported.ok) return unsent(`Not sent: ${exported.errors[0]!.message}`);
+      const { file, rowCount } = exported.value;
+      email = scheduledExportEmail({
         to: recipient.email,
         name: recipient.name,
         language: recipient.language,
@@ -360,8 +413,9 @@ export class ExportScheduleService {
         period,
         rows: rowCount,
         file: { ...file, filename: periodFilename(row.frequency, row.layout, period, row.format) },
-      }),
-    );
+      });
+    }
+    const outcome = await sender.send(email);
     if (outcome === 'sent') {
       await this.#next(shopId, row, shop.timezone, { sentAt: at });
       return 'sent';
@@ -433,6 +487,7 @@ function toRecord(row: ScheduleRow): ExportScheduleRecord {
     layout: row.layout,
     format: row.format,
     query: row.query,
+    reportId: row.report_id,
     nextRunAt: toDate(row.next_run_at),
     nextPeriod: exportPeriod(row.frequency, row.period_end),
     lastSentAt: toDateOrNull(row.last_sent_at),

@@ -26,6 +26,12 @@ import {
 } from './export-schedule.types.js';
 import { OrderExportFormat, OrderExportLayout } from './export.types.js';
 
+/** A custom report's ID, or none that is one: a report not found, as the service says. */
+const reportIdOf = (id: string): string => tryFromPublicId(id, 'customReport') ?? NO_REPORT;
+
+/** No report's: found by none. */
+const NO_REPORT = '00000000-0000-0000-0000-000000000000';
+
 /** Staff who may not export orders may not schedule exports either, nor see who does. */
 function exportingOnly(tenant: TenantContext): void {
   if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'export_orders')) {
@@ -78,6 +84,7 @@ export class ExportScheduleResolver {
       layout: input.layout.toLowerCase() as ExportLayoutValue,
       format: input.format.toLowerCase() as ExportFormatValue,
       query: input.query,
+      reportId: input.customReportId ? reportIdOf(input.customReportId) : null,
     });
     return Object.assign(new OrderExportScheduleCreatePayload(), {
       exportSchedule: result.ok ? toSchedule(result.value) : null,
@@ -115,6 +122,7 @@ function toSchedule(record: ExportScheduleRecord): OrderExportSchedule {
     layout: record.layout.toUpperCase() as OrderExportLayout,
     format: record.format.toUpperCase() as OrderExportFormat,
     query: record.query,
+    customReportId: record.reportId && toPublicId('customReport', record.reportId),
     nextSendAt: record.nextRunAt,
     nextPeriodFirstDay: record.nextPeriod.firstDay,
     nextPeriodLastDay: record.nextPeriod.lastDay,

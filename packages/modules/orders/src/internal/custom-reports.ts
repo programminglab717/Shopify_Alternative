@@ -188,6 +188,15 @@ export interface CustomReportResult {
   totals: ReportValue[] | null;
 }
 
+/** A report exported, and the name it was saved as. */
+export interface CustomReportFile {
+  /** "monthly-sales.xlsx". */
+  filename: string;
+  contentType: string;
+  content: Buffer;
+  name: string;
+}
+
 /** "2026-10-27" plus `days`. */
 function addDays(day: string, days: number): string {
   const at = new Date(`${day}T00:00:00Z`);
@@ -520,7 +529,7 @@ export class CustomReportService {
     trueProfit: boolean,
     at: Date,
     over?: { placedFrom: Date; placedBefore: Date },
-  ): Promise<MutationResult<{ filename: string; contentType: string; content: Buffer }>> {
+  ): Promise<MutationResult<CustomReportFile>> {
     const report = await this.get(tenant, id);
     if (!report) return failOne(['id'], 'NOT_FOUND', 'Report not found');
     const ran = await this.run(tenant, report, trueProfit, at, over);
@@ -545,6 +554,7 @@ export class CustomReportService {
         filename: `${reportFilename(report.name)}.xlsx`,
         contentType: XLSX_CONTENT_TYPE,
         content,
+        name: report.name,
       },
     };
   }

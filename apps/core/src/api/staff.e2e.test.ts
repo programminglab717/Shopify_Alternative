@@ -1627,6 +1627,43 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         ).orderExportScheduleDelete,
       ).toEqual({ deletedExportScheduleId: id, userErrors: [] });
       expect((await app(LIST)).orderExportSchedules).toEqual([]);
+
+      // A custom report scheduled in place of the orders goes as a workbook (ADR-818).
+      const report = (
+        await graphql(
+          accountant.accessToken,
+          shopA,
+          `
+            mutation {
+              customReportCreate(
+                input: {
+                  name: "Weekly sales"
+                  breakdown: DAY
+                  columns: ["net_sales"]
+                  period: LAST_WEEK
+                }
+              ) {
+                customReport {
+                  id
+                }
+              }
+            }
+          `,
+        )
+      ).json().data.customReportCreate.customReport;
+      const reported = (
+        await graphql(
+          accountant.accessToken,
+          shopA,
+          `mutation { orderExportScheduleCreate(input: { frequency: WEEKLY, format: CSV,
+             query: "stage:delivered", customReportId: "${report.id}" }) {
+             exportSchedule { format query customReportId } userErrors { message } } }`,
+        )
+      ).json().data.orderExportScheduleCreate;
+      expect(reported).toEqual({
+        exportSchedule: { format: 'XLSX', query: '', customReportId: report.id },
+        userErrors: [],
+      });
     });
 
     it("lets owners, managers and accountants reconcile couriers' remittances", async () => {

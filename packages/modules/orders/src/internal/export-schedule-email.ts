@@ -59,13 +59,16 @@ export function periodFilename(
   extension: string,
 ): string {
   const prefix = layout === 'orders' ? 'orders' : 'order-items';
-  const name =
-    frequency === 'daily'
-      ? period.firstDay
-      : frequency === 'weekly'
-        ? `${period.firstDay}-to-${period.lastDay}`
-        : period.firstDay.slice(0, 7);
-  return `${prefix}-${name}.${extension}`;
+  return `${prefix}-${periodPart(frequency, period)}.${extension}`;
+}
+
+/** A period as a file's name says it: "2026-10-04", "2026-09-28-to-2026-10-04", "2026-09". */
+export function periodPart(frequency: ExportFrequencyValue, period: ExportPeriod): string {
+  return frequency === 'daily'
+    ? period.firstDay
+    : frequency === 'weekly'
+      ? `${period.firstDay}-to-${period.lastDay}`
+      : period.firstDay.slice(0, 7);
 }
 
 /** What a scheduled export's email is in: its member's own language (ADR-194). */
@@ -119,6 +122,59 @@ export function scheduledExportEmail(input: {
   return {
     to: input.to,
     subject: urdu ? `${shop} کے آرڈرز: ${label}` : `Orders from ${shop}: ${label}`,
+    text: paragraphs.join('\n\n'),
+    html:
+      `<!doctype html><html lang="${input.language}"${urdu ? ' dir="rtl"' : ''}>` +
+      '<body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1f2933">' +
+      paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('') +
+      '</body></html>',
+    attachment: input.file,
+  };
+}
+
+/**
+ * The email carrying a scheduled custom report to `to` (ADR-818), run over the period that ended,
+ * its workbook attached, in `language`.
+ */
+export function scheduledReportEmail(input: {
+  to: string;
+  /** The member's name. */
+  name: string;
+  shop: string;
+  /** The report's name. */
+  report: string;
+  frequency: ExportFrequencyValue;
+  period: ExportPeriod;
+  file: OrderExportFile;
+  language: ExportEmailLanguage;
+}): ScheduledExportEmail {
+  const shop = oneLine(input.shop);
+  const name = oneLine(input.name);
+  const report = oneLine(input.report);
+  const { filename } = input.file;
+  const { label } = periodWords(input.frequency, input.period, input.language);
+  const urdu = input.language === 'ur';
+  let paragraphs: string[];
+  if (urdu) {
+    const every = { daily: 'روز', weekly: 'ہفتے', monthly: 'مہینے' }[input.frequency];
+    paragraphs = [
+      `السلام علیکم ${name}،`,
+      `${shop} کی رپورٹ "${report}"، ${label}: منسلک فائل ${filename} میں۔`,
+      `آپ کو یہ ہر ${every} ملتی ہے کیونکہ آپ نے اسے ہٹی میں شیڈول کیا ہے۔ اسے روکنے کے لیے ` +
+        'ہٹی کے ایڈمن میں شیڈول حذف کریں۔',
+    ];
+  } else {
+    const every = { daily: 'day', weekly: 'week', monthly: 'month' }[input.frequency];
+    paragraphs = [
+      `Assalam o alaikum ${name},`,
+      `${shop}'s report "${report}" for ${label}, in the attached ${filename}.`,
+      `You get this every ${every} because you scheduled it in Hatti. To stop it, delete the ` +
+        "schedule in Hatti's admin.",
+    ];
+  }
+  return {
+    to: input.to,
+    subject: urdu ? `${shop}: ${report}، ${label}` : `${report} from ${shop}: ${label}`,
     text: paragraphs.join('\n\n'),
     html:
       `<!doctype html><html lang="${input.language}"${urdu ? ' dir="rtl"' : ''}>` +

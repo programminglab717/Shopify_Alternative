@@ -77,6 +77,7 @@ import {
   ThemeService,
 } from '@hatti/online-store/public';
 import {
+  CustomReportService,
   CustomerAnswers,
   DeskDutyService,
   ExportScheduleService,
@@ -84,6 +85,7 @@ import {
   ORDER_LINK_PATH,
   ORDER_SEGMENT_FACTS,
   OrderExportService,
+  SalesReportService,
 } from '@hatti/orders/public';
 import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
@@ -709,7 +711,16 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     const exportEmails = exportEmailsOf(config, logger);
     if (exportEmails) {
       const scheduled = new ScheduledExports(
-        new ExportScheduleService(database, new OrderExportService(database)),
+        new ExportScheduleService(
+          database,
+          new OrderExportService(database),
+          // Custom reports sent too, true profit as each shop's plan has it (ADR-818).
+          new CustomReportService(database, new SalesReportService(database)),
+          new BillingService(
+            database,
+            new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+          ),
+        ),
         exportEmails,
         logger,
       ).start(config.SWEEP_INTERVAL_MS);
