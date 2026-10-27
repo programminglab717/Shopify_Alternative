@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Combined listings
+### 4cbbcce · Combined listings
 
 * **One listing:** products, such as a print's colours, are shown as one combined listing, each a
   value of its option, through the Admin API; each product's page in Hatti Base offers the
