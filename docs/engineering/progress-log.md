@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Drop token pools
+
+* **The rush stopped at Valkey:** during a live drop, checkout takes each line's units from a
+  pool of tokens first and refuses at once once it is empty; the order still takes its stock,
+  so nothing oversells (INV-09, [ADR-821](../architecture/13-decision-log.md#adr-821--during-a-live-drop-checkout-takes-each-lines-units-from-a-token-pool-in-valkey-first-refusing-at-once-once-it-is-empty-the-order-still-takes-its-stock-so-a-pool-that-is-wrong-never-oversells)). Lock-free orders wait for the spike (OWN-14).
+* 4384 tests (2 new).
+
 ### 289316d · Drops
 
 * **Drop Mode, first slice:** a shop on Pro schedules a drop of products that go on sale

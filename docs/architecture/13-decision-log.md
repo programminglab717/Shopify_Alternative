@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-820 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-821 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -828,6 +828,7 @@
 | 818 | A scheduled export may send a custom report in place of the orders: run over the period that ended, true profit as the plan has it, and emailed as a workbook named for the report and the period | Accepted |
 | 819 | Custom reports in the admin: made and changed by their rows, period and columns in the order ticked, shown as a table with the period's total, downloaded and scheduled by those who export orders | Accepted |
 | 820 | A shop on Pro schedules drops: products on sale together from a time to an end, selling to no one before, its drafts on sale at its start, and so many units of each to a customer by their number while it is live | Accepted |
+| 821 | During a live drop, checkout takes each line's units from a token pool in Valkey first, refusing at once once it is empty; the order still takes its stock, so a pool that is wrong never oversells | Accepted |
 
 ---
 
@@ -26981,3 +26982,29 @@
   oversell, but its rush contends on its variants' rows: the token pools of ADR-019 come next
   (ADR-821), and the load spike ADR-019 asks for needs a hosted environment (owner actions).
   A hoarder with many numbers is limited by number alone until the waiting room's defences.
+
+## ADR-821 · During a live drop, checkout takes each line's units from a token pool in Valkey first, refusing at once once it is empty; the order still takes its stock, so a pool that is wrong never oversells
+
+* **Context:** a drop (ADR-820) is a rush on a few variants: thousands of checkouts at once,
+  each taking its stock under a lock on the same rows. ADR-019 proposes token pools in Valkey,
+  loaded with the units available, so that orders need no lock on those rows, with a
+  reconciler folding what was taken back into Postgres; and a spike to prove it first, which
+  needs a hosted environment (OWN-14).
+* **Decision:** the pools come first as a gate in front of the stock, not in place of it.
+  * **A pool for each drop's variant**, a count in Valkey, started from the variant's units
+    for sale online the first time a checkout asks during the drop, and kept an hour past the
+    drop's end. Its keys name the drop and the variant and nothing of the shopper.
+  * **Checkout takes a live drop's units from their pools** after the order's other checks and
+    before it is placed, atomically by a script. Too few, and the order is refused at once as
+    unavailable, before the stock's rows are touched: once a drop sells out, the rush stops
+    at Valkey. An order not placed, for whatever reason, gives its tokens back.
+  * **An empty pool is started again from the stock** at most every 15 seconds, as cancelled
+    orders, stock added and orders not placed after a crash give it more.
+  * **The order still takes its stock** as any other does. A pool that says too many lets the
+    stock refuse; one that says too few refuses orders the stock would take, until it is
+    started again. Neither oversells, so no reconciler is needed.
+  * Without Valkey, as in tests, checkout takes no tokens, and a drop's orders take stock as
+    any order.
+* **Consequences:** the rows' lock is still taken by every order that the pool lets through,
+  so throughput while a drop still has stock is the database's; ADR-019's lock-free orders
+  wait for its spike (OWN-14). Variants that sell without limit have no pool.
