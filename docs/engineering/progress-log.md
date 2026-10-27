@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Cashback: gift cards and refunds
+
+* **Gift cards earn none:** an order's cashback is a share of its goods, gift cards aside
+  (MKT-06, [ADR-805](../architecture/13-decision-log.md#adr-805--cashback-leaves-gift-cards-out-and-a-refund-takes-back-the-share-of-it-the-refund-took-from-what-is-left-of-that-credit-alone)).
+* **Refunds take theirs back:** once an order is refunded, the share of its cashback the
+  refunds took is taken back, from what is left of that credit: what the customer spent stays
+  spent.
+* 4292 tests (3 new).
+
 ### 262c528 · Stitching in the admin
 
 * **Stitching service card:** a product is offered stitched from its page in the admin, with

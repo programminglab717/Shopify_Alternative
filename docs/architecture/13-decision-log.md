@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-804 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-805 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -812,6 +812,7 @@
 | 802 | An unstitched product may be offered stitched to the shopper's measurements, in inches: the cart adds what stitching costs to a stitched line and asks for every measurement | Accepted |
 | 803 | A line sold stitched keeps the day it ships by: the day it was sold, or its pre-order's if later, and the days its stitching takes | Accepted |
 | 804 | The admin offers a product stitched from its page: what stitching adds, its days and the measurements to ask for, the usual ones chosen to begin with | Accepted |
+| 805 | Cashback leaves gift cards out, and a refund takes back the share of it the refund took, from what is left of that credit alone | Accepted |
 
 ---
 
@@ -26637,3 +26638,20 @@
   (ADR-477).
 * **Consequences:** a shop offers stitching where it lists the product. Measurements are the
   twelve Hatti knows; a tailor's own beyond them waits for shops to ask.
+
+## ADR-805 · Cashback leaves gift cards out, and a refund takes back the share of it the refund took, from what is left of that credit alone
+
+* **Context:** cashback gave a share of a delivered, paid order's goods in store credit
+  (ADR-453), gift cards among them, and kept it whatever came back: a customer could buy a card,
+  earn on it, and spend both; or return an order and keep its cashback. A delivered order can't
+  be cancelled, so refunds are how an order comes back.
+* **Decision:** an order's gift card lines earn none: what earns is its goods after its
+  discount, the discount shared over its lines as their totals are and the cards' share left
+  out. Once an order that earned cashback is refunded, the worker hears it and takes back the
+  share of the credit the refunds took, what the order still earns rounded down to a rupee, less
+  what was taken back for it already. It takes from what is left of that credit alone, as one
+  debit of the order's refund held against it: what the customer spent of it, or saw expire,
+  stays theirs, never taken from other credit. Heard again, it takes nothing more.
+* **Consequences:** cashback follows what the customer kept. Credit spent before the refund is
+  not recovered; a shop that minds can debit the customer's store credit by hand (ADR-184).
+  Points and tiers stay out (ADR-453): tiers by what a customer has spent follow (ADR-806).
