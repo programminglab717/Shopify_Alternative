@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Cashback tiers
+### 17667ea · Cashback tiers
 
 * **Tiers:** cashback gives a larger share to customers who spent more on their other orders,
   in up to three named tiers, edited in Marketing → Automations (MKT-06, [ADR-806](../architecture/13-decision-log.md#adr-806--cashback-has-up-to-three-tiers-by-what-a-customer-spent-on-their-other-orders-each-giving-back-more)). With
