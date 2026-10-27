@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-801 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-802 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -809,6 +809,7 @@
 | 799 | A shop shows products as one combined listing, each a value of its option: each product's page offers the others on sale as swatches linking to their pages | Accepted |
 | 800 | The admin combines products into one listing from a product's page, that product always among them | Accepted |
 | 801 | Blog articles are drafted with AI from what the shop wants them to say, never kept, thirty a day, each spending an AI credit | Accepted |
+| 802 | An unstitched product may be offered stitched to the shopper's measurements, in inches: the cart adds what stitching costs to a stitched line and asks for every measurement | Accepted |
 
 ---
 
@@ -26574,3 +26575,32 @@
 * **Consequences:** a shop writes an article in minutes, checking every word. The model may write
   common advice that is wrong for a fabric; the note asks the shop to check. Drafts are never
   kept, so a draft discarded is lost.
+
+## ADR-802 · An unstitched product may be offered stitched to the shopper's measurements, in inches: the cart adds what stitching costs to a stitched line and asks for every measurement
+
+* **Context:** most eastern wear Pakistani shops sell comes unstitched (ADR-477), and many shops
+  stitch it for the shopper for a charge, taking measurements on WhatsApp and adding days before
+  it ships (CAT-09, Growth). Personalisation fields (ADR-689, ADR-697) carry answers and add to a
+  line's price, but a field's price applies to any answer, and a field is required or not: they
+  cannot charge for one choice alone, nor ask for measurements only when stitching is chosen.
+* **Decision:**
+  * **The catalog keeps a product's stitching** (migration 0342): what it adds to each unit's
+    price, the days it adds before shipping (1 to 60), and the measurements its page asks for,
+    from twelve Hatti knows, shirt length to trouser bottom, in the order tailors take them. The
+    Admin API sets it with `productStitchingSet(productId, stitching)`, null for none, and reads
+    it as `Product.stitching`, under the products' scopes.
+  * **A cart line stitched says so as its "Stitching" property, "Stitched"**, each measurement a
+    property of its own named "Chest (inches)", which the order's line keeps and its packing slip
+    prints (ADR-687). The cart adds the stitching to a stitched line's price, as a field's price
+    is added (ADR-697), so the order keeps what was charged; it refuses a stitched line with a
+    measurement missing or not inches (1 to 99, to a quarter) or of a product offered none, in
+    the theme's words. A line unstitched, or of a product offered none and not stitched, asks
+    nothing.
+  * **The storefront document and `product.stitching`**, Hatti's own, carry its price, days,
+    the property and its values, and each measurement's key and input name. Hatti Base's product
+    form offers unstitched or stitched for the price, saying the days it adds, and shows the
+    measurement boxes once stitched is chosen, in English and Urdu.
+* **Consequences:** a shop sells a lawn suit unstitched or stitched to measurements from its own
+  page, the tailor reading them on the packing slip. A stitched line's later shipping is said on
+  the page; its order's day to ship by, and the admin's card, follow. Measurements are inches
+  alone, as Pakistani tailors measure.

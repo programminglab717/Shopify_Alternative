@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Stitching
+
+* **Stitched to measurements:** an unstitched product may be offered stitched for what the shop
+  charges, the days it adds and the measurements it asks for, in inches; the cart prices a
+  stitched line and asks for every measurement, and Hatti Base's form offers it (CAT-09, [ADR-802](../architecture/13-decision-log.md#adr-802--an-unstitched-product-may-be-offered-stitched-to-the-shoppers-measurements-in-inches-the-cart-adds-what-stitching-costs-to-a-stitched-line-and-asks-for-every-measurement)).
+  Its order's day to ship by and the admin's card come next.
+* 4284 tests (6 new).
+
 ### b6b9ce8 · Articles written with AI
 
 * **Blog with AI:** a blog article's title and body are written with AI from what the shop wants
