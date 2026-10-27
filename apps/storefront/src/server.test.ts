@@ -4309,6 +4309,48 @@ describe("Shoppers' accounts (ADR-571)", () => {
     await app.close();
   });
 
+  it('gives a signed-in shopper their link to bring friends while the shop rewards it (ADR-809)', async () => {
+    // The shop's own address, as the platform's gives it.
+    const app = server({
+      renderer: new PageRenderer(theme, {
+        limits: { timeMs: 10_000 },
+        platformUrl: 'https://hatti.pk',
+      }),
+    });
+    const cookie = signedIn();
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      referral: { code: 'K7QH2MXP', referrerCredit: 30_000, friendCredit: 20_000, currency: 'PKR' },
+    });
+    const page = await app.inject({
+      method: 'GET',
+      url: '/account',
+      headers: { host: 'localhost', cookie },
+    });
+    const block = page.body.slice(page.body.indexOf('<div class="account__referral">'));
+    expect(block).toContain('<h2>Bring a friend</h2>');
+    expect(block).toContain(
+      'Once a friend&#39;s first order from it arrives, you are given Rs 300 and they are given Rs 200 in store credit.',
+    );
+    expect(block).toMatch(/value="https:\/\/[a-z0-9-]+\.hatti\.pk\/\?invite=K7QH2MXP"/);
+    expect(block).toMatch(
+      /href="https:\/\/wa\.me\/\?text=Shop\+at\+.+https%3A%2F%2F.+%3Finvite%3DK7QH2MXP"/,
+    );
+    // The friend given nothing: it says what they are given alone, in Urdu too.
+    core.accounts.set(ACCOUNT_TOKEN, {
+      ...ACCOUNT,
+      referral: { code: 'K7QH2MXP', referrerCredit: 30_000, friendCredit: 0, currency: 'PKR' },
+    });
+    const urdu = await app.inject({
+      method: 'GET',
+      url: '/ur/account',
+      headers: { host: 'localhost', cookie },
+    });
+    expect(urdu.body).toContain('<h2>دوست کو لائیں</h2>');
+    expect(urdu.body).toContain('تو آپ کو Rs 300 اسٹور کریڈٹ ملتا ہے۔');
+    expect(urdu.body).toContain('?invite=K7QH2MXP');
+  });
+
   it('shows a signed-in shopper their orders and store credit, never kept, and others the way to sign in', async () => {
     const app = server();
     const cookie = signedIn();
@@ -4398,6 +4440,8 @@ describe("Shoppers' accounts (ADR-571)", () => {
     });
     expect(empty.body).toContain('<p>You haven&#39;t placed an order with us yet.</p>');
     expect(empty.body).not.toContain('<div class="account__credit">');
+    // No link to bring friends while the shop's referral programme is off.
+    expect(empty.body).not.toContain('<div class="account__referral">');
     expect(empty.body).toContain('<p class="account__who"><bdi dir="ltr">+923217654321</bdi>');
 
     // Not signed in: on to sign in. A session that is over takes its cookies with it.

@@ -184,6 +184,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       pastOrders: [],
       storeCredit: { balance: 0, currency: 'PKR', expiring: null, history: [] },
       dataRequests: { available: false, erasureWaitDays: 10, export: null, erasure: null },
+      referral: null,
     });
     // Not in another shop.
     expect(await f.accounts.session(f.b.shopId, signedIn.token)).toBeNull();
@@ -244,6 +245,28 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await f.accounts.startSignIn(f.b.shopId, { phone: '0345 1234567' }, ip)).toMatchObject({
       kind: 'sent',
     });
+  });
+
+  it("gives a customer their code to bring friends while the shop's referral programme is on (ADR-809)", async () => {
+    unwrap(await customers.create(f.a, { phone: '0300 7654321', name: 'Sana' }));
+    const token = await signIn('+923007654321');
+    expect((await f.accounts.account(f.a.shopId, token))!.referral).toBeNull();
+    await f.admin.query(
+      `INSERT INTO messaging.referral_programs
+              (shop_id, enabled, referrer_credit, friend_credit, credit_days)
+       VALUES ($1, true, 30000, 0, 60)`,
+      [f.a.shopId],
+    );
+    const { referral } = (await f.accounts.account(f.a.shopId, token))!;
+    expect(referral).toEqual({
+      code: expect.stringMatching(/^[A-HJ-NP-Z2-9]{8}$/),
+      referrerCredit: 30_000,
+      friendCredit: 0,
+      currency: 'PKR',
+    });
+    // The same code each time.
+    expect((await f.accounts.account(f.a.shopId, token))!.referral).toEqual(referral);
+    await f.admin.query('DELETE FROM messaging.referral_programs WHERE shop_id = $1', [f.a.shopId]);
   });
 
   it('takes five tries at a code, for ten minutes, the last sent alone working', async () => {

@@ -21,6 +21,8 @@ import { newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import {
   MESSAGE_LANGUAGES,
   MessagesService,
+  referralCodeIn,
+  referralProgramIn,
   type MessageLanguage,
   type PhoneChannel,
 } from '@hatti/messaging/public';
@@ -290,6 +292,10 @@ export class AccountService {
       const erasure = session.customerId
         ? await this.data.ownErasureIn(tx, shopId, session.customerId)
         : null;
+      // Their code to bring friends, while the shop's referral programme is on (ADR-809).
+      const program = session.customerId ? await referralProgramIn(tx, shopId) : null;
+      const code =
+        program && session.customerId ? await referralCodeIn(tx, shopId, session.customerId) : null;
       const dataRequests: AccountDataRequestsJson = {
         available: session.customerId !== null,
         erasureWaitDays: ERASURE_WAIT_DAYS,
@@ -346,6 +352,15 @@ export class AccountService {
           })),
         },
         dataRequests,
+        referral:
+          program && code
+            ? {
+                code,
+                referrerCredit: Number(program.referrerCredit),
+                friendCredit: Number(program.friendCredit),
+                currency,
+              }
+            : null,
       };
     });
   }

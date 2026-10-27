@@ -294,6 +294,16 @@ export interface AccountStoreCreditEntryJson {
   orderId: string | null;
 }
 
+/** A shopper's code to bring friends, while the shop's referral programme is on (ADR-809). */
+export interface AccountReferralJson {
+  /** What their link carries after `?invite=`. */
+  code: string;
+  /** Minor units: what they are given once a friend's first order arrives, and the friend. */
+  referrerCredit: number;
+  friendCredit: number;
+  currency: string;
+}
+
 /** A shopper's account with the shop. */
 export interface AccountJson {
   /** E.164: the number they signed in with, whole, as it is theirs. */
@@ -322,6 +332,11 @@ export interface AccountJson {
   };
   /** Their file, and their erasure, as they asked for them (ADR-572). */
   dataRequests: AccountDataRequestsJson;
+  /**
+   * Their code to bring friends (ADR-809): null while the shop's referral programme is off, or
+   * for a number no customer has; absent from older cores.
+   */
+  referral?: AccountReferralJson | null;
 }
 
 /** GET `…/account`: the account, or null when the session is none. */

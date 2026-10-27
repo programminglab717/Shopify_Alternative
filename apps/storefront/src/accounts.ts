@@ -565,6 +565,16 @@ export function customerObject(
     new_address: { id: null, country: 'Pakistan', country_code: 'PK' },
     // Hatti's: whether the book has room for another.
     'addresses_full?': addresses.length >= ACCOUNT_ADDRESSES_MAX,
+    // Hatti's: their link to bring friends while the shop rewards it (ADR-809): its path, put
+    // after the shop's address, and what each side is given.
+    referral: account.referral
+      ? {
+          code: account.referral.code,
+          path: `/?invite=${encodeURIComponent(account.referral.code)}`,
+          referrer_credit: account.referral.referrerCredit,
+          friend_credit: account.referral.friendCredit,
+        }
+      : null,
     store_credit_account: {
       balance: credit.balance,
       currency: { iso_code: credit.currency },

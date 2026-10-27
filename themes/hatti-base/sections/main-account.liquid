@@ -110,6 +110,29 @@
       </div>
     {%- endif -%}
 
+    {%- comment -%} Their link to bring friends, while the shop rewards it (ADR-809). {%- endcomment -%}
+    {%- if customer.referral -%}
+      {%- assign referral_url = shop.url | append: customer.referral.path -%}
+      {%- assign referral_earned = customer.referral.referrer_credit | money -%}
+      {%- assign referral_given = customer.referral.friend_credit | money -%}
+      {%- assign referral_message = 'customer.account.referral_message' | t: shop: shop.name, url: referral_url -%}
+      <div class="account__referral">
+        <h2>{{ 'customer.account.referral' | t }}</h2>
+        <p>
+          {%- if customer.referral.friend_credit > 0 -%}
+            {{- 'customer.account.referral_note' | t: earned: referral_earned, given: referral_given -}}
+          {%- else -%}
+            {{- 'customer.account.referral_note_yours' | t: earned: referral_earned -}}
+          {%- endif -%}
+        </p>
+        <label for="ReferralLink">{{ 'customer.account.referral_link' | t }}</label>
+        <input id="ReferralLink" class="account__referral-link" type="text" dir="ltr" readonly value="{{ referral_url }}">
+        <a class="button" href="https://wa.me/?text={{ referral_message | url_encode }}" target="_blank" rel="noopener">
+          {{- 'customer.account.referral_share' | t -}}
+        </a>
+      </div>
+    {%- endif -%}
+
     <h2>{{ 'customer.account.orders' | t }}</h2>
     {%- if customer.orders_count == 0 -%}
       <p>{{ 'customer.account.no_orders' | t }}</p>
@@ -284,6 +307,11 @@
   .account__credit h2 { margin-block-start: 0; font-size: 1rem; }
   .account__credit p { margin: 0.25rem 0 0; }
   .account__credit-balance { font-size: 1.5rem; font-weight: 700; }
+  .account__referral { display: flex; flex-direction: column; gap: 0.5rem; margin-block-end: 2rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
+  .account__referral h2 { margin: 0; font-size: 1rem; }
+  .account__referral p { margin: 0; }
+  .account__referral-link { min-height: 3rem; padding-inline: 0.75rem; border: 1px solid var(--color-border); border-radius: 0.25rem; font: inherit; }
+  .account__referral .button { align-self: flex-start; }
   .account__orders { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.75rem; }
   .account__order { padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
   .account__order-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; font-weight: 600; }
