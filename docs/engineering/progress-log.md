@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Custom reports
+
+* **Saved reports:** a shop saves reports of its own over the sales report, broken down one
+  way with the columns it chooses, over a period such as last month that moves with the day;
+  run when asked and exported as a workbook (ANL-06, [ADR-817](../architecture/13-decision-log.md#adr-817--a-shop-saves-reports-of-its-own-over-the-sales-report-broken-down-one-way-the-columns-chosen-in-order-over-a-period-that-moves-with-the-day-run-when-asked-and-exported-as-a-workbook)). Scheduling and the admin follow.
+* 4361 tests (18 new).
+
 ### 27689ee · Digital products in the admin
 
 * **Set up from its page:** a product is made digital, its files uploaded and its licence keys

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-816 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-817 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -824,6 +824,7 @@
 | 814 | A digital product is delivered once its order is paid: each line a link of its own to the files, counted by file, and each unit a key, both sent on WhatsApp | Accepted |
 | 815 | A checkout of digital products alone asks for no address, charges no delivery and takes no cash on delivery; a line given all it sells is fulfilled and delivered at once | Accepted |
 | 816 | A product is made digital from its page, its files uploaded and its keys added there; keys added are given at once to the paid orders whose units were sold none | Accepted |
+| 817 | A shop saves reports of its own over the sales report: broken down one way, the columns chosen in order, over a period that moves with the day, run when asked and exported as a workbook | Accepted |
 
 ---
 
@@ -26877,3 +26878,35 @@
 * **Consequences:** a shop sets up and restocks a digital product without the API. Keys are
   never shown in the admin once added. More than 200 orders waiting on one product are given
   keys 200 at a time, as the shop adds them.
+
+## ADR-817 · A shop saves reports of its own over the sales report: broken down one way, the columns chosen in order, over a period that moves with the day, run when asked and exported as a workbook
+
+* **Context:** ANL-06 asks for custom reports and their scheduling (Growth). The sales report
+  (ADR-061) answers one question at a time over dates typed each time, and its workbook
+  (ADR-798) has every column; shops keep asking the same few questions, such as last month's
+  net sales by channel, or which products made the most gross profit this week.
+* **Decision:**
+  * **A report is what to show, not what it showed:** a name; a breakdown, by day, week from
+    Monday or month in the shop's time zone, by product (the 250 that sold most), or by channel,
+    visit source or campaign as the sales report's dimensions (ADR-140); 1 to 20 columns in the
+    order chosen; and a period: today, yesterday, the last 7, 30 or 90 days, this or last week,
+    this or last month, the last 12 months, or this year. "Last" periods are whole days, weeks
+    or months before today; "this" ones run to the end of today. A shop keeps up to 50, kept in
+    `orders.custom_reports`, each change recorded in the audit log.
+  * **Its columns are the sales report's own**, worked out by the same functions so the two
+    never disagree: orders, gross sales, discounts, returns, net sales, shipping, additional
+    fees, taxes, total sales, refunds, average order value, cost of goods, gross profit and
+    gross margin, and true profit's lines (shipping costs, write-offs, claims recovered, ad
+    spend, profit and return on ad spend) on the plans that have them (ADR-529), left out on
+    the others. A report of products has its own: units sold, orders, gross sales, cost of
+    goods and gross profit, gross sales before order-level discounts as the report's top
+    products have them. `customReportColumns(breakdown)` lists them.
+  * **Run when asked:** `customReportRun` works it out from the orders over its period as of
+    now, or over a period given of a year at most; amounts in major units, counts, and ratios to
+    four places, as text, with the period's total for a report of sales.
+  * **Exported** by those who export orders, as a workbook of one sheet named for the report:
+    its rows, and the total last; each export is recorded in the audit log.
+  * **Read and saved by those who read orders**, as the sales report is.
+* **Consequences:** a report answers its question again each time with no dates typed. Filters
+  (one channel's products, say) and reports of customers or stock are left for shops to ask
+  for; the inventory and cohort reports stay as they are. Scheduling them follows (ADR-818).
