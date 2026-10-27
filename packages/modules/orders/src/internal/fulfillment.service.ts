@@ -364,6 +364,16 @@ export class FulfillmentService {
     orderId: string,
     input: FulfillInput,
   ): Promise<MutationResult<ParcelResult>> {
+    return this.db.tenant(tenant.shopId, (tx) => this.fulfillIn(tx, tenant, orderId, input));
+  }
+
+  /** {@link fulfill} in the caller's `tx`, as a module shipping with it does (ADR-824). */
+  async fulfillIn(
+    tx: Tx,
+    tenant: ParcelCaller,
+    orderId: string,
+    input: FulfillInput,
+  ): Promise<MutationResult<ParcelResult>> {
     const check = new InputChecker();
     const tracking = checkTracking(check, ['input', 'trackingInfo'], input.tracking);
     const requested = (input.lineItems ?? []).map((line, index) => ({
@@ -383,125 +393,123 @@ export class FulfillmentService {
     }
     if (!check.ok) return { ok: false, errors: check.errors };
 
-    return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<ParcelResult>> => {
-      const order = await lockOrder(tx, tenant.shopId, orderId);
-      if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
-      if (order.overLimitAt) return failOne(['id'], 'INVALID', OVER_LIMIT_MESSAGE);
-      if (order.status !== 'open') {
-        return failOne(['id'], 'INVALID', `A ${order.status} order can't be shipped`);
-      }
-      // Handed over at the counter instead (ADR-389).
-      if (order.deliveryMethod === 'pickup') return failOne(['id'], 'INVALID', PICKUP_NOT_SHIPPED);
-      const unready = handOverRefusal(order);
-      if (unready) return failOne(['id'], 'INVALID', unready);
-      const orderLines = await tx
-        .select({
-          id: lines.id,
-          variantId: lines.variantId,
-          quantity: lines.quantity,
-          fulfilledQuantity: lines.fulfilledQuantity,
+    const order = await lockOrder(tx, tenant.shopId, orderId);
+    if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+    if (order.overLimitAt) return failOne(['id'], 'INVALID', OVER_LIMIT_MESSAGE);
+    if (order.status !== 'open') {
+      return failOne(['id'], 'INVALID', `A ${order.status} order can't be shipped`);
+    }
+    // Handed over at the counter instead (ADR-389).
+    if (order.deliveryMethod === 'pickup') return failOne(['id'], 'INVALID', PICKUP_NOT_SHIPPED);
+    const unready = handOverRefusal(order);
+    if (unready) return failOne(['id'], 'INVALID', unready);
+    const orderLines = await tx
+      .select({
+        id: lines.id,
+        variantId: lines.variantId,
+        quantity: lines.quantity,
+        fulfilledQuantity: lines.fulfilledQuantity,
+      })
+      .from(lines)
+      .where(and(eq(lines.shopId, tenant.shopId), eq(lines.orderId, order.id)));
+    const byId = new Map(orderLines.map((line) => [line.id, line]));
+
+    const errors: FieldError[] = [];
+    const shipping = input.lineItems
+      ? requested.flatMap((wanted) => {
+          const line = byId.get(wanted.id);
+          if (!line) {
+            errors.push({
+              field: [...wanted.field, 'id'],
+              code: 'NOT_FOUND',
+              message: 'Line not found on this order',
+            });
+            return [];
+          }
+          const left = line.quantity - line.fulfilledQuantity;
+          if (wanted.quantity! > left) {
+            errors.push({
+              field: [...wanted.field, 'quantity'],
+              code: 'INVALID',
+              message:
+                left === 0 ? 'Everything on this line has shipped' : `Only ${left} left to ship`,
+            });
+            return [];
+          }
+          return [{ line, quantity: wanted.quantity! }];
         })
-        .from(lines)
-        .where(and(eq(lines.shopId, tenant.shopId), eq(lines.orderId, order.id)));
-      const byId = new Map(orderLines.map((line) => [line.id, line]));
+      : orderLines
+          .filter((line) => line.quantity > line.fulfilledQuantity)
+          .map((line) => ({ line, quantity: line.quantity - line.fulfilledQuantity }));
+    if (errors.length > 0) return { ok: false, errors };
+    if (shipping.length === 0) {
+      return failOne(['id'], 'INVALID', 'Everything on this order has shipped');
+    }
 
-      const errors: FieldError[] = [];
-      const shipping = input.lineItems
-        ? requested.flatMap((wanted) => {
-            const line = byId.get(wanted.id);
-            if (!line) {
-              errors.push({
-                field: [...wanted.field, 'id'],
-                code: 'NOT_FOUND',
-                message: 'Line not found on this order',
-              });
-              return [];
-            }
-            const left = line.quantity - line.fulfilledQuantity;
-            if (wanted.quantity! > left) {
-              errors.push({
-                field: [...wanted.field, 'quantity'],
-                code: 'INVALID',
-                message:
-                  left === 0 ? 'Everything on this line has shipped' : `Only ${left} left to ship`,
-              });
-              return [];
-            }
-            return [{ line, quantity: wanted.quantity! }];
-          })
-        : orderLines
-            .filter((line) => line.quantity > line.fulfilledQuantity)
-            .map((line) => ({ line, quantity: line.quantity - line.fulfilledQuantity }));
-      if (errors.length > 0) return { ok: false, errors };
-      if (shipping.length === 0) {
-        return failOne(['id'], 'INVALID', 'Everything on this order has shipped');
-      }
-
-      const shipped = await this.stock.fulfill(
-        tx,
-        tenant,
-        shipping.map(({ line, quantity }) => ({
-          variantId: line.variantId,
-          locationId: order.locationId,
-          quantity,
-        })),
-        { referenceDocumentUri: orderReference(order.id) },
-      );
-      if (!shipped.ok) throw new Error('Shipping stock cannot fall short');
-
-      const fulfillmentId = newId();
-      await tx.insert(fulfillments).values({
-        shopId: tenant.shopId,
-        id: fulfillmentId,
-        orderId: order.id,
+    const shipped = await this.stock.fulfill(
+      tx,
+      tenant,
+      shipping.map(({ line, quantity }) => ({
+        variantId: line.variantId,
         locationId: order.locationId,
-        ...tracking,
-      });
-      await tx.insert(fulfillmentLines).values(
-        shipping.map(({ line, quantity }) => ({
-          shopId: tenant.shopId,
-          fulfillmentId,
-          lineId: line.id,
-          quantity,
-        })),
-      );
-      await tx.execute(sql`
-        UPDATE orders.lines l
-           SET fulfilled_quantity = l.fulfilled_quantity + s.quantity
-          FROM unnest(${sql.param(shipping.map(({ line }) => line.id))}::uuid[],
-                      ${sql.param(shipping.map(({ quantity }) => quantity))}::int[])
-               AS s(id, quantity)
-         WHERE l.shop_id = ${tenant.shopId} AND l.id = s.id`);
+        quantity,
+      })),
+      { referenceDocumentUri: orderReference(order.id) },
+    );
+    if (!shipped.ok) throw new Error('Shipping stock cannot fall short');
 
-      const updated = await updateOrder(tx, tenant.shopId, order, {});
-      const units = shipping.reduce((sum, { quantity }) => sum + quantity, 0);
-      const via = trackingText(tracking);
-      await addTimelineEntry(
-        tx,
-        tenant.shopId,
-        order.id,
-        tenant.actor,
-        'fulfilled',
-        `Shipped ${items(units)}` + (via ? ` with ${via}` : ''),
-      );
-      await appendEvent<FulfillmentCreatedPayload>(tx, tenant.shopId, {
-        type: OrderEvents.FulfillmentCreated,
-        aggregateType: 'fulfillment',
-        aggregateId: fulfillmentId,
-        payload: {
-          orderId: order.id,
-          status: 'in_transit',
-          trackingCompany: tracking.trackingCompany,
-          trackingNumber: tracking.trackingNumber,
-          orderStage: updated.stage,
-          orderVersion: updated.version,
-        },
-      });
-      return {
-        ok: true,
-        value: { order: (await loadOrder(tx, tenant.shopId, order.id))!, fulfillmentId },
-      };
+    const fulfillmentId = newId();
+    await tx.insert(fulfillments).values({
+      shopId: tenant.shopId,
+      id: fulfillmentId,
+      orderId: order.id,
+      locationId: order.locationId,
+      ...tracking,
     });
+    await tx.insert(fulfillmentLines).values(
+      shipping.map(({ line, quantity }) => ({
+        shopId: tenant.shopId,
+        fulfillmentId,
+        lineId: line.id,
+        quantity,
+      })),
+    );
+    await tx.execute(sql`
+      UPDATE orders.lines l
+         SET fulfilled_quantity = l.fulfilled_quantity + s.quantity
+        FROM unnest(${sql.param(shipping.map(({ line }) => line.id))}::uuid[],
+                    ${sql.param(shipping.map(({ quantity }) => quantity))}::int[])
+             AS s(id, quantity)
+       WHERE l.shop_id = ${tenant.shopId} AND l.id = s.id`);
+
+    const updated = await updateOrder(tx, tenant.shopId, order, {});
+    const units = shipping.reduce((sum, { quantity }) => sum + quantity, 0);
+    const via = trackingText(tracking);
+    await addTimelineEntry(
+      tx,
+      tenant.shopId,
+      order.id,
+      tenant.actor,
+      'fulfilled',
+      `Shipped ${items(units)}` + (via ? ` with ${via}` : ''),
+    );
+    await appendEvent<FulfillmentCreatedPayload>(tx, tenant.shopId, {
+      type: OrderEvents.FulfillmentCreated,
+      aggregateType: 'fulfillment',
+      aggregateId: fulfillmentId,
+      payload: {
+        orderId: order.id,
+        status: 'in_transit',
+        trackingCompany: tracking.trackingCompany,
+        trackingNumber: tracking.trackingNumber,
+        orderStage: updated.stage,
+        orderVersion: updated.version,
+      },
+    });
+    return {
+      ok: true,
+      value: { order: (await loadOrder(tx, tenant.shopId, order.id))!, fulfillmentId },
+    };
   }
 
   /**

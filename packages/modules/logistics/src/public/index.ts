@@ -125,3 +125,12 @@ export {
 export { REMITTANCE_OUTCOMES, type RemittanceOutcomeValue } from '../internal/schema.js';
 export { STATEMENT_LIMITS, amountOf, headingKey } from '../internal/statement.js';
 export { courierShipmentOf } from '../internal/shipments.js';
+export {
+  DeliveryCodeSender,
+  RIDER_LIMITS,
+  RIDER_LINK_PATH,
+  RiderEvents,
+  RiderService,
+  type DeliveryRecord,
+  type RiderRecord,
+} from '../internal/riders.js';

@@ -148,6 +148,10 @@ export const ID_PREFIXES = {
   customReport: 'crep',
   // A drop of products on sale together at a time (ADR-820).
   drop: 'drop',
+  // A shop's own rider, and an order handed to one (ADR-824).
+  rider: 'ridr',
+  riderDelivery: 'rdel',
+  riderHandover: 'rhnd',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

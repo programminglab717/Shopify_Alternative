@@ -34,6 +34,7 @@ export enum MessageKind {
   GIFT_CARD = 'GIFT_CARD',
   DIGITAL_DOWNLOAD = 'DIGITAL_DOWNLOAD',
   LICENCE_KEY = 'LICENCE_KEY',
+  DELIVERY_CODE = 'DELIVERY_CODE',
   CHECKOUT_REMINDER = 'CHECKOUT_REMINDER',
   CHECKOUT_OFFER = 'CHECKOUT_OFFER',
   REVIEW_REQUEST = 'REVIEW_REQUEST',
@@ -182,6 +183,11 @@ registerEnumType(MessageKind, {
       description:
         'A licence key of a digital product they bought, once its order is paid, which is not ' +
         'kept in the message once sent (ADR-814); the shop cannot turn it off.',
+    },
+    DELIVERY_CODE: {
+      description:
+        "The code to give the shop's own rider at the door, the order going out with them, " +
+        'which is not kept in the message once sent (SHP-10, ADR-824); the shop cannot turn it off.',
     },
     CHECKOUT_REMINDER: {
       description:

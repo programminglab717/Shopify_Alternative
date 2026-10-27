@@ -8388,6 +8388,11 @@ enum MessageKind {
   DAILY_SUMMARY
 
   """
+  The code to give the shop's own rider at the door, the order going out with them, which is not kept in the message once sent (SHP-10, ADR-824); the shop cannot turn it off.
+  """
+  DELIVERY_CODE
+
+  """
   A digital product they bought, once its order is paid: a link of their own to its files (CAT-13, ADR-814); the shop cannot turn it off.
   """
   DIGITAL_DOWNLOAD
@@ -10581,6 +10586,24 @@ type Mutation {
   Sets from how many stars, 3, 4 or 5, reviews publish by themselves, and how many days after delivery customers are asked for them. Reviews written before keep their status.
   """
   reviewSettingsUpdate(input: ReviewSettingsInput!): ReviewSettingsPayload!
+
+  """
+  Adds a rider, with their page's link, given this once. Staff need to be an owner or a manager.
+  """
+  riderCreate(input: RiderInput!): RiderPayload!
+
+  """
+  Hands packed orders to a rider who rides for the shop now, 50 at most, each on its own: shipped with them, everything left to ship in one parcel, its cash on delivery theirs to collect, and its customer sent a code on WhatsApp to give them at the door.
+  """
+  riderHandOut(orderIds: [ID!]!, riderId: ID!): RiderHandOutPayload!
+
+  """
+  A new link for a rider's page, given this once; the old one works no more.
+  """
+  riderNewLink(id: ID!): RiderPayload!
+
+  """Changes a rider's name, number, or whether they ride for the shop now."""
+  riderUpdate(id: ID!, input: RiderInput!): RiderPayload!
 
   """
   The sales report as an Excel workbook for the shop's accountant (ANL-10, ADR-798): what each day, week or month came to, a row each and their total last, the 250 products that sold most, and each channel's sales, amounts as salesReport gives them, true profit's lines on the plans that have them. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
@@ -16246,6 +16269,14 @@ type Query {
   reviewSettings: ReviewSettings!
 
   """
+  The deliveries the shop's riders carried, the latest first: 100 at most.
+  """
+  riderDeliveries(riderId: ID, status: RiderDeliveryStatus): [RiderDelivery!]!
+
+  """The shop's riders, by name, those who ride now first."""
+  riders: [Rider!]!
+
+  """
   Tries an address against the storefront's robots.txt (ADR-616): whether a crawler, Googlebot unless another is named, may fetch it, and the rule that says so. The rules given are tried in place of the shop's saved ones, as they would be saved, without saving them.
   """
   robotsTxtTest(
@@ -17019,6 +17050,95 @@ input ReviewSettingsInput {
 
 type ReviewSettingsPayload {
   reviewSettings: ReviewSettings
+  userErrors: [UserError!]!
+}
+
+"""
+One of the shop's own riders (SHP-10, ADR-824), with a page of their own opened from a link, with no account.
+"""
+type Rider {
+  """Whether they ride for the shop now: only they are handed orders."""
+  active: Boolean!
+
+  """What they collected and have not handed over."""
+  cashHeld: Money!
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+
+  """Deliveries they carry now."""
+  out: Int!
+
+  """Their mobile, as +923001234567."""
+  phone: String!
+}
+
+"""An order handed to the shop's own rider, its parcel theirs to deliver."""
+type RiderDelivery {
+  cashCollected: Money!
+
+  """What the order owed in cash when it went out."""
+  cashDue: Money!
+
+  """Whether the rider gave the customer's code on delivering it."""
+  codeGiven: Boolean!
+
+  """Whether its customer was sent a code to give the rider at the door."""
+  codeSent: Boolean!
+  createdAt: DateTime!
+  deliveredAt: DateTime
+  failedAt: DateTime
+  failedReason: String
+
+  """Its parcel."""
+  fulfillmentId: ID!
+  id: ID!
+  orderId: ID!
+  riderId: ID!
+  status: RiderDeliveryStatus!
+}
+
+"""Where a delivery the shop's own rider carries stands (ADR-824)."""
+enum RiderDeliveryStatus {
+  """Delivered, as the rider said."""
+  DELIVERED
+
+  """Not delivered: the rider brings it back."""
+  FAILED
+
+  """With the rider."""
+  OUT
+}
+
+type RiderHandOutPayload {
+  results: [RiderHandOutResult!]!
+  userErrors: [UserError!]!
+}
+
+"""An order handed to a rider, or why not."""
+type RiderHandOutResult {
+  delivery: RiderDelivery
+  orderId: ID!
+  problem: String
+}
+
+input RiderInput {
+  """Whether they ride for the shop now; true unless said."""
+  active: Boolean
+
+  """1 to 80 characters."""
+  name: String!
+
+  """A Pakistani mobile, such as 0300 1234567."""
+  phone: String!
+}
+
+type RiderPayload {
+  """
+  Their page's address, carrying its secret: given once, when made or made anew, to send the rider. Null otherwise.
+  """
+  link: String
+  rider: Rider
   userErrors: [UserError!]!
 }
 

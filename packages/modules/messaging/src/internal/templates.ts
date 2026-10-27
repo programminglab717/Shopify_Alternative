@@ -36,6 +36,7 @@ export const MESSAGE_KINDS = [
   'gift_card',
   'digital_download',
   'licence_key',
+  'delivery_code',
   'checkout_reminder',
   'checkout_offer',
   'review_request',
@@ -134,6 +135,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   // What the customer bought: a digital product's files and licence keys (ADR-814).
   'digital_download',
   'licence_key',
+  // What the shop's own rider asks for at the door, the order going out with them (ADR-824).
+  'delivery_code',
   'invoice_due',
   'payment_overdue',
   'plan_ended',
@@ -276,6 +279,8 @@ export interface MessageVariables {
   /** What is left to pay before the order ships, part of it paid: "Rs 3,250" (ADR-629). */
   left?: string;
   courier?: string;
+  /** The shop's own rider an order goes out with (ADR-824). */
+  rider?: string;
   tracking?: string;
   /** The order's page for its customer, which follows its parcels too (ADR-160). */
   url?: string;
@@ -854,6 +859,18 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: here is your licence key for {product}: {code}. Keep it safe: whoever has it can use it.',
       ur: '{shop}: یہ {product} کے لیے آپ کی لائسنس کی ہے: {code}۔ اسے سنبھال کر رکھیں: جس کے پاس ہو وہ اسے استعمال کر سکتا ہے۔',
+    },
+  },
+  delivery_code: {
+    whatsapp: 'hatti_delivery_code',
+    category: 'utility',
+    parameters: ['shop', 'order', 'rider', 'code'],
+    // The code proves the parcel reached the customer: kept nowhere in the message once sent
+    // (ADR-824).
+    secret: true,
+    text: {
+      en: '{shop}: your order {order} is out for delivery with our rider {rider}. When it arrives, give them this code: {code}. Give it to no one else.',
+      ur: '{shop}: آپ کا آرڈر {order} ہمارے رائیڈر {rider} کے ساتھ ڈیلیوری کے لیے نکل چکا ہے۔ پہنچنے پر انہیں یہ کوڈ دیں: {code}۔ یہ کسی اور کو نہ دیں۔',
     },
   },
   checkout_reminder: {

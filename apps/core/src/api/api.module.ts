@@ -19,6 +19,7 @@ import {
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
 import { CheckoutModule, DropTokens } from '@hatti/checkout/public';
 import { RedisDropTokens } from '../drop-tokens.js';
+import { MessagingDeliveryCodes } from '../delivery-codes.js';
 import { SecretBox } from '@hatti/crypto';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -26,7 +27,7 @@ import { FilesModule } from '@hatti/files/public';
 import { TrustModule } from '@hatti/trust/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryCopiedVariantStock, InventoryModule } from '@hatti/inventory/public';
-import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
+import { type Couriers, DeliveryCodeSender, LogisticsModule } from '@hatti/logistics/public';
 import {
   MarketingModule,
   type MetaGraphOptions,
@@ -34,6 +35,7 @@ import {
   type TikTokApiOptions,
 } from '@hatti/marketing/public';
 import {
+  MessagesService,
   MessagingModule,
   type SupportLineSettings,
   type VoiceWebhookSettings,
@@ -237,6 +239,11 @@ class InfrastructureModule {
         { provide: ObjectStorage, useValue: options.storage },
         { provide: AiGateway, useValue: options.ai ?? null },
         { provide: MapTiles, useValue: options.mapTiles ?? null },
+        // The codes customers give the shop's own riders, sent as messages are (ADR-824).
+        {
+          provide: DeliveryCodeSender,
+          useValue: new MessagingDeliveryCodes(new MessagesService(options.database)),
+        },
         // Drops' token pools in Valkey (ADR-821); without it, drops take stock as any order.
         {
           provide: DropTokens,
@@ -259,6 +266,7 @@ class InfrastructureModule {
         AiGateway,
         MapTiles,
         DropTokens,
+        DeliveryCodeSender,
         CopiedVariantStock,
       ],
     };

@@ -1,4 +1,5 @@
 import { InventoryModule } from '@hatti/inventory/public';
+import { OrdersModule } from '@hatti/orders/public';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { CourierBookingService } from './bookings.service.js';
 import { COURIERS, CourierAccountService } from './courier-accounts.service.js';
@@ -11,6 +12,8 @@ import { CourierResolver } from './graphql/couriers.resolver.js';
 import { CourierPickupResolver } from './graphql/pickups.resolver.js';
 import { RateCardResolver } from './graphql/rate-cards.resolver.js';
 import { CodRemittanceResolver } from './graphql/remittance.resolver.js';
+import { RiderResolver } from './graphql/riders.resolver.js';
+import { RiderService } from './riders.js';
 import { CourierPickupService } from './pickups.service.js';
 import { RateCardService } from './rate-cards.service.js';
 import { CodRemittanceService } from './remittance.service.js';
@@ -30,7 +33,7 @@ export class LogisticsModule {
     return {
       module: LogisticsModule,
       // Labels say where parcels come from: the inventory module's locations.
-      imports: [InventoryModule],
+      imports: [InventoryModule, OrdersModule],
       providers: [
         {
           provide: COURIERS,
@@ -49,6 +52,8 @@ export class LogisticsModule {
         CourierRuleService,
         RateCardResolver,
         RateCardService,
+        RiderResolver,
+        RiderService,
       ],
       exports: [
         CodRemittanceService,
@@ -59,6 +64,7 @@ export class LogisticsModule {
         CourierPickupService,
         CourierRuleService,
         RateCardService,
+        RiderService,
       ],
     };
   }

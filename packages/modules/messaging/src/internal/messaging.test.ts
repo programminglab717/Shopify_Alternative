@@ -683,6 +683,8 @@ describe("Messages' words", () => {
       // What the customer bought: a digital product's files and keys (ADR-814).
       'digital_download',
       'licence_key',
+      // What the shop's own rider asks for at the door (ADR-824).
+      'delivery_code',
       'invoice_due',
       'payment_overdue',
       'plan_ended',
@@ -784,7 +786,13 @@ describe("Messages' words", () => {
       'ABCD EFGH JKLM NPQR',
     ]);
     expect(templateButtons('gift_card', card)).toEqual([]);
-    expect(SECRET_KINDS).toEqual(['gift_card', 'licence_key', 'one_time_code', 'account_code']);
+    expect(SECRET_KINDS).toEqual([
+      'gift_card',
+      'licence_key',
+      'delivery_code',
+      'one_time_code',
+      'account_code',
+    ]);
     expect(messageEmail('gift_card', 'en', card)).toBeNull();
   });
 
@@ -818,6 +826,22 @@ describe("Messages' words", () => {
       'KEY-0001',
     ]);
     expect(SECRET_KINDS).toContain('licence_key');
+  });
+
+  it("sends the code the shop's own rider asks for as a secret (ADR-824)", () => {
+    const sent = { shop: 'Zari Fashions', order: '#1042', rider: 'Asif', code: '4821' };
+    expect(messageText('delivery_code', 'en', sent)).toBe(
+      'Zari Fashions: your order #1042 is out for delivery with our rider Asif. When it ' +
+        'arrives, give them this code: 4821. Give it to no one else.',
+    );
+    expect(messageText('delivery_code', 'ur', sent)).toContain('4821');
+    expect(templateParameters('delivery_code', sent)).toEqual([
+      'Zari Fashions',
+      '#1042',
+      'Asif',
+      '4821',
+    ]);
+    expect(SECRET_KINDS).toContain('delivery_code');
   });
 
   it('carries a code in its words and in the button that copies it', () => {
