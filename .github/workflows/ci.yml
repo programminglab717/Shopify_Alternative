@@ -71,11 +71,14 @@ jobs:
           # tests run where it is.
           # A package mirror that stops answering ends a try, not the job's twenty minutes (runs
           # 306 and 307 waited on one until they were cancelled); the next try may reach another.
-          # The update says where it is, so that a stall names the source.
+          # The update says where it is, so that a stall names the source; ffmpeg's install says
+          # what it fetches, and gives up on a connection silent for 20 seconds, trying it twice
+          # more, rather than waiting out its three minutes (run 40440076365's first attempt).
           for attempt in 1 2 3; do
             if timeout 90 sudo apt-get update &&
               timeout 90 sudo apt-get install -y -qq pgbouncer &&
-              timeout 180 sudo apt-get install -y -qq --no-install-recommends ffmpeg; then
+              timeout 180 sudo apt-get install -y -q -o Acquire::http::Timeout=20 \
+                -o Acquire::Retries=2 --no-install-recommends ffmpeg; then
               break
             fi
             if [ "$attempt" = 3 ]; then exit 1; fi
