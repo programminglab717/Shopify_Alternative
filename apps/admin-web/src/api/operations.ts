@@ -8285,6 +8285,8 @@ const SHOP_LOCATION = /* GraphQL */ `
     localPickupSettings {
       instructions
     }
+    storefrontListed
+    openingHours
     address {
       address1
       address2

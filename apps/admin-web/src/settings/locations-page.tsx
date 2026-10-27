@@ -1,5 +1,16 @@
-import { Pencil, Plus, Power, PowerOff, Save, Star, Store, Trash2, Warehouse } from 'lucide-react';
-import { useState } from 'react';
+import {
+  MapPin,
+  Pencil,
+  Plus,
+  Power,
+  PowerOff,
+  Save,
+  Star,
+  Store,
+  Trash2,
+  Warehouse,
+} from 'lucide-react';
+import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   LocationActivateMutation,
@@ -176,6 +187,118 @@ function LocationForm({
   );
 }
 
+/**
+ * Whether the online store's store locator lists the location (OS-18, ADR-831), and its opening
+ * hours as customers read them: list it, change its hours, or take it off. For locations in use
+ * alone; one needs its street address and city first, as for pickup.
+ */
+function StorefrontListing({ location }: { location: ShopLocation }) {
+  const { t } = useLocale();
+  const id = useId();
+  const edit = useAdminMutation<LocationPayloadData, { id: string; input: object }>(
+    LocationEditMutation,
+  );
+  const listed = location.storefrontListed;
+  const [editing, setEditing] = useState(false);
+  const [hours, setHours] = useState(location.openingHours ?? '');
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const run = async (input: { storefrontListed: boolean; openingHours?: string | null }) => {
+    setProblem(null);
+    try {
+      const { locationEdit } = await edit.mutateAsync({ id: location.id, input });
+      const error = locationEdit?.userErrors[0];
+      if (error) {
+        setProblem(problemText(error, t));
+        return;
+      }
+      setEditing(false);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    void run({ storefrontListed: true, openingHours: hours.trim() || null });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {listed && (
+        <span className="flex items-start gap-1 text-[length:var(--hatti-type-body-sm-size)]">
+          <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+          <span>
+            {t('locations.listedOn')}
+            {location.openingHours && (
+              <span className="whitespace-pre-line text-secondary" dir="auto">
+                {' · '}
+                {location.openingHours}
+              </span>
+            )}
+          </span>
+        </span>
+      )}
+      {editing ? (
+        <form onSubmit={save} className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <label htmlFor={id} className="font-medium">
+              {t('locations.hours')}
+            </label>
+            <textarea
+              id={id}
+              value={hours}
+              rows={3}
+              maxLength={300}
+              dir="auto"
+              placeholder={t('locations.hoursPlaceholder')}
+              aria-describedby={`${id}-hint`}
+              onChange={(event) => setHours(event.target.value)}
+              className="rounded-control border border-line bg-surface px-3 py-2 text-text"
+            />
+            <span
+              id={`${id}-hint`}
+              className="text-secondary text-[length:var(--hatti-type-body-sm-size)]"
+            >
+              {t('locations.hoursHint')}
+            </span>
+          </div>
+          <span className="flex flex-wrap gap-2">
+            <Button type="submit" busy={edit.isPending}>
+              {t(listed ? 'locations.listSave' : 'locations.listStart')}
+            </Button>
+            <Button variant="tertiary" onClick={() => setEditing(false)}>
+              {t('locations.keep')}
+            </Button>
+          </span>
+        </form>
+      ) : (
+        <span className="flex flex-wrap gap-2">
+          <Button
+            variant="tertiary"
+            icon={<MapPin aria-hidden className="size-5" />}
+            onClick={() => {
+              setHours(location.openingHours ?? '');
+              setEditing(true);
+            }}
+          >
+            {t(listed ? 'locations.listChange' : 'locations.listLet')}
+          </Button>
+          {listed && (
+            <Button
+              variant="tertiary"
+              busy={edit.isPending}
+              onClick={() => void run({ storefrontListed: false })}
+            >
+              {t('locations.listStop')}
+            </Button>
+          )}
+        </span>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
 /** One location: what it is, and changed, taken out of use, put back or deleted. */
 /**
  * Whether customers may collect their orders at the location (SHP-15, ADR-389), and what it tells
@@ -346,6 +469,7 @@ function LocationRow({ location }: { location: ShopLocation }) {
         {t(location.fulfillsOnlineOrders ? 'locations.fulfilsYes' : 'locations.fulfilsNo')}
       </span>
       {location.isActive && !editing && <LocalPickup location={location} />}
+      {location.isActive && !editing && <StorefrontListing location={location} />}
       {editing ? (
         <LocationForm
           initial={draftOf(location)}

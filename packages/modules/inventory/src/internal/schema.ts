@@ -48,6 +48,9 @@ export const locations = inventorySchema.table(
     /** Whether customers may collect their orders here (SHP-15, ADR-389), and what it tells them. */
     pickupEnabled: boolean('pickup_enabled').notNull().default(false),
     pickupInstructions: text('pickup_instructions'),
+    /** Whether the online store's store locator lists it (OS-18, ADR-828), and its hours. */
+    storefrontListed: boolean('storefront_listed').notNull().default(false),
+    openingHours: text('opening_hours'),
     deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     ...timestamps,

@@ -9,6 +9,8 @@ export const LIMITS = {
   addressLine: 255,
   /** What a location tells customers of picking up there (ADR-389). */
   pickupInstructions: 200,
+  /** A location's opening hours, as its store locator shows them (ADR-828). */
+  openingHours: 300,
   uri: 2_048,
 } as const;
 

@@ -28,6 +28,10 @@ export interface LocationRecord {
    * "Ready in two hours; ask at the counter"; null where they may not.
    */
   localPickup: LocalPickupRecord | null;
+  /** The online store's store locator lists it (OS-18, ADR-828). */
+  storefrontListed: boolean;
+  /** Its opening hours as the merchant writes them, "Mon–Sat 10am–9pm"; null for none given. */
+  openingHours: string | null;
   deactivatedAt: Date | null;
   version: number;
   createdAt: Date;

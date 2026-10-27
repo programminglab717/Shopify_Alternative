@@ -13,6 +13,7 @@ import type {
   PageDoc,
   ProductDoc,
   ShopDoc,
+  StoreDoc,
   StoreData,
   VariantDoc,
   VideoSourceDoc,
@@ -1129,7 +1130,29 @@ export function shopObject(
       ? { days: doc.returns.days, exchanges_only: doc.returns.exchangesOnly }
       : null,
     brand: brandObject(doc),
+    // Hatti's: the locations it lists for customers to visit (OS-18, ADR-829); empty for none.
+    stores: (doc.stores ?? []).map(storeObject),
     ...policiesObject(doc, language),
+  };
+}
+
+/**
+ * A location the shop lists, as Liquid gives it (ADR-829): its address as lines, a link that
+ * finds it on a map, its number to call, and its hours as the shop wrote them.
+ */
+export function storeObject(store: StoreDoc): Record<string, unknown> {
+  const query = [store.name, ...store.address].join(', ');
+  return {
+    name: store.name,
+    address: store.address,
+    city: store.city,
+    phone: store.phone,
+    // A number in Pakistan's own way, "0300 1234567", as people there read and dial it.
+    phone_local: store.phone && `0${store.phone.slice(3, 6)} ${store.phone.slice(6)}`,
+    hours: store.hours,
+    pickup: store.pickup,
+    // Google Maps' search link, which needs no key and opens its app on phones.
+    map_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
   };
 }
 

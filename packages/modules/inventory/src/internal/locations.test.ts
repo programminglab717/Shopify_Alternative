@@ -3,7 +3,7 @@ import { PlanAllowance, type PlanLimit } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { LocationService } from './location.service.js';
+import { LocationService, storefrontLocationsIn } from './location.service.js';
 import { FIRST_LOCATION_NAME, LIMITS } from './rules.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
 
@@ -177,6 +177,77 @@ describe.skipIf(!server)('LocationService', () => {
     ).toEqual([
       { changed: ['zip', 'phone', 'name'], version: 2 },
       { changed: ['city', 'provinceCode'], version: 3 },
+    ]);
+  });
+
+  it('lists a location on the online store, with its hours, while it is in use (OS-18, ADR-828)', async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const store = await f.location(f.a, 'Gulberg store');
+    const listed = () =>
+      f.db.tenant(f.a.shopId, async (tx) =>
+        (await storefrontLocationsIn(tx, f.a.shopId)).map((each) => [each.name, each.openingHours]),
+      );
+    // Customers must find it: its street and city first.
+    expect(errorsOf(await f.locations.edit(f.a, store.id, { storefrontListed: true }))).toEqual([
+      ['input.storefrontListed', 'INVALID'],
+    ]);
+    const shown = unwrap(
+      await f.locations.edit(f.a, store.id, {
+        address: { address1: '12 Main Boulevard', city: 'lahore' },
+        storefrontListed: true,
+        openingHours: '  Mon–Sat 11am–9pm\nSunday closed ',
+      }),
+    );
+    expect(shown).toMatchObject({
+      storefrontListed: true,
+      openingHours: 'Mon–Sat 11am–9pm\nSunday closed',
+    });
+    // Nor can its address be taken away while it is listed.
+    expect(
+      errorsOf(await f.locations.edit(f.a, store.id, { address: { address1: null } })),
+    ).toEqual([['input.address', 'INVALID']]);
+    expect(
+      errorsOf(
+        await f.locations.edit(f.a, store.id, {
+          openingHours: 'x'.repeat(LIMITS.openingHours + 1),
+          storefrontListed: null,
+        }),
+      ),
+    ).toEqual([
+      ['input.storefrontListed', 'BLANK'],
+      ['input.openingHours', 'TOO_LONG'],
+    ]);
+    expect(await listed()).toEqual([['Gulberg store', 'Mon–Sat 11am–9pm\nSunday closed']]);
+
+    // The primary first; one out of use left out; blank hours clear them.
+    unwrap(
+      await f.locations.edit(f.a, warehouse.id, {
+        address: { address1: 'Plot 7', city: 'Lahore' },
+        storefrontListed: true,
+        openingHours: ' ',
+      }),
+    );
+    expect(await listed()).toEqual([
+      ['Warehouse', null],
+      ['Gulberg store', 'Mon–Sat 11am–9pm\nSunday closed'],
+    ]);
+    unwrap(await f.locations.deactivate(f.a, store.id));
+    expect(await listed()).toEqual([['Warehouse', null]]);
+    // Listed again only once in use again.
+    unwrap(await f.locations.edit(f.a, store.id, { storefrontListed: false }));
+    expect(errorsOf(await f.locations.edit(f.a, store.id, { storefrontListed: true }))).toEqual([
+      ['input.storefrontListed', 'INVALID'],
+    ]);
+    expect(
+      (await f.outbox())
+        .filter(
+          (event) => event.event_type === 'location.updated' && event.aggregate_id === store.id,
+        )
+        .map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([
+      ['address1', 'city', 'provinceCode', 'storefrontListed', 'openingHours'],
+      ['isActive'],
+      ['storefrontListed'],
     ]);
   });
 

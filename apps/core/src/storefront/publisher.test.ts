@@ -179,7 +179,11 @@ describe('What storefront documents an event makes stale', () => {
     // What its page asks the shopper for (ADR-689).
     expect(itemsFor(event('product_personalisation.updated'))).toEqual(['product:a1']);
     expect(itemsFor(event('product.deleted'))).toContain('every-bundle');
-    expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual([]);
+    // Its name shows only in the shop's store locator (ADR-828); what it sells, nowhere.
+    expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual(['shop']);
+    expect(itemsFor(event('location.updated', { changed: ['fulfillsOnlineOrders'] }))).toEqual([
+      'every-product',
+    ]);
     // A size chart changed or given: the products whose pages show it (ADR-407).
     expect(itemsFor(event('size_chart.updated', { productIds: ['p1', 'p2'] }))).toEqual([
       'product:p1',
@@ -191,6 +195,7 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('size_chart.deleted', { productIds: [] }))).toEqual([]);
     expect(itemsFor(event('location.updated', { changed: ['isActive'] }))).toEqual([
       'every-product',
+      'shop',
     ]);
     expect(itemsFor(event('order.created'))).toEqual([]);
   });
@@ -2126,6 +2131,53 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().shop()).waitingRooms).toBeUndefined();
     expect((await store().products([lawn.id]))[0]!.drop).toBeUndefined();
+  });
+
+  it('publishes the locations the shop lists for customers to visit, and follows them (ADR-828)', async () => {
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).stores).toBeUndefined();
+    const gulberg = unwrap(
+      await locations.add(tenant, {
+        name: 'Gulberg store',
+        address: {
+          address1: '12 Main Boulevard',
+          city: 'Lahore',
+          zip: '54000',
+          phone: '03001234567',
+        },
+      }),
+    );
+    // Added, it is not listed: nothing of the shop's changes.
+    expect(await deliver()).toEqual(['location.created']);
+    unwrap(
+      await locations.edit(tenant, gulberg.id, {
+        storefrontListed: true,
+        openingHours: 'Mon–Sat 11am–9pm',
+      }),
+    );
+    await deliver();
+    expect((await store().shop()).stores).toEqual([
+      {
+        name: 'Gulberg store',
+        address: ['12 Main Boulevard', 'Lahore 54000', 'Punjab'],
+        city: 'Lahore',
+        phone: '+923001234567',
+        hours: 'Mon–Sat 11am–9pm',
+        pickup: false,
+      },
+    ]);
+    unwrap(await locations.enableLocalPickup(tenant, gulberg.id, {}));
+    await deliver();
+    expect((await store().shop()).stores?.[0]?.pickup).toBe(true);
+    unwrap(await locations.deactivate(tenant, gulberg.id));
+    await deliver();
+    expect((await store().shop()).stores).toBeUndefined();
+    unwrap(await locations.activate(tenant, gulberg.id));
+    await deliver();
+    expect((await store().shop()).stores?.map((each) => each.name)).toEqual(['Gulberg store']);
+    unwrap(await locations.delete(tenant, gulberg.id));
+    expect(await deliver()).toEqual(['location.deleted']);
+    expect((await store().shop()).stores).toBeUndefined();
   });
 
   it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {

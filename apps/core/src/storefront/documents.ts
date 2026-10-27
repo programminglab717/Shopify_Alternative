@@ -1,5 +1,7 @@
 import type { ShopProfile } from '@hatti/api';
 import type { DeliverySettingsRecord } from '@hatti/checkout/public';
+import type { LocationRecord } from '@hatti/inventory/public';
+import { PK_PROVINCES } from '@hatti/pk';
 import {
   DEFAULT_VARIANT_TITLE,
   shownSizeOf,
@@ -53,6 +55,7 @@ import {
   type ShopDoc,
   type ThemeDoc,
   type EasternWearDoc,
+  type StoreDoc,
   type WaitingRoomDoc,
 } from '@hatti/storefront-data';
 
@@ -690,6 +693,8 @@ export function shopDoc(
   webChat: { greeting: string | null } | null = null,
   /** Its drops' waiting rooms that have not ended (ADR-822). */
   waitingRooms: readonly WaitingRoomDoc[] = [],
+  /** The locations it lists for customers to visit (ADR-828). */
+  stores: readonly StoreDoc[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -758,6 +763,8 @@ export function shopDoc(
     }),
     // Its drops' waiting rooms (ADR-822), left out while it has none, likewise.
     ...(waitingRooms.length > 0 && { waitingRooms: [...waitingRooms] }),
+    // The locations it lists (ADR-828), left out while it lists none, likewise.
+    ...(stores.length > 0 && { stores: [...stores] }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.
@@ -848,4 +855,21 @@ export function textToHtml(text: string): string {
 
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+}
+
+/** A location the shop lists for customers to visit, as its document has it (OS-18, ADR-828). */
+export function storeDoc(location: LocationRecord): StoreDoc {
+  const { address } = location;
+  const province = address.provinceCode ? PK_PROVINCES[address.provinceCode].name : null;
+  const cityLine = [address.city, address.zip].filter(Boolean).join(' ');
+  return {
+    name: location.name,
+    address: [address.address1, address.address2, cityLine, province].filter(
+      (line): line is string => Boolean(line),
+    ),
+    city: address.city,
+    phone: address.phone,
+    hours: location.openingHours,
+    pickup: location.localPickup !== null,
+  };
 }

@@ -4114,4 +4114,76 @@ describe('Storefront rendering', () => {
     expect(localizedPath('#size-chart', '/ur')).toBe('#size-chart');
     expect(localizedPath('/pages/faq', '')).toBe('/pages/faq');
   });
+
+  it("lists the shop's stores on its page, each found on a map, a city's alone at a choice (ADR-830)", async () => {
+    const documents = sampleStore();
+    const stores = {
+      id: 'pg-stores',
+      handle: 'stores',
+      title: 'Our stores',
+      bodyHtml: '',
+      templateSuffix: 'stores',
+      publishedAt: '2026-09-01T09:00:00.000Z',
+    };
+    const listed = (shop: ShopDoc) =>
+      new MemoryStore({ ...documents, shop, pages: [...documents.pages!, stores] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render(
+      { path: '/pages/stores' },
+      listed({
+        ...documents.shop,
+        stores: [
+          {
+            name: 'Zari Gulberg',
+            address: ['12 Main Boulevard', 'Gulberg III', 'Lahore 54000', 'Punjab'],
+            city: 'Lahore',
+            phone: '+923001234567',
+            hours: 'Mon–Sat 11am–9pm\nSunday closed',
+            pickup: true,
+          },
+          {
+            name: 'Zari Clifton',
+            address: ['Block 5', 'Karachi'],
+            city: 'Karachi',
+            phone: null,
+            hours: null,
+            pickup: false,
+          },
+        ],
+      }).fresh(),
+    );
+    expect(page.status).toBe(200);
+    const names = [...page.html.matchAll(/<h3 dir="auto">([^<]*)<\/h3>/g)].map(([, name]) => name);
+    expect(names).toEqual(['Zari Gulberg', 'Zari Clifton']);
+    expect(page.html).toContain(
+      '<address dir="auto">12 Main Boulevard<br>Gulberg III<br>Lahore 54000<br>Punjab</address>',
+    );
+    expect(page.html).toContain('Mon–Sat 11am–9pm<br />\nSunday closed');
+    expect(page.html).toContain('<a href="tel:+923001234567">Call 0300 1234567</a>');
+    expect(page.html).toContain(
+      'href="https://www.google.com/maps/search/?api=1&amp;query=Zari%20Gulberg%2C%2012%20Main',
+    );
+    // Collecting orders at the one that offers it.
+    expect(page.html.match(/Collect your online order here/g)).toHaveLength(1);
+    // Its cities to choose between, shown once the script runs.
+    expect([...page.html.matchAll(/<option value="([^"]*)">/g)].map(([, city]) => city)).toEqual([
+      '',
+      'Karachi',
+      'Lahore',
+    ]);
+    const data = [
+      ...page.html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g),
+    ]
+      .map(([, json]) => JSON.parse(json!) as unknown)
+      .find((each) => Array.isArray(each)) as Record<string, unknown>[];
+    expect(data.map((store) => [store['@type'], store.name, store.telephone])).toEqual([
+      ['Store', 'Zari Gulberg', '+923001234567'],
+      ['Store', 'Zari Clifton', undefined],
+    ]);
+
+    // A shop that lists none says so.
+    const none = await renderer.render({ path: '/pages/stores' }, listed(documents.shop).fresh());
+    expect(none.html).toContain('Our stores will be listed here soon.');
+    expect(none.html).not.toContain('<select');
+  });
 });

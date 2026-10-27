@@ -4127,6 +4127,9 @@ export interface ShopLocation {
   fulfillsOnlineOrders: boolean;
   /** Customers may collect their orders here (ADR-389); null where they may not. */
   localPickupSettings: { instructions: string | null } | null;
+  /** The online store's store locator lists it (ADR-828), with its hours as customers read them. */
+  storefrontListed: boolean;
+  openingHours: string | null;
   address: {
     address1: string | null;
     address2: string | null;

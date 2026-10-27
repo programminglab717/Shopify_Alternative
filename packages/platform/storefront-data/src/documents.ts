@@ -553,6 +553,11 @@ export interface ShopDoc {
    */
   waitingRooms?: WaitingRoomDoc[];
   /**
+   * Its locations it lists for customers to visit (OS-18, ADR-828), the primary first, then by
+   * name. Absent for none, as in documents written before the store locator.
+   */
+  stores?: StoreDoc[];
+  /**
    * True while Hatti has taken the store down (ADR-461): its storefront answers every page with
    * Hatti's page saying so. Absent while it is not, as in documents written before stores could be
    * taken down.
@@ -707,6 +712,20 @@ export interface WaitingRoomDoc {
   endsAt: string;
   /** Shoppers let in a minute. */
   admitPerMinute: number;
+}
+
+/** A location the shop lists for customers to visit, as its document has it (ADR-828). */
+export interface StoreDoc {
+  name: string;
+  /** Its address as lines to print, empty parts left out: street, city and postcode, province. */
+  address: string[];
+  city: string | null;
+  /** Its mobile number in E.164 form, "+923001234567"; null for none. */
+  phone: string | null;
+  /** Its opening hours as the shop wrote them; null for none given. */
+  hours: string | null;
+  /** Whether customers may collect their online orders there (ADR-389). */
+  pickup: boolean;
 }
 
 /** The waiting room live at `now`, if any (ADR-822). */

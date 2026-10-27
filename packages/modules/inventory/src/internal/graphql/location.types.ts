@@ -88,6 +88,18 @@ export class Location {
   })
   localPickupSettings!: LocationLocalPickupSettings | null;
 
+  @Field({
+    description:
+      "Whether the online store's store locator lists it, while it is in use (OS-18, ADR-828).",
+  })
+  storefrontListed!: boolean;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Its opening hours as customers read them, "Mon–Sat 10am–9pm".',
+  })
+  openingHours!: string | null;
+
   @Field(() => GraphQLISODateTime, { nullable: true })
   deactivatedAt!: Date | null;
 
@@ -188,6 +200,20 @@ export class LocationEditInput {
 
   @Field(() => Boolean, { nullable: true })
   fulfillsOnlineOrders?: boolean | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      "Lists it on the online store's store locator (ADR-828). It must be in use, with its " +
+      'street address and city.',
+  })
+  storefrontListed?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Up to 300 characters, "Mon–Sat 10am–9pm"; null or "" clears them.',
+  })
+  openingHours?: string | null;
 }
 
 @ObjectType()

@@ -7506,6 +7506,14 @@ type Location {
   """
   localPickupSettings: LocationLocalPickupSettings
   name: String!
+
+  """Its opening hours as customers read them, "Mon–Sat 10am–9pm"."""
+  openingHours: String
+
+  """
+  Whether the online store's store locator lists it, while it is in use (OS-18, ADR-828).
+  """
+  storefrontListed: Boolean!
   updatedAt: DateTime!
 
   """Starts at 1 and increases with every change."""
@@ -7598,6 +7606,14 @@ input LocationEditInput {
   address: LocationAddressInput
   fulfillsOnlineOrders: Boolean
   name: String
+
+  """Up to 300 characters, "Mon–Sat 10am–9pm"; null or "" clears them."""
+  openingHours: String
+
+  """
+  Lists it on the online store's store locator (ADR-828). It must be in use, with its street address and city.
+  """
+  storefrontListed: Boolean
 }
 
 type LocationEditPayload {

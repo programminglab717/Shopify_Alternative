@@ -306,6 +306,18 @@
           "label": "On the home page alone"
         }
       }
+    },
+    "store-locator": {
+      "name": "Store locator",
+      "settings": {
+        "heading": {
+          "label": "Heading"
+        },
+        "structured_data": {
+          "label": "Tell search engines about these stores",
+          "info": "As schema.org's Store, which search results and maps may show."
+        }
+      }
     }
   },
   "settings_schema": {

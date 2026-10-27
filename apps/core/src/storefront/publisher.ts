@@ -71,6 +71,7 @@ import {
   InventoryEvents,
   InventoryService,
   preordersIn,
+  storefrontLocationsIn,
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
 import { ShopEvents } from '@hatti/identity/public';
@@ -150,6 +151,7 @@ import {
   pageDoc,
   productDoc,
   shopDoc,
+  storeDoc,
   themeDoc,
   themePictureIds,
   withMetafields,
@@ -228,6 +230,22 @@ const LINKED_ARTICLE_FIELDS = new Set(['handle', 'isPublished', 'blogId']);
 
 /** Location fields that decide whether its stock is sold online. */
 const SELLING_FIELDS = new Set(['isActive', 'fulfillsOnlineOrders']);
+
+/** Location fields its store locator shows (ADR-828), or that decide whether it shows. */
+const STORE_FIELDS = new Set([
+  'name',
+  'address1',
+  'address2',
+  'city',
+  'provinceCode',
+  'zip',
+  'phone',
+  'isActive',
+  'isPrimary',
+  'localPickup',
+  'storefrontListed',
+  'openingHours',
+]);
 
 /** The storefront documents an event makes stale (03 §8). */
 export function itemsFor(event: DomainEvent): string[] {
@@ -319,8 +337,15 @@ export function itemsFor(event: DomainEvent): string[] {
       // Whether a location sells online, or at all, changes what every product has to sell. A
       // location with stock history cannot be deleted, so deleting one changes nothing.
       const { changed } = event.payload as unknown as LocationUpdatedPayload;
-      return changed.some((name) => SELLING_FIELDS.has(name)) ? [Items.everyProduct] : [];
+      return [
+        ...(changed.some((name) => SELLING_FIELDS.has(name)) ? [Items.everyProduct] : []),
+        // The shop's document lists those it shows customers (ADR-828).
+        ...(changed.some((name) => STORE_FIELDS.has(name)) ? [Items.shop] : []),
+      ];
     }
+    case InventoryEvents.LocationDeleted:
+      // It may have been listed for customers to visit (ADR-828).
+      return [Items.shop];
     case OnlineStoreEvents.ThemeUpdated:
       // Only the main theme shows; the others are being prepared.
       return (event.payload as unknown as ThemeUpdatedPayload).role === 'main' ? [Items.shop] : [];
@@ -511,6 +536,7 @@ export const PUBLISHED_EVENTS = [
   InventoryEvents.InventoryLevelUpdated,
   InventoryEvents.ProductPreorderUpdated,
   InventoryEvents.LocationUpdated,
+  InventoryEvents.LocationDeleted,
   OnlineStoreEvents.ThemeUpdated,
   OnlineStoreEvents.ThemePublished,
   OnlineStoreEvents.MenuCreated,
@@ -1028,6 +1054,7 @@ export class StorefrontPublisher {
         endsAt: room.endsAt.toISOString(),
         admitPerMinute: room.admitPerMinute,
       })),
+      (await storefrontLocationsIn(tx, shopId)).map(storeDoc),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

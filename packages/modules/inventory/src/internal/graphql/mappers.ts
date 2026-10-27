@@ -67,6 +67,8 @@ export function toLocation(record: LocationRecord): Location {
       Object.assign(new LocationLocalPickupSettings(), {
         instructions: record.localPickup.instructions,
       }),
+    storefrontListed: record.storefrontListed,
+    openingHours: record.openingHours,
     deactivatedAt: record.deactivatedAt,
     version: record.version,
     createdAt: record.createdAt,

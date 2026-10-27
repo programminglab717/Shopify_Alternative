@@ -24,6 +24,8 @@ export function toLocationRecord(row: LocationRow): LocationRecord {
     isActive: row.isActive,
     fulfillsOnlineOrders: row.fulfillsOnlineOrders,
     localPickup: row.pickupEnabled ? { instructions: row.pickupInstructions } : null,
+    storefrontListed: row.storefrontListed,
+    openingHours: row.openingHours,
     deactivatedAt: row.deactivatedAt,
     version: row.version,
     createdAt: row.createdAt,
@@ -46,6 +48,8 @@ export interface LocationJson {
   fulfills_online_orders: boolean;
   pickup_enabled: boolean;
   pickup_instructions: string | null;
+  storefront_listed: boolean;
+  opening_hours: string | null;
   deactivated_at: string | null;
   version: number;
   created_at: string;
@@ -68,6 +72,8 @@ export function locationFromJson(json: LocationJson): LocationRecord {
     isActive: json.is_active,
     fulfillsOnlineOrders: json.fulfills_online_orders,
     localPickup: json.pickup_enabled ? { instructions: json.pickup_instructions } : null,
+    storefrontListed: json.storefront_listed,
+    openingHours: json.opening_hours,
     deactivatedAt: json.deactivated_at === null ? null : new Date(json.deactivated_at),
     version: json.version,
     createdAt: new Date(json.created_at),

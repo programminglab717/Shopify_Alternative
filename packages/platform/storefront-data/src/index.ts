@@ -42,6 +42,7 @@ export {
   type MetafieldsDoc,
   type VariantDoc,
   type VideoSourceDoc,
+  type StoreDoc,
   type WaitingRoomDoc,
   type ProductDropDoc,
 } from './documents.js';

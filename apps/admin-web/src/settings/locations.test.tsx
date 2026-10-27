@@ -15,6 +15,8 @@ function location(id: string, name: string, extra: object = {}) {
     isActive: true,
     fulfillsOnlineOrders: true,
     localPickupSettings: null as { instructions: string | null } | null,
+    storefrontListed: false,
+    openingHours: null as string | null,
     address: {
       address1: null,
       address2: null,
@@ -72,7 +74,43 @@ function core(role: StaffRole) {
         return ok('locationAdd', added);
       }
       case 'LocationEdit': {
-        const input = variables.input as { name: string; fulfillsOnlineOrders: boolean };
+        const input = variables.input as {
+          name: string;
+          fulfillsOnlineOrders: boolean;
+          storefrontListed?: boolean;
+          openingHours?: string | null;
+        };
+        if (input.storefrontListed !== undefined) {
+          if (variables.id === 'loc_2' && input.storefrontListed) {
+            return {
+              locationEdit: {
+                location: null,
+                userErrors: [
+                  {
+                    field: ['input', 'storefrontListed'],
+                    code: 'INVALID',
+                    message:
+                      'Give the location its street address and city, for customers to find it',
+                  },
+                ],
+              },
+            };
+          }
+          locations = locations.map((each) =>
+            each.id === variables.id
+              ? {
+                  ...each,
+                  storefrontListed: input.storefrontListed!,
+                  openingHours:
+                    input.openingHours === undefined ? each.openingHours : input.openingHours,
+                }
+              : each,
+          );
+          return ok(
+            'locationEdit',
+            locations.find((each) => each.id === variables.id)!,
+          );
+        }
         locations = locations.map((each) =>
           each.id === variables.id
             ? { ...each, name: input.name, fulfillsOnlineOrders: input.fulfillsOnlineOrders }
@@ -274,5 +312,53 @@ describe("The shop's locations", () => {
       expect(within(warehouse!).queryByText('Customers can pick up orders here')).toBeNull(),
     );
     expect(sentOf(fake, 'LocationLocalPickupDisable')).toEqual([{ locationId: 'loc_1' }]);
+  });
+
+  it('shows a location on the store locator with its hours, changes them, and takes it off (ADR-831)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/locations');
+
+    const [warehouse, shop] = await screen.findAllByRole('listitem');
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Show on your store locator' }));
+    typeIn(warehouse!, 'Opening hours', '  Mon–Sat 11am–9pm\nSunday closed  ');
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Show it' }));
+    expect(
+      await within(warehouse!).findByText('Shown on your online store’s store locator'),
+    ).toBeTruthy();
+    expect(within(warehouse!).getByText(/Sunday closed/)).toBeTruthy();
+
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Change opening hours' }));
+    expect((within(warehouse!).getByLabelText('Opening hours') as HTMLTextAreaElement).value).toBe(
+      'Mon–Sat 11am–9pm\nSunday closed',
+    );
+    typeIn(warehouse!, 'Opening hours', ' ');
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Save hours' }));
+    await waitFor(() => expect(within(warehouse!).queryByText(/Sunday closed/)).toBeNull());
+
+    // A location without its address says why.
+    fireEvent.click(within(shop!).getByRole('button', { name: 'Show on your store locator' }));
+    fireEvent.click(within(shop!).getByRole('button', { name: 'Show it' }));
+    expect(
+      await within(shop!).findByText(
+        'Give the location its street address and city, for customers to find it',
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Take off the store locator' }));
+    await waitFor(() =>
+      expect(
+        within(warehouse!).queryByText('Shown on your online store’s store locator'),
+      ).toBeNull(),
+    );
+    expect(sentOf(fake, 'LocationEdit')).toEqual([
+      {
+        id: 'loc_1',
+        input: { storefrontListed: true, openingHours: 'Mon–Sat 11am–9pm\nSunday closed' },
+      },
+      { id: 'loc_1', input: { storefrontListed: true, openingHours: null } },
+      { id: 'loc_2', input: { storefrontListed: true, openingHours: null } },
+      { id: 'loc_1', input: { storefrontListed: false } },
+    ]);
   });
 });

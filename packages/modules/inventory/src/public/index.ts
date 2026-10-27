@@ -56,6 +56,7 @@ export { TransferService } from '../internal/transfer.service.js';
 export {
   LocationService,
   pickupLocationsIn,
+  storefrontLocationsIn,
   type ListLocationsOptions,
   type LocationAddInput,
   type LocationAddressInput,

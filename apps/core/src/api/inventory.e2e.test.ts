@@ -210,14 +210,25 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     const edited = await mutate(
       tokens.a,
       `mutation ($id: ID!) {
-         locationEdit(id: $id, input: { name: "Tariq Road store", address: { phone: null } }) {
-           location { name version address { phone } } userErrors { code }
+         locationEdit(id: $id, input: {
+           name: "Tariq Road store", address: { phone: null },
+           storefrontListed: true, openingHours: " Daily 11am–10pm "
+         }) {
+           location { name version address { phone } storefrontListed openingHours }
+           userErrors { code }
          }
        }`,
       { id: storeId },
     );
+    // Shown on the online store's store locator too (ADR-828).
     expect(edited).toEqual({
-      location: { name: 'Tariq Road store', version: 2, address: { phone: null } },
+      location: {
+        name: 'Tariq Road store',
+        version: 2,
+        address: { phone: null },
+        storefrontListed: true,
+        openingHours: 'Daily 11am–10pm',
+      },
       userErrors: [],
     });
 

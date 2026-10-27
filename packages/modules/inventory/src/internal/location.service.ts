@@ -49,6 +49,13 @@ export interface LocationEditInput {
   name?: string | null;
   address?: LocationAddressInput | null;
   fulfillsOnlineOrders?: boolean | null;
+  /**
+   * Lists it on the online store's store locator (OS-18, ADR-828). It must be in use and have its
+   * street and city, as for pickup.
+   */
+  storefrontListed?: boolean | null;
+  /** Its opening hours as customers read them, "Mon–Sat 10am–9pm"; null or blank clears them. */
+  openingHours?: string | null;
 }
 
 export interface ListLocationsOptions {
@@ -118,7 +125,7 @@ function checkAddress(
 
 const NAME_TAKEN = 'A location with this name already exists';
 
-/** Why customers can't collect orders at a location as its address stands, or null. */
+/** Why customers can't collect orders at, or find, a location as its address stands, or null. */
 function pickupRefusal(location: { address1: string | null; city: string | null }): string | null {
   return location.address1 && location.city
     ? null
@@ -323,6 +330,15 @@ export class LocationService {
     if (input.fulfillsOnlineOrders === null) {
       check.add(['input', 'fulfillsOnlineOrders'], 'BLANK', "can't be blank");
     }
+    if (input.storefrontListed === null) {
+      check.add(['input', 'storefrontListed'], 'BLANK', "can't be blank");
+    }
+    const openingHours =
+      input.openingHours === undefined
+        ? undefined
+        : (check.text(['input', 'openingHours'], input.openingHours, {
+            max: LIMITS.openingHours,
+          }) ?? null);
     if (!check.ok) return { ok: false, errors: check.errors };
 
     try {
@@ -334,8 +350,29 @@ export class LocationService {
         if (input.fulfillsOnlineOrders !== undefined && input.fulfillsOnlineOrders !== null) {
           next.fulfillsOnlineOrders = input.fulfillsOnlineOrders;
         }
-        const refusal = row.pickupEnabled ? pickupRefusal({ ...row, ...next }) : null;
-        if (refusal) return failOne(['input', 'address'], 'INVALID', refusal);
+        if (input.storefrontListed !== undefined && input.storefrontListed !== null) {
+          next.storefrontListed = input.storefrontListed;
+        }
+        if (openingHours !== undefined) next.openingHours = openingHours;
+        const listing = next.storefrontListed === true && !row.storefrontListed;
+        if (listing && !row.isActive) {
+          return failOne(
+            ['input', 'storefrontListed'],
+            'INVALID',
+            'Activate the location before listing it on the online store',
+          );
+        }
+        const refusal =
+          row.pickupEnabled || (next.storefrontListed ?? row.storefrontListed)
+            ? pickupRefusal({ ...row, ...next })
+            : null;
+        if (refusal) {
+          return failOne(
+            listing ? ['input', 'storefrontListed'] : ['input', 'address'],
+            'INVALID',
+            refusal,
+          );
+        }
         const changed = (Object.keys(next) as (keyof LocationRow)[]).filter(
           (key) => next[key] !== row[key],
         );
@@ -603,17 +640,23 @@ export class LocationService {
  * The active locations customers may collect their orders at (SHP-15, ADR-389), the primary
  * first, then by name, in a tenant transaction `tx`: for checkout to offer them (ADR-391).
  */
-export async function pickupLocationsIn(tx: Tx, shopId: string): Promise<LocationRecord[]> {
+export function pickupLocationsIn(tx: Tx, shopId: string): Promise<LocationRecord[]> {
+  return activeLocationsIn(tx, shopId, eq(locations.pickupEnabled, true));
+}
+
+/**
+ * The active locations the online store's store locator lists (OS-18, ADR-828), the primary
+ * first, then by name, in a tenant transaction `tx`: for its storefront to show them.
+ */
+export function storefrontLocationsIn(tx: Tx, shopId: string): Promise<LocationRecord[]> {
+  return activeLocationsIn(tx, shopId, eq(locations.storefrontListed, true));
+}
+
+async function activeLocationsIn(tx: Tx, shopId: string, which: SQL): Promise<LocationRecord[]> {
   const rows = await tx
     .select()
     .from(locations)
-    .where(
-      and(
-        eq(locations.shopId, shopId),
-        eq(locations.isActive, true),
-        eq(locations.pickupEnabled, true),
-      ),
-    )
+    .where(and(eq(locations.shopId, shopId), eq(locations.isActive, true), which))
     .orderBy(sql`${locations.isPrimary} DESC`, sql`lower(${locations.name})`, asc(locations.id));
   return rows.map(toLocationRecord);
 }

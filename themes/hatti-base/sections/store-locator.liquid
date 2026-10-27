@@ -1,0 +1,115 @@
+{%- comment -%}
+  The shop's stores for customers to visit (OS-18, ADR-830), on a page of its own whose template
+  is page.stores: each location it lists, the primary first, with its address, its hours, its
+  number to call, whether online orders may be collected there, and a link that finds it on a
+  map. Where they are in more than one city, shoppers may show one city's alone; that needs
+  JavaScript, and without it every store shows. And, where the section says so, the stores told
+  to search engines as schema.org's Store.
+{%- endcomment -%}
+{%- assign stores = shop.stores -%}
+<div class="page-width section-spacing store-locator">
+  {%- if section.settings.heading != blank %}
+  <h2 dir="auto">{{ section.settings.heading | escape }}</h2>
+  {%- endif %}
+  {%- if stores.size == 0 %}
+  <p dir="auto">{{ 'sections.store_locator.empty' | t }}</p>
+  {%- else %}
+    {%- assign cities = stores | map: 'city' | compact | uniq | sort_natural %}
+  <hatti-store-locator>
+    {%- if cities.size > 1 %}
+    <p class="store-locator__filter" data-filter hidden>
+      <label for="StoreCity-{{ section.id }}">{{ 'sections.store_locator.city' | t }}</label>
+      <select id="StoreCity-{{ section.id }}">
+        <option value="">{{ 'sections.store_locator.every_city' | t }}</option>
+        {%- for city in cities %}
+        <option value="{{ city | escape }}">{{ city | escape }}</option>
+        {%- endfor %}
+      </select>
+    </p>
+    {%- endif %}
+    <ul class="store-locator__list" role="list">
+      {%- for store in stores %}
+      <li class="store-locator__store" data-city="{{ store.city | escape }}">
+        <h3 dir="auto">{{ store.name | escape }}</h3>
+        <address dir="auto">
+          {%- for line in store.address -%}
+            {{ line | escape }}{% unless forloop.last %}<br>{% endunless %}
+          {%- endfor -%}
+        </address>
+        {%- if store.hours %}
+        <p class="store-locator__hours" dir="auto">{{ store.hours | escape | newline_to_br }}</p>
+        {%- endif %}
+        {%- if store.pickup %}
+        <p class="store-locator__pickup">{{ 'sections.store_locator.pickup' | t }}</p>
+        {%- endif %}
+        <p class="store-locator__links">
+          {%- if store.phone %}
+          <a href="tel:{{ store.phone | escape }}">{{ 'sections.store_locator.call' | t: number: store.phone_local }}</a>
+          {%- endif %}
+          <a href="{{ store.map_url | escape }}" target="_blank" rel="noopener">{{ 'sections.store_locator.directions' | t }}</a>
+        </p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </hatti-store-locator>
+    {%- if section.settings.structured_data %}
+<script type="application/ld+json">[
+  {%- for store in stores -%}
+    {"@context":"https://schema.org","@type":"Store","name":{{ store.name | json }},"address":{{ store.address | join: ', ' | json }}
+    {%- if store.phone %},"telephone":{{ store.phone | json }}{% endif %},"hasMap":{{ store.map_url | json }}}
+    {%- unless forloop.last %},{% endunless -%}
+  {%- endfor -%}
+]</script>
+    {%- endif %}
+  {%- endif %}
+</div>
+
+{% stylesheet %}
+  .store-locator__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+  .store-locator__store { border: 1px solid rgb(0 0 0 / 0.1); border-radius: 0.5rem; padding: 1rem; }
+  .store-locator__store h3 { margin-block: 0 0.5rem; }
+  .store-locator__store address { font-style: normal; }
+  .store-locator__links { display: flex; flex-wrap: wrap; gap: 1rem; margin-block-end: 0; }
+  .store-locator__filter { display: flex; gap: 0.5rem; align-items: center; }
+{% endstylesheet %}
+
+{% javascript %}
+  class HattiStoreLocator extends HTMLElement {
+    connectedCallback() {
+      const filter = this.querySelector('[data-filter]');
+      if (!filter) return;
+      filter.hidden = false;
+      filter.querySelector('select').addEventListener('change', (event) => {
+        const city = event.target.value;
+        for (const store of this.querySelectorAll('[data-city]')) {
+          store.hidden = city !== '' && store.dataset.city !== city;
+        }
+      });
+    }
+  }
+  if (!customElements.get('hatti-store-locator')) {
+    customElements.define('hatti-store-locator', HattiStoreLocator);
+  }
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "t:sections.store-locator.name",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:sections.store-locator.settings.heading.label",
+      "default": "Visit us"
+    },
+    {
+      "type": "checkbox",
+      "id": "structured_data",
+      "label": "t:sections.store-locator.settings.structured_data.label",
+      "info": "t:sections.store-locator.settings.structured_data.info",
+      "default": true
+    }
+  ],
+  "presets": [{"name": "t:sections.store-locator.name"}]
+}
+{% endschema %}

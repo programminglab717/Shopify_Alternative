@@ -303,6 +303,14 @@
       "close": "Close",
       "code": "Your code for the offer:",
       "later": "Not now"
+    },
+    "store_locator": {
+      "empty": "Our stores will be listed here soon.",
+      "city": "City",
+      "every_city": "Every city",
+      "pickup": "Collect your online order here",
+      "call": "Call {{ number }}",
+      "directions": "Directions"
     }
   },
   "footer": {

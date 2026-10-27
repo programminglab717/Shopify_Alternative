@@ -306,6 +306,18 @@
           "label": "صرف ہوم پیج پر"
         }
       }
+    },
+    "store-locator": {
+      "name": "اسٹور لوکیٹر",
+      "settings": {
+        "heading": {
+          "label": "سرخی"
+        },
+        "structured_data": {
+          "label": "سرچ انجنز کو ان اسٹورز کے بارے میں بتائیں",
+          "info": "schema.org کے Store کے طور پر، جو سرچ نتائج اور نقشے دکھا سکتے ہیں۔"
+        }
+      }
     }
   },
   "settings_schema": {

@@ -4314,6 +4314,16 @@ const en = {
   'locations.pickupInstructions': 'Pickup instructions',
   'locations.pickupInstructionsHint':
     'What customers are told when their order is ready, like "Ready in two hours; ask at the counter". Up to 200 characters.',
+  'locations.listedOn': 'Shown on your online store’s store locator',
+  'locations.listLet': 'Show on your store locator',
+  'locations.listChange': 'Change opening hours',
+  'locations.listStop': 'Take off the store locator',
+  'locations.listStart': 'Show it',
+  'locations.listSave': 'Save hours',
+  'locations.hours': 'Opening hours',
+  'locations.hoursPlaceholder': 'Mon–Sat 11am–9pm\nSunday closed',
+  'locations.hoursHint':
+    'As customers read them on your store locator page, a page with the "stores" template. Up to 300 characters.',
   'messages.kind.ORDER_READY_FOR_PICKUP': 'Ready for pickup',
   'messages.hint.ORDER_READY_FOR_PICKUP':
     "When an order the customer collects is packed: where to come, and the location's instructions.",
@@ -10459,6 +10469,16 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'locations.pickupInstructions': 'وصولی کی ہدایات',
   'locations.pickupInstructionsHint':
     'آرڈر تیار ہونے پر گاہکوں کو یہ بتایا جاتا ہے، جیسے "دو گھنٹے میں تیار؛ کاؤنٹر پر پوچھیں"۔ زیادہ سے زیادہ 200 حروف۔',
+  'locations.listedOn': 'آپ کے آن لائن اسٹور کے اسٹور لوکیٹر پر دکھایا جا رہا ہے',
+  'locations.listLet': 'اسٹور لوکیٹر پر دکھائیں',
+  'locations.listChange': 'اوقاتِ کار بدلیں',
+  'locations.listStop': 'اسٹور لوکیٹر سے ہٹائیں',
+  'locations.listStart': 'دکھائیں',
+  'locations.listSave': 'اوقات محفوظ کریں',
+  'locations.hours': 'اوقاتِ کار',
+  'locations.hoursPlaceholder': 'پیر تا ہفتہ صبح 11 تا رات 9\nاتوار بند',
+  'locations.hoursHint':
+    'جیسے گاہک انہیں آپ کے اسٹور لوکیٹر پیج پر پڑھیں گے، یعنی "stores" ٹیمپلیٹ والا پیج۔ زیادہ سے زیادہ 300 حروف۔',
   'messages.kind.ORDER_READY_FOR_PICKUP': 'وصولی کے لیے تیار',
   'messages.hint.ORDER_READY_FOR_PICKUP':
     'جب گاہک کا خود وصول کرنے والا آرڈر پیک ہو جائے: کہاں آنا ہے، اور جگہ کی ہدایات۔',
