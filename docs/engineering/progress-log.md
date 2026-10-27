@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Riders' cash
+
+* **Cash handed over:** what a rider collected is theirs to hand over; those who reconcile
+  payments record it, at most what the rider holds (SHP-10, [ADR-826](../architecture/13-decision-log.md#adr-826--the-cash-a-rider-hands-over-is-recorded-by-those-who-reconcile-payments-at-most-what-the-rider-holds-and-what-they-hold-is-what-they-collected-less-what-they-handed-over)). The admin's pages follow.
+* 4403 tests (1 new).
+
 ### 0622eb1 · Riders' pages
 
 * **Rider mode:** a rider's page from their own link lists what they carry, with a map and the

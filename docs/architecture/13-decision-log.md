@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-825 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-826 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -833,6 +833,7 @@
 | 823 | A drop's products count down to its start on their pages, saying how many a customer may buy, and owners and managers schedule and delete drops from the admin | Accepted |
 | 824 | A shop's own riders each have a page opened from a secret link, with no account; a packed order handed to one ships with them, and its customer is sent a code on WhatsApp to give the rider at the door | Accepted |
 | 825 | A rider's page lists what they carry with its address, map and the customer's number; delivered with the customer's code and the cash collected, received on its order, or not delivered with why, its parcel coming back | Accepted |
+| 826 | The cash a rider hands over is recorded by those who reconcile payments, at most what the rider holds, and what they hold is what they collected less what they handed over | Accepted |
 
 ---
 
@@ -27115,3 +27116,18 @@
     not open shows nothing; one rider's link changes none of another's deliveries.
 * **Consequences:** a photo as proof, and routing several stops, wait for shops to ask; the code
   stands for proof. The rider's page needs the shop's WhatsApp sending to send codes (OWN-23).
+
+## ADR-826 · The cash a rider hands over is recorded by those who reconcile payments, at most what the rider holds, and what they hold is what they collected less what they handed over
+
+* **Context:** a rider's deliveries receive their cash on their orders as they are made
+  (ADR-825); the cash itself is in the rider's pocket until they bring it back. 06 §9 asks for an
+  end-of-day cash hand-over reconciled against what was collected.
+* **Decision:** what a rider holds is worked out when asked: the cash their deliveries
+  collected less what they handed over, nothing kept beside. Owners, managers and accountants
+  (`reconcile_payments`), and apps, record a hand-over (`riderHandOver`): an amount in rupees,
+  more than nothing and at most what the rider holds, with a note, one of a rider's at a time so
+  that two can't both take the same cash. Each is audited and listed for the rider, the latest
+  first, with who took it. The rider's page says what they hold.
+* **Consequences:** a rider short at the end of the day shows as holding cash until it comes; the
+  orders were paid when delivered, so the shortfall is the rider's, not the customers'. A
+  hand-over is not undone; a wrong one is set right by the rider's next.
