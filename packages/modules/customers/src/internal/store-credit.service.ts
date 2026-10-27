@@ -677,6 +677,61 @@ export async function withdrawOrderCreditIn(
   return taken;
 }
 
+/**
+ * Takes back what of credit `take.creditId`, given for order `take.orderId`, the order no longer
+ * earns once refunded, in the caller's transaction (ADR-805): all but `take.keep` of what it gave, less what was
+ * taken back of it for the order already, from what is left of that credit alone: what its
+ * customer spent of it, or saw expire, stays theirs. What it took.
+ */
+export async function takeBackOrderCreditIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor | 'system',
+  take: {
+    creditId: string;
+    orderId: string;
+    keep: bigint;
+    note: string;
+  },
+  at: Date = new Date(),
+): Promise<bigint> {
+  const { rows: credits } = await tx.execute<{ account_id: string; amount: string }>(sql`
+    SELECT account_id, amount::text AS amount FROM customers.store_credit_transactions
+     WHERE shop_id = ${shopId} AND id = ${take.creditId} AND kind = 'credit'`);
+  const credit = credits[0];
+  if (!credit) return 0n;
+  // Held as every change of the account is made; what is left read once it is.
+  await lockAccount(tx, shopId, credit.account_id);
+  await expireIn(tx, shopId, credit.account_id, at);
+  const { rows } = await tx.execute<{ remaining: string; taken: string }>(sql`
+    SELECT c.remaining::text AS remaining,
+           coalesce((SELECT sum(a.amount) FROM customers.store_credit_allocations a
+                       JOIN customers.store_credit_transactions d
+                         ON d.shop_id = a.shop_id AND d.id = a.debit_id
+                      WHERE a.shop_id = c.shop_id AND a.credit_id = c.id
+                        AND d.order_id = ${take.orderId}), 0)::text AS taken
+      FROM customers.store_credit_transactions c
+     WHERE c.shop_id = ${shopId} AND c.id = ${take.creditId}`);
+  const owed = BigInt(credit.amount) - take.keep - BigInt(rows[0]!.taken);
+  const left = BigInt(rows[0]!.remaining);
+  const taking = owed < left ? owed : left;
+  if (taking <= 0n) return 0n;
+  const { actorKind, actorId } = actorOf(actor);
+  const id = newId();
+  await tx.execute(sql`
+    INSERT INTO customers.store_credit_transactions
+           (shop_id, id, account_id, kind, event, amount, order_id, note, actor_kind, actor_id)
+    VALUES (${shopId}, ${id}, ${credit.account_id}, 'debit', 'order_refund', ${taking},
+            ${take.orderId}, ${take.note}, ${actorKind}, ${actorId})`);
+  await tx.execute(sql`
+    UPDATE customers.store_credit_transactions SET remaining = remaining - ${taking}
+     WHERE shop_id = ${shopId} AND id = ${take.creditId}`);
+  await tx.execute(sql`
+    INSERT INTO customers.store_credit_allocations (shop_id, debit_id, credit_id, amount)
+    VALUES (${shopId}, ${id}, ${take.creditId}, ${taking})`);
+  return taking;
+}
+
 /** Whether the shop has given any customer store credit: checkout offers it only then. */
 export async function shopGivesStoreCreditIn(tx: Tx, shopId: string): Promise<boolean> {
   const { rows } = await tx.execute<{ gives: boolean }>(sql`

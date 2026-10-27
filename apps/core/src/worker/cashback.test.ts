@@ -5,7 +5,12 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
-import { FulfillmentService, OrderEvents, type OrderService } from '@hatti/orders/public';
+import {
+  FulfillmentService,
+  OrderEvents,
+  RefundService,
+  type OrderService,
+} from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CashbackRewards, cashbackCreditId } from './cashback.js';
@@ -33,14 +38,19 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
   let orders: OrderService;
   let fulfillments: FulfillmentService;
   let rewards: CashbackRewards;
+  let refunds: RefundService;
   let variantId = '';
+  let cardId = '';
   let phones = 0;
 
-  /** An order of `quantity` kurtas at Rs 2,345, paid by cash on delivery. */
-  async function ordered(quantity = 1): Promise<string> {
+  /** An order of `quantity` kurtas at Rs 2,345, and `cards` gift cards, paid by cash on delivery. */
+  async function ordered(quantity = 1, cards = 0): Promise<string> {
     const order = unwrap(
       await orders.create(SHOP, {
-        lineItems: [{ variantId, quantity }],
+        lineItems: [
+          { variantId, quantity },
+          ...(cards ? [{ variantId: cardId, quantity: cards }] : []),
+        ],
         shippingAddress: {
           name: 'Ayesha Khan',
           phone: `0300 44433${String(phones++).padStart(2, '0')}`,
@@ -70,7 +80,7 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
       id: newId(),
       type,
       shopId: SHOP.shopId,
-      aggregateType: type === OrderEvents.OrderPaid ? 'order' : 'fulfillment',
+      aggregateType: type === OrderEvents.FulfillmentUpdated ? 'fulfillment' : 'order',
       aggregateId,
       payload,
       occurredAt: new Date().toISOString(),
@@ -107,6 +117,7 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
     orders = workerOrders(database);
     fulfillments = new FulfillmentService(database, new StockService());
     rewards = new CashbackRewards(database);
+    refunds = new RefundService(database);
     const product = unwrap(
       await new ProductService(database).create(SHOP, {
         title: 'Kurta',
@@ -115,12 +126,23 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
       }),
     );
     variantId = product.variants[0]!.id;
+    cardId = unwrap(
+      await new ProductService(database).create(SHOP, {
+        title: 'Gift card',
+        status: 'active',
+        giftCard: true,
+        variants: [{ price: '5,000' }],
+      }),
+    ).variants[0]!.id;
     const location = await new LocationService(database).primary(SHOP);
     unwrap(
       await new InventoryService(database, new VariantService(database)).setQuantities(SHOP, {
         name: 'on_hand',
         reason: 'received',
-        quantities: [{ inventoryItemId: variantId, locationId: location.id, quantity: 50 }],
+        quantities: [
+          { inventoryItemId: variantId, locationId: location.id, quantity: 50 },
+          { inventoryItemId: cardId, locationId: location.id, quantity: 50 },
+        ],
       }),
     );
   });
@@ -195,6 +217,64 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
     expect(await hear(OrderEvents.OrderPaid, cancelled)).toBeNull();
     expect(await credits(unsent)).toEqual([]);
     expect(await credits(cancelled)).toEqual([]);
+  });
+
+  it('gives none for gift cards: a card is money, not goods (ADR-805)', async () => {
+    await turn(true, 10, 30);
+    const orderId = await ordered(2, 1);
+    unwrap(await orders.markAsPaid(SHOP, orderId));
+    await delivered(orderId);
+    // 10% of the kurtas' Rs 4,690, not of the card's Rs 5,000.
+    expect(await hear(OrderEvents.OrderPaid, orderId)).toBe(469_00n);
+  });
+
+  it('takes back the share of cashback a refund took, from what is left of that credit (ADR-805)', async () => {
+    await turn(true, 10, 30);
+    const orderId = await ordered(2);
+    unwrap(await orders.markAsPaid(SHOP, orderId));
+    await delivered(orderId);
+    expect(await hear(OrderEvents.OrderPaid, orderId)).toBe(469_00n);
+    const taken = async () =>
+      (
+        await admin.query<{ amount: string; note: string }>(
+          `SELECT amount::text, note FROM customers.store_credit_transactions
+            WHERE order_id = $1 AND kind = 'debit' ORDER BY created_at`,
+          [orderId],
+        )
+      ).rows;
+    // A kurta of the two came back: Rs 2,345 of Rs 4,690, half its cashback with it.
+    unwrap(await refunds.refund(SHOP, orderId, { amount: '2,345', method: 'cash' }));
+    expect(await hear(OrderEvents.OrderRefunded, orderId)).toBe(-235_00n);
+    // Heard again: nothing more.
+    expect(await hear(OrderEvents.OrderRefunded, orderId)).toBeNull();
+    const { rows } = await admin.query<{ number: number; remaining: string }>(
+      `SELECT o.number, c.remaining::text FROM orders.orders o
+         JOIN customers.store_credit_transactions c ON c.id = $2
+        WHERE o.id = $1`,
+      [orderId, cashbackCreditId(orderId)],
+    );
+    expect(rows[0]!.remaining).toBe('23400');
+    expect(await taken()).toEqual([
+      { amount: '23500', note: `Cashback taken back: order #${rows[0]!.number} refunded` },
+    ]);
+    // Its customer spent Rs 200 of what was left; then the rest came back: what they spent stays
+    // theirs.
+    await admin.query(
+      `UPDATE customers.store_credit_transactions SET remaining = remaining - 20000
+        WHERE id = $1`,
+      [cashbackCreditId(orderId)],
+    );
+    unwrap(await refunds.refund(SHOP, orderId, { amount: '2,345', method: 'cash' }));
+    expect(await hear(OrderEvents.OrderRefunded, orderId)).toBe(-34_00n);
+    expect((await taken()).map((row) => row.amount)).toEqual(['23500', '3400']);
+  });
+
+  it('takes back nothing of an order that earned no cashback', async () => {
+    await turn(true);
+    const orderId = await ordered();
+    unwrap(await orders.markAsPaid(SHOP, orderId));
+    unwrap(await refunds.refund(SHOP, orderId, { amount: '2,345', method: 'cash' }));
+    expect(await hear(OrderEvents.OrderRefunded, orderId)).toBeNull();
   });
 
   it('makes the same credit ID of an order however often asked, a UUID of its own', () => {

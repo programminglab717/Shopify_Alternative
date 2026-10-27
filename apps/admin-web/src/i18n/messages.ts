@@ -5226,7 +5226,7 @@ const en = {
   'automations.badCredit': 'Offer between Rs {min} and Rs {max} of store credit.',
   'automations.CASHBACK': 'Cashback',
   'automations.CASHBACK.hint':
-    'Once an order is delivered and paid in full: a share of what its goods came to, given back in store credit for the next one.',
+    'Once an order is delivered and paid in full: a share of what its goods came to, gift cards aside, given back in store credit for the next one. Refunded, the share of it the refund took is taken back, as far as the customer has not spent it.',
   'automations.cashbackFromHatti':
     "Given as store credit, which checkout spends once the customer proves their number. They hear of it on WhatsApp from Hatti's number, so it needs no template of yours.",
   'automations.percent': 'Share given back (%)',
@@ -11161,7 +11161,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'automations.badCredit': '{min} سے {max} روپے تک کا اسٹور کریڈٹ پیش کریں۔',
   'automations.CASHBACK': 'کیش بیک',
   'automations.CASHBACK.hint':
-    'آرڈر پہنچنے اور پوری ادائیگی کے بعد: اس کے سامان کی رقم کا ایک حصہ اگلے آرڈر کے لیے اسٹور کریڈٹ میں واپس۔',
+    'آرڈر پہنچنے اور پوری ادائیگی کے بعد: اس کے سامان کی رقم کا ایک حصہ، گفٹ کارڈ کے سوا، اگلے آرڈر کے لیے اسٹور کریڈٹ میں واپس۔ ریفنڈ ہونے پر اس کا وہ حصہ واپس لے لیا جاتا ہے جو ریفنڈ نے لیا، جتنا گاہک نے خرچ نہ کیا ہو۔',
   'automations.cashbackFromHatti':
     'اسٹور کریڈٹ کے طور پر دیا جاتا ہے، جو گاہک اپنا نمبر ثابت کرنے پر چیک آؤٹ پر خرچ کرتا ہے۔ انہیں ہٹی کے واٹس ایپ نمبر سے اطلاع ملتی ہے، اس لیے آپ کے کسی ٹیمپلیٹ کی ضرورت نہیں۔',
   'automations.percent': 'واپس دیا جانے والا حصہ (%)',

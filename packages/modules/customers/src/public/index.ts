@@ -86,6 +86,7 @@ export {
   creditStoreCreditIn,
   debitStoreCreditIn,
   giveBackOrderCreditIn,
+  takeBackOrderCreditIn,
   revertOrderStoreCreditIn,
   shopGivesStoreCreditIn,
   storeCreditAccountsIn,

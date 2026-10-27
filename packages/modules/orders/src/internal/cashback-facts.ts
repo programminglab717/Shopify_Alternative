@@ -14,6 +14,12 @@ export interface OrderCashbackFacts {
   amountPaid: bigint;
   /** What its goods came to after its discount: what cashback is a share of. */
   goods: bigint;
+  /** What its lines came to, before its discount. */
+  subtotal: bigint;
+  /** What was refunded of it. */
+  amountRefunded: bigint;
+  /** Each line's product and what it came to, for those that earn none, as gift cards (ADR-805). */
+  lines: { productId: string; total: bigint }[];
   customerId: string;
   /** Whether its customer was erased since. */
   erased: boolean;
@@ -34,14 +40,22 @@ export async function orderCashbackFactsIn(
     total: string;
     amount_paid: string;
     goods: string;
+    subtotal: string;
+    amount_refunded: string;
     customer_id: string;
     erased: boolean;
+    lines: { product_id: string; total: string }[];
   }>(sql`
-    SELECT id, number, status, stage, currency, total::text, amount_paid::text,
-           greatest(subtotal - discount, 0)::text AS goods, customer_id,
-           customer_erased_at IS NOT NULL AS erased
-      FROM orders.orders
-     WHERE shop_id = ${shopId} AND id = ${orderId}`);
+    SELECT o.id, o.number, o.status, o.stage, o.currency, o.total::text, o.amount_paid::text,
+           greatest(o.subtotal - o.discount, 0)::text AS goods, o.subtotal::text,
+           o.amount_refunded::text, o.customer_id,
+           o.customer_erased_at IS NOT NULL AS erased,
+           coalesce((SELECT json_agg(json_build_object('product_id', l.product_id,
+                                                       'total', l.total::text))
+                       FROM orders.lines l
+                      WHERE l.shop_id = o.shop_id AND l.order_id = o.id), '[]') AS lines
+      FROM orders.orders o
+     WHERE o.shop_id = ${shopId} AND o.id = ${orderId}`);
   const row = rows[0];
   if (!row) return null;
   return {
@@ -53,6 +67,9 @@ export async function orderCashbackFactsIn(
     total: BigInt(row.total),
     amountPaid: BigInt(row.amount_paid),
     goods: BigInt(row.goods),
+    subtotal: BigInt(row.subtotal),
+    amountRefunded: BigInt(row.amount_refunded),
+    lines: row.lines.map((line) => ({ productId: line.product_id, total: BigInt(line.total) })),
     customerId: row.customer_id,
     erased: row.erased,
   };
