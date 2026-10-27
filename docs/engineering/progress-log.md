@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Custom reports in the admin
+
+* **The admin's page:** custom reports are made, shown, downloaded as Excel, scheduled to the
+  member's email, changed and deleted from Analytics (ANL-06, [ADR-819](../architecture/13-decision-log.md#adr-819--custom-reports-in-the-admin-made-and-changed-by-their-rows-period-and-columns-in-the-order-ticked-shown-as-a-table-with-the-periods-total-downloaded-and-scheduled-by-those-who-export-orders)). ANL-06 is done.
+* **Count explained:** the admin's suite checks each GraphQL operation it sends against the
+  schema, one test each. Of the 10 tests the digital products entry below called uncounted, 6
+  were the checks of that slice's own 6 operations; 4 were uncounted before it.
+* 4374 tests (11 new: 4, and 7 checks of the new operations).
+
 ### b8e6002 · Custom reports scheduled
 
 * **On a schedule:** a scheduled export may send a custom report in place of the orders, run

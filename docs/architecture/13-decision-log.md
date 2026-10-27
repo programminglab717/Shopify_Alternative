@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-818 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-819 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -826,6 +826,7 @@
 | 816 | A product is made digital from its page, its files uploaded and its keys added there; keys added are given at once to the paid orders whose units were sold none | Accepted |
 | 817 | A shop saves reports of its own over the sales report: broken down one way, the columns chosen in order, over a period that moves with the day, run when asked and exported as a workbook | Accepted |
 | 818 | A scheduled export may send a custom report in place of the orders: run over the period that ended, true profit as the plan has it, and emailed as a workbook named for the report and the period | Accepted |
+| 819 | Custom reports in the admin: made and changed by their rows, period and columns in the order ticked, shown as a table with the period's total, downloaded and scheduled by those who export orders | Accepted |
 
 ---
 
@@ -26931,3 +26932,21 @@
 * **Consequences:** ANL-06 is done in code but for the admin's page (ADR-819). A report goes to
   the member who scheduled it alone; sending to others, such as an outside accountant, waits
   for a way to prove their email.
+
+## ADR-819 · Custom reports in the admin: made and changed by their rows, period and columns in the order ticked, shown as a table with the period's total, downloaded and scheduled by those who export orders
+
+* **Context:** custom reports (ADR-817) and their schedules (ADR-818) were reachable through
+  the Admin API alone.
+* **Decision:** Analytics links to *Custom reports*, a page of the shop's reports by name, each
+  with its rows and period, and a form for a new one: its name, its rows (each day, week or
+  month, product, channel, visit source or campaign), its period, and its columns as the core
+  offers them for those rows, shown in the order ticked, true profit's marked as the Growth and
+  bigger plans'. Rows of products start from their own usual columns. Saved, a report opens on
+  a page of its own: a table of its rows over its period now, amounts in rupees, margins as
+  percentages and return on ad spend as a multiple, the period's total last. It is changed
+  there, and deleted after asking, its scheduled emails with it. Those who export orders
+  download it as Excel and schedule it to their own email each day, week or month, confirming
+  who they are as for any scheduled export; the exports page names the reports it emails,
+  linking to each. Everyone who reads analytics reads and saves reports.
+* **Consequences:** ANL-06 is done. A report's table scrolls sideways on a phone when it has
+  many columns.
