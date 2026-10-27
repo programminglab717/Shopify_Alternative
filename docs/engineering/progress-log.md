@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Stitched lines' days
+### 3b2c937 · Stitched lines' days
 
 * **Ships by:** an order's line sold stitched keeps the day it ships by, after the days its
   stitching takes, said in the admin and on the customer's order page; checkout promises no
