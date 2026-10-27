@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Cashback tiers
+
+* **Tiers:** cashback gives a larger share to customers who spent more on their other orders,
+  in up to three named tiers, edited in Marketing → Automations (MKT-06, [ADR-806](../architecture/13-decision-log.md#adr-806--cashback-has-up-to-three-tiers-by-what-a-customer-spent-on-their-other-orders-each-giving-back-more)). With
+  ADR-805, MKT-06 is done: loyalty is cashback with tiers, not points (ADR-453).
+* 4295 tests (3 new).
+
 ### cc3f19f · Cashback: gift cards and refunds
 
 * **Gift cards earn none:** an order's cashback is a share of its goods, gift cards aside

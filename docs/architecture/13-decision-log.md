@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-805 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-806 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -813,6 +813,7 @@
 | 803 | A line sold stitched keeps the day it ships by: the day it was sold, or its pre-order's if later, and the days its stitching takes | Accepted |
 | 804 | The admin offers a product stitched from its page: what stitching adds, its days and the measurements to ask for, the usual ones chosen to begin with | Accepted |
 | 805 | Cashback leaves gift cards out, and a refund takes back the share of it the refund took, from what is left of that credit alone | Accepted |
+| 806 | Cashback has up to three tiers by what a customer spent on their other orders, each giving back more | Accepted |
 
 ---
 
@@ -26655,3 +26656,18 @@
 * **Consequences:** cashback follows what the customer kept. Credit spent before the refund is
   not recovered; a shop that minds can debit the customer's store credit by hand (ADR-184).
   Points and tiers stay out (ADR-453): tiers by what a customer has spent follow (ADR-806).
+
+## ADR-806 · Cashback has up to three tiers by what a customer spent on their other orders, each giving back more
+
+* **Context:** MKT-06 asks for points and tiers. Points were turned down for cashback
+  (ADR-453): one share for every customer. Shops reward their best customers with more.
+* **Decision:** cashback takes up to three tiers, each named (Silver, Gold), with what a
+  customer must have spent on their other orders to reach it and the share it gives back. What
+  they spent is what their stats count (ADR-023): paid less refunded, cancelled orders aside,
+  this order left out. Each tier gives more than those who spent less, and more than the share
+  every customer gets; kept by what they start from, as JSON on the recipe, set all at once.
+  The worker gives the share of the highest tier the customer reaches, and the credit's note
+  names it. Marketing → Automations edits them on the cashback recipe.
+* **Consequences:** no tier is shown to the shopper on the storefront, nor is a customer told
+  when they reach one: the WhatsApp of their cashback says how much they got. With ADR-805,
+  MKT-06 is done.
