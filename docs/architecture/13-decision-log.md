@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-812 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-813 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -820,6 +820,7 @@
 | 810 | Web chat: a shopper gives their name and number to chat from the online store, kept as a conversation of the inbox, each browser reading only its own session | Accepted |
 | 811 | Hatti Base offers the chat from a button on every page, its session in a cookie the page's script never reads | Accepted |
 | 812 | The admin turns the chat on in Customer messages, and its inbox shows chats from the online store by name, answered at any time | Accepted |
+| 813 | A product made digital sells files kept privately and licence keys kept sealed, each key given once to one unit of an order's line | Accepted |
 
 ---
 
@@ -26787,3 +26788,25 @@
   customer is offered to send in it at any time too, as on WhatsApp within its day.
 * **Consequences:** a shop turns the chat on and answers it where it answers WhatsApp. With
   ADR-810 and ADR-811, MSG-10 is done.
+
+## ADR-813 · A product made digital sells files kept privately and licence keys kept sealed, each key given once to one unit of an order's line
+
+* **Context:** CAT-13 asks for digital products: downloads and licence keys. Shops here sell
+  ebooks of patterns, courses, software keys and game codes. Shopify leaves both to apps. A
+  shop's files (ADR-079) are images, PDFs and videos for its pages, 20 MB at most; and gift
+  cards (ADR-451) noted that a product needing no delivery was not yet possible.
+* **Decision:** a product is made digital as its own record, as stitching is (ADR-802): how
+  many times each unit's link downloads each file (5 unless set, 1 to 50), for how many days
+  (30 unless set, 1 to 365), and whether each unit is given a licence key. A gift card cannot
+  be digital: its card is what it sells. Its files are any kind of file up to 2 GB, kept under
+  `shops/{id}/digital/` apart from the files its pages show, uploaded through a URL the
+  Admin API signs, staged until storage has them at the size staged, and removed from storage
+  with the product's being digital. Its keys are a pool the shop fills, up to a thousand at
+  once: each sealed with the platform's secret box for that product alone, kept unique by its
+  SHA-256, shown only by its last four characters, never by the API. One is given to each unit
+  of an order's line, once, the oldest first; the same unit asked again is given the same key.
+* **Consequences:** a key leaked from the database is no use without the secret box's key.
+  Selling them follows: a checkout of digital products alone needs no delivery and no cash on
+  delivery, and once the order is paid its buyer is sent their links and keys (ADR-814 on).
+  Building this found two optional services Nest had left out since they were written, typed
+  as unions with null; a test now walks every provider of the running API for that.

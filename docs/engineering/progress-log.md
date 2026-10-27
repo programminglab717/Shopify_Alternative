@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Digital products, and two services Nest left out
+
+* **Digital products:** a product is made digital, with files kept privately and licence keys
+  kept sealed, each key given once to one unit of an order's line (CAT-13, [ADR-813](../architecture/13-decision-log.md#adr-813--a-product-made-digital-sells-files-kept-privately-and-licence-keys-kept-sealed-each-key-given-once-to-one-unit-of-an-orders-line)). Selling
+  them, sending links and keys, and the admin come next.
+* **Fix (2d6b25d):** the inbox's replies never found the shop's own WhatsApp number, and the
+  AI's product copy never saw the photos: both services were typed as unions with null, which
+  Nest cannot inject. Named now, and a test checks every provider of the running API.
+* 4323 tests (5 new).
+
 ### a9b6ad6 · Web chat in the admin
 
 * **Settings and inbox:** the chat on the online store is turned on in Settings → Customer
