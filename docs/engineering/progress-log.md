@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Digital checkouts
+### 4995262 · Digital checkouts
 
 * **Nothing to deliver:** a cart of digital products alone checks out with no address,
   delivery or cash on delivery, and its lines are fulfilled and delivered once given all they
