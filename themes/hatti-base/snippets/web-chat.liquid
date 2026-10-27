@@ -1,0 +1,53 @@
+{%- comment -%}
+  The chat on every page (MSG-10, ADR-811), while the shop offers it: a button at the start of
+  the line the page reads in, the WhatsApp button keeping the end, that opens a panel. The
+  shopper gives their name, mobile number and message to start; the shop answers from its inbox,
+  and the panel asks for its answers every ten seconds while it is open. web-chat.js does the
+  rest; without it, the button opens nothing.
+{%- endcomment -%}
+{%- liquid
+  assign greeting = shop.web_chat.greeting | escape
+  if greeting == blank
+    assign greeting = 'general.web_chat.greeting' | t
+  endif
+-%}
+<div class="web-chat" data-web-chat hidden>
+  <button type="button" class="web-chat__open" aria-expanded="false" aria-controls="WebChatPanel">
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="26" height="26">
+      <path fill="currentColor" d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+    </svg>
+    <span class="visually-hidden">{{ 'general.web_chat.open' | t }}</span>
+  </button>
+  <section id="WebChatPanel" class="web-chat__panel" aria-labelledby="WebChatTitle" hidden>
+    <header class="web-chat__header">
+      <h2 id="WebChatTitle">{{ 'general.web_chat.title' | t: shop: shop.name }}</h2>
+      <button type="button" class="web-chat__close" data-web-chat-close>
+        <span aria-hidden="true">×</span>
+        <span class="visually-hidden">{{ 'general.web_chat.close' | t }}</span>
+      </button>
+    </header>
+    <p class="web-chat__greeting" dir="auto">{{ greeting }}</p>
+    <ol class="web-chat__messages" data-web-chat-messages role="log" aria-live="polite"></ol>
+    <form class="web-chat__start" data-web-chat-start>
+      <label for="WebChatName">{{ 'general.web_chat.name' | t }}</label>
+      <input id="WebChatName" name="name" autocomplete="name" maxlength="80" required>
+      <label for="WebChatPhone">{{ 'general.web_chat.phone' | t }}</label>
+      <input id="WebChatPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" required>
+      <label for="WebChatFirst">{{ 'general.web_chat.message' | t }}</label>
+      <textarea id="WebChatFirst" name="body" rows="3" maxlength="2000" required></textarea>
+      <button type="submit" class="button">{{ 'general.web_chat.send' | t }}</button>
+    </form>
+    <form class="web-chat__write" data-web-chat-write hidden>
+      <label for="WebChatBody" class="visually-hidden">{{ 'general.web_chat.message' | t }}</label>
+      <textarea id="WebChatBody" name="body" rows="2" maxlength="2000" required></textarea>
+      <button type="submit" class="button">{{ 'general.web_chat.send' | t }}</button>
+    </form>
+    <p class="web-chat__problem" data-web-chat-problem role="alert" hidden></p>
+    <p class="web-chat__note">{{ 'general.web_chat.note' | t }}</p>
+  </section>
+  <template data-web-chat-words
+    data-shop="{{ 'general.web_chat.shop' | t | escape }}"
+    data-you="{{ 'general.web_chat.you' | t | escape }}"
+    data-failed="{{ 'general.web_chat.failed' | t | escape }}"></template>
+</div>
+<script src="{{ 'web-chat.js' | asset_url }}" defer></script>

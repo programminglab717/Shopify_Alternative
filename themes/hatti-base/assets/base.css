@@ -663,8 +663,114 @@ input[type='number'] {
   color: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
 }
+/* The chat on every page (ADR-811), at the start of the line, the WhatsApp button keeping the end. */
+.web-chat__open {
+  position: fixed;
+  inset-block-end: 1rem;
+  inset-inline-start: 1rem;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-text, #111);
+  color: var(--color-background, #fff);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+}
+.web-chat__panel {
+  position: fixed;
+  inset-block-end: 5rem;
+  inset-inline-start: 1rem;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  inline-size: min(22rem, calc(100vw - 2rem));
+  max-block-size: min(32rem, calc(100vh - 7rem));
+  padding: 1rem;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 0.75rem;
+  background: var(--color-background, #fff);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
+.web-chat__panel[hidden] {
+  display: none;
+}
+.web-chat__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.web-chat__header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.web-chat__close {
+  min-inline-size: 2.75rem;
+  min-block-size: 2.75rem;
+  border: 0;
+  background: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.web-chat__greeting,
+.web-chat__note {
+  margin: 0;
+}
+.web-chat__note {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+.web-chat__messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.web-chat__message {
+  max-inline-size: 85%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--color-border, #eee);
+}
+.web-chat__message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.web-chat__message--shopper {
+  align-self: flex-end;
+}
+.web-chat__who {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.web-chat__start,
+.web-chat__write {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.web-chat__start[hidden],
+.web-chat__write[hidden] {
+  display: none;
+}
+.web-chat__start input,
+.web-chat__start textarea,
+.web-chat__write textarea {
+  min-block-size: 2.75rem;
+  padding: 0.5rem;
+  font: inherit;
+}
 @media print {
-  .whatsapp-chat {
+  .whatsapp-chat,
+  .web-chat {
     display: none;
   }
 }

@@ -52,6 +52,7 @@ import {
   type CommentResult,
   type ContactMessageRequest,
   type ContactMessageResult,
+  type WebChatResult,
   type SignUpRequest,
   type SignUpResult,
   type ReportRequest,
@@ -542,6 +543,35 @@ class FakeCore {
   /** The contact form's messages sent on, and how the core answers them (ADR-589). */
   readonly contactMessages: { shopId: string; request: ContactMessageRequest }[] = [];
   messaged: ContactMessageResult | Error = { ok: true, id: 'cform_7Kq2xY' };
+
+  /** The chats the storefront sent on, and what the core says back (ADR-811). */
+  readonly chats: { shopId: string; action: string; request: object }[] = [];
+  chatting: WebChatResult = {
+    ok: true,
+    token: 'T'.repeat(43),
+    messages: [
+      { id: 'cmsg_1', direction: 'inbound', body: 'Salam', at: '2026-10-27T09:00:00.000Z' },
+    ],
+  };
+
+  async webChatStart(shopId: string, request: object): Promise<WebChatResult> {
+    this.chats.push({ shopId, action: 'start', request });
+    return this.chatting;
+  }
+
+  async webChatWrite(shopId: string, request: object): Promise<WebChatResult> {
+    this.chats.push({ shopId, action: 'write', request });
+    return this.chatting && this.chatting.ok
+      ? { ...this.chatting, token: undefined }
+      : this.chatting;
+  }
+
+  async webChatRead(shopId: string, token: string): Promise<WebChatResult> {
+    this.chats.push({ shopId, action: 'read', request: { token } });
+    return this.chatting && this.chatting.ok
+      ? { ...this.chatting, token: undefined }
+      : this.chatting;
+  }
 
   async contactMessage(
     shopId: string,
@@ -3497,6 +3527,116 @@ describe('Carts', () => {
     expect((await post(signUp)).statusCode).toBe(503);
     expect(core.signUps).toHaveLength(4);
     await app.close();
+  });
+
+  it("offers the shop's chat on every page while it is on, and sends its messages on (ADR-811)", async () => {
+    const sample = sampleStore();
+    // Off: no chat on the page.
+    const off = await server().inject({ method: 'GET', url: '/', headers: { host: 'localhost' } });
+    expect(off.body).not.toContain('data-web-chat');
+    // Hatti's words while the shop wrote none, written once.
+    const own = await server({
+      sample: new MemoryStore({ ...sample, shop: { ...sample.shop, webChat: { greeting: null } } }),
+    }).inject({ method: 'GET', url: '/', headers: { host: 'localhost' } });
+    expect(own.body).toContain('Hi! Ask us anything, and we&#39;ll answer here.</p>');
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, webChat: { greeting: 'Ask us about <sizes>!' } },
+      }),
+    });
+    const page = await app.inject({ method: 'GET', url: '/', headers: { host: 'localhost' } });
+    expect(page.body).toContain('<div class="web-chat" data-web-chat hidden>');
+    expect(page.body).toContain(
+      '<p class="web-chat__greeting" dir="auto">Ask us about &lt;sizes&gt;!</p>',
+    );
+    expect(page.body).toMatch(/<script src="[^"]*web-chat\.js[^"]*" defer><\/script>/);
+    const urdu = await app.inject({ method: 'GET', url: '/ur', headers: { host: 'localhost' } });
+    expect(urdu.body).toContain('<label for="WebChatPhone">آپ کا موبائل نمبر</label>');
+
+    const JSON_POST = { host: 'localhost', 'content-type': 'application/json' };
+    const start = await app.inject({
+      method: 'POST',
+      url: '/chat',
+      headers: JSON_POST,
+      payload: { name: 'Ayesha', phone: '0300 1234567', body: 'Salam' },
+    });
+    expect([start.statusCode, start.headers['cache-control']]).toEqual([200, 'private, no-store']);
+    expect(start.json()).toEqual({
+      messages: [{ from: 'shopper', body: 'Salam', at: '2026-10-27T09:00:00.000Z' }],
+    });
+    // The session's token in a cookie the page's script never reads.
+    const cookie = String(start.headers['set-cookie']);
+    expect(cookie).toMatch(/^hatti_chat=T{43}; Path=\/; Max-Age=2592000; HttpOnly; SameSite=Lax/);
+    expect(core.chats.at(-1)).toEqual({
+      shopId: expect.any(String) as unknown,
+      action: 'start',
+      request: { name: 'Ayesha', phone: '0300 1234567', body: 'Salam' },
+    });
+    const session = `hatti_chat=${'T'.repeat(43)}`;
+    const wrote = await app.inject({
+      method: 'POST',
+      url: '/chat/messages',
+      headers: { ...JSON_POST, cookie: session },
+      payload: { body: 'Medium?' },
+    });
+    expect([wrote.statusCode, wrote.headers['set-cookie']]).toEqual([200, undefined]);
+    expect(core.chats.at(-1)?.request).toEqual({ token: 'T'.repeat(43), body: 'Medium?' });
+    const read = await app.inject({
+      method: 'GET',
+      url: '/chat/messages.json',
+      headers: { host: 'localhost', cookie: session },
+    });
+    expect(read.json().messages).toHaveLength(1);
+
+    // No session yet: nothing to read or write in, and nothing asked of the core.
+    const asked = core.chats.length;
+    const none = await app.inject({
+      method: 'GET',
+      url: '/chat/messages.json',
+      headers: { host: 'localhost' },
+    });
+    expect(none.statusCode).toBe(404);
+    expect(core.chats).toHaveLength(asked);
+    // What the core refuses, said by field.
+    core.chatting = {
+      ok: false,
+      errors: [{ field: 'phone', message: 'Give a Pakistani mobile number' }],
+    };
+    const wrong = await app.inject({
+      method: 'POST',
+      url: '/chat',
+      headers: JSON_POST,
+      payload: { name: 'Ayesha', phone: '12', body: 'Hi' },
+    });
+    expect([wrong.statusCode, wrong.json()]).toEqual([
+      422,
+      { errors: [{ field: 'phone', message: 'Give a Pakistani mobile number' }] },
+    ]);
+    // A session the core no longer knows, or a chat turned off: its cookie goes.
+    core.chatting = null;
+    const gone = await app.inject({
+      method: 'GET',
+      url: '/chat/messages.json',
+      headers: { host: 'localhost', cookie: session },
+    });
+    expect(gone.statusCode).toBe(404);
+    expect(String(gone.headers['set-cookie'])).toMatch(/^hatti_chat=; Path=\/; Max-Age=0/);
+    // From another site, or not JSON: refused.
+    const across = await app.inject({
+      method: 'POST',
+      url: '/chat',
+      headers: { ...JSON_POST, 'sec-fetch-site': 'cross-site' },
+      payload: { name: 'A', phone: '0300 1234567', body: 'Hi' },
+    });
+    expect(across.statusCode).toBe(403);
+    const formed = await app.inject({
+      method: 'POST',
+      url: '/chat',
+      headers: FORM,
+      payload: form({ name: 'A', phone: '0300 1234567', body: 'Hi' }),
+    });
+    expect(formed.statusCode).toBe(415);
   });
 
   it("sends Shopify's contact form on to the core, then back to its page saying how it went (ADR-589)", async () => {

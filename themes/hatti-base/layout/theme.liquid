@@ -40,6 +40,9 @@
     {%- if settings.whatsapp_chat and shop.whatsapp %}
     {% render 'whatsapp-chat' %}
     {%- endif %}
+    {%- if shop.web_chat %}
+    {% render 'web-chat' %}
+    {%- endif %}
     {% section 'cart-drawer' %}
     {%- render 'breadcrumb-list' %}
   </body>

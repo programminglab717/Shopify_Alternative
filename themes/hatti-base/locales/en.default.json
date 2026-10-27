@@ -12,6 +12,20 @@
     "menu": "Main menu",
     "menu_open": "Menu",
     "language": "اردو",
+    "web_chat": {
+      "greeting": "Hi! Ask us anything, and we'll answer here.",
+      "open": "Chat with us",
+      "title": "Chat with {{ shop }}",
+      "close": "Close the chat",
+      "name": "Your name",
+      "phone": "Your mobile number",
+      "message": "Your message",
+      "send": "Send",
+      "note": "We keep your number to answer you, and may write to you on WhatsApp.",
+      "shop": "Shop",
+      "you": "You",
+      "failed": "Your message could not be sent. Please try again in a minute."
+    },
     "whatsapp": {
       "chat": "Chat on WhatsApp",
       "order": "Order on WhatsApp",

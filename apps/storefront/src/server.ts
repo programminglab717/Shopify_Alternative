@@ -130,6 +130,7 @@ import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
+import { chatCookie, chatCookieCleared, chatMessagesJson, chatTokenOf } from './web-chat.js';
 import {
   VISITS_COOKIE,
   keptVisits,
@@ -234,6 +235,18 @@ const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
  * so few, but room for many behind one mobile network's address.
  */
 const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
+/**
+ * Messages an address may write a minute in shops' chats (ADR-811): a shopper writes a few, and
+ * a script many.
+ */
+const CHAT_WRITES = { name: 'chat-writes', limit: 20, windowMs: 60_000 };
+
+/**
+ * Reads of chats an address may make a minute: an open chat asks every ten seconds, for room for
+ * many shoppers behind one mobile network's address.
+ */
+const CHAT_READS = { name: 'chat-reads', limit: 240, windowMs: 60_000 };
+
 /** Messages through the contact form from one address (ADR-589). */
 const CONTACT_MESSAGES = { name: 'contact-messages', limit: 5, windowMs: 60_000 };
 
@@ -3322,6 +3335,61 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     };
 
   /**
+   * The chat on the shop's pages (MSG-10, ADR-811), for the theme's script: `POST /chat` with
+   * `{ "name", "phone", "body" }` starts one, keeping its session in a cookie of its own;
+   * `POST /chat/messages` with `{ "body" }` writes in it; `GET /chat/messages.json` reads it. Each
+   * answers `{ "messages": [{ "from": "shopper" | "shop", "body", "at" }] }`, the oldest first, or
+   * 422 with `{ "errors": [{ "field", "message" }] }`; 404 while the shop's chat is off or for no
+   * session, whose cookie goes. JSON alone, from the shop's own pages alone, at most
+   * {@link CHAT_WRITES} writes and {@link CHAT_READS} reads a minute from an address, never kept.
+   */
+  const chat =
+    (action: 'start' | 'write' | 'read') =>
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      accountAnswer(reply);
+      const refuse = (status: number, message: string) => reply.code(status).send({ message });
+      if (!fromShopItself(request))
+        return refuse(403, "Chats are written from the shop's own pages.");
+      if (action !== 'read' && !isJson(request)) return refuse(415, 'Send JSON.');
+      const limit = action === 'read' ? CHAT_READS : CHAT_WRITES;
+      if (limiter !== null && !(await limiter.hit(limit, request.ip)).allowed) {
+        return refuse(429, 'Too many messages. Please wait a minute.');
+      }
+      const options = { secure: secureFor(request) };
+      const body = paramsOf(request);
+      const text = (name: string) => (typeof body[name] === 'string' ? body[name] : '');
+      try {
+        if (!core) throw new StorefrontApiError(503, 'This storefront keeps no chats');
+        const token = chatTokenOf(request.headers.cookie);
+        if (action !== 'start' && !token) return await refuse(404, 'No chat yet.');
+        const result =
+          action === 'start'
+            ? await core.webChatStart(found.shopId, {
+                name: text('name'),
+                phone: text('phone'),
+                body: text('body'),
+              })
+            : action === 'write'
+              ? await core.webChatWrite(found.shopId, { token: token!, body: text('body') })
+              : await core.webChatRead(found.shopId, token!);
+        if (!result) {
+          if (token) reply.header('set-cookie', chatCookieCleared(options));
+          return await refuse(404, 'No chat here.');
+        }
+        if (!result.ok) return await reply.code(422).send({ errors: result.errors });
+        if (result.token) reply.header('set-cookie', chatCookie(result.token, options));
+        return await reply.send({ messages: chatMessagesJson(result.messages) });
+      } catch (error) {
+        if (error instanceof StoreMissingError)
+          return notFound(reply, 'This shop is not open yet.');
+        if (!unreachable(request, error)) throw error;
+        return refuse(503, 'The shop cannot be reached just now. Please try again in a minute.');
+      }
+    };
+
+  /**
    * A signed-in shopper's own prices (CUS-06, ADR-781), for the theme's script, the product pages
    * being the same for every shopper: `GET /account/prices.json?variants=…`, at most
    * {@link ACCOUNT_PRICES_MAX} variants' IDs by commas, answers `{ "prices": { id: { "amount",
@@ -3533,6 +3601,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     app.post(`${prefix}/account/addresses/:id`, addressChange);
     app.route({ method: ['GET', 'POST'], url: `${prefix}/account/logout`, handler: logout });
   }
+  // The chat on the shop's pages, the same whatever the page's language (ADR-811).
+  app.post('/chat', chat('start'));
+  app.post('/chat/messages', chat('write'));
+  app.get('/chat/messages.json', chat('read'));
 
   app.get('/*', async (request, reply) => {
     const found = await shopFor(request, reply);
