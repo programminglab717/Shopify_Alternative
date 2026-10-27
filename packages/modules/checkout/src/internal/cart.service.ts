@@ -191,6 +191,15 @@ export class CartService {
     });
   }
 
+  /** How many of each variant can be sold online now, in the caller's `tx`; null for no limit. */
+  async sellableIn(
+    tx: Tx,
+    shopId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, number | null>> {
+    return this.inventory.sellableOf(tx, shopId, variantIds);
+  }
+
   /** The cart `token` names, in the caller's transaction `tx`; null when it names none. */
   async findIn(tx: Tx, shopId: string, token: string): Promise<KeptCart | null> {
     const hash = hashOf(token);

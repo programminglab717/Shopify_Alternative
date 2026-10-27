@@ -4,10 +4,32 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
-import type { CheckoutForm, CheckoutView } from './checkout.service.js';
+import type { CheckoutForm, CheckoutService, CheckoutView } from './checkout.service.js';
+import { DropTokens, type DropTokenPool } from './drop-tokens.js';
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
 
 const server = testDatabaseServer();
+
+/** Pools kept in memory, as Valkey keeps them. */
+class KeptTokens extends DropTokens {
+  readonly left = new Map<string, number>();
+  readonly givenBack: number[] = [];
+
+  async take(pool: DropTokenPool, quantity: number, stock: () => Promise<number>) {
+    const key = `${pool.dropId}:${pool.variantId}`;
+    if (!this.left.has(key)) this.left.set(key, await stock());
+    const left = this.left.get(key)!;
+    if (left < quantity) return false;
+    this.left.set(key, left - quantity);
+    return true;
+  }
+
+  async giveBack(pool: DropTokenPool, quantity: number) {
+    const key = `${pool.dropId}:${pool.variantId}`;
+    this.left.set(key, (this.left.get(key) ?? 0) + quantity);
+    this.givenBack.push(quantity);
+  }
+}
 
 describe.skipIf(!server)('Checking out in a drop (INV-09, ADR-820)', () => {
   let f: CheckoutFixture;
@@ -74,14 +96,18 @@ describe.skipIf(!server)('Checking out in a drop (INV-09, ADR-820)', () => {
     return f.carts.act(f.a.shopId, null, action);
   };
 
-  /** Places a cart of `quantity` for `phone`. */
-  async function placed(quantity: number, phone: string): Promise<CheckoutView> {
+  /** Places a cart of `quantity` for `phone`, through `checkouts`. */
+  async function placed(
+    quantity: number,
+    phone: string,
+    checkouts: CheckoutService = f.checkouts,
+  ): Promise<CheckoutView> {
     const added = await add(quantity);
     if (!added.ok) throw new Error(`Refused: ${JSON.stringify(added.error)}`);
-    const secret = (await f.checkouts.start(f.a.shopId, added.token!))!;
-    const view = await f.checkouts.view(secret);
+    const secret = (await checkouts.start(f.a.shopId, added.token!))!;
+    const view = await checkouts.view(secret);
     if (view.kind !== 'open') throw new Error(`Expected an open checkout, got ${view.kind}`);
-    return f.checkouts.place(secret, view.shown, { ...FORM, phone });
+    return checkouts.place(secret, view.shown, { ...FORM, phone });
   }
 
   it('sells its products to no one before it starts', async () => {
@@ -118,5 +144,63 @@ describe.skipIf(!server)('Checking out in a drop (INV-09, ADR-820)', () => {
     expect((await placed(2, '0300-1234567')).kind).toBe('placed');
     await over();
     expect((await placed(3, '0300-1234567')).kind).toBe('placed');
+  });
+
+  it("takes a live drop's units from its pool first, refusing at once once it is empty (ADR-821)", async () => {
+    await live();
+    await f.admin.query('UPDATE catalog.drops SET per_customer = NULL WHERE id = $1', [dropId]);
+    const tokens = new KeptTokens();
+    const checkouts = f.checkoutsWith(tokens);
+    expect((await placed(2, '0300-1234567', checkouts)).kind).toBe('placed');
+    // Started from the stock: 100, two of them taken.
+    expect([...tokens.left.values()]).toEqual([98]);
+    // Empty, the pool refuses before the stock is asked.
+    tokens.left.set([...tokens.left.keys()][0]!, 1);
+    const refused = await placed(2, '0321-7654321', checkouts);
+    expect(refused).toMatchObject({ kind: 'open', problem: { kind: 'unavailable' } });
+    const { rows } = await f.admin.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM orders.orders',
+    );
+    expect(rows[0]!.count).toBe(1);
+    // The stock refuses what the pool let through: its tokens go back. Two carts of the last
+    // unit, the first placed before the second.
+    tokens.left.set([...tokens.left.keys()][0]!, 500);
+    await f.admin.query(
+      'UPDATE inventory.levels SET on_hand = committed + 1 WHERE variant_id = $1',
+      [lawn],
+    );
+    const opened = async () => {
+      const added = await add(1);
+      if (!added.ok) throw new Error(`Refused: ${JSON.stringify(added.error)}`);
+      const secret = (await checkouts.start(f.a.shopId, added.token!))!;
+      const view = await checkouts.view(secret);
+      if (view.kind !== 'open') throw new Error(view.kind);
+      return { secret, shown: view.shown };
+    };
+    const first = await opened();
+    const second = await opened();
+    expect(
+      (await checkouts.place(first.secret, first.shown, { ...FORM, phone: '0333-1112223' })).kind,
+    ).toBe('placed');
+    expect(
+      await checkouts.place(second.secret, second.shown, { ...FORM, phone: '0345-9998887' }),
+    ).toMatchObject({ kind: 'open', problem: { kind: 'unavailable' } });
+    // Refused by its own stock before the pool is asked, the second takes no tokens.
+    expect([...tokens.left.values()]).toEqual([499]);
+    expect(tokens.givenBack).toEqual([]);
+
+    // Undone after its tokens were taken, as when the shop asks for a code first, the order
+    // gives them back.
+    await f.admin.query(
+      'UPDATE inventory.levels SET on_hand = committed + 5 WHERE variant_id = $1',
+      [lawn],
+    );
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }));
+    const third = await opened();
+    expect(
+      await checkouts.place(third.secret, third.shown, { ...FORM, phone: '0312-4445556' }),
+    ).toMatchObject({ kind: 'open', problem: { kind: 'code' } });
+    expect(tokens.givenBack).toEqual([1]);
+    expect([...tokens.left.values()]).toEqual([499]);
   });
 });

@@ -125,6 +125,7 @@ import { checkouts } from './schema.js';
 import { orderItemsIn } from './discount-items.js';
 import { checkoutTotals } from './totals.js';
 import { StockHolds } from './stock-holds.js';
+import { DropTokens, type DropClaim } from './drop-tokens.js';
 import { storefrontUrlIn } from './storefront-url.js';
 import { trustBadgesIn } from './trust-badge.service.js';
 import type { TrustBadgeValue } from './trust-badges.js';
@@ -701,6 +702,8 @@ export class CheckoutService {
     @Optional() private readonly site?: PublicSite,
     /** The tiles of a map to move the pin on (ADR-719); without them, no map. */
     @Optional() @Inject(MapTiles) private readonly mapTiles?: MapTiles | null,
+    /** Drops' token pools (ADR-821); without them, a drop's orders take stock as any other. */
+    @Optional() @Inject(DropTokens) private readonly dropTokens?: DropTokens | null,
   ) {}
 
   /** Stock held while shoppers check out (ADR-715). */
@@ -1018,9 +1021,14 @@ export class CheckoutService {
       const refused = await this.#checkCode(found, form);
       if (refused) return refused;
     }
+    // A drop's tokens taken for the order, given back unless it is placed (ADR-821).
+    const claims: DropClaim[] = [];
     try {
-      return await this.#place(found, shown, form, client);
+      const view = await this.#place(found, shown, form, client, claims);
+      if (view.kind !== 'placed') await this.#giveBack(claims);
+      return view;
     } catch (error) {
+      await this.#giveBack(claims);
       // The shop asks for a code first, or the shopper's store credit does: the order is
       // undone, and one sent on WhatsApp.
       if (error instanceof NeedsCode) return this.#sendCode(found, form, 'whatsapp', client);
@@ -1173,11 +1181,61 @@ export class CheckoutService {
     return null;
   }
 
+  /**
+   * Takes the tokens of `lines` in live drops from their pools (ADR-821), into `claims`: whether
+   * one was too short, the order to be refused at once. Variants that sell without limit take none.
+   */
+  async #takeDropTokens(
+    tx: Tx,
+    shopId: string,
+    lines: readonly { productId: string; variantId: string; quantity: number }[],
+    claims: DropClaim[],
+  ): Promise<boolean> {
+    const tokens = this.dropTokens;
+    if (!tokens) return false;
+    const now = new Date();
+    const drops = await dropFactsIn(tx, shopId, [...new Set(lines.map((line) => line.productId))]);
+    const units = new Map<string, { dropId: string; endsAt: Date; quantity: number }>();
+    for (const line of lines) {
+      const drop = drops.get(line.productId);
+      if (!drop || drop.startsAt > now) continue;
+      const before = units.get(line.variantId);
+      units.set(line.variantId, {
+        dropId: drop.dropId,
+        endsAt: drop.endsAt,
+        quantity: (before?.quantity ?? 0) + line.quantity,
+      });
+    }
+    if (units.size === 0) return false;
+    const sellable = await this.carts.sellableIn(tx, shopId, [...units.keys()]);
+    for (const [variantId, { dropId, endsAt, quantity }] of units) {
+      const stock = sellable.get(variantId);
+      if (stock === null || stock === undefined) continue;
+      const pool = { dropId, variantId };
+      // Its stock now, as the pool starts from it, or starts again once empty.
+      const fresh = async () =>
+        (await this.carts.sellableIn(tx, shopId, [variantId])).get(variantId) ?? 0;
+      const taken = await tokens.take(pool, quantity, fresh, endsAt);
+      if (!taken) return true;
+      claims.push({ pool, quantity });
+    }
+    return false;
+  }
+
+  /** Gives back the tokens of an order not placed. */
+  async #giveBack(claims: DropClaim[]): Promise<void> {
+    const tokens = this.dropTokens;
+    if (!tokens) return;
+    await Promise.all(claims.map((claim) => tokens.giveBack(claim.pool, claim.quantity)));
+    claims.length = 0;
+  }
+
   async #place(
     found: { shopId: string; checkoutId: string },
     shown: string,
     form: CheckoutForm,
     client: CheckoutClient | undefined,
+    claims: DropClaim[] = [],
   ): Promise<CheckoutView> {
     return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
       const view = await this.#view(tx, found, true, form);
@@ -1281,6 +1339,10 @@ export class CheckoutService {
         view.cart.items,
       );
       if (limited) return { ...view, problem: limited };
+      // A drop's units taken from its pools first: too few, and it is refused at once (ADR-821).
+      if (await this.#takeDropTokens(tx, found.shopId, view.cart.items, claims)) {
+        return { ...view, problem: { kind: 'unavailable' } };
+      }
       const profile = await shopProfile(tx, found.shopId);
       const discounts = view.discounts;
       const code = discounts.code;

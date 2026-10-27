@@ -17,7 +17,8 @@ import {
   type SupportContact,
 } from '@hatti/billing/public';
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
-import { CheckoutModule } from '@hatti/checkout/public';
+import { CheckoutModule, DropTokens } from '@hatti/checkout/public';
+import { RedisDropTokens } from '../drop-tokens.js';
 import { SecretBox } from '@hatti/crypto';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -236,6 +237,11 @@ class InfrastructureModule {
         { provide: ObjectStorage, useValue: options.storage },
         { provide: AiGateway, useValue: options.ai ?? null },
         { provide: MapTiles, useValue: options.mapTiles ?? null },
+        // Drops' token pools in Valkey (ADR-821); without it, drops take stock as any order.
+        {
+          provide: DropTokens,
+          useValue: options.redis ? new RedisDropTokens(options.redis) : null,
+        },
         // The keys staff sign-in encrypts with; theme previews' links are sealed with them too.
         { provide: SecretBox, useValue: options.identity.secretBox },
         // A duplicated product's stock settings, which the catalog asks the inventory for (ADR-343).
@@ -252,6 +258,7 @@ class InfrastructureModule {
         ObjectStorage,
         AiGateway,
         MapTiles,
+        DropTokens,
         CopiedVariantStock,
       ],
     };
