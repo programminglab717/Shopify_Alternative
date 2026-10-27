@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Riders in the admin
+### 2bf2156 · Riders in the admin
 
 * **Admin:** Shipping's Riders tab adds riders and sends them their link on WhatsApp, hands
   packed orders to them, and records the cash they hand over (SHP-10, APP-06, [ADR-827](../architecture/13-decision-log.md#adr-827--riders-in-the-admin-a-riders-tab-on-shipping-each-riders-link-shown-once-to-send-on-whatsapp-packed-orders-handed-to-a-rider-from-the-list-and-cash-handed-over-recorded)).
