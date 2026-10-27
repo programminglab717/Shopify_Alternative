@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-798 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-799 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -806,6 +806,7 @@
 | 796 | The admin renames and describes the shop's custom fields in place, their keys and types kept | Accepted |
 | 797 | The admin changes where an app's webhook is sent, its topic kept | Accepted |
 | 798 | The sales report goes to the shop's accountant as an Excel workbook: its days, weeks or months with their total, the products that sold most and each channel's sales | Accepted |
+| 799 | A shop shows products as one combined listing, each a value of its option: each product's page offers the others on sale as swatches linking to their pages | Accepted |
 
 ---
 
@@ -26496,3 +26497,36 @@
 * **Consequences:** the accountant has the month's figures as the report has them, in the file
   they work in. Integrations with accounting tools, and a journal of debits and credits, wait for
   shops to say which tools they use. A period is at most 366 days, as the report's is.
+
+## ADR-799 · A shop shows products as one combined listing, each a value of its option: each product's page offers the others on sale as swatches linking to their pages
+
+* **Context:** Pakistani shops often keep each colour of a print as a product of its own, with
+  its own photos, stock and address: "Lawn suit 12A, maroon", "Lawn suit 12A, teal". Shoppers
+  see them as unrelated products. Shopify's combined listings, on Plus alone, show such products
+  as one, its colour an option whose values link to each (CAT-23, Growth). Hatti's variants
+  already give one product up to three options, but moving a shop's colours into one product
+  loses their addresses, reviews and photos per colour.
+* **Decision:**
+  * **A combined listing is an option name and its products**, each with its value of that
+    option, in the shop's order (migration 0340): 2 to 100 products, each in one listing at
+    most, each value once whatever its case. There is no parent product: every member is a
+    product of its own, listed in collections and search as before.
+  * **The Admin API** makes or changes one with `combinedListingSet(id, input)`, deletes one with
+    `combinedListingDelete`, and reads them with `combinedListings`, `combinedListing` and
+    `Product.combinedListing`, under the products' scopes. Shopify's own API, built on a parent
+    product, is not followed.
+  * **Each member's storefront document names the listing's products on sale**, itself among
+    them, by ID with their values; with fewer than two, none. The publisher rebuilds the members
+    when the listing changes and when a member's status does; a member's other changes, its
+    photos, stock or address, need no rebuild, as the storefront reads each from its own
+    document when a page shows it.
+  * **`product.combined_listing`**, Hatti's own, gives `option_name` and `values`, each its
+    `name`, whether it is the product shown (`selected`) and its `product`, fetched with the
+    others' when a template first touches one. Hatti Base's product page shows them above the
+    buy buttons as swatches, each with its first photo, linking to its page and saying where it
+    is sold out. `options_with_values` is left as it was: themes made for Shopify match a
+    variant by the place of each option, which a value from another product would upset.
+* **Consequences:** a print's colours are offered from each other's page, each keeping its own
+  address, reviews and stock. Collections still list every member; one card for a listing, its
+  option and values in Urdu, and a theme for Shopify reading the listing as its options are left
+  for later. The store's export does not hold the listings yet.

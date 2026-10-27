@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Combined listings
+
+* **One listing:** products, such as a print's colours, are shown as one combined listing, each a
+  value of its option, through the Admin API; each product's page in Hatti Base offers the
+  others on sale as swatches linking to their pages (CAT-23, [ADR-799](../architecture/13-decision-log.md#adr-799--a-shop-shows-products-as-one-combined-listing-each-a-value-of-its-option-each-products-page-offers-the-others-on-sale-as-swatches-linking-to-their-pages)).
+* 4267 tests (5 new).
+
 ### 01a259d · Sales for the accountant
 
 * **Sales report as Excel:** `salesReportExport` gives the report as a workbook of its days,
