@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-823 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-824 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -831,6 +831,7 @@
 | 821 | During a live drop, checkout takes each line's units from a token pool in Valkey first, refusing at once once it is empty; the order still takes its stock, so a pool that is wrong never oversells | Accepted |
 | 822 | A drop's waiting room lets shoppers in a minute's worth at a time in the order they came, each place kept by a secret in a cookie and its digest in Valkey, ten places at most from one internet address | Accepted |
 | 823 | A drop's products count down to its start on their pages, saying how many a customer may buy, and owners and managers schedule and delete drops from the admin | Accepted |
+| 824 | A shop's own riders each have a page opened from a secret link, with no account; a packed order handed to one ships with them, and its customer is sent a code on WhatsApp to give the rider at the door | Accepted |
 
 ---
 
@@ -27059,3 +27060,32 @@
     core's refusals are named, a plan without drops among them. Others read the list.
 * **Consequences:** INV-09 and OS-17 are done in code, but for the load spike (OWN-14). A drop
   is not changed from the admin yet, only deleted and scheduled again; the API changes it.
+
+## ADR-824 · A shop's own riders each have a page opened from a secret link, with no account; a packed order handed to one ships with them, and its customer is sent a code on WhatsApp to give the rider at the door
+
+* **Context:** SHP-10 and APP-06 ask for delivery by the shop's own riders (Growth): bakeries,
+  grocers and same-city fashion shops send their own people, today marked shipped by hand
+  (ADR-330) with nothing to say who carries what, whether it arrived, or what cash came back.
+  06 §9 sketches zones, a rider mode, proof of delivery and a cash hand-over.
+* **Decision:**
+  * **Riders** (`logistics.riders`): a name and a Pakistani mobile, active or not, 50 a shop.
+    Each has a page of their own opened from a link that carries a 128-bit secret, kept only as
+    its SHA-256, given once when the rider is added or given a new link, the old one then
+    working no more. Riders need no account: many have a phone and WhatsApp, not an email.
+    Owners and managers, and roles that manage staff, add and change them.
+  * **Handing out:** packed orders handed to an active rider, 50 at a time, each in a
+    transaction of its own, are shipped with them as their courier (tracking company "<shop>'s
+    rider <name>", a number of Hatti's own, everything left to ship in one parcel): shipping
+    now joins the caller's transaction (`fulfillIn`), so that a parcel and its delivery are made
+    together or not at all. The delivery keeps what the order owed in cash on delivery then,
+    the rider's to collect. One refused, as an order not yet confirmed, stops none of the others.
+  * **A code for the door:** its customer is sent a four-digit code on WhatsApp
+    (`hatti_delivery_code`, sent whatever the shop's notifications say, as a secret kept
+    nowhere once sent), and the delivery keeps only its SHA-256, for the rider's page to check.
+    Where no code can be sent, the delivery says so.
+  * The Admin API lists riders, with the deliveries they carry and the cash they hold, and the
+    deliveries, by rider and status.
+* **Consequences:** the rider's page, delivered or failed with the cash collected, comes next
+  (ADR-825), then the cash handed over (ADR-826) and the admin's pages (ADR-827). Zones and
+  their fees stay with the shop's delivery charges by city; a rider is chosen by hand.
+  `hatti_delivery_code` is for Meta to approve with Hatti's other templates (OWN-23).

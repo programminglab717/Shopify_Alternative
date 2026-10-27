@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Own riders
+
+* **Riders and hand-outs:** a shop adds its own riders, each with a page opened from a link of
+  their own, and hands them packed orders, each shipped with them and its customer sent a code
+  to give the rider at the door (SHP-10, APP-06, [ADR-824](../architecture/13-decision-log.md#adr-824--a-shops-own-riders-each-have-a-page-opened-from-a-secret-link-with-no-account-a-packed-order-handed-to-one-ships-with-them-and-its-customer-is-sent-a-code-on-whatsapp-to-give-the-rider-at-the-door)). The rider's page, the cash handed
+  over and the admin's pages follow.
+* **Needs the owner later:** `hatti_delivery_code`, a new Hatti template, for Meta to approve
+  with the rest (OWN-23).
+* 4397 tests (5 new).
+
 ### fa1e622 · Drops on the storefront and in the admin
 
 * **Countdown and admin:** a drop's products count down to its start on Hatti Base with the
