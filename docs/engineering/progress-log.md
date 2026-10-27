@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Stitching in the admin
+### 262c528 · Stitching in the admin
 
 * **Stitching service card:** a product is offered stitched from its page in the admin, with
   what stitching adds, its days and the measurements to ask for (CAT-09, [ADR-804](../architecture/13-decision-log.md#adr-804--the-admin-offers-a-product-stitched-from-its-page-what-stitching-adds-its-days-and-the-measurements-to-ask-for-the-usual-ones-chosen-to-begin-with)). CAT-09 is
