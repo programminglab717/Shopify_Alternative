@@ -26783,7 +26783,7 @@
   with what it says first, for those who change settings; others see it as it is. The inbox
   shows a chat from the online store by the name the shopper gave and their number, marked
   Web chat in the list; its page says they read answers when they open the chat again, and
-  offers the reply box at any time, saying no day to answer within. Its orders' drafts are
-  offered as they are while the WhatsApp window is open.
+  offers the reply box at any time, saying no day to answer within; an order drafted for the
+  customer is offered to send in it at any time too, as on WhatsApp within its day.
 * **Consequences:** a shop turns the chat on and answers it where it answers WhatsApp. With
   ADR-810 and ADR-811, MSG-10 is done.

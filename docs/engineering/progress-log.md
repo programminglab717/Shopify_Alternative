@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Web chat in the admin
+### a9b6ad6 · Web chat in the admin
 
 * **Settings and inbox:** the chat on the online store is turned on in Settings → Customer
   messages; the inbox shows its chats by name, answered at any time (MSG-10, [ADR-812](../architecture/13-decision-log.md#adr-812--the-admin-turns-the-chat-on-in-customer-messages-and-its-inbox-shows-chats-from-the-online-store-by-name-answered-at-any-time)). MSG-10
