@@ -28,7 +28,7 @@ export interface LocalStorageOptions {
 /** What a URL `LocalStorage` signed lets its holder do. */
 export type LocalGrant =
   | { method: 'PUT'; contentType: string; contentLength: number }
-  | { method: 'GET'; filename: string | null; attachment: boolean };
+  | { method: 'GET'; filename: string | null; attachment?: true };
 
 /**
  * Files kept in a directory, for development and tests: the core serves them at `baseUrl`, taking
@@ -94,7 +94,11 @@ export class LocalStorage extends ObjectStorage {
     const given = Buffer.from(signature);
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
     if (method === 'GET') {
-      return { method, filename: fields.filename ?? null, attachment: fields.attachment === '1' };
+      return {
+        method,
+        filename: fields.filename ?? null,
+        ...(fields.attachment === '1' && { attachment: true as const }),
+      };
     }
     const length = Number(fields.length);
     if (!fields.type || !Number.isSafeInteger(length)) return null;

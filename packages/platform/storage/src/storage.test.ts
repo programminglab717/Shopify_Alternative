@@ -111,7 +111,6 @@ describe('LocalStorage', () => {
     expect(storage.verify('GET', KEY, queryOf(download))).toEqual({
       method: 'GET',
       filename: 'Receipt 12.jpg',
-      attachment: false,
     });
     // Saved as a download (ADR-814), which the signature keeps.
     const saved = storage.signDownload(KEY, 60, { filename: 'Patterns.pdf', attachment: true });
