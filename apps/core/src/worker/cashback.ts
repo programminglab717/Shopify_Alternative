@@ -43,7 +43,8 @@ export function cashbackCreditId(orderId: string): string {
  * both heard, in whichever order they come; the credit is given once. Gift cards earn none: a
  * card is money, not goods (ADR-805). Refunded, the share of its cashback the refunds took is
  * taken back, as far as what is left of that credit goes: what its customer spent of it stays
- * spent. (A delivered order can't be cancelled.)
+ * spent. (A delivered order can't be cancelled.) A customer who spent enough on their other
+ * orders is given the share of the highest tier they reach (ADR-806).
  */
 export class CashbackRewards {
   /** The events {@link handle} reads. */
@@ -81,8 +82,11 @@ export class CashbackRewards {
       ) {
         return null;
       }
+      // The highest tier what its customer spent on their other orders reaches (ADR-806).
+      const tier = cashback.tiers.filter((each) => each.spent <= order.spentElsewhere).at(-1);
+      const percent = tier?.percent ?? cashback.percent;
       const amount =
-        (((await earning(tx, shopId, order)) * BigInt(cashback.percent)) / 100n / RUPEE) * RUPEE;
+        (((await earning(tx, shopId, order)) * BigInt(percent)) / 100n / RUPEE) * RUPEE;
       if (amount <= 0n) return null;
       const id = cashbackCreditId(order.id);
       const given = await creditStoreCreditIn(
@@ -96,7 +100,7 @@ export class CashbackRewards {
           event: 'adjustment',
           orderId: order.id,
           expiresAt: new Date(at.getTime() + cashback.days * 86_400_000),
-          note: `Cashback: ${cashback.percent}% of order #${order.number}`,
+          note: `Cashback: ${percent}% of order #${order.number}` + (tier ? ` (${tier.name})` : ''),
         },
         ['orderId'],
         at,

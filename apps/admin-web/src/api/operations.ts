@@ -10015,6 +10015,13 @@ const MARKETING_AUTOMATION = /* GraphQL */ `
     }
     cashbackPercent
     creditDays
+    cashbackTiers {
+      name
+      spent {
+        amount
+      }
+      percent
+    }
     updatedAt
     template {
       id

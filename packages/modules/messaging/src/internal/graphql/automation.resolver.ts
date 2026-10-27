@@ -60,6 +60,7 @@ export class AutomationResolver {
       creditAmount: input.creditAmount,
       cashbackPercent: input.cashbackPercent,
       creditDays: input.creditDays,
+      cashbackTiers: input.cashbackTiers?.map((tier) => ({ ...tier })),
     });
     return Object.assign(new MarketingAutomationUpdatePayload(), {
       marketingAutomation: result.ok ? toAutomation(result.value, tenant) : null,
@@ -75,5 +76,10 @@ function toAutomation(record: AutomationRecord, tenant: TenantContext): Marketin
     template: record.template && toTemplate(record.template),
     creditAmount:
       record.creditAmount === null ? null : Money.from(money(record.creditAmount, tenant.currency)),
+    cashbackTiers:
+      record.cashbackTiers?.map((tier) => ({
+        ...tier,
+        spent: Money.from(money(tier.spent, tenant.currency)),
+      })) ?? null,
   });
 }

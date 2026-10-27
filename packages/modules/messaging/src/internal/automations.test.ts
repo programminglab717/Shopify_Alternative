@@ -188,6 +188,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         creditAmount: null,
         cashbackPercent: null,
         creditDays: null,
+        cashbackTiers: null,
         updatedAt: null,
       },
       {
@@ -198,6 +199,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         creditAmount: null,
         cashbackPercent: null,
         creditDays: null,
+        cashbackTiers: null,
         updatedAt: null,
       },
       {
@@ -208,6 +210,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         creditAmount: null,
         cashbackPercent: null,
         creditDays: null,
+        cashbackTiers: null,
         updatedAt: null,
       },
       {
@@ -218,6 +221,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         creditAmount: 100_00n,
         cashbackPercent: null,
         creditDays: null,
+        cashbackTiers: null,
         updatedAt: null,
       },
       {
@@ -228,6 +232,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         creditAmount: null,
         cashbackPercent: 5,
         creditDays: 90,
+        cashbackTiers: [],
         updatedAt: null,
       },
     ]);
@@ -358,9 +363,9 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
       cashbackPercent: 5,
       creditDays: 90,
     });
-    expect(await cashback()).toEqual({ percent: 5, days: 90 });
+    expect(await cashback()).toEqual({ percent: 5, days: 90, tiers: [] });
     unwrap(await automations.update(a, 'cashback', { cashbackPercent: 3, creditDays: 30 }));
-    expect(await cashback()).toEqual({ percent: 3, days: 30 });
+    expect(await cashback()).toEqual({ percent: 3, days: 30, tiers: [] });
     // Off, it gives nothing; on again, as much as before.
     unwrap(await automations.update(a, 'cashback', { enabled: false }));
     expect(await cashback()).toBeNull();
@@ -368,6 +373,70 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
       cashbackPercent: 3,
       creditDays: 30,
     });
+  });
+
+  it('gives more back to customers who spent more, in up to three tiers, checked (ADR-806)', async () => {
+    const code = async (result: Promise<MutationResult<unknown>>) => {
+      const done = await result;
+      return done.ok
+        ? 'ok'
+        : `${done.errors[0]!.field.join('.')} ${done.errors[0]!.code}: ${done.errors[0]!.message}`;
+    };
+    const tier = (name: string, spent: string, percent: number) => ({ name, spent, percent });
+    const cashback = () => db.tenant(a.shopId, (tx) => cashbackIn(tx, a.shopId));
+    unwrap(await automations.update(a, 'cashback', { enabled: true, cashbackPercent: 5 }));
+    expect(
+      await code(automations.update(a, 'welcome', { cashbackTiers: [tier('Gold', '1', 6)] })),
+    ).toBe('input.cashbackTiers INVALID: Only cashback has tiers');
+    const tried = async (...tiers: ReturnType<typeof tier>[]) =>
+      code(automations.update(a, 'cashback', { cashbackTiers: tiers }));
+    expect(
+      await tried(tier('A', '1', 6), tier('B', '2', 7), tier('C', '3', 8), tier('D', '4', 9)),
+    ).toBe('input.cashbackTiers TOO_MANY: Cashback has 3 tiers at most');
+    expect(await tried(tier(' ', '1', 6))).toBe('input.cashbackTiers.0.name BLANK: Name the tier');
+    expect(await tried(tier('x'.repeat(41), '1', 6))).toBe(
+      'input.cashbackTiers.0.name TOO_LONG: Name the tier in 40 characters at most',
+    );
+    expect(await tried(tier('Gold', '1', 6), tier('gold', '2', 7))).toBe(
+      'input.cashbackTiers.1.name TAKEN: Another tier has this name',
+    );
+    expect(await tried(tier('Gold', '0.5', 6))).toBe(
+      'input.cashbackTiers.0.spent INVALID: A tier starts from between Rs 1 and Rs 1 crore spent',
+    );
+    expect(await tried(tier('Gold', '1,000', 6), tier('Silver', '1000', 7))).toBe(
+      'input.cashbackTiers.1.spent TAKEN: Another tier starts from this much',
+    );
+    expect(await tried(tier('Gold', '1', 21))).toBe(
+      'input.cashbackTiers.0.percent INVALID: Give back between 1% and 20%',
+    );
+    expect(await tried(tier('Gold', '50,000', 7), tier('Silver', '20,000', 8))).toBe(
+      'input.cashbackTiers INVALID: Gold must give back more than Silver, as its customers spent more',
+    );
+    expect(await tried(tier('Silver', '20,000', 5))).toBe(
+      'input.cashbackTiers INVALID: Silver must give back more than the 5% every customer gets',
+    );
+    // Kept by what they start from, whatever order they came in.
+    expect(
+      unwrap(
+        await automations.update(a, 'cashback', {
+          cashbackTiers: [tier(' Gold ', '50,000', 10), tier('Silver', '20,000', 7)],
+        }),
+      ).cashbackTiers,
+    ).toEqual([
+      { name: 'Silver', spent: 20_000_00n, percent: 7 },
+      { name: 'Gold', spent: 50_000_00n, percent: 10 },
+    ]);
+    expect((await cashback())!.tiers.map((each) => each.name)).toEqual(['Silver', 'Gold']);
+    // The share every customer gets stays below its tiers'; left out, the tiers stay.
+    expect(await code(automations.update(a, 'cashback', { cashbackPercent: 7 }))).toBe(
+      'input.cashbackPercent INVALID: Silver must give back more than the 7% every customer gets',
+    );
+    expect(
+      unwrap(await automations.update(a, 'cashback', { creditDays: 60 })).cashbackTiers,
+    ).toHaveLength(2);
+    expect(
+      unwrap(await automations.update(a, 'cashback', { cashbackTiers: [] })).cashbackTiers,
+    ).toEqual([]);
   });
 
   it('welcomes a customer who subscribed once, from the shop number with its template', async () => {

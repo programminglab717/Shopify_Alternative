@@ -1,5 +1,6 @@
 import type { Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
+import { customerFactsQuery } from './customer-facts.js';
 import type { OrderStageValue, OrderStatusValue } from './schema.js';
 
 /** An order as the worker reads it to give its customer cashback (PAY-13, ADR-453). */
@@ -21,6 +22,11 @@ export interface OrderCashbackFacts {
   /** Each line's product and what it came to, for those that earn none, as gift cards (ADR-805). */
   lines: { productId: string; total: bigint }[];
   customerId: string;
+  /**
+   * What its customer has spent on their other orders, as their stats count it (ADR-023): their
+   * tier of cashback is by it (ADR-806).
+   */
+  spentElsewhere: bigint;
   /** Whether its customer was erased since. */
   erased: boolean;
 }
@@ -58,6 +64,9 @@ export async function orderCashbackFactsIn(
      WHERE o.shop_id = ${shopId} AND o.id = ${orderId}`);
   const row = rows[0];
   if (!row) return null;
+  const { rows: spent } = await tx.execute<{ amount_spent: string }>(
+    customerFactsQuery(shopId, [row.customer_id], { exceptOrderId: row.id }),
+  );
   return {
     id: row.id,
     number: row.number,
@@ -71,6 +80,7 @@ export async function orderCashbackFactsIn(
     amountRefunded: BigInt(row.amount_refunded),
     lines: row.lines.map((line) => ({ productId: line.product_id, total: BigInt(line.total) })),
     customerId: row.customer_id,
+    spentElsewhere: BigInt(spent[0]?.amount_spent ?? 0),
     erased: row.erased,
   };
 }

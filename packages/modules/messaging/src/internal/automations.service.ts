@@ -51,7 +51,22 @@ export const COD_PREPAID_CREDIT = { default: 10_000n, min: 1_000n, max: 1_000_00
 export const CASHBACK = {
   percent: { default: 5, min: 1, max: 20 },
   days: { default: 90, min: 7, max: 365 },
+  /**
+   * Its tiers (MKT-06, ADR-806): at most three, each named in so many characters at most, from
+   * what a customer has spent on their other orders, Rs 1 to Rs 1 crore.
+   */
+  tiers: { max: 3, name: 40, spentMin: 100n, spentMax: 1_000_000_000n },
 } as const;
+
+/**
+ * A tier of cashback (ADR-806): a larger share for customers who have spent at least `spent`, in
+ * minor units, on their other orders.
+ */
+export interface CashbackTier {
+  name: string;
+  spent: bigint;
+  percent: number;
+}
 
 /** How many days after a customer's last order a win-back goes: by default, and its bounds. */
 export const WIN_BACK_DAYS = { default: 60, min: 14, max: 365 } as const;
@@ -96,6 +111,8 @@ export interface AutomationRecord {
   cashbackPercent: number | null;
   /** For cashback: how many days the credit lasts. */
   creditDays: number | null;
+  /** For cashback: its tiers, by what they start from; null for other recipes. */
+  cashbackTiers: CashbackTier[] | null;
   /** When the shop last changed it; null for one never set. */
   updatedAt: Date | null;
 }
@@ -110,6 +127,8 @@ export interface AutomationInput {
   cashbackPercent?: number | null;
   /** For cashback: how many days the credit lasts. */
   creditDays?: number | null;
+  /** For cashback: its tiers, all of them, what each starts from in major units; [] for none. */
+  cashbackTiers?: { name: string; spent: string; percent: number }[] | null;
 }
 
 type AutomationRow = {
@@ -120,6 +139,7 @@ type AutomationRow = {
   credit_amount: string | null;
   cashback_percent: number | null;
   credit_days: number | null;
+  cashback_tiers: { name: string; spent: string; percent: number }[];
   updated_at: string | Date;
 };
 
@@ -162,6 +182,7 @@ export class AutomationsService {
         cashbackPercent:
           kind === 'cashback' ? (row?.cashback_percent ?? CASHBACK.percent.default) : null,
         creditDays: kind === 'cashback' ? (row?.credit_days ?? CASHBACK.days.default) : null,
+        cashbackTiers: kind === 'cashback' ? tiersOf(row) : null,
         updatedAt: row ? toDate(row.updated_at) : null,
       };
     });
@@ -241,6 +262,24 @@ export class AutomationsService {
       `The credit lasts between ${CASHBACK.days.min} and ${CASHBACK.days.max} days`,
       current.creditDays,
     );
+    let cashbackTiers = current.cashbackTiers;
+    if (input.cashbackTiers !== undefined && input.cashbackTiers !== null) {
+      if (kind !== 'cashback') {
+        check.addMessage(['input', 'cashbackTiers'], 'INVALID', 'Only cashback has tiers');
+      } else {
+        cashbackTiers = checkTiers(check, input.cashbackTiers, tenant.currency);
+      }
+    }
+    if (check.ok && cashbackTiers && cashbackPercent !== null) {
+      const below = cashbackTiers.find((tier) => tier.percent <= cashbackPercent);
+      if (below) {
+        check.addMessage(
+          ['input', input.cashbackTiers ? 'cashbackTiers' : 'cashbackPercent'],
+          'INVALID',
+          `${below.name} must give back more than the ${cashbackPercent}% every customer gets`,
+        );
+      }
+    }
     if (!check.ok) return { ok: false, errors: check.errors };
 
     const hatti = HATTI_TEMPLATE_KINDS.includes(kind);
@@ -297,16 +336,18 @@ export class AutomationsService {
       const { rows } = await tx.execute<AutomationRow>(sql`
         INSERT INTO messaging.automations
                (shop_id, kind, enabled, template_id, after_days, credit_amount,
-                cashback_percent, credit_days)
+                cashback_percent, credit_days, cashback_tiers)
         VALUES (${tenant.shopId}, ${kind}, ${enabled}, ${templateId}, ${afterDays},
-                ${creditAmount}, ${cashbackPercent}, ${creditDays})
+                ${creditAmount}, ${cashbackPercent}, ${creditDays},
+                ${JSON.stringify(tiersJson(cashbackTiers))}::jsonb)
         ON CONFLICT (shop_id, kind) DO UPDATE
            SET enabled = EXCLUDED.enabled, template_id = EXCLUDED.template_id,
                after_days = EXCLUDED.after_days, credit_amount = EXCLUDED.credit_amount,
                cashback_percent = EXCLUDED.cashback_percent,
-               credit_days = EXCLUDED.credit_days, updated_at = now()
+               credit_days = EXCLUDED.credit_days, cashback_tiers = EXCLUDED.cashback_tiers,
+               updated_at = now()
         RETURNING kind, enabled, template_id, after_days, credit_amount, cashback_percent,
-                  credit_days, updated_at`);
+                  credit_days, cashback_tiers, updated_at`);
       const row = rows[0]!;
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MarketingAutomationUpdatedPayload>(tx, tenant.shopId, {
@@ -326,7 +367,11 @@ export class AutomationsService {
           template: template?.name ?? null,
           afterDays,
           creditAmount: creditAmount?.toString() ?? null,
-          ...(kind === 'cashback' && { cashbackPercent, creditDays }),
+          ...(kind === 'cashback' && {
+            cashbackPercent,
+            creditDays,
+            cashbackTiers: tiersJson(cashbackTiers),
+          }),
         },
       });
       return {
@@ -339,6 +384,7 @@ export class AutomationsService {
           creditAmount: row.credit_amount === null ? null : BigInt(row.credit_amount),
           cashbackPercent: row.cashback_percent,
           creditDays: row.credit_days,
+          cashbackTiers: kind === 'cashback' ? tiersOf(row) : null,
           updatedAt: toDate(row.updated_at),
         },
       };
@@ -463,7 +509,7 @@ export class AutomationsService {
 async function automationsIn(tx: Tx, shopId: string): Promise<AutomationRow[]> {
   const { rows } = await tx.execute<AutomationRow>(sql`
     SELECT kind, enabled, template_id, after_days, credit_amount, cashback_percent, credit_days,
-           updated_at
+           cashback_tiers, updated_at
       FROM messaging.automations WHERE shop_id = ${shopId}`);
   return rows;
 }
@@ -487,7 +533,7 @@ export async function codPrepaidCreditIn(tx: Tx, shopId: string): Promise<bigint
 export async function cashbackIn(
   tx: Tx,
   shopId: string,
-): Promise<{ percent: number; days: number } | null> {
+): Promise<{ percent: number; days: number; tiers: CashbackTier[] } | null> {
   const row = (await automationsIn(tx, shopId)).find(
     (each) => each.kind === 'cashback' && each.enabled,
   );
@@ -495,8 +541,95 @@ export async function cashbackIn(
     ? {
         percent: row.cashback_percent ?? CASHBACK.percent.default,
         days: row.credit_days ?? CASHBACK.days.default,
+        tiers: tiersOf(row),
       }
     : null;
+}
+
+/** Cashback's tiers as kept, by what they start from. */
+function tiersOf(row: Pick<AutomationRow, 'cashback_tiers'> | undefined): CashbackTier[] {
+  return (row?.cashback_tiers ?? [])
+    .map((tier) => ({ name: tier.name, spent: BigInt(tier.spent), percent: tier.percent }))
+    .sort((a, b) => (a.spent < b.spent ? -1 : a.spent > b.spent ? 1 : 0));
+}
+
+/** Cashback's tiers as they are kept. */
+function tiersJson(
+  tiers: CashbackTier[] | null,
+): { name: string; spent: string; percent: number }[] {
+  return (tiers ?? []).map((tier) => ({
+    name: tier.name,
+    spent: tier.spent.toString(),
+    percent: tier.percent,
+  }));
+}
+
+/**
+ * Cashback's tiers as given, checked (ADR-806): at most three, each named, from Rs 1 to Rs 1 crore
+ * spent, each giving back more than those who spent less; by what they start from. Null where
+ * any is wrong, the checker saying why.
+ */
+function checkTiers(
+  check: InputChecker,
+  input: readonly { name: string; spent: string; percent: number }[],
+  currency: TenantContext['currency'],
+): CashbackTier[] | null {
+  const field = ['input', 'cashbackTiers'];
+  if (input.length > CASHBACK.tiers.max) {
+    check.addMessage(field, 'TOO_MANY', `Cashback has ${CASHBACK.tiers.max} tiers at most`);
+    return null;
+  }
+  const tiers: CashbackTier[] = [];
+  input.forEach((each, index) => {
+    const at = [...field, String(index)];
+    const name = each.name.trim();
+    if (!name) {
+      check.addMessage([...at, 'name'], 'BLANK', 'Name the tier');
+    } else if (name.length > CASHBACK.tiers.name) {
+      check.addMessage(
+        [...at, 'name'],
+        'TOO_LONG',
+        `Name the tier in ${CASHBACK.tiers.name} characters at most`,
+      );
+    } else if (tiers.some((tier) => tier.name.toLowerCase() === name.toLowerCase())) {
+      check.addMessage([...at, 'name'], 'TAKEN', 'Another tier has this name');
+    }
+    const spent = check.price([...at, 'spent'], each.spent, currency, { required: true });
+    if (spent !== null && (spent < CASHBACK.tiers.spentMin || spent > CASHBACK.tiers.spentMax)) {
+      check.addMessage(
+        [...at, 'spent'],
+        'INVALID',
+        'A tier starts from between Rs 1 and Rs 1 crore spent',
+      );
+    } else if (spent !== null && tiers.some((tier) => tier.spent === spent)) {
+      check.addMessage([...at, 'spent'], 'TAKEN', 'Another tier starts from this much');
+    }
+    if (
+      !Number.isInteger(each.percent) ||
+      each.percent < CASHBACK.percent.min ||
+      each.percent > CASHBACK.percent.max
+    ) {
+      check.addMessage(
+        [...at, 'percent'],
+        'INVALID',
+        `Give back between ${CASHBACK.percent.min}% and ${CASHBACK.percent.max}%`,
+      );
+    }
+    if (spent !== null) tiers.push({ name, spent, percent: each.percent });
+  });
+  if (!check.ok) return null;
+  tiers.sort((a, b) => (a.spent < b.spent ? -1 : 1));
+  for (let i = 1; i < tiers.length; i++) {
+    if (tiers[i]!.percent <= tiers[i - 1]!.percent) {
+      check.addMessage(
+        field,
+        'INVALID',
+        `${tiers[i]!.name} must give back more than ${tiers[i - 1]!.name}, as its customers spent more`,
+      );
+      return null;
+    }
+  }
+  return tiers;
 }
 
 /** Whether the shop's automation of `kind` is on, in the caller's transaction `tx`. */

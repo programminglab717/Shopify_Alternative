@@ -200,6 +200,7 @@ export {
   AutomationsService,
   automationOnIn,
   CASHBACK,
+  type CashbackTier,
   cashbackIn,
   codPrepaidCreditIn,
   COD_PREPAID_CREDIT,

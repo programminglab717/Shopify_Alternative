@@ -44,7 +44,7 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
   let phones = 0;
 
   /** An order of `quantity` kurtas at Rs 2,345, and `cards` gift cards, paid by cash on delivery. */
-  async function ordered(quantity = 1, cards = 0): Promise<string> {
+  async function ordered(quantity = 1, cards = 0, phone?: string): Promise<string> {
     const order = unwrap(
       await orders.create(SHOP, {
         lineItems: [
@@ -53,7 +53,7 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
         ],
         shippingAddress: {
           name: 'Ayesha Khan',
-          phone: `0300 44433${String(phones++).padStart(2, '0')}`,
+          phone: phone ?? `0300 44433${String(phones++).padStart(2, '0')}`,
           address1: 'House 12, Street 4',
           city: 'Lahore',
         },
@@ -95,13 +95,19 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
       )
     ).rows;
 
-  const turn = (enabled: boolean, percent = 5, days = 90) =>
+  const turn = (
+    enabled: boolean,
+    percent = 5,
+    days = 90,
+    tiers: { name: string; spent: string; percent: number }[] = [],
+  ) =>
     admin.query(
-      `INSERT INTO messaging.automations (shop_id, kind, enabled, cashback_percent, credit_days)
-       VALUES ($1, 'cashback', $2, $3, $4)
+      `INSERT INTO messaging.automations
+              (shop_id, kind, enabled, cashback_percent, credit_days, cashback_tiers)
+       VALUES ($1, 'cashback', $2, $3, $4, $5)
        ON CONFLICT (shop_id, kind) DO UPDATE
-          SET enabled = $2, cashback_percent = $3, credit_days = $4`,
-      [SHOP.shopId, enabled, percent, days],
+          SET enabled = $2, cashback_percent = $3, credit_days = $4, cashback_tiers = $5`,
+      [SHOP.shopId, enabled, percent, days, JSON.stringify(tiers)],
     );
 
   beforeAll(async () => {
@@ -267,6 +273,30 @@ describe.skipIf(!server)('Cashback on delivered, paid orders (PAY-13, ADR-453)',
     unwrap(await refunds.refund(SHOP, orderId, { amount: '2,345', method: 'cash' }));
     expect(await hear(OrderEvents.OrderRefunded, orderId)).toBe(-34_00n);
     expect((await taken()).map((row) => row.amount)).toEqual(['23500', '3400']);
+  });
+
+  it('gives the share of the highest tier what the customer spent on their other orders reaches (ADR-806)', async () => {
+    // A customer's first order: nothing spent before, the 5% every customer gets.
+    await turn(true, 5, 30, [
+      { name: 'Silver', spent: '200000', percent: 7 },
+      { name: 'Gold', spent: '10000000', percent: 10 },
+    ]);
+    const first = await ordered(1, 0, '0300 4443399');
+    unwrap(await orders.markAsPaid(SHOP, first));
+    await delivered(first);
+    expect(await hear(OrderEvents.OrderPaid, first)).toBe(117_00n);
+    // The same customer again: Rs 2,345 spent, Silver's 7% of the next.
+    const again = await ordered(1, 0, '0300 4443399');
+    unwrap(await orders.markAsPaid(SHOP, again));
+    await delivered(again);
+    expect(await hear(OrderEvents.OrderPaid, again)).toBe(164_00n);
+    const { rows: numbered } = await admin.query<{ number: number }>(
+      'SELECT number FROM orders.orders WHERE id = $1',
+      [again],
+    );
+    expect((await credits(again))[0]!.note).toBe(
+      `Cashback: 7% of order #${numbered[0]!.number} (Silver)`,
+    );
   });
 
   it('takes back nothing of an order that earned no cashback', async () => {

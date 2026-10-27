@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { CircleCheck, CirclePause, Save, Workflow } from 'lucide-react';
+import { CircleCheck, CirclePause, Plus, Save, Trash2, Workflow } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { MarketingAutomationsQuery, MarketingAutomationUpdateMutation } from '../api/operations';
@@ -31,6 +31,19 @@ const FROM_HATTI: readonly MarketingAutomationKind[] = ['BACK_IN_STOCK', 'COD_PR
 /** Cashback's share of the goods given back, and the days its credit lasts (ADR-453). */
 const CASHBACK_PERCENT = { min: 1, max: 20 } as const;
 const CASHBACK_DAYS = { min: 7, max: 365 } as const;
+
+/** Cashback's tiers, at most three (ADR-806), as the page holds them while they are changed. */
+const CASHBACK_TIERS = 3;
+type TierDraft = { name: string; spent: string; percent: string };
+
+/** The tiers as the core gives them, as the page holds them. */
+function tierDrafts(automation: MarketingAutomation): TierDraft[] {
+  return (automation.cashbackTiers ?? []).map((tier) => ({
+    name: tier.name,
+    spent: rupeesOf(tier.spent.amount),
+    percent: String(tier.percent),
+  }));
+}
 
 /** The store credit COD to prepaid may offer, in rupees (ADR-432), and as the page says them. */
 const CREDIT_RUPEES = { min: 10, max: 10_000 } as const;
@@ -72,6 +85,7 @@ function Recipe({
         creditAmount?: string;
         cashbackPercent?: number;
         creditDays?: number;
+        cashbackTiers?: { name: string; spent: string; percent: number }[];
       };
     }
   >(MarketingAutomationUpdateMutation);
@@ -85,6 +99,13 @@ function Recipe({
   const [credit, setCredit] = useState(rupeesOf(automation.creditAmount?.amount));
   const [percent, setPercent] = useState(String(automation.cashbackPercent ?? ''));
   const [creditDays, setCreditDays] = useState(String(automation.creditDays ?? ''));
+  const [tiers, setTiers] = useState<TierDraft[]>(() => tierDrafts(automation));
+  const tiersChanged =
+    cashback &&
+    JSON.stringify(tiers.map((tier) => ({ ...tier, name: tier.name.trim() }))) !==
+      JSON.stringify(tierDrafts(automation));
+  const setTier = (index: number, change: Partial<TierDraft>) =>
+    setTiers((all) => all.map((tier, at) => (at === index ? { ...tier, ...change } : tier)));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   // The approved templates, and the one chosen whatever Meta made of it since.
@@ -98,7 +119,8 @@ function Recipe({
     (prepaid && credit.trim() !== rupeesOf(automation.creditAmount?.amount)) ||
     (cashback &&
       (percent.trim() !== String(automation.cashbackPercent ?? '') ||
-        creditDays.trim() !== String(automation.creditDays ?? '')));
+        creditDays.trim() !== String(automation.creditDays ?? '') ||
+        tiersChanged));
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -146,6 +168,21 @@ function Recipe({
       setProblem(t('automations.badCreditDays', CASHBACK_DAYS));
       return;
     }
+    const tiered = tiers.map((tier) => ({
+      name: tier.name.trim(),
+      spent: tier.spent.trim(),
+      percent: within(tier.percent, CASHBACK_PERCENT),
+    }));
+    if (
+      tiersChanged &&
+      tiered.some(
+        (tier) =>
+          !tier.name || !(Number(tier.spent.replace(/,/g, '')) > 0) || tier.percent === null,
+      )
+    ) {
+      setProblem(t('automations.badTier', CASHBACK_PERCENT));
+      return;
+    }
     try {
       const { marketingAutomationUpdate } = await update.mutateAsync({
         kind: automation.kind,
@@ -155,6 +192,9 @@ function Recipe({
           ...(winBack && { afterDays }),
           ...(prepaid && { creditAmount: credit.trim() }),
           ...(cashback && { cashbackPercent: share!, creditDays: lasts! }),
+          ...(tiersChanged && {
+            cashbackTiers: tiered.map((tier) => ({ ...tier, percent: tier.percent! })),
+          }),
         },
       });
       const error = marketingAutomationUpdate.userErrors[0];
@@ -162,6 +202,9 @@ function Recipe({
         setProblem(problemText(error, t));
         return;
       }
+      // As the core keeps them: by what they start from, in plain rupees.
+      const kept = marketingAutomationUpdate.marketingAutomation;
+      if (kept && cashback) setTiers(tierDrafts(kept));
       setSaved(true);
     } catch (failure) {
       setProblem(errorText(failure, t));
@@ -246,6 +289,55 @@ function Recipe({
               value={creditDays}
               onChange={(event) => setCreditDays(event.target.value)}
             />
+            <fieldset className="flex flex-col gap-3">
+              <legend className="font-medium">{t('automations.tiers')}</legend>
+              <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                {t('automations.tiersHint', { max: CASHBACK_TIERS })}
+              </p>
+              {tiers.map((tier, index) => (
+                <div key={index} className="flex flex-wrap items-end gap-2">
+                  <TextField
+                    label={t('automations.tierName', { n: index + 1 })}
+                    value={tier.name}
+                    maxLength={40}
+                    onChange={(event) => setTier(index, { name: event.target.value })}
+                  />
+                  <TextField
+                    label={t('automations.tierSpent', { n: index + 1 })}
+                    inputMode="decimal"
+                    ltr
+                    value={tier.spent}
+                    onChange={(event) => setTier(index, { spent: event.target.value })}
+                  />
+                  <TextField
+                    label={t('automations.tierPercent', { n: index + 1 })}
+                    inputMode="numeric"
+                    ltr
+                    value={tier.percent}
+                    onChange={(event) => setTier(index, { percent: event.target.value })}
+                  />
+                  <Button
+                    type="button"
+                    variant="danger"
+                    icon={<Trash2 aria-hidden className="size-5" />}
+                    onClick={() => setTiers((all) => all.filter((_, at) => at !== index))}
+                  >
+                    {t('automations.removeTier', { n: index + 1 })}
+                  </Button>
+                </div>
+              ))}
+              {tiers.length < CASHBACK_TIERS && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="self-start"
+                  icon={<Plus aria-hidden className="size-5" />}
+                  onClick={() => setTiers((all) => [...all, { name: '', spent: '', percent: '' }])}
+                >
+                  {t('automations.addTier')}
+                </Button>
+              )}
+            </fieldset>
           </>
         )}
         <CheckField label={t('automations.on')} checked={enabled} onChange={setEnabled} />

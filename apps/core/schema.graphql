@@ -1774,6 +1774,33 @@ type CashOnDeliverySettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+A tier of cashback (MKT-06, ADR-806): a larger share for customers who have spent at least so much on their other orders.
+"""
+type CashbackTier {
+  """Its name, as Gold."""
+  name: String!
+
+  """The share of an order's goods it gives back, in percent."""
+  percent: Int!
+
+  """What a customer has spent on their other orders from."""
+  spent: Money!
+}
+
+input CashbackTierInput {
+  """Its name, in 40 characters at most."""
+  name: String!
+
+  """
+  1 to 20 percent of an order's goods, more than those who spent less get.
+  """
+  percent: Int!
+
+  """What a customer has spent on their other orders from, as "20000"."""
+  spent: String!
+}
+
 """What the checkout offers to send a gift with (CHK-16, ADR-413)."""
 type CheckoutGiftOptions {
   """
@@ -7433,6 +7460,11 @@ type MarketingAutomation {
   """
   cashbackPercent: Int
 
+  """
+  For cashback: its tiers, by what they start from, each giving back more; the share above for those who spent less than any (ADR-806).
+  """
+  cashbackTiers: [CashbackTier!]
+
   """For COD to prepaid: the store credit offered for paying online."""
   creditAmount: Money
 
@@ -7458,6 +7490,9 @@ input MarketingAutomationInput {
 
   """For cashback: 1 to 20 percent of an order's goods given back."""
   cashbackPercent: Int
+
+  """For cashback: all its tiers, at most three; [] for none."""
+  cashbackTiers: [CashbackTierInput!]
 
   """For COD to prepaid: Rs 10 to Rs 10,000 of store credit, as "100"."""
   creditAmount: String

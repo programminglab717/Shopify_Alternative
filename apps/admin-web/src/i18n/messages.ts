@@ -5244,6 +5244,16 @@ const en = {
   'automations.afterDays': 'Days after their last order',
   'automations.afterDaysHint': 'From {min} to {max}.',
   'automations.badDays': 'Give days from {min} to {max}',
+  'automations.tiers': 'Tiers',
+  'automations.tiersHint':
+    'A larger share for customers who have spent more on their other orders: up to {max} tiers, each giving back more than the one before.',
+  'automations.tierName': 'Tier {n} name',
+  'automations.tierSpent': 'Tier {n}: spent from (Rs)',
+  'automations.tierPercent': 'Tier {n}: share given back (%)',
+  'automations.removeTier': 'Remove tier {n}',
+  'automations.addTier': 'Add a tier',
+  'automations.badTier':
+    'Name each tier, say in rupees what it starts from, and give back between {min}% and {max}%.',
   'automations.save': 'Save',
   'automations.saved': 'Saved.',
   'automations.noTemplate': 'An automation sends a template Meta approved. You have none yet.',
@@ -11178,6 +11188,16 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'automations.afterDays': 'آخری آرڈر کے کتنے دن بعد',
   'automations.afterDaysHint': '{min} سے {max} تک۔',
   'automations.badDays': '{min} سے {max} دن دیں',
+  'automations.tiers': 'درجے',
+  'automations.tiersHint':
+    'اپنے دوسرے آرڈرز پر زیادہ خرچ کرنے والے گاہکوں کے لیے بڑا حصہ: زیادہ سے زیادہ {max} درجے، ہر ایک پچھلے سے زیادہ واپس دیتا ہے۔',
+  'automations.tierName': 'درجہ {n} کا نام',
+  'automations.tierSpent': 'درجہ {n}: اتنے خرچ سے (روپے)',
+  'automations.tierPercent': 'درجہ {n}: واپس دیا جانے والا حصہ (%)',
+  'automations.removeTier': 'درجہ {n} ہٹائیں',
+  'automations.addTier': 'درجہ شامل کریں',
+  'automations.badTier':
+    'ہر درجے کا نام لکھیں، روپوں میں بتائیں کہ وہ کتنے خرچ سے شروع ہوتا ہے، اور {min}% سے {max}% کے درمیان واپس دیں۔',
   'automations.save': 'محفوظ کریں',
   'automations.saved': 'محفوظ ہو گیا۔',
   'automations.noTemplate':

@@ -4738,6 +4738,8 @@ export interface MarketingAutomation {
   cashbackPercent?: number | null;
   /** For cashback: how many days its store credit lasts; absent from a fake core. */
   creditDays?: number | null;
+  /** For cashback: its tiers, by what they start from (ADR-806); absent from a fake core. */
+  cashbackTiers?: { name: string; spent: { amount: string }; percent: number }[] | null;
   updatedAt: string | null;
   template: AutomationTemplate | null;
 }

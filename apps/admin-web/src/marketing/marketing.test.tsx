@@ -196,6 +196,7 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
           creditAmount?: string;
           cashbackPercent?: number;
           creditDays?: number;
+          cashbackTiers?: { name: string; spent: string; percent: number }[];
         };
         const chosen = (templates as { id: string; status: string }[]).find(
           (each) => each.id === input.templateId,
@@ -230,6 +231,12 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
                 ...(input.cashbackPercent && {
                   cashbackPercent: input.cashbackPercent,
                   creditDays: input.creditDays,
+                }),
+                ...(input.cashbackTiers && {
+                  cashbackTiers: [...input.cashbackTiers]
+                    .map((tier) => ({ ...tier, spent: tier.spent.replace(/,/g, '') }))
+                    .sort((a, b) => Number(a.spent) - Number(b.spent))
+                    .map((tier) => ({ ...tier, spent: { amount: `${tier.spent}.00` } })),
                 }),
                 updatedAt: LATER,
               }
@@ -726,6 +733,63 @@ describe('Marketing: automations (MKT-04, ADR-428)', () => {
       expect(
         (within(again).getByLabelText('Days the credit lasts') as HTMLInputElement).value,
       ).toBe('30');
+    });
+  });
+  it('gives more back to customers who spent more, in up to three tiers (ADR-806)', async () => {
+    const fake = core('owner', { templates: [] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/automations');
+
+    const heading = { name: 'Cashback' };
+    const form = (await screen.findByRole('heading', heading)).closest('form')!;
+    const add = () => fireEvent.click(within(form).getByRole('button', { name: 'Add a tier' }));
+    const field = (label: string) => within(form).getByLabelText(label) as HTMLInputElement;
+    add();
+    add();
+    fireEvent.change(field('Tier 1 name'), { target: { value: 'Gold' } });
+    fireEvent.change(field('Tier 1: spent from (Rs)'), { target: { value: '50,000' } });
+    fireEvent.change(field('Tier 1: share given back (%)'), { target: { value: '10' } });
+    // A tier half filled in: said before anything is sent.
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(
+      await within(form).findByText(
+        'Name each tier, say in rupees what it starts from, and give back between 1% and 20%.',
+      ),
+    ).toBeTruthy();
+    fireEvent.change(field('Tier 2 name'), { target: { value: 'Silver' } });
+    fireEvent.change(field('Tier 2: spent from (Rs)'), { target: { value: '20000' } });
+    fireEvent.change(field('Tier 2: share given back (%)'), { target: { value: '7' } });
+    // Three at most.
+    add();
+    expect(within(form).queryByRole('button', { name: 'Add a tier' })).toBeNull();
+    fireEvent.click(within(form).getByRole('button', { name: 'Remove tier 3' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'MarketingAutomationUpdate')?.variables,
+      ).toEqual({
+        kind: 'CASHBACK',
+        input: {
+          enabled: false,
+          cashbackPercent: 5,
+          creditDays: 90,
+          cashbackTiers: [
+            { name: 'Gold', spent: '50,000', percent: 10 },
+            { name: 'Silver', spent: '20000', percent: 7 },
+          ],
+        },
+      }),
+    );
+    // Kept by what they start from: Silver first.
+    await waitFor(() => {
+      const again = screen.getByRole('heading', heading).closest('form')!;
+      expect((within(again).getByLabelText('Tier 1 name') as HTMLInputElement).value).toBe(
+        'Silver',
+      );
+      expect(
+        (within(again).getByLabelText('Tier 2: spent from (Rs)') as HTMLInputElement).value,
+      ).toBe('50000');
+      expect(within(again).getByRole('button', { name: 'Save' })).toHaveProperty('disabled', true);
     });
   });
 });

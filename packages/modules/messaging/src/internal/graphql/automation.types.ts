@@ -55,6 +55,36 @@ registerEnumType(MarketingAutomationKind, {
 
 @ObjectType({
   description:
+    'A tier of cashback (MKT-06, ADR-806): a larger share for customers who have spent at least ' +
+    'so much on their other orders.',
+})
+export class CashbackTier {
+  @Field({ description: 'Its name, as Gold.' })
+  name!: string;
+
+  @Field(() => Money, { description: 'What a customer has spent on their other orders from.' })
+  spent!: Money;
+
+  @Field(() => Int, { description: "The share of an order's goods it gives back, in percent." })
+  percent!: number;
+}
+
+@InputType()
+export class CashbackTierInput {
+  @Field({ description: 'Its name, in 40 characters at most.' })
+  name!: string;
+
+  @Field({ description: 'What a customer has spent on their other orders from, as "20000".' })
+  spent!: string;
+
+  @Field(() => Int, {
+    description: "1 to 20 percent of an order's goods, more than those who spent less get.",
+  })
+  percent!: number;
+}
+
+@ObjectType({
+  description:
     "One of the shop's automations (ADR-425): one of its approved WhatsApp templates, sent from " +
     'its own number when something happens to a customer who agreed to hear from it there.',
 })
@@ -95,6 +125,14 @@ export class MarketingAutomation {
   })
   creditDays!: number | null;
 
+  @Field(() => [CashbackTier], {
+    nullable: true,
+    description:
+      'For cashback: its tiers, by what they start from, each giving back more; the share above ' +
+      'for those who spent less than any (ADR-806).',
+  })
+  cashbackTiers!: CashbackTier[] | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed it; null for one never set.',
@@ -133,6 +171,12 @@ export class MarketingAutomationInput {
     description: 'For cashback: the store credit given lasts 7 to 365 days.',
   })
   creditDays?: number | null;
+
+  @Field(() => [CashbackTierInput], {
+    nullable: true,
+    description: 'For cashback: all its tiers, at most three; [] for none.',
+  })
+  cashbackTiers?: CashbackTierInput[] | null;
 }
 
 @ObjectType()
