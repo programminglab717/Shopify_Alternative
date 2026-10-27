@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Web chat
+
+* **Chat on the online store:** shoppers give their name and number and write to the shop;
+  the chat is a conversation of the inbox, answered there at any time; each browser reads only
+  its own session (MSG-10, [ADR-810](../architecture/13-decision-log.md#adr-810--web-chat-a-shopper-gives-their-name-and-number-to-chat-from-the-online-store-kept-as-a-conversation-of-the-inbox-each-browser-reading-only-its-own-session)). The Hatti Base widget and the admin come next.
+* **Fix:** the schema was stale after the invite link's description changed, which failed CI
+  once; fixed in 3c66c5c. The schema is now regenerated as the last step before each commit.
+* 4315 tests (6 new).
+
 ### 8ba84d1 · Invite links on the account page
 
 * **Bring a friend:** a signed-in shopper sees their invite link on their account, what each

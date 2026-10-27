@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-809 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-810 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -817,6 +817,7 @@
 | 807 | Referrals: a code for each customer, read from the order's landing page, and both sides given store credit once the friend's first order arrives, unless the checks against fraud refuse it | Accepted |
 | 808 | Referrals are set and seen in Marketing, and a customer's link carries ?invite=, apart from affiliates' ?ref= | Accepted |
 | 809 | A signed-in shopper finds their invite link on their account, with what each side is given, to share on WhatsApp | Accepted |
+| 810 | Web chat: a shopper gives their name and number to chat from the online store, kept as a conversation of the inbox, each browser reading only its own session | Accepted |
 
 ---
 
@@ -26731,3 +26732,25 @@
 * **Consequences:** a customer finds their link once signed in; one who never signs in has
   none, though the shop can see their code through the Admin API. With ADR-807 and ADR-808,
   MKT-07 is done.
+
+## ADR-810 · Web chat: a shopper gives their name and number to chat from the online store, kept as a conversation of the inbox, each browser reading only its own session
+
+* **Context:** MSG-10 asks for a chat on the online store. The inbox keeps conversations by
+  the customer's number (ADR-545), and its staff answer there (ADR-546); Shopify's Inbox is a
+  chat on the store. Most shoppers here would rather WhatsApp, but some will not leave the page,
+  and a shop without its own WhatsApp number has no other way to chat.
+* **Decision:** a shop turns the chat on, with a greeting of its own, in the Admin API; the
+  shop's document says whether its pages offer it (rebuilt when it changes). A shopper gives
+  their name, Pakistani mobile number and first message: the number keeps the chat beside the
+  shop's other conversations with them and lets the shop find them again. It is the
+  conversation of that number on the web, a channel of the inbox beside WhatsApp, unread and
+  waiting as a WhatsApp message is, its staff told of it as of any. They answer it from the
+  inbox at any time: no WhatsApp window, nothing sent anywhere, the answer kept for the chat.
+  Each browser that starts a chat keeps a token of its own, 32 random bytes kept as their
+  SHA-256, and reads only what was written since it began: typing someone else's number shows
+  nothing said before. Reading marks the shop's answers read. A session writes 30 messages an
+  hour at most; the storefront limits each address too. The storefront API carries it in the
+  request's body, never the address.
+* **Consequences:** a shopper who closes the page reads the answer only when they come back;
+  the shop can write to them on WhatsApp. The widget on Hatti Base and the admin's settings and
+  inbox follow (ADR-811, ADR-812). Erasing a customer removes their chats with their numbers.
