@@ -52,6 +52,7 @@ import {
   type ShopDoc,
   type ThemeDoc,
   type EasternWearDoc,
+  type WaitingRoomDoc,
 } from '@hatti/storefront-data';
 
 // The storefront's documents, made from the catalog's records (03 §8). Only what a theme may
@@ -676,6 +677,8 @@ export function shopDoc(
   pictures: Readonly<Record<string, string>> = {},
   /** The chat its pages offer, while it is on (ADR-810). */
   webChat: { greeting: string | null } | null = null,
+  /** Its drops' waiting rooms that have not ended (ADR-822). */
+  waitingRooms: readonly WaitingRoomDoc[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -742,6 +745,8 @@ export function shopDoc(
         ...(preferences.maintenance.checkoutOnly && { checkoutOnly: true as const }),
       },
     }),
+    // Its drops' waiting rooms (ADR-822), left out while it has none, likewise.
+    ...(waitingRooms.length > 0 && { waitingRooms: [...waitingRooms] }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.

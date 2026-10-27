@@ -163,6 +163,33 @@ export async function dropFactsIn(
   );
 }
 
+/** The shop's drops with a waiting room that have not ended at `at` (ADR-822), the soonest first. */
+export async function waitingRoomsIn(
+  tx: Tx,
+  shopId: string,
+  at: Date = new Date(),
+): Promise<
+  { dropId: string; name: string; startsAt: Date; endsAt: Date; admitPerMinute: number }[]
+> {
+  const { rows } = await tx.execute<{
+    id: string;
+    name: string;
+    starts_at: string | Date;
+    ends_at: string | Date;
+    admit_per_minute: number;
+  }>(sql`
+    SELECT id, name, starts_at, ends_at, admit_per_minute FROM catalog.drops
+     WHERE shop_id = ${shopId} AND admit_per_minute IS NOT NULL AND ends_at > ${at.toISOString()}
+     ORDER BY starts_at, id`);
+  return rows.map((row) => ({
+    dropId: row.id,
+    name: row.name,
+    startsAt: new Date(row.starts_at),
+    endsAt: new Date(row.ends_at),
+    admitPerMinute: row.admit_per_minute,
+  }));
+}
+
 /**
  * The shop's drops (ADR-820): scheduled, changed and deleted through the Admin API, on the plans
  * that have them.

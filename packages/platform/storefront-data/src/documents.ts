@@ -542,6 +542,12 @@ export interface ShopDoc {
    */
   maintenance?: MaintenanceDoc;
   /**
+   * Its drops with a waiting room that have not ended (ADR-822): while one is live, shoppers are
+   * let in so many a minute, in the order they came. Absent for none, as in documents written
+   * before drops.
+   */
+  waitingRooms?: WaitingRoomDoc[];
+  /**
    * True while Hatti has taken the store down (ADR-461): its storefront answers every page with
    * Hatti's page saying so. Absent while it is not, as in documents written before stores could be
    * taken down.
@@ -674,6 +680,31 @@ export interface MaintenanceDoc {
    * (ADR-603); absent for the whole storefront paused, as in documents written before.
    */
   checkoutOnly?: true;
+}
+
+/** A drop's waiting room, as a shop's document has it (ADR-822). */
+export interface WaitingRoomDoc {
+  dropId: string;
+  /** The drop's name, as its page says what shoppers wait for. */
+  name: string;
+  /** ISO 8601. */
+  startsAt: string;
+  endsAt: string;
+  /** Shoppers let in a minute. */
+  admitPerMinute: number;
+}
+
+/** The waiting room live at `now`, if any (ADR-822). */
+export function waitingRoomAt(
+  rooms: readonly WaitingRoomDoc[] | undefined,
+  now: Date,
+): WaitingRoomDoc | null {
+  return (
+    rooms?.find(
+      (room) =>
+        Date.parse(room.startsAt) <= now.getTime() && now.getTime() < Date.parse(room.endsAt),
+    ) ?? null
+  );
 }
 
 /**

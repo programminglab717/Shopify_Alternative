@@ -6495,4 +6495,87 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     }
     await app.close();
   });
+
+  it("lets a drop's shoppers in a minute's worth at a time, keeping each one's place (ADR-822)", async () => {
+    const droppy = randomUUID();
+    const sample = sampleStore();
+    const room = (startedAgoMs: number) => ({
+      dropId: randomUUID().replace(/^.{8}/, 'd0d0d0d0'),
+      name: 'Eid lawn',
+      startsAt: new Date(Date.now() - startedAgoMs).toISOString(),
+      endsAt: new Date(Date.now() + 3_600_000).toISOString(),
+      admitPerMinute: 10,
+    });
+    const live = room(30_000);
+    await publish(droppy, 'droppy', { ...sample, shop: { ...sample.shop, waitingRooms: [live] } });
+    const app = server();
+    const visit = (ip: string, cookie?: string) =>
+      app.inject({
+        method: 'GET',
+        url: '/',
+        headers: { host: 'droppy.localhost', ...(cookie && { cookie }) },
+        remoteAddress: ip,
+      });
+    // The first minute's ten are let in, each given a place.
+    for (let shopper = 1; shopper <= 10; shopper++) {
+      const response = await visit(`198.51.100.${shopper}`);
+      expect(response.statusCode, String(shopper)).toBe(200);
+      expect(String(response.headers['set-cookie'])).toMatch(/hatti_line=/);
+    }
+    // The eleventh waits, told where they are, and the page asks again by itself.
+    const waiting = await visit('198.51.100.11');
+    expect(waiting.statusCode).toBe(503);
+    expect(waiting.headers['cache-control']).toBe('private, no-store');
+    expect(Number(waiting.headers.refresh)).toBeGreaterThanOrEqual(20);
+    expect(waiting.body).toContain('re in line');
+    expect(waiting.body).toContain('About 1 ahead of you: around 1 minute.');
+    const cookie = /hatti_line=[^;]+/.exec(String(waiting.headers['set-cookie']))![0];
+    // Back again, the same place, and no new one.
+    const again = await visit('198.51.100.11', cookie);
+    expect(again.statusCode).toBe(503);
+    expect(again.headers['set-cookie']).toBeUndefined();
+    expect(again.body).toContain('About 1 ahead of you');
+    // Scripts are told in a line; robots.txt is answered as ever.
+    const script = await app.inject({
+      method: 'GET',
+      url: '/cart.js',
+      headers: { host: 'droppy.localhost', cookie },
+      remoteAddress: '198.51.100.11',
+    });
+    expect(script.statusCode).toBe(503);
+    expect(script.body).toBe(
+      "You're in line for this drop: open the shop's page to keep your place.\n",
+    );
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/robots.txt',
+          headers: { host: 'droppy.localhost' },
+          remoteAddress: '198.51.100.11',
+        })
+      ).statusCode,
+    ).toBe(200);
+    // One address takes ten places at most.
+    for (let place = 0; place < 10; place++) await visit('198.51.100.12');
+    const refused = await visit('198.51.100.12');
+    expect(refused.statusCode).toBe(503);
+    expect(refused.body).toContain('Too many places in line came from your internet connection.');
+    // A minute on, the next minute's are let in, the eleventh among them.
+    await publish(droppy, 'droppy', {
+      ...sample,
+      shop: { ...sample.shop, waitingRooms: [{ ...live, startsAt: room(61_000).startsAt }] },
+    });
+    expect((await visit('198.51.100.11', cookie)).statusCode).toBe(200);
+    // Over, or not yet begun, no one waits.
+    await publish(droppy, 'droppy', {
+      ...sample,
+      shop: {
+        ...sample.shop,
+        waitingRooms: [{ ...room(0), startsAt: new Date(Date.now() + 60_000).toISOString() }],
+      },
+    });
+    expect((await visit('198.51.100.13')).statusCode).toBe(200);
+    await app.close();
+  });
 });

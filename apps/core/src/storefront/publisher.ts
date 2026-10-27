@@ -5,6 +5,8 @@ import {
   ProductService,
   BundleEvents,
   CombinedListingEvents,
+  DropEvents,
+  waitingRoomsIn,
   ComplementEvents,
   ReviewEvents,
   SizeChartEvents,
@@ -288,6 +290,9 @@ export function itemsFor(event: DomainEvent): string[] {
       return (event.payload as unknown as CombinedListingUpdatedPayload).productIds.map(
         Items.product,
       );
+    case DropEvents.Updated:
+      // Its waiting room is the shop's document's (ADR-822).
+      return [Items.shop];
     case ReviewEvents.Written:
     case ReviewEvents.Published:
     case ReviewEvents.Hidden:
@@ -488,6 +493,7 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Hidden,
   BundleEvents.Updated,
   CombinedListingEvents.Updated,
+  DropEvents.Updated,
   ComplementEvents.Updated,
   PersonalisationEvents.Updated,
   StitchingEvents.Updated,
@@ -1009,6 +1015,13 @@ export class StorefrontPublisher {
       await this.services.filters.shownStorefrontFiltersOf(tx, shopId),
       theme ? await this.#pictures(tx, shopId, theme) : {},
       await webChatIn(tx, shopId),
+      (await waitingRoomsIn(tx, shopId)).map((room) => ({
+        dropId: room.dropId,
+        name: room.name,
+        startsAt: room.startsAt.toISOString(),
+        endsAt: room.endsAt.toISOString(),
+        admitPerMinute: room.admitPerMinute,
+      })),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

@@ -240,6 +240,7 @@ export {
   DropService,
   dropFactsIn,
   dropStatus,
+  waitingRoomsIn,
   type DropFact,
   type DropRecord,
   type DropUpdatedPayload,

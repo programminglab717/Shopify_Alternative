@@ -18,6 +18,7 @@ import {
   pathTag,
   localDay,
   pausedAt,
+  waitingRoomAt,
   redirectKey,
   searchReportOf,
   shopTag,
@@ -114,6 +115,7 @@ import {
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { developmentPage, maintenancePage, retryAfterOf } from './maintenance.js';
+import { ROOM_LIMITS, WaitingRooms, waitingPage } from './waiting-room.js';
 import {
   EMPTY_REPORT,
   EMPTY_RIGHTS,
@@ -707,6 +709,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     platform: options.platformThemes,
   });
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
+  // Drops' waiting rooms (ADR-822); without Valkey, none.
+  const rooms = redis ? new WaitingRooms(redis, keys) : null;
   // What shoppers do on each shop, counted as Shopify's analytics count it (ADR-180).
   const activity = redis ? new StorefrontActivity(redis, keys) : null;
   // Shoppers' largest contentful paint across every shop, for the objective that three in four
@@ -1149,6 +1153,54 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       .header('x-content-type-options', 'nosniff')
       .type('text/html; charset=utf-8')
       .send(paused.html);
+  });
+
+  // While a drop with a waiting room is live (ADR-822), a shopper is let in once their place in
+  // line is reached; until then every page shows where they are and asks again by itself, and
+  // scripts and forms are answered in a line of text, all with 503 and nothing kept at the edge.
+  // What a paused shop answers as ever, it answers as ever too; its staff's previews pass.
+  app.addHook('preHandler', async (request, reply) => {
+    if (!rooms || PAUSE_OPEN_ROUTES.has(request.routeOptions.url ?? '')) return;
+    const shop = await shopFor(request, reply);
+    if (!shop || shop.preview) return;
+    let doc: ShopDoc;
+    try {
+      doc = await shop.store.shop();
+    } catch (error) {
+      if (error instanceof StoreMissingError) return;
+      throw error;
+    }
+    const now = new Date();
+    const room = waitingRoomAt(doc.waitingRooms, now);
+    if (!room) return;
+    const answer = await rooms.enter(shop.shopId, room, request.headers.cookie, request.ip, now, {
+      secure: secureFor(request),
+    });
+    if (answer.kind !== 'refused' && answer.cookie) reply.header('set-cookie', answer.cookie);
+    if (answer.kind === 'in') return;
+    // Asked again a few seconds apart at random, so that the line does not ask all at once.
+    const again = ROOM_LIMITS.refreshSeconds + Math.floor(Math.random() * 10);
+    reply.header('cache-control', 'private, no-store').header('retry-after', String(again));
+    const url = new URL(request.url, 'http://storefront');
+    const page =
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !fromScript(request) &&
+      !asksForSections(url) &&
+      !/\.(js|json|xml|atom)$/.test(url.pathname);
+    if (!page) {
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send("You're in line for this drop: open the shop's page to keep your place.\n");
+    }
+    const waiting = waitingPage(doc, room, answer);
+    return reply
+      .code(503)
+      .header('refresh', String(again))
+      .header('content-security-policy', waiting.contentSecurityPolicy)
+      .header('x-content-type-options', 'nosniff')
+      .type('text/html; charset=utf-8')
+      .send(waiting.html);
   });
 
   /** The theme the shop's pages are rendered in: the one previewed, else its main theme. */

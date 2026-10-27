@@ -94,6 +94,14 @@ export class StorefrontKeys {
     return `${this.prefix}:sf:domains`;
   }
 
+  /**
+   * A drop's waiting room (ADR-822): the count of shoppers who came, and each one's place in line
+   * by a digest of the secret their cookie keeps.
+   */
+  waitingRoom(shopId: string, dropId: string): string {
+    return `${this.prefix}:{${shopId}}:wr:${dropId}`;
+  }
+
   /** Where storefronts count what shoppers do, such as changes to carts, to limit it. */
   rateLimits(): string {
     return `${this.prefix}:sf:rl`;

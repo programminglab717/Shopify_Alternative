@@ -5,6 +5,7 @@ export {
   checkoutPausedAt,
   pausedAt,
   policyField,
+  waitingRoomAt,
   sitemapEntryOf,
   type ArticleDoc,
   type BlogDoc,
@@ -41,6 +42,7 @@ export {
   type MetafieldsDoc,
   type VariantDoc,
   type VideoSourceDoc,
+  type WaitingRoomDoc,
 } from './documents.js';
 export { TranslatedStore, translated, translatedProduct } from './translations.js';
 export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';

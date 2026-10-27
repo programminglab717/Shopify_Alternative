@@ -12,6 +12,7 @@ import {
   PriceSaleService,
   StitchingService,
   ProductService,
+  DropService,
   SizeChartService,
   MetafieldService,
   bundleProductIdsIn,
@@ -2087,6 +2088,37 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { returnDays: null }));
     await deliver();
     expect((await store().shop()).returns).toBeUndefined();
+  });
+
+  it("publishes the shop's drops' waiting rooms that have not ended, and leaves them out without (ADR-822)", async () => {
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).waitingRooms).toBeUndefined();
+    const lawn = unwrap(await products.create(tenant, { title: 'Eid lawn', status: 'active' }));
+    const startsAt = new Date(Date.now() + 3_600_000);
+    const endsAt = new Date(startsAt.getTime() + 86_400_000);
+    const drops = new DropService(database);
+    const drop = unwrap(
+      await drops.set(tenant, null, {
+        name: 'Eid lawn',
+        startsAt,
+        endsAt,
+        productIds: [lawn.id],
+        admitPerMinute: 500,
+      }),
+    );
+    expect(await deliver()).toContain('drop.updated');
+    expect((await store().shop()).waitingRooms).toEqual([
+      {
+        dropId: drop.id,
+        name: 'Eid lawn',
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        admitPerMinute: 500,
+      },
+    ]);
+    await drops.delete(tenant, drop.id);
+    await deliver();
+    expect((await store().shop()).waitingRooms).toBeUndefined();
   });
 
   it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {
