@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-800 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-801 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -808,6 +808,7 @@
 | 798 | The sales report goes to the shop's accountant as an Excel workbook: its days, weeks or months with their total, the products that sold most and each channel's sales | Accepted |
 | 799 | A shop shows products as one combined listing, each a value of its option: each product's page offers the others on sale as swatches linking to their pages | Accepted |
 | 800 | The admin combines products into one listing from a product's page, that product always among them | Accepted |
+| 801 | Blog articles are drafted with AI from what the shop wants them to say, never kept, thirty a day, each spending an AI credit | Accepted |
 
 ---
 
@@ -26545,3 +26546,31 @@
   product they are about. Stopping it deletes the listing. Those who change products edit it.
 * **Consequences:** the listing is edited from any of its products' pages, each showing the
   same listing. There is no page of every listing; the Admin API's `combinedListings` has them.
+
+## ADR-801 · Blog articles are drafted with AI from what the shop wants them to say, never kept, thirty a day, each spending an AI credit
+
+* **Context:** a shop's blog brings shoppers from search engines and tells them how to wear and
+  care for what it sells, but few Pakistani shops have the time to write one (MKT-15, Growth).
+  The AI gateway already drafts products' copy (ADR-471) and translations (ADR-463), each spending
+  a credit of the plan's (ADR-533).
+* **Decision:**
+  * **`draftArticle`**, in the AI package, writes a title, a body of 300 to 700 words under
+    headings, a summary and the search engine title and description, from the shop's brief: what
+    the article is about, what it must say in the shop's own words, and the blog it is for, in
+    English, Urdu or Roman Urdu. Of the shop, its products, prices, offers, delivery and returns,
+    it says only what the brief gives; general advice that is common knowledge, such as how to
+    wash lawn, it may give. The brief is data between tags the shop's words cannot close. The
+    body keeps paragraphs, headings, lists, emphasis and quotes, no links or images; the summary
+    paragraphs and emphasis alone.
+  * **`articleCopyDraft(input)`** gives the draft, for those who write content, and keeps nothing:
+    the shop checks it in its form and saves it as an article. Thirty asks a day a shop, fewer
+    than products' hundred as an article costs more; each is logged with its tokens (migration
+    0341), and each draft given spends one of the plan's AI credits, `article` now among their
+    uses. `articleCopyDrafting` says whether it may ask and how many are left.
+  * **The admin's article form** writes the title and body with AI from a topic, the title until
+    one is typed, and what it must say, in the language chosen, marking the draft as AI's until
+    the shop saves it. The summary and search listing the draft gives stay the API's, as the form
+    edits those apart.
+* **Consequences:** a shop writes an article in minutes, checking every word. The model may write
+  common advice that is wrong for a fabric; the note asks the shop to check. Drafts are never
+  kept, so a draft discarded is lost.

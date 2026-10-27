@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Articles written with AI
+
+* **Blog with AI:** a blog article's title and body are written with AI from what the shop wants
+  it to say, in English, Urdu or Roman Urdu, never kept, thirty a day, each spending an AI credit
+  (MKT-15, [ADR-801](../architecture/13-decision-log.md#adr-801--blog-articles-are-drafted-with-ai-from-what-the-shop-wants-them-to-say-never-kept-thirty-a-day-each-spending-an-ai-credit)).
+* **CI:** ffmpeg's install gives up on a mirror silent for 20 seconds, after a stalled mirror
+  ran out the step's eight minutes before any test (the re-run passed).
+* 4278 tests (7 new).
+
 ### 86a0fc5 · Combined listings in the admin
 
 * **From a product's page:** a Combined listing card names the option and lists the products
