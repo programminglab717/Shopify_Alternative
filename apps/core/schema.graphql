@@ -11701,6 +11701,11 @@ type OrderLineItem {
   sku: String
 
   """
+  The day it was promised to ship by, YYYY-MM-DD, sold stitched to the shopper’s measurements (CAT-09, ADR-803); null otherwise.
+  """
+  stitchedShipsOn: String
+
+  """
   The sales tax its price included, after its share of the order's discount; none when it was not taxed.
   """
   taxLines: [TaxLine!]!

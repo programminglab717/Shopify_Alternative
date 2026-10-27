@@ -20,6 +20,8 @@ export interface ShownOrder {
     total: bigint;
     /** The day it ships by, its product on pre-order when it was sold (ADR-403). */
     preorderShipsOn?: string | null;
+    /** The day it ships by, sold stitched to measurements (ADR-803). */
+    stitchedShipsOn?: string | null;
     /** The bundle it was sold as a part of (ADR-410); a draft's lines have none. */
     bundle?: LineBundle | null;
     /** What the shopper wrote or chose on it (ADR-687); a draft's lines have none. */

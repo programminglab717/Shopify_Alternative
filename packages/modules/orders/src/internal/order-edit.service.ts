@@ -98,6 +98,8 @@ interface EditedLine {
   createdAt: Date | null;
   /** The day it ships by: a kept line's as it was sold, an added one's product's now (ADR-403). */
   preorderShipsOn: string | null;
+  /** The day a kept line sold stitched ships by (ADR-803); none for one added. */
+  stitchedShipsOn?: string | null;
   /** The bundle a kept line was sold as a part of, as its row has it; none for one added. */
   bundleKey?: string | null;
   bundleTitle?: string | null;
@@ -1281,6 +1283,7 @@ function lineValues(
     taxRate: tax.lines[index]!.rate,
     tax: tax.lines[index]!.tax,
     preorderShipsOn: line.preorderShipsOn,
+    stitchedShipsOn: line.stitchedShipsOn ?? null,
     bundleKey: line.bundleKey ?? null,
     bundleTitle: line.bundleTitle ?? null,
     bundleQuantity: line.bundleQuantity ?? null,

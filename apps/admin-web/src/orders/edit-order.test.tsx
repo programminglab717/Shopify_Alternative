@@ -145,12 +145,15 @@ describe("Changing an order's items and charges, on its page", () => {
       lineItems: [
         { ...line('li_1', 'Lawn suit', 'M', 1, '2500'), preorderShipsOn: '2026-11-30' },
         { ...line('li_2', 'Dupatta', 'Default Title', 1, '1200'), preorderShipsOn: null },
+        // Sold stitched to measurements, the day its stitching is done (ADR-803).
+        { ...line('li_3', 'Lawn suit', 'L', 1, '4000'), stitchedShipsOn: '2026-11-03' },
       ],
     });
     vi.stubGlobal('fetch', core('owner', preordered).fetcher);
     renderAdmin('/shop_1/orders/ord_7');
     expect(await screen.findByText('Pre-order: ships by 30 Nov 2026')).toBeTruthy();
     expect(screen.getAllByText(/^Pre-order: ships by/)).toHaveLength(1);
+    expect(screen.getByText('Stitched to measurements: ships by 3 Nov 2026')).toBeTruthy();
   });
 
   it('says of each line sold as a part of a bundle which, and how many sets (ADR-410)', async () => {

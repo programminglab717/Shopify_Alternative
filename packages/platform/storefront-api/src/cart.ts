@@ -244,6 +244,8 @@ export interface CartLineJson {
    * not.
    */
   preorderShipsOn?: string;
+  /** The days its stitching adds before it ships, where it is stitched (ADR-803); absent if not. */
+  stitchedDays?: number;
 }
 
 export interface CartJson {

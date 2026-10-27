@@ -56,6 +56,11 @@ export interface OrderLineRecord {
    * sold (CAT-14, ADR-403); null otherwise.
    */
   preorderShipsOn: string | null;
+  /**
+   * The day it was promised to ship by, YYYY-MM-DD, sold stitched to the shopper's measurements
+   * (CAT-09, ADR-803); null otherwise.
+   */
+  stitchedShipsOn: string | null;
   /** The bundle it was sold as a part of (CAT-11, ADR-410); null when it was sold alone. */
   bundle: LineBundle | null;
   /**

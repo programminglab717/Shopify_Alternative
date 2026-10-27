@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  isStitched,
   personalisationPrice,
   stitchingPrice,
   stitchingProblem,
@@ -370,6 +371,11 @@ export function cartJson(
       taxCode: variant.taxCode,
       maxQuantity: short ? Math.max(0, variant.sellable! - (all - line.quantity)) : null,
       ...(variant.preorderShipsOn && { preorderShipsOn: variant.preorderShipsOn }),
+      // Stitched, the days its stitching adds (ADR-803).
+      ...(stitching.has(variant.productId) &&
+        isStitched(line.properties) && {
+          stitchedDays: stitching.get(variant.productId)!.leadDays,
+        }),
     };
   });
   return {

@@ -614,6 +614,14 @@ export class OrderLineItem {
   })
   preorderShipsOn!: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The day it was promised to ship by, YYYY-MM-DD, sold stitched to the shopper’s ' +
+      'measurements (CAT-09, ADR-803); null otherwise.',
+  })
+  stitchedShipsOn!: string | null;
+
   @Field(() => LineItemBundle, {
     nullable: true,
     description:

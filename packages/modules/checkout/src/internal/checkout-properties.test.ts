@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { PersonalisationService } from '@hatti/catalog/public';
+import { PersonalisationService, StitchingService } from '@hatti/catalog/public';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
@@ -113,5 +113,50 @@ describe.skipIf(!server)("Orders keeping their cart lines' properties (CAT-15, A
       [1, 2_000_00n, {}],
     ]);
     expect(placed.order.subtotal).toBe(9_751_50n);
+  });
+
+  it('places a stitched line at its price with its stitching, keeping the day it ships by (ADR-803)', async () => {
+    const snapshots = await f.db.tenant(f.a.shopId, (tx) =>
+      f.variants.snapshotsOf(tx, f.a.shopId, [kurta]),
+    );
+    const offered = await new StitchingService(f.db).set(f.a, snapshots.get(kurta)!.productId, {
+      price: '1500',
+      leadDays: 7,
+      measurements: ['chest'],
+    });
+    if (!offered.ok) throw new Error(`Refused: ${JSON.stringify(offered.errors)}`);
+    const action = parseAction('add', {
+      items: [
+        {
+          variantId: kurta,
+          quantity: 1,
+          properties: { Stitching: 'Stitched', 'Chest (inches)': '38' },
+        },
+        { variantId: kurta, quantity: 1, properties: { Stitching: 'Unstitched' } },
+      ],
+    });
+    if ('code' in action) throw new Error(`Refused: ${JSON.stringify(action)}`);
+    const added = await f.carts.act(f.a.shopId, null, action);
+    if (!added.ok) throw new Error(`Refused: ${JSON.stringify(added.error)}`);
+    expect(added.cart.items.map((item) => [item.price, item.stitchedDays])).toEqual([
+      [3_500_00, 7],
+      [2_000_00, undefined],
+    ]);
+
+    const secret = (await f.checkouts.start(f.a.shopId, added.token!))!;
+    const view = await f.checkouts.view(secret);
+    if (view.kind !== 'open') throw new Error(`Expected an open checkout, got ${view.kind}`);
+    const placed = await f.checkouts.place(secret, view.shown, FORM);
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
+    const sold = new Date(placed.order.createdAt.getTime() + 5 * 3_600_000);
+    sold.setUTCDate(sold.getUTCDate() + 7);
+    expect(
+      placed.order.lines
+        .map((line) => [line.unitPrice, line.stitchedShipsOn])
+        .sort(([a], [b]) => Number(b) - Number(a)),
+    ).toEqual([
+      [3_500_00n, sold.toISOString().slice(0, 10)],
+      [2_000_00n, null],
+    ]);
   });
 });

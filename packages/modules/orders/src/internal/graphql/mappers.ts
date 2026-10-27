@@ -224,6 +224,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       taxable: line.taxable,
       taxLines: line.taxRate === null ? [] : [toTaxLine(line.taxRate, line.tax, currency)],
       preorderShipsOn: line.preorderShipsOn,
+      stitchedShipsOn: line.stitchedShipsOn,
       bundle: line.bundle,
       customAttributes: Object.entries(line.properties).map(([key, value]) => ({ key, value })),
     }),

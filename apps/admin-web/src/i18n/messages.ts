@@ -5470,6 +5470,7 @@ const en = {
   'preorder.savedOn': 'On pre-order, shipping by {date}',
   'preorder.savedOff': 'No longer on pre-order: it sells as its stock allows',
   'preorder.line': 'Pre-order: ships by {date}',
+  'stitched.line': 'Stitched to measurements: ships by {date}',
   'schedule.title': 'Put on sale later',
   'schedule.hint':
     'For a drop that goes live at a set time, such as midnight before Eid. It stays a draft until then, and goes on sale within a minute of it.',
@@ -11383,6 +11384,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'preorder.savedOn': 'پیشگی آرڈر پر، {date} تک روانگی',
   'preorder.savedOff': 'اب پیشگی آرڈر پر نہیں: اسٹاک کے مطابق بکتا ہے',
   'preorder.line': 'پیشگی آرڈر: {date} تک روانگی',
+  'stitched.line': 'ناپ پر سلائی: {date} تک روانگی',
   'schedule.title': 'بعد میں فروخت پر لگائیں',
   'schedule.hint':
     'کسی مقررہ وقت پر لانچ کے لیے، جیسے عید سے پہلے آدھی رات۔ تب تک یہ ڈرافٹ رہتا ہے، اور اس وقت کے ایک منٹ کے اندر فروخت پر لگ جاتا ہے۔',

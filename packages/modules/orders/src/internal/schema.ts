@@ -548,6 +548,7 @@ export const lines = ordersSchema.table(
      * sold (CAT-14, ADR-403); null otherwise.
      */
     preorderShipsOn: date('preorder_ships_on'),
+    stitchedShipsOn: date('stitched_ships_on'),
     /** The bundle it was sold as a part of (CAT-11, ADR-410): its parts' lines share the key. */
     bundleKey: uuid('bundle_key'),
     bundleTitle: text('bundle_title'),

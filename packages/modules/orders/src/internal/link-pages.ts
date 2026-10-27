@@ -1753,6 +1753,20 @@ function propertyLines(properties: Record<string, string>): Html[] {
   );
 }
 
+/** A line sold stitched to measurements (ADR-803): the day it ships by, YYYY-MM-DD, in words. */
+function stitchedWords(shipsOn: string): Words {
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${shipsOn}T00:00:00Z`));
+  return {
+    en: `Stitched to your measurements: ships by ${day}`,
+    ur: `آپ کے ناپ پر سلائی: ${day} تک روانہ ہوگا`,
+  };
+}
+
 /** A line sold on pre-order (ADR-403): the day it ships by, YYYY-MM-DD, in words. */
 function preorderWords(shipsOn: string): Words {
   const day = new Intl.DateTimeFormat('en-GB', {
@@ -1827,6 +1841,11 @@ function summary(shown: ShownOrder): Html {
               line.preorderShipsOn &&
               html`<br /><span class="small"
                   >${say('bilingual', preorderWords(line.preorderShipsOn))}</span
+                >`
+            }${
+              line.stitchedShipsOn &&
+              html`<br /><span class="small"
+                  >${say('bilingual', stitchedWords(line.stitchedShipsOn))}</span
                 >`
             }${propertyLines(line.properties ?? {})}
           </td>

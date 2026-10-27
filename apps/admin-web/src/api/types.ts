@@ -315,6 +315,8 @@ export interface OrderDetail {
     quantity: number;
     /** The day it ships by, sold on pre-order (ADR-403); absent where a fake core leaves it out. */
     preorderShipsOn?: string | null;
+    /** The day it ships by, sold stitched (ADR-803); absent where a fake core leaves it out. */
+    stitchedShipsOn?: string | null;
     /** The bundle it was sold as a part of (ADR-410); absent where a fake core leaves it out. */
     bundle?: { key: string; title: string; quantity: number } | null;
     /**

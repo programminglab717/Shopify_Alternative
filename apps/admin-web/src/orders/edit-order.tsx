@@ -468,6 +468,11 @@ export function OrderItems({ order }: { order: OrderDetail }) {
                   {t('preorder.line', { date: shipsOnWords(line.preorderShipsOn, locale) })}
                 </span>
               )}
+              {line.stitchedShipsOn && (
+                <span className="text-warning">
+                  {t('stitched.line', { date: shipsOnWords(line.stitchedShipsOn, locale) })}
+                </span>
+              )}
               {line.bundle && (
                 <span className="text-secondary">
                   {t('bundle.line', {

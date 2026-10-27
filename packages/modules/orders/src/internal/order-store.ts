@@ -127,6 +127,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     tax_rate: number | null;
     tax: string;
     preorder_ships_on: string | null;
+    stitched_ships_on: string | null;
     bundle_key: string | null;
     bundle_title: string | null;
     bundle_quantity: number | null;
@@ -341,6 +342,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       taxRate: line.tax_rate,
       tax: BigInt(line.tax),
       preorderShipsOn: line.preorder_ships_on,
+      stitchedShipsOn: line.stitched_ships_on ?? null,
       bundle: line.bundle_key
         ? { key: line.bundle_key, title: line.bundle_title!, quantity: line.bundle_quantity! }
         : null,
@@ -495,7 +497,8 @@ export async function loadOrders(
                       'weight_grams', l.weight_grams,
                       'fulfilled_quantity', l.fulfilled_quantity, 'taxable', l.taxable,
                       'tax_rate', l.tax_rate, 'tax', l.tax::text,
-                      'preorder_ships_on', l.preorder_ships_on, 'bundle_key', l.bundle_key,
+                      'preorder_ships_on', l.preorder_ships_on,
+                      'stitched_ships_on', l.stitched_ships_on, 'bundle_key', l.bundle_key,
                       'bundle_title', l.bundle_title, 'bundle_quantity', l.bundle_quantity,
                       'properties', l.properties)
                     ORDER BY l.position)

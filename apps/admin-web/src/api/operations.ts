@@ -218,6 +218,7 @@ export const OrderQuery = /* GraphQL */ `
         sku
         quantity
         preorderShipsOn
+        stitchedShipsOn
         bundle {
           key
           title

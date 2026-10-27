@@ -11,7 +11,13 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { VariantService, bundlesOfVariantsIn, type VariantSnapshot } from '@hatti/catalog/public';
+import {
+  VariantService,
+  bundlesOfVariantsIn,
+  isStitched,
+  stitchingIn,
+  type VariantSnapshot,
+} from '@hatti/catalog/public';
 import {
   BlocklistService,
   CustomerService,
@@ -127,6 +133,7 @@ import {
   type StoredAddressValue,
 } from './schema.js';
 import { shareBundlePrice } from './bundle-lines.js';
+import { stitchedShipsOn } from './stitched.js';
 
 export interface OrderLineInput {
   variantId: string;
@@ -834,6 +841,11 @@ export class OrderService {
       shopId,
       priced.map((line) => line.snapshot.productId),
     );
+    const stitching = await stitchingIn(
+      tx,
+      shopId,
+      priced.map((line) => line.snapshot.productId),
+    );
     await tx.insert(lines).values(
       priced.map((line, index) => ({
         shopId,
@@ -854,6 +866,14 @@ export class OrderService {
         taxRate: tax.lines[index]!.rate,
         tax: tax.lines[index]!.tax,
         preorderShipsOn: preorders.get(line.snapshot.productId) ?? null,
+        // Sold stitched, the days its stitching takes after it was sold or would ship (ADR-803).
+        stitchedShipsOn: isStitched(line.properties ?? {})
+          ? stitchedShipsOn(
+              row!.createdAt,
+              stitching.get(line.snapshot.productId),
+              preorders.get(line.snapshot.productId) ?? null,
+            )
+          : null,
         bundleKey: line.bundle?.key ?? null,
         bundleTitle: line.bundle?.title ?? null,
         bundleQuantity: line.bundle?.quantity ?? null,

@@ -257,15 +257,18 @@ export function deliveryCountsFrom(settings: DeliverySettingsRecord, at: Date): 
 /**
  * The day to expect delivery to `city` by (ADR-594), YYYY-MM-DD: the most of the city's working
  * days counted from `today` past Sundays and Pakistan's public holidays. Null without a city, or
- * days the shop said, or while an item waits on its pre-order, whose day says more.
+ * days the shop said, or while an item waits on its pre-order, whose day says more, or on its
+ * stitching (ADR-803), whose days the order's page says.
  */
 export function expectedDeliveryOn(
   settings: DeliverySettingsRecord,
   city: string,
   today: string,
-  items: readonly { preorderShipsOn?: string | null }[],
+  items: readonly { preorderShipsOn?: string | null; stitchedDays?: number | null }[],
 ): string | null {
-  if (city.trim() === '' || items.some((item) => item.preorderShipsOn)) return null;
+  if (city.trim() === '' || items.some((item) => item.preorderShipsOn || item.stitchedDays)) {
+    return null;
+  }
   const days = deliveryDays(settings, city);
   return days ? addPkWorkingDays(today, days.max) : null;
 }
