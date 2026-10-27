@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-810 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-811 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -818,6 +818,7 @@
 | 808 | Referrals are set and seen in Marketing, and a customer's link carries ?invite=, apart from affiliates' ?ref= | Accepted |
 | 809 | A signed-in shopper finds their invite link on their account, with what each side is given, to share on WhatsApp | Accepted |
 | 810 | Web chat: a shopper gives their name and number to chat from the online store, kept as a conversation of the inbox, each browser reading only its own session | Accepted |
+| 811 | Hatti Base offers the chat from a button on every page, its session in a cookie the page's script never reads | Accepted |
 
 ---
 
@@ -26754,3 +26755,20 @@
 * **Consequences:** a shopper who closes the page reads the answer only when they come back;
   the shop can write to them on WhatsApp. The widget on Hatti Base and the admin's settings and
   inbox follow (ADR-811, ADR-812). Erasing a customer removes their chats with their numbers.
+
+## ADR-811 · Hatti Base offers the chat from a button on every page, its session in a cookie the page's script never reads
+
+* **Context:** web chat is kept and answered in the core (ADR-810); shoppers need a way to
+  start one on the shop's pages, which every shopper is served the same, cached.
+* **Decision:** the shop's document says whether its pages offer the chat, and themes read it
+  as `shop.web_chat`, with its greeting. Hatti Base shows a chat button at the start of the
+  line on every page, the WhatsApp button (ADR-593) keeping the end, and a panel: the
+  shopper's name, mobile number and message to start, then the conversation, the shop's
+  answers asked for every ten seconds while it is open, in English or Urdu, the greeting the
+  shop's or Hatti's. Its script talks to the storefront's own `/chat` routes, JSON from the
+  shop's own pages alone, at most 20 writes and 240 reads a minute from an address; the
+  storefront sends them on to the core and keeps the session's token in an HttpOnly cookie
+  that the page's script never reads, forgotten once the core no longer knows it.
+* **Consequences:** a page cached for everyone shows the chat to all; each browser's session
+  is its own. The panel asks while open, not when closed: a shopper sees answers when they
+  open it again. The admin's settings and inbox follow (ADR-812).

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### The chat on Hatti Base
+
+* **Chat button:** while the shop's chat is on, every page of Hatti Base has a chat button
+  beside WhatsApp's; shoppers start a chat and read the shop's answers there (MSG-10, [ADR-811](../architecture/13-decision-log.md#adr-811--hatti-base-offers-the-chat-from-a-button-on-every-page-its-session-in-a-cookie-the-pages-script-never-reads)).
+  Checked in Chromium, which caught a greeting written twice escaped.
+* 4316 tests (1 new).
+
 ### b09477c · Web chat
 
 * **Chat on the online store:** shoppers give their name and number and write to the shop;
