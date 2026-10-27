@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Digital checkouts
+
+* **Nothing to deliver:** a cart of digital products alone checks out with no address,
+  delivery or cash on delivery, and its lines are fulfilled and delivered once given all they
+  sell (CAT-13, [ADR-815](../architecture/13-decision-log.md#adr-815--a-checkout-of-digital-products-alone-asks-for-no-address-charges-no-delivery-and-takes-no-cash-on-delivery-a-line-given-all-it-sells-is-fulfilled-and-delivered-at-once)).
+* **Fix (37d41fc):** CI failed on the delivery slice: a signed download's grant gained a field
+  that another module's test compared whole. It carries it only when set now. Changes to a
+  platform package now run every dependent package's tests before pushing.
+* 4331 tests (2 new).
+
 ### b09df4d · Digital products delivered
 
 * **Once paid:** each line of a digital product gets a link of its own to the files, counted

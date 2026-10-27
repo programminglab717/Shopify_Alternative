@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-814 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-815 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -822,6 +822,7 @@
 | 812 | The admin turns the chat on in Customer messages, and its inbox shows chats from the online store by name, answered at any time | Accepted |
 | 813 | A product made digital sells files kept privately and licence keys kept sealed, each key given once to one unit of an order's line | Accepted |
 | 814 | A digital product is delivered once its order is paid: each line a link of its own to the files, counted by file, and each unit a key, both sent on WhatsApp | Accepted |
+| 815 | A checkout of digital products alone asks for no address, charges no delivery and takes no cash on delivery; a line given all it sells is fulfilled and delivered at once | Accepted |
 
 ---
 
@@ -26835,3 +26836,23 @@
   sold when no key is left is given none until the shop adds more (ADR-816). The two templates
   are Hatti's, approved by Meta with the rest (OWN-23). A checkout of digital products alone
   still asks for an address and offers cash on delivery until ADR-815.
+
+## ADR-815 · A checkout of digital products alone asks for no address, charges no delivery and takes no cash on delivery; a line given all it sells is fulfilled and delivered at once
+
+* **Context:** digital products are delivered by link and key once paid (ADR-814), but
+  checkout asked for an address, charged delivery and offered cash on delivery, which no rider
+  can collect for a download; and their lines waited for a courier to be fulfilled.
+* **Decision:** a cart whose items are all digital products checks out with nothing to
+  deliver. The page asks for the shopper's name and number alone, saying their downloads and
+  keys come to that number on WhatsApp, and the email as ever; no city, street, landmark,
+  map, pickup or delivery slot. It charges no delivery, and shows no row for it. Cash on
+  delivery is refused for a reason of its own, so the shopper pays by transfer or online, or
+  is told it is paid in advance where the shop takes neither. Placed, the order keeps
+  "Delivered online, Online" as its address, which orders need, and its page says the
+  downloads and keys come once it is paid. A cart with goods too checks out as any. Once the
+  worker has given a line all it sells (its files, and a key for each unit where it gives
+  them), it fulfils the line and marks it delivered at once, the system as its actor; an order
+  of digital products alone completes then.
+* **Consequences:** a shop selling downloads takes transfers or an online gateway. Its
+  products' stock should be untracked, as a file never runs out. A line short of keys waits
+  unfulfilled for the shop to add more (ADR-816). Gift cards still check out as goods.
