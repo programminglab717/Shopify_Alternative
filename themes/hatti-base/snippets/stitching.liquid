@@ -1,0 +1,41 @@
+{%- comment -%}
+  Stitching offered with an unstitched product (CAT-09, ADR-802): unstitched, or stitched to the
+  shopper's measurements for what it adds, shipping the days it takes later. A line stitched says
+  so in its properties, each measurement in inches; the cart asks for them all. The measurements
+  show once stitched is chosen, and always where a browser cannot tell.
+  Accepts: stitching, the product's stitching.
+{%- endcomment -%}
+{%- if stitching -%}
+  {%- assign adds = stitching.price | money -%}
+  <fieldset class="product__stitching">
+    <legend>{{ 'products.product.stitching.title' | t }}</legend>
+    <div class="product__stitching-choices">
+      <label class="pill">
+        <input type="radio" name="{{ stitching.input_name }}" value="{{ stitching.unstitched_value }}" checked>
+        <span>{{ 'products.product.stitching.unstitched' | t }}</span>
+      </label>
+      <label class="pill">
+        <input type="radio" name="{{ stitching.input_name }}" value="{{ stitching.stitched_value }}">
+        <span>{{ 'products.product.stitching.stitched' | t: price: adds }}</span>
+      </label>
+    </div>
+    <div class="product__measurements">
+      <p class="product__stitching-days">{{ 'products.product.stitching.days' | t: count: stitching.lead_days }}</p>
+      <p>{{ 'products.product.stitching.measurements' | t }}</p>
+      {%- for measurement in stitching.measurements -%}
+        {%- assign words = 'products.product.stitching.measurement.' | append: measurement.key -%}
+        <label class="product__personalisation">
+          <span>{{ words | t }}</span>
+          <input
+            type="text"
+            inputmode="decimal"
+            name="{{ measurement.input_name | escape }}"
+            pattern="[0-9]{1,2}([.][0-9]{1,2})?"
+            dir="ltr"
+            autocomplete="off"
+          >
+        </label>
+      {%- endfor -%}
+    </div>
+  </fieldset>
+{%- endif -%}

@@ -1900,6 +1900,47 @@ describe('Storefront rendering', () => {
     expect(plain.html).not.toContain('<label class="product__personalisation">');
   });
 
+  it('offers an unstitched product stitched to measurements, for its price and days (ADR-802)', async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const lawn = {
+      ...first!,
+      stitching: {
+        price: 1_500_00,
+        leadDays: 7,
+        measurements: [
+          { key: 'shirt_length', property: 'Shirt length (inches)' },
+          { key: 'chest', property: 'Chest (inches)' },
+        ],
+      },
+    };
+    const shop = new MemoryStore({ ...sample, products: [lawn, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${lawn.handle}` }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain('<legend>Stitching</legend>');
+    expect(flat).toContain(
+      '<input type="radio" name="properties[Stitching]" value="Unstitched" checked> <span>Unstitched</span>',
+    );
+    expect(flat).toContain(
+      '<input type="radio" name="properties[Stitching]" value="Stitched"> <span>Stitched to my measurements (+Rs 1,500)</span>',
+    );
+    expect(flat).toContain('Stitched pieces ship 7 days later.');
+    expect(flat).toMatch(
+      /<span>Shirt length<\/span> <input type="text" inputmode="decimal" name="properties\[Shirt length \(inches\)\]"/,
+    );
+    expect(flat).toContain('<span>Chest</span>');
+    const urdu = await renderer.render(
+      { path: `/products/${lawn.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('میرے ناپ پر سلائی');
+    expect(urdu.html).toContain('<span>چھاتی</span>');
+    // A product offered no stitching has none.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('product__stitching"');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

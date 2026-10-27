@@ -6,6 +6,8 @@ import {
   type BundleRecord,
   type CollectionRecord,
   type CombinedListingRecord,
+  measurementProperty,
+  type StitchingOffer,
   type MediaRecord,
   type OptionRecord,
   type ProductRecord,
@@ -115,6 +117,8 @@ export function productDoc(
   personalisation: readonly PersonalisationField[] = [],
   /** The combined listing it is in, if any (ADR-799). */
   combinedListing?: CombinedListingRecord,
+  /** The stitching it is offered with, if any (ADR-802). */
+  stitching?: StitchingOffer,
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -227,6 +231,16 @@ export function productDoc(
     ...(related && related.length > 0 && { related: [...related] }),
     ...(complements && complements.length > 0 && { complements: [...complements] }),
     ...combinedListingDoc(record.id, combinedListing),
+    ...(stitching && {
+      stitching: {
+        price: stitching.price,
+        leadDays: stitching.leadDays,
+        measurements: stitching.measurements.map((key) => ({
+          key,
+          property: measurementProperty(key),
+        })),
+      },
+    }),
   };
 }
 

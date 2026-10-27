@@ -9,6 +9,7 @@ import {
   ReviewEvents,
   SizeChartEvents,
   PersonalisationEvents,
+  StitchingEvents,
   MetafieldEvents,
   shownMetafieldsIn,
   type MetafieldOwnerType,
@@ -27,6 +28,7 @@ import {
   shownReviewsIn,
   shownSizeChartsIn,
   personalisationIn,
+  stitchingIn,
   videoPathOf,
   type BundleRecord,
   type CollectionRecord,
@@ -34,6 +36,7 @@ import {
   type CombinedListingUpdatedPayload,
   type PersonalisationField,
   type ProductRecord,
+  type StitchingOffer,
   type ProductReviewChangedPayload,
   type ProductUpdatedPayload,
   type ShownReviews,
@@ -272,10 +275,12 @@ export function itemsFor(event: DomainEvent): string[] {
       return [Items.product(productId), Items.bundlesWith(productId)];
     }
     // Its bundle's parts, or the products the shop pairs with it, which its page and the cart
-    // recommend (ADR-435), or what its page asks the shopper for (ADR-689).
+    // recommend (ADR-435), or what its page asks the shopper for (ADR-689), or the stitching it is
+    // offered with (ADR-802).
     case BundleEvents.Updated:
     case ComplementEvents.Updated:
     case PersonalisationEvents.Updated:
+    case StitchingEvents.Updated:
       return [Items.product(id)];
     // The products in a combined listing before and after its change (ADR-799).
     case CombinedListingEvents.Updated:
@@ -481,6 +486,7 @@ export const PUBLISHED_EVENTS = [
   CombinedListingEvents.Updated,
   ComplementEvents.Updated,
   PersonalisationEvents.Updated,
+  StitchingEvents.Updated,
   SizeChartEvents.Updated,
   SizeChartEvents.Deleted,
   SizeChartEvents.ProductsUpdated,
@@ -640,6 +646,12 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, PersonalisationField[]>>;
+    /** The stitching each is offered with (ADR-802). */
+    stitchingOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, StitchingOffer>>;
   };
   /** The products on pre-order, and the day each ships by (ADR-403). */
   preorders: {
@@ -1189,6 +1201,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const stitching = await this.services.personalisation.stitchingOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const productFields = await this.services.metafields.shownMetafieldsOf(
       tx,
       shopId,
@@ -1263,6 +1280,7 @@ export class StorefrontPublisher {
           left,
           personalisation.get(record.id),
           combined.get(record.id),
+          stitching.get(record.id),
         ),
         productFields,
         variantFields,
@@ -1532,7 +1550,7 @@ export function createStorefrontPublisher(
         combinedListingsOf: combinedListingsIn,
       },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
-      personalisation: { personalisationOf: personalisationIn },
+      personalisation: { personalisationOf: personalisationIn, stitchingOf: stitchingIn },
       metafields: { shownMetafieldsOf: shownMetafieldsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),

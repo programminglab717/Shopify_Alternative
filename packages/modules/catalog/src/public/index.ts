@@ -293,3 +293,21 @@ export {
   type ProductCondition,
 } from '../internal/taxonomy.js';
 export { COPY_LANGUAGE, CopyLanguage } from '../internal/graphql/copy-language.js';
+export {
+  MEASUREMENTS,
+  MEASUREMENT_KEYS,
+  STITCHED,
+  STITCHING_LIMITS,
+  STITCHING_PROPERTY,
+  StitchingEvents,
+  StitchingService,
+  isMeasurement,
+  isStitched,
+  measurementProperty,
+  stitchingIn,
+  stitchingPrice,
+  stitchingProblem,
+  type MeasurementKey,
+  type StitchingOffer,
+  type StitchingProblem,
+} from '../internal/stitching.js';

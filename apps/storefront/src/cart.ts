@@ -558,6 +558,19 @@ export function cartErrorMessage(
             values,
             `Please choose ${error.field} for ${error.title} from its list.`,
           );
+        // A stitched line's measurement, or stitching the product no longer offers (ADR-802).
+        case 'not_a_measurement':
+          return say(
+            'stitching_not_a_measurement',
+            values,
+            `Please give ${error.field} for ${error.title} in inches, such as 38 or 38.5.`,
+          );
+        case 'not_offered':
+          return say(
+            'stitching_not_offered',
+            values,
+            `${error.title} is not offered stitched any more.`,
+          );
       }
     }
   }

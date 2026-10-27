@@ -117,7 +117,28 @@
       "sale_ends_on": "Sale ends {{ date }}",
       "sale_ends_in": "Sale ends in {{ time }}",
       "sale_days": "{{ count }}d",
-      "low_stock": "Only {{ count }} left"
+      "low_stock": "Only {{ count }} left",
+      "stitching": {
+        "title": "Stitching",
+        "unstitched": "Unstitched",
+        "stitched": "Stitched to my measurements (+{{ price }})",
+        "days": "Stitched pieces ship {{ count }} days later.",
+        "measurements": "Your measurements, in inches",
+        "measurement": {
+          "shirt_length": "Shirt length",
+          "chest": "Chest",
+          "waist": "Waist",
+          "hips": "Hips",
+          "shoulder": "Shoulder",
+          "sleeve_length": "Sleeve length",
+          "armhole": "Armhole",
+          "neck": "Neck",
+          "wrist": "Wrist",
+          "trouser_length": "Trouser length",
+          "trouser_waist": "Trouser waist",
+          "trouser_bottom": "Trouser bottom"
+        }
+      }
     },
     "wishlist": {
       "save": "Save {{ title }} to your wishlist"
@@ -411,7 +432,9 @@
       "empty": "Your cart is empty.",
       "personalisation_missing": "Please fill in {{ field }} for {{ title }}.",
       "personalisation_too_long": "{{ field }} for {{ title }} is too long.",
-      "personalisation_not_a_choice": "Please choose {{ field }} for {{ title }} from its list."
+      "personalisation_not_a_choice": "Please choose {{ field }} for {{ title }} from its list.",
+      "stitching_not_a_measurement": "Please give {{ field }} for {{ title }} in inches, such as 38 or 38.5.",
+      "stitching_not_offered": "{{ title }} is not offered stitched any more."
     },
     "reorder": {
       "partial": "Not everything from your order could go in your cart: some of it is sold out, has fewer left, or is no longer for sale.",

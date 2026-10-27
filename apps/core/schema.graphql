@@ -9986,6 +9986,11 @@ type Mutation {
   Puts a draft on sale by itself at `publishAt`, a minute to a year ahead, as a drop "goes live at 00:00"; null takes the time away. Set on sale or archived by hand, a product loses its time.
   """
   productSchedulePublish(productId: ID!, publishAt: DateTime): ProductUpdatePayload!
+
+  """
+  Offers stitching with a product, in place of what it offered: what it adds to each unit's price, the days it adds before shipping, and the measurements its page asks for. A null `stitching`, and it offers none.
+  """
+  productStitchingSet(productId: ID!, stitching: ProductStitchingInput): ProductStitchingSetPayload!
   productUpdate(input: ProductUpdateInput!): ProductUpdatePayload!
   productUpdateMedia(media: [UpdateMediaInput!]!, productId: ID!): ProductPayload!
 
@@ -13492,6 +13497,9 @@ type Product {
   """
   soldLast30Days: Int!
   status: ProductStatus!
+
+  """The stitching it is offered with, if any (ADR-802)."""
+  stitching: ProductStitching
   tags: [String!]!
   title: String!
 
@@ -14011,6 +14019,38 @@ enum ProductStatus {
 
   """Being prepared; not on sale."""
   DRAFT
+}
+
+"""
+Stitching offered with a product (CAT-09, ADR-802): a line stitched says "Stitching: Stitched" among its properties, each measurement a property of its own in inches.
+"""
+type ProductStitching {
+  """How many days more a stitched piece takes before it ships."""
+  leadDays: Int!
+
+  """In the order tailors take them."""
+  measurements: [StitchingMeasurement!]!
+
+  """What it adds to each unit’s price."""
+  price: Money!
+}
+
+input ProductStitchingInput {
+  """1 to 60 days."""
+  leadDays: Int!
+
+  """
+  The measurements asked for, by their keys: shirt_length, chest, waist, hips, shoulder, sleeve_length, armhole, neck, wrist, trouser_length, trouser_waist, trouser_bottom.
+  """
+  measurements: [String!]!
+
+  """What it adds to each unit’s price, as "1500"."""
+  price: String!
+}
+
+type ProductStitchingSetPayload {
+  stitching: ProductStitching
+  userErrors: [UserError!]!
 }
 
 input ProductUpdateInput {
@@ -17650,6 +17690,18 @@ enum Stitching {
   SEMI_STITCHED
   STITCHED
   UNSTITCHED
+}
+
+"""A measurement a stitched piece is made to, in inches."""
+type StitchingMeasurement {
+  """Its key: "chest"."""
+  key: String!
+
+  """What it is: "Chest"."""
+  name: String!
+
+  """The cart line property its answer goes in: "Chest (inches)"."""
+  property: String!
 }
 
 """

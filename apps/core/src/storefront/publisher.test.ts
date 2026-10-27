@@ -10,6 +10,7 @@ import {
   ComplementService,
   PersonalisationService,
   PriceSaleService,
+  StitchingService,
   ProductService,
   SizeChartService,
   MetafieldService,
@@ -24,6 +25,7 @@ import {
   shownReviewsIn,
   shownSizeChartsIn,
   personalisationIn,
+  stitchingIn,
   shownMetafieldsIn,
   writeReviewsIn,
 } from '@hatti/catalog/public';
@@ -505,7 +507,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
             ),
         },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
-        personalisation: { personalisationOf: personalisationIn },
+        personalisation: { personalisationOf: personalisationIn, stitchingOf: stitchingIn },
         metafields: { shownMetafieldsOf: shownMetafieldsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
@@ -1598,6 +1600,36 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await listingOf(maroon.handle)).toBeUndefined();
     expect(await listingOf(mustard.handle)).toBeUndefined();
     for (const each of [maroon, teal, mustard]) unwrap(await products.delete(tenant, each.id));
+    await deliver();
+  });
+
+  it('publishes the stitching a product is offered with, and none once taken away (ADR-802)', async () => {
+    const stitching = new StitchingService(database);
+    const lawn = unwrap(
+      await products.create(tenant, { title: 'Stitchable lawn', status: 'active' }),
+    );
+    await deliver();
+    expect((await store().productByHandle(lawn.handle))?.stitching).toBeUndefined();
+    unwrap(
+      await stitching.set(tenant, lawn.id, {
+        price: '1500',
+        leadDays: 7,
+        measurements: ['chest', 'shirt_length'],
+      }),
+    );
+    expect(await deliver()).toEqual(['product_stitching.updated']);
+    expect((await store().productByHandle(lawn.handle))?.stitching).toEqual({
+      price: 1_500_00,
+      leadDays: 7,
+      measurements: [
+        { key: 'shirt_length', property: 'Shirt length (inches)' },
+        { key: 'chest', property: 'Chest (inches)' },
+      ],
+    });
+    unwrap(await stitching.set(tenant, lawn.id, null));
+    await deliver();
+    expect((await store().productByHandle(lawn.handle))?.stitching).toBeUndefined();
+    unwrap(await products.delete(tenant, lawn.id));
     await deliver();
   });
 

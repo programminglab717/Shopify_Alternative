@@ -259,6 +259,19 @@ export interface ProductDoc {
    * in the listing's order. Absent when it is in none.
    */
   combinedListing?: CombinedListingDoc;
+  /**
+   * The stitching it is offered with (CAT-09, ADR-802): what it adds to each unit's price in
+   * minor units, the days it adds before shipping, and each measurement asked for by its key with
+   * the cart line property its answer goes in. Absent when it is offered none.
+   */
+  stitching?: StitchingDoc;
+}
+
+/** Stitching offered with a product (ADR-802). */
+export interface StitchingDoc {
+  price: number;
+  leadDays: number;
+  measurements: { key: string; property: string }[];
 }
 
 /** Products shown as one listing, each a value of its option (ADR-799). */

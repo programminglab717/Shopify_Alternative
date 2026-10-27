@@ -336,14 +336,15 @@ export type CartError =
   | { code: 'MAX_LINES'; max: number }
   /**
    * What a product made to order asks for (ADR-689, ADR-691): `field` left unanswered, answered
-   * past its length, or with what is not among its choices, on a line of `title`.
+   * past its length, or with what is not among its choices, on a line of `title`; or, for a line
+   * stitched (ADR-802), a measurement that is not inches, or stitching the product does not offer.
    */
   | {
       code: 'PERSONALISATION';
       variantId: string;
       title: string;
       field: string;
-      problem: 'missing' | 'too_long' | 'not_a_choice';
+      problem: 'missing' | 'too_long' | 'not_a_choice' | 'not_a_measurement' | 'not_offered';
     }
   /** No checkout for a cart with nothing that can be ordered, or none at all. */
   | { code: 'EMPTY' };

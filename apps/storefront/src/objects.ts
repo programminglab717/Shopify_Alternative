@@ -431,6 +431,24 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // each of them on sale as a value of it, itself selected, its product fetched with the
     // others' when a template first touches one; nil when it is in none. Hatti's own.
     combined_listing: combinedListingObject(doc, ctx),
+    // The stitching it is offered with (CAT-09, ADR-802): what it adds to each unit's price in
+    // minor units for `money`, the days it adds, the property a stitched line says so in and the
+    // value it says, and each measurement asked for, by its key for the theme's words, with the
+    // name its answer goes in, in inches; nil when it is offered none. Hatti's own.
+    stitching: doc.stitching
+      ? {
+          price: doc.stitching.price,
+          lead_days: doc.stitching.leadDays,
+          input_name: 'properties[Stitching]',
+          stitched_value: 'Stitched',
+          unstitched_value: 'Unstitched',
+          measurements: doc.stitching.measurements.map((measurement) => ({
+            key: measurement.key,
+            name: measurement.property,
+            input_name: `properties[${measurement.property}]`,
+          })),
+        }
+      : null,
     // What it holds, where it is a bundle (ADR-411): each part's title, variant, how many one set
     // has, and a link to it while it is for sale; nil for a product that is no bundle. Hatti's own.
     bundle: doc.bundle

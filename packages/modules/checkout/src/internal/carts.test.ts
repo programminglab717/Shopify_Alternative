@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import type { TenantContext } from '@hatti/api';
-import { BundleService, PersonalisationService } from '@hatti/catalog/public';
+import { BundleService, PersonalisationService, StitchingService } from '@hatti/catalog/public';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -226,6 +226,53 @@ describe.skipIf(!server)('CartService', () => {
     expect(cart!.items.map((item) => [item.quantity, item.properties])).toEqual([
       [1, { Name: 'Ayesha', Thread: 'Gold' }],
       [2, {}],
+    ]);
+  });
+
+  it('prices a stitched line with its stitching, refusing measurements missing or not inches (ADR-802)', async () => {
+    const [lawn] = await f.variantsOf(f.a, 'Unstitched lawn', { price: '4,000' });
+    const snapshots = await f.db.tenant(f.a.shopId, (tx) =>
+      f.variants.snapshotsOf(tx, f.a.shopId, [lawn!]),
+    );
+    const productId = snapshots.get(lawn!)!.productId;
+    const refused = (field: string, problem: string) => ({
+      ok: false,
+      error: { code: 'PERSONALISATION', variantId: lawn, title: 'Unstitched lawn', field, problem },
+    });
+    const add = (token: string | null, properties: Record<string, string>) =>
+      act(f.a, token, 'add', { items: [{ variantId: lawn, properties }] });
+    // Not offered yet: a line said to be stitched is refused; one unstitched is taken.
+    expect(await add(null, { Stitching: 'Stitched' })).toEqual(refused('Stitching', 'not_offered'));
+    const { token } = done(await add(null, { Stitching: 'Unstitched' }));
+    unwrap(
+      await new StitchingService(f.db).set(f.a, productId, {
+        price: '1,500',
+        leadDays: 7,
+        measurements: ['chest', 'shirt_length'],
+      }),
+    );
+    expect(await add(token, { Stitching: 'Stitched', 'Chest (inches)': '38' })).toEqual(
+      refused('Shirt length (inches)', 'missing'),
+    );
+    expect(
+      await add(token, {
+        Stitching: 'Stitched',
+        'Chest (inches)': 'medium',
+        'Shirt length (inches)': '40',
+      }),
+    ).toEqual(refused('Chest (inches)', 'not_a_measurement'));
+    done(
+      await add(token, {
+        Stitching: 'Stitched',
+        'Chest (inches)': '38.5',
+        'Shirt length (inches)': '40',
+      }),
+    );
+    const cart = await f.carts.cart(f.a.shopId, token!);
+    // Stitched, Rs 4,000 and Rs 1,500 a unit; unstitched, the variant's price.
+    expect(cart!.items.map((item) => [item.price, item.properties.Stitching])).toEqual([
+      [550_000, 'Stitched'],
+      [400_000, 'Unstitched'],
     ]);
   });
 

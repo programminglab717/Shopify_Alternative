@@ -22,6 +22,8 @@ import { ProductLabelResolver } from './graphql/product-label.resolver.js';
 import { ProductLabelService } from './product-labels.js';
 import { PersonalisationResolver } from './graphql/personalisation.resolver.js';
 import { PersonalisationService } from './personalisation.js';
+import { StitchingResolver } from './graphql/stitching.resolver.js';
+import { StitchingService } from './stitching.js';
 import { PriceSaleResolver } from './graphql/price-sale.resolver.js';
 import { ProductScheduleResolver } from './graphql/schedule.resolver.js';
 import { MediaService } from './media.service.js';
@@ -68,6 +70,7 @@ import { MetafieldService } from './metafields.js';
     ComplementService,
     CombinedListingService,
     PersonalisationService,
+    StitchingService,
     PriceSaleService,
     ProductResolver,
     ProductPartsResolver,
@@ -84,6 +87,7 @@ import { MetafieldService } from './metafields.js';
     ProductLabelService,
     ProductLabelResolver,
     PersonalisationResolver,
+    StitchingResolver,
     ProductScheduleResolver,
     PriceSaleResolver,
     CopyDraftService,
@@ -110,6 +114,7 @@ import { MetafieldService } from './metafields.js';
     ComplementService,
     CombinedListingService,
     PersonalisationService,
+    StitchingService,
     PriceSaleService,
     MetafieldService,
   ],

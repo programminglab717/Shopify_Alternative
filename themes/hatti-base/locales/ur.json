@@ -117,7 +117,28 @@
       "sale_ends_on": "سیل {{ date }} کو ختم",
       "sale_ends_in": "سیل ختم ہونے میں {{ time }}",
       "sale_days": "{{ count }} دن",
-      "low_stock": "صرف {{ count }} باقی"
+      "low_stock": "صرف {{ count }} باقی",
+      "stitching": {
+        "title": "سلائی",
+        "unstitched": "بغیر سلائی",
+        "stitched": "میرے ناپ پر سلائی (+{{ price }})",
+        "days": "سلائی والے کپڑے {{ count }} دن بعد بھیجے جاتے ہیں۔",
+        "measurements": "آپ کا ناپ، انچوں میں",
+        "measurement": {
+          "shirt_length": "قمیض کی لمبائی",
+          "chest": "چھاتی",
+          "waist": "کمر",
+          "hips": "کولہے",
+          "shoulder": "کندھا",
+          "sleeve_length": "آستین کی لمبائی",
+          "armhole": "بغل",
+          "neck": "گلا",
+          "wrist": "کلائی",
+          "trouser_length": "شلوار کی لمبائی",
+          "trouser_waist": "شلوار کی کمر",
+          "trouser_bottom": "پائنچہ"
+        }
+      }
     },
     "wishlist": {
       "save": "{{ title }} اپنی پسندیدہ فہرست میں رکھیں"
@@ -411,7 +432,9 @@
       "empty": "آپ کا کارٹ خالی ہے۔",
       "personalisation_missing": "براہ کرم {{ title }} کے لیے {{ field }} لکھیں۔",
       "personalisation_too_long": "{{ title }} کے لیے {{ field }} بہت لمبا ہے۔",
-      "personalisation_not_a_choice": "براہ کرم {{ title }} کے لیے {{ field }} فہرست میں سے منتخب کریں۔"
+      "personalisation_not_a_choice": "براہ کرم {{ title }} کے لیے {{ field }} فہرست میں سے منتخب کریں۔",
+      "stitching_not_a_measurement": "براہ کرم {{ title }} کے لیے {{ field }} انچوں میں دیں، جیسے 38 یا 38.5۔",
+      "stitching_not_offered": "{{ title }} اب سلائی کے ساتھ دستیاب نہیں۔"
     },
     "reorder": {
       "partial": "آپ کے آرڈر کی ہر چیز کارٹ میں نہیں ڈالی جا سکی: کچھ اشیاء ختم ہو گئی ہیں، کم بچی ہیں یا اب فروخت کے لیے نہیں ہیں۔",

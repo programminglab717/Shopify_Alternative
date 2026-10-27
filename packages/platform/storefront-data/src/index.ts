@@ -25,6 +25,7 @@ export {
   type PageDoc,
   type ProductDoc,
   type CombinedListingDoc,
+  type StitchingDoc,
   type AttributeWordDoc,
   type EasternWearDoc,
   type ProductReviewsDoc,

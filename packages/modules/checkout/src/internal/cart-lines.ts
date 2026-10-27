@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { personalisationPrice, type PersonalisationField } from '@hatti/catalog/public';
+import {
+  personalisationPrice,
+  stitchingPrice,
+  stitchingProblem,
+  type PersonalisationField,
+  type StitchingOffer,
+} from '@hatti/catalog/public';
 import { typedCode } from '@hatti/pricing/public';
 import type {
   CartActionName,
@@ -329,12 +335,14 @@ export function applyAction(
 /**
  * The cart as a storefront shows it, priced now. Lines whose product is gone or no longer for
  * sale are left out. A line's price adds what its answers to `asked`, the personalisation fields of
- * its product, add to each unit (ADR-697), so the order's line keeps it.
+ * its product, add to each unit (ADR-697), and its stitching where it is stitched (ADR-802), so
+ * the order's line keeps it.
  */
 export function cartJson(
   cart: CartContent,
   facts: ReadonlyMap<string, VariantFacts>,
   asked: ReadonlyMap<string, readonly PersonalisationField[]> = new Map(),
+  stitching: ReadonlyMap<string, StitchingOffer> = new Map(),
 ): CartJson {
   const lines = cart.lines.filter((line) => facts.get(line.variantId)?.forSale);
   const inCart = totals(lines);
@@ -343,7 +351,9 @@ export function cartJson(
     const all = inCart.get(line.variantId)!;
     const short = variant.sellable !== null && all > variant.sellable;
     const price =
-      variant.price + personalisationPrice(asked.get(variant.productId) ?? [], line.properties);
+      variant.price +
+      personalisationPrice(asked.get(variant.productId) ?? [], line.properties) +
+      stitchingPrice(stitching.get(variant.productId), line.properties);
     return {
       key: lineKey(line),
       variantId: line.variantId,
@@ -432,6 +442,21 @@ export function personalisationProblem(
     }
   }
   return null;
+}
+
+/**
+ * What is wrong with a line of `variantId`, of `title`, stitched with `properties` for its
+ * product's stitching `offer` (ADR-802): stitched where none is offered, or a measurement missing
+ * or not inches; null when nothing is, or the line is not stitched.
+ */
+export function stitchingCartProblem(
+  variantId: string,
+  title: string,
+  offer: StitchingOffer | undefined,
+  properties: Record<string, string>,
+): CartError | null {
+  const found = stitchingProblem(offer, properties);
+  return found && { code: 'PERSONALISATION', variantId, title, ...found };
 }
 
 /** Units of each variant, across its lines. */
