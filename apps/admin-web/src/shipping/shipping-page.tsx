@@ -1,5 +1,5 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { FileText, PackageCheck, Printer, Truck, Wrench, X } from 'lucide-react';
+import { Bike, FileText, PackageCheck, Printer, Truck, Wrench, X } from 'lucide-react';
 import { useState } from 'react';
 import {
   CourierAccountsForQuery,
@@ -32,10 +32,11 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { openPrintTab } from '../ui/print';
 import { ShipByHand } from './by-hand';
+import { HandToRider, Riders } from './riders';
 import { CityFix } from './city-names';
 import { Pickups } from './pickups';
 
-type Tab = 'book' | 'booked' | 'pickups';
+type Tab = 'book' | 'booked' | 'pickups' | 'riders';
 
 /** The shipping page's search: which tab. */
 export interface ShippingSearch {
@@ -44,7 +45,7 @@ export interface ShippingSearch {
 
 export function validateShippingSearch(search: Record<string, unknown>): ShippingSearch {
   const tab = search.tab;
-  return tab === 'booked' || tab === 'pickups' ? { tab } : {};
+  return tab === 'booked' || tab === 'pickups' || tab === 'riders' ? { tab } : {};
 }
 
 /** Orders a page asks to book, the most a booking takes being 250. */
@@ -102,6 +103,8 @@ function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolea
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   // The orders being shipped by hand, as they were chosen.
   const [byHand, setByHand] = useState<readonly OrderListItem[] | null>(null);
+  // The orders being handed to a rider of the shop's own (ADR-827).
+  const [toRider, setToRider] = useState<readonly OrderListItem[] | null>(null);
 
   if (orders.isPending) return <Loading label={t('state.loading')} />;
   if (orders.isError) {
@@ -156,7 +159,17 @@ function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolea
           )}
         </Alert>
       )}
-      {byHand ? (
+      {toRider ? (
+        <HandToRider
+          orders={toRider}
+          onCancel={() => setToRider(null)}
+          onDone={(done) => {
+            setOutcome({ booked: 0, ...done });
+            setToRider(null);
+            setSelected(new Set());
+          }}
+        />
+      ) : byHand ? (
         <ShipByHand
           orders={byHand}
           onCancel={() => setByHand(null)}
@@ -251,7 +264,7 @@ function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolea
           </ul>
         </Card>
       )}
-      {selected.size > 0 && !byHand && (
+      {selected.size > 0 && !byHand && !toRider && (
         <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap items-center justify-center gap-2 px-4 md:bottom-6">
           {(accounts.length > 1 || ruled) && (
             <select
@@ -287,6 +300,17 @@ function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolea
             }}
           >
             {t('shipping.byHand', { count: formatCount(selected.size) })}
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Bike aria-hidden className="size-5" />}
+            disabled={book.isPending}
+            onClick={() => {
+              setOutcome(null);
+              setToRider(shown.filter((order) => selected.has(order.id)));
+            }}
+          >
+            {t('riders.handTo', { count: formatCount(selected.size) })}
           </Button>
         </div>
       )}
@@ -596,6 +620,7 @@ export function ShippingPage() {
     ['book', 'shipping.toBook'],
     ['booked', 'shipping.bookings'],
     ['pickups', 'pickups.title'],
+    ['riders', 'riders.title'],
   ];
 
   return (
@@ -641,6 +666,8 @@ export function ShippingPage() {
         />
       ) : tab === 'booked' ? (
         <Booked accounts={accounts.data.courierAccounts} />
+      ) : tab === 'riders' ? (
+        <Riders />
       ) : (
         <Pickups />
       )}

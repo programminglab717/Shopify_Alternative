@@ -3453,6 +3453,75 @@ export interface CustomReportExportData {
   };
 }
 
+/** One of the shop's own riders (ADR-824). */
+export interface RiderValue {
+  id: string;
+  name: string;
+  phone: string;
+  active: boolean;
+  out: number;
+  cashHeld: MoneyValue;
+}
+
+export type RiderDeliveryStatus = 'OUT' | 'DELIVERED' | 'FAILED';
+
+export interface RiderDeliveryValue {
+  id: string;
+  riderId: string;
+  orderId: string;
+  status: RiderDeliveryStatus;
+  cashDue: MoneyValue;
+  cashCollected: MoneyValue;
+  codeSent: boolean;
+  codeGiven: boolean;
+  failedReason: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+}
+
+export interface RidersData {
+  riders: RiderValue[];
+}
+
+export interface RiderDetailData {
+  riderDeliveries: RiderDeliveryValue[];
+  riderHandovers?: { id: string; amount: MoneyValue; note: string; createdAt: string }[];
+}
+
+export interface RiderSaved {
+  rider: RiderValue | null;
+  link: string | null;
+  userErrors: UserError[];
+}
+
+export interface RiderCreateData {
+  riderCreate: RiderSaved;
+}
+
+export interface RiderUpdateData {
+  riderUpdate: RiderSaved;
+}
+
+export interface RiderNewLinkData {
+  riderNewLink: RiderSaved;
+}
+
+export interface RiderHandOutData {
+  riderHandOut: {
+    results: { orderId: string; problem: string | null; delivery: { id: string } | null }[];
+    userErrors: UserError[];
+  };
+}
+
+export interface RiderHandOverData {
+  riderHandOver: {
+    handover: { id: string } | null;
+    rider: RiderValue | null;
+    userErrors: UserError[];
+  };
+}
+
 export type DropStatus = 'SCHEDULED' | 'LIVE' | 'ENDED';
 
 /** A drop of products on sale together (ADR-820). */

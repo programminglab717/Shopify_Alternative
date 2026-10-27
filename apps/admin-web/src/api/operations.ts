@@ -9981,6 +9981,158 @@ const PRICE_SALE = /* GraphQL */ `
   }
 `;
 
+const RIDER = /* GraphQL */ `
+  fragment RiderFields on Rider {
+    id
+    name
+    phone
+    active
+    out
+    cashHeld {
+      amount
+      currencyCode
+    }
+  }
+`;
+
+const RIDER_DELIVERY = /* GraphQL */ `
+  fragment RiderDeliveryFields on RiderDelivery {
+    id
+    riderId
+    orderId
+    status
+    cashDue {
+      amount
+      currencyCode
+    }
+    cashCollected {
+      amount
+      currencyCode
+    }
+    codeSent
+    codeGiven
+    failedReason
+    deliveredAt
+    failedAt
+    createdAt
+  }
+`;
+
+/** The shop's own riders (SHP-10, ADR-827). */
+export const RidersQuery = /* GraphQL */ `
+  query Riders {
+    riders {
+      ...RiderFields
+    }
+  }
+  ${RIDER}
+`;
+
+/** A rider's deliveries and the cash they handed over. */
+export const RiderDetailQuery = /* GraphQL */ `
+  query RiderDetail($riderId: ID!, $cash: Boolean!) {
+    riderDeliveries(riderId: $riderId) {
+      ...RiderDeliveryFields
+    }
+    riderHandovers(riderId: $riderId) @include(if: $cash) {
+      id
+      amount {
+        amount
+        currencyCode
+      }
+      note
+      createdAt
+    }
+  }
+  ${RIDER_DELIVERY}
+`;
+
+export const RiderCreateMutation = /* GraphQL */ `
+  mutation RiderCreate($input: RiderInput!) {
+    riderCreate(input: $input) {
+      rider {
+        ...RiderFields
+      }
+      link
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${RIDER}
+  ${USER_ERRORS}
+`;
+
+export const RiderUpdateMutation = /* GraphQL */ `
+  mutation RiderUpdate($id: ID!, $input: RiderInput!) {
+    riderUpdate(id: $id, input: $input) {
+      rider {
+        ...RiderFields
+      }
+      link
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${RIDER}
+  ${USER_ERRORS}
+`;
+
+export const RiderNewLinkMutation = /* GraphQL */ `
+  mutation RiderNewLink($id: ID!) {
+    riderNewLink(id: $id) {
+      rider {
+        ...RiderFields
+      }
+      link
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${RIDER}
+  ${USER_ERRORS}
+`;
+
+/** Packed orders handed to a rider. */
+export const RiderHandOutMutation = /* GraphQL */ `
+  mutation RiderHandOut($riderId: ID!, $orderIds: [ID!]!) {
+    riderHandOut(riderId: $riderId, orderIds: $orderIds) {
+      results {
+        orderId
+        problem
+        delivery {
+          id
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Cash a rider handed over. */
+export const RiderHandOverMutation = /* GraphQL */ `
+  mutation RiderHandOver($riderId: ID!, $input: RiderHandOverInput!) {
+    riderHandOver(riderId: $riderId, input: $input) {
+      handover {
+        id
+      }
+      rider {
+        ...RiderFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${RIDER}
+  ${USER_ERRORS}
+`;
+
 const DROP = /* GraphQL */ `
   fragment DropFields on Drop {
     id
