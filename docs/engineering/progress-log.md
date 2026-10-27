@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Combined listings in the admin
+### 86a0fc5 · Combined listings in the admin
 
 * **From a product's page:** a Combined listing card names the option and lists the products
   with their values, that product among them, saved at once or stopped (CAT-23, [ADR-800](../architecture/13-decision-log.md#adr-800--the-admin-combines-products-into-one-listing-from-a-products-page-that-product-always-among-them)).
