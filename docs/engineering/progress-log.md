@@ -16,6 +16,18 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Store locator
+
+* **Locations:** a location in use with its street and city may be listed on the store locator,
+  with its opening hours as the shop writes them; the shop's document carries those listed
+  (OS-18, [ADR-828](../architecture/13-decision-log.md#adr-828--a-location-the-shop-lists-shows-on-its-online-stores-store-locator-while-it-is-in-use-and-has-its-street-address-and-city-with-its-opening-hours-as-the-shop-writes-them-and-the-shops-document-carries-the-locations-it-lists)).
+* **Themes:** Liquid's `shop.stores` gives each with its address, number, hours, pickup and a
+  Google Maps search link that needs no key ([ADR-829](../architecture/13-decision-log.md#adr-829--liquid-has-the-shops-listed-locations-as-shopstores-each-with-its-address-as-lines-its-number-to-call-written-as-pakistan-writes-it-its-hours-whether-orders-may-be-collected-there-and-a-google-maps-search-link-that-needs-no-key)); Hatti Base's `page.stores` template
+  lists them, filters by city, and tells search engines of each as a Store ([ADR-830](../architecture/13-decision-log.md#adr-830--hatti-bases-store-locator-a-section-on-a-page-with-the-stores-template-lists-the-shops-stores-filters-them-by-city-once-its-script-runs-and-tells-search-engines-of-each-as-schemaorgs-store)).
+* **Admin:** Settings → Locations lists a location and sets its hours ([ADR-831](../architecture/13-decision-log.md#adr-831--the-admins-location-settings-list-a-location-on-the-store-locator-with-its-opening-hours-change-them-and-take-it-off)). OS-18 is done
+  in code; nothing waits on the owner.
+* 4417 tests (4 new).
+
 ### 2bf2156 · Riders in the admin
 
 * **Admin:** Shipping's Riders tab adds riders and sends them their link on WhatsApp, hands

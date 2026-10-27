@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-827 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-831 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -835,6 +835,10 @@
 | 825 | A rider's page lists what they carry with its address, map and the customer's number; delivered with the customer's code and the cash collected, received on its order, or not delivered with why, its parcel coming back | Accepted |
 | 826 | The cash a rider hands over is recorded by those who reconcile payments, at most what the rider holds, and what they hold is what they collected less what they handed over | Accepted |
 | 827 | Riders in the admin: a Riders tab on Shipping, each rider's link shown once to send on WhatsApp, packed orders handed to a rider from the list, and cash handed over recorded | Accepted |
+| 828 | A location the shop lists shows on its online store's store locator while it is in use and has its street address and city, with its opening hours as the shop writes them, and the shop's document carries the locations it lists | Accepted |
+| 829 | Liquid has the shop's listed locations as `shop.stores`, each with its address as lines, its number to call written as Pakistan writes it, its hours, whether orders may be collected there and a Google Maps search link that needs no key | Accepted |
+| 830 | Hatti Base's store locator, a section on a page with the stores template, lists the shop's stores, filters them by city once its script runs, and tells search engines of each as schema.org's Store | Accepted |
+| 831 | The admin's location settings list a location on the store locator with its opening hours, change them, and take it off | Accepted |
 
 ---
 
@@ -27150,3 +27154,67 @@
     shipping them by hand, those the core refuses named and left packed.
 * **Consequences:** SHP-10 and APP-06 are done in code, but for the Meta template (OWN-23). Zones
   on a map and routing several stops wait for shops to ask.
+
+## ADR-828 · A location the shop lists shows on its online store's store locator while it is in use and has its street address and city, with its opening hours as the shop writes them, and the shop's document carries the locations it lists
+
+* **Context:** OS-18 asks for a store locator for retailers. Locations kept their address and a
+  mobile number for couriers, and those letting customers pick up already said so (ADR-389), but
+  nothing told shoppers where to visit the shop.
+* **Decision:**
+  * **Two new fields on a location** (migration 0353): `storefront_listed`, whether the store
+    locator lists it, and `opening_hours`, up to 300 characters as the shop writes them,
+    "Mon–Sat 11am–9pm", lines and all. Hours are words, not a schedule: a shop's hours change
+    for Ramadan and Eid, and it writes them as it would on its door.
+  * **Set through `locationEdit`**, as Shopify keeps a location's fields there. Listing one needs
+    it in use and with its street and city, the same refusal pickup gives; its address can't be
+    taken away while it is listed. Blank hours clear them.
+  * **A location taken out of use leaves the locator** without losing its setting, and comes back
+    when it is used again; one out of use can't be newly listed.
+  * **The shop's document carries `stores`**: the listed locations in use, the primary first, then
+    by name, each its name, address lines, city, number, hours and whether pickup is offered
+    there. It is left out for none, so a document written before is unchanged.
+  * **The publisher follows** a location's changes to what the locator shows, or whether it shows,
+    and a location deleted, rebuilding the shop's document; changes to what a location sells still
+    rebuild every product, as before.
+* **Consequences:** a location's hours are not read by checkout or pickup: they are for shoppers
+  to read. Several sets of hours, or a schedule that knows holidays, wait for shops to ask.
+
+## ADR-829 · Liquid has the shop's listed locations as `shop.stores`, each with its address as lines, its number to call written as Pakistan writes it, its hours, whether orders may be collected there and a Google Maps search link that needs no key
+
+* **Context:** themes need the listed locations (ADR-828) in a form they can print.
+* **Decision:** `shop.stores`, Hatti's own, empty for none. Each store has its `name`, `address`
+  (lines to print), `city`, `phone` in E.164 for a `tel:` link, `phone_local` written as Pakistan
+  writes it, "0300 1234567", `hours` as the shop wrote them, `pickup`, and `map_url`: a Google Maps
+  search for its name and address. That link is Google's documented Maps URL; it needs no API key,
+  costs nothing and opens the Maps app on phones. No map is embedded on the page, so no key, no
+  tracking script and no cost.
+* **Consequences:** a store found on a map by its address, not by coordinates. Pins placed by hand
+  wait for shops whose address Maps can't find.
+
+## ADR-830 · Hatti Base's store locator, a section on a page with the stores template, lists the shop's stores, filters them by city once its script runs, and tells search engines of each as schema.org's Store
+
+* **Context:** Hatti Base had no page for a shop's stores, though the information architecture
+  plans `/pages/stores` for retailers.
+* **Decision:**
+  * **A `store-locator` section** and a `page.stores` template that puts it under the page's own
+    words. A shop makes a page, picks the stores template, and its listed stores show.
+  * **Each store is a card:** its name, address, hours with their lines, "Collect your online
+    order here" where it offers pickup, "Call 0300 1234567", and "Directions" to Maps.
+  * **Where its stores are in more than one city**, a choice of city shows once the section's
+    script runs, showing that city's alone; without the script every store shows.
+  * **Search engines are told of each as a schema.org `Store`**, a LocalBusiness, with its name,
+    address, telephone and map, unless the section says not to. Its hours are left out, because
+    schema.org wants them in a fixed form and the shop writes them as words.
+  * **A shop that lists none** says its stores will be listed soon. Words are in English and Urdu.
+* **Consequences:** this is the first part of the SEO row's "a shop's own business hours and
+  address as a LocalBusiness": its address, but not its hours in schema.org's form.
+
+## ADR-831 · The admin's location settings list a location on the store locator with its opening hours, change them, and take it off
+
+* **Context:** the listing and hours (ADR-828) were set through the Admin API alone.
+* **Decision:** each location in use on Settings → Locations shows whether it is on the store
+  locator, with its hours. "Show on your store locator" opens the opening hours, a few lines,
+  then lists it. "Change opening hours" changes them, and "Take off the store locator" takes it
+  off. A refusal, such as a location without its address, is said there. English and Urdu.
+* **Consequences:** OS-18 is done in code. The pickup points were done already (ADR-389 to
+  ADR-391), and the store locator is now done too. Nothing waits on the owner.
