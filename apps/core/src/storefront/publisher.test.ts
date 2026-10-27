@@ -6,6 +6,7 @@ import {
   MediaService,
   ProductReviewService,
   BundleService,
+  CombinedListingService,
   ComplementService,
   PersonalisationService,
   PriceSaleService,
@@ -15,6 +16,7 @@ import {
   bundleProductIdsIn,
   bundlesContainingIn,
   bundlesOfProductsIn,
+  combinedListingsIn,
   complementsIn,
   runningSalesIn,
   relatedProductsIn,
@@ -141,8 +143,14 @@ describe('What storefront documents an event makes stale', () => {
       'all-products',
       'menus',
       'bundles-with:a1',
+      // Those in a combined listing with it, which offer it while it is on sale (ADR-799).
+      'combined-with:a1',
     ]);
     expect(itemsFor(event('product.deleted'))).toContain('every-collection');
+    expect(itemsFor(event('combined_listing.updated', { productIds: ['p1', 'p2'] }))).toEqual([
+      'product:p1',
+      'product:p2',
+    ]);
     expect(itemsFor(event('collection.updated', { changed: ['title'] }))).toEqual([
       'collection:a1',
       'all-products',
@@ -490,6 +498,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         related: {
           relatedProductsOf: relatedProductsIn,
           complementsOf: complementsIn,
+          combinedListingsOf: combinedListingsIn,
           boughtTogetherOf: (tx, shopId, ids) =>
             Promise.resolve(
               new Map(ids.filter((id) => bought.has(id)).map((id) => [id, bought.get(id)!])),
@@ -1535,6 +1544,60 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().productByHandle(kurta.handle))?.complements).toBeUndefined();
     for (const each of [kurta, dupatta, khussa]) unwrap(await products.delete(tenant, each.id));
+    await deliver();
+  });
+
+  it("publishes a combined listing's products on each one's page, those on sale alone (ADR-799)", async () => {
+    const listings = new CombinedListingService(database);
+    const made = async (title: string) =>
+      unwrap(await products.create(tenant, { title, status: 'active' }));
+    const maroon = await made('Combined maroon');
+    const teal = await made('Combined teal');
+    const mustard = await made('Combined mustard');
+    await deliver();
+    const listingOf = async (handle: string) =>
+      (await store().productByHandle(handle))?.combinedListing;
+    const listing = unwrap(
+      await listings.set(tenant, null, {
+        optionName: 'Colour',
+        products: [
+          { productId: maroon.id, value: 'Maroon' },
+          { productId: teal.id, value: 'Teal' },
+          { productId: mustard.id, value: 'Mustard' },
+        ],
+      }),
+    );
+    expect(await deliver()).toEqual(['combined_listing.updated']);
+    const all = {
+      optionName: 'Colour',
+      products: [
+        { id: maroon.id, value: 'Maroon' },
+        { id: teal.id, value: 'Teal' },
+        { id: mustard.id, value: 'Mustard' },
+      ],
+    };
+    expect(await listingOf(maroon.handle)).toEqual(all);
+    expect(await listingOf(mustard.handle)).toEqual(all);
+
+    // One taken off sale is offered by the others no more.
+    unwrap(await products.update(tenant, { id: teal.id, status: 'draft' }));
+    await deliver();
+    expect((await listingOf(maroon.handle))?.products.map((each) => each.value)).toEqual([
+      'Maroon',
+      'Mustard',
+    ]);
+    // With one left on sale, there is nothing to choose; deleted, none.
+    unwrap(await products.update(tenant, { id: mustard.id, status: 'draft' }));
+    await deliver();
+    expect(await listingOf(maroon.handle)).toBeUndefined();
+    unwrap(await products.update(tenant, { id: mustard.id, status: 'active' }));
+    await deliver();
+    expect(await listingOf(mustard.handle)).toBeDefined();
+    unwrap(await listings.delete(tenant, listing.id));
+    await deliver();
+    expect(await listingOf(maroon.handle)).toBeUndefined();
+    expect(await listingOf(mustard.handle)).toBeUndefined();
+    for (const each of [maroon, teal, mustard]) unwrap(await products.delete(tenant, each.id));
     await deliver();
   });
 

@@ -1775,6 +1775,52 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('اس سیٹ میں');
   });
 
+  it("offers a combined listing's other products as values of its option, linked to their pages (ADR-799)", async () => {
+    const sample = sampleStore();
+    const [first, second, third, ...rest] = sample.products;
+    const listing = {
+      optionName: 'Colour',
+      products: [
+        { id: first!.id, value: 'Maroon' },
+        { id: second!.id, value: 'Teal <dark>' },
+        { id: third!.id, value: 'Mustard' },
+        // One whose page is gone since is left out.
+        { id: 'gone', value: 'Black' },
+      ],
+    };
+    const soldOut = {
+      ...third!,
+      combinedListing: listing,
+      variants: third!.variants.map((each) => ({ ...each, available: false })),
+    };
+    const products = [
+      { ...first!, combinedListing: listing },
+      { ...second!, combinedListing: listing },
+      soldOut,
+      ...rest,
+    ];
+    const shop = new MemoryStore({ ...sample, products });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${first!.handle}` }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain('<p class="combined-listing__name">Colour</p>');
+    expect(flat).toMatch(
+      /<span class="combined-listing__value combined-listing__value--selected" aria-current="page">.*?<span dir="auto">Maroon<\/span>/,
+    );
+    expect(flat).toMatch(
+      new RegExp(
+        `<a class="combined-listing__value" href="/products/${second!.handle}">.*?<span dir="auto">Teal &lt;dark&gt;</span></a>`,
+      ),
+    );
+    expect(flat).toMatch(
+      /<span dir="auto">Mustard<\/span><span class="combined-listing__sold-out">Sold out<\/span><\/a>/,
+    );
+    expect(flat).not.toContain('Black');
+
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('combined-listing__name');
+  });
+
   it("counts down a running sale's end, and says how many are left where few are (ADR-445)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

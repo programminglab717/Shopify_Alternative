@@ -427,6 +427,10 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
       price: field.price ?? 0,
       input_name: `properties[${field.name}]`,
     })),
+    // The combined listing it is in (CAT-23, ADR-799): the option its products differ by, and
+    // each of them on sale as a value of it, itself selected, its product fetched with the
+    // others' when a template first touches one; nil when it is in none. Hatti's own.
+    combined_listing: combinedListingObject(doc, ctx),
     // What it holds, where it is a bundle (ADR-411): each part's title, variant, how many one set
     // has, and a link to it while it is for sale; nil for a product that is no bundle. Hatti's own.
     bundle: doc.bundle
@@ -445,6 +449,31 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
       rating: review.rating,
       content: review.bodyHtml ?? '',
       created_at: review.createdAt,
+    })),
+  };
+}
+
+/**
+ * A product's combined listing (ADR-799): `option_name`, and `values`, each its `name`, whether
+ * it is the product shown (`selected`) and its `product`, whose `url`, `available` and
+ * `featured_image` a swatch links and shows.
+ */
+function combinedListingObject(
+  doc: ProductDoc,
+  ctx: ObjectContext,
+): Record<string, unknown> | null {
+  const listing = doc.combinedListing;
+  if (!listing) return null;
+  const products = lazyProducts(
+    listing.products.map((product) => product.id),
+    ctx,
+  );
+  return {
+    option_name: listing.optionName,
+    values: listing.products.map((product, index) => ({
+      name: product.value,
+      selected: product.id === doc.id,
+      product: products[index],
     })),
   };
 }

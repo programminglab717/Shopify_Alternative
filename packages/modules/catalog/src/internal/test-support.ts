@@ -80,6 +80,7 @@ export async function catalogFixture(server: string): Promise<CatalogFixture> {
     async reset() {
       await admin.query(`
         DELETE FROM catalog.collections;
+        DELETE FROM catalog.combined_listings;
         DELETE FROM catalog.products;
         DELETE FROM catalog.media_removals;
         DELETE FROM platform.outbox_events;`);

@@ -253,6 +253,19 @@ export interface ProductDoc {
    * recommendations. Absent when it pairs with none.
    */
   complements?: string[];
+  /**
+   * The combined listing it is in (CAT-23, ADR-799): the option its products differ by, and
+   * those of them on sale when it was last built, itself among them, each by ID with its value,
+   * in the listing's order. Absent when it is in none.
+   */
+  combinedListing?: CombinedListingDoc;
+}
+
+/** Products shown as one listing, each a value of its option (ADR-799). */
+export interface CombinedListingDoc {
+  /** "Colour". */
+  optionName: string;
+  products: { id: string; value: string }[];
 }
 
 /** A product's published reviews, as its page shows them (ADR-401). */

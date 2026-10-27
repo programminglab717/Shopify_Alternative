@@ -24,6 +24,7 @@ export {
   type MenuLinkDoc,
   type PageDoc,
   type ProductDoc,
+  type CombinedListingDoc,
   type AttributeWordDoc,
   type EasternWearDoc,
   type ProductReviewsDoc,

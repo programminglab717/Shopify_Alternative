@@ -4,6 +4,7 @@ import {
   CollectionService,
   ProductService,
   BundleEvents,
+  CombinedListingEvents,
   ComplementEvents,
   ReviewEvents,
   SizeChartEvents,
@@ -17,6 +18,7 @@ import {
   bundleSellable,
   bundlesContainingIn,
   bundlesOfProductsIn,
+  combinedListingsIn,
   complementsIn,
   runningSalesIn,
   relatedProductsIn,
@@ -28,6 +30,8 @@ import {
   videoPathOf,
   type BundleRecord,
   type CollectionRecord,
+  type CombinedListingRecord,
+  type CombinedListingUpdatedPayload,
   type PersonalisationField,
   type ProductRecord,
   type ProductReviewChangedPayload,
@@ -165,6 +169,8 @@ export const Items = {
   bundlesWith: (productId: string) => `bundles-with:${productId}`,
   /** The shop's bundles: one may have lost a part. */
   everyBundle: 'every-bundle',
+  /** The products in a combined listing with a product, which offer it on their pages (ADR-799). */
+  combinedWith: (productId: string) => `combined-with:${productId}`,
   /**
    * The shop's settings, preferences and delivery charges, its Meta pixel, and its main theme,
    * the theme written first.
@@ -230,7 +236,8 @@ export function itemsFor(event: DomainEvent): string[] {
           : [Items.product(id)];
       }
       // Its listings may change order or drop it: smart collections it left no longer hold it.
-      // The bundles it is a part of name it, and are not sold while it is not (ADR-411).
+      // The bundles it is a part of name it, and are not sold while it is not (ADR-411); the
+      // products in a combined listing with it offer it while it is on sale (ADR-799).
       return [
         Items.product(id),
         Items.collectionsWith(id),
@@ -238,6 +245,7 @@ export function itemsFor(event: DomainEvent): string[] {
         Items.allProducts,
         Items.menus,
         Items.bundlesWith(id),
+        Items.combinedWith(id),
       ];
     }
     case CatalogEvents.ProductDeleted:
@@ -269,6 +277,11 @@ export function itemsFor(event: DomainEvent): string[] {
     case ComplementEvents.Updated:
     case PersonalisationEvents.Updated:
       return [Items.product(id)];
+    // The products in a combined listing before and after its change (ADR-799).
+    case CombinedListingEvents.Updated:
+      return (event.payload as unknown as CombinedListingUpdatedPayload).productIds.map(
+        Items.product,
+      );
     case ReviewEvents.Written:
     case ReviewEvents.Published:
     case ReviewEvents.Hidden:
@@ -465,6 +478,7 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Published,
   ReviewEvents.Hidden,
   BundleEvents.Updated,
+  CombinedListingEvents.Updated,
   ComplementEvents.Updated,
   PersonalisationEvents.Updated,
   SizeChartEvents.Updated,
@@ -534,6 +548,7 @@ const BY_ID = new Set([
   'article',
   'collections-with',
   'bundles-with',
+  'combined-with',
   'articles-in',
 ]);
 
@@ -603,6 +618,12 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, string[]>>;
+    /** The combined listing each is in (ADR-799). */
+    combinedListingsOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, CombinedListingRecord>>;
   };
   /** When the sale each product is in now ends (ADR-445). */
   sales: {
@@ -746,6 +767,7 @@ export class StorefrontPublisher {
     const containing: string[] = [];
     const articlesIn: string[] = [];
     const bundlesWith: string[] = [];
+    const combinedWith: string[] = [];
     const wanted = new Set<string>();
     for (const item of batch.items) {
       const [kind, id = ''] = splitItem(item);
@@ -759,6 +781,7 @@ export class StorefrontPublisher {
       else if (kind === 'article') articles.add(id);
       else if (kind === 'articles-in') articlesIn.push(id);
       else if (kind === 'bundles-with') bundlesWith.push(id);
+      else if (kind === 'combined-with') combinedWith.push(id);
       else containing.push(id);
     }
 
@@ -770,6 +793,16 @@ export class StorefrontPublisher {
       if (bundlesWith.length > 0) {
         const ids = await this.services.bundles.bundlesContainingIn(tx, shopId, bundlesWith);
         more.push(...ids.map(Items.product));
+      }
+      // The products in a combined listing with one whose sale may have changed (ADR-799).
+      if (combinedWith.length > 0) {
+        const listings = await this.services.related.combinedListingsOf(tx, shopId, combinedWith);
+        const asked = new Set(combinedWith);
+        for (const listing of new Set(listings.values())) {
+          for (const { productId } of listing.products) {
+            if (!asked.has(productId)) more.push(Items.product(productId));
+          }
+        }
       }
       if (wanted.has(Items.everyBundle)) {
         more.push(
@@ -1178,6 +1211,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const combined = await this.services.related.combinedListingsOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     // Where the shop paired none with a product, those its customers bought with it (ADR-480).
     const unpaired = active.filter((record) => !complements.has(record.id));
     const boughtTogether = await this.services.related.boughtTogetherOf(
@@ -1224,6 +1262,7 @@ export class StorefrontPublisher {
           sales.get(record.id),
           left,
           personalisation.get(record.id),
+          combined.get(record.id),
         ),
         productFields,
         variantFields,
@@ -1490,6 +1529,7 @@ export function createStorefrontPublisher(
         relatedProductsOf: relatedProductsIn,
         complementsOf: complementsIn,
         boughtTogetherOf: boughtTogetherIn,
+        combinedListingsOf: combinedListingsIn,
       },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
       personalisation: { personalisationOf: personalisationIn },

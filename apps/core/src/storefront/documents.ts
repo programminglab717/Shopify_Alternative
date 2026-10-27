@@ -5,6 +5,7 @@ import {
   shownSizeOf,
   type BundleRecord,
   type CollectionRecord,
+  type CombinedListingRecord,
   type MediaRecord,
   type OptionRecord,
   type ProductRecord,
@@ -112,6 +113,8 @@ export function productDoc(
   left: ReadonlyMap<string, number> = new Map(),
   /** What its page asks the shopper for, in order (ADR-689). */
   personalisation: readonly PersonalisationField[] = [],
+  /** The combined listing it is in, if any (ADR-799). */
+  combinedListing?: CombinedListingRecord,
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -223,7 +226,24 @@ export function productDoc(
     ...(bundle && { bundle }),
     ...(related && related.length > 0 && { related: [...related] }),
     ...(complements && complements.length > 0 && { complements: [...complements] }),
+    ...combinedListingDoc(record.id, combinedListing),
   };
+}
+
+/**
+ * A product's combined listing as its document holds it (ADR-799): its products on sale, itself
+ * among them; none where no other is, as the listing then offers nothing to choose.
+ */
+function combinedListingDoc(
+  productId: string,
+  listing: CombinedListingRecord | undefined,
+): Pick<ProductDoc, 'combinedListing'> {
+  if (!listing) return {};
+  const products = listing.products
+    .filter((product) => product.active || product.productId === productId)
+    .map((product) => ({ id: product.productId, value: product.value }));
+  if (products.length < 2) return {};
+  return { combinedListing: { optionName: listing.optionName, products } };
 }
 
 /**

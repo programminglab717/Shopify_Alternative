@@ -235,6 +235,15 @@ export {
   complementsIn,
 } from '../internal/complements.js';
 export {
+  COMBINED_LISTING_LIMITS,
+  CombinedListingEvents,
+  CombinedListingService,
+  combinedListingsIn,
+  type CombinedListingMember,
+  type CombinedListingRecord,
+  type CombinedListingUpdatedPayload,
+} from '../internal/combined-listings.js';
+export {
   PERSONALISATION_KINDS,
   PERSONALISATION_LIMITS,
   PersonalisationEvents,

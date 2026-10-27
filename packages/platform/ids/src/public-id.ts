@@ -139,6 +139,8 @@ export const ID_PREFIXES = {
   priceList: 'plst',
   // An order from the store a shop moved from, kept to look back on (ADR-786).
   pastOrder: 'pord',
+  // Products shown as one listing, each a value of its option, as colours are (ADR-799).
+  combinedListing: 'cmbl',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

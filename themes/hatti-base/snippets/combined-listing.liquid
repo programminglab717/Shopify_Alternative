@@ -1,0 +1,32 @@
+{%- comment -%}
+  A combined listing's products as values of its option (CAT-23, ADR-799): the one shown
+  marked, each other linked to its own page with its first image, said where it is sold out.
+  Accepts: listing, the product's combined listing.
+{%- endcomment -%}
+{%- if listing -%}
+  <div class="combined-listing">
+    <p class="combined-listing__name">{{ listing.option_name | escape }}</p>
+    <ul class="combined-listing__values" role="list">
+      {%- for value in listing.values -%}
+        {%- assign item = value.product -%}
+        {%- if value.selected or item.url -%}
+          <li>
+            {%- if value.selected -%}
+              <span class="combined-listing__value combined-listing__value--selected" aria-current="page">
+            {%- else -%}
+              <a class="combined-listing__value" href="{{ item.url }}">
+            {%- endif -%}
+            {%- if item.featured_image -%}
+              {{ item.featured_image | image_url: width: 96 | image_tag: width: 48, height: 48, loading: 'lazy', alt: '' }}
+            {%- endif -%}
+            <span dir="auto">{{ value.name | escape }}</span>
+            {%- unless item.available -%}
+              <span class="combined-listing__sold-out">{{ 'products.product.sold_out' | t }}</span>
+            {%- endunless -%}
+            {%- if value.selected -%}</span>{%- else -%}</a>{%- endif -%}
+          </li>
+        {%- endif -%}
+      {%- endfor -%}
+    </ul>
+  </div>
+{%- endif -%}

@@ -2482,6 +2482,60 @@ type CollectionsImportFromShopifyPayload {
 }
 
 """
+Products the shop shows as one listing (CAT-23, ADR-799), each a value of its option, as a print's colours are: each product's page offers the others as that option's other values, linking to their pages. A product is in one listing at most.
+"""
+type CombinedListing {
+  createdAt: DateTime!
+  id: ID!
+
+  """What its products differ by, as its pages name the option: "Colour"."""
+  optionName: String!
+
+  """In the order its pages show them."""
+  products: [CombinedListingProduct!]!
+  updatedAt: DateTime!
+}
+
+type CombinedListingDeletePayload {
+  deletedCombinedListingId: ID
+  userErrors: [UserError!]!
+}
+
+input CombinedListingInput {
+  """Up to 255 characters."""
+  optionName: String!
+
+  """
+  2 to 100 products, in the order its pages show them, each in no other listing.
+  """
+  products: [CombinedListingProductInput!]!
+}
+
+type CombinedListingPayload {
+  combinedListing: CombinedListing
+  userErrors: [UserError!]!
+}
+
+"""
+A product of a combined listing, and its value of the listing's option.
+"""
+type CombinedListingProduct {
+  """The product, whatever its status."""
+  product: Product
+  productId: ID!
+
+  """Its value of the option: "Maroon"."""
+  value: String!
+}
+
+input CombinedListingProductInput {
+  productId: ID!
+
+  """Up to 255 characters, none of the others'."""
+  value: String!
+}
+
+"""
 A comment a shopper posted on an article from its page on the storefront (ADR-220), shown there once published, as its blog's comment policy says.
 """
 type Comment {
@@ -8740,6 +8794,16 @@ type Mutation {
     store: String!
   ): CollectionsImportFromShopifyPayload!
 
+  """
+  Deletes a combined listing: its products stay, each shown on its own again.
+  """
+  combinedListingDelete(id: ID!): CombinedListingDeletePayload!
+
+  """
+  Makes a combined listing of products, or, given its ID, sets its option and products in place of those it had. Their pages offer one another as values of its option.
+  """
+  combinedListingSet(id: ID, input: CombinedListingInput!): CombinedListingPayload!
+
   """Shows a comment on the storefront, as the shop approves it."""
   commentApprove(id: ID!): CommentApprovePayload!
 
@@ -13299,6 +13363,9 @@ type Product {
     first: Int = 50
   ): CollectionConnection!
 
+  """The combined listing it is in, if any (ADR-799)."""
+  combinedListing: CombinedListing
+
   """
   The products the shop pairs with it, in its order, at most 10: what its page and the cart recommend beside it as complementary (ADR-435).
   """
@@ -14597,6 +14664,10 @@ type Query {
     """Words to find in the title."""
     query: String
   ): CollectionConnection!
+  combinedListing(id: ID!): CombinedListing
+
+  """The shop's combined listings, the newest first."""
+  combinedListings: [CombinedListing!]!
   comment(id: ID!): Comment
 
   """The comments on the shop's articles, the latest first."""

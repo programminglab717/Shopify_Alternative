@@ -81,6 +81,7 @@
 
         {%- when 'buy_buttons' -%}
           <div class="product__buy" {{ block.shopify_attributes }}>
+          {% render 'combined-listing', listing: product.combined_listing %}
           {% render 'bundle-contents', bundle: product.bundle %}
           {%- form 'product', product, id: 'product-form', class: 'product__form', novalidate: 'novalidate' -%}
             {%- unless product.has_only_default_variant -%}
