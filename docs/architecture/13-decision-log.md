@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-811 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-812 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -819,6 +819,7 @@
 | 809 | A signed-in shopper finds their invite link on their account, with what each side is given, to share on WhatsApp | Accepted |
 | 810 | Web chat: a shopper gives their name and number to chat from the online store, kept as a conversation of the inbox, each browser reading only its own session | Accepted |
 | 811 | Hatti Base offers the chat from a button on every page, its session in a cookie the page's script never reads | Accepted |
+| 812 | The admin turns the chat on in Customer messages, and its inbox shows chats from the online store by name, answered at any time | Accepted |
 
 ---
 
@@ -26772,3 +26773,17 @@
 * **Consequences:** a page cached for everyone shows the chat to all; each browser's session
   is its own. The panel asks while open, not when closed: a shopper sees answers when they
   open it again. The admin's settings and inbox follow (ADR-812).
+
+## ADR-812 · The admin turns the chat on in Customer messages, and its inbox shows chats from the online store by name, answered at any time
+
+* **Context:** web chat is kept in the core (ADR-810) and offered on Hatti Base (ADR-811),
+  set through the Admin API alone. The inbox showed every conversation as WhatsApp's, its
+  reply box closed a day after the customer last wrote.
+* **Decision:** Settings → Customer messages has a card to offer the chat on the online store,
+  with what it says first, for those who change settings; others see it as it is. The inbox
+  shows a chat from the online store by the name the shopper gave and their number, marked
+  Web chat in the list; its page says they read answers when they open the chat again, and
+  offers the reply box at any time, saying no day to answer within. Its orders' drafts are
+  offered as they are while the WhatsApp window is open.
+* **Consequences:** a shop turns the chat on and answers it where it answers WhatsApp. With
+  ADR-810 and ADR-811, MSG-10 is done.
