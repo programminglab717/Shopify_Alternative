@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Referrals
+### d35a07e · Referrals
 
 * **Referral programme:** each customer has a code; a friend's first order from their link
   gives both store credit once it is delivered and paid, unless the checks against fraud
