@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Digital products, and two services Nest left out
+### 9a3231c · Digital products, and two services Nest left out
 
 * **Digital products:** a product is made digital, with files kept privately and licence keys
   kept sealed, each key given once to one unit of an order's line (CAT-13, [ADR-813](../architecture/13-decision-log.md#adr-813--a-product-made-digital-sells-files-kept-privately-and-licence-keys-kept-sealed-each-key-given-once-to-one-unit-of-an-orders-line)). Selling
