@@ -6,7 +6,9 @@ import {
   BundleEvents,
   CombinedListingEvents,
   DropEvents,
+  dropFactsIn,
   waitingRoomsIn,
+  type DropUpdatedPayload,
   ComplementEvents,
   ReviewEvents,
   SizeChartEvents,
@@ -291,8 +293,12 @@ export function itemsFor(event: DomainEvent): string[] {
         Items.product,
       );
     case DropEvents.Updated:
-      // Its waiting room is the shop's document's (ADR-822).
-      return [Items.shop];
+      // Its waiting room is the shop's document's (ADR-822); its products' pages count down to
+      // it (ADR-823).
+      return [
+        Items.shop,
+        ...(event.payload as unknown as DropUpdatedPayload).productIds.map(Items.product),
+      ];
     case ReviewEvents.Written:
     case ReviewEvents.Published:
     case ReviewEvents.Hidden:
@@ -1259,6 +1265,12 @@ export class StorefrontPublisher {
       shopId,
       unpaired.map((record) => record.id),
     );
+    // The drops they are in, to count down to (ADR-823).
+    const drops = await dropFactsIn(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const sales = await this.services.sales.runningSalesOf(
       tx,
       shopId,
@@ -1300,6 +1312,7 @@ export class StorefrontPublisher {
           personalisation.get(record.id),
           combined.get(record.id),
           stitching.get(record.id),
+          drops.get(record.id),
         ),
         productFields,
         variantFields,

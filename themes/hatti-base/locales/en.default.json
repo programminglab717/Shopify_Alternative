@@ -131,6 +131,9 @@
       "sale_ends_on": "Sale ends {{ date }}",
       "sale_ends_in": "Sale ends in {{ time }}",
       "sale_days": "{{ count }}d",
+      "drop_starts_on": "On sale {{ date }}",
+      "drop_starts_in": "On sale in {{ time }}",
+      "drop_limit": "{{ count }} per customer",
       "low_stock": "Only {{ count }} left",
       "stitching": {
         "title": "Stitching",

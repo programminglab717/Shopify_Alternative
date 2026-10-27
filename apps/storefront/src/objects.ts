@@ -411,6 +411,17 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // When the sale it is in now ends (ADR-445), ISO 8601 for a countdown; nil when it is in none.
     // Hatti's own.
     sale_ends_at: doc.saleEndsAt ?? null,
+    // The drop it is in that has not ended (ADR-823): its name, when it starts and ends, ISO 8601
+    // for a countdown, and how many a customer may buy, nil for no limit; nil when it is in none.
+    // Hatti's own.
+    drop: doc.drop
+      ? {
+          name: doc.drop.name,
+          starts_at: doc.drop.startsAt,
+          ends_at: doc.drop.endsAt,
+          per_customer_limit: doc.drop.perCustomer ?? null,
+        }
+      : null,
     // Its size chart (ADR-407), each measurement in inches and centimetres; nil when it has none.
     // Hatti's own.
     size_chart: sizeChartObject(doc),

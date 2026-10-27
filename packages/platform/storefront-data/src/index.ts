@@ -43,6 +43,7 @@ export {
   type VariantDoc,
   type VideoSourceDoc,
   type WaitingRoomDoc,
+  type ProductDropDoc,
 } from './documents.js';
 export { TranslatedStore, translated, translatedProduct } from './translations.js';
 export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';

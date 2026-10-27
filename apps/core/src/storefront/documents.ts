@@ -6,6 +6,7 @@ import {
   type BundleRecord,
   type CollectionRecord,
   type CombinedListingRecord,
+  type DropFact,
   measurementProperty,
   type StitchingOffer,
   type MediaRecord,
@@ -120,6 +121,8 @@ export function productDoc(
   combinedListing?: CombinedListingRecord,
   /** The stitching it is offered with, if any (ADR-802). */
   stitching?: StitchingOffer,
+  /** The drop it is in that has not ended, if any (ADR-823). */
+  drop?: DropFact,
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -213,6 +216,14 @@ export function productDoc(
     ...(record.condition !== 'new' && { condition: record.condition }),
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
+    ...(drop && {
+      drop: {
+        name: drop.name,
+        startsAt: drop.startsAt.toISOString(),
+        endsAt: drop.endsAt.toISOString(),
+        ...(drop.perCustomer !== null && { perCustomer: drop.perCustomer }),
+      },
+    }),
     ...(sizeChart && { sizeChart }),
     ...(personalisation.length > 0 && {
       personalisation: personalisation.map((field) => ({

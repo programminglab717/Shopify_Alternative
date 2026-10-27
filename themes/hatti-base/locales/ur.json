@@ -131,6 +131,9 @@
       "sale_ends_on": "سیل {{ date }} کو ختم",
       "sale_ends_in": "سیل ختم ہونے میں {{ time }}",
       "sale_days": "{{ count }} دن",
+      "drop_starts_on": "{{ date }} کو سیل کے لیے",
+      "drop_starts_in": "سیل شروع ہونے میں {{ time }}",
+      "drop_limit": "ہر گاہک کے لیے {{ count }}",
       "low_stock": "صرف {{ count }} باقی",
       "stitching": {
         "title": "سلائی",

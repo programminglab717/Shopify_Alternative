@@ -196,6 +196,11 @@ export interface ProductDoc {
    */
   preorderShipsOn?: string;
   /**
+   * The drop it is in that has not ended (ADR-823): until it starts the product sells to no one,
+   * and while it is live each customer buys so many at most. Absent when it is in none.
+   */
+  drop?: ProductDropDoc;
+  /**
    * When the sale it is in now ends, as ISO 8601 (MKT-14, ADR-445): for its page's countdown.
    * Absent when it is in none.
    */
@@ -680,6 +685,16 @@ export interface MaintenanceDoc {
    * (ADR-603); absent for the whole storefront paused, as in documents written before.
    */
   checkoutOnly?: true;
+}
+
+/** A product's drop, as its document has it (ADR-823). */
+export interface ProductDropDoc {
+  name: string;
+  /** ISO 8601. */
+  startsAt: string;
+  endsAt: string;
+  /** Units a customer may buy while it is live; absent for no limit. */
+  perCustomer?: number;
 }
 
 /** A drop's waiting room, as a shop's document has it (ADR-822). */

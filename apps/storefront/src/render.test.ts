@@ -1861,6 +1861,38 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('صرف 3 باقی');
   });
 
+  it("counts down to a drop's start, and says how many a customer may buy (ADR-823)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const inDrop = {
+      ...first!,
+      drop: {
+        name: 'Eid lawn',
+        startsAt: '2026-10-31T19:00:00.000Z',
+        endsAt: '2026-11-01T19:00:00.000Z',
+        perCustomer: 2,
+      },
+    };
+    const shop = new MemoryStore({ ...sample, products: [inDrop, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${inDrop.handle}` }, shop.fresh());
+    expect(page.html).toMatch(
+      /<p\s+class="product__drop"\s+data-drop-starts="2026-10-31T19:00:00.000Z"\s+data-drop-ends="2026-11-01T19:00:00.000Z"\s+data-words="On sale in \{time\}"\s+data-days="\{count\}d"\s*>On sale 1 November 2026<\/p>/,
+    );
+    expect(page.html).toContain('<p class="product__drop-limit">2 per customer</p>');
+    // Its script counts down, and turns the button off until the start.
+    expect(page.html).toContain("document.querySelectorAll('[data-drop-starts]')");
+    // A product in no drop says nothing of one.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('class="product__drop');
+    // In Urdu too.
+    const urdu = await renderer.render(
+      { path: `/products/${inDrop.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('ہر گاہک کے لیے 2');
+  });
+
   it('asks for what a product made to order needs, as properties of the line it adds (ADR-689)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

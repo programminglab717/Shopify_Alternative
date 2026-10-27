@@ -2090,7 +2090,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).returns).toBeUndefined();
   });
 
-  it("publishes the shop's drops' waiting rooms that have not ended, and leaves them out without (ADR-822)", async () => {
+  it("publishes the shop's drops' waiting rooms and its products' drops, and leaves them out without (ADR-822, ADR-823)", async () => {
     await publisher.publishAll(shopId);
     expect((await store().shop()).waitingRooms).toBeUndefined();
     const lawn = unwrap(await products.create(tenant, { title: 'Eid lawn', status: 'active' }));
@@ -2116,9 +2116,16 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         admitPerMinute: 500,
       },
     ]);
+    // Its product's page counts down to it (ADR-823).
+    expect((await store().products([lawn.id]))[0]!.drop).toEqual({
+      name: 'Eid lawn',
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+    });
     await drops.delete(tenant, drop.id);
     await deliver();
     expect((await store().shop()).waitingRooms).toBeUndefined();
+    expect((await store().products([lawn.id]))[0]!.drop).toBeUndefined();
   });
 
   it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {

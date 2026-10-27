@@ -124,6 +124,28 @@
               <input type="number" name="quantity" value="1" min="1" max="10" inputmode="numeric">
             </label>
             <p class="product__error" role="alert" data-cart-error hidden></p>
+            {%- comment -%}
+              A drop still to start (ADR-823): its start counted down by the second, the button
+              off until then where JavaScript runs; how many a customer may buy while it is live.
+              The cart refuses it before then all the same.
+            {%- endcomment -%}
+            {%- if product.drop -%}
+              {%- assign drop_starts = product.drop.starts_at | date: format: 'day_month_year' -%}
+              <p
+                class="product__drop"
+                data-drop-starts="{{ product.drop.starts_at }}"
+                data-drop-ends="{{ product.drop.ends_at }}"
+                data-words="{{ 'products.product.drop_starts_in' | t: time: '{time}' | escape }}"
+                data-days="{{ 'products.product.sale_days' | t: count: '{count}' | escape }}"
+              >
+                {{- 'products.product.drop_starts_on' | t: date: drop_starts -}}
+              </p>
+              {%- if product.drop.per_customer_limit -%}
+                <p class="product__drop-limit">
+                  {{- 'products.product.drop_limit' | t: count: product.drop.per_customer_limit -}}
+                </p>
+              {%- endif -%}
+            {%- endif -%}
             <button type="submit" name="add" class="button" {% unless current.available %}disabled{% endunless %}>
               {%- if current.available and product.preorder_ships_on -%}
                 {{ 'products.product.preorder' | t }}
@@ -398,6 +420,8 @@
   .product__promises li::before { content: "✓ "; color: var(--color-accent); }
   .product__verified { font-weight: 600; }
   .product__sale-ends { margin: 0.25rem 0 0; color: var(--color-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .product__drop { margin: 0 0 0.5rem; color: var(--color-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .product__drop-limit { margin: 0 0 0.5rem; }
   .product__low-stock { margin: 0; color: #b45309; font-weight: 600; }
   .product__own-price { margin: 0.25rem 0 0; color: var(--color-accent); font-weight: 600; }
   .back-in-stock__form { display: grid; gap: 0.5rem; margin-block-end: 1rem; }
@@ -470,6 +494,32 @@
         showOwnPrice(form?.elements.id.value);
       })
       .catch(() => {});
+  }
+
+  // A drop's start counted down by the second (ADR-823), the button off until it comes; gone once
+  // it starts, the button on again where its variant is for sale.
+  for (const drop of document.querySelectorAll('[data-drop-starts]')) {
+    const starts = Date.parse(drop.dataset.dropStarts);
+    const ends = Date.parse(drop.dataset.dropEnds);
+    const button = drop.closest('form')?.querySelector('button[name="add"]');
+    const wasOn = button && !button.disabled;
+    const pad = (value) => String(value).padStart(2, '0');
+    const tick = () => {
+      const seconds = Math.floor((starts - Date.now()) / 1000);
+      if (!(seconds > 0)) {
+        drop.hidden = true;
+        if (button && wasOn && Date.now() < ends) button.disabled = false;
+        clearInterval(timer);
+        return;
+      }
+      if (button) button.disabled = true;
+      const days = Math.floor(seconds / 86400);
+      const clock = `${pad(Math.floor((seconds % 86400) / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;
+      const time = days > 0 ? `${drop.dataset.days.replace('{count}', days)} ${clock}` : clock;
+      drop.textContent = drop.dataset.words.replace('{time}', time);
+    };
+    const timer = setInterval(tick, 1000);
+    tick();
   }
 
   // A sale's end counted down by the second (ADR-445); gone once it ends.
