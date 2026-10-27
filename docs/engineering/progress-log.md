@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Referrals in the admin
+### 8dc5260 · Referrals in the admin
 
 * **Marketing → Referrals:** the programme set, and the referrals listed, rewarded or refused
   with why (MKT-07, [ADR-808](../architecture/13-decision-log.md#adr-808--referrals-are-set-and-seen-in-marketing-and-a-customers-link-carries-invite-apart-from-affiliates-ref)).
