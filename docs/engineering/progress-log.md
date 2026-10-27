@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Installable storefront and pushes to shoppers
+### 77b5299 · Installable storefront and pushes to shoppers
 
 * **Installable:** every shop's pages name a manifest of its own and register a service worker
   that keeps the offline page alone; Chromium finds the shop installable and shows the offline
