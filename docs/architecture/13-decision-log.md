@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-799 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-800 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -807,6 +807,7 @@
 | 797 | The admin changes where an app's webhook is sent, its topic kept | Accepted |
 | 798 | The sales report goes to the shop's accountant as an Excel workbook: its days, weeks or months with their total, the products that sold most and each channel's sales | Accepted |
 | 799 | A shop shows products as one combined listing, each a value of its option: each product's page offers the others on sale as swatches linking to their pages | Accepted |
+| 800 | The admin combines products into one listing from a product's page, that product always among them | Accepted |
 
 ---
 
@@ -26530,3 +26531,17 @@
   address, reviews and stock. Collections still list every member; one card for a listing, its
   option and values in Urdu, and a theme for Shopify reading the listing as its options are left
   for later. The store's export does not hold the listings yet.
+
+## ADR-800 · The admin combines products into one listing from a product's page, that product always among them
+
+* **Context:** combined listings (ADR-799) were the Admin API's alone. A merchant thinks of them
+  from a product: "this suit also comes in teal and mustard".
+* **Decision:** each product's page has a Combined listing card, beside the products it pairs
+  with (ADR-436). It names the option, such as Colour, and lists the products with their
+  values, the one whose page it is first when it is in none and never taken out, so the card
+  always edits the listing that product is in. Others are found by name as pairings are,
+  ordered and taken out; the whole is saved at once through `combinedListingSet`, refused
+  before it is sent with fewer than two products, and the core's problems are said of the
+  product they are about. Stopping it deletes the listing. Those who change products edit it.
+* **Consequences:** the listing is edited from any of its products' pages, each showing the
+  same listing. There is no page of every listing; the Admin API's `combinedListings` has them.
