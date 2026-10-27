@@ -77,6 +77,7 @@ describe.skipIf(!server)('Billing', () => {
       'trueProfit',
       'pixels',
       'fiscalReporting',
+      'drops',
     ] as const) {
       expect(await f.billing.excludes(f.a.shopId, feature)).toBe('Free');
     }
@@ -174,6 +175,8 @@ describe.skipIf(!server)('Billing', () => {
     }
     // FBR's POS integration is Pro's (ADR-555).
     expect(await f.billing.excludes(f.a.shopId, 'fiscalReporting')).toBe('Growth');
+    // So are drops (ADR-820).
+    expect(await f.billing.excludes(f.a.shopId, 'drops')).toBe('Growth');
     // Reloaded, nothing changes; and a paid invoice is not paid again.
     await f.billing.returned(publicId(invoice.id), f.formOf(started.url));
     expect(errorsOf(await f.billing.pay(f.a, invoice.id))).toEqual([['id', 'INVALID']]);

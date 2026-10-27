@@ -23,7 +23,8 @@ export type PlanFeature =
   | 'removeBranding'
   | 'trueProfit'
   | 'pixels'
-  | 'fiscalReporting';
+  | 'fiscalReporting'
+  | 'drops';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {

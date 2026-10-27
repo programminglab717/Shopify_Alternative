@@ -3,6 +3,7 @@ import {
   bundleSellable,
   bundlesOfVariantsIn,
   digitalProductIdsIn,
+  dropFactsIn,
   personalisationIn,
   stitchingIn,
   type PersonalisationField,
@@ -391,11 +392,12 @@ export class CartService {
       cartId ? await heldForCartIn(tx, shopId, cartId) : undefined,
     );
     for (const [id, bundle] of bundles) sellable.set(id, bundleSellable(bundle, sellable));
-    const preorders = await preordersIn(
-      tx,
-      shopId,
-      [...snapshots.values()].map((snapshot) => snapshot.productId),
-    );
+    const productIds = [...snapshots.values()].map((snapshot) => snapshot.productId);
+    const preorders = await preordersIn(tx, shopId, productIds);
+    // A drop's products sell to no one before it starts, and so many to a customer while it is
+    // live (ADR-820): a cart holds no more of each.
+    const drops = await dropFactsIn(tx, shopId, productIds);
+    const now = new Date();
     return new Map(
       [...snapshots].map(([id, snapshot]) => [
         id,
@@ -408,13 +410,21 @@ export class CartService {
           grams: snapshot.weightGrams ?? 0,
           taxable: snapshot.taxable,
           taxCode: snapshot.taxCode,
-          forSale: snapshot.productStatus === 'active',
-          sellable: sellable.get(id) ?? null,
+          forSale:
+            snapshot.productStatus === 'active' &&
+            !((drops.get(snapshot.productId)?.startsAt ?? now) > now),
+          sellable: capped(sellable.get(id) ?? null, drops.get(snapshot.productId)?.perCustomer),
           preorderShipsOn: preorders.get(snapshot.productId),
         },
       ]),
     );
   }
+}
+
+/** What can be sold, no more than a drop's limit for each customer where it has one. */
+function capped(sellable: number | null, limit: number | null | undefined): number | null {
+  if (limit === null || limit === undefined) return sellable;
+  return sellable === null ? limit : Math.min(sellable, limit);
 }
 
 /**

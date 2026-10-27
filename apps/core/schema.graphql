@@ -1042,6 +1042,11 @@ type BillingPlan {
   customDomains: Boolean!
 
   """
+  Whether the shop may schedule drops: a waiting room, and stock that cannot oversell (ADR-820).
+  """
+  drops: Boolean!
+
+  """
   Whether the shop may connect its POS to FBR, to report its invoices as a Tier-1 retailer (ADR-555).
   """
   fiscalReporting: Boolean!
@@ -5582,6 +5587,81 @@ type DraftOrderUpdatePayload {
 }
 
 """
+Products put on sale together at a time, until an end (INV-09, OS-17, ADR-820): until it starts they sell to no one, and its drafts go on sale at its start; while it is live each customer, by their number, buys so many units of each at most.
+"""
+type Drop {
+  """Shoppers its waiting room lets in a minute; null for none (ADR-822)."""
+  admitPerMinute: Int
+  createdAt: DateTime!
+  endsAt: DateTime!
+  id: ID!
+  name: String!
+
+  """
+  Units of each product a customer may buy while it is live; null for no limit.
+  """
+  perCustomerLimit: Int
+
+  """By title."""
+  products: [DropProduct!]!
+  startsAt: DateTime!
+  status: DropStatus!
+  updatedAt: DateTime!
+}
+
+type DropDeletePayload {
+  """Null where there was nothing to delete."""
+  deletedId: ID
+}
+
+input DropInput {
+  """
+  Shoppers its waiting room lets in a minute, 10 to 100,000; none for no waiting room.
+  """
+  admitPerMinute: Int
+
+  """After startsAt, 7 days later at most."""
+  endsAt: DateTime!
+
+  """1 to 80 characters."""
+  name: String!
+
+  """
+  Units of each product a customer may buy while it is live, 1 to 100; none for no limit.
+  """
+  perCustomerLimit: Int
+
+  """
+  1 to 250 products, none a gift card, none in another drop that has not ended.
+  """
+  productIds: [ID!]!
+
+  """A minute to a year ahead; a drop that has started keeps its start."""
+  startsAt: DateTime!
+}
+
+type DropPayload {
+  drop: Drop
+  userErrors: [UserError!]!
+}
+
+"""A product of a drop."""
+type DropProduct {
+  id: ID!
+
+  """Its status now: a draft goes on sale at the drop's start."""
+  status: String!
+  title: String!
+}
+
+"""Whether a drop is still to start, on now, or over."""
+enum DropStatus {
+  ENDED
+  LIVE
+  SCHEDULED
+}
+
+"""
 How shoppers choose a suit (CAT-08, ADR-477): whether it comes stitched, in how many pieces, of what fabrics, and for which season. Each may be unsaid.
 """
 type EasternWear {
@@ -9569,6 +9649,19 @@ type Mutation {
   Changes an open draft: only the fields given. A draft that becomes prepaid, or loses its address, loses its link.
   """
   draftOrderUpdate(id: ID!, input: DraftOrderInput!): DraftOrderUpdatePayload!
+
+  """
+  Schedules a drop (ADR-820), on the Pro plan. Its drafts go on sale at its start.
+  """
+  dropCreate(input: DropInput!): DropPayload!
+
+  """
+  Deletes a drop: its products sell as any others, and its drafts go on sale at no time.
+  """
+  dropDelete(id: ID!): DropDeletePayload!
+
+  """Changes a drop that has not ended, all of it."""
+  dropUpdate(id: ID!, input: DropInput!): DropPayload!
 
   """
   Disconnects the shop from FBR, its POS or digital invoicing: its token is forgotten, and invoices are not reported from now on, those still waiting among them.
@@ -15522,6 +15615,10 @@ type Query {
     query: String
     status: DraftOrderStatus
   ): DraftOrderConnection!
+  drop(id: ID!): Drop
+
+  """The shop's drops, the latest to start first."""
+  drops: [Drop!]!
 
   """
   The shop's connection to FBR, its POS or digital invoicing; null while it has none.

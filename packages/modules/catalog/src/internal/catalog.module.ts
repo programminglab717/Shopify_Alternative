@@ -12,6 +12,8 @@ import { BundleResolver } from './graphql/bundle.resolver.js';
 import { BundleService } from './bundles.js';
 import { ComplementService } from './complements.js';
 import { CombinedListingService } from './combined-listings.js';
+import { DropService } from './drops.js';
+import { DropResolver } from './graphql/drop.resolver.js';
 import {
   CombinedListingProductResolver,
   CombinedListingResolver,
@@ -73,6 +75,7 @@ import { MetafieldService } from './metafields.js';
     BundleService,
     ComplementService,
     CombinedListingService,
+    DropService,
     PersonalisationService,
     StitchingService,
     DigitalProductService,
@@ -88,6 +91,7 @@ import { MetafieldService } from './metafields.js';
     BundleResolver,
     ComplementResolver,
     CombinedListingResolver,
+    DropResolver,
     CombinedListingProductResolver,
     ProductLabelService,
     ProductLabelResolver,
@@ -120,6 +124,7 @@ import { MetafieldService } from './metafields.js';
     BundleService,
     ComplementService,
     CombinedListingService,
+    DropService,
     PersonalisationService,
     StitchingService,
     DigitalProductService,

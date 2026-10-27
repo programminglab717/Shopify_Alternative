@@ -7,7 +7,7 @@ import {
   type FieldError,
   type MutationResult,
 } from '@hatti/api';
-import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
+import { DEFAULT_VARIANT_TITLE, dropFactsIn } from '@hatti/catalog/public';
 import {
   giftCardByCodeIn,
   giftCardOfIn,
@@ -446,6 +446,11 @@ export type CheckoutProblem =
    * internet address (CHK-18).
    */
   | { kind: 'too_many'; by: 'phone' | 'address' }
+  /**
+   * A drop's product of the cart is limited to `limit` units a customer while the drop is live,
+   * and the number has ordered `had` of them in it already (ADR-820).
+   */
+  | { kind: 'drop_limit'; title: string; limit: number; had: number }
   /**
    * The shop asks for a code sent to the number first (CHK-09, ADR-148): `phone`, masked, where
    * it went and how; then whether the one typed was wrong, too late, or one too many.
@@ -1131,6 +1136,43 @@ export class CheckoutService {
     });
   }
 
+  /**
+   * The first product of `lines` in a live drop that limits it for each customer (ADR-820) of
+   * which the number `phone` would have more than the limit with these; null for none.
+   */
+  async #dropLimitProblem(
+    tx: Tx,
+    shopId: string,
+    phone: string,
+    lines: readonly { productId: string; quantity: number; title: string }[],
+  ): Promise<Extract<CheckoutProblem, { kind: 'drop_limit' }> | null> {
+    const now = new Date();
+    const drops = await dropFactsIn(tx, shopId, [...new Set(lines.map((line) => line.productId))]);
+    const live = [...drops].filter(
+      ([, drop]) => drop.perCustomer !== null && drop.startsAt <= now && now < drop.endsAt,
+    );
+    if (live.length === 0) return null;
+    const earliest = new Date(Math.min(...live.map(([, drop]) => drop.startsAt.getTime())));
+    const had = await this.orders.unitsOrderedByIn(
+      tx,
+      shopId,
+      phone,
+      live.map(([productId]) => productId),
+      earliest,
+    );
+    for (const [productId, drop] of live) {
+      const ordered = lines
+        .filter((line) => line.productId === productId)
+        .reduce((sum, line) => sum + line.quantity, 0);
+      const before = had.get(productId) ?? 0;
+      if (before + ordered > drop.perCustomer!) {
+        const title = lines.find((line) => line.productId === productId)!.title;
+        return { kind: 'drop_limit', title, limit: drop.perCustomer!, had: before };
+      }
+    }
+    return null;
+  }
+
   async #place(
     found: { shopId: string; checkoutId: string },
     shown: string,
@@ -1230,6 +1272,15 @@ export class CheckoutService {
       if (recent.ipHour >= CHECKOUT_LIMITS.ordersPerAddressHourly) {
         return { ...view, problem: { kind: 'too_many', by: 'address' } };
       }
+      // No more of a drop's product to the number than the drop allows a customer (ADR-820),
+      // counted under the number's lock taken above.
+      const limited = await this.#dropLimitProblem(
+        tx,
+        found.shopId,
+        address.phone,
+        view.cart.items,
+      );
+      if (limited) return { ...view, problem: limited };
       const profile = await shopProfile(tx, found.shopId);
       const discounts = view.discounts;
       const code = discounts.code;

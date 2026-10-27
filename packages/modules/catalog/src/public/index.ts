@@ -235,6 +235,16 @@ export {
   complementsIn,
 } from '../internal/complements.js';
 export {
+  DROP_LIMITS,
+  DropEvents,
+  DropService,
+  dropFactsIn,
+  dropStatus,
+  type DropFact,
+  type DropRecord,
+  type DropUpdatedPayload,
+} from '../internal/drops.js';
+export {
   COMBINED_LISTING_LIMITS,
   CombinedListingEvents,
   CombinedListingService,

@@ -319,6 +319,7 @@ function toPlan(plan: Plan): BillingPlan {
     trueProfit: plan.trueProfit,
     pixels: plan.pixels,
     fiscalReporting: plan.fiscalReporting,
+    drops: plan.drops,
     aiCredits: plan.aiCredits,
   });
 }

@@ -1945,6 +1945,22 @@ function problemWords(
               'later, or message the shop in your chat.',
             ur: 'پچھلے ایک گھنٹے میں آپ کے انٹرنیٹ کنکشن سے بہت سے آرڈر آئے ہیں۔ کچھ دیر بعد دوبارہ کوشش کریں، یا اپنی چیٹ میں دکان کو پیغام بھیجیں۔',
           };
+    case 'drop_limit':
+      return problem.had > 0
+        ? {
+            en:
+              `In this drop, each customer may buy ${problem.limit} of ${problem.title} at ` +
+              `most, and this number has ordered ${problem.had}. Take some out of your cart.`,
+            ur: html`اس ڈراپ میں ہر گاہک ${problem.title} کے زیادہ سے زیادہ ${problem.limit} خرید
+            سکتا ہے، اور اس نمبر سے ${problem.had} کا آرڈر ہو چکا ہے۔ اپنے کارٹ سے کچھ کم کریں۔`,
+          }
+        : {
+            en:
+              `In this drop, each customer may buy ${problem.limit} of ${problem.title} at ` +
+              'most. Take some out of your cart.',
+            ur: html`اس ڈراپ میں ہر گاہک ${problem.title} کے زیادہ سے زیادہ ${problem.limit} خرید
+            سکتا ہے۔ اپنے کارٹ سے کچھ کم کریں۔`,
+          };
     case 'discount':
       return refusalWords(problem.code, problem.refusal);
     case 'gift_card':

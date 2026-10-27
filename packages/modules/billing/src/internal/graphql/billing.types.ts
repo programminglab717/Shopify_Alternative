@@ -200,6 +200,13 @@ export class BillingPlan {
   })
   fiscalReporting!: boolean;
 
+  @Field({
+    description:
+      'Whether the shop may schedule drops: a waiting room, and stock that cannot oversell ' +
+      '(ADR-820).',
+  })
+  drops!: boolean;
+
   @Field(() => Int, {
     description: 'AI credits it includes a month, each a draft the AI gives (ADR-533).',
   })

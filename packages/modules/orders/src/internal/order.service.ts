@@ -1297,6 +1297,31 @@ export class OrderService {
   }
 
   /**
+   * How many units of each of `productIds` orders to mobile number `phone` took since `since`,
+   * cancelled ones aside, as a drop's limit for each customer counts them (ADR-820); products of
+   * none are left out. In the caller's transaction, which holds the number's lock as
+   * {@link checkoutOrdersFrom} takes it, so that its orders are counted one at a time.
+   */
+  async unitsOrderedByIn(
+    tx: Tx,
+    shopId: string,
+    phone: string,
+    productIds: readonly string[],
+    since: Date,
+  ): Promise<Map<string, number>> {
+    if (productIds.length === 0) return new Map();
+    const { rows } = await tx.execute<{ product_id: string; units: number }>(sql`
+      SELECT l.product_id, sum(l.quantity)::int AS units
+        FROM orders.orders o
+        JOIN orders.lines l ON l.shop_id = o.shop_id AND l.order_id = o.id
+       WHERE o.shop_id = ${shopId} AND o.phone = ${phone} AND o.status <> 'cancelled'
+         AND o.created_at >= ${since.toISOString()}
+         AND l.product_id = ANY(${sql.param([...productIds])}::uuid[])
+       GROUP BY l.product_id`);
+    return new Map(rows.map((row) => [row.product_id, row.units]));
+  }
+
+  /**
    * How many orders, cancelled ones aside, are to be delivered in the slots starting at
    * `startsAt` (CHK-15, ADR-772), by when each starts, in ms; slots with none are left out. In
    * the caller's transaction `tx`; with `lock`, which holds a lock on the shop's slots until it

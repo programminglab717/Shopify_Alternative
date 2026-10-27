@@ -47,6 +47,8 @@ export interface Plan {
   pixels: boolean;
   /** Whether it may connect its POS to FBR, to report its invoices as a Tier-1 retailer (ADR-555). */
   fiscalReporting: boolean;
+  /** Whether it may schedule drops: a waiting room and stock that cannot oversell (ADR-820). */
+  drops: boolean;
   /** AI credits it includes a month, each a draft the AI gives (ADR-533). */
   aiCredits: number;
 }
@@ -69,6 +71,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     trueProfit: false,
     pixels: false,
     fiscalReporting: false,
+    drops: false,
     aiCredits: 10,
   },
   starter: {
@@ -88,6 +91,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     trueProfit: false,
     pixels: true,
     fiscalReporting: false,
+    drops: false,
     aiCredits: 50,
   },
   growth: {
@@ -107,6 +111,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     trueProfit: true,
     pixels: true,
     fiscalReporting: false,
+    drops: false,
     aiCredits: 150,
   },
   pro: {
@@ -126,6 +131,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     trueProfit: true,
     pixels: true,
     fiscalReporting: true,
+    drops: true,
     aiCredits: 600,
   },
 };
