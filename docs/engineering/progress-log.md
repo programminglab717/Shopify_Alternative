@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Digital products delivered
+### b09df4d · Digital products delivered
 
 * **Once paid:** each line of a digital product gets a link of its own to the files, counted
   by file and lasting the product's days, and each unit a licence key, both on WhatsApp
