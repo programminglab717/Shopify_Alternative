@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Drops
+### 289316d · Drops
 
 * **Drop Mode, first slice:** a shop on Pro schedules a drop of products that go on sale
   together, selling to no one before and so many to a customer while live (INV-09, OS-17,
