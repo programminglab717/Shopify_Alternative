@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Drop waiting rooms
+
+* **Waiting room:** while a drop with one is live, the storefront lets shoppers in a minute's
+  worth at a time in the order they came, showing each how many are ahead (OS-17, [ADR-822](../architecture/13-decision-log.md#adr-822--a-drops-waiting-room-lets-shoppers-in-a-minutes-worth-at-a-time-in-the-order-they-came-each-place-kept-by-a-secret-in-a-cookie-and-its-digest-in-valkey-ten-places-at-most-from-one-internet-address)).
+  The storefront's countdown and the admin's drop pages follow.
+* 4386 tests (2 new).
+
 ### ee8346f · Drop token pools
 
 * **The rush stopped at Valkey:** during a live drop, checkout takes each line's units from a

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-821 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-822 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -829,6 +829,7 @@
 | 819 | Custom reports in the admin: made and changed by their rows, period and columns in the order ticked, shown as a table with the period's total, downloaded and scheduled by those who export orders | Accepted |
 | 820 | A shop on Pro schedules drops: products on sale together from a time to an end, selling to no one before, its drafts on sale at its start, and so many units of each to a customer by their number while it is live | Accepted |
 | 821 | During a live drop, checkout takes each line's units from a token pool in Valkey first, refusing at once once it is empty; the order still takes its stock, so a pool that is wrong never oversells | Accepted |
+| 822 | A drop's waiting room lets shoppers in a minute's worth at a time in the order they came, each place kept by a secret in a cookie and its digest in Valkey, ten places at most from one internet address | Accepted |
 
 ---
 
@@ -27008,3 +27009,31 @@
 * **Consequences:** the rows' lock is still taken by every order that the pool lets through,
   so throughput while a drop still has stock is the database's; ADR-019's lock-free orders
   wait for its spike (OWN-14). Variants that sell without limit have no pool.
+
+## ADR-822 · A drop's waiting room lets shoppers in a minute's worth at a time in the order they came, each place kept by a secret in a cookie and its digest in Valkey, ten places at most from one internet address
+
+* **Context:** OS-17 asks for a waiting room: at a lawn launch's midnight, thousands arrive at
+  once and the storefront and checkout slow for everyone. ADR-820 keeps each drop's admission
+  rate; 12 §5 sketches a waiting room in Durable Objects, but the hosting is not decided
+  (OWN-03) and every storefront already reaches Valkey.
+* **Decision:**
+  * **The shop's document carries its drops' waiting rooms** that have not ended: each drop's
+    ID, name, start, end and shoppers let in a minute, published again as drops change.
+  * **While one is live, the storefront gives each shopper who comes a place in line:** a count
+    in Valkey taken atomically, kept by a random secret in an HttpOnly cookie (`hatti_line`)
+    and, in Valkey, by the secret's digest alone, until an hour past the drop. A place is let
+    in once the room has let in as many as came before it: a minute's worth at the start, and
+    a minute's more each minute.
+  * **Until then every page is the waiting page:** the shop, the drop, about how many are ahead
+    and how long that is, in English and Urdu, with 503, `Retry-After` and `Refresh` a few
+    seconds apart at random so the line does not ask at once, and nothing kept at the edge.
+    Scripts and forms are answered in a line of text. Routes a paused shop answers as ever
+    (robots, sitemaps, theme files, tracking, checkouts) are answered as ever; staff's previews
+    pass.
+  * **One internet address takes ten places at most** in a drop's line, as a bot would take
+    many; past that, its page says so.
+  * Without Valkey, there is no waiting room.
+* **Consequences:** the rate is the shop's own, fixed; letting in by how fast checkout answers,
+  as 12 §5 sketches, and a challenge such as Turnstile for anomalies (OWN-27), wait for the load
+  spike (OWN-14). Shoppers who arrive before the start see the shop, its drop's products not yet
+  for sale (ADR-820); at the start, their pages' next loads take places in the order they come.
