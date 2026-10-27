@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-819 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-820 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -827,6 +827,7 @@
 | 817 | A shop saves reports of its own over the sales report: broken down one way, the columns chosen in order, over a period that moves with the day, run when asked and exported as a workbook | Accepted |
 | 818 | A scheduled export may send a custom report in place of the orders: run over the period that ended, true profit as the plan has it, and emailed as a workbook named for the report and the period | Accepted |
 | 819 | Custom reports in the admin: made and changed by their rows, period and columns in the order ticked, shown as a table with the period's total, downloaded and scheduled by those who export orders | Accepted |
+| 820 | A shop on Pro schedules drops: products on sale together from a time to an end, selling to no one before, its drafts on sale at its start, and so many units of each to a customer by their number while it is live | Accepted |
 
 ---
 
@@ -26950,3 +26951,33 @@
   linking to each. Everyone who reads analytics reads and saves reports.
 * **Consequences:** ANL-06 is done. A report's table scrolls sideways on a phone when it has
   many columns.
+
+## ADR-820 · A shop on Pro schedules drops: products on sale together from a time to an end, selling to no one before, its drafts on sale at its start, and so many units of each to a customer by their number while it is live
+
+* **Context:** INV-09 and OS-17 ask for Drop Mode (Growth phase; on Pro in the pricing): lawn
+  launches at midnight that today oversell, sell early to whoever finds the page, or are
+  bought up for resale. Products already go on sale at a time ahead (ADR-441), one at a time;
+  ADR-019 proposes token pools in Valkey for the rush itself, after a spike.
+* **Decision:**
+  * **A drop** (`catalog.drops`) has a name, a start a minute to a year ahead, an end after it
+    a week at most, 1 to 250 products (no gift card, none in another drop that has not ended),
+    a limit of 1 to 100 units of each product for each customer or none, and the rate its
+    waiting room lets shoppers in, kept for ADR-822. Scheduled, changed and deleted through the
+    Admin API with the scopes products take, on the plans with `drops` (Pro); others are
+    refused, naming their plan. Each change is audited and emits `drop.updated` with the
+    products it touched.
+  * **Before it starts, its products sell to no one:** a cart is refused them as products not
+    for sale. Its drafts go on sale at its start through `publish_at` (ADR-441); moving its
+    start moves them, and those it no longer has, or a deleted drop's, go on sale at no time.
+    A drop that has started keeps its start; one that has ended changes no more.
+  * **While it is live, a customer buys so many of each product at most:** a cart holds no
+    more of each variant than the limit, and checkout, under the number's lock it already takes
+    (ADR-087), counts the units of each product the number has ordered since the drop began,
+    cancelled orders aside, and refuses an order that would pass the limit, saying how many
+    the number has had, in English and Urdu.
+  * Once it ends, its products sell as any others.
+* **Consequences:** a drop protects its stock from the early, and from hoarders by number; the
+  stampede itself is next. Stock stays counted by Postgres as for any order, so a drop cannot
+  oversell, but its rush contends on its variants' rows: the token pools of ADR-019 come next
+  (ADR-821), and the load spike ADR-019 asks for needs a hosted environment (owner actions).
+  A hoarder with many numbers is limited by number alone until the waiting room's defences.

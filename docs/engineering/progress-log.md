@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Drops
+
+* **Drop Mode, first slice:** a shop on Pro schedules a drop of products that go on sale
+  together, selling to no one before and so many to a customer while live (INV-09, OS-17,
+  [ADR-820](../architecture/13-decision-log.md#adr-820--a-shop-on-pro-schedules-drops-products-on-sale-together-from-a-time-to-an-end-selling-to-no-one-before-its-drafts-on-sale-at-its-start-and-so-many-units-of-each-to-a-customer-by-their-number-while-it-is-live)). Token pools for the rush, the waiting room, the storefront's countdown and the
+  admin's pages follow.
+* **Needs the owner later:** ADR-019's load spike (2,000 checkouts a minute on one product,
+  failover) needs a hosted environment; it is in the owner's actions.
+* 4382 tests (8 new).
+
 ### 4b7d1cf · Custom reports in the admin
 
 * **The admin's page:** custom reports are made, shown, downloaded as Excel, scheduled to the
