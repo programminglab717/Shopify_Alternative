@@ -353,6 +353,15 @@ const en = {
     "Your AI credits are used: your plan's come back on the 1st, or buy more in Settings → Billing.",
   'copyDraft.drafted':
     'Written by AI from what you gave. Check every word, the fabric and sizes above all, before you save.',
+  'articleDraft.title': 'Write it with AI',
+  'articleDraft.topic': 'What it is about',
+  'articleDraft.topicHint': 'Such as "How to care for lawn suits in summer".',
+  'articleDraft.notes': 'What it must say (optional)',
+  'articleDraft.notesHint':
+    'Your products, offers and facts, in your words. The AI says nothing of your shop you do not give it.',
+  'articleDraft.left': '{count} AI drafts of articles left today.',
+  'articleDraft.drafted':
+    'Written by AI from what you gave, in place of the title and body. Check every word before you save.',
   'product.titleLabel': 'Title',
   'product.titleHint': 'Lawn suit, 3 piece',
   'product.description': 'Description',
@@ -6264,6 +6273,15 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'آپ کے AI کریڈٹ ختم ہو گئے: پلان کے کریڈٹ یکم کو واپس آئیں گے، یا سیٹنگز ← بلنگ میں مزید خریدیں۔',
   'copyDraft.drafted':
     'یہ AI نے آپ کی دی گئی معلومات سے لکھا ہے۔ محفوظ کرنے سے پہلے ہر لفظ، خاص طور پر کپڑا اور سائز، دیکھ لیں۔',
+  'articleDraft.title': 'AI سے لکھوائیں',
+  'articleDraft.topic': 'یہ کس بارے میں ہے',
+  'articleDraft.topicHint': 'جیسے "گرمیوں میں لان کے سوٹ کی دیکھ بھال کیسے کریں"۔',
+  'articleDraft.notes': 'اس میں کیا لازمی ہو (اختیاری)',
+  'articleDraft.notesHint':
+    'آپ کی پراڈکٹس، آفرز اور حقائق، آپ کے الفاظ میں۔ AI آپ کی دکان کے بارے میں وہی کہتا ہے جو آپ دیں۔',
+  'articleDraft.left': 'آج مضامین کے {count} AI ڈرافٹ باقی ہیں۔',
+  'articleDraft.drafted':
+    'یہ AI نے آپ کی دی گئی معلومات سے عنوان اور متن کی جگہ لکھا ہے۔ محفوظ کرنے سے پہلے ہر لفظ دیکھ لیں۔',
   'product.titleLabel': 'نام',
   'product.titleHint': 'لان سوٹ، 3 پیس',
   'product.description': 'تفصیل',

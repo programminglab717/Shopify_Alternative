@@ -6,6 +6,8 @@ import { StorefrontCommentsController } from './comment.controller.js';
 import { CommentService } from './comment.service.js';
 import { DomainService } from './domain.service.js';
 import { ArticleImageResolver, ArticleResolver, BlogResolver } from './graphql/blog.resolver.js';
+import { ArticleDraftResolver } from './graphql/article-draft.resolver.js';
+import { ArticleDraftService } from './article-drafts.js';
 import { ArticleCommentsResolver, CommentResolver } from './graphql/comment.resolver.js';
 import { DomainResolver } from './graphql/domain.resolver.js';
 import { LinkTapsResolver } from './graphql/link-taps.resolver.js';
@@ -47,6 +49,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     PageResolver,
     BlogService,
     BlogResolver,
+    ArticleDraftResolver,
+    ArticleDraftService,
     ArticleService,
     ArticleResolver,
     ArticleImageResolver,

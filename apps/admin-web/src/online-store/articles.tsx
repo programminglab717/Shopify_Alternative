@@ -34,6 +34,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { ArticleDraft } from './article-draft';
 import { BodyArea, normalized, useBody } from './body-field';
 import { usePageState, WRITES_BLOGS } from './pages';
 import { ArticleUrduCard } from '../urdu/urdu-pages';
@@ -147,6 +148,14 @@ function ArticleForm({ blogId, article }: { blogId: string; article?: ArticleDet
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-4">
       <FormSection title={t('pages.content')}>
+        <ArticleDraft
+          blogId={blogId}
+          title={title}
+          onDraft={(draft) => {
+            setTitle(draft.title);
+            body.load(draft.bodyHtml);
+          }}
+        />
         <TextField
           label={t('articles.titleLabel')}
           required

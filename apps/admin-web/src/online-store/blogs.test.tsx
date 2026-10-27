@@ -66,9 +66,48 @@ const ARTICLE = {
   },
 };
 
-function core(role: StaffRole) {
+function core(role: StaffRole, ai = false) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'ArticleCopyDrafting':
+        return {
+          articleCopyDrafting: {
+            available: ai,
+            usedToday: 2,
+            limitPerDay: 30,
+            creditsLeft: 7,
+            creditsPerMonth: 10,
+          },
+        };
+      case 'ArticleCopyDraft': {
+        const input = variables.input as { topic: string };
+        if (input.topic === 'Refused') {
+          return {
+            articleCopyDraft: {
+              draft: null,
+              userErrors: [
+                {
+                  field: ['base'],
+                  code: 'UNAVAILABLE',
+                  message: 'The AI would not write this article: write it yourself',
+                },
+              ],
+            },
+          };
+        }
+        return {
+          articleCopyDraft: {
+            draft: {
+              title: 'Caring for lawn in summer',
+              bodyHtml: '<p>Lawn breathes.</p><h2>Washing</h2><p>Cold water.</p>',
+              summaryHtml: '<p>Keep lawn fresh.</p>',
+              seoTitle: 'Caring for lawn',
+              seoDescription: 'How to wash lawn.',
+            },
+            userErrors: [],
+          },
+        };
+      }
       case 'Blogs':
         return { blogs: { nodes: [NEWS] } };
       case 'Blog':
@@ -196,6 +235,47 @@ describe("The online store's blogs", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe('/shop_1/online-store/articles/art_9'),
     );
+  });
+
+  it('writes an article with AI from what the shop wants it to say, for it to check (ADR-801)', async () => {
+    const fake = core('marketer', true);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/blogs/blg_1/articles/new');
+
+    await screen.findByRole('heading', { name: 'Write an article' });
+    expect(await screen.findByText('7 AI credits left; your plan gives 10 a month.')).toBeTruthy();
+    // The topic is the title until one is typed.
+    type('Title', 'Lawn care');
+    expect((screen.getByLabelText('What it is about') as HTMLInputElement).value).toBe('Lawn care');
+    type('What it is about', 'Refused');
+    fireEvent.click(screen.getByRole('button', { name: 'Write with AI' }));
+    expect(
+      await screen.findByText('The AI would not write this article: write it yourself'),
+    ).toBeTruthy();
+
+    type('What it is about', 'Caring for lawn in summer');
+    type('What it must say (optional)', ' Our lawn is 100% cotton. ');
+    fireEvent.change(screen.getByLabelText('Write in'), { target: { value: 'ROMAN_URDU' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Write with AI' }));
+    expect(
+      await screen.findByText(
+        'Written by AI from what you gave, in place of the title and body. Check every word before you save.',
+      ),
+    ).toBeTruthy();
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+      'Caring for lawn in summer',
+    );
+    expect((screen.getByLabelText('Article') as HTMLTextAreaElement).value).toContain(
+      'Lawn breathes.',
+    );
+    expect(sentOf(fake, 'ArticleCopyDraft')).toEqual({
+      input: {
+        language: 'ROMAN_URDU',
+        topic: 'Caring for lawn in summer',
+        notes: 'Our lawn is 100% cotton.',
+        blogId: 'blg_1',
+      },
+    });
   });
 
   it('changes an article, moderates its comments, and deletes it', async () => {

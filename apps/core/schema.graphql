@@ -397,6 +397,63 @@ type ArticleConnection {
   pageInfo: PageInfo!
 }
 
+type ArticleCopyDraft {
+  """
+  Paragraphs, headings and lists alone: p, h2, h3, ul, ol, li, strong, em, br and blockquote.
+  """
+  bodyHtml: String!
+
+  """The description search engines show, at most 320 characters."""
+  seoDescription: String!
+
+  """The title search engines show, at most 70 characters."""
+  seoTitle: String!
+
+  """A sentence or two for the blog's list and feed: p, strong, em and br."""
+  summaryHtml: String!
+  title: String!
+}
+
+"""What the shop wants an article to say (MKT-15, ADR-801)."""
+input ArticleCopyDraftInput {
+  """The blog it is for, whose kind it keeps to."""
+  blogId: ID
+  language: CopyLanguage!
+
+  """
+  What it must say, in the shop's own words: its products, its facts, its points. The article says nothing of the shop it does not.
+  """
+  notes: String
+
+  """What it is about: "How to care for lawn suits in summer"."""
+  topic: String!
+}
+
+type ArticleCopyDraftPayload {
+  """The draft; null on errors."""
+  draft: ArticleCopyDraft
+  userErrors: [UserError!]!
+}
+
+type ArticleCopyDrafting {
+  """Whether this Hatti writes articles with AI at all."""
+  available: Boolean!
+
+  """
+  The AI credits of the shop's plan left this month, each spent on a draft the AI gives (ADR-533): none left, it drafts no more until the next month.
+  """
+  creditsLeft: Int
+
+  """AI credits the shop's plan includes a month."""
+  creditsPerMonth: Int
+
+  """Drafts of articles a shop may ask for in 24 hours."""
+  limitPerDay: Int!
+
+  """Drafts of articles asked for in the last 24 hours."""
+  usedToday: Int!
+}
+
 """A new article."""
 input ArticleCreateInput {
   author: AuthorInput
@@ -8596,6 +8653,11 @@ type Mutation {
   affiliateUpdate(input: AffiliateUpdateInput!): AffiliateUpdatePayload!
 
   """
+  An AI draft of a blog article's title, body, summary and search engine title and description, from what the shop wants it to say, in the language asked for (MKT-15, ADR-801). It says nothing of the shop the shop did not; nothing is kept: the shop checks it in its form and saves it. Each draft spends one of the AI credits of the shop’s plan; 30 a day per shop.
+  """
+  articleCopyDraft(input: ArticleCopyDraftInput!): ArticleCopyDraftPayload!
+
+  """
   A new article, which the storefront shows a moment later unless it is not published. Its body and summary are cleaned of anything that could run.
   """
   articleCreate(article: ArticleCreateInput!): ArticleCreatePayload!
@@ -14479,6 +14541,11 @@ type Query {
   """
   affiliates: [Affiliate!]!
   article(id: ID!): Article
+
+  """
+  Whether the shop may ask for AI drafts of articles, and how many it has today.
+  """
+  articleCopyDrafting: ArticleCopyDrafting!
 
   """The articles of the shop's blogs, or of one, oldest first."""
   articles(

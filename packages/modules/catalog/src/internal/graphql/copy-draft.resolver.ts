@@ -10,29 +10,10 @@ import {
   ObjectType,
   Query,
   Resolver,
-  registerEnumType,
 } from '@nestjs/graphql';
 import { COPY_DRAFT_LIMITS, CopyDraftService } from '../copy-drafts.service.js';
 import { failOne } from '../input-checker.js';
-
-export enum CopyLanguage {
-  ENGLISH = 'ENGLISH',
-  URDU = 'URDU',
-  ROMAN_URDU = 'ROMAN_URDU',
-}
-
-registerEnumType(CopyLanguage, {
-  name: 'CopyLanguage',
-  description:
-    'The language AI copy is written in: English, Urdu in its own script, or Roman Urdu, Urdu ' +
-    'in Latin letters as shoppers write it on WhatsApp.',
-});
-
-const LANGUAGE = {
-  [CopyLanguage.ENGLISH]: 'en',
-  [CopyLanguage.URDU]: 'ur',
-  [CopyLanguage.ROMAN_URDU]: 'roman_ur',
-} as const;
+import { CopyLanguage, COPY_LANGUAGE as LANGUAGE } from './copy-language.js';
 
 @InputType({ description: 'One of a product’s options and its values, as its form has them.' })
 export class ProductCopyOptionInput {

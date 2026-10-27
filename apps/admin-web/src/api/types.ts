@@ -2597,6 +2597,29 @@ export interface ProductCopyDraftData {
   };
 }
 
+export interface ArticleCopyDraftingData {
+  articleCopyDrafting: {
+    available: boolean;
+    usedToday: number;
+    limitPerDay: number;
+    creditsLeft?: number | null;
+    creditsPerMonth?: number | null;
+  };
+}
+
+export interface ArticleCopyDraftData {
+  articleCopyDraft: {
+    draft: {
+      title: string;
+      bodyHtml: string;
+      summaryHtml: string;
+      seoTitle: string;
+      seoDescription: string;
+    } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface TranslationDraftingData {
   translationDrafting: {
     available: boolean;

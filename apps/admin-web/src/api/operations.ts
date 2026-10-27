@@ -5766,6 +5766,37 @@ export const ProductCopyDraftMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+export const ArticleCopyDraftingQuery = /* GraphQL */ `
+  query ArticleCopyDrafting {
+    articleCopyDrafting {
+      available
+      usedToday
+      limitPerDay
+      creditsLeft
+      creditsPerMonth
+    }
+  }
+`;
+
+/** An article written with AI from what the shop wants it to say (MKT-15, ADR-801). */
+export const ArticleCopyDraftMutation = /* GraphQL */ `
+  mutation ArticleCopyDraft($input: ArticleCopyDraftInput!) {
+    articleCopyDraft(input: $input) {
+      draft {
+        title
+        bodyHtml
+        summaryHtml
+        seoTitle
+        seoDescription
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const TranslationDraftingQuery = /* GraphQL */ `
   query TranslationDrafting {
     translationDrafting {

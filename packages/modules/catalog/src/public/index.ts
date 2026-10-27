@@ -292,3 +292,4 @@ export {
   type ProductCategory,
   type ProductCondition,
 } from '../internal/taxonomy.js';
+export { COPY_LANGUAGE, CopyLanguage } from '../internal/graphql/copy-language.js';

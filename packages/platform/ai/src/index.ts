@@ -26,3 +26,12 @@ export {
   type ProductCopyRequest,
   type ProductFacts,
 } from './product-copy.js';
+export {
+  ARTICLE_DRAFT_LIMITS,
+  briefText,
+  draftArticle,
+  plainArticleHtml,
+  type ArticleBrief,
+  type ArticleDraft,
+  type ArticleDraftRequest,
+} from './article.js';
