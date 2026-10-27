@@ -131,7 +131,7 @@ export async function codOwedIn(
 export async function receiveCodIn(
   tx: Tx,
   shopId: string,
-  actor: Actor,
+  actor: Actor | 'system',
   input: { orderId: string; amount: bigint; message: string },
 ): Promise<bigint> {
   const order = await lockOrder(tx, shopId, input.orderId);

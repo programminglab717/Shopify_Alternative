@@ -100,8 +100,8 @@ export type HandOutResult =
 
 const digest = (text: string) => createHash('sha256').update(text).digest();
 
-/** Where riders' pages are served: /r/<secret>. */
-export const RIDER_LINK_PATH = 'r';
+/** Where riders' pages are served: /rider/<secret>. */
+export const RIDER_LINK_PATH = 'rider';
 
 /** A rider's page's secret: 128 random bits, as customers' links have. */
 export const RIDER_LINK = /^[A-Za-z0-9_-]{22}$/;

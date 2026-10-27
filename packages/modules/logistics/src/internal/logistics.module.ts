@@ -14,6 +14,7 @@ import { RateCardResolver } from './graphql/rate-cards.resolver.js';
 import { CodRemittanceResolver } from './graphql/remittance.resolver.js';
 import { RiderResolver } from './graphql/riders.resolver.js';
 import { RiderService } from './riders.js';
+import { RiderPageController, RiderPageService } from './rider-page.js';
 import { CourierPickupService } from './pickups.service.js';
 import { RateCardService } from './rate-cards.service.js';
 import { CodRemittanceService } from './remittance.service.js';
@@ -34,6 +35,7 @@ export class LogisticsModule {
       module: LogisticsModule,
       // Labels say where parcels come from: the inventory module's locations.
       imports: [InventoryModule, OrdersModule],
+      controllers: [RiderPageController],
       providers: [
         {
           provide: COURIERS,
@@ -52,6 +54,7 @@ export class LogisticsModule {
         CourierRuleService,
         RateCardResolver,
         RateCardService,
+        RiderPageService,
         RiderResolver,
         RiderService,
       ],
