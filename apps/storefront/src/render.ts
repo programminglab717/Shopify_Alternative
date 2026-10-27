@@ -29,6 +29,7 @@ import {
   type RenderLimits,
 } from './limits.js';
 import { checkoutPausedBar } from './maintenance.js';
+import { pwaHead } from './pwa.js';
 import { ChunkQueue } from './stream.js';
 import {
   RequestData,
@@ -538,8 +539,9 @@ export class PageRenderer {
       });
     }
     // Shoppers' pages keep the visits that brought them (ADR-139), count their sessions
-    // (ADR-180), measure how fast they were (ADR-485), load the shop's pixel (ADR-144) and
-    // report a search (ADR-683); staff's previews do none of it.
+    // (ADR-180), measure how fast they were (ADR-485), load the shop's pixel (ADR-144),
+    // report a search (ADR-683) and make the shop installable (ADR-832); staff's previews do
+    // none of it.
     const header =
       prepared.alternates +
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
@@ -551,7 +553,8 @@ export class PageRenderer {
             `<script data-hatti-session>${SESSION_SCRIPT}</script>` +
             `<script data-hatti-vitals data-template="${vitalTemplateOf(templateFile)}">` +
             `${VITALS_SCRIPT}</script>${prepared.pixel}${prepared.pausedBar}` +
-            prepared.searchReport);
+            prepared.searchReport +
+            pwaHead(locale === 'ur'));
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,

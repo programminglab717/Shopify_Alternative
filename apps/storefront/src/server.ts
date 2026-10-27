@@ -115,6 +115,7 @@ import {
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { developmentPage, maintenancePage, retryAfterOf } from './maintenance.js';
+import { PWA_PATHS, SERVICE_WORKER, initialIcon, offlinePage, webManifest } from './pwa.js';
 import { ROOM_LIMITS, WaitingRooms, waitingPage } from './waiting-room.js';
 import {
   EMPTY_REPORT,
@@ -366,6 +367,11 @@ const PAUSE_OPEN_ROUTES = new Set([
   '/ur/report',
   '/report/rights',
   '/ur/report/rights',
+  // The installable storefront's (ADR-832): the worker must install and update whatever the shop.
+  PWA_PATHS.manifest,
+  PWA_PATHS.worker,
+  PWA_PATHS.offline,
+  PWA_PATHS.icon,
 ]);
 
 /**
@@ -1240,6 +1246,61 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       throw error;
     }
   };
+
+  /**
+   * The installable storefront (OS-14, ADR-832): the shop's manifest, its icon where it has no
+   * square logo, and its offline page, kept at the edge an hour and forgotten with the shop's
+   * document; and the worker, which browsers ask for afresh, so a new one reaches them at once.
+   */
+  const installable =
+    (type: string, body: (doc: ShopDoc, request: FastifyRequest, reply: FastifyReply) => string) =>
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      try {
+        const doc = await found.store.shop();
+        reply
+          .header('cache-control', CRAWLER_CACHE)
+          .header('cache-tag', shopTag(found.shopId))
+          .header('x-content-type-options', 'nosniff');
+        return await reply.type(type).send(body(doc, request, reply));
+      } catch (error) {
+        if (error instanceof StoreMissingError)
+          return notFound(reply, 'This shop is not open yet.');
+        throw error;
+      }
+    };
+  app.get(
+    PWA_PATHS.manifest,
+    installable('application/manifest+json; charset=utf-8', (doc, request) =>
+      JSON.stringify(
+        webManifest(doc, {
+          urdu: (request.query as Record<string, unknown>).locale === 'ur',
+        }),
+      ),
+    ),
+  );
+  app.get(
+    PWA_PATHS.icon,
+    installable('image/svg+xml', (doc) => initialIcon(doc.name)),
+  );
+  app.get(
+    PWA_PATHS.offline,
+    installable('text/html; charset=utf-8', (doc, _request, reply) => {
+      const page = offlinePage(doc);
+      reply
+        .header('content-security-policy', page.contentSecurityPolicy)
+        .header('x-robots-tag', 'noindex');
+      return page.html;
+    }),
+  );
+  app.get(PWA_PATHS.worker, async (_request, reply) =>
+    reply
+      .header('cache-control', 'no-cache')
+      .header('x-content-type-options', 'nosniff')
+      .type('text/javascript; charset=utf-8')
+      .send(SERVICE_WORKER),
+  );
 
   app.get('/robots.txt', (request, reply) =>
     crawlers(request, reply, 'text/plain; charset=utf-8', async (found, origin) =>

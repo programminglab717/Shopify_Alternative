@@ -71,6 +71,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { passwordVerifier } from '@hatti/crypto';
 import { sampleStore } from './fixtures.js';
 import { linkKey } from './link-page.js';
+import { shortNameOf } from './pwa.js';
 import { PageRenderer } from './render.js';
 import {
   createStorefrontServer,
@@ -2641,6 +2642,58 @@ describe('Carts', () => {
     );
     expect(text.startsWith('User-agent: *\n')).toBe(true);
     await ruled.close();
+  });
+
+  it('makes the shop installable: its manifest, icon, worker and offline page (ADR-832)', async () => {
+    const app = server();
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    const shop = sampleStore().shop;
+
+    // Every shopper's page names the manifest and registers the worker.
+    const home = await get('/');
+    expect(home.body).toContain('<link rel="manifest" href="/manifest.webmanifest">');
+    expect(home.body).toContain('navigator.serviceWorker.register("/sw.js")');
+    expect((await get('/ur')).body).toContain('href="/manifest.webmanifest?locale=ur"');
+
+    const manifest = await get('/manifest.webmanifest');
+    expect([manifest.statusCode, manifest.headers['content-type']]).toEqual([
+      200,
+      'application/manifest+json; charset=utf-8',
+    ]);
+    expect(manifest.headers['cache-control']).toBe('public, max-age=0, s-maxage=3600');
+    expect(manifest.json()).toMatchObject({
+      name: shop.name,
+      short_name: shortNameOf(shop.name),
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      lang: 'en',
+      // No square logo: an icon of its initial.
+      icons: [{ src: '/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+    });
+    expect((await get('/manifest.webmanifest?locale=ur')).json()).toMatchObject({
+      start_url: '/ur',
+      lang: 'ur',
+      dir: 'rtl',
+    });
+    const icon = await get('/pwa-icon.svg');
+    expect(icon.headers['content-type']).toBe('image/svg+xml');
+    expect(icon.body).toContain(`>${shop.name[0]!.toUpperCase()}</text>`);
+
+    // Asked for afresh, so a new worker reaches browsers at once.
+    const worker = await get('/sw.js');
+    expect([worker.headers['content-type'], worker.headers['cache-control']]).toEqual([
+      'text/javascript; charset=utf-8',
+      'no-cache',
+    ]);
+    expect(worker.body).toContain('const OFFLINE = "/offline";');
+
+    const offline = await get('/offline');
+    expect(offline.statusCode).toBe(200);
+    expect(offline.body).toContain('Connect to the internet to keep shopping.');
+    expect(offline.body).toContain('آپ آف لائن ہیں');
+    expect(offline.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(offline.headers['x-robots-tag']).toBe('noindex');
   });
 
   it("gives Google's and Meta's catalogs the shop's products, an item a variant", async () => {
