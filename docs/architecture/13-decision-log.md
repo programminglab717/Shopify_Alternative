@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-824 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-825 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -832,6 +832,7 @@
 | 822 | A drop's waiting room lets shoppers in a minute's worth at a time in the order they came, each place kept by a secret in a cookie and its digest in Valkey, ten places at most from one internet address | Accepted |
 | 823 | A drop's products count down to its start on their pages, saying how many a customer may buy, and owners and managers schedule and delete drops from the admin | Accepted |
 | 824 | A shop's own riders each have a page opened from a secret link, with no account; a packed order handed to one ships with them, and its customer is sent a code on WhatsApp to give the rider at the door | Accepted |
+| 825 | A rider's page lists what they carry with its address, map and the customer's number; delivered with the customer's code and the cash collected, received on its order, or not delivered with why, its parcel coming back | Accepted |
 
 ---
 
@@ -27089,3 +27090,28 @@
   (ADR-825), then the cash handed over (ADR-826) and the admin's pages (ADR-827). Zones and
   their fees stay with the shop's delivery charges by city; a rider is chosen by hand.
   `hatti_delivery_code` is for Meta to approve with Hatti's other templates (OWN-23).
+
+## ADR-825 · A rider's page lists what they carry with its address, map and the customer's number; delivered with the customer's code and the cash collected, received on its order, or not delivered with why, its parcel coming back
+
+* **Context:** riders are handed orders, each customer sent a code (ADR-824). APP-06 asks for a
+  rider mode: what they carry, navigation, calling and WhatsApp, proof of delivery and the cash
+  collected (06 §9). Riders have no account in the admin.
+* **Decision:**
+  * **`/rider/<secret>`**, the link of their own (`/r/` being the reminders' already): the shop,
+    the rider, today's deliveries made and not, the cash they hold, and each delivery they
+    carry, the oldest first: its order, customer, address, a Google Maps link at its pin where
+    the customer gave one or at its address, buttons to call and to message on WhatsApp, and the
+    cash to collect or that it is paid. Plain HTML in English and Urdu with nothing loaded from
+    anywhere, never cached, indexed, framed or referred; its forms post to itself.
+  * **Delivered:** with the customer's code where one was sent, five tries at it, though one the
+    customer lost may be left out, the delivery then saying no code was given; and the cash
+    collected in rupees, at most what the order owed. The parcel is delivered, and the cash
+    received on its order as cash on delivery is, the system as its actor: the order is paid, or
+    paid in part with the rest owed. The cash is the rider's to hand over (ADR-826).
+  * **Not delivered:** with why, from a list (no one home, refused, the address not found, no
+    cash, something else): its parcel is coming back with the rider, to be checked in as any.
+  * Every answer after a post sends the rider back to the page, so reloading posts nothing; a
+    refusal says why, as a wrong code. A link that is none, a rider who rides no more, or a shop
+    not open shows nothing; one rider's link changes none of another's deliveries.
+* **Consequences:** a photo as proof, and routing several stops, wait for shops to ask; the code
+  stands for proof. The rider's page needs the shop's WhatsApp sending to send codes (OWN-23).

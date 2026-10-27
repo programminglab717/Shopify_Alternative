@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
+### Riders' pages
+
+* **Rider mode:** a rider's page from their own link lists what they carry, with a map and the
+  customer's number, and takes each delivery with the customer's code and the cash collected,
+  or why not (SHP-10, APP-06, [ADR-825](../architecture/13-decision-log.md#adr-825--a-riders-page-lists-what-they-carry-with-its-address-map-and-the-customers-number-delivered-with-the-customers-code-and-the-cash-collected-received-on-its-order-or-not-delivered-with-why-its-parcel-coming-back)). The cash handed over and the admin's pages follow.
+* 4402 tests (5 new).
+
 ### 3f1144c · Own riders
 
 * **Riders and hand-outs:** a shop adds its own riders, each with a page opened from a link of
