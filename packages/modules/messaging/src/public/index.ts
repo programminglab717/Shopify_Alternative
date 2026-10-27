@@ -212,6 +212,21 @@ export {
   type AutomationRecord,
 } from '../internal/automations.service.js';
 export {
+  REFERRALS,
+  REFERRAL_REFUSALS,
+  ReferralProgramService,
+  recordReferralIn,
+  referralCodeIn,
+  referralProgramIn,
+  referralRecordedIn,
+  referralsRewardedIn,
+  referrerOfIn,
+  type ReferralProgramInput,
+  type ReferralProgramRecord,
+  type ReferralRecord,
+  type ReferralRefusal,
+} from '../internal/referrals.service.js';
+export {
   STOCK_WATCH_DAYS,
   STOCK_WATCHES_PER_PHONE,
   StockWatchService,

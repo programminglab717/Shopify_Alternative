@@ -118,6 +118,14 @@ export {
 export { orderGiftCardFactsIn, type OrderGiftCardFacts } from '../internal/gift-card-facts.js';
 export { orderCashbackFactsIn, type OrderCashbackFacts } from '../internal/cashback-facts.js';
 export {
+  customerOrderTracesIn,
+  orderReferralFactsIn,
+  referralCodeOf,
+  type CustomerOrderTraces,
+  type OrderReferralFacts,
+  type OrderTrace,
+} from '../internal/referral-facts.js';
+export {
   BOUGHT_TOGETHER,
   BOUGHT_TOGETHER_ORDERS,
   boughtTogetherIn,

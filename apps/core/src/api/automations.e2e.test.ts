@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -225,5 +225,66 @@ describe.skipIf(!server)('Admin GraphQL API: marketing automations (MKT-04, ADR-
       },
       userErrors: [],
     });
+  });
+  it("sets the referral programme, lists its referrals, and gives a customer's code (MKT-07, ADR-807)", async () => {
+    expect(
+      await data(
+        tokens.reader,
+        `{ referralProgram { enabled referrerCredit { amount } friendCredit { amount }
+             creditDays minimumOrder { amount } perMonth updatedAt } }`,
+      ),
+    ).toEqual({
+      enabled: false,
+      referrerCredit: { amount: '200.00' },
+      friendCredit: { amount: '200.00' },
+      creditDays: 90,
+      minimumOrder: { amount: '0.00' },
+      perMonth: 10,
+      updatedAt: null,
+    });
+    const update = `mutation ($input: ReferralProgramInput!) {
+      referralProgramUpdate(input: $input) {
+        referralProgram { enabled referrerCredit { amount } friendCredit { amount } creditDays }
+        userErrors { field code message }
+      }
+    }`;
+    const refused = await gql(tokens.reader, update, { input: { enabled: true } });
+    expect(refused.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect(await data(tokens.owner, update, { input: { referrerCredit: '5' } })).toEqual({
+      referralProgram: null,
+      userErrors: [
+        {
+          field: ['input', 'referrerCredit'],
+          code: 'INVALID',
+          message: 'Give the referrer between Rs 10 and Rs 10,000 in store credit',
+        },
+      ],
+    });
+    expect(
+      await data(tokens.owner, update, {
+        input: { enabled: true, referrerCredit: '300', friendCredit: '150', creditDays: 60 },
+      }),
+    ).toEqual({
+      referralProgram: {
+        enabled: true,
+        referrerCredit: { amount: '300.00' },
+        friendCredit: { amount: '150.00' },
+        creditDays: 60,
+      },
+      userErrors: [],
+    });
+    expect(await data(tokens.reader, '{ referrals { orderId outcome } }')).toEqual([]);
+
+    const { rows } = await admin.query<{ id: string }>(
+      'SELECT id FROM customers.customers WHERE shop_id = $1 ORDER BY phone LIMIT 1',
+      [shop],
+    );
+    const customerId = toPublicId('customer', rows[0]!.id);
+    const codeOf = `query ($id: ID!) { customerReferralCode(customerId: $id) }`;
+    const customers = await issueToken(['read_customers']);
+    const code = await data(customers, codeOf, { id: customerId });
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(await data(customers, codeOf, { id: customerId })).toBe(code);
+    expect(await data(customers, codeOf, { id: toPublicId('customer', newId()) })).toBeNull();
   });
 });

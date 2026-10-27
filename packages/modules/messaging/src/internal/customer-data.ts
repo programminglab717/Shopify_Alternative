@@ -15,7 +15,8 @@ import { queueMessageIn } from './messages.service.js';
  * their erasure from their account is told once it is done (ADR-582), by a message forgotten once
  * sent, so that their number is kept no longer than it takes to tell them. What they wrote through
  * the online store's contact form, from their numbers or email, goes too, and is in their file
- * (ADR-589).
+ * (ADR-589). A merged duplicate's referral code goes, unless the customer has none, and its
+ * referrals become the customer's; an erased customer's code and referrals go (ADR-807).
  */
 export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'messaging',
@@ -28,6 +29,20 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       UPDATE messaging.messages SET customer_id = ${intoId}
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
+    await tx.execute(sql`
+      UPDATE messaging.referral_codes SET customer_id = ${intoId}
+       WHERE shop_id = ${shopId} AND customer_id = ${fromId}
+         AND NOT EXISTS (SELECT 1 FROM messaging.referral_codes
+                          WHERE shop_id = ${shopId} AND customer_id = ${intoId})`);
+    await tx.execute(sql`
+      DELETE FROM messaging.referral_codes
+       WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
+    await tx.execute(sql`
+      UPDATE messaging.referrals
+         SET referrer_id = CASE WHEN referrer_id = ${fromId} THEN ${intoId}::uuid
+                                ELSE referrer_id END,
+             friend_id = CASE WHEN friend_id = ${fromId} THEN ${intoId}::uuid ELSE friend_id END
+       WHERE shop_id = ${shopId} AND ${fromId} IN (referrer_id, friend_id)`);
   },
 
   async erase(tx, shopId, customer) {
@@ -44,6 +59,13 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       DELETE FROM messaging.conversations
        WHERE shop_id = ${shopId} AND customer_phone = ANY(${sql.param(customer.phones)}::text[])`);
+    // Their referral code, and the referrals they made or were made (ADR-807).
+    await tx.execute(sql`
+      DELETE FROM messaging.referral_codes
+       WHERE shop_id = ${shopId} AND customer_id = ${customer.id}`);
+    await tx.execute(sql`
+      DELETE FROM messaging.referrals
+       WHERE shop_id = ${shopId} AND ${customer.id} IN (referrer_id, friend_id)`);
     // What they wrote through the contact form (ADR-589).
     await tx.execute(sql`
       DELETE FROM messaging.contact_messages

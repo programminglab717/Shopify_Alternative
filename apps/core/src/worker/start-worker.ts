@@ -139,6 +139,7 @@ import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
 import { GiftCardSales } from './gift-card-sales.js';
 import { CashbackRewards } from './cashback.js';
+import { ReferralRewards } from './referrals.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
@@ -192,6 +193,7 @@ export interface EventConsumers {
   storeCredit?: StoreCreditNotices;
   giftCards?: GiftCardSales;
   cashback?: CashbackRewards;
+  referrals?: ReferralRewards;
   domains?: DomainNotices;
   storeExports?: StoreExportNotices;
   planOrders?: PlanOrders;
@@ -221,6 +223,7 @@ export function eventHandlers(
     storeCredit,
     giftCards,
     cashback,
+    referrals,
     domains,
     storeExports,
     planOrders,
@@ -315,6 +318,13 @@ export function eventHandlers(
     for (const type of CashbackRewards.EVENTS) {
       registry.on(type, async (event) => {
         await cashback.handle(event);
+      });
+    }
+  }
+  if (referrals) {
+    for (const type of ReferralRewards.EVENTS) {
+      registry.on(type, async (event) => {
+        await referrals.handle(event);
       });
     }
   }
@@ -432,6 +442,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         giftCards: new GiftCardSales(database, new MessagesService(database)),
         cashback: new CashbackRewards(database),
+        referrals: new ReferralRewards(database),
         domains: new DomainNotices(database, new MessagesService(database)),
         storeExports: new StoreExportNotices(database, new MessagesService(database)),
         planOrders: new PlanOrders(database, new MessagesService(database), workerOrders(database)),

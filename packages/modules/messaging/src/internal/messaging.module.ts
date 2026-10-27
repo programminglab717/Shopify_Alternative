@@ -7,6 +7,8 @@ import { ConversationResolver } from './graphql/conversation.resolver.js';
 import { CustomersModule } from '@hatti/customers/public';
 import { Module, type DynamicModule } from '@nestjs/common';
 import { AutomationsService } from './automations.service.js';
+import { ReferralResolver } from './graphql/referral.resolver.js';
+import { ReferralProgramService } from './referrals.service.js';
 import {
   ContactMessagesService,
   StorefrontContactMessagesController,
@@ -105,6 +107,8 @@ export class MessagingModule {
         AutomationsService,
         StockWatchService,
         AutomationResolver,
+        ReferralProgramService,
+        ReferralResolver,
         SmsSendersService,
         SmsSenderResolver,
         PushService,
@@ -120,6 +124,7 @@ export class MessagingModule {
         BroadcastsService,
         AutomationsService,
         StockWatchService,
+        ReferralProgramService,
         PushService,
       ],
     };

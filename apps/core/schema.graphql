@@ -10118,6 +10118,9 @@ type Mutation {
   """Turns the shop's news off in the signed-in member of staff's browser."""
   pushUnsubscribe(endpoint: String!): PushUnsubscribePayload!
 
+  """Turns the shop's referral programme on or off, or changes its credit."""
+  referralProgramUpdate(input: ReferralProgramInput!): ReferralProgramUpdatePayload!
+
   """
   Cancels a return still on its way back, as when its customer keeps the items after all.
   """
@@ -15062,6 +15065,11 @@ type Query {
     first: Int
   ): CustomerErasureRequestConnection!
 
+  """
+  A customer's referral code, made the first time it is asked for: the online store's link with `?ref=` and it brings their friends. Null for no such customer.
+  """
+  customerReferralCode(customerId: ID!): String
+
   """Customers, newest first."""
   customers(
     after: String
@@ -15716,6 +15724,14 @@ type Query {
   pushNotifications(endpoint: String): PushNotifications!
 
   """
+  The shop's referral programme (MKT-07), as set, or off where it never was.
+  """
+  referralProgram: ReferralProgram!
+
+  """The referrals the shop's codes brought, latest first."""
+  referrals(first: Int! = 50): [Referral!]!
+
+  """
   Returns shoppers asked for from their delivered orders' pages, the oldest first: those waiting (REQUESTED) are for staff to approve or decline.
   """
   returnRequests(
@@ -16035,6 +16051,116 @@ type Query {
   The shop's own WhatsApp templates on the number it has connected, the latest first; none without one.
   """
   whatsAppTemplates: [WhatsAppTemplate!]!
+}
+
+"""A friend's order a customer's code brought (ADR-807)."""
+type Referral {
+  createdAt: DateTime!
+
+  """What the friend was given."""
+  friendCredit: Money!
+
+  """The friend."""
+  friendId: ID!
+
+  """The friend's order."""
+  orderId: ID!
+  outcome: ReferralOutcome!
+
+  """Why it was refused."""
+  reason: ReferralRefusal
+
+  """What the referrer was given."""
+  referrerCredit: Money!
+
+  """The customer whose code it was."""
+  referrerId: ID!
+}
+
+"""What became of a referral (MKT-07, ADR-807)."""
+enum ReferralOutcome {
+  REFUSED
+  REWARDED
+}
+
+"""
+The shop's referral programme (MKT-07, ADR-807): once a friend's first order, placed from a customer's link, is delivered and paid, both are given store credit, unless the checks against fraud refuse it.
+"""
+type ReferralProgram {
+  """How many days the credit given lasts."""
+  creditDays: Int!
+
+  """Whether it rewards referrals."""
+  enabled: Boolean!
+
+  """Store credit given to the friend; zero for none."""
+  friendCredit: Money!
+
+  """
+  What the friend's goods must come to, after their discount; zero for anything.
+  """
+  minimumOrder: Money!
+
+  """How many referrals a customer is rewarded for in 30 days."""
+  perMonth: Int!
+
+  """Store credit given to the customer whose link it was."""
+  referrerCredit: Money!
+
+  """When the shop last changed it; null for one never set."""
+  updatedAt: DateTime
+}
+
+input ReferralProgramInput {
+  """The credit lasts 7 to 365 days."""
+  creditDays: Int
+
+  """On only with a plan that includes loyalty."""
+  enabled: Boolean
+
+  """
+  Up to Rs 10,000 of store credit for the friend, as "200"; "0" for none.
+  """
+  friendCredit: String
+
+  """
+  What the friend's goods must come to, up to Rs 1,000,000; "0" for anything.
+  """
+  minimumOrder: String
+
+  """Rs 10 to Rs 10,000 of store credit for the referrer, as "200"."""
+  referrerCredit: String
+}
+
+type ReferralProgramUpdatePayload {
+  referralProgram: ReferralProgram
+  userErrors: [UserError!]!
+}
+
+"""Why a referral was not rewarded: the checks against fraud (ADR-807)."""
+enum ReferralRefusal {
+  """The friend's goods came to less than the programme asks."""
+  BELOW_MINIMUM
+
+  """The referrer was rewarded as often as 30 days allow."""
+  MONTHLY_LIMIT
+
+  """The friend had ordered from the shop before."""
+  NOT_FIRST_ORDER
+
+  """The order was the referrer's own."""
+  OWN_CODE
+
+  """The referrer has had no order of their own delivered and paid."""
+  REFERRER_UNPROVEN
+
+  """The friend's order went where one of the referrer's went."""
+  SAME_ADDRESS
+
+  """
+  The friend ordered from the referrer's device: the same address and browser.
+  """
+  SAME_DEVICE
 }
 
 """Money given back on an order, as staff recorded it."""
