@@ -6,13 +6,23 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows still
-open, in the order the alpha's shops need them. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
+built; its Growth rows that need no partner come next, accounting exports (ANL-10) first. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
+
+## 2026-10-27
+
+### Sales for the accountant
+
+* **Sales report as Excel:** `salesReportExport` gives the report as a workbook of its days,
+  weeks or months with their total, the products that sold most and each channel's sales, which
+  the analytics page downloads for owners, managers and accountants (ANL-10, [ADR-798](../architecture/13-decision-log.md#adr-798--the-sales-report-goes-to-the-shops-accountant-as-an-excel-workbook-its-days-weeks-or-months-with-their-total-the-products-that-sold-most-and-each-channels-sales)).
+* **Tests:** the orders fixture clears ad spend between tests, as the ad spend test's leaked.
+* 4262 tests (4 new).
 
 ## 2026-10-24
 

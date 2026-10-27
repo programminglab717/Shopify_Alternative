@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-797 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-798 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -805,6 +805,7 @@
 | 795 | The admin changes a gift card's last day, note and customer, sending only what changed | Accepted |
 | 796 | The admin renames and describes the shop's custom fields in place, their keys and types kept | Accepted |
 | 797 | The admin changes where an app's webhook is sent, its topic kept | Accepted |
+| 798 | The sales report goes to the shop's accountant as an Excel workbook: its days, weeks or months with their total, the products that sold most and each channel's sales | Accepted |
 
 ---
 
@@ -26469,3 +26470,29 @@
   internet, are said as they are on adding one.
 * **Consequences:** a webhook keeps its deliveries when its app moves. Deliveries queued before
   the change go to the new address from their next try on.
+
+## ADR-798 · The sales report goes to the shop's accountant as an Excel workbook: its days, weeks or months with their total, the products that sold most and each channel's sales
+
+* **Context:** a shop's accountant books its sales month by month, and asks for them as a
+  spreadsheet (ANL-10, Growth). The admin's analytics showed the sales report (ADR-061, ADR-279)
+  but nothing to take away: the order export (ADR-182) has every order, not what they came to,
+  and adding up returns, tax and profit from it by hand is the report's work done again.
+* **Decision:**
+  * **`salesReportExport(placedFrom, placedBefore, interval)` gives the report as a workbook**
+    of three sheets: *Sales*, a row for each day, week from Monday or month in the shop's time
+    zone, the first column the day it starts on ("2026-10-01", "2026-10" for a month), and a
+    last row of their total; *Products*, the 250 that sold most; and *Channels*, the sales of
+    each source of orders. Each row has the report's amounts in its own terms: orders, gross
+    sales, discounts, returns, net sales, shipping, additional fees, taxes, total sales, refunds,
+    cost of goods and gross profit, without the tax prices include but on taxes and total sales
+    (ADR-117), as numbers a spreadsheet adds up.
+  * **True profit's lines** (shipping costs, write-offs, claims recovered, ad spend and profit)
+    are columns only on the plans that have them (ADR-529).
+  * **Those who export orders export it**: owners, managers and accountants (`export_orders`),
+    and apps that read orders. It holds no customer's details, so it asks no recent sign-in as
+    the order export does; each export is recorded in the audit log with its period.
+  * **The admin's analytics page downloads the period it shows**, by day, or by week over 90
+    days, as its bars are.
+* **Consequences:** the accountant has the month's figures as the report has them, in the file
+  they work in. Integrations with accounting tools, and a journal of debits and credits, wait for
+  shops to say which tools they use. A period is at most 366 days, as the report's is.
