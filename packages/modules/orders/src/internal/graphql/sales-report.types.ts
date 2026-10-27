@@ -1,4 +1,4 @@
-import { Money } from '@hatti/api';
+import { Money, UserError } from '@hatti/api';
 import {
   ArgsType,
   Field,
@@ -10,6 +10,7 @@ import {
   registerEnumType,
 } from '@nestjs/graphql';
 import { SALES_REPORT_LIMITS } from '../sales-report.service.js';
+import { OrderExportFile } from './export.types.js';
 
 /** What the true profit lines say of a plan without it (ADR-529). */
 const PLAN_LEAVES_OUT = " Null when the shop's plan leaves true profit out (ADR-529).";
@@ -81,6 +82,34 @@ export class SalesReportArgs {
 
   @Field(() => Int, { nullable: true, description: 'Rows at most, 1 to 250; default 50.' })
   first?: number | null;
+}
+
+@ArgsType()
+export class SalesReportExportArgs {
+  @Field(() => GraphQLISODateTime, { description: 'Orders placed at or after this.' })
+  placedFrom!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    description: `Orders placed before this; at most ${SALES_REPORT_LIMITS.days} days after placedFrom.`,
+  })
+  placedBefore!: Date;
+
+  @Field(() => SalesInterval, { defaultValue: SalesInterval.DAY })
+  interval!: SalesInterval;
+}
+
+@ObjectType()
+export class SalesReportExportPayload {
+  @Field(() => OrderExportFile, {
+    nullable: true,
+    description:
+      '"sales-2026-10-27.xlsx", an Excel workbook: a sheet of the periods, a row each and their ' +
+      'total last; the products that sold most; and the sales of each channel. Null where refused.',
+  })
+  file!: OrderExportFile | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType({

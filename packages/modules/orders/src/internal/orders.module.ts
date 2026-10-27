@@ -69,6 +69,7 @@ import { ReturnRequestResolver } from './graphql/return-request.resolver.js';
 import { ReturnRequestService } from './return-request.service.js';
 import { RiskSettingsService } from './risk-settings.service.js';
 import { SalesReportService } from './sales-report.service.js';
+import { SalesReportExportService } from './sales-report-export.js';
 import { SavedSearchService } from './saved-search.service.js';
 import { TodayService } from './today.service.js';
 import { OrderTrackingService } from './tracking.service.js';
@@ -104,6 +105,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderSettingsService,
     BankTransferService,
     SalesReportService,
+    SalesReportExportService,
     CustomerCohortsService,
     AffiliatesService,
     TransferReceiptService,

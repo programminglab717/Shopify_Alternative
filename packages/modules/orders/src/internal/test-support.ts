@@ -335,6 +335,7 @@ export async function ordersFixture(
         DELETE FROM orders.order_settings;
         DELETE FROM orders.saved_searches;
         DELETE FROM orders.affiliates;
+        DELETE FROM marketing.ad_spend;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

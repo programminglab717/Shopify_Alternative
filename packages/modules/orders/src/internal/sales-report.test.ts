@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { listAudit } from '@hatti/events';
 import { TaxSettingsService } from '@hatti/tax/public';
+import { xlsxRows } from '@hatti/xlsx/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   SalesReportService,
@@ -13,6 +15,7 @@ import {
   type SalesReportInput,
 } from './sales-report.service.js';
 import { estimateParcelChargesIn } from './parcel-estimates.js';
+import { SalesReportExportService, periodLabel } from './sales-report-export.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -577,6 +580,84 @@ describe.skipIf(!server)('SalesReportService', () => {
     // Refunds are beside net sales, which take off only what came back.
     expect(netSales(report.previous.totals)).toBe(7_000_00n);
     expect(report.totals.refunds).toBe(0n);
+  });
+
+  it("exports the report as a workbook for the shop's accountant, true profit as the plan has it (ADR-798)", async () => {
+    await aFewDaysOfOrders();
+    const exports = new SalesReportExportService(f.db, sales);
+    const now = new Date('2026-10-26T20:00:00Z');
+    const file = unwrap(await exports.export(f.a, days(), true, now));
+    // The day it was exported in Karachi: the 27th already.
+    expect(file.filename).toBe('sales-2026-10-27.xlsx');
+    expect(file.contentType).toMatch(/spreadsheetml/);
+    const [header, ...rows] = xlsxRows(file.content);
+    expect(header).toEqual([
+      'Day',
+      'Orders',
+      'Gross sales',
+      'Discounts',
+      'Returns',
+      'Net sales',
+      'Shipping',
+      'Additional fees',
+      'Taxes',
+      'Total sales',
+      'Refunds',
+      'Cost of goods',
+      'Gross profit',
+      'Shipping costs',
+      'Write-offs',
+      'Claims recovered',
+      'Ad spend',
+      'Profit',
+    ]);
+    expect(rows).toEqual([
+      ['2026-09-28', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      ['2026-09-29', 2, 9000, 500, 0, 8500, 250, 0, 0, 8750, 0, 2400, 6100, 0, 0, 0, 0, 6350],
+      ['2026-09-30', 1, 2000, 0, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      ['Total', 3, 11000, 500, 2000, 8500, 250, 0, 0, 8750, 0, 2400, 6100, 0, 0, 0, 0, 6350],
+    ]);
+    expect(xlsxRows(file.content, 2)).toEqual([
+      ['Product', 'Units sold', 'Orders', 'Gross sales', 'Cost of goods'],
+      ['Kurta', 3, 2, 6000, 3600],
+      ['Pashmina Shawl', 1, 1, 5000, 0],
+    ]);
+    const [channelHeader, ...channels] = xlsxRows(file.content, 3);
+    expect(channelHeader![0]).toBe('Channel');
+    // The fixture's orders come through an app.
+    expect(channels.map((row) => row.slice(0, 3))).toEqual([['Apps', 3, 11000]]);
+
+    // Without true profit, its lines are left out; by month, each its month.
+    const monthly = unwrap(
+      await exports.export(f.a, days({ interval: 'month' }), false, now),
+    ).content;
+    const [plain, september, total] = xlsxRows(monthly);
+    expect(plain).toHaveLength(13);
+    expect(plain![0]).toBe('Month');
+    expect(september!.slice(0, 3)).toEqual(['2026-09', 3, 11000]);
+    expect(total!.slice(0, 2)).toEqual(['Total', 3]);
+    expect(periodLabel(new Date('2026-09-28T00:00:00+05:00'), 'week', 'Asia/Karachi')).toBe(
+      '2026-09-28',
+    );
+
+    const audit = await f.db.tenant(f.a.shopId, (tx) => listAudit(tx, f.a.shopId, { first: 50 }));
+    const exported = audit.items.filter((item) => item.action === 'sales_report.exported');
+    expect(exported.map((item) => [item.action, item.details])).toEqual([
+      [
+        'sales_report.exported',
+        {
+          placedFrom: '2026-09-27T19:00:00.000Z',
+          placedBefore: '2026-09-30T19:00:00.000Z',
+          interval: 'MONTH',
+        },
+      ],
+      ['sales_report.exported', expect.objectContaining({ interval: 'DAY' })],
+    ]);
+    // A period too long is refused as the report refuses it.
+    const long = { placedBefore: new Date('2027-12-01T00:00:00+05:00') };
+    expect(errorsOf(await exports.export(f.a, days(long), true))).toEqual([
+      ['placedBefore', 'INVALID'],
+    ]);
   });
 
   it('takes a period of a year at most', async () => {

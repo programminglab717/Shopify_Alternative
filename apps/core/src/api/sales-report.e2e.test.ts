@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { xlsxRows } from '@hatti/xlsx/testing';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -197,6 +198,30 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     expect(tooLong.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
 
     const denied = await gql(tokens.products, SALES, period);
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
+  it("exports the report as a workbook for the shop's accountant (ANL-10, ADR-798)", async () => {
+    const EXPORT = `mutation ($from: DateTime!, $before: DateTime!) {
+      salesReportExport(placedFrom: $from, placedBefore: $before) {
+        file { filename contentType content }
+        userErrors { field code message }
+      }
+    }`;
+    const exported = (await gql(tokens.owner, EXPORT, period)).data?.salesReportExport;
+    expect(exported.userErrors).toEqual([]);
+    expect(exported.file.filename).toMatch(/^sales-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    const rows = xlsxRows(Buffer.from(exported.file.content, 'base64'));
+    const totals = (await gql(tokens.owner, SALES, period)).data?.salesReport.totals;
+    expect(rows[0]![0]).toBe('Day');
+    // The plan has true profit by now: its lines end each row.
+    expect(rows[0]!.at(-1)).toBe('Profit');
+    expect(rows.at(-1)!.slice(0, 2)).toEqual(['Total', totals.orders]);
+
+    const tooLong = (await gql(tokens.owner, EXPORT, { ...period, from: '2025-01-01T00:00:00Z' }))
+      .data?.salesReportExport;
+    expect(tooLong).toMatchObject({ file: null, userErrors: [{ field: ['placedBefore'] }] });
+    const denied = await gql(tokens.products, EXPORT, period);
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 

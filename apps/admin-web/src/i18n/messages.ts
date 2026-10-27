@@ -1137,6 +1137,9 @@ const en = {
   'analytics.title': 'Analytics',
   'analytics.days': 'Last {count} days',
   'analytics.against': 'Against the {count} days before.',
+  'analytics.export': 'Download as Excel',
+  'analytics.exportHint':
+    'For your accountant: what each day came to, by week over 90 days, with the products and channels.',
   'analytics.netSales': 'Net sales',
   'analytics.orders': 'Orders',
   'analytics.average': 'Average order',
@@ -7022,6 +7025,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'analytics.title': 'تجزیہ',
   'analytics.days': 'پچھلے {count} دن',
   'analytics.against': 'اس سے پہلے کے {count} دنوں کے مقابلے میں۔',
+  'analytics.export': 'ایکسل میں ڈاؤن لوڈ کریں',
+  'analytics.exportHint':
+    'آپ کے اکاؤنٹنٹ کے لیے: ہر دن کی فروخت، 90 دنوں پر ہفتہ وار، پروڈکٹس اور چینلز کے ساتھ۔',
   'analytics.netSales': 'خالص فروخت',
   'analytics.orders': 'آرڈرز',
   'analytics.average': 'اوسط آرڈر',

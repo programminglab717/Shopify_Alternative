@@ -1,17 +1,19 @@
 import { Link } from '@tanstack/react-router';
-import { Gauge } from 'lucide-react';
+import { Download, Gauge } from 'lucide-react';
 import { useState } from 'react';
-import { SalesQuery } from '../api/operations';
-import type { MoneyValue, SalesData, SalesTotalsValue } from '../api/types';
+import { SalesQuery, SalesReportExportMutation } from '../api/operations';
+import type { MoneyValue, SalesData, SalesReportExportData, SalesTotalsValue } from '../api/types';
 import { gate, permits } from '../auth/permissions';
 import { SEES_AGENTS } from '../desk/agents-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney, formatTimes } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { FormSection } from '../products/product-form';
-import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
+import { EXPORTS_ORDERS, save } from '../orders/export-page';
+import { problemText } from '../products/product-form';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
-import { ErrorState, Loading } from '../ui/feedback';
+import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { CodHealth } from './cod-health';
 import { Cohorts } from './cohorts';
 import { CourierPerformance } from './courier-performance';
@@ -106,12 +108,70 @@ function Totals({
 }
 
 /**
+ * The period's sales as an Excel workbook for the shop's accountant (ANL-10, ADR-798), by day,
+ * or by week as the bars are over 90 days, for those who may export orders.
+ */
+function ExportSales({
+  from,
+  before,
+  interval,
+}: {
+  from: string;
+  before: string;
+  interval: string;
+}) {
+  const { t } = useLocale();
+  const exporting = useAdminMutation<SalesReportExportData, Record<string, unknown>>(
+    SalesReportExportMutation,
+  );
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const download = async () => {
+    setProblem(null);
+    try {
+      const { salesReportExport } = await exporting.mutateAsync({
+        placedFrom: from,
+        placedBefore: before,
+        interval,
+      });
+      const error = salesReportExport.userErrors[0];
+      if (error || !salesReportExport.file) {
+        setProblem(error ? problemText(error, t) : t('state.error'));
+        return;
+      }
+      save(salesReportExport.file);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          variant="secondary"
+          busy={exporting.isPending}
+          icon={<Download aria-hidden className="size-5" />}
+          onClick={() => void download()}
+        >
+          {t('analytics.export')}
+        </Button>
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('analytics.exportHint')}
+        </span>
+      </div>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
+/**
  * Sales over time (ANL-02, ADR-250): who is on the online store now; the last 7, 30 or 90 days
  * against the period as long before, with what the ads cost and brought in (ADR-553), net sales
  * by day (by week over 90), what sold most, where the orders came from, the online store's visits
  * and how far they went, what shoppers searched it for (ADR-684), how its cash-on-delivery orders
  * turned out, and how its stock sold (ANL-05); for owners and managers, the way to how each agent
- * of the Confirmation Desk did.
+ * of the Confirmation Desk did; the period's sales as a workbook for the accountant (ADR-798).
  */
 export function AnalyticsPage() {
   const { t, locale } = useLocale();
@@ -144,6 +204,9 @@ export function AnalyticsPage() {
       ) : (
         <>
           <p className="text-secondary">{t('analytics.against', { count: days })}</p>
+          {permits(shop, EXPORTS_ORDERS) && (
+            <ExportSales from={from} before={before} interval={interval} />
+          )}
           <Totals
             now={query.data.salesReport.totals}
             before={query.data.salesReport.previous.totals}

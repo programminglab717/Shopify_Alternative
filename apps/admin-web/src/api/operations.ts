@@ -3601,6 +3601,27 @@ const SALES_TOTALS = /* GraphQL */ `
 `;
 
 /** Sales over a period by day or week, against the period before, with what sold most (ANL-02). */
+/** The sales report as an Excel workbook for the shop's accountant (ANL-10, ADR-798). */
+export const SalesReportExportMutation = /* GraphQL */ `
+  mutation SalesReportExport(
+    $placedFrom: DateTime!
+    $placedBefore: DateTime!
+    $interval: SalesInterval
+  ) {
+    salesReportExport(placedFrom: $placedFrom, placedBefore: $placedBefore, interval: $interval) {
+      file {
+        filename
+        contentType
+        content
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const SalesQuery = /* GraphQL */ `
   query Sales($placedFrom: DateTime!, $placedBefore: DateTime!, $interval: SalesInterval!) {
     salesReport(

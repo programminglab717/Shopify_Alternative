@@ -16,6 +16,8 @@ import type { OrderSourceValue } from './schema.js';
 export const SALES_REPORT_LIMITS = {
   /** The longest period asked for at once. */
   days: 366,
+  /** The most products, or rows of a breakdown, asked for at once. */
+  rows: 250,
 } as const;
 
 /** How a sales report divides its period: days, weeks from Monday, or months, in the shop's time. */

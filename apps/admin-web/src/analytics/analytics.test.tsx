@@ -131,6 +131,76 @@ describe('Analytics in the admin', () => {
     expect(screen.queryByText('Return on ad spend')).toBeNull();
   });
 
+  it("downloads the period's sales as Excel for the accountant, or says why not (ADR-798)", async () => {
+    let refuse = true;
+    const core = fakeCore('accountant', (operation) => {
+      if (operation in NO_VISITS) return NO_VISITS[operation];
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
+      if (operation === 'SalesReportExport') {
+        if (refuse) {
+          refuse = false;
+          return {
+            salesReportExport: {
+              file: null,
+              userErrors: [
+                {
+                  field: ['placedBefore'],
+                  code: 'INVALID',
+                  message: 'A sales report covers at most 366 days at a time',
+                },
+              ],
+            },
+          };
+        }
+        return {
+          salesReportExport: {
+            file: {
+              filename: 'sales-2026-10-27.xlsx',
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              content: btoa('PK'),
+            },
+            userErrors: [],
+          },
+        };
+      }
+      if (operation !== 'Sales') return {};
+      return {
+        salesReport: {
+          totals: totals('60000', 20),
+          previous: { totals: totals('48000', 25) },
+          periods: [],
+          topProducts: [],
+          rows: [],
+          trueProfit: true,
+        },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:sales');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    renderAdmin('/shop_1/analytics');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Download as Excel' }));
+    expect(
+      await screen.findByText('A sales report covers at most 366 days at a time'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Download as Excel' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    const [sales] = core.sent.filter((each) => each.operation === 'Sales');
+    const exports = core.sent.filter((each) => each.operation === 'SalesReportExport');
+    // The period the page shows, as it shows it.
+    expect(exports.map((each) => each.variables)).toEqual([
+      {
+        placedFrom: sales!.variables.placedFrom,
+        placedBefore: sales!.variables.placedBefore,
+        interval: 'DAY',
+      },
+      expect.objectContaining({ interval: 'DAY' }),
+    ]);
+    vi.restoreAllMocks();
+  });
+
   it('shows what the ads cost and the net sales they brought in, beside profit (ADR-553)', async () => {
     const report = (adSpend: string | null, returnOnAdSpend: number | null) => ({
       salesReport: {
@@ -227,6 +297,8 @@ describe('Analytics in the admin', () => {
     );
 
     expect(screen.queryByRole('link', { name: "Agents' performance" })).toBeNull();
+    // Marketers do not export (ADR-798).
+    expect(screen.queryByRole('button', { name: 'Download as Excel' })).toBeNull();
     // Without true profit said, no ad spend.
     expect(screen.queryByText('Ad spend')).toBeNull();
 

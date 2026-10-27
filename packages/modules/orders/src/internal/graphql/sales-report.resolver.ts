@@ -3,14 +3,18 @@ import {
   Money,
   PlanAllowance,
   RequireScopes,
+  UserError,
   badUserInput,
+  deniedToRole,
+  hasCapability,
   pageSize,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
 import { Optional } from '@nestjs/common';
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { SalesReportExportService } from '../sales-report-export.js';
 import {
   SalesReportService,
   averageOrderValue,
@@ -30,15 +34,59 @@ import {
   SalesPeriod,
   SalesReport,
   SalesReportArgs,
+  SalesReportExportArgs,
+  SalesReportExportPayload,
   SalesRow,
 } from './sales-report.types.js';
+import { OrderExportFile } from './export.types.js';
 
 @Resolver()
 export class SalesReportResolver {
   constructor(
     private readonly sales: SalesReportService,
+    private readonly exports: SalesReportExportService,
     @Optional() private readonly allowance?: PlanAllowance,
   ) {}
+
+  @Mutation(() => SalesReportExportPayload, {
+    description:
+      "The sales report as an Excel workbook for the shop's accountant (ANL-10, ADR-798): what " +
+      'each day, week or month came to, a row each and their total last, the 250 products that ' +
+      "sold most, and each channel's sales, amounts as salesReport gives them, true profit's " +
+      'lines on the plans that have them. Staff need to be an owner, a manager or an ' +
+      'accountant. Every export is recorded in the audit log.',
+  })
+  @RequireScopes('read_orders')
+  async salesReportExport(
+    @CurrentTenant() tenant: TenantContext,
+    @Args() args: SalesReportExportArgs,
+  ): Promise<SalesReportExportPayload> {
+    if (tenant.actor.kind === 'staff' && !hasCapability(tenant.actor, 'export_orders')) {
+      throw deniedToRole(
+        'Access denied. Only owners, managers and accountants export the sales report.',
+      );
+    }
+    const trueProfit = !(await this.allowance?.excludes(tenant.shopId, 'trueProfit'));
+    const result = await this.exports.export(
+      tenant,
+      {
+        placedFrom: args.placedFrom,
+        placedBefore: args.placedBefore,
+        interval: args.interval.toLowerCase() as SalesIntervalValue,
+      },
+      trueProfit,
+    );
+    return Object.assign(new SalesReportExportPayload(), {
+      file: result.ok
+        ? Object.assign(new OrderExportFile(), {
+            filename: result.value.filename,
+            contentType: result.value.contentType,
+            content: result.value.content.toString('base64'),
+          })
+        : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
 
   @Query(() => SalesReport, {
     description:

@@ -9982,6 +9982,19 @@ type Mutation {
   """
   reviewSettingsUpdate(input: ReviewSettingsInput!): ReviewSettingsPayload!
 
+  """
+  The sales report as an Excel workbook for the shop's accountant (ANL-10, ADR-798): what each day, week or month came to, a row each and their total last, the 250 products that sold most, and each channel's sales, amounts as salesReport gives them, true profit's lines on the plans that have them. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
+  """
+  salesReportExport(
+    interval: SalesInterval! = DAY
+
+    """Orders placed before this; at most 366 days after placedFrom."""
+    placedBefore: DateTime!
+
+    """Orders placed at or after this."""
+    placedFrom: DateTime!
+  ): SalesReportExportPayload!
+
   """Keeps a saved reply: at most 100 a shop, each of its own title."""
   savedReplyCreate(input: SavedReplyInput!): SavedReplyPayload!
 
@@ -16404,6 +16417,14 @@ type SalesReport {
   Whether the shop's plan includes true profit (ANL-03, ADR-529): without it, every Sales' shippingCosts, shippingCostsEstimated, writeOffs, claimsRecovered, profit, adSpend and returnOnAdSpend are null.
   """
   trueProfit: Boolean!
+}
+
+type SalesReportExportPayload {
+  """
+  "sales-2026-10-27.xlsx", an Excel workbook: a sheet of the periods, a row each and their total last; the products that sold most; and the sales of each channel. Null where refused.
+  """
+  file: OrderExportFile
+  userErrors: [UserError!]!
 }
 
 """What the orders of one channel, source or campaign came to."""

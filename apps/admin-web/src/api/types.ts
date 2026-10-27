@@ -3321,6 +3321,13 @@ export interface OrdersExportData {
   };
 }
 
+export interface SalesReportExportData {
+  salesReportExport: {
+    file: { content: string; contentType: string; filename: string } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface ExportSchedule {
   id: string;
   frequency: OrderExportFrequency;
