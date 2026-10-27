@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-27
 
-### Own riders
+### 3f1144c · Own riders
 
 * **Riders and hand-outs:** a shop adds its own riders, each with a page opened from a link of
   their own, and hands them packed orders, each shipped with them and its customer sent a code
