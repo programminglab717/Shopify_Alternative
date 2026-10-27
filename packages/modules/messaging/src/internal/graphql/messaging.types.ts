@@ -32,6 +32,8 @@ export enum MessageKind {
   STORE_CREDIT_GIVEN = 'STORE_CREDIT_GIVEN',
   STORE_CREDIT_EXPIRING = 'STORE_CREDIT_EXPIRING',
   GIFT_CARD = 'GIFT_CARD',
+  DIGITAL_DOWNLOAD = 'DIGITAL_DOWNLOAD',
+  LICENCE_KEY = 'LICENCE_KEY',
   CHECKOUT_REMINDER = 'CHECKOUT_REMINDER',
   CHECKOUT_OFFER = 'CHECKOUT_OFFER',
   REVIEW_REQUEST = 'REVIEW_REQUEST',
@@ -170,6 +172,16 @@ registerEnumType(MessageKind, {
       description:
         'A gift card they bought, once its order is paid: what it is worth and its code, which ' +
         'is not kept once sent (CAT-12, ADR-451); the shop cannot turn it off.',
+    },
+    DIGITAL_DOWNLOAD: {
+      description:
+        'A digital product they bought, once its order is paid: a link of their own to its ' +
+        'files (CAT-13, ADR-814); the shop cannot turn it off.',
+    },
+    LICENCE_KEY: {
+      description:
+        'A licence key of a digital product they bought, once its order is paid, which is not ' +
+        'kept in the message once sent (ADR-814); the shop cannot turn it off.',
     },
     CHECKOUT_REMINDER: {
       description:

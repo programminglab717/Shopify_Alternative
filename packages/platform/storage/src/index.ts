@@ -23,6 +23,7 @@ export {
 } from './object-storage.js';
 export {
   S3Storage,
+  contentDisposition,
   inlineDisposition,
   type CorsRule,
   type S3StorageOptions,

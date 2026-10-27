@@ -680,6 +680,9 @@ describe("Messages' words", () => {
       'order_confirmation_call',
       // What the customer bought: the card's code (ADR-451).
       'gift_card',
+      // What the customer bought: a digital product's files and keys (ADR-814).
+      'digital_download',
+      'licence_key',
       'invoice_due',
       'payment_overdue',
       'plan_ended',
@@ -781,8 +784,40 @@ describe("Messages' words", () => {
       'ABCD EFGH JKLM NPQR',
     ]);
     expect(templateButtons('gift_card', card)).toEqual([]);
-    expect(SECRET_KINDS).toEqual(['gift_card', 'one_time_code', 'account_code']);
+    expect(SECRET_KINDS).toEqual(['gift_card', 'licence_key', 'one_time_code', 'account_code']);
     expect(messageEmail('gift_card', 'en', card)).toBeNull();
+  });
+
+  it("sends a digital product's link by its button, and its key as a secret (ADR-814)", () => {
+    const link = {
+      shop: 'Zari Fashions',
+      product: 'Embroidery patterns',
+      url: `https://api.hatti.pk/dl/${'T'.repeat(43)}`,
+    };
+    expect(messageText('digital_download', 'en', link)).toBe(
+      'Zari Fashions: thank you for buying Embroidery patterns. Its files are ready: tap below ' +
+        `to download them. https://api.hatti.pk/dl/${'T'.repeat(43)}`,
+    );
+    expect(templateParameters('digital_download', link)).toEqual([
+      'Zari Fashions',
+      'Embroidery patterns',
+    ]);
+    expect(templateButtons('digital_download', link)).toEqual([
+      {
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: 'T'.repeat(43) }],
+      },
+    ]);
+    const key = { shop: 'Zari Fashions', product: 'Shop app', code: 'KEY-0001' };
+    expect(messageText('licence_key', 'ur', key)).toContain('KEY-0001');
+    expect(templateParameters('licence_key', key)).toEqual([
+      'Zari Fashions',
+      'Shop app',
+      'KEY-0001',
+    ]);
+    expect(SECRET_KINDS).toContain('licence_key');
   });
 
   it('carries a code in its words and in the button that copies it', () => {

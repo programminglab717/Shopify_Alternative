@@ -25,6 +25,7 @@ import { PersonalisationService } from './personalisation.js';
 import { StitchingResolver } from './graphql/stitching.resolver.js';
 import { StitchingService } from './stitching.js';
 import { DigitalProductService } from './digital-products.js';
+import { DigitalDeliveryService, DigitalDownloadController } from './digital-deliveries.js';
 import { DigitalProductResolver } from './graphql/digital-product.resolver.js';
 import { PriceSaleResolver } from './graphql/price-sale.resolver.js';
 import { ProductScheduleResolver } from './graphql/schedule.resolver.js';
@@ -56,6 +57,7 @@ import { MetafieldService } from './metafields.js';
  */
 @Module({
   providers: [
+    DigitalDeliveryService,
     ProductService,
     OptionService,
     VariantService,
@@ -102,7 +104,8 @@ import { MetafieldService } from './metafields.js';
     VariantMetafieldResolver,
     CollectionMetafieldResolver,
   ],
-  controllers: [StorefrontSearchController],
+  // The search the storefront asks for, and the links to digital products' files (ADR-814).
+  controllers: [StorefrontSearchController, DigitalDownloadController],
   exports: [
     ProductService,
     OptionService,

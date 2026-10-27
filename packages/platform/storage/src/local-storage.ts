@@ -28,7 +28,7 @@ export interface LocalStorageOptions {
 /** What a URL `LocalStorage` signed lets its holder do. */
 export type LocalGrant =
   | { method: 'PUT'; contentType: string; contentLength: number }
-  | { method: 'GET'; filename: string | null };
+  | { method: 'GET'; filename: string | null; attachment: boolean };
 
 /**
  * Files kept in a directory, for development and tests: the core serves them at `baseUrl`, taking
@@ -62,13 +62,15 @@ export class LocalStorage extends ObjectStorage {
     };
   }
 
-  signDownload(key: string, expiresIn: number, options: { filename?: string } = {}): string {
-    const params = this.#signed(
-      'GET',
-      key,
-      expiresIn,
-      options.filename ? { filename: options.filename } : {},
-    );
+  signDownload(
+    key: string,
+    expiresIn: number,
+    options: { filename?: string; attachment?: boolean } = {},
+  ): string {
+    const params = this.#signed('GET', key, expiresIn, {
+      ...(options.filename ? { filename: options.filename } : {}),
+      ...(options.attachment ? { attachment: '1' } : {}),
+    });
     return `${this.locationOf(key)}?${params}`;
   }
 
@@ -91,7 +93,9 @@ export class LocalStorage extends ObjectStorage {
     const expected = Buffer.from(this.#signature(method, key, { ...fields, expires }));
     const given = Buffer.from(signature);
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
-    if (method === 'GET') return { method, filename: fields.filename ?? null };
+    if (method === 'GET') {
+      return { method, filename: fields.filename ?? null, attachment: fields.attachment === '1' };
+    }
     const length = Number(fields.length);
     if (!fields.type || !Number.isSafeInteger(length)) return null;
     return { method, contentType: fields.type, contentLength: length };

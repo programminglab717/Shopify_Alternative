@@ -8168,6 +8168,11 @@ enum MessageKind {
   DAILY_SUMMARY
 
   """
+  A digital product they bought, once its order is paid: a link of their own to its files (CAT-13, ADR-814); the shop cannot turn it off.
+  """
+  DIGITAL_DOWNLOAD
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: DNS points a domain of its own elsewhere, which is disconnected three days on unless it points back (ADR-262).
   """
   DOMAIN_UNPOINTED
@@ -8191,6 +8196,11 @@ enum MessageKind {
   For the shop, from Hatti and paid by Hatti, at its alerts number and by email to its owner: a new version of one of Hatti's legal documents, the day it takes effect and its page (ADR-742).
   """
   LEGAL_CHANGED
+
+  """
+  A licence key of a digital product they bought, once its order is paid, which is not kept in the message once sent (ADR-814); the shop cannot turn it off.
+  """
+  LICENCE_KEY
 
   """
   For the shop, from Hatti and paid by Hatti, at its alerts number: listings held for a rights complaint let go, and why (ADR-476).

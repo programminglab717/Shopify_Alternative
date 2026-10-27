@@ -73,10 +73,18 @@ export class S3Storage extends ObjectStorage {
     return { url, method: 'PUT', headers };
   }
 
-  signDownload(key: string, expiresIn: number, options: { filename?: string } = {}): string {
+  signDownload(
+    key: string,
+    expiresIn: number,
+    options: { filename?: string; attachment?: boolean } = {},
+  ): string {
     const url = this.#url(key);
-    if (options.filename) {
-      url.searchParams.set('response-content-disposition', inlineDisposition(options.filename));
+    const filename = options.filename ?? (options.attachment ? key.split('/').at(-1) : undefined);
+    if (filename) {
+      url.searchParams.set(
+        'response-content-disposition',
+        contentDisposition(filename, options.attachment ? 'attachment' : 'inline'),
+      );
     }
     return presignUrl('GET', url, { ...this.#signing(), expiresIn });
   }
@@ -272,8 +280,13 @@ export class S3Storage extends ObjectStorage {
 
 /** Shown in the browser, saved as `filename` if saved: RFC 6266's form, for any characters. */
 export function inlineDisposition(filename: string): string {
+  return contentDisposition(filename, 'inline');
+}
+
+/** A Content-Disposition naming `filename`, shown in the browser or saved as a download. */
+export function contentDisposition(filename: string, kind: 'inline' | 'attachment'): string {
   const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
-  return `inline; filename="${ascii}"; filename*=UTF-8''${uriEncode(filename)}`;
+  return `${kind}; filename="${ascii}"; filename*=UTF-8''${uriEncode(filename)}`;
 }
 
 /** XML's five entities, as a listing escapes keys. */

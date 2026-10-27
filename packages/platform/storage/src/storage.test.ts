@@ -111,7 +111,16 @@ describe('LocalStorage', () => {
     expect(storage.verify('GET', KEY, queryOf(download))).toEqual({
       method: 'GET',
       filename: 'Receipt 12.jpg',
+      attachment: false,
     });
+    // Saved as a download (ADR-814), which the signature keeps.
+    const saved = storage.signDownload(KEY, 60, { filename: 'Patterns.pdf', attachment: true });
+    expect(storage.verify('GET', KEY, queryOf(saved))).toEqual({
+      method: 'GET',
+      filename: 'Patterns.pdf',
+      attachment: true,
+    });
+    expect(storage.verify('GET', KEY, { ...queryOf(download), attachment: '1' })).toBeNull();
     now = new Date(NOW.getTime() + 61_000);
     expect(storage.verify('GET', KEY, queryOf(download))).toBeNull();
     expect(storage.verify('PUT', KEY, query)).not.toBeNull();
@@ -209,6 +218,8 @@ describe('S3Storage', () => {
     expect(queryOf(download)['response-content-disposition']).toBe(
       `inline; filename="____.jpg"; filename*=UTF-8''%D8%B1%D8%B3%DB%8C%D8%AF.jpg`,
     );
+    const saved = storage.signDownload(KEY, 300, { attachment: true });
+    expect(queryOf(saved)['response-content-disposition']).toMatch(/^attachment; filename="/);
     expect(storage.keyOf(storage.locationOf(KEY))).toBe(KEY);
     expect(storage.keyOf('https://acct.r2.cloudflarestorage.com/other/x')).toBeNull();
   });

@@ -34,6 +34,8 @@ export const MESSAGE_KINDS = [
   'store_credit_given',
   'store_credit_expiring',
   'gift_card',
+  'digital_download',
+  'licence_key',
   'checkout_reminder',
   'checkout_offer',
   'review_request',
@@ -129,6 +131,9 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'order_confirmation_call',
   // What the customer bought: the gift card's code, which no one else has (ADR-451).
   'gift_card',
+  // What the customer bought: a digital product's files and licence keys (ADR-814).
+  'digital_download',
+  'licence_key',
   'invoice_due',
   'payment_overdue',
   'plan_ended',
@@ -827,6 +832,28 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: here is the gift card you bought, worth {amount}. Its code is {code}. Spend it at checkout, or give it to someone. Keep it safe: whoever has the code can spend it.',
       ur: '{shop}: یہ آپ کا خریدا ہوا گفٹ کارڈ ہے، {amount} کا۔ اس کا کوڈ {code} ہے۔ اسے چیک آؤٹ پر استعمال کریں، یا کسی کو تحفے میں دیں۔ اسے سنبھال کر رکھیں: جس کے پاس کوڈ ہو وہ اسے خرچ کر سکتا ہے۔',
+    },
+  },
+  digital_download: {
+    whatsapp: 'hatti_digital_download',
+    category: 'utility',
+    parameters: ['shop', 'product'],
+    // The line's own link, /dl/<secret>, to the product's files (ADR-814).
+    buttons: [{ type: 'url' }],
+    text: {
+      en: '{shop}: thank you for buying {product}. Its files are ready: tap below to download them.',
+      ur: '{shop}: {product} خریدنے کا شکریہ۔ اس کی فائلیں تیار ہیں: انہیں ڈاؤن لوڈ کرنے کے لیے نیچے ٹیپ کریں۔',
+    },
+  },
+  licence_key: {
+    whatsapp: 'hatti_licence_key',
+    category: 'utility',
+    parameters: ['shop', 'product', 'code'],
+    // The key is what the customer bought: kept nowhere in the message once sent (ADR-814).
+    secret: true,
+    text: {
+      en: '{shop}: here is your licence key for {product}: {code}. Keep it safe: whoever has it can use it.',
+      ur: '{shop}: یہ {product} کے لیے آپ کی لائسنس کی ہے: {code}۔ اسے سنبھال کر رکھیں: جس کے پاس ہو وہ اسے استعمال کر سکتا ہے۔',
     },
   },
   checkout_reminder: {

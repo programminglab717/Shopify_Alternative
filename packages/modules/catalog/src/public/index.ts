@@ -322,3 +322,9 @@ export {
   type DigitalFileRecord,
   type DigitalProductRecord,
 } from '../internal/digital-products.js';
+export {
+  DOWNLOAD_LINK_PATH,
+  DigitalDeliveryService,
+  deliverDigitalIn,
+  type DigitalLine,
+} from '../internal/digital-deliveries.js';

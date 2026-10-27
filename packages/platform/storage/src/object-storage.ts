@@ -71,7 +71,12 @@ export abstract class ObjectStorage {
    * A URL that gives the file under `key` for `expiresIn` seconds, shown in the browser rather
    * than downloaded, as `filename` when given.
    */
-  abstract signDownload(key: string, expiresIn: number, options?: { filename?: string }): string;
+  abstract signDownload(
+    key: string,
+    expiresIn: number,
+    /** `attachment`: the browser saves it, as a download, rather than showing it. */
+    options?: { filename?: string; attachment?: boolean },
+  ): string;
 
   /** Where `key` is, unsigned: what a staged upload's resource URL says. */
   abstract locationOf(key: string): string;

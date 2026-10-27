@@ -137,6 +137,7 @@ import { AccountDataFiles } from './account-data-files.js';
 import { ExpiredMemberships } from './expired-memberships.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
+import { DigitalSales } from './digital-sales.js';
 import { GiftCardSales } from './gift-card-sales.js';
 import { CashbackRewards } from './cashback.js';
 import { ReferralRewards } from './referrals.js';
@@ -192,6 +193,7 @@ export interface EventConsumers {
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
   giftCards?: GiftCardSales;
+  digital?: DigitalSales;
   cashback?: CashbackRewards;
   referrals?: ReferralRewards;
   domains?: DomainNotices;
@@ -222,6 +224,7 @@ export function eventHandlers(
     staff,
     storeCredit,
     giftCards,
+    digital,
     cashback,
     referrals,
     domains,
@@ -313,6 +316,13 @@ export function eventHandlers(
   }
   if (giftCards) {
     for (const type of GiftCardSales.EVENTS) registry.on(type, (event) => giftCards.handle(event));
+  }
+  if (digital) {
+    for (const type of DigitalSales.EVENTS) {
+      registry.on(type, async (event) => {
+        await digital.handle(event);
+      });
+    }
   }
   if (cashback) {
     for (const type of CashbackRewards.EVENTS) {
@@ -441,6 +451,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         staff: new StaffAlerts(database, new MessagesService(database), pushes),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         giftCards: new GiftCardSales(database, new MessagesService(database)),
+        // Licence keys are opened with the platform's keys; without them, links alone (ADR-814).
+        digital: new DigitalSales(
+          database,
+          new MessagesService(database),
+          new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+          config.ENCRYPTION_KEYS ?? null,
+        ),
         cashback: new CashbackRewards(database),
         referrals: new ReferralRewards(database),
         domains: new DomainNotices(database, new MessagesService(database)),

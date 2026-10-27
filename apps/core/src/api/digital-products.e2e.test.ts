@@ -151,5 +151,16 @@ describe.skipIf(!server)('Admin GraphQL API: digital products (CAT-13, ADR-813)'
         { id: ebook },
       ),
     ).toEqual({ removed: true });
+
+    // The link page of a line, which no secret here names (ADR-814): private, and plain.
+    const page = await app.inject({ method: 'GET', url: `/dl/${'x'.repeat(43)}` });
+    expect([
+      page.statusCode,
+      page.headers['cache-control'],
+      page.headers['referrer-policy'],
+    ]).toEqual([404, 'no-store', 'no-referrer']);
+    expect(page.body).toContain('There is nothing to download here');
+    const file = await app.inject({ method: 'GET', url: `/dl/${'x'.repeat(43)}/${newId()}` });
+    expect(file.statusCode).toBe(404);
   });
 });

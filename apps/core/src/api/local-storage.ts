@@ -1,4 +1,4 @@
-import { LocalStorage, MAX_VIDEO_UPLOAD_BYTES, inlineDisposition } from '@hatti/storage';
+import { LocalStorage, MAX_VIDEO_UPLOAD_BYTES, contentDisposition } from '@hatti/storage';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 /**
@@ -61,7 +61,10 @@ export async function serveLocalStorage(
         .header('content-type', file.contentType ?? 'application/octet-stream')
         .header(
           'content-disposition',
-          inlineDisposition(grant.filename ?? target.key.split('/').at(-1)!),
+          contentDisposition(
+            grant.filename ?? target.key.split('/').at(-1)!,
+            grant.attachment ? 'attachment' : 'inline',
+          ),
         )
         .header('cache-control', 'private, max-age=3600')
         .header('x-content-type-options', 'nosniff')
