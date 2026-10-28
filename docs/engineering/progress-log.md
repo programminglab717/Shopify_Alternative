@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Apps inside the admin and on the storefront
+
+* **Developers:** installed apps open inside the admin, their frames carrying a minute's session
+  token the app checks with its secret. Apps offer the storefront scripts, such as a reviews
+  widget, that load once the shop's owner or a manager turns them on; uninstalled, they go
+  (DEV-06, [ADR-852](../architecture/13-decision-log.md#adr-852--apps-open-inside-the-admin-with-a-minutes-session-token-signed-with-their-client-secret-and-offer-the-storefront-scripts-that-load-once-the-shop-turns-them-on)). Apps no longer see or uninstall other apps.
+* 4541 tests (8 new; the admin's count, five short before, corrected).
+
 ### 6ab8fbb · Public apps through OAuth
 
 * **Developers:** partners register apps that shops install. An owner or a manager approves one

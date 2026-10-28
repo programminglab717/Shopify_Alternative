@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-851 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-852 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -859,6 +859,7 @@
 | 849 | On Growth and Pro, a shop may let the AI answer its customers on WhatsApp and in its web chat, from its policies and the customer's own orders, handing the conversation to staff when it should; staff answering or taking it leave it theirs | Accepted |
 | 850 | Developers get a TypeScript client for the Admin API, which waits out throttles and keeps one idempotency key across a mutation's tries, and `hatti`, a command line that pulls and pushes a shop's theme files | Accepted |
 | 851 | Partners' public apps are installed through OAuth: an owner or a manager approves one on the admin's consent page, and the app trades the code with its secret for a token of the shop's; until Hatti lists an app, it installs on its partner's development stores alone | Accepted |
+| 852 | Apps open inside the admin with a minute's session token signed with their client secret, and offer the storefront scripts that load once the shop turns them on | Accepted |
 
 ---
 
@@ -27942,3 +27943,50 @@
   * **PKCE without a client secret:** for apps with no server. Hatti's apps are server-side, as
     Shopify's are, and webhooks need a secret the app holds.
   * **Listing every app at once:** rejected. Merchants would install apps nobody had looked at.
+
+## ADR-852 · Apps open inside the admin with a minute's session token signed with their client secret, and offer the storefront scripts that load once the shop turns them on
+
+* **Context:**
+  * DEV-06 asks for embedded admin apps and theme app extensions, as Shopify's.
+  * Public apps install through OAuth (ADR-851). Once installed, a merchant still left the admin
+    to use one, and an app had no way onto the shop's pages but asking the merchant to paste
+    code into the theme.
+* **Decision:**
+  * **Embedded apps:** Settings › Apps opens an installed public app inside the admin, in a frame
+    of its own (`/<shop>/settings/apps/<app>`).
+    * `appSession(id)` gives the frame its address: the app's URL with `shop`, `embedded=1` and
+      `id_token`.
+    * The token is a JWT, HS256, signed with the app's client secret, lasting a minute. It names
+      the shop (`dest`), the member of staff (`sub`), their session (`sid`) and the app's client
+      ID (`aud`), as Shopify's session tokens do.
+    * The app checks it with `verifySessionToken` from `@hatti/admin-client`, then keeps a session
+      of its own. The frame keeps the address it first loaded, so the app is not reloaded.
+    * Staff alone open apps; an app's own token opens no session.
+  * **App embeds**, as Shopify's theme app embeds:
+    * An app, custom or public, offers a script with `appEmbedSet(input: { handle, name, src })`
+      (`write_themes`): an https address, ten scripts an app at most.
+    * It is off until the shop's owner or a manager turns it on (`appEmbedEnable`), never the
+      app. Its address changed, it is off again, for the shop to look at what it now loads.
+    * The storefront loads each one turned on, async, in every page's head, previews and the
+      theme editor included. The shop's document carries them, written again as they change and
+      as apps are installed, uninstalled or removed.
+    * An app removed or uninstalled takes its scripts with it.
+  * **Who sees installs:** `installedApps` answers the shop's staff alone, and `appUninstall`
+    the owner and managers alone; an app does not see what else the shop installed. This
+    tightens what ADR-851 shipped.
+* **Consequences:**
+  * A partner's app is used without leaving the admin, and puts its widget on the storefront
+    without the merchant touching the theme.
+  * Apps' scripts are the apps' own: they run on the shop's pages as the theme's scripts do, and
+    follow the shop's consent banner (ADR-551) by reading its `hatti_consent` cookie themselves.
+  * Not yet:
+    * app blocks a theme's sections place, which need sections from outside the theme;
+    * an App Bridge script for frames: navigation, toasts and the save bar from inside the app;
+    * extensions of admin pages, such as an order's.
+* **Alternatives:**
+  * **Shopify's script tag API, scripts on at once:** rejected. An app would put code on the
+    shop's pages without the shop's word.
+  * **Opening apps in a new tab with the app's own sign-in:** what partners' apps did until now.
+    Merchants leave the admin, and each app asks them to sign in again.
+  * **A token signed by Hatti's key, checked through an API call:** every app page would wait
+    on Hatti. The client secret is already what the app and Hatti share.

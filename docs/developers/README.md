@@ -111,6 +111,35 @@ const { accessToken, scopes } = await accessTokenFor({
 * Until Hatti reviews and lists an app, it installs on its partner's own development stores
   alone.
 
+## Inside the admin, and on the storefront
+
+* **Embedded apps:** a merchant opens an installed app from Settings › Apps, inside the admin.
+  Its frame loads the app's URL with `shop`, `embedded=1` and `id_token`, a session token of a
+  minute's life. Check it, then keep a session of your own (ADR-852):
+
+  ```ts
+  import { verifySessionToken } from '@hatti/admin-client';
+
+  const claims = verifySessionToken(url.searchParams.get('id_token'), { clientId, clientSecret });
+  if (!claims) return reply.code(401);
+  // claims.dest is the shop, claims.sub the member of staff looking.
+  ```
+
+* **App embeds:** an app with `write_themes` offers the storefront a script of its own, which
+  loads on every page once the shop turns it on:
+
+  ```graphql
+  mutation {
+    appEmbedSet(input: { handle: "reviews", name: "Reviews widget", src: "https://cdn.example/w.js" }) {
+      appEmbed { id enabled }
+      userErrors { field message }
+    }
+  }
+  ```
+
+  Changing its address turns it off again until the shop looks. Follow the shop's consent
+  banner by reading its `hatti_consent` cookie before tracking anyone.
+
 ## Trying things safely
 
 * A **development store**, opened by a partner (ADR-504), is closed to shoppers until it is
