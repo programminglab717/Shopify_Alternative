@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); RFM segments (ANL-04) next. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); B2B payment terms (CUS-06) next. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### Customers by how recently and often they buy
+
+* **Grid:** each customer who has ordered, by the days since their last order and their
+  delivered orders, in nine groups from champions to lost ([ADR-887](../architecture/13-decision-log.md#adr-887--customers-by-how-recently-and-often-they-buy-rfm-on-a-grid-of-three-by-three-by-the-days-since-their-last-order-against-two-lines-the-shop-picks-and-by-their-delivered-orders-each-group-a-segments-query)).
+* **Segments:** each group is a segment's query; the admin saves one to send it a campaign.
+* 4813 tests (7 new).
 
 ### a13dc9e · Workflows that wait and check
 

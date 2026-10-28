@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-886 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-887 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -894,6 +894,7 @@
 | 884 | Sessions by where they came from, their landing page and device: each counted once as it began, from its first page's script and its user agent, counted in Valkey and kept each day in Postgres by the worker, not in ClickHouse | Accepted |
 | 885 | The sales as a journal for the shop's books: an entry a day, posting what the sales report counts to accounts the shop names, as a CSV, Xero's or QuickBooks' journal import or Tally's vouchers; what the shop is paid is left to the accountant to clear | Accepted |
 | 886 | Workflows wait and check: a wait of an hour to a week before the next action, and a check that goes on only where its conditions hold of the order as it is then, with the order's stage and confirmation to check | Accepted |
+| 887 | Customers by how recently and often they buy: RFM on a grid of three by three, by the days since their last order against two lines the shop picks and by their delivered orders, each group a segment's query | Accepted |
 
 ---
 
@@ -29398,3 +29399,38 @@
     * actions that change more than tags: holding or cancelling an order, or a WhatsApp message
       to the customer, which needs approved templates;
     * scheduled triggers, and triggers on stock.
+
+## ADR-887 · Customers by how recently and often they buy: RFM on a grid of three by three, by the days since their last order against two lines the shop picks and by their delivered orders, each group a segment's query
+
+* **Context:** ANL-04 asks for cohorts, retention and RFM. Cohorts are built (ADR-774, ADR-775),
+  and both left RFM to follow on the same orders. A merchant wants to know who their best
+  customers are, who is slipping away, and to send each group something different.
+* **Decision:**
+  * **`customerRfm(recentDays = 30, lapsedDays = 90)`** puts each customer who has ordered on a
+    grid of three by three, worked out from the orders when asked:
+    * **How recently:** recent where they last ordered within `recentDays`, lapsed where
+      `lapsedDays` ago or more, slipping between. The two lines are 1 to 730 days, lapsed past
+      recent.
+    * **How often:** by their delivered orders, one or none, two or three, four or more. A
+      Pakistani shop counts a sale when the parcel is taken, not when it is ordered: a refused
+      COD order is not a purchase.
+    * **The groups,** as merchants know RFM's: champions, becoming loyal, new; loyal, needing
+      attention, drifting away; can't lose them, at risk, lost.
+  * **Scores by fixed lines, not quintiles.** Most of a small shop's customers have one order, so
+    quintiles of frequency would split identical customers. Merchants can read "four or more
+    delivered, ordered in the last 30 days"; a score of 5 means nothing to them.
+  * **Each group** gives how many customers, what they spent (paid on orders not cancelled, less
+    refunds) and their delivered orders on average.
+    * It also gives the segment query that finds it: `delivered_orders >= 4 AND last_order_date >
+      -30d`.
+    * It reads the same customer facts segments do (ADR-023), days in Pakistan's time as
+      segments count them, so a segment saved from a group has the group's count.
+  * **Who sees it:** those who read orders, as cohorts.
+  * **The admin's analytics** show the nine groups after the cohort table, with three choices of
+    lines: 30 and 90 days, 60 and 180, 90 and 365. Those who keep segments (owner, managers,
+    marketers) save a group as a segment, to send it a campaign (MKT-03) or see its customers.
+* **Consequences:**
+  * A shop sends its at-risk customers a reason to come back, and thanks its champions, from
+    two clicks.
+  * Monetary value is shown, not scored. Segments by spend can be added to a group's query by
+    hand.
