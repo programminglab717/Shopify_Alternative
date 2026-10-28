@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Apps' charges in rupees
+### edf4203 · Apps' charges in rupees
 
 * **Developers:** public apps charge the shop once, in rupees. The owner approves the charge in
   the admin and pays it as an invoice of Hatti's; on development stores it is a test. The app's
