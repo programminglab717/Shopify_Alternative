@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Apps' charges in rupees
+
+* **Developers:** public apps charge the shop once, in rupees. The owner approves the charge in
+  the admin and pays it as an invoice of Hatti's; on development stores it is a test. The app's
+  partner earns 80% (DEV-05, [ADR-854](../architecture/13-decision-log.md#adr-854--public-apps-charge-shops-once-in-rupees-the-owner-approves-a-charge-in-the-admin-and-pays-it-as-an-invoice-of-hattis-a-test-on-development-stores-and-the-apps-partner-earns-80)). The share, refunds and terms are OWN-48.
+* 4557 tests (7 new, the admin's check of each new GraphQL operation among them).
+
 ### 6a929c7 · The theme store
 
 * **Online store:** Online store › Themes has a theme store of designers' themes, free or for a
@@ -23,7 +30,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
   of Hatti's, and installs it as often as they like. Partners offer themes from their
   development stores, Hatti lists each after a look, and the designer earns 80% of each sale
   (OS-20, [ADR-853](../architecture/13-decision-log.md#adr-853--the-theme-store-partners-offer-themes-from-their-development-stores-free-or-for-rs-1000-to-rs-100000-hatti-lists-each-after-a-look-a-shop-installs-a-free-one-at-once-or-buys-a-paid-one-with-an-invoice-of-hattis-and-the-designer-earns-80)). The share, prices and review are OWN-47.
-* 4550 tests (5 new; the admin's count, four short before, corrected).
+* 4550 tests (9 new, the admin's check of each new GraphQL operation among them).
 
 ### ea6c0be · Apps inside the admin and on the storefront
 
@@ -31,7 +38,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
   token the app checks with its secret. Apps offer the storefront scripts, such as a reviews
   widget, that load once the shop's owner or a manager turns them on; uninstalled, they go
   (DEV-06, [ADR-852](../architecture/13-decision-log.md#adr-852--apps-open-inside-the-admin-with-a-minutes-session-token-signed-with-their-client-secret-and-offer-the-storefront-scripts-that-load-once-the-shop-turns-them-on)). Apps no longer see or uninstall other apps.
-* 4541 tests (8 new; the admin's count, five short before, corrected).
+* 4541 tests (13 new, the admin's check of each new GraphQL operation among them).
 
 ### 6ab8fbb · Public apps through OAuth
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-853 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-854 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -861,6 +861,7 @@
 | 851 | Partners' public apps are installed through OAuth: an owner or a manager approves one on the admin's consent page, and the app trades the code with its secret for a token of the shop's; until Hatti lists an app, it installs on its partner's development stores alone | Accepted |
 | 852 | Apps open inside the admin with a minute's session token signed with their client secret, and offer the storefront scripts that load once the shop turns them on | Accepted |
 | 853 | The theme store: partners offer themes from their development stores, free or for Rs 1,000 to Rs 100,000; Hatti lists each after a look; a shop installs a free one at once or buys a paid one with an invoice of Hatti's, and the designer earns 80% | Accepted |
+| 854 | Public apps charge shops once in rupees: the owner approves a charge in the admin and pays it as an invoice of Hatti's, a test on development stores, and the app's partner earns 80% | Accepted |
 
 ---
 
@@ -28036,3 +28037,42 @@
   * **Themes paid from message credit:** rejected. Credit is for messages, and a theme's price
     is often more than a shop keeps there.
   * **Shopify's 85% share:** a possible choice, for the owner (OWN-47).
+
+## ADR-854 · Public apps charge shops once in rupees: the owner approves a charge in the admin and pays it as an invoice of Hatti's, a test on development stores, and the app's partner earns 80%
+
+* **Context:**
+  * DEV-05 asks for a billing API in PKR. Public apps install through OAuth (ADR-851), but had
+    no way to be paid by the shops using them, so partners would bill merchants by hand.
+* **Decision:**
+  * **The charge:** an installed public app asks `appPurchaseOneTimeCreate(name, price, returnUrl)`,
+    as Shopify's apps do.
+    * The price is Rs 50 to Rs 500,000 in whole rupees, in PKR.
+    * The return URL is an https address the owner goes back to.
+    * The answer carries `confirmationUrl`, the admin's page for the owner to approve the charge.
+    * Custom apps don't charge; an app sees its own charges alone (`appPurchaseOneTime`,
+      `appPurchasesOneTime`).
+  * **Approving:** the shop's owner alone, having signed in lately, approves or declines.
+    * Approved, the charge is an invoice of Hatti's, of a new kind, `APP`, with sales tax as every
+      invoice (ADR-512). The admin sends the owner on to pay it through Hatti's gateway; a
+      transfer pays it too.
+    * One app charge's invoice waits at a time, beside one for the plan, one for credit and one
+      for a theme.
+    * Paid, the charge is `PAID`, for the app to give what it charged for.
+  * **Development stores:** a charge there is a test, paid once approved with no money moving and
+    no invoice, for partners to try their billing.
+  * **The partner's share:** 80% of what the shop paid, less the sales tax, recorded as billing
+    says it is paid, through identity's `record_app_sale`, and paid out with partners' other
+    earnings (ADR-505).
+* **Consequences:**
+  * A partner is paid for their app in rupees by any Hatti shop, through Hatti, with no bank
+    details passed between them.
+  * The share, refunds, and the terms for apps' charges are the owner's to confirm (OWN-48).
+  * Not yet:
+    * recurring charges, Shopify's appSubscriptionCreate, which renew each period with the plan;
+    * usage charges;
+    * a webhook to the app when a charge is paid. The app asks `appPurchaseOneTime` when the
+      owner comes back to its return URL.
+* **Alternatives:**
+  * **Apps taking payment through their own gateways:** rejected. Merchants would give card or
+    wallet details to every app, and Hatti couldn't stand behind what they bought.
+  * **Charging from message credit:** rejected, as for themes (ADR-853).

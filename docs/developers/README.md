@@ -111,6 +111,29 @@ const { accessToken, scopes } = await accessTokenFor({
 * Until Hatti reviews and lists an app, it installs on its partner's own development stores
   alone.
 
+## Charging shops
+
+An installed public app charges the shop once, in rupees, as Shopify's apps do (ADR-854):
+
+```graphql
+mutation {
+  appPurchaseOneTimeCreate(
+    name: "Photo reviews, for good"
+    price: { amount: "2500", currencyCode: PKR }
+    returnUrl: "https://your-app.example/charged"
+  ) {
+    appPurchaseOneTime { id status test }
+    confirmationUrl
+    userErrors { field message }
+  }
+}
+```
+
+Send the shop's owner to `confirmationUrl`. They approve it and pay it as an invoice of Hatti's;
+then they come back to `returnUrl`, and `appPurchaseOneTime(id)` says `PAID`. On a development
+store the charge is a test, paid once approved with no money moving. Hatti pays you 80% of what
+the shop paid, less the sales tax.
+
 ## Inside the admin, and on the storefront
 
 * **Embedded apps:** a merchant opens an installed app from Settings › Apps, inside the admin.
@@ -161,5 +184,5 @@ earnings. A theme's own files are JSON over one of Hatti's themes, so `hatti the
 
 * PHP and Python clients.
 * Publishing the client and the command line to npm (OWN-45).
-* The billing API, by which a public app charges shops in PKR, and an app store page.
+* Recurring and usage charges for apps, and an app store page.
 * Urdu video tutorials.
