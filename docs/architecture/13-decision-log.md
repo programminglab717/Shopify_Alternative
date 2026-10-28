@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-847 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-848 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -855,6 +855,7 @@
 | 845 | Staff have a customer's receipt for their transfer read by the AI, the receipt alone sent, and see what it says beside what Hatti makes of it; they still mark the order paid themselves | Accepted |
 | 846 | A cash-on-delivery parcel out with the shop's own rider may be paid online at the door: its page offers what the rider would collect, the rider shows it as a QR code, and paid, the rider collects nothing; couriers' parcels wait on the couriers | Accepted |
 | 847 | Each shop answers AI shopping agents: a UCP profile at /.well-known/ucp and a store MCP endpoint whose tools search and read its products and make carts its own checkout takes, so an agent's order is placed and confirmed as any shopper's | Accepted |
+| 848 | The Storefront API: GraphQL at each shop's own address, as Shopify's at /api/<version>/graphql.json, answered with the shop's public or private tokens, its catalog read from the storefront's documents and its carts changed through the core | Accepted |
 
 ---
 
@@ -27719,3 +27720,62 @@
     transports.
   * **Carts kept in the core:** rejected. An agent's cart is its own until a shopper takes it,
     and the shop's checkout makes the real one.
+
+## ADR-848 · The Storefront API: GraphQL at each shop's own address, as Shopify's at /api/<version>/graphql.json, answered with the shop's public or private tokens, its catalog read from the storefront's documents and its carts changed through the core
+
+* **Context:**
+  * DEV-02 asks for the Storefront API with public and private tokens (08 §1), for headless
+    storefronts and shopping apps.
+  * Until now only the platform's own storefront changed carts, through the core's routes
+    under `/storefront/` and its own key (ADR-042). "The GraphQL Storefront API with public
+    tokens comes with headless storefronts."
+  * Shopify's clients ask `https://<shop>/api/<version>/graphql.json` with a token in
+    `X-Shopify-Storefront-Access-Token`, or a private one in `Shopify-Storefront-Private-Token`.
+* **Decision:**
+  * **Tokens:** a shop makes Storefront API tokens on Settings › Apps, or with the Admin API's
+    `storefrontAccessTokenCreate`, `storefrontAccessTokens` and `storefrontAccessTokenDelete`
+    (`read_settings`, `write_settings`). Migration 0362 keeps them.
+    * A token is public, sent from shoppers' browsers, or private, kept on a server.
+    * Public tokens start `hsf_` and private ones `hsfp_`, so they are told apart at a glance.
+    * A token is shown once and kept as its SHA-256 digest with its last four characters. A
+      shop has at most 100.
+  * **Checking a token:** the shop's storefront document carries its tokens' digests and kinds.
+    A change of them republishes it. The storefront checks each request's token against them,
+    with no call to the core, so a deleted token stops working a moment later.
+  * **The API is the storefront's,** at the shop's own address: POST
+    `/api/<version>/graphql.json`, any `YYYY-MM` version or `unstable`. It is a subset of
+    Shopify's schema, its names and shapes kept:
+    * `shop`;
+    * `product` and `products`, with `query` searching through the core;
+    * `collection` and `collections`;
+    * `cart`;
+    * `cartCreate`, `cartLinesAdd`, `cartLinesUpdate`, `cartLinesRemove`, `cartNoteUpdate` and
+      `cartDiscountCodesUpdate`.
+    Prices are MoneyV2 decimals in rupees. IDs are `gid://hatti/…`. The catalog is read from
+    the documents the shop's pages read (ADR-036).
+  * **Carts:** carts are the core's (ADR-042). A cart's ID carries its token, as the shopper's
+    cookie does. Its `checkoutUrl` is the shop's `/cart/c/<token>`, which keeps it as the
+    shopper's cart and starts the shop's own checkout (ADR-139). Checkout stays on Hatti, and
+    a cash-on-delivery order is confirmed as any order is.
+  * **Limits:**
+    * a query of at most 20,000 characters and 12 fields deep;
+    * lists of at most 250, with opaque cursors;
+    * 100 cart lines a change;
+    * 300 calls a minute from an address with a public token, and 6,000 with a private one;
+    * CORS open to any origin, for browsers.
+* **Consequences:**
+  * A headless storefront or app built for Shopify's Storefront API asks this one in the same
+    words, for what it covers.
+  * Not yet:
+    * customers' accounts (the Customer Account API, 08 §1);
+    * `@inContext` for Urdu and other languages;
+    * metafields;
+    * menus, pages and articles;
+    * cost-based limits and persisted queries (08 §1.2);
+    * a Next.js starter kit (04 §7).
+* **Alternatives:**
+  * **A second schema in the core's NestJS GraphQL:** rejected. Every call would reach the
+    core, and the core would need its own copies of the catalog the storefront already serves
+    from its documents.
+  * **Tokens checked by the core on each call:** rejected, as a round trip a call, where
+    digests in the document cost none.

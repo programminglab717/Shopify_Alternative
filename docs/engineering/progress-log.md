@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### The Storefront API
+
+* **Developers:** each shop answers Shopify's Storefront API at `/api/<version>/graphql.json`,
+  with tokens it makes on Settings › Apps, public or private. It covers the shop, its products,
+  search and collections, and carts whose `checkoutUrl` is the shop's own checkout (DEV-02,
+  [ADR-848](../architecture/13-decision-log.md#adr-848--the-storefront-api-graphql-at-each-shops-own-address-as-shopifys-at-apiversiongraphqljson-answered-with-the-shops-public-or-private-tokens-its-catalog-read-from-the-storefronts-documents-and-its-carts-changed-through-the-core)).
+* 4491 tests (13 new: 10, and 3 checks of the admin's new operations).
+
 ### d716755 · Shops for AI shopping agents
 
 * **Online store:** each shop publishes a UCP profile at `/.well-known/ucp`, and a store MCP
