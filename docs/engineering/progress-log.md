@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Carts from the WhatsApp catalogue
+### 9c2e6ee · Carts from the WhatsApp catalogue
 
 * **Inbox:** a customer who sends a cart from the shop's WhatsApp catalogue, fed by its catalog
   feed, is answered at once with a link to the shop's checkout holding those items, their number
