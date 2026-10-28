@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Partners certified
+### 20f1e59 · Partners certified
 
 * **Partners:** the partner page has Hatti's course, six lessons and ten questions in English and
   Urdu. Eight right certify a partner for a year, and shops see certified experts marked so
