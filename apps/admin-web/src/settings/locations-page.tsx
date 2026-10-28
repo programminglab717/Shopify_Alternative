@@ -44,6 +44,10 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   province: 'locations.province',
   zip: 'locations.zip',
   phone: 'locations.phone',
+  servesCities: 'locations.servesCities',
+  servesProvinces: 'locations.servesProvinces',
+  cities: 'locations.servesCities',
+  provinces: 'locations.servesProvinces',
 };
 
 interface Draft {
@@ -55,7 +59,29 @@ interface Draft {
   zip: string;
   phone: string;
   fulfils: boolean;
+  /** The cities it ships to first, as typed: "Karachi, Hyderabad" (ADR-839). */
+  servesCities: string;
+  /** The provinces it ships to first, as typed: "Sindh, Balochistan". */
+  servesProvinces: string;
 }
+
+/** Provinces and territories by the codes the core keeps, as the admin names them. */
+const PROVINCE_NAMES: Record<string, string> = {
+  PB: 'Punjab',
+  SD: 'Sindh',
+  KP: 'Khyber Pakhtunkhwa',
+  BA: 'Balochistan',
+  IS: 'Islamabad',
+  GB: 'Gilgit-Baltistan',
+  JK: 'Azad Kashmir',
+};
+
+/** A list as typed, split at commas, blanks left out. */
+const listOf = (typed: string) =>
+  typed
+    .split(/[,،]/)
+    .map((each) => each.trim())
+    .filter(Boolean);
 
 const EMPTY: Draft = {
   name: '',
@@ -66,6 +92,8 @@ const EMPTY: Draft = {
   zip: '',
   phone: '',
   fulfils: true,
+  servesCities: '',
+  servesProvinces: '',
 };
 
 function draftOf(location: ShopLocation): Draft {
@@ -79,15 +107,25 @@ function draftOf(location: ShopLocation): Draft {
     zip: address.zip ?? '',
     phone: address.phone ? formatPhone(address.phone) : '',
     fulfils: location.fulfillsOnlineOrders,
+    servesCities: location.serves.cities.join(', '),
+    servesProvinces: location.serves.provinceCodes
+      .map((code) => PROVINCE_NAMES[code] ?? code)
+      .join(', '),
   };
 }
 
-/** The location as the core takes it: blank parts of its address as none. */
-function inputOf(draft: Draft) {
+/**
+ * The location as the core takes it: blank parts of its address as none; editing one, where it
+ * ships to first too (ADR-839).
+ */
+function inputOf(draft: Draft, editing: boolean) {
   const part = (text: string) => text.trim() || null;
   return {
     name: draft.name.trim(),
     fulfillsOnlineOrders: draft.fulfils,
+    ...(editing && {
+      serves: { cities: listOf(draft.servesCities), provinces: listOf(draft.servesProvinces) },
+    }),
     address: {
       address1: part(draft.address1),
       address2: part(draft.address2),
@@ -128,7 +166,7 @@ function LocationForm({
     event.preventDefault();
     setProblems([]);
     try {
-      const errors = await submit(inputOf(draft));
+      const errors = await submit(inputOf(draft, Boolean(onCancel)));
       if (errors && errors.length > 0) {
         setProblems(errors.map((error) => settingProblem(error, t, LABELS, () => null)));
       } else if (!onCancel) setDraft(EMPTY);
@@ -162,6 +200,17 @@ function LocationForm({
         checked={draft.fulfils}
         onChange={(fulfils) => set({ fulfils })}
       />
+      {/* Where it ships to first (SHP-09, ADR-839), for a location already added. */}
+      {onCancel && (
+        <>
+          <TextField
+            {...field('servesCities', { hint: t('locations.servesHint') })}
+            placeholder="Karachi, Hyderabad"
+            dir="auto"
+          />
+          <TextField {...field('servesProvinces')} placeholder="Sindh, Balochistan" dir="auto" />
+        </>
+      )}
       <Problems problems={problems} />
       <div className="flex flex-wrap gap-2">
         <Button
@@ -468,6 +517,16 @@ function LocationRow({ location }: { location: ShopLocation }) {
       <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
         {t(location.fulfillsOnlineOrders ? 'locations.fulfilsYes' : 'locations.fulfilsNo')}
       </span>
+      {(location.serves.cities.length > 0 || location.serves.provinceCodes.length > 0) && (
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]" dir="auto">
+          {t('locations.servesFirst', {
+            places: [
+              ...location.serves.cities,
+              ...location.serves.provinceCodes.map((code) => PROVINCE_NAMES[code] ?? code),
+            ].join(', '),
+          })}
+        </span>
+      )}
       {location.isActive && !editing && <LocalPickup location={location} />}
       {location.isActive && !editing && <StorefrontListing location={location} />}
       {editing ? (

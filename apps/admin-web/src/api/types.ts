@@ -4137,6 +4137,8 @@ export interface ShopLocation {
   /** The online store's store locator lists it (ADR-828), with its hours as customers read them. */
   storefrontListed: boolean;
   openingHours: string | null;
+  /** Where it ships to before other locations (ADR-839). */
+  serves: { cities: string[]; provinceCodes: string[] };
   address: {
     address1: string | null;
     address2: string | null;

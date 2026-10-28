@@ -60,6 +60,27 @@ export class LocalPickupSettingsInput {
   instructions?: string | null;
 }
 
+@ObjectType({ description: 'Where a location ships to before others (ADR-839).' })
+export class LocationServes {
+  @Field(() => [String], { description: 'Cities, known ones spelled the standard way.' })
+  cities!: string[];
+
+  @Field(() => [String], { description: 'Provinces and territories by code, e.g. "PB".' })
+  provinceCodes!: string[];
+}
+
+@InputType({ description: 'Each list left out stays as it is; an empty one names none.' })
+export class LocationServesInput {
+  @Field(() => [String], { nullable: true, description: 'At most 100 cities.' })
+  cities?: string[] | null;
+
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Provinces or territories: codes ("PB"), names ("Punjab") or aliases ("KPK").',
+  })
+  provinces?: string[] | null;
+}
+
 @ObjectType({ description: 'A place where stock is kept, such as a warehouse or a shop.' })
 export class Location {
   @Field(() => ID)
@@ -99,6 +120,13 @@ export class Location {
     description: 'Its opening hours as customers read them, "Mon–Sat 10am–9pm".',
   })
   openingHours!: string | null;
+
+  @Field(() => LocationServes, {
+    description:
+      'Where it ships to before other locations (SHP-09, ADR-839): an order goes out from one ' +
+      "that has all of it and serves its customer's city, else their province, first.",
+  })
+  serves!: LocationServes;
 
   @Field(() => GraphQLISODateTime, { nullable: true })
   deactivatedAt!: Date | null;
@@ -214,6 +242,12 @@ export class LocationEditInput {
     description: 'Up to 300 characters, "Mon–Sat 10am–9pm"; null or "" clears them.',
   })
   openingHours?: string | null;
+
+  @Field(() => LocationServesInput, {
+    nullable: true,
+    description: 'Where it ships to before other locations (ADR-839).',
+  })
+  serves?: LocationServesInput | null;
 }
 
 @ObjectType()

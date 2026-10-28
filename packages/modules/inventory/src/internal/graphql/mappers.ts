@@ -24,6 +24,7 @@ import {
   LocationConnection,
   LocationEdge,
   LocationLocalPickupSettings,
+  LocationServes,
 } from './location.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
@@ -69,6 +70,10 @@ export function toLocation(record: LocationRecord): Location {
       }),
     storefrontListed: record.storefrontListed,
     openingHours: record.openingHours,
+    serves: Object.assign(new LocationServes(), {
+      cities: record.serves.cities,
+      provinceCodes: record.serves.provinces,
+    }),
     deactivatedAt: record.deactivatedAt,
     version: record.version,
     createdAt: record.createdAt,

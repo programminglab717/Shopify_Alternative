@@ -56,6 +56,12 @@ export interface LocationEditInput {
   storefrontListed?: boolean | null;
   /** Its opening hours as customers read them, "Mon–Sat 10am–9pm"; null or blank clears them. */
   openingHours?: string | null;
+  /**
+   * Where it ships to before other locations (SHP-09, ADR-839): cities, known ones spelled the
+   * standard way, and provinces as codes, names or aliases; empty lists for wherever. Each list
+   * left out stays.
+   */
+  serves?: { cities?: readonly string[] | null; provinces?: readonly string[] | null } | null;
 }
 
 export interface ListLocationsOptions {
@@ -119,6 +125,52 @@ function checkAddress(
         'must be a Pakistani mobile number, like 0300 1234567',
       );
     }
+  }
+  return columns;
+}
+
+/**
+ * The cities and provinces a location ships to, as given (ADR-839): each list checked, known
+ * cities spelled the standard way, each once; the columns they set, those left out left out.
+ */
+function checkServes(
+  check: InputChecker,
+  field: string[],
+  input: LocationEditInput['serves'],
+): Pick<Partial<LocationRow>, 'servesCities' | 'servesProvinces'> {
+  const columns: Pick<Partial<LocationRow>, 'servesCities' | 'servesProvinces'> = {};
+  if (!input) return columns;
+  if (input.cities !== undefined && input.cities !== null) {
+    const cities = new Map<string, string>();
+    input.cities.forEach((typed, index) => {
+      const city = check.text([...field, 'cities', String(index)], typed, {
+        required: true,
+        max: LIMITS.addressLine,
+      });
+      if (city) {
+        const name = findCity(city)?.name ?? city;
+        cities.set(name.toLowerCase(), name);
+      }
+    });
+    if (cities.size > LIMITS.servesCities) {
+      check.add([...field, 'cities'], 'TOO_MANY', `can name at most ${LIMITS.servesCities} cities`);
+    }
+    columns.servesCities = [...cities.values()];
+  }
+  if (input.provinces !== undefined && input.provinces !== null) {
+    const provinces = new Set<string>();
+    input.provinces.forEach((typed, index) => {
+      const code = findProvince(typed.trim());
+      if (code) provinces.add(code);
+      else {
+        check.add(
+          [...field, 'provinces', String(index)],
+          'INVALID',
+          'must be a province or territory of Pakistan, like Punjab or KPK',
+        );
+      }
+    });
+    columns.servesProvinces = [...provinces];
   }
   return columns;
 }
@@ -194,15 +246,19 @@ export class LocationService {
 
   /**
    * Where an order's goods ship from when no one says (INV-10, ADR-355): the first active location
-   * that fulfils online orders and has every tracked one of `lines` for sale there, the primary
-   * first, then by name; the primary where none has them all. Read without locks: committing the
-   * stock checks it again.
+   * that fulfils online orders and has every tracked one of `lines` for sale there; of those, one
+   * that ships to the city the order goes `to`, then to its province (SHP-09, ADR-839), then the
+   * primary, then by name; the primary where none has them all. Read without locks: committing
+   * the stock checks it again.
    */
   async forOrderIn(
     tx: Tx,
     shopId: string,
     lines: readonly { variantId: string; quantity: number }[],
+    to: { city: string | null; provinceCode: string | null } | null = null,
   ): Promise<LocationRecord> {
+    const city = to?.city ? (findCity(to.city)?.name ?? to.city.trim()).toLowerCase() : null;
+    const province = to?.provinceCode ?? (to?.city ? (findCity(to.city)?.province ?? null) : null);
     const wanted = new Map<string, number>();
     for (const line of lines) {
       wanted.set(line.variantId, (wanted.get(line.variantId) ?? 0) + line.quantity);
@@ -224,7 +280,10 @@ export class LocationService {
                    ON l.shop_id = loc.shop_id AND l.location_id = loc.id
                   AND l.variant_id = want.variant_id
                 WHERE p.product_id IS NULL AND coalesce(l.available, 0) < want.quantity)
-       ORDER BY loc.is_primary DESC, lower(loc.name), loc.id
+       ORDER BY coalesce(${city}::text = ANY (SELECT lower(c) FROM unnest(loc.serves_cities) c),
+                         false) DESC,
+                coalesce(${province}::text = ANY (loc.serves_provinces), false) DESC,
+                loc.is_primary DESC, lower(loc.name), loc.id
        LIMIT 1`);
     const found = rows[0] && (await this.locationsOf(tx, shopId, [rows[0].id])).get(rows[0].id);
     return found ?? this.primaryOf(tx, shopId);
@@ -339,6 +398,7 @@ export class LocationService {
         : (check.text(['input', 'openingHours'], input.openingHours, {
             max: LIMITS.openingHours,
           }) ?? null);
+    const serves = checkServes(check, ['input', 'serves'], input.serves);
     if (!check.ok) return { ok: false, errors: check.errors };
 
     try {
@@ -354,6 +414,7 @@ export class LocationService {
           next.storefrontListed = input.storefrontListed;
         }
         if (openingHours !== undefined) next.openingHours = openingHours;
+        Object.assign(next, serves);
         const listing = next.storefrontListed === true && !row.storefrontListed;
         if (listing && !row.isActive) {
           return failOne(
@@ -373,8 +434,10 @@ export class LocationService {
             refusal,
           );
         }
-        const changed = (Object.keys(next) as (keyof LocationRow)[]).filter(
-          (key) => next[key] !== row[key],
+        const changed = (Object.keys(next) as (keyof LocationRow)[]).filter((key) =>
+          Array.isArray(next[key])
+            ? JSON.stringify(next[key]) !== JSON.stringify(row[key])
+            : next[key] !== row[key],
         );
         if (changed.length === 0) return { ok: true, value: toLocationRecord(row) };
         if (

@@ -51,6 +51,9 @@ export const locations = inventorySchema.table(
     /** Whether the online store's store locator lists it (OS-18, ADR-828), and its hours. */
     storefrontListed: boolean('storefront_listed').notNull().default(false),
     openingHours: text('opening_hours'),
+    /** The cities and provinces it ships to (SHP-09, ADR-839); none for wherever. */
+    servesCities: text('serves_cities').array().notNull().default([]),
+    servesProvinces: text('serves_provinces').array().notNull().default([]),
     deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     ...timestamps,

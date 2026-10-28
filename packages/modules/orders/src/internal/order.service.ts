@@ -571,6 +571,8 @@ export class OrderService {
       pickupAt?.ok ? pickupAt.value : order.locationId,
       [...order.field, 'locationId'],
       placing.lines,
+      // Routed by where it goes (ADR-839), where it goes anywhere.
+      deliveryMethod === 'shipping' ? address : null,
     );
     const errors: FieldError[] = [];
     if (!location.ok) errors.push(location.error);
@@ -3184,7 +3186,8 @@ export class OrderService {
 
   /**
    * The location named, which must be active; or, with none named, the first fulfilling online
-   * orders that has all of `lines` for sale, the primary otherwise (INV-10, ADR-355).
+   * orders that has all of `lines` for sale, one shipping to where it goes `to` first (ADR-839),
+   * the primary otherwise (INV-10, ADR-355).
    */
   async #location(
     tx: Tx,
@@ -3192,9 +3195,10 @@ export class OrderService {
     locationId: string | null,
     field: string[],
     lines: readonly { variantId: string; quantity: number }[],
+    to: { city: string; provinceCode: string | null } | null = null,
   ): Promise<{ ok: true; value: LocationRecord } | { ok: false; error: FieldError }> {
     if (!locationId) {
-      return { ok: true, value: await this.locations.forOrderIn(tx, shopId, lines) };
+      return { ok: true, value: await this.locations.forOrderIn(tx, shopId, lines, to) };
     }
     const location = (await this.locations.locationsOf(tx, shopId, [locationId])).get(locationId);
     if (!location) {

@@ -7519,6 +7519,11 @@ type Location {
   openingHours: String
 
   """
+  Where it ships to before other locations (SHP-09, ADR-839): an order goes out from one that has all of it and serves its customer's city, else their province, first.
+  """
+  serves: LocationServes!
+
+  """
   Whether the online store's store locator lists it, while it is in use (OS-18, ADR-828).
   """
   storefrontListed: Boolean!
@@ -7618,6 +7623,9 @@ input LocationEditInput {
   """Up to 300 characters, "Mon–Sat 10am–9pm"; null or "" clears them."""
   openingHours: String
 
+  """Where it ships to before other locations (ADR-839)."""
+  serves: LocationServesInput
+
   """
   Lists it on the online store's store locator (ADR-828). It must be in use, with its street address and city.
   """
@@ -7645,6 +7653,26 @@ type LocationLocalPickupSettings {
 type LocationMakePrimaryPayload {
   location: Location
   userErrors: [UserError!]!
+}
+
+"""Where a location ships to before others (ADR-839)."""
+type LocationServes {
+  """Cities, known ones spelled the standard way."""
+  cities: [String!]!
+
+  """Provinces and territories by code, e.g. "PB"."""
+  provinceCodes: [String!]!
+}
+
+"""Each list left out stays as it is; an empty one names none."""
+input LocationServesInput {
+  """At most 100 cities."""
+  cities: [String!]
+
+  """
+  Provinces or territories: codes ("PB"), names ("Punjab") or aliases ("KPK").
+  """
+  provinces: [String!]
 }
 
 """

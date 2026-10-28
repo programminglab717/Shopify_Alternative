@@ -26,6 +26,10 @@ export function toLocationRecord(row: LocationRow): LocationRecord {
     localPickup: row.pickupEnabled ? { instructions: row.pickupInstructions } : null,
     storefrontListed: row.storefrontListed,
     openingHours: row.openingHours,
+    serves: {
+      cities: row.servesCities,
+      provinces: row.servesProvinces as PkProvinceCode[],
+    },
     deactivatedAt: row.deactivatedAt,
     version: row.version,
     createdAt: row.createdAt,
@@ -50,6 +54,8 @@ export interface LocationJson {
   pickup_instructions: string | null;
   storefront_listed: boolean;
   opening_hours: string | null;
+  serves_cities: string[];
+  serves_provinces: string[];
   deactivated_at: string | null;
   version: number;
   created_at: string;
@@ -74,6 +80,10 @@ export function locationFromJson(json: LocationJson): LocationRecord {
     localPickup: json.pickup_enabled ? { instructions: json.pickup_instructions } : null,
     storefrontListed: json.storefront_listed,
     openingHours: json.opening_hours,
+    serves: {
+      cities: json.serves_cities,
+      provinces: json.serves_provinces as PkProvinceCode[],
+    },
     deactivatedAt: json.deactivated_at === null ? null : new Date(json.deactivated_at),
     version: json.version,
     createdAt: new Date(json.created_at),

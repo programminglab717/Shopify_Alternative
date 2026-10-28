@@ -32,6 +32,11 @@ export interface LocationRecord {
   storefrontListed: boolean;
   /** Its opening hours as the merchant writes them, "Mon–Sat 10am–9pm"; null for none given. */
   openingHours: string | null;
+  /**
+   * Where it ships to before other locations (SHP-09, ADR-839): cities as known ones are spelled,
+   * and provinces' codes; both empty for wherever.
+   */
+  serves: { cities: string[]; provinces: PkProvinceCode[] };
   deactivatedAt: Date | null;
   version: number;
   createdAt: Date;

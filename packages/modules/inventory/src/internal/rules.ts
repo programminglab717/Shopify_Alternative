@@ -11,6 +11,8 @@ export const LIMITS = {
   pickupInstructions: 200,
   /** A location's opening hours, as its store locator shows them (ADR-828). */
   openingHours: 300,
+  /** Cities a location names as those it ships to (ADR-839). */
+  servesCities: 100,
   uri: 2_048,
 } as const;
 

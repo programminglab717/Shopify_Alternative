@@ -3181,6 +3181,11 @@ const en = {
   'locations.phoneHint': 'The number couriers call when they collect parcels.',
   'locations.fulfils': 'Fulfils online orders',
   'locations.fulfilsHint': 'Its stock is sold online and its parcels booked from here.',
+  'locations.servesCities': 'Cities it ships to first',
+  'locations.servesProvinces': 'Provinces it ships to first',
+  'locations.servesHint':
+    'Separated by commas. Orders to these places go out from here when it has all of them; leave both empty for anywhere.',
+  'locations.servesFirst': 'Ships first to {places}',
   'locations.edit': 'Edit',
   'locations.editOf': 'Edit {name}',
   'locations.save': 'Save location',
@@ -9374,6 +9379,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'locations.phoneHint': 'جس نمبر پر کوریئر پارسل لینے آتے وقت کال کرتے ہیں۔',
   'locations.fulfils': 'آن لائن آرڈرز پورے کرتا ہے',
   'locations.fulfilsHint': 'اس کا اسٹاک آن لائن بکتا ہے اور اس کے پارسل یہیں سے بک ہوتے ہیں۔',
+  'locations.servesCities': 'شہر جہاں یہ پہلے بھیجتا ہے',
+  'locations.servesProvinces': 'صوبے جہاں یہ پہلے بھیجتا ہے',
+  'locations.servesHint':
+    'کوما سے الگ کریں۔ ان جگہوں کے آرڈر یہیں سے جاتے ہیں جب اس کے پاس سب کچھ ہو؛ ہر جگہ کے لیے دونوں خالی چھوڑیں۔',
+  'locations.servesFirst': 'پہلے یہاں بھیجتا ہے: {places}',
   'locations.edit': 'ترمیم',
   'locations.editOf': '{name} میں ترمیم',
   'locations.save': 'مقام محفوظ کریں',

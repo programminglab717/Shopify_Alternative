@@ -76,6 +76,47 @@ describe.skipIf(!server)('Where an order ships from (INV-10)', () => {
     expect(named.locationId).toBe(gulberg.id);
   });
 
+  it("routes an order to a location that ships to its customer's city, else province, that has all of it (SHP-09, ADR-839)", async () => {
+    const primary = await f.primary(f.a);
+    await f.stock(f.a, kurta, 5);
+    const karachi = await place('Karachi store', [[kurta, 5]]);
+    const sindh = await place('Hyderabad store', [[kurta, 5]]);
+    const lahore = await place('Lahore store', [[kurta, 5]]);
+    unwrap(await f.locations.edit(f.a, karachi.id, { serves: { cities: ['khi', 'Karachi'] } }));
+    unwrap(await f.locations.edit(f.a, sindh.id, { serves: { provinces: ['Sindh'] } }));
+    unwrap(
+      await f.locations.edit(f.a, lahore.id, {
+        serves: { cities: ['lhr', 'Faisalabad'], provinces: ['KPK'] },
+      }),
+    );
+    expect((await f.locations.get(f.a, lahore.id))!.serves).toEqual({
+      cities: ['Lahore', 'Faisalabad'],
+      provinces: ['KP'],
+    });
+
+    const to = async (city: string) =>
+      (await f.order(f.a, [kurta], { shippingAddress: { ...ADDRESS, city } })).locationId;
+    // The city first, its province next, then the primary for anywhere else.
+    expect(await to('Karachi')).toBe(karachi.id);
+    expect(await to('lahore')).toBe(lahore.id);
+    expect(await to('Peshawar')).toBe(lahore.id);
+    expect(await to('Sukkur')).toBe(sindh.id);
+    expect(await to('Quetta')).toBe(primary.id);
+    // A location that serves the city but hasn't all of it is passed over.
+    await f.inventory.setQuantities(f.a, {
+      name: 'on_hand',
+      reason: 'correction',
+      quantities: [{ inventoryItemId: kurta, locationId: karachi.id, quantity: 0 }],
+    });
+    expect(await to('Karachi')).toBe(sindh.id);
+    // Named, it ships from there whatever the rules say.
+    expect((await f.order(f.a, [kurta], { locationId: lahore.id })).locationId).toBe(lahore.id);
+    // What it names is checked.
+    expect(
+      errorsOf(await f.locations.edit(f.a, sindh.id, { serves: { provinces: ['Atlantis'] } })),
+    ).toEqual([['input.serves.provinces.0', 'INVALID']]);
+  });
+
   it('moves an order before it is packed, its stock committed where it goes and let go where it was', async () => {
     const primary = await f.primary(f.a);
     await f.stock(f.a, kurta, 5);

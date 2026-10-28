@@ -212,9 +212,13 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       `mutation ($id: ID!) {
          locationEdit(id: $id, input: {
            name: "Tariq Road store", address: { phone: null },
-           storefrontListed: true, openingHours: " Daily 11am–10pm "
+           storefrontListed: true, openingHours: " Daily 11am–10pm ",
+           serves: { cities: ["khi"], provinces: ["Sindh"] }
          }) {
-           location { name version address { phone } storefrontListed openingHours }
+           location {
+             name version address { phone } storefrontListed openingHours
+             serves { cities provinceCodes }
+           }
            userErrors { code }
          }
        }`,
@@ -228,6 +232,8 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
         address: { phone: null },
         storefrontListed: true,
         openingHours: 'Daily 11am–10pm',
+        // Where it ships to first (ADR-839).
+        serves: { cities: ['Karachi'], provinceCodes: ['SD'] },
       },
       userErrors: [],
     });

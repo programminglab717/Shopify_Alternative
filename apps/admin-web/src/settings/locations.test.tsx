@@ -17,6 +17,7 @@ function location(id: string, name: string, extra: object = {}) {
     localPickupSettings: null as { instructions: string | null } | null,
     storefrontListed: false,
     openingHours: null as string | null,
+    serves: { cities: [] as string[], provinceCodes: [] as string[] },
     address: {
       address1: null,
       address2: null,
@@ -79,6 +80,7 @@ function core(role: StaffRole) {
           fulfillsOnlineOrders: boolean;
           storefrontListed?: boolean;
           openingHours?: string | null;
+          serves?: { cities: string[]; provinces: string[] };
         };
         if (input.storefrontListed !== undefined) {
           if (variables.id === 'loc_2' && input.storefrontListed) {
@@ -113,7 +115,19 @@ function core(role: StaffRole) {
         }
         locations = locations.map((each) =>
           each.id === variables.id
-            ? { ...each, name: input.name, fulfillsOnlineOrders: input.fulfillsOnlineOrders }
+            ? {
+                ...each,
+                name: input.name,
+                fulfillsOnlineOrders: input.fulfillsOnlineOrders,
+                ...(input.serves && {
+                  serves: {
+                    cities: input.serves.cities,
+                    provinceCodes: input.serves.provinces.map((each) =>
+                      each === 'Sindh' ? 'SD' : each,
+                    ),
+                  },
+                }),
+              }
             : each,
         );
         return ok(
@@ -261,6 +275,25 @@ describe("The shop's locations", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Karachi Clifton shop')).toBeNull());
     expect(sentOf(fake, 'LocationDelete')).toEqual([{ locationId: 'loc_2' }]);
+  });
+
+  it('says where a location ships to first, its orders routed there (SHP-09, ADR-839)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/locations');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Karachi shop' }));
+    const row = screen.getByRole('button', { name: 'Save location' }).closest('li')!;
+    typeIn(row as HTMLElement, 'Cities it ships to first', 'Karachi, Hyderabad ,');
+    typeIn(row as HTMLElement, 'Provinces it ships to first', 'Sindh');
+    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Save location' }));
+    expect(await screen.findByText('Ships first to Karachi, Hyderabad, Sindh')).toBeTruthy();
+    expect(sentOf(fake, 'LocationEdit')[0]).toMatchObject({
+      id: 'loc_2',
+      input: { serves: { cities: ['Karachi', 'Hyderabad'], provinces: ['Sindh'] } },
+    });
+    // Adding a location asks nothing of it: it ships anywhere until edited.
+    expect(screen.queryAllByLabelText('Cities it ships to first')).toHaveLength(0);
   });
 
   it('makes another active location the primary one', async () => {

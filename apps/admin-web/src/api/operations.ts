@@ -8293,6 +8293,10 @@ const SHOP_LOCATION = /* GraphQL */ `
     }
     storefrontListed
     openingHours
+    serves {
+      cities
+      provinceCodes
+    }
     address {
       address1
       address2
