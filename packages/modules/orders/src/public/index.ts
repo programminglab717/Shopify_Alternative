@@ -512,3 +512,17 @@ export {
   type PosSessionReport,
   type PosTenderMethod,
 } from '../internal/pos.service.js';
+export {
+  DARAZ_CLIENT,
+  DARAZ_LIMITS,
+  DarazService,
+  type DarazAccountRecord,
+  type DarazSyncResult,
+} from '../internal/daraz.service.js';
+export {
+  DarazClient,
+  DarazError,
+  darazSignature,
+  priceQuantityPayload,
+  type DarazSettings,
+} from '../internal/daraz-client.js';

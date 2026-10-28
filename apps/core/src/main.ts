@@ -8,6 +8,7 @@ import { MapTiles } from '@hatti/orders/public';
 import { LeakyBuckets, RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
 import {
+  darazClientOf,
   googleAdsOptions,
   loadApiConfig,
   passkeysOf,
@@ -85,6 +86,7 @@ const app = await createApi({
   storefrontDnsTarget: config.STOREFRONT_DNS_TARGET,
   hattiPass: config.HATTI_PASS,
   voiceOrders: Boolean(config.SPEECH_TO_TEXT_URL && config.AI_API_KEY && config.AI_MODEL),
+  daraz: darazClientOf(config),
   mapTiles:
     config.MAP_TILES_URL && config.MAP_TILES_ATTRIBUTION
       ? new MapTiles(config.MAP_TILES_URL, config.MAP_TILES_ATTRIBUTION)

@@ -93,6 +93,7 @@ import { AppsPage } from './settings/apps-page';
 import { ExpansionStoresPage } from './settings/expansion-stores-page';
 import { SubscriptionsPage } from './settings/subscriptions-page';
 import { CurrenciesPage } from './settings/currencies-page';
+import { DarazCallbackPage, DarazPage } from './settings/daraz-page';
 import { WorkflowsPage } from './settings/workflows-page';
 import { SsoCallbackPage } from './auth/sso';
 import { AppFramePage } from './settings/app-frame-page';
@@ -848,6 +849,27 @@ const settingsSubscriptions = createRoute({
   component: SubscriptionsPage,
 });
 
+// The shop's Daraz account, and Daraz's code on the way back from connecting it (ADR-875).
+const darazSearch = (search: Record<string, unknown>): { code?: string; state?: string } => ({
+  ...(typeof search.code === 'string' && { code: search.code }),
+  ...(typeof search.state === 'string' && { state: search.state }),
+});
+
+const settingsDaraz = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/daraz',
+  validateSearch: darazSearch,
+  component: DarazPage,
+});
+
+const darazCallback = createRoute({
+  getParentRoute: () => root,
+  path: '/daraz/callback',
+  validateSearch: darazSearch,
+  beforeLoad: requireSignedIn,
+  component: DarazCallbackPage,
+});
+
 // The currencies the shop shows its prices in besides rupees (ADR-865).
 const settingsCurrencies = createRoute({
   getParentRoute: () => shop,
@@ -1079,6 +1101,7 @@ export const routeTree = root.addChildren([
   signUp,
   twoStep,
   shops,
+  darazCallback,
   askAccess,
   partners,
   invitation,
@@ -1194,6 +1217,7 @@ export const routeTree = root.addChildren([
     settingsWorkflows,
     settingsSubscriptions,
     settingsCurrencies,
+    settingsDaraz,
     settingsWhatsApp,
     marketing,
     marketingTemplates,

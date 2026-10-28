@@ -4951,6 +4951,57 @@ type CustomersImportPayload {
 }
 
 """
+The shop's Daraz Seller Center account (CH-06, ADR-875): its SKUs' stock, and prices where asked, kept in step with a location here, and its orders brought in as the shop’s own.
+"""
+type DarazAccount {
+  """The seller as Daraz names them."""
+  account: String!
+  connectedAt: DateTime!
+
+  """Why the last sync failed, if it did."""
+  lastError: String
+
+  """Daraz orders left out, the latest first."""
+  leftOut: [DarazLeftOut!]!
+
+  """Where its stock comes from and its orders ship from."""
+  locationId: ID!
+  sellerId: String
+
+  """Whether Daraz's prices follow the shop's; its stock always does."""
+  syncPrices: Boolean!
+  syncedAt: DateTime
+}
+
+type DarazAccountPayload {
+  account: DarazAccount
+  userErrors: [UserError!]!
+}
+
+type DarazConnection {
+  account: DarazAccount
+
+  """Whether shops may connect Daraz here."""
+  available: Boolean!
+}
+
+"""A Daraz order left out, and why."""
+type DarazLeftOut {
+  at: DateTime!
+  darazOrderId: String!
+  error: String!
+}
+
+type DarazSyncResult {
+  cancelled: Int!
+  imported: Int!
+  leftOut: Int!
+
+  """SKUs whose stock or price Daraz was given."""
+  pushed: Int!
+}
+
+"""
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
 scalar DateTime
@@ -10047,6 +10098,24 @@ type Mutation {
     """
     store: String!
   ): CustomersImportFromShopifyPayload!
+
+  """
+  The location the Daraz account sells from, and whether its prices follow the shop's.
+  """
+  darazAccountUpdate(locationId: ID, syncPrices: Boolean): DarazAccountPayload!
+
+  """
+  Connects the shop's Daraz account with the code Daraz gave on its way back, selling from the primary location unless told. Orders placed on Daraz from now on come in.
+  """
+  darazConnect(code: String!, locationId: ID, state: String!): DarazAccountPayload!
+
+  """
+  Forgets the shop's Daraz account; the orders it brought in stay the shop's.
+  """
+  darazDisconnect: Boolean!
+
+  """Syncs the Daraz account now, as the worker does every few minutes."""
+  darazSync: DarazSyncResult
 
   """
   Changes what the shop charges to deliver an order, for checkouts from now on; the storefront shows it a moment later. Those not given stay as they are.
@@ -16804,6 +16873,14 @@ type Query {
     """
     query: String
   ): CustomerConnection!
+
+  """Whether the shop's Daraz account is connected."""
+  daraz: DarazConnection!
+
+  """
+  Where to send the shop to authorise Hatti on Daraz, coming back to `redirectUri` with a code and the state to give darazConnect; null where Daraz isn’t set up here.
+  """
+  darazConnectUrl(redirectUri: String!): String
 
   """
   Parcels on their way whose last step is a failed delivery (COD-08, ADR-388), with what their customers answered on WhatsApp since: whether to deliver again or call them first.

@@ -19,6 +19,7 @@ import {
   Percent,
   Receipt,
   ShieldCheck,
+  ShoppingBag,
   Store,
   Truck,
   UserCog,
@@ -82,6 +83,7 @@ interface Section {
     | '/$shopId/settings/workflows'
     | '/$shopId/settings/subscriptions'
     | '/$shopId/settings/currencies'
+    | '/$shopId/settings/daraz'
     | '/$shopId/settings/expansion-stores'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/custom-data'
@@ -234,6 +236,13 @@ const SECTIONS: readonly Section[] = [
     label: 'settings.currencies',
     hint: 'settings.currenciesHint',
     icon: Coins,
+    gate: SETS_SETTINGS,
+  },
+  {
+    to: '/$shopId/settings/daraz',
+    label: 'settings.daraz',
+    hint: 'settings.darazHint',
+    icon: ShoppingBag,
     gate: SETS_SETTINGS,
   },
   {

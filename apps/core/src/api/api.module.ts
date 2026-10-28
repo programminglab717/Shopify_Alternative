@@ -51,7 +51,7 @@ import {
   type WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
-import { MapTiles, OrdersModule } from '@hatti/orders/public';
+import { DARAZ_CLIENT, DarazClient, MapTiles, OrdersModule } from '@hatti/orders/public';
 import { type PaymentGateways, PaymentsModule } from '@hatti/payments/public';
 import { PricingModule } from '@hatti/pricing/public';
 import { TaxModule } from '@hatti/tax/public';
@@ -196,6 +196,8 @@ export interface ApiModuleOptions {
   hattiPass?: boolean;
   /** Whether the worker hears voice notes (ADR-871): its speech-to-text server and AI set up. */
   voiceOrders?: boolean;
+  /** Daraz's Open Platform, with Hatti's app key (ADR-875); without it, no shop connects Daraz. */
+  daraz?: DarazClient | null;
   /** Where apps' functions run (ADR-868); a worker of the API's own unless given. */
   functionRunner?: FunctionRunner;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
@@ -266,6 +268,7 @@ class InfrastructureModule {
         { provide: ObjectStorage, useValue: options.storage },
         { provide: AiGateway, useValue: options.ai ?? null },
         { provide: MapTiles, useValue: options.mapTiles ?? null },
+        { provide: DARAZ_CLIENT, useValue: options.daraz ?? null },
         { provide: HattiPassSetting, useValue: new HattiPassSetting(options.hattiPass ?? false) },
         // The shop's apps' functions, run in a worker of their own (ADR-868).
         {
@@ -299,6 +302,7 @@ class InfrastructureModule {
         ObjectStorage,
         AiGateway,
         MapTiles,
+        DARAZ_CLIENT,
         DropTokens,
         DeliveryCodeSender,
         CopiedVariantStock,

@@ -17,6 +17,8 @@ import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { PosService } from './pos.service.js';
 import { PosCashierService } from './pos-cashiers.js';
+import { DarazService } from './daraz.service.js';
+import { DarazResolver } from './graphql/daraz.resolver.js';
 import { PosResolver } from './graphql/pos.resolver.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { PastOrderService } from './past-orders.js';
@@ -98,6 +100,8 @@ import { SubscriptionService } from './subscriptions.js';
   providers: [
     PosService,
     PosCashierService,
+    DarazService,
+    DarazResolver,
     PosResolver,
     OrderService,
     DraftOrderService,

@@ -22,7 +22,7 @@ import type {
   WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
 import type { GoogleAdsOptions, MetaGraphOptions, TikTokApiOptions } from '@hatti/marketing/public';
-import type { MapTiles } from '@hatti/orders/public';
+import type { DarazClient, MapTiles } from '@hatti/orders/public';
 import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -112,6 +112,8 @@ export async function startTestApi(
     mapTiles?: MapTiles;
     /** Shopify's stores, as owners move from them (ADR-749); the real ones unless given. */
     shopifyStores?: ShopifyStores;
+    /** Daraz's Open Platform (ADR-875); without it, no shop connects Daraz. */
+    daraz?: DarazClient;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -131,6 +133,7 @@ export async function startTestApi(
     redis: options.redis ?? null,
     ai: options.ai ?? null,
     mapTiles: options.mapTiles ?? null,
+    daraz: options.daraz ?? null,
     logger: createLogger({ name: 'api-test', level: 'silent' }),
     identity: {
       db: identityDatabase.app,

@@ -13315,3 +13315,87 @@ export const PosCustomerSalesQuery = /* GraphQL */ `
   }
   ${POS_SALE}
 `;
+
+/** The shop's Daraz account (CH-06, ADR-875). */
+const DARAZ_ACCOUNT = /* GraphQL */ `
+  fragment DarazAccountParts on DarazAccount {
+    account
+    sellerId
+    locationId
+    syncPrices
+    syncedAt
+    lastError
+    connectedAt
+    leftOut {
+      darazOrderId
+      error
+      at
+    }
+  }
+`;
+
+export const DarazQuery = /* GraphQL */ `
+  query Daraz {
+    daraz {
+      available
+      account {
+        ...DarazAccountParts
+      }
+    }
+  }
+  ${DARAZ_ACCOUNT}
+`;
+
+/** Where to send the shop to authorise Hatti on Daraz. */
+export const DarazConnectUrlQuery = /* GraphQL */ `
+  query DarazConnectUrl($redirectUri: String!) {
+    darazConnectUrl(redirectUri: $redirectUri)
+  }
+`;
+
+export const DarazConnectMutation = /* GraphQL */ `
+  mutation DarazConnect($code: String!, $state: String!) {
+    darazConnect(code: $code, state: $state) {
+      account {
+        ...DarazAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DARAZ_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+export const DarazAccountUpdateMutation = /* GraphQL */ `
+  mutation DarazAccountUpdate($locationId: ID, $syncPrices: Boolean) {
+    darazAccountUpdate(locationId: $locationId, syncPrices: $syncPrices) {
+      account {
+        ...DarazAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DARAZ_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+export const DarazSyncMutation = /* GraphQL */ `
+  mutation DarazSync {
+    darazSync {
+      imported
+      cancelled
+      leftOut
+      pushed
+    }
+  }
+`;
+
+export const DarazDisconnectMutation = /* GraphQL */ `
+  mutation DarazDisconnect {
+    darazDisconnect
+  }
+`;

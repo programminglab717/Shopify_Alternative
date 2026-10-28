@@ -37,7 +37,12 @@ import {
 } from '@hatti/events';
 import { StoreExportService } from '@hatti/files/public';
 import { ImageFetcher, MAX_VIDEO_BYTES, VideoSizer } from '@hatti/images';
-import { InventoryService, LowStockService, StockService } from '@hatti/inventory/public';
+import {
+  InventoryService,
+  LocationService,
+  LowStockService,
+  StockService,
+} from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
   ConversionsService,
@@ -88,6 +93,7 @@ import {
 import {
   CustomReportService,
   CustomerAnswers,
+  DarazService,
   DeskDutyService,
   ExportScheduleService,
   FulfillmentService,
@@ -99,7 +105,7 @@ import {
 } from '@hatti/orders/public';
 import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
-import { googleAdsOptions, vapidKeysOf, type WorkerConfig } from '../config.js';
+import { darazClientOf, googleAdsOptions, vapidKeysOf, type WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { exportEmailsOf, hattiEmailsOf } from '../emails.js';
 import { messageProvidersOf, ownNumbersOf, shopNumbersOf } from '../messaging.js';
@@ -179,6 +185,7 @@ import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
 import { StatusShopNotices } from './status-shop-notices.js';
 import { CurrencyRates } from './currency-rates.js';
+import { DarazSync } from './daraz-sync.js';
 import { ThemeExperiments } from './theme-experiments.js';
 import { LegalChangeNotices } from './legal-notices.js';
 import { OrderTemplates } from './order-templates.js';
@@ -962,6 +969,23 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.CURRENCY_RATES_INTERVAL_MS);
     closers.push(() => currencyRates.stop());
+    // Shops' Daraz accounts kept in step (ADR-875), where Hatti has its app on Daraz.
+    const darazClient = darazClientOf(config);
+    if (darazClient && config.ENCRYPTION_KEYS) {
+      const darazSync = new DarazSync(
+        new DarazService(
+          database,
+          workerOrders(database),
+          new VariantService(database),
+          new InventoryService(database, new VariantService(database)),
+          new LocationService(database),
+          config.ENCRYPTION_KEYS,
+          darazClient,
+        ),
+        logger,
+      ).start(config.DARAZ_SYNC_INTERVAL_MS);
+      closers.push(() => darazSync.stop());
+    }
     // Hatti's parts checked, incidents posted when one stops answering (ADR-536).
     if (config.STATUS_PROBES.length > 0) {
       const probes = new StatusProbes(

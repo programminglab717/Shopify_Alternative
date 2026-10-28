@@ -2,6 +2,7 @@ import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
 import { parseDsn } from '@hatti/logger';
 import type { GoogleAdsOptions } from '@hatti/marketing/public';
+import { DarazClient } from '@hatti/orders/public';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
 import { FBR_DI_URLS } from '@hatti/tax/public';
 import { STATUS_COMPONENTS, type StatusComponent } from '@hatti/trust/public';
@@ -362,6 +363,44 @@ const speechToText = {
   SPEECH_TO_TEXT_MODEL: z.string().trim().min(1).max(200).optional(),
 };
 
+/**
+ * Hatti's app on Daraz's Open Platform (ADR-875): its key and secret, both or neither, and the
+ * platform's addresses for Pakistan. Without them, shops cannot connect Daraz.
+ */
+const daraz = {
+  DARAZ_APP_KEY: z.string().trim().min(1).max(64).optional(),
+  DARAZ_APP_SECRET: env.secret(16).optional(),
+  DARAZ_API_URL: env.httpUrl().default('https://api.daraz.pk/rest'),
+  DARAZ_AUTH_URL: env.httpUrl().default('https://auth.daraz.com/rest'),
+  DARAZ_AUTHORIZE_URL: env.httpUrl().default('https://api.daraz.pk/oauth/authorize'),
+};
+
+const darazPaired = (config: { DARAZ_APP_KEY?: string; DARAZ_APP_SECRET?: string }) =>
+  (config.DARAZ_APP_KEY === undefined) === (config.DARAZ_APP_SECRET === undefined);
+const DARAZ_PAIRED = {
+  path: ['DARAZ_APP_SECRET'],
+  message: 'Set both DARAZ_APP_KEY and DARAZ_APP_SECRET, or neither',
+};
+
+/** Daraz's client, from the configuration; null without its app's key. */
+export function darazClientOf(config: {
+  DARAZ_APP_KEY?: string;
+  DARAZ_APP_SECRET?: string;
+  DARAZ_API_URL: string;
+  DARAZ_AUTH_URL: string;
+  DARAZ_AUTHORIZE_URL: string;
+}): DarazClient | null {
+  return config.DARAZ_APP_KEY && config.DARAZ_APP_SECRET
+    ? new DarazClient({
+        appKey: config.DARAZ_APP_KEY,
+        appSecret: config.DARAZ_APP_SECRET,
+        apiUrl: config.DARAZ_API_URL,
+        authUrl: config.DARAZ_AUTH_URL,
+        authorizeUrl: config.DARAZ_AUTHORIZE_URL,
+      })
+    : null;
+}
+
 const aiPaired = (config: { AI_API_KEY?: string; AI_MODEL?: string }) =>
   (config.AI_API_KEY === undefined) === (config.AI_MODEL === undefined);
 const AI_PAIRED = { path: ['AI_MODEL'], message: 'Set both AI_API_KEY and AI_MODEL, or neither' };
@@ -554,6 +593,7 @@ const apiSchema = z
     ...supportWhatsApp,
     ...aiGateway,
     ...speechToText,
+    ...daraz,
     /**
      * The map tiles checkout's map to move the address's pin on is drawn from (ADR-719): a
      * provider's raster tiles by a template with {z}, {x} and {y} after its host, such as
@@ -576,6 +616,7 @@ const apiSchema = z
   })
   .refine(webPushComplete, WEB_PUSH_COMPLETE)
   .refine(aiPaired, AI_PAIRED)
+  .refine(darazPaired, DARAZ_PAIRED)
   .refine(
     (config) =>
       (config.MAP_TILES_URL === undefined) === (config.MAP_TILES_ATTRIBUTION === undefined),
@@ -927,10 +968,18 @@ const workerSchema = z
     ...messageSending,
     ...aiGateway,
     ...speechToText,
+    ...daraz,
+    /** How often each shop's Daraz account is synced (ADR-875). */
+    DARAZ_SYNC_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .default(10 * 60_000),
     ...storage,
     ...webPush,
   })
   .refine(aiPaired, AI_PAIRED)
+  .refine(darazPaired, DARAZ_PAIRED)
   .refine(webPushComplete, WEB_PUSH_COMPLETE)
   .refine(whatsAppPaired, WHATSAPP_PAIRED)
   .refine(smsPaired, SMS_PAIRED)

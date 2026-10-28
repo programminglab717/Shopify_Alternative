@@ -143,6 +143,33 @@ export class VariantService {
   }
 
   /**
+   * The variant each of `skus` names, of the shop's active products, in the caller's tenant
+   * transaction: for a marketplace's orders, which name what they sold by SKU (ADR-875). SKUs no
+   * active product's variant has are left out; where two have one, the first by product.
+   */
+  async idsBySkuIn(tx: Tx, shopId: string, skus: readonly string[]): Promise<Map<string, string>> {
+    if (skus.length === 0) return new Map();
+    const rows = await tx
+      .select({ id: variants.id, sku: variants.sku })
+      .from(variants)
+      .innerJoin(
+        products,
+        and(eq(products.shopId, variants.shopId), eq(products.id, variants.productId)),
+      )
+      .where(
+        and(
+          eq(variants.shopId, shopId),
+          eq(products.status, 'active'),
+          inArray(variants.sku, [...new Set(skus)]),
+        ),
+      )
+      .orderBy(products.id, variants.position);
+    const found = new Map<string, string>();
+    for (const row of rows) if (row.sku && !found.has(row.sku)) found.set(row.sku, row.id);
+    return found;
+  }
+
+  /**
    * The variants the shop's till sells (ADR-872): those of its active products, by product title
    * and position, with what the till looks them up by, at most `limit`. Runs in the caller's
    * tenant transaction `tx`.

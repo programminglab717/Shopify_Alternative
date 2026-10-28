@@ -439,10 +439,11 @@ export class OrderService {
     tenant: TenantContext,
     input: OrderCreateInput,
     /**
-     * Placed at the shop's till (ADR-873): its source, how the timeline says it was placed, the
-     * customer confirmed it in person, and placed in the till's transaction.
+     * Placed at the shop's till (ADR-873), or brought in from a marketplace (ADR-875): in the
+     * caller's transaction, with its source (`pos` unless given), how the timeline says it was
+     * placed, and confirmed already, by the customer in person or by the marketplace.
      */
-    till?: { tx: Tx; how: string },
+    till?: { tx: Tx; how: string; source?: OrderSourceValue },
   ): Promise<MutationResult<OrderRecord>> {
     const check = new InputChecker();
     const lineInputs = input.lineItems;
@@ -511,7 +512,7 @@ export class OrderService {
       shopId: tenant.shopId,
       currency: tenant.currency,
       actor: tenant.actor,
-      source: till ? 'pos' : sourceOf(tenant),
+      source: till ? (till.source ?? 'pos') : sourceOf(tenant),
       how: till?.how ?? (tenant.actor.kind === 'staff' ? 'by staff' : 'through the API'),
       ...(till && { confirmedByCustomer: true }),
     };

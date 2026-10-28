@@ -6501,3 +6501,32 @@ export interface PosCashierValue {
 export interface PosCashierSignInData {
   posCashierSignIn: { cashier: PosCashierValue | null; userErrors: UserError[] };
 }
+
+/** The shop's Daraz account (ADR-875). */
+export interface DarazAccountValue {
+  account: string;
+  sellerId: string | null;
+  locationId: string;
+  syncPrices: boolean;
+  syncedAt: string | null;
+  lastError: string | null;
+  connectedAt: string;
+  leftOut: { darazOrderId: string; error: string; at: string }[];
+}
+
+export interface DarazData {
+  daraz: { available: boolean; account: DarazAccountValue | null };
+}
+
+export interface DarazConnectUrlData {
+  darazConnectUrl: string | null;
+}
+
+export interface DarazAccountPayloadData {
+  darazConnect?: { account: DarazAccountValue | null; userErrors: UserError[] };
+  darazAccountUpdate?: { account: DarazAccountValue | null; userErrors: UserError[] };
+}
+
+export interface DarazSyncData {
+  darazSync: { imported: number; cancelled: number; leftOut: number; pushed: number } | null;
+}
