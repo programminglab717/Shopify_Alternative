@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Public apps through OAuth
+### 6ab8fbb · Public apps through OAuth
 
 * **Developers:** partners register apps that shops install. An owner or a manager approves one
   on the admin's consent page, within what their role reaches; the app trades the code with its
