@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next, accounting exports (ANL-10) first. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows' waits and branches (MKT-04) next. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,12 +16,22 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### The sales as a journal for the shop's books
+
+* **Journal:** each day's sales, refunds and cost of goods as a balanced entry, for Tally,
+  Xero or QuickBooks to import, or as a CSV ([ADR-885](../architecture/13-decision-log.md#adr-885--the-sales-as-a-journal-for-the-shops-books-an-entry-a-day-posting-what-the-sales-report-counts-to-accounts-the-shop-names-as-a-csv-xeros-or-quickbooks-journal-import-or-tallys-vouchers-what-the-shop-is-paid-is-left-to-the-accountant-to-clear)).
+* **Accounts:** shops name and number the accounts as their books do; the analytics page
+  downloads the journal and names them.
+* **Not posted:** what the shop is paid, which its accountant clears from the bank's statement.
+* **Owner:** an accountant to try the files in Tally, Xero and QuickBooks (OWN-66).
+* 4804 tests (13 new).
+
 ### 73c88b4 · Sessions by source, landing page and device
 
 * **Counted:** each session once as it began, by where it came from, the page it landed on and
   its device, in Valkey, and kept each day in Postgres by the worker ([ADR-884](../architecture/13-decision-log.md#adr-884--sessions-by-where-they-came-from-their-landing-page-and-device-each-counted-once-as-it-began-from-its-first-pages-script-and-its-user-agent-counted-in-valkey-and-kept-each-day-in-postgres-by-the-worker-not-in-clickhouse)).
 * **Shown:** the admin's analytics show the ten with the most of each, with their share.
-* 4791 tests (8 new; the admin's count was one short before).
+* 4791 tests (9 new: the admin checks each of its operations against the schema, a test each).
 
 ### 009a574 · Transfers matched from Hatti's bank statement
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-884 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-885 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -892,6 +892,7 @@
 | 882 | Support access, followed through: the console lists the shops whose owners let support look now, with where to look in the admin; a shop is told on WhatsApp and by email the first time support looks under each grant; and whether support may ever change things is left to Hatti's owner | Accepted |
 | 883 | Transfers to Hatti matched from its bank statement: the CSV the bank exports read in the console, each credit carrying a waiting transfer's reference paired with it, and each match confirmed by Hatti's people for what came | Accepted |
 | 884 | Sessions by where they came from, their landing page and device: each counted once as it began, from its first page's script and its user agent, counted in Valkey and kept each day in Postgres by the worker, not in ClickHouse | Accepted |
+| 885 | The sales as a journal for the shop's books: an entry a day, posting what the sales report counts to accounts the shop names, as a CSV, Xero's or QuickBooks' journal import or Tally's vouchers; what the shop is paid is left to the accountant to clear | Accepted |
 
 ---
 
@@ -29308,3 +29309,57 @@
   * No ClickHouse, and nothing about a shopper kept: only counts by day.
   * Sessions are counted by where they came from from this release on; earlier days show none.
   * Sessions by place (city) wait for an IP-to-place database that is free to use.
+
+## ADR-885 · The sales as a journal for the shop's books: an entry a day, posting what the sales report counts to accounts the shop names, as a CSV, Xero's or QuickBooks' journal import or Tally's vouchers; what the shop is paid is left to the accountant to clear
+
+* **Context:** ADR-798 gives the shop's accountant the sales report as a workbook. It left
+  integrations with accounting tools, and a journal of debits and credits, for later. Pakistani
+  shops' accountants mostly keep their books in Tally, and some in Xero or QuickBooks Online.
+  All three import a journal from a file. Linking to their APIs would need Hatti registered as
+  an app with each, and Tally has no cloud API.
+* **Decision:**
+  * **`accountingJournalExport(placedFrom, placedBefore, format)`** gives a journal with an entry
+    for each day of the period, in the shop's time zone, that had anything to post. Each entry
+    is numbered `HATTI-20261005`, so the same day exported twice is recognisably the same entry.
+    Its debits equal its credits.
+    * **Sales**, as the sales report counts them, without the tax prices include (ADR-117):
+      * the receivable is debited with total sales;
+      * discounts and returns are debited with what they took off;
+      * sales, delivery charged, cash-on-delivery fees and sales tax are credited.
+    * **Goods:** cost of goods sold is debited and stock credited with what the items kept
+      cost (ADR-141).
+    * **Refunds** paid are debited to the receivable and credited to the bank.
+    * **On plans with true profit (ADR-529):**
+      * couriers' charges on their statements are debited to an expense and credited to the
+        courier account; charges only estimated from rate cards are not posted;
+      * stock written off is debited to write-offs and credited to stock;
+      * claims couriers paid are debited to the courier account and credited to income.
+  * **Formats:**
+    * `CSV`: a line for each debit or credit, with its account's code and name.
+    * `XERO`: Xero's manual journal import, by account code, amounts signed, tax rate "Tax
+      Exempt" since sales tax has an account of its own.
+    * `QUICKBOOKS`: QuickBooks Online's journal entry import, by account name.
+    * `TALLY`: Tally's XML of journal vouchers, by ledger name, a debit's amount negative and
+      deemed positive, as Tally writes them.
+    * Days in Xero's and QuickBooks' files are written day first, as outside the United States.
+  * **Accounts:** the journal posts to fourteen accounts. Each has a usual code and name (1200
+    Sales receivable, 4000 Sales and so on) until the shop names it as its books do
+    (`journalLedgers`, `journalLedgersSet`, migration 0387).
+    * Two accounts may not share a code or a name, so they don't merge in the books.
+    * A blank code and name together go back to the usual.
+    * Only the shop's staff who export orders (owners, managers, accountants) name the accounts;
+      apps read them.
+  * **Who exports:** those who export orders, and apps that read orders, as with the sales
+    report. Each export is recorded in the audit log.
+  * **The admin:** the analytics page downloads the period it shows, in the format chosen, and
+    names the accounts under "Your accounts".
+* **Consequences:**
+  * The accountant imports a month's sales in one file instead of keying them in from the
+    workbook.
+  * **What the shop is paid is not posted.** COD remittances, gateways' settlements and
+    transfers clear the receivable as the accountant reconciles the bank's statement. Hatti
+    knows when each is paid, but not which bank account it went to.
+  * The files follow Xero's, QuickBooks' and Tally's published import layouts, but haven't yet
+    been tried in each by an accountant (OWN-66).
+  * Linking to Xero's and QuickBooks' APIs comes later, if shops ask for it, once Hatti is
+    registered as an app with each.
