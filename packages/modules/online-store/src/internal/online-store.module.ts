@@ -15,6 +15,7 @@ import { MenuResolver } from './graphql/menu.resolver.js';
 import { PageResolver } from './graphql/page.resolver.js';
 import { PolicyResolver } from './graphql/policy.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
+import { PresentmentCurrencyResolver } from './graphql/presentment-currencies.resolver.js';
 import { StorefrontFiltersResolver } from './graphql/storefront-filters.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
 import { TranslationResolver } from './graphql/translation.resolver.js';
@@ -25,6 +26,7 @@ import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import { PolicyService } from './policy.service.js';
 import { PreferencesService } from './preferences.service.js';
+import { PresentmentCurrencyService } from './presentment-currencies.js';
 import { SessionDaysService } from './session-days.service.js';
 import { StorefrontFiltersService } from './storefront-filters.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
@@ -61,6 +63,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     ArticleCommentsResolver,
     PreferencesService,
     PreferencesResolver,
+    PresentmentCurrencyService,
+    PresentmentCurrencyResolver,
     StorefrontFiltersService,
     StorefrontFiltersResolver,
     DomainService,

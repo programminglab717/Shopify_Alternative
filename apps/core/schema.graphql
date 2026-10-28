@@ -4160,6 +4160,17 @@ enum CurrencyCode {
   USD
 }
 
+"""A currency's rate on the day, from the open currency feed Hatti reads."""
+type CurrencyRate {
+  currencyCode: String!
+
+  """Rupees for one unit: "76.4521"."""
+  rate: String!
+
+  """The feed's day, YYYY-MM-DD."""
+  rateDate: String!
+}
+
 """
 One of the shop's custom apps (DEV-04, ADR-395): an Admin API access token with a name and the scopes it may use, and a secret its webhooks are signed with. Neither is shown again once made.
 """
@@ -10783,6 +10794,11 @@ type Mutation {
   ): PaymentSettlementImportPayload!
 
   """
+  Sets the currencies the shop shows its prices in, in its picker’s order, replacing those it had; none to show rupees alone.
+  """
+  presentmentCurrenciesSet(input: [PresentmentCurrencyInput!]!): PresentmentCurrenciesSetPayload!
+
+  """
   Makes a price list for the customers with a tag: a shop keeps up to 20.
   """
   priceListCreate(input: PriceListInput!): PriceListPayload!
@@ -14340,6 +14356,36 @@ type PlatformTheme {
   name: String!
 }
 
+type PresentmentCurrenciesSetPayload {
+  presentmentCurrencies: [PresentmentCurrency!]
+  userErrors: [UserError!]!
+}
+
+"""
+A currency the shop shows its prices in besides rupees (OS-21, ADR-865), for shoppers abroad: at a rate it fixes, or the day’s. Checkout charges rupees.
+"""
+type PresentmentCurrency {
+  """AED, SAR, GBP, USD, CAD or EUR."""
+  currencyCode: String!
+
+  """
+  Rupees for one unit, as the shop fixes it: "76.4521". Null to follow the day’s.
+  """
+  fixedRate: String
+
+  """exact, to the cent; whole, to a whole unit; or ninety_nine, up to .99."""
+  rounding: String!
+  updatedAt: DateTime!
+}
+
+input PresentmentCurrencyInput {
+  currencyCode: String!
+
+  """Blank or null to follow the day’s rate."""
+  fixedRate: String
+  rounding: String = "exact"
+}
+
 """
 A shop's wholesale prices, for the customers it gave a tag (CUS-06, ADR-778): a share off every item, prices of its own for some variants, and more off as more of a variant is bought. A customer's draft orders are priced from it.
 """
@@ -16149,6 +16195,11 @@ type Query {
   """The couriers shops book parcels with here."""
   couriers: [Courier!]!
 
+  """
+  The day's rates, rupees for one unit, that currencies without a fixed rate follow.
+  """
+  currencyRates: [CurrencyRate!]!
+
   """The caller's latest bulk operation: running, or how it ended."""
   currentBulkOperation: BulkOperation
 
@@ -16760,6 +16811,11 @@ type Query {
   Hatti's own themes a shop may begin a theme with, Hatti Base first (ADR-730).
   """
   platformThemes: [PlatformTheme!]!
+
+  """
+  The currencies the shop shows its prices in besides rupees, in its picker's order.
+  """
+  presentmentCurrencies: [PresentmentCurrency!]!
 
   """
   The variants with a price of their own in a price list; null for no such list.

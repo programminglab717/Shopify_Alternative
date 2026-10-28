@@ -865,6 +865,22 @@ const workerSchema = z
     /** How often storefronts whose publisher gave up are built, once they go quiet (ADR-225). */
     STOREFRONTS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     /**
+     * The open currency feed the day's rates come from (ADR-865), units of each currency for one
+     * rupee: Fawaz Ahmed's exchange API, free and its data in the public domain, from jsDelivr's
+     * CDN.
+     */
+    CURRENCY_FEED_URL: env
+      .httpUrl()
+      .default(
+        'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/pkr.json',
+      ),
+    /** How often the feed is read: its rates change once a day. */
+    CURRENCY_RATES_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .default(6 * 3_600_000),
+    /**
      * Hatti's support address (ADR-508), which is told of shops' requests still open past their
      * plan's time (ADR-525). Without it, they are logged alone.
      */

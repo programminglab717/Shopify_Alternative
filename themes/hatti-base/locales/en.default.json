@@ -217,7 +217,8 @@
       "heavier": "Your order is over {{ weight }} kg: delivery costs {{ amount }} more.",
       "larger": "Your order pays at most {{ amount }} for delivery.",
       "larger_free": "Your order's value makes its delivery free.",
-      "cash_limit": "By law, cash on delivery collects at most {{ amount }} an order: checkout asks the rest in advance, or another way to pay."
+      "cash_limit": "By law, cash on delivery collects at most {{ amount }} an order: checkout asks the rest in advance, or another way to pay.",
+      "charged_in_rupees": "You pay {{ total }} at checkout. Prices in {{ code }} are a guide."
     },
     "cart_drawer": {
       "close": "Close",
@@ -326,7 +327,12 @@
     "verified": "Verified by Hatti",
     "notifications_on": "Get our offers as notifications",
     "notifications_done": "Notifications are on. We'll tell you of our offers.",
-    "notifications_denied": "Notifications are blocked: allow them in your browser's settings for this site."
+    "notifications_denied": "Notifications are blocked: allow them in your browser's settings for this site.",
+    "currency": "Prices in",
+    "currency_apply": "Show",
+    "currency_note": "Prices in {{ code }} are a guide, at 1 {{ code }} = Rs {{ rate }}. Checkout charges rupees.",
+    "currency_suggest": "Shopping from abroad? See prices in",
+    "currency_dismiss": "No, thanks"
   },
   "customer": {
     "login": {

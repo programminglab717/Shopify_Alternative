@@ -75,6 +75,12 @@ import {
   type CoreBackend,
 } from './cart.js';
 import {
+  askedCurrency,
+  currencyCookie,
+  currencyCookieOf,
+  suggestedCurrency,
+} from './currencies.js';
+import {
   CODE_TYPED_MAX,
   PHONE_TYPED_MAX,
   accountTokenOf,
@@ -521,6 +527,8 @@ interface Found {
   store: StoreData;
   preview: Preview | null;
   editor: boolean;
+  /** The currency the shopper picked (ADR-865), from their cookie; null for rupees. */
+  currency: string | null;
 }
 
 /**
@@ -790,6 +798,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     if (reply.hasHeader('set-cookie') && /^public/.test(String(reply.getHeader('cache-control')))) {
       reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
     }
+    // Prices shown in the shopper's own currency (ADR-865): their page alone, never kept for
+    // everyone at the edge, which keeps the rupees' pages.
+    if (
+      currencyCookieOf(request.headers.cookie) !== null &&
+      /^public/.test(String(reply.getHeader('cache-control'))) &&
+      /^(text\/html|application\/json)/.test(String(reply.getHeader('content-type') ?? ''))
+    ) {
+      reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
+    }
     // A shop closed behind its password (ADR-054): nothing is kept at the edge, which would show
     // it to everyone, or indexed, while it is closed.
     if (await locks.get(request)?.catch(() => null)) {
@@ -886,7 +903,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const preview = await previewFor(request, reply, found.shopId);
     // Framed, a preview is in the theme editor, which alone may frame it.
     const framed = request.headers['sec-fetch-dest'] === 'iframe';
-    return { ...found, preview, editor: preview !== null && framed && editorOrigins.length > 0 };
+    return {
+      ...found,
+      preview,
+      editor: preview !== null && framed && editorOrigins.length > 0,
+      currency: currencyCookieOf(request.headers.cookie),
+    };
   };
 
   /**
@@ -1552,7 +1574,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const preview = shop.preview && { name: shop.preview.name };
     const editor = shop.editor ? { origins: editorOrigins } : null;
     const ready = await renderer.prepare(
-      { ...request, preview, editor },
+      { ...request, preview, editor, currency: shop.currency },
       shop.store,
       themeFor(shop),
     );
@@ -1634,7 +1656,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   ): Promise<Record<string, string | null>> => {
     if (ids.length === 0) return {};
     const theme = editing ? () => editing.theme : themeFor(shop);
-    const request = pageRequestOf(page, cart, Boolean(editing));
+    const request = { ...pageRequestOf(page, cart, Boolean(editing)), currency: shop.currency };
     const rendered = await renderer.sections(request, shop.store, ids, theme);
     return Object.fromEntries(ids.map((id) => [id, rendered.get(id) ?? null]));
   };
@@ -2546,7 +2568,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         locale: url.pathname.startsWith('/ur/') ? 'ur' : 'en',
         suggest: { params, productIds, pageIds: more.pageIds, articleIds: more.articleIds },
       };
-      const rendered = await renderer.sections(page, found.store, [sectionId], themeFor(found));
+      const rendered = await renderer.sections(
+        { ...page, currency: found.currency },
+        found.store,
+        [sectionId],
+        themeFor(found),
+      );
       const html = rendered.get(sectionId);
       if (!html) return notFound(reply, 'The theme has no such section.');
       return await reply.type('text/html; charset=utf-8').send(html);
@@ -2601,7 +2628,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
               : RECOMMENDATIONS_LIMIT,
         },
       };
-      const rendered = await renderer.sections(page, found.store, [sectionId], themeFor(found));
+      const rendered = await renderer.sections(
+        { ...page, currency: found.currency },
+        found.store,
+        [sectionId],
+        themeFor(found),
+      );
       const html = rendered.get(sectionId);
       if (!html) return notFound(reply, 'The theme has no such section.');
       if (found.preview) previewed(reply);
@@ -2794,6 +2826,55 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/contact', '/ur/contact']) app.post(path, contact);
+
+  /**
+   * Shopify's localization form (OS-21, ADR-865): the currency the shopper picks of the shop's,
+   * by `currency_code`, or by `country_code` as Shopify's country pickers post it, kept in their
+   * cookie; rupees forget it. And the language, by `language_code`. Back to `return_to`.
+   */
+  const localization = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const params = paramsOf(request);
+    const asked = askedCurrency(params);
+    if (asked === 'PKR') {
+      reply.header('set-cookie', currencyCookie(null, { secure }));
+    } else if (asked !== null) {
+      // A currency the shop doesn't show its prices in is left as the shopper had it.
+      const offered = (await found.store.shop()).currencies ?? [];
+      if (offered.some((each) => each.currency === asked)) {
+        reply.header('set-cookie', currencyCookie(asked, { secure }));
+      }
+    }
+    let back = returnTo(params) ?? '/';
+    const language = typeof params.language_code === 'string' ? params.language_code : null;
+    if (language === 'ur' || language === 'en') {
+      const path = back.replace(/^\/ur(?=\/|$|\?)/, '') || '/';
+      back = language === 'ur' ? `/ur${path === '/' ? '' : path}` : path;
+    }
+    return reply.redirect(back, 303);
+  };
+  app.post('/localization', localization);
+
+  /**
+   * The currency the shopper's page is in and the one to suggest them, by the country the edge
+   * says they are in, for the theme's script asking shoppers abroad to see prices in theirs.
+   */
+  app.get('/localization.json', async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const country = request.headers['cf-ipcountry'];
+    const offered = (await found.store.shop()).currencies ?? [];
+    return reply.header('cache-control', 'private, no-store').send({
+      currency: found.currency ?? 'PKR',
+      suggested:
+        found.currency === null
+          ? suggestedCurrency(typeof country === 'string' ? country : undefined, offered)
+          : null,
+      currencies: ['PKR', ...offered.map((each) => each.currency)],
+    });
+  });
 
   /**
    * Hatti's back_in_stock form, which Hatti Base shows on a sold-out variant's page (ADR-431):

@@ -180,6 +180,16 @@ export interface SellingPlanDoc {
   productTag: string | null;
 }
 
+/**
+ * A currency the shop shows its prices in besides rupees (OS-21, ADR-865), at the rate the
+ * document was written with: rupees for one unit, "76.4521", and how its prices are rounded.
+ */
+export interface CurrencyDoc {
+  currency: 'AED' | 'SAR' | 'GBP' | 'USD' | 'CAD' | 'EUR';
+  rate: string;
+  rounding: 'exact' | 'whole' | 'ninety_nine';
+}
+
 export interface ProductDoc {
   id: string;
   /** Sold as a gift card (CAT-12, ADR-451): Liquid's `product.gift_card?`. Absent when it is not. */
@@ -584,6 +594,12 @@ export interface ShopDoc {
    * of them, are offered it on their pages. Absent for none.
    */
   sellingPlans?: SellingPlanDoc[];
+  /**
+   * The currencies it shows its prices in besides rupees (OS-21, ADR-865), in its picker's
+   * order: shoppers who pick one see its prices in it, and checkout charges rupees. Absent for
+   * none.
+   */
+  currencies?: CurrencyDoc[];
   /**
    * True while Hatti has taken the store down (ADR-461): its storefront answers every page with
    * Hatti's page saying so. Absent while it is not, as in documents written before stores could be

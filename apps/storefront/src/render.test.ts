@@ -2019,6 +2019,89 @@ describe('Storefront rendering', () => {
     expect(plain.html).not.toContain('<fieldset class="product__selling-plans">');
   });
 
+  it("shows prices in the shopper's currency, of the shop's, and says checkout charges rupees (ADR-865)", async () => {
+    const sample = sampleStore();
+    const product = sample.products[0]!;
+    const variant = product.variants[0]!;
+    const shop = new MemoryStore({
+      ...sample,
+      shop: {
+        ...sample.shop,
+        currencies: [
+          { currency: 'AED', rate: '76.4521', rounding: 'ninety_nine' },
+          { currency: 'GBP', rate: '372', rounding: 'exact' },
+        ],
+      },
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    // Up to the next .99 of the dirhams, at Rs 76.4521 each.
+    const aed = Math.ceil(variant.price / 100 / 76.4521 + 0.000_1) - 0.01;
+    const page = await renderer.render(
+      { path: `/products/${product.handle}`, currency: 'AED' },
+      shop.fresh(),
+    );
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain(`AED ${aed.toFixed(2)}`);
+    expect(flat).not.toContain(`Rs ${(variant.price / 100).toLocaleString('en')}`);
+    // The footer's picker lists rupees and the shop's currencies, the shopper's picked.
+    expect(flat).toContain('<option value="PKR">PKR · Pakistani rupee</option>');
+    expect(flat).toContain('<option value="AED" selected>AED · UAE dirham</option>');
+    expect(flat).toContain('<option value="GBP">GBP · British pound</option>');
+    expect(flat).toContain(
+      'Prices in AED are a guide, at 1 AED = Rs 76.4521. Checkout charges rupees.',
+    );
+    // A currency the shop doesn't show its prices in, or none, is rupees, and the suggestion.
+    for (const currency of ['USD', null]) {
+      const rupees = await renderer.render(
+        { path: `/products/${product.handle}`, currency },
+        shop.fresh(),
+      );
+      expect(rupees.html).toContain(`Rs ${(variant.price / 100).toLocaleString('en')}`);
+      expect(rupees.html).toContain('<option value="PKR" selected>');
+      expect(rupees.html).toContain(
+        '<hatti-currency-suggest class="footer__currency-suggest" hidden>',
+      );
+    }
+    // The cart says what checkout charges, in rupees.
+    const cart: CartJson = {
+      note: '',
+      attributes: {},
+      items: [
+        {
+          key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+          variantId: variant.id,
+          productId: product.id,
+          quantity: 1,
+          properties: {},
+          price: variant.price,
+          linePrice: variant.price,
+          title: product.title,
+          variantTitle: variant.title,
+          sku: null,
+          grams: 0,
+          taxable: true,
+          taxCode: null,
+          maxQuantity: null,
+        },
+      ],
+      itemCount: 1,
+      subtotal: variant.price,
+      totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
+    };
+    const cartPage = await renderer.render({ path: '/cart', currency: 'GBP', cart }, shop.fresh());
+    expect(cartPage.html.replace(/\s+/g, ' ')).toContain(
+      `You pay Rs ${(variant.price / 100).toLocaleString('en-IN')} at checkout. Prices in GBP are a guide.`,
+    );
+    // A shop showing rupees alone has no picker.
+    const plain = await renderer.render(
+      { path: `/products/${product.handle}`, currency: 'AED' },
+      new MemoryStore(sample).fresh(),
+    );
+    expect(plain.html).not.toContain('<select id="FooterCurrency"');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

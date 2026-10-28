@@ -46,6 +46,11 @@ export const OnlineStoreEvents = {
   TranslationsUpdated: 'translations.updated',
   /** A Storefront API token made or deleted (ADR-848): the shop's document carries their digests. */
   StorefrontAccessTokensUpdated: 'storefront_access_tokens.updated',
+  /**
+   * The currencies the shop shows its prices in changed, or the day's rate of one it follows
+   * (ADR-865): its document carries them, with their rates.
+   */
+  PresentmentCurrenciesUpdated: 'presentment_currencies.updated',
 } as const;
 
 export interface ThemeCreatedPayload {

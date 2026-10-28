@@ -26,6 +26,40 @@
         <p data-denied hidden>{{ 'footer.notifications_denied' | t }}</p>
       </hatti-notifications>
     {%- endif -%}
+    {%- comment -%}
+      The currencies the shop shows its prices in besides rupees (OS-21, ADR-865), as Shopify's
+      localization form picks them; checkout charges rupees, and the cart says how many. Shoppers
+      abroad who have picked none are asked whether to see theirs, as the edge says where they are.
+    {%- endcomment -%}
+    {%- if localization.available_currencies.size > 1 -%}
+      {%- form 'localization', class: 'footer__currency' -%}
+        <label for="FooterCurrency">{{ 'footer.currency' | t }}</label>
+        <select id="FooterCurrency" name="currency_code">
+          {%- for currency in localization.available_currencies -%}
+            <option value="{{ currency.iso_code }}"{% if currency.iso_code == localization.currency.iso_code %} selected{% endif %}>
+              {{- currency.iso_code }} · {{ currency.name -}}
+            </option>
+          {%- endfor -%}
+        </select>
+        <input type="hidden" name="return_to" value="{{ request.path }}">
+        <button type="submit">{{ 'footer.currency_apply' | t }}</button>
+      {%- endform -%}
+      {%- if localization.currency.iso_code != 'PKR' -%}
+        <p class="footer__currency-note">
+          {{- 'footer.currency_note' | t: code: localization.currency.iso_code, rate: localization.currency.rate -}}
+        </p>
+      {%- else -%}
+        <hatti-currency-suggest class="footer__currency-suggest" hidden>
+          {%- form 'localization' -%}
+            <input type="hidden" name="currency_code" value="">
+            <input type="hidden" name="return_to" value="{{ request.path }}">
+            <span>{{ 'footer.currency_suggest' | t }} <strong data-currency></strong></span>
+            <button type="submit">{{ 'footer.currency_apply' | t }}</button>
+            <button type="button" data-dismiss>{{ 'footer.currency_dismiss' | t }}</button>
+          {%- endform -%}
+        </hatti-currency-suggest>
+      {%- endif -%}
+    {%- endif -%}
     {%- assign year = 'now' | date: '%Y' -%}
     <p class="footer__rights">{{ 'footer.rights' | t: year: year, shop: shop.name }}</p>
     {%- if shop.verified -%}
@@ -59,6 +93,10 @@
   .footer__powered a { color: var(--color-muted); }
   .footer__notify { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
   .footer__notifications p { margin: 0; font-size: 0.875rem; color: var(--color-muted); }
+  .footer__currency { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+  .footer__currency select { font: inherit; }
+  .footer__currency-note { margin: 0; font-size: 0.75rem; color: var(--color-muted); }
+  .footer__currency-suggest form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
 {% endstylesheet %}
 
 {% javascript %}
@@ -80,6 +118,39 @@
   }
   if (!customElements.get('hatti-notifications')) {
     customElements.define('hatti-notifications', HattiNotifications);
+  }
+
+  // Shoppers abroad asked whether to see the shop's prices in their currency (ADR-865), by the
+  // country the edge says they are in, once they have picked none; dismissed, it stays away.
+  class HattiCurrencySuggest extends HTMLElement {
+    connectedCallback() {
+      if (/(?:^|;\s*)currency=/.test(document.cookie)) return;
+      try {
+        if (localStorage.getItem('hatti:currency-suggest') === 'no') return;
+      } catch {
+        // A browser that keeps nothing is asked each time.
+      }
+      this.querySelector('[data-dismiss]').addEventListener('click', () => {
+        this.hidden = true;
+        try {
+          localStorage.setItem('hatti:currency-suggest', 'no');
+        } catch {
+          // Nothing kept: it is asked again next time.
+        }
+      });
+      fetch('/localization.json', { credentials: 'same-origin' })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((answer) => {
+          if (!answer || !answer.suggested) return;
+          this.querySelector('input[name="currency_code"]').value = answer.suggested;
+          this.querySelector('[data-currency]').textContent = answer.suggested;
+          this.hidden = false;
+        })
+        .catch(() => {});
+    }
+  }
+  if (!customElements.get('hatti-currency-suggest')) {
+    customElements.define('hatti-currency-suggest', HattiCurrencySuggest);
   }
 {% endjavascript %}
 

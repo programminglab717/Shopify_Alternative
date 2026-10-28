@@ -21,3 +21,15 @@ export {
   type Money,
 } from './money.js';
 export { formatMoney, type FormatOptions } from './format.js';
+export {
+  PRESENTMENT_CURRENCIES,
+  PRESENTMENT_ROUNDINGS,
+  RATE_SCALE,
+  formatRate,
+  isPresentmentCurrency,
+  parseRate,
+  presentFromRupees,
+  rateFromUnitsPerRupee,
+  type PresentmentCurrency,
+  type PresentmentRounding,
+} from './presentment.js';

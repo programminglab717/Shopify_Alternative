@@ -177,6 +177,7 @@ import { StaffAlerts } from './staff-alerts.js';
 import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
 import { StatusShopNotices } from './status-shop-notices.js';
+import { CurrencyRates } from './currency-rates.js';
 import { LegalChangeNotices } from './legal-notices.js';
 import { OrderTemplates } from './order-templates.js';
 import { StatusProbes } from './status-probes.js';
@@ -911,6 +912,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => legalNotices.stop());
+    // The day's rates of the currencies shops show their prices in (ADR-865).
+    const currencyRates = new CurrencyRates(
+      database,
+      config.CURRENCY_FEED_URL,
+      fetch,
+      logger,
+    ).start(config.CURRENCY_RATES_INTERVAL_MS);
+    closers.push(() => currencyRates.stop());
     // Hatti's parts checked, incidents posted when one stops answering (ADR-536).
     if (config.STATUS_PROBES.length > 0) {
       const probes = new StatusProbes(

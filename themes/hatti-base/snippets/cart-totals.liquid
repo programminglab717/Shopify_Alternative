@@ -35,6 +35,14 @@
     <strong>{{ cart.total_price | money }}</strong>
   </p>
 {%- endif -%}
+{%- comment -%}
+  Prices shown in the shopper's currency (ADR-865): checkout charges rupees, and the cart says how
+  many before it.
+{%- endcomment -%}
+{%- if localization.currency.iso_code != 'PKR' -%}
+  {%- assign rupees = cart.total_price | money_pk -%}
+  <p class="cart__currency">{{ 'sections.cart.charged_in_rupees' | t: total: rupees, code: localization.currency.iso_code }}</p>
+{%- endif -%}
 {%- for discount_code in cart.discount_codes -%}
   {%- unless discount_code.applicable -%}
     <p class="cart__delivery">{{ 'sections.cart.discount_not_applicable_html' | t: code: discount_code.code }}</p>

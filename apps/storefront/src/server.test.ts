@@ -6759,6 +6759,81 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     await app.close();
   });
 
+  it('keeps the currency a shopper picks, their pages theirs alone, and suggests one abroad (ADR-865)', async () => {
+    const shopId = randomUUID();
+    const sample = sampleStore();
+    await publish(shopId, 'gulf', {
+      ...sample,
+      shop: {
+        ...sample.shop,
+        currencies: [{ currency: 'AED', rate: '76.4521', rounding: 'exact' }],
+      },
+    });
+    const app = server();
+    const host = 'gulf.localhost';
+    const picked = await app.inject({
+      method: 'POST',
+      url: '/localization',
+      headers: { host, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'form_type=localization&currency_code=AED&return_to=%2Fcollections%2Fall',
+    });
+    expect([picked.statusCode, picked.headers.location]).toEqual([303, '/collections/all']);
+    expect(picked.headers['set-cookie']).toBe(
+      'currency=AED; Max-Age=31536000; Path=/; SameSite=Lax',
+    );
+    // Shopify's country pickers post the country; one the shop has no currency of changes nothing.
+    const country = await app.inject({
+      method: 'POST',
+      url: '/localization',
+      headers: { host, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'country_code=GB&return_to=%2F%2Fevil.example',
+    });
+    expect([country.headers.location, country.headers['set-cookie']]).toEqual(['/', undefined]);
+    const urdu = await app.inject({
+      method: 'POST',
+      url: '/localization',
+      headers: { host, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'currency_code=PKR&language_code=ur&return_to=%2Fproducts%2Fkurta',
+    });
+    expect([urdu.headers.location, urdu.headers['set-cookie']]).toEqual([
+      '/ur/products/kurta',
+      'currency=; Max-Age=0; Path=/; SameSite=Lax',
+    ]);
+
+    // In dirhams, the page is the shopper's own; in rupees, kept at the edge as ever.
+    const inDirhams = await app.inject({
+      method: 'GET',
+      url: '/',
+      headers: { host, cookie: 'currency=AED' },
+    });
+    expect(inDirhams.body).toContain('<option value="AED" selected>');
+    expect(inDirhams.headers['cache-control']).toBe('private, no-store');
+    expect(inDirhams.headers['cache-tag']).toBeUndefined();
+    const inRupees = await app.inject({ method: 'GET', url: '/', headers: { host } });
+    expect(String(inRupees.headers['cache-control'])).toMatch(/^public/);
+
+    // From the Emirates, dirhams are suggested; from elsewhere, or having picked, nothing.
+    const asked = async (headers: Record<string, string>) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/localization.json',
+          headers: { host, ...headers },
+        })
+      ).json() as {
+        currency: string;
+        suggested: string | null;
+      };
+    expect(await asked({ 'cf-ipcountry': 'AE' })).toEqual({
+      currency: 'PKR',
+      suggested: 'AED',
+      currencies: ['PKR', 'AED'],
+    });
+    expect((await asked({ 'cf-ipcountry': 'GB' })).suggested).toBeNull();
+    expect((await asked({ 'cf-ipcountry': 'AE', cookie: 'currency=AED' })).suggested).toBeNull();
+    await app.close();
+  });
+
   it('takes sign-ups on a closed shop, as its password page may ask for them', async () => {
     const closed = randomUUID();
     const sample = sampleStore();

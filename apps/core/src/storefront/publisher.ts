@@ -102,6 +102,7 @@ import {
   shopRedirectsOf,
   shopTranslationsOf,
   shownStorefrontFiltersIn,
+  shownCurrenciesIn,
   storefrontTokensIn,
   type ArticleChangedPayload,
   type ArticleRecord,
@@ -378,6 +379,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case SellingPlanEvents.Updated:
       // Its selling plans, its products' pages offer (ADR-862).
       return [Items.shop];
+    case OnlineStoreEvents.PresentmentCurrenciesUpdated:
+      // The currencies its prices are shown in, at their rates (ADR-865).
+      return [Items.shop];
     case OnlineStoreEvents.DomainCreated:
     case OnlineStoreEvents.DomainUpdated:
     case OnlineStoreEvents.DomainDeleted:
@@ -577,6 +581,7 @@ export const PUBLISHED_EVENTS = [
   AppEvents.Uninstalled,
   AppEvents.Deleted,
   SellingPlanEvents.Updated,
+  OnlineStoreEvents.PresentmentCurrenciesUpdated,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
   OnlineStoreEvents.DomainDeleted,
@@ -1087,6 +1092,7 @@ export class StorefrontPublisher {
         discountPercent: plan.discountPercent,
         productTag: plan.productTag,
       })),
+      await shownCurrenciesIn(tx, shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

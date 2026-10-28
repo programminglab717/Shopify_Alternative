@@ -6217,3 +6217,31 @@ export interface ShopSsoData {
 export interface ShopSsoUpdateData {
   shopSsoUpdate: { sso: ShopSso | null; userErrors: UserError[] };
 }
+
+export type PresentmentRounding = 'exact' | 'whole' | 'ninety_nine';
+
+/** A currency the shop shows its prices in besides rupees (OS-21, ADR-865). */
+export interface PresentmentCurrency {
+  currencyCode: string;
+  /** Rupees for one unit, "76.4521"; null to follow the day's rate. */
+  fixedRate: string | null;
+  rounding: PresentmentRounding;
+}
+
+export interface CurrencyRate {
+  currencyCode: string;
+  rate: string;
+  rateDate: string;
+}
+
+export interface CurrenciesData {
+  presentmentCurrencies: PresentmentCurrency[];
+  currencyRates: CurrencyRate[];
+}
+
+export interface PresentmentCurrenciesSetData {
+  presentmentCurrenciesSet: {
+    presentmentCurrencies: PresentmentCurrency[] | null;
+    userErrors: UserError[];
+  };
+}

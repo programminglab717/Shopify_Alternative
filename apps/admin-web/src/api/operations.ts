@@ -12739,3 +12739,41 @@ export const ShopSsoDeleteMutation = /* GraphQL */ `
     shopSsoDelete
   }
 `;
+
+const PRESENTMENT_CURRENCY = /* GraphQL */ `
+  fragment PresentmentCurrencyFields on PresentmentCurrency {
+    currencyCode
+    fixedRate
+    rounding
+  }
+`;
+
+/** The currencies the shop shows its prices in, and the day's rates (OS-21, ADR-865). */
+export const CurrenciesQuery = /* GraphQL */ `
+  query Currencies {
+    presentmentCurrencies {
+      ...PresentmentCurrencyFields
+    }
+    currencyRates {
+      currencyCode
+      rate
+      rateDate
+    }
+  }
+  ${PRESENTMENT_CURRENCY}
+`;
+
+export const PresentmentCurrenciesSetMutation = /* GraphQL */ `
+  mutation PresentmentCurrenciesSet($input: [PresentmentCurrencyInput!]!) {
+    presentmentCurrenciesSet(input: $input) {
+      presentmentCurrencies {
+        ...PresentmentCurrencyFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRESENTMENT_CURRENCY}
+  ${USER_ERRORS}
+`;

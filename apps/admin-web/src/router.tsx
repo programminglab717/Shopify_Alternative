@@ -91,6 +91,7 @@ import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { ExpansionStoresPage } from './settings/expansion-stores-page';
 import { SubscriptionsPage } from './settings/subscriptions-page';
+import { CurrenciesPage } from './settings/currencies-page';
 import { WorkflowsPage } from './settings/workflows-page';
 import { SsoCallbackPage } from './auth/sso';
 import { AppFramePage } from './settings/app-frame-page';
@@ -840,6 +841,13 @@ const settingsSubscriptions = createRoute({
   component: SubscriptionsPage,
 });
 
+// The currencies the shop shows its prices in besides rupees (ADR-865).
+const settingsCurrencies = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/currencies',
+  component: CurrenciesPage,
+});
+
 // The shop's workflows: triggers, conditions and actions (ADR-861).
 const settingsWorkflows = createRoute({
   getParentRoute: () => shop,
@@ -1177,6 +1185,7 @@ export const routeTree = root.addChildren([
     settingsExpansionStores,
     settingsWorkflows,
     settingsSubscriptions,
+    settingsCurrencies,
     settingsWhatsApp,
     marketing,
     marketingTemplates,

@@ -28,6 +28,7 @@
     "@hatti/events": "workspace:*",
     "@hatti/files": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/storefront-api": "workspace:*",
     "@hatti/themes": "workspace:*",

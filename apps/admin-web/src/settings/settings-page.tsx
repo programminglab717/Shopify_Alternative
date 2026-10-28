@@ -3,6 +3,7 @@ import {
   Archive,
   BadgeCheck,
   Banknote,
+  Coins,
   Blocks,
   Braces,
   ChevronRight,
@@ -80,6 +81,7 @@ interface Section {
     | '/$shopId/settings/apps'
     | '/$shopId/settings/workflows'
     | '/$shopId/settings/subscriptions'
+    | '/$shopId/settings/currencies'
     | '/$shopId/settings/expansion-stores'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/custom-data'
@@ -226,6 +228,13 @@ const SECTIONS: readonly Section[] = [
     hint: 'settings.subscriptionsHint',
     icon: Repeat,
     gate: gate(RUNS_SHOP, (shop) => can(shop, 'read_products') && can(shop, 'read_orders')),
+  },
+  {
+    to: '/$shopId/settings/currencies',
+    label: 'settings.currencies',
+    hint: 'settings.currenciesHint',
+    icon: Coins,
+    gate: SETS_SETTINGS,
   },
   {
     to: '/$shopId/settings/workflows',

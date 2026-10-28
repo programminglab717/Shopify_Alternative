@@ -28,6 +28,14 @@ export {
   storefrontTokensIn,
   type StorefrontTokenRecord,
 } from '../internal/storefront-tokens.js';
+export {
+  PresentmentCurrencyService,
+  currencyRatesIn,
+  presentmentCurrenciesIn,
+  shownCurrenciesIn,
+  type CurrencyRateRecord,
+  type PresentmentCurrencyRecord,
+} from '../internal/presentment-currencies.js';
 export type {
   ArticleImageRecord,
   ArticleRecord,

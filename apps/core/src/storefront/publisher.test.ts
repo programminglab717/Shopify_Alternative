@@ -62,6 +62,7 @@ import {
   PageService,
   PolicyService,
   PreferencesService,
+  PresentmentCurrencyService,
   StorefrontFiltersService,
   StorefrontTokenService,
   ThemeService,
@@ -94,6 +95,7 @@ import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TestDns } from '../testing/api.js';
+import { CurrencyRates } from '../worker/currency-rates.js';
 import { StorefrontSweep } from '../worker/storefront-sweep.js';
 import { Items, itemsFor, StorefrontPublisher } from './publisher.js';
 
@@ -463,7 +465,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
 
   beforeAll(async () => {
     testDb = await createTestDatabase(server!);
-    database = new Database({ appUrl: testDb.appUrl, applicationName: 'publisher-test' });
+    database = new Database({
+      appUrl: testDb.appUrl,
+      systemUrl: testDb.systemUrl,
+      applicationName: 'publisher-test',
+    });
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(
@@ -2241,6 +2247,63 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     );
     await deliver();
     expect((await store().shop()).appEmbeds).toBeUndefined();
+  });
+
+  it("publishes the currencies the shop shows its prices in, at their rates, the day's as they change (ADR-865)", async () => {
+    const currencies = new PresentmentCurrencyService(database);
+    let feed: Record<string, number> = { aed: 0.013_08, gbp: 0.002_688, usd: 0.003_571 };
+    let day = '2026-10-27';
+    const rates = new CurrencyRates(database, 'https://feed.example/pkr.json', (async () =>
+      Response.json({ date: day, pkr: feed })) as unknown as typeof fetch);
+    const refused = await currencies.set(tenant, [
+      { currency: 'gbp', fixedRate: 'Rs 372' },
+      { currency: 'GBP' },
+      { currency: 'AED', rounding: 'often' },
+      { currency: 'PKR' },
+    ]);
+    expect(
+      refused.ok ? [] : refused.errors.map((each) => [each.field.join('.'), each.code]),
+    ).toEqual([
+      ['input.0.fixedRate', 'INVALID'],
+      ['input.1.currency', 'TAKEN'],
+      ['input.2.rounding', 'INVALID'],
+      ['input.3.currency', 'INVALID'],
+    ]);
+    unwrap(
+      await currencies.set(tenant, [
+        { currency: 'aed', rounding: 'ninety_nine' },
+        { currency: 'GBP', fixedRate: '372' },
+      ]),
+    );
+    expect(await deliver()).toEqual(['presentment_currencies.updated']);
+    // The dirham follows the day's rate, which the worker hasn't read: it waits for it.
+    expect((await store().shop()).currencies).toEqual([
+      { currency: 'GBP', rate: '372', rounding: 'exact' },
+    ]);
+    expect(await rates.sweep()).toEqual(['AED', 'GBP', 'USD']);
+    expect(await deliver()).toEqual(['presentment_currencies.updated']);
+    expect((await store().shop()).currencies).toEqual([
+      { currency: 'AED', rate: '76.4526', rounding: 'ninety_nine' },
+      { currency: 'GBP', rate: '372', rounding: 'exact' },
+    ]);
+    // The same day again changes nothing; a rate moved too far is the feed's mistake, kept.
+    expect(await rates.sweep()).toEqual([]);
+    day = '2026-10-28';
+    feed = { aed: 0.013_1, gbp: 0.005, usd: 0.003_571 };
+    expect(await rates.sweep()).toEqual(['AED']);
+    await deliver();
+    expect((await store().shop()).currencies?.[0]).toEqual({
+      currency: 'AED',
+      rate: '76.3359',
+      rounding: 'ninety_nine',
+    });
+    // A currency only fixed at a rate is not written again for the day's.
+    feed = { aed: 0.013_1, gbp: 0.002_7, usd: 0.003_571 };
+    expect(await rates.sweep()).toEqual(['GBP']);
+    expect(await deliver()).toEqual([]);
+    unwrap(await currencies.set(tenant, []));
+    await deliver();
+    expect((await store().shop()).currencies).toBeUndefined();
   });
 
   it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {

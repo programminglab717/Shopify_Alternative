@@ -1,9 +1,11 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
+import { CURRENCIES, formatRate, parseRate } from '@hatti/money';
 import type { AccountAddress, AccountJson, CartJson } from '@hatti/storefront-api';
 import { customerObject, type AddressForm, type DataNotice, type LoginForm } from './accounts.js';
 import {
   TranslatedStore,
   checkoutPausedAt,
+  type CurrencyDoc,
   type HandledKind,
   type SeoDoc,
   type ShopDoc,
@@ -19,6 +21,7 @@ import {
   translation,
   unescapeHtml,
   type PageState,
+  type ShownCurrency,
 } from './liquid.js';
 import {
   CappedEmitter,
@@ -160,6 +163,11 @@ export interface PageRequest {
   addresses?: readonly AccountAddress[] | null;
   /** An address form posted to the address book's page that did not go, shown again. */
   addressForm?: AddressForm | null;
+  /**
+   * The currency the shopper picked (OS-21, ADR-865), from their cookie: prices are shown in it
+   * where the shop offers it, and in rupees where it doesn't. Null or absent for rupees.
+   */
+  currency?: string | null;
 }
 
 /**
@@ -251,6 +259,8 @@ interface PreparedPage {
   login: LoginForm | null;
   /** An address form that did not go; null on other pages. */
   addressForm: AddressForm | null;
+  /** The currency the shopper picked of the shop's, its prices are shown in; null for rupees. */
+  currency: ShownCurrency | null;
   /** Content of the platform's own instead of a template's, as a policy's page has (ADR-056). */
   builtIn: string | null;
   theme: Theme;
@@ -393,6 +403,7 @@ export class PageRenderer {
       formErrors: page.formErrors,
       login: page.login,
       addressForm: page.addressForm,
+      currency: page.currency,
       renderSection: () => Promise.resolve(''),
       renderGroup: () => Promise.resolve(''),
     };
@@ -488,6 +499,7 @@ export class PageRenderer {
       formErrors: prepared.formErrors,
       login: prepared.login,
       addressForm: prepared.addressForm,
+      currency: prepared.currency,
       renderSection: (section) =>
         limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
       renderGroup: (group) =>
@@ -644,6 +656,8 @@ export class PageRenderer {
     ctx.pictures = shopDoc.theme?.pictures;
     // Its selling plans, its products' pages offer (ADR-862).
     ctx.sellingPlans = shopDoc.sellingPlans;
+    // The shopper's currency, where the shop offers it (ADR-865).
+    const currency = shownCurrencyOf(shopDoc.currencies, request.currency);
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
     const seo = (resource as { [SEO]?: PageSeo })[SEO];
@@ -742,7 +756,24 @@ export class PageRenderer {
           name: LOCALE_NAMES[code]?.name ?? code,
           endonym_name: LOCALE_NAMES[code]?.endonym ?? code,
         })),
-        country: { iso_code: 'PK', name: 'Pakistan', currency: { iso_code: 'PKR', symbol: 'Rs' } },
+        // The shopper's currency, of those the shop shows its prices in (ADR-865), and the
+        // country it is of, as Shopify's localization gives them; Pakistan's rupee otherwise.
+        country: countryOf(currency?.code ?? 'PKR') ?? countryOf('PKR'),
+        available_countries: [
+          'PKR' as const,
+          ...(shopDoc.currencies ?? []).map((each) => each.currency),
+        ]
+          .map(countryOf)
+          .filter(Boolean),
+        // Hatti's: the currency itself, with its rate, and those the shopper may pick.
+        currency: currencyObject(currency),
+        available_currencies: [
+          currencyObject(null),
+          ...(shopDoc.currencies ?? []).flatMap((each) => {
+            const shown = shownCurrencyOf([each], each.currency);
+            return shown ? [currencyObject(shown)] : [];
+          }),
+        ],
       },
       // A link to Hatti, as Shopify's: none while the shop hides it on a plan that lets it
       // (ADR-526).
@@ -808,6 +839,7 @@ export class PageRenderer {
       formErrors: request.formErrors ?? {},
       login: request.login ?? null,
       addressForm: request.addressForm ?? null,
+      currency,
       builtIn,
       editor: request.editor ?? null,
       templateFile,
@@ -1405,4 +1437,53 @@ export function poweredByLink(platformUrl: string, locale: string): string {
     `${platformUrl.replace(/\/+$/, '')}/?utm_campaign=poweredby&amp;utm_medium=hatti` +
     '&amp;utm_source=onlinestore';
   return `<a target="_blank" rel="nofollow" href="${href}">${words}</a>`;
+}
+
+/** The shopper's currency, as `asked` names it, where the shop shows its prices in it (ADR-865). */
+function shownCurrencyOf(
+  currencies: readonly CurrencyDoc[] | undefined,
+  asked: string | null | undefined,
+): ShownCurrency | null {
+  const doc = asked ? currencies?.find((each) => each.currency === asked) : undefined;
+  const rate = doc ? parseRate(doc.rate) : null;
+  return doc && rate ? { code: doc.currency, rate, rounding: doc.rounding } : null;
+}
+
+/** The country each currency is of, as Shopify's localization lists countries; the euro none. */
+const CURRENCY_COUNTRIES: Readonly<Record<string, { iso_code: string; name: string }>> = {
+  PKR: { iso_code: 'PK', name: 'Pakistan' },
+  AED: { iso_code: 'AE', name: 'United Arab Emirates' },
+  SAR: { iso_code: 'SA', name: 'Saudi Arabia' },
+  GBP: { iso_code: 'GB', name: 'United Kingdom' },
+  USD: { iso_code: 'US', name: 'United States' },
+  CAD: { iso_code: 'CA', name: 'Canada' },
+};
+
+const CURRENCY_NAMES: Readonly<Record<string, string>> = {
+  PKR: 'Pakistani rupee',
+  AED: 'UAE dirham',
+  SAR: 'Saudi riyal',
+  GBP: 'British pound',
+  USD: 'US dollar',
+  CAD: 'Canadian dollar',
+  EUR: 'Euro',
+};
+
+/** Liquid's currency: its code, symbol and name; Hatti's rate, rupees for one, but the rupee's. */
+function currencyObject(currency: ShownCurrency | null) {
+  const code = currency?.code ?? 'PKR';
+  return {
+    iso_code: code,
+    symbol: CURRENCIES[code].symbol,
+    name: CURRENCY_NAMES[code] ?? code,
+    rate: currency ? formatRate(currency.rate) : null,
+  };
+}
+
+/** Liquid's country of a currency, with the currency; null for one of no single country. */
+function countryOf(code: keyof typeof CURRENCIES) {
+  const country = CURRENCY_COUNTRIES[code];
+  return country
+    ? { ...country, currency: { iso_code: code, symbol: CURRENCIES[code].symbol } }
+    : null;
 }

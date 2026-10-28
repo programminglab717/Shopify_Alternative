@@ -1,4 +1,11 @@
-import { formatMoney, money } from '@hatti/money';
+import {
+  formatMoney,
+  money,
+  presentFromRupees,
+  type Money,
+  type PresentmentCurrency,
+  type PresentmentRounding,
+} from '@hatti/money';
 import { isFilterParam, type QueryParams } from './filters.js';
 import {
   Drop,
@@ -58,6 +65,18 @@ export interface PageState {
   login: LoginForm | null;
   /** An address form posted to the address book's page that did not go (ADR-584); or null. */
   addressForm: AddressForm | null;
+  /**
+   * The currency the shopper picked of the shop's (ADR-865), its rate rupees for one unit in
+   * ten-thousandths, which `money` filters show prices in; null for rupees.
+   */
+  currency: ShownCurrency | null;
+}
+
+/** A currency prices are shown in besides rupees, as a page shows them (ADR-865). */
+export interface ShownCurrency {
+  code: PresentmentCurrency;
+  rate: bigint;
+  rounding: PresentmentRounding;
 }
 
 export const PAGE = Symbol('page');
@@ -246,13 +265,31 @@ function themeFs(files: ThemeFiles): FS {
 function filters(theme: Theme): Record<string, FilterImplOptions> {
   const rupees = (value: unknown, grouping: 'international' | 'south-asian' = 'international') =>
     formatMoney(money(BigInt(Math.round(Number(value) || 0)), 'PKR'), { grouping });
+  /** A price in paisa as the page shows it: in the shopper's currency where they picked one. */
+  const shown = (filter: { context: Context }, value: unknown): Money => {
+    const paisa = BigInt(Math.round(Number(value) || 0));
+    const currency = (filter.context.globals as { [PAGE]?: PageState })[PAGE]?.currency;
+    return currency
+      ? presentFromRupees(paisa, currency.code, currency.rate, currency.rounding)
+      : money(paisa, 'PKR');
+  };
   return {
-    money: (value: unknown) => rupees(value),
-    money_with_currency: (value: unknown) => `${rupees(value)} PKR`,
-    money_without_trailing_zeros: (value: unknown) => rupees(value),
-    money_without_currency: (value: unknown) =>
-      formatMoney(money(BigInt(Math.round(Number(value) || 0)), 'PKR'), { display: 'none' }),
-    /** Hatti's: lakh and crore grouping, "Rs 1,25,000". */
+    money: function (this: { context: Context }, value: unknown) {
+      return formatMoney(shown(this, value));
+    },
+    money_with_currency: function (this: { context: Context }, value: unknown) {
+      const price = shown(this, value);
+      const text = formatMoney(price);
+      // "AED 163.50" names its currency already; "£ 5.10" is "£ 5.10 GBP".
+      return text.includes(price.currency) ? text : `${text} ${price.currency}`;
+    },
+    money_without_trailing_zeros: function (this: { context: Context }, value: unknown) {
+      return formatMoney(shown(this, value));
+    },
+    money_without_currency: function (this: { context: Context }, value: unknown) {
+      return formatMoney(shown(this, value), { display: 'none' });
+    },
+    /** Hatti's: rupees always, lakh and crore grouping, "Rs 1,25,000": what checkout charges. */
     money_pk: (value: unknown) => rupees(value, 'south-asian'),
 
     image_url: (image: unknown, ...args: unknown[]) => imageUrl(image, named(args)),
