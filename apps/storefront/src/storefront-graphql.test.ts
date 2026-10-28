@@ -393,3 +393,96 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
     expect((await ask(q.CART_QUERY!, { id: made.cart.id }, at)).data.cart.totalQuantity).toBe(0);
   });
 });
+
+describe("The Storefront API's menus, pages, blogs and policies (ADR-890)", () => {
+  const withPolicies = () => {
+    const store = new MemoryStore({
+      ...sample,
+      policies: { privacy_policy: '<p>We keep your number to deliver your order.</p>' },
+    });
+    return { ...api(), store, shop: { name: 'Zari', policies: ['privacy_policy'] } };
+  };
+
+  it('gives a menu by its handle, its links made absolute and typed', async () => {
+    const { data } = await ask(`{
+      menu(handle: "footer") { handle title itemsCount items { title url type items { title } } }
+      none: menu(handle: "nowhere") { handle }
+    }`);
+    expect(data.none).toBeNull();
+    expect(data.menu).toMatchObject({ handle: 'footer', title: 'Footer', itemsCount: 3 });
+    expect(data.menu.items[0]).toEqual({
+      title: 'Returns and exchanges',
+      url: 'https://zari.hatti.pk/pages/returns',
+      type: 'PAGE',
+      items: [],
+    });
+  });
+
+  it('gives pages by handle, by ID and a page at a time', async () => {
+    const { data } = await ask(`{
+      page(handle: "returns") { id handle title body bodySummary onlineStoreUrl }
+      pages(first: 2) { nodes { handle } pageInfo { hasNextPage endCursor } }
+    }`);
+    expect(data.page).toMatchObject({
+      handle: 'returns',
+      title: 'Returns and exchanges',
+      onlineStoreUrl: 'https://zari.hatti.pk/pages/returns',
+    });
+    expect(data.page.body).toContain('<strong>7 days</strong>');
+    expect(data.page.bodySummary).toMatch(/^Changed your mind\? Send it back within 7 days/);
+    const byId = await ask('query ($id: ID!) { page(id: $id) { handle } }', { id: data.page.id });
+    expect(byId.data.page).toEqual({ handle: 'returns' });
+    const handles = sample.pages!.map((page) => page.handle).sort();
+    expect(data.pages.nodes.map((each: Json) => each.handle)).toEqual(handles.slice(0, 2));
+    expect(data.pages.pageInfo.hasNextPage).toBe(handles.length > 2);
+  });
+
+  it("gives a blog's articles, the latest first, and an article by its handle", async () => {
+    const { data } = await ask(`{
+      blog(handle: "news") {
+        handle title onlineStoreUrl
+        articles(first: 5) { nodes { handle title excerpt authorV2 { name } blog { handle } } }
+        articleByHandle(handle: "eid-lawn-is-here") { title content onlineStoreUrl }
+      }
+      blogs(first: 5) { nodes { handle } }
+      articles(first: 10) { nodes { handle } }
+    }`);
+    expect(data.blog).toMatchObject({
+      handle: 'news',
+      title: 'News',
+      onlineStoreUrl: 'https://zari.hatti.pk/blogs/news',
+    });
+    expect(data.blog.articles.nodes.map((each: Json) => each.handle)).toEqual(
+      sample.articles!.map((article) => article.handle),
+    );
+    expect(data.blog.articles.nodes[0]).toMatchObject({
+      title: 'Eid lawn is here',
+      excerpt: 'Hand-block printed in Multan, out now.',
+      blog: { handle: 'news' },
+    });
+    expect(data.blog.articleByHandle).toMatchObject({
+      title: 'Eid lawn is here',
+      onlineStoreUrl: 'https://zari.hatti.pk/blogs/news/eid-lawn-is-here',
+    });
+    expect(data.blog.articleByHandle.content).toMatch(/^Our Eid lawn is hand-block printed/);
+    expect(data.blogs.nodes).toEqual([{ handle: 'news' }]);
+    expect(data.articles.nodes).toHaveLength(sample.articles!.length);
+  });
+
+  it('gives the policies the shop has, null for the rest', async () => {
+    const { data } = await ask(
+      '{ shop { privacyPolicy { handle title body url } refundPolicy { handle } } }',
+      undefined,
+      withPolicies(),
+    );
+    expect(data.shop).toEqual({
+      privacyPolicy: {
+        handle: 'privacy-policy',
+        title: 'Privacy policy',
+        body: '<p>We keep your number to deliver your order.</p>',
+        url: 'https://zari.hatti.pk/policies/privacy-policy',
+      },
+      refundPolicy: null,
+    });
+  });
+});

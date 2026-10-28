@@ -1,12 +1,18 @@
 import { createHash } from 'node:crypto';
 import type { CartActionResult, CartError, CartJson, CartLineJson } from '@hatti/storefront-api';
-import type {
-  CollectionDoc,
-  ImageDoc,
-  ProductDoc,
-  ShopDoc,
-  StoreData,
-  VariantDoc,
+import {
+  articleHandle,
+  type ArticleDoc,
+  type BlogDoc,
+  type CollectionDoc,
+  type ImageDoc,
+  type MenuLinkDoc,
+  type PageDoc,
+  type ProductDoc,
+  type SeoDoc,
+  type ShopDoc,
+  type StoreData,
+  type VariantDoc,
 } from '@hatti/storefront-data';
 import {
   GraphQLError,
@@ -20,6 +26,7 @@ import {
   type SelectionSetNode,
 } from 'graphql';
 import { imageAddress, unescapeHtml } from './liquid.js';
+import { POLICIES, policyTitle } from './policies.js';
 
 // The Storefront API (DEV-02, ADR-848): GraphQL for headless storefronts and shopping apps, at
 // the shop's own address, /api/<version>/graphql.json, as Shopify's, with a token of the shop's,
@@ -57,6 +64,21 @@ const SDL = /* GraphQL */ `
     collection(id: ID, handle: String): Collection
     collections(first: Int, after: String): CollectionConnection!
     cart(id: ID!): Cart
+    """
+    A menu of the shop's, by its handle: "main-menu", "footer" (ADR-890).
+    """
+    menu(handle: String!): Menu
+    page(id: ID, handle: String): Page
+    """
+    The shop's published pages, by their handles.
+    """
+    pages(first: Int, after: String): PageConnection!
+    blog(id: ID, handle: String): Blog
+    blogs(first: Int, after: String): BlogConnection!
+    """
+    Every blog's published articles, by their blogs' handles and their own.
+    """
+    articles(first: Int, after: String): ArticleConnection!
   }
 
   type Mutation {
@@ -72,6 +94,139 @@ const SDL = /* GraphQL */ `
     name: String!
     primaryDomain: Domain!
     moneyFormat: String!
+    """
+    The shop's policies, each null where it has none (ADR-890).
+    """
+    privacyPolicy: ShopPolicy
+    refundPolicy: ShopPolicy
+    shippingPolicy: ShopPolicy
+    termsOfService: ShopPolicy
+  }
+
+  type ShopPolicy {
+    id: ID!
+    handle: String!
+    title: String!
+    """
+    Its text, as HTML the online store cleaned.
+    """
+    body: String!
+    url: String!
+  }
+
+  type SEO {
+    title: String
+    description: String
+  }
+
+  enum MenuItemType {
+    FRONTPAGE
+    CATALOG
+    COLLECTION
+    COLLECTIONS
+    PRODUCT
+    PAGE
+    BLOG
+    ARTICLE
+    SEARCH
+    POLICY
+    HTTP
+  }
+
+  type MenuItem {
+    id: ID!
+    title: String!
+    """
+    A path on the storefront, absolute, or an address elsewhere.
+    """
+    url: String
+    type: MenuItemType!
+    items: [MenuItem!]!
+  }
+
+  type Menu {
+    id: ID!
+    handle: String!
+    title: String!
+    itemsCount: Int!
+    items: [MenuItem!]!
+  }
+
+  type Page {
+    id: ID!
+    handle: String!
+    title: String!
+    """
+    Its content, as HTML the online store cleaned.
+    """
+    body: String!
+    bodySummary: String!
+    createdAt: String!
+    updatedAt: String!
+    onlineStoreUrl: String
+    seo: SEO
+  }
+
+  type ArticleAuthor {
+    name: String!
+  }
+
+  type Article {
+    id: ID!
+    handle: String!
+    title: String!
+    content: String!
+    contentHtml: String!
+    excerpt: String
+    excerptHtml: String
+    authorV2: ArticleAuthor
+    tags: [String!]!
+    publishedAt: String!
+    image: Image
+    onlineStoreUrl: String
+    seo: SEO
+    blog: Blog!
+  }
+
+  type Blog {
+    id: ID!
+    handle: String!
+    title: String!
+    onlineStoreUrl: String
+    seo: SEO
+    """
+    Its published articles, the latest first.
+    """
+    articles(first: Int, after: String): ArticleConnection!
+    articleByHandle(handle: String!): Article
+  }
+
+  type PageEdge {
+    cursor: String!
+    node: Page!
+  }
+  type PageConnection {
+    edges: [PageEdge!]!
+    nodes: [Page!]!
+    pageInfo: PageInfo!
+  }
+  type BlogEdge {
+    cursor: String!
+    node: Blog!
+  }
+  type BlogConnection {
+    edges: [BlogEdge!]!
+    nodes: [Blog!]!
+    pageInfo: PageInfo!
+  }
+  type ArticleEdge {
+    cursor: String!
+    node: Article!
+  }
+  type ArticleConnection {
+    edges: [ArticleEdge!]!
+    nodes: [Article!]!
+    pageInfo: PageInfo!
   }
 
   type Domain {
@@ -340,9 +495,19 @@ export interface StorefrontApiShop {
   shopId: string;
   store: Pick<
     StoreData,
-    'products' | 'productByHandle' | 'productIds' | 'collectionByHandle' | 'handles'
+    | 'products'
+    | 'productByHandle'
+    | 'productIds'
+    | 'collectionByHandle'
+    | 'handles'
+    | 'menu'
+    | 'pageByHandle'
+    | 'blogByHandle'
+    | 'articleByHandle'
+    | 'articles'
+    | 'policy'
   >;
-  shop: Pick<ShopDoc, 'name'>;
+  shop: Pick<ShopDoc, 'name' | 'policies'>;
   /** The shop's products a search finds, the likeliest first. */
   search: (terms: string) => Promise<string[]>;
   carts: StorefrontApiCarts | null;
@@ -511,6 +676,120 @@ function variantOf(doc: ProductDoc, variant: VariantDoc, api: StorefrontApiShop)
     image: imageOf(variant.image !== null ? doc.images[variant.image] : doc.images[0], api.origin),
     product: () => productOf(doc, api),
   };
+}
+
+/** A menu's link, as Shopify's MenuItem: its type by what it links to (ADR-890). */
+function menuItemOf(link: MenuLinkDoc, key: string, api: StorefrontApiShop): unknown {
+  const types: Record<string, string> = {
+    frontpage_link: 'FRONTPAGE',
+    catalog_link: 'CATALOG',
+    collection_link: 'COLLECTION',
+    collections_link: 'COLLECTIONS',
+    product_link: 'PRODUCT',
+    page_link: 'PAGE',
+    blog_link: 'BLOG',
+    article_link: 'ARTICLE',
+    search_link: 'SEARCH',
+    policy_link: 'POLICY',
+  };
+  return {
+    id: gid('MenuItem', key),
+    title: link.title,
+    // A path on the storefront made absolute, for an app that is not on it.
+    url: link.url.startsWith('/') ? `${api.origin}${link.url}` : link.url,
+    type: types[link.type] ?? 'HTTP',
+    items: link.links.map((each, index) => menuItemOf(each, `${key}-${index}`, api)),
+  };
+}
+
+const seoOf = (seo: SeoDoc | undefined) =>
+  seo ? { title: seo.title ?? null, description: seo.description ?? null } : null;
+
+function pageOf(doc: PageDoc, api: StorefrontApiShop) {
+  return {
+    id: gid('Page', doc.id),
+    handle: doc.handle,
+    title: doc.title,
+    body: doc.bodyHtml,
+    bodySummary: plainOf(doc.bodyHtml).slice(0, 150),
+    createdAt: doc.publishedAt,
+    updatedAt: doc.updatedAt ?? doc.publishedAt,
+    onlineStoreUrl: `${api.origin}/pages/${encodeURIComponent(doc.handle)}`,
+    seo: seoOf(doc.seo),
+  };
+}
+
+function blogOf(doc: BlogDoc, api: StorefrontApiShop): Record<string, unknown> {
+  return {
+    id: gid('Blog', doc.id),
+    handle: doc.handle,
+    title: doc.title,
+    onlineStoreUrl: `${api.origin}/blogs/${encodeURIComponent(doc.handle)}`,
+    seo: seoOf(doc.seo),
+    articles: async (args: { first?: number; after?: string }) => {
+      const page = connection(doc.articles, args);
+      const docs = await api.store.articles(page.nodes.map((each) => each.id));
+      const edges = page.edges.flatMap((edge, index) =>
+        docs[index] ? [{ cursor: edge.cursor, node: articleOf(docs[index]!, doc, api) }] : [],
+      );
+      return { edges, nodes: edges.map((edge) => edge.node), pageInfo: page.pageInfo };
+    },
+    articleByHandle: async (args: { handle: string }) => {
+      const found = await api.store.articleByHandle(
+        articleHandle({ blogHandle: doc.handle, handle: args.handle }),
+      );
+      return found ? articleOf(found, doc, api) : null;
+    },
+  };
+}
+
+function articleOf(doc: ArticleDoc, blog: BlogDoc, api: StorefrontApiShop) {
+  return {
+    id: gid('Article', doc.id),
+    handle: doc.handle,
+    title: doc.title,
+    content: plainOf(doc.bodyHtml),
+    contentHtml: doc.bodyHtml,
+    excerpt: doc.summaryHtml ? plainOf(doc.summaryHtml) : null,
+    excerptHtml: doc.summaryHtml || null,
+    authorV2: doc.author ? { name: doc.author } : null,
+    tags: doc.tags,
+    publishedAt: doc.publishedAt,
+    image: imageOf(doc.image, api.origin),
+    onlineStoreUrl:
+      `${api.origin}/blogs/${encodeURIComponent(blog.handle)}/` + encodeURIComponent(doc.handle),
+    seo: seoOf(doc.seo),
+    blog: () => blogOf(blog, api),
+  };
+}
+
+/** A shop's policy of `type`, as Shopify's ShopPolicy; null where it has none. */
+async function policyOf(type: string, api: StorefrontApiShop) {
+  const kind = POLICIES.find((each) => each.type === type)!;
+  if (!(api.shop.policies ?? []).includes(type)) return null;
+  const body = await api.store.policy(type);
+  if (body === null) return null;
+  return {
+    id: gid('ShopPolicy', kind.handle),
+    handle: kind.handle,
+    title: policyTitle(kind, 'en'),
+    body,
+    url: `${api.origin}/policies/${kind.handle}`,
+  };
+}
+
+/** A page of the documents `handles` name, in the handles' order; those gone left out. */
+async function byHandles<T>(
+  handles: readonly string[],
+  args: { first?: number | null; after?: string | null },
+  read: (handle: string) => Promise<T | null>,
+) {
+  const page = connection([...handles].sort(), args);
+  const nodes = await Promise.all(page.nodes.map(read));
+  const edges = page.edges.flatMap((edge, index) =>
+    nodes[index] ? [{ cursor: edge.cursor, node: nodes[index]! }] : [],
+  );
+  return { edges, nodes: edges.map((edge) => edge.node), pageInfo: page.pageInfo };
 }
 
 function collectionOf(doc: CollectionDoc, api: StorefrontApiShop) {
@@ -688,7 +967,65 @@ function rootOf(api: StorefrontApiShop) {
       name: api.shop.name,
       primaryDomain: { host: new URL(api.origin).host, url: api.origin },
       moneyFormat: 'Rs {{amount}}',
+      privacyPolicy: () => policyOf('privacy_policy', api),
+      refundPolicy: () => policyOf('refund_policy', api),
+      shippingPolicy: () => policyOf('shipping_policy', api),
+      termsOfService: () => policyOf('terms_of_service', api),
     }),
+    menu: async (args: { handle: string }) => {
+      const doc = await api.store.menu(args.handle);
+      if (!doc) return null;
+      return {
+        id: gid('Menu', doc.handle),
+        handle: doc.handle,
+        title: doc.title,
+        itemsCount: doc.links.length,
+        items: doc.links.map((link, index) => menuItemOf(link, `${doc.handle}-${index}`, api)),
+      };
+    },
+    page: async (args: { id?: string | null; handle?: string | null }) => {
+      const wanted = args.id ? idOf('Page', args.id) : null;
+      if (args.handle) {
+        const doc = await api.store.pageByHandle(args.handle);
+        return doc && (!wanted || doc.id === wanted) ? pageOf(doc, api) : null;
+      }
+      if (!wanted) return null;
+      for (const handle of await api.store.handles('page')) {
+        const doc = await api.store.pageByHandle(handle);
+        if (doc?.id === wanted) return pageOf(doc, api);
+      }
+      return null;
+    },
+    pages: async (args: { first?: number; after?: string }) =>
+      byHandles(await api.store.handles('page'), args, async (handle) => {
+        const doc = await api.store.pageByHandle(handle);
+        return doc && pageOf(doc, api);
+      }),
+    blog: async (args: { id?: string | null; handle?: string | null }) => {
+      const wanted = args.id ? idOf('Blog', args.id) : null;
+      if (args.handle) {
+        const doc = await api.store.blogByHandle(args.handle);
+        return doc && (!wanted || doc.id === wanted) ? blogOf(doc, api) : null;
+      }
+      if (!wanted) return null;
+      for (const handle of await api.store.handles('blog')) {
+        const doc = await api.store.blogByHandle(handle);
+        if (doc?.id === wanted) return blogOf(doc, api);
+      }
+      return null;
+    },
+    blogs: async (args: { first?: number; after?: string }) =>
+      byHandles(await api.store.handles('blog'), args, async (handle) => {
+        const doc = await api.store.blogByHandle(handle);
+        return doc && blogOf(doc, api);
+      }),
+    articles: async (args: { first?: number; after?: string }) =>
+      byHandles(await api.store.handles('article'), args, async (handle) => {
+        const doc = await api.store.articleByHandle(handle);
+        if (!doc) return null;
+        const blog = await api.store.blogByHandle(doc.blogHandle);
+        return blog && articleOf(doc, blog, api);
+      }),
     product: async (args: { id?: string | null; handle?: string | null }) => {
       const id = args.id ? idOf('Product', args.id) : null;
       const doc = id
