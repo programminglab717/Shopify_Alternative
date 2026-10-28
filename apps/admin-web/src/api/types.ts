@@ -6279,3 +6279,27 @@ export interface ThemeExperimentPayloadData {
   themeExperimentStart?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
   themeExperimentEnd?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
 }
+
+/** A function an app gives the shop's checkout (DEV-07, ADR-868). */
+export interface AppFunction {
+  id: string;
+  appName: string;
+  title: string;
+  target: 'payment_customization' | 'cart_validation';
+  enabled: boolean;
+  /** Its settings, as JSON. */
+  configuration: string;
+  lastError: string | null;
+  failedAt: string | null;
+}
+
+export interface AppFunctionsData {
+  appFunctions: AppFunction[];
+}
+
+export interface AppFunctionEnableData {
+  appFunctionEnable: {
+    appFunction: Pick<AppFunction, 'id' | 'enabled' | 'configuration'> | null;
+    userErrors: UserError[];
+  };
+}

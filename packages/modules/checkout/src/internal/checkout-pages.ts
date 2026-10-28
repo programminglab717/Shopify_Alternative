@@ -297,7 +297,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     problem?.kind === 'address' ||
     problem?.kind === 'vague_address' ||
     problem?.kind === 'discount' ||
-    problem?.kind === 'gift_card'
+    problem?.kind === 'gift_card' ||
+    problem?.kind === 'validation'
       ? 422
       : problem?.kind === 'too_many'
         ? 429
@@ -1623,7 +1624,10 @@ function codRefusalWords(refusal: CodRefusal, ways: PrepaidWays): Sentence {
         ur: html`${text(urdu)} میں ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
       };
     }
+    // Its refusals before, or the shop's apps' payment customisations, as the shop asked them
+    // (ADR-868).
     case 'customer':
+    case 'app':
       return {
         en: `Cash on delivery isn't available for this order.${instead.en}`,
         ur: `اس آرڈر کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
@@ -1989,6 +1993,12 @@ function problemWords(
       return codeWords(problem);
     case 'recall':
       return recallWords(problem);
+    // In the app's own words, which the shop chose to run (ADR-868).
+    case 'validation':
+      return {
+        en: problem.messages.join(' '),
+        ur: 'دکان یہ آرڈر ابھی نہیں لے سکتی، اوپر وجہ دیکھیں۔',
+      };
     case 'changed':
       return {
         en:

@@ -180,6 +180,8 @@ export const ID_PREFIXES = {
   orderSubscription: 'osub',
   // A shop's theme experiment: a draft theme shown a share of its shoppers (ADR-866).
   themeExperiment: 'texp',
+  // A function an app gives the shop's checkout (ADR-868).
+  appFunction: 'afun',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

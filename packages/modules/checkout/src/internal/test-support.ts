@@ -35,6 +35,7 @@ import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
 import { HattiPassSetting } from './hatti-pass.js';
+import type { CheckoutFunctions } from './checkout-functions.js';
 import { CheckoutService } from './checkout.service.js';
 import type { DropTokens } from './drop-tokens.js';
 import { CodRulesService } from './cod-rules.service.js';
@@ -123,6 +124,8 @@ export interface CheckoutFixture {
   testDb: TestDatabase;
   /** Checkouts that take drops' tokens from `dropTokens` (ADR-821). */
   checkoutsWith: (dropTokens: DropTokens) => CheckoutService;
+  /** Checkouts that ask `functions` of the shop's apps' functions (ADR-868). */
+  checkoutsWithFunctions: (functions: CheckoutFunctions) => CheckoutService;
   db: Database;
   admin: pg.Client;
   /** Two shops, so every test can check the other one sees nothing. */
@@ -278,6 +281,22 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         new PublicSite('https://hatti.test'),
         null,
         dropTokens,
+      ),
+    checkoutsWithFunctions: (functions: CheckoutFunctions) =>
+      new CheckoutService(
+        db,
+        carts,
+        delivery,
+        orders,
+        storefronts,
+        storage,
+        new MessagesService(db),
+        payments,
+        new PublicSite('https://hatti.test'),
+        null,
+        null,
+        null,
+        functions,
       ),
     abandoned: new AbandonedCheckoutService(
       db,

@@ -12846,3 +12846,35 @@ export const ThemeExperimentEndMutation = /* GraphQL */ `
   ${THEME_EXPERIMENT}
   ${USER_ERRORS}
 `;
+
+/** The functions the shop's apps give its checkout (DEV-07, ADR-868). */
+export const AppFunctionsQuery = /* GraphQL */ `
+  query AppFunctions {
+    appFunctions {
+      id
+      appName
+      title
+      target
+      enabled
+      configuration
+      lastError
+      failedAt
+    }
+  }
+`;
+
+export const AppFunctionEnableMutation = /* GraphQL */ `
+  mutation AppFunctionEnable($id: ID!, $enabled: Boolean!, $configuration: String) {
+    appFunctionEnable(id: $id, enabled: $enabled, configuration: $configuration) {
+      appFunction {
+        id
+        enabled
+        configuration
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

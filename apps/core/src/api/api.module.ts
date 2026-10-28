@@ -8,7 +8,7 @@ import {
   SystemDnsLookup,
   type ApiContext,
 } from '@hatti/api';
-import { AppsModule } from '@hatti/apps/public';
+import { AppsModule, FunctionRunner } from '@hatti/apps/public';
 import {
   BillingModule,
   type HattiBankAccount,
@@ -17,7 +17,13 @@ import {
   type SupportContact,
 } from '@hatti/billing/public';
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
-import { CheckoutModule, DropTokens, HattiPassSetting } from '@hatti/checkout/public';
+import {
+  CheckoutFunctions,
+  CheckoutModule,
+  DropTokens,
+  HattiPassSetting,
+} from '@hatti/checkout/public';
+import { AppCheckoutFunctions } from './checkout-functions.js';
 import { RedisDropTokens } from '../drop-tokens.js';
 import { MessagingDeliveryCodes } from '../delivery-codes.js';
 import { SecretBox } from '@hatti/crypto';
@@ -188,6 +194,8 @@ export interface ApiModuleOptions {
   mapTiles?: MapTiles | null;
   /** Whether checkout offers Hatti Pass (ADR-867); off unless set. */
   hattiPass?: boolean;
+  /** Where apps' functions run (ADR-868); a worker of the API's own unless given. */
+  functionRunner?: FunctionRunner;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
   couriers?: Couriers;
   /**
@@ -257,6 +265,11 @@ class InfrastructureModule {
         { provide: AiGateway, useValue: options.ai ?? null },
         { provide: MapTiles, useValue: options.mapTiles ?? null },
         { provide: HattiPassSetting, useValue: new HattiPassSetting(options.hattiPass ?? false) },
+        // The shop's apps' functions, run in a worker of their own (ADR-868).
+        {
+          provide: CheckoutFunctions,
+          useValue: new AppCheckoutFunctions(options.functionRunner ?? new FunctionRunner()),
+        },
         // The codes customers give the shop's own riders, sent as messages are (ADR-824).
         {
           provide: DeliveryCodeSender,

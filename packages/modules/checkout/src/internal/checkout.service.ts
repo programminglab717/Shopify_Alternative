@@ -126,6 +126,7 @@ import { orderItemsIn } from './discount-items.js';
 import { checkoutTotals } from './totals.js';
 import { StockHolds } from './stock-holds.js';
 import { HattiPassSetting, forgetPassIn, passAddressIn, savePassIn } from './hatti-pass.js';
+import { CheckoutFunctions, functionInputOf } from './checkout-functions.js';
 import { DropTokens, type DropClaim } from './drop-tokens.js';
 import { storefrontUrlIn } from './storefront-url.js';
 import { trustBadgesIn } from './trust-badge.service.js';
@@ -416,6 +417,8 @@ export interface CheckoutPayments {
 export type CheckoutProblem =
   /** The cart, or what delivery costs, changed after the page showed it. */
   | { kind: 'changed' }
+  /** The shop's apps' cart validations refused the order, saying why (ADR-868). */
+  | { kind: 'validation'; messages: string[] }
   /** The address or number does not check out. */
   | { kind: 'address'; errors: FieldError[] }
   /**
@@ -726,6 +729,10 @@ export class CheckoutService {
     @Optional() @Inject(DropTokens) private readonly dropTokens?: DropTokens | null,
     /** Whether checkout offers Hatti Pass (ADR-867); off without it. */
     @Optional() @Inject(HattiPassSetting) private readonly hattiPass?: HattiPassSetting | null,
+    /** The shop's apps' functions (ADR-868); without them, checkout runs none. */
+    @Optional()
+    @Inject(CheckoutFunctions)
+    private readonly functions?: CheckoutFunctions | null,
   ) {}
 
   /** Stock held while shoppers check out (ADR-715). */
@@ -1581,6 +1588,16 @@ export class CheckoutService {
         pastLimit > 0n
           ? { due: advance.due > pastLimit ? advance.due : pastLimit, ifRisky: null }
           : advance;
+      // What the shop's apps' cart validations say is wrong refuses the order (ADR-868).
+      if (this.functions) {
+        const messages = await this.functions.validationErrors(
+          tx,
+          found.shopId,
+          functionInputOf(view.cart, profile.currency, form, paymentMethod ? [paymentMethod] : []),
+        );
+        if (messages.length > 0)
+          return { ...view, form, problem: { kind: 'validation', messages } };
+      }
       const placed = await this.#placeHeld(tx, found, (savepoint) =>
         this.orders.placeIn(
           savepoint,
@@ -1919,7 +1936,7 @@ export class CheckoutService {
       ownAdvance === null && !mayPassLimit
         ? null
         : (transfer?.account ?? (await bankTransferSettingsIn(tx, shopId)).account);
-    const payments: CheckoutPayments = {
+    const offeredPayments: CheckoutPayments = {
       // A link the shop takes prepaid alone (ADR-248) offers no cash on delivery at all.
       codRefusal: link?.prepaidOnly
         ? { reason: 'link' }
@@ -1938,6 +1955,14 @@ export class CheckoutService {
       online,
       onlineDiscount,
     };
+    const payments = await this.#customizedPayments(
+      tx,
+      shopId,
+      offeredPayments,
+      priced,
+      profile.currency,
+      form,
+    );
     const { codRefusal } = payments;
     const tax = await taxSettingsIn(tx, shopId);
     const storeCredit = await shopGivesStoreCreditIn(tx, shopId);
@@ -1978,6 +2003,40 @@ export class CheckoutService {
           : codRefusal.reason === 'law'
             ? { kind: 'cod_limit' }
             : { kind: 'cod_unavailable', refusal: codRefusal },
+    };
+  }
+
+  /**
+   * The ways to pay the page offers, less those the shop's apps' payment customisations hide
+   * (ADR-868): cash on delivery refused for the app, a transfer or paying online not offered.
+   */
+  async #customizedPayments(
+    tx: Tx,
+    shopId: string,
+    payments: CheckoutPayments,
+    cart: CartJson,
+    currency: string,
+    form: CheckoutForm,
+  ): Promise<CheckoutPayments> {
+    const offered = [
+      payments.codRefusal === null ? 'cash_on_delivery' : null,
+      payments.bankTransfer ? 'bank_transfer' : null,
+      payments.online ? 'online' : null,
+    ].filter((each): each is string => each !== null);
+    if (!this.functions || offered.length === 0) return payments;
+    const hidden = new Set(
+      await this.functions.hiddenPaymentMethods(
+        tx,
+        shopId,
+        functionInputOf(cart, currency, form, offered),
+      ),
+    );
+    if (hidden.size === 0) return payments;
+    return {
+      ...payments,
+      ...(hidden.has('cash_on_delivery') && { codRefusal: { reason: 'app' as const } }),
+      ...(hidden.has('bank_transfer') && { bankTransfer: null, transferDiscount: null }),
+      ...(hidden.has('online') && { online: null, onlineDiscount: null }),
     };
   }
 

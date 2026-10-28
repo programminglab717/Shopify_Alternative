@@ -4545,6 +4545,17 @@ const en = {
   'error.SSO_SESSION':
     'Signed in through your organisation, you can work in its shop alone. Sign in with your password to change your account.',
   'settings.workflows': 'Workflows',
+  'appFunctions.title': "Apps' checkout functions",
+  'appFunctions.hint':
+    'Functions your apps give your checkout: hiding a way to pay, such as cash on delivery above an amount, or refusing an order, saying why. Each is off until you turn it on. One that fails is skipped, and checkout goes on.',
+  'appFunctions.none': 'No app gives a function.',
+  'appFunctions.by': 'By {app}',
+  'appFunctions.payments': 'Hides ways to pay',
+  'appFunctions.validation': 'Checks orders before they are placed',
+  'appFunctions.settings': 'Settings of {name}',
+  'appFunctions.settingsHint': 'As its app asks, in JSON: {"above": 1000000}.',
+  'appFunctions.saveSettings': 'Save settings',
+  'appFunctions.failed': 'Last failed {date}: {error}. Checkout went on without it.',
   'experiments.title': 'Experiments',
   'experiments.hint':
     'Try a draft theme on some of your shoppers before publishing it: a new home page, other sections, an offer’s banner. The rest see your live theme, and each shopper keeps the theme they first see. Hatti counts each theme’s visits, carts and orders, and ends an experiment whose draft sells clearly worse.',
@@ -11213,6 +11224,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'error.SSO_SESSION':
     'اپنے ادارے کے ذریعے سائن ان ہو کر آپ صرف اسی کی دکان میں کام کر سکتے ہیں۔ اپنا اکاؤنٹ بدلنے کے لیے پاس ورڈ سے سائن ان کریں۔',
   'settings.workflows': 'ورک فلو',
+  'appFunctions.title': 'ایپس کے چیک آؤٹ فنکشنز',
+  'appFunctions.hint':
+    'وہ فنکشنز جو آپ کی ایپس آپ کے چیک آؤٹ کو دیتی ہیں: ادائیگی کا کوئی طریقہ چھپانا، جیسے ایک رقم سے زیادہ پر کیش آن ڈیلیوری، یا وجہ بتا کر آرڈر روکنا۔ ہر ایک تب تک بند رہتا ہے جب تک آپ اسے آن نہ کریں۔ جو ناکام ہو اسے چھوڑ دیا جاتا ہے، اور چیک آؤٹ چلتا رہتا ہے۔',
+  'appFunctions.none': 'کوئی ایپ فنکشن نہیں دیتی۔',
+  'appFunctions.by': 'از {app}',
+  'appFunctions.payments': 'ادائیگی کے طریقے چھپاتا ہے',
+  'appFunctions.validation': 'آرڈر دینے سے پہلے جانچتا ہے',
+  'appFunctions.settings': '{name} کی سیٹنگز',
+  'appFunctions.settingsHint': 'جیسے اس کی ایپ کہے، JSON میں: {"above": 1000000}۔',
+  'appFunctions.saveSettings': 'سیٹنگز محفوظ کریں',
+  'appFunctions.failed': 'آخری بار {date} کو ناکام ہوا: {error}۔ چیک آؤٹ اس کے بغیر چلتا رہا۔',
   'experiments.title': 'تجربے',
   'experiments.hint':
     'ڈرافٹ تھیم شائع کرنے سے پہلے اسے کچھ خریداروں پر آزمائیں: نیا ہوم پیج، دوسرے سیکشنز، کسی آفر کا بینر۔ باقی آپ کی لائیو تھیم دیکھتے ہیں، اور ہر خریدار وہی تھیم دیکھتا رہتا ہے جو اس نے پہلے دیکھی۔ ہٹی ہر تھیم کے وزٹ، کارٹس اور آرڈرز گنتی ہے، اور جس ڈرافٹ کی فروخت واضح طور پر کم ہو وہ تجربہ ختم کر دیتی ہے۔',

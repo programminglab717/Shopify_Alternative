@@ -36,6 +36,7 @@ import { FormSection } from '../products/product-form';
 import { SelectField } from './settings-form';
 import { AppWebhooks } from './app-webhooks';
 import { AppEmbeds } from './app-embeds';
+import { AppFunctions } from './app-functions';
 import { InstalledApps } from './installed-apps';
 import { StorefrontTokens } from './storefront-tokens';
 import { BackToSettings } from './settings-page';
@@ -457,6 +458,7 @@ export function AppsPage() {
       {body()}
       <InstalledApps />
       <AppEmbeds />
+      <AppFunctions />
       <StorefrontTokens />
     </div>
   );

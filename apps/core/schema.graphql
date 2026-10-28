@@ -359,6 +359,62 @@ type AppEmbedPayload {
 }
 
 """
+A function an app gives the shop's checkout (DEV-07, ADR-868): a WebAssembly module checkout runs on what it is about to offer, once the owner or a manager turns it on.
+"""
+type AppFunction {
+  """The app giving it."""
+  appId: ID!
+  appName: String!
+
+  """The module’s size as it runs."""
+  bytes: Int!
+
+  """Its settings, as JSON: the function reads them as configuration."""
+  configuration: String!
+
+  """Whether checkout runs it: off until the shop turns it on."""
+  enabled: Boolean!
+  failedAt: DateTime
+
+  """The app's own name for it: "cod-above-limit"."""
+  handle: String!
+  id: ID!
+
+  """Its last failure: past its time, or no answer."""
+  lastError: String
+
+  """
+  payment_customization, hiding ways to pay; or cart_validation, refusing an order with a message.
+  """
+  target: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+type AppFunctionDeletePayload {
+  deletedAppFunctionId: ID
+  userErrors: [UserError!]!
+}
+
+input AppFunctionInput {
+  handle: String!
+
+  """payment_customization or cart_validation."""
+  target: String!
+  title: String!
+
+  """
+  The module, base64: a WASI command reading its input as JSON on standard input and writing its answer as JSON on standard output, 256 KiB at most.
+  """
+  wasm: String!
+}
+
+type AppFunctionPayload {
+  appFunction: AppFunction
+  userErrors: [UserError!]!
+}
+
+"""
 An installed app's one-time charge of the shop, in rupees (DEV-05, ADR-854), as Shopify's AppPurchaseOneTime: approved by its owner, then paid as an invoice of Hatti's.
 """
 type AppPurchaseOneTime {
@@ -9451,6 +9507,19 @@ type Mutation {
   """
   appEmbedSet(input: AppEmbedInput!): AppEmbedPayload!
 
+  """Takes back the calling app's function."""
+  appFunctionDelete(handle: String!): AppFunctionDeletePayload!
+
+  """
+  Turns an app's function on or off, with its settings as JSON where given: the owner's and managers' to do.
+  """
+  appFunctionEnable(configuration: String, enabled: Boolean!, id: ID!): AppFunctionPayload!
+
+  """
+  Gives the calling app's function, or a new version of it by its handle: off until the shop turns it on, and as it was for a new version.
+  """
+  appFunctionSet(input: AppFunctionInput!): AppFunctionPayload!
+
   """
   Approves an app's charge: an invoice, paid with billingInvoicePay; a test is paid at once. The owner alone, having signed in lately.
   """
@@ -15779,6 +15848,9 @@ type Query {
   The calling app's storefront scripts; for staff, every app's the shop has.
   """
   appEmbeds: [AppEmbed!]!
+
+  """The calling app's functions; for staff, every app's the shop has."""
+  appFunctions: [AppFunction!]!
   appPurchaseOneTime(id: ID!): AppPurchaseOneTime
 
   """

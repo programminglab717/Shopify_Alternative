@@ -103,6 +103,18 @@ function core() {
       enabled: false,
     },
   ];
+  let functions: Record<string, unknown>[] = [
+    {
+      id: 'afun_1',
+      appName: 'COD guard',
+      title: 'Hide cash on delivery above Rs 10,000',
+      target: 'payment_customization',
+      enabled: false,
+      configuration: '{}',
+      lastError: 'It ran past 50 ms',
+      failedAt: EARLIER,
+    },
+  ];
   let subscriptions: Record<string, unknown>[] = [
     {
       id: 'whs_1',
@@ -248,6 +260,24 @@ function core() {
           return {
             appEmbedEnable: {
               appEmbed: { id: variables.id, enabled: variables.enabled },
+              userErrors: [],
+            },
+          };
+        case 'AppFunctions':
+          return { appFunctions: functions };
+        case 'AppFunctionEnable':
+          functions = functions.map((each) =>
+            each.id === variables.id
+              ? {
+                  ...each,
+                  enabled: variables.enabled,
+                  configuration: variables.configuration ?? each.configuration,
+                }
+              : each,
+          );
+          return {
+            appFunctionEnable: {
+              appFunction: functions.find((each) => each.id === variables.id),
               userErrors: [],
             },
           };
@@ -524,6 +554,34 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
     const frame = (await screen.findByTitle('Reviews Pro, inside Hatti')) as HTMLIFrameElement;
     expect(frame.src).toBe('https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=jwt');
     expect(sentOf(fake, 'AppSession')).toEqual([{ id: 'tok_9' }]);
+  });
+
+  it("turns apps' checkout functions on with their settings, and says when one failed (DEV-07)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/apps');
+
+    const functions = await screen.findByRole('region', { name: "Apps' checkout functions" });
+    expect(
+      await within(functions).findByText('Hide cash on delivery above Rs 10,000'),
+    ).toBeTruthy();
+    expect(within(functions).getByText('By COD guard · Hides ways to pay')).toBeTruthy();
+    expect(within(functions).getByText(/Checkout went on without it\./)).toBeTruthy();
+    fireEvent.change(
+      within(functions).getByLabelText('Settings of Hide cash on delivery above Rs 10,000'),
+      { target: { value: '{"above":1000000}' } },
+    );
+    fireEvent.click(
+      within(functions).getByRole('button', {
+        name: 'Turn on Hide cash on delivery above Rs 10,000',
+      }),
+    );
+    await waitFor(() =>
+      expect(sentOf(fake, 'AppFunctionEnable')).toEqual([
+        { id: 'afun_1', enabled: true, configuration: '{"above":1000000}' },
+      ]),
+    );
+    expect(await within(functions).findByText('On')).toBeTruthy();
   });
 
   it('says so of an app not installed', async () => {

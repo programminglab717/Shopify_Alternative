@@ -166,7 +166,9 @@ export type CodRefusal =
   /** It was opened from a payment link the shop takes prepaid alone (ADR-248). */
   | { reason: 'link' }
   /** It holds digital products alone, which no rider delivers (ADR-815). */
-  | { reason: 'digital' };
+  | { reason: 'digital' }
+  /** One of the shop's apps' payment customisations hides it for this cart (ADR-868). */
+  | { reason: 'app' };
 
 /** A product in an order, as the shop's rules for cash on delivery see it. */
 export interface CodProduct {

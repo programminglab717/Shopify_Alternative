@@ -81,3 +81,19 @@ export {
   type WorkflowRunOutcome,
   type WorkflowRunRecord,
 } from '../internal/workflows.service.js';
+export {
+  APP_FUNCTION_LIMITS,
+  AppFunctionService,
+  FUNCTION_TARGETS,
+  PAYMENT_METHODS,
+  enabledFunctionsIn,
+  hiddenPaymentMethodsOf,
+  recordFunctionFailureIn,
+  validationErrorsOf,
+  type AppFunctionRecord,
+  type FunctionTarget,
+  type PaymentMethodName,
+  type RunnableFunction,
+} from '../internal/app-functions.service.js';
+export { FunctionRunner, RUN_LIMITS, type RunResult } from '../internal/function-runner.js';
+export { WASM_LIMITS, WasmError, capWasm } from '../internal/wasm.js';
