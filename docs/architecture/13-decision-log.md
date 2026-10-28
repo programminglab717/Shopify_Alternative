@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-899 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-900 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -907,6 +907,7 @@
 | 897 | Bulk mutations: bulkOperationRunMutation runs a mutation once for each line of a JSONL file of variables the caller staged, as the caller, in order, each answer a line of the file it writes | Accepted |
 | 898 | An order paid on delivery that no one location has all of may be split among those that do as it is placed, as the shop allows: each part an order of its own, shipped from its location at the shop's cost | Accepted |
 | 899 | An affiliate sees their own figures at a secret link the shop sends them: their link, code and share, what their orders came to and earned, and their latest orders, nothing of their customers | Accepted |
+| 900 | Spin to win: a wheel of 2 to 8 offers on the theme's sign-up pop-up, a shopper's number signing them up and spinning once, the slice chosen by weight on the platform and given as a single-use code of their own | Accepted |
 
 ---
 
@@ -29819,3 +29820,37 @@
   * Anyone with the link sees the figures, as anyone with an order's link sees the order. A shop
     that suspects it has been passed on makes a new one.
   * Paying affiliates through Hatti still needs a payments partner (PAY-10).
+
+## ADR-900 · Spin to win: a wheel of 2 to 8 offers on the theme's sign-up pop-up, a shopper's number signing them up and spinning once, the slice chosen by weight on the platform and given as a single-use code of their own
+
+* **Context:** OS-08 asks for spin-to-win, which Shopify shops add with an app. ADR-457 gave Hatti
+  Base a sign-up pop-up with one code for everyone; shops want a game that gives each shopper a
+  code of their own, so codes are not passed round.
+* **Decision:**
+  * **The wheel,** under Marketing › Spin to win and `spinWheel` / `spinWheelUpdate`
+    (`read_discounts`, `write_discounts`; migration 0398):
+    * 2 to 8 slices, each with words of up to 24 characters, what it gives (a percentage or an
+      amount off, free delivery, or nothing) and a weight from 1 to 100;
+    * the days its codes work, 1 to 90, and a minimum order;
+    * slices are checked as discount codes are, so every slice can become a code;
+    * every slice weighs something, so none is a prize that never comes up.
+  * **A spin,** `POST /storefront/shops/{shop}/spins` through the storefront's `POST /spin`
+    (JSON, from the shop's own pages, ten a minute from an address):
+    * signs the shopper up for the shop's news and offers on WhatsApp, as the shop's form does
+      (ADR-189), tagged `spin`;
+    * chooses the slice by weight on the platform with a cryptographic random number, never on
+      the page;
+    * makes a code `SPIN-` and eight letters for a slice that gives something: one order, once a
+      customer, for the wheel's days, with its minimum, counted among the shop's codes;
+    * once a number: a number that spun before, in any form of it, gets its slice and code again,
+      and two spins at once wait for each other.
+  * **Hatti Base's sign-up pop-up** has a "Show the spin-to-win wheel" setting. With it on, and
+    the shop's wheel on, the pop-up draws the wheel from `GET /spin.json`, posts the number and
+    turns the wheel to where the platform stopped it. Without scripts, or with the wheel off, it
+    is the plain sign-up.
+  * **Customers' data:** a customer's spins are in their export and go with their erasure. The
+    codes stay, as other codes do.
+* **Consequences:**
+  * Shops get spin-to-win without an app, and each shopper's code is their own and works once.
+  * A shop whose 10,000 codes are full gives no spins until it deletes some.
+  * A customer who is erased can spin again with the same number.

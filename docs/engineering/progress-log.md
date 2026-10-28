@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) are built; next, the Growth rows' smaller gaps: combined listings as one card in collections (CAT-23). Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; next, the Growth rows' smaller gaps: combined listings as one card in collections (CAT-23). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### Spin to win
+
+* **A wheel of offers** on Hatti Base's sign-up pop-up: a shopper's number signs them up and
+  spins once, the platform chooses the slice by weight, and a slice that gives something is a
+  single-use code of their own ([ADR-900](../architecture/13-decision-log.md#adr-900--spin-to-win-a-wheel-of-2-to-8-offers-on-the-themes-sign-up-pop-up-a-shoppers-number-signing-them-up-and-spinning-once-the-slice-chosen-by-weight-on-the-platform-and-given-as-a-single-use-code-of-their-own)).
+* **Marketing › Spin to win** sets the slices, the codes' days and their minimum.
+* 4884 tests (17 new).
 
 ### be1dfd6 · Affiliates' own pages
 
