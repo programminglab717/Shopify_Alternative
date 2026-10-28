@@ -167,7 +167,12 @@ import { StatusShopNotices } from './status-shop-notices.js';
 import { LegalChangeNotices } from './legal-notices.js';
 import { OrderTemplates } from './order-templates.js';
 import { StatusProbes } from './status-probes.js';
-import { IncidentsService, StatusSubscriptionsService } from '@hatti/trust/public';
+import {
+  IncidentsService,
+  StatusSubscriptionsService,
+  StoreSignalsService,
+} from '@hatti/trust/public';
+import { StoreSignals } from './store-signals.js';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
@@ -550,6 +555,9 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => waiting.stop());
+    // Signs of scam stores, for Hatti's people to look into (ADR-842).
+    const storeSignals = new StoreSignals(new StoreSignalsService(database), logger).start();
+    closers.push(() => storeSignals.stop());
     // Shops' push campaigns to their shoppers' browsers, in marketing hours (ADR-834).
     const pushCampaigns = new PushCampaigns(
       new ShopperPushService(database, vapid && new WebPushSender(vapid)),

@@ -70,6 +70,17 @@ export {
   type RightsListing,
   type RightsStatus,
 } from '../internal/rights.service.js';
+// Signs of a scam store, for Hatti's people (TNS-02, ADR-842).
+export {
+  SIGNAL_KINDS,
+  SIGNAL_LIMITS,
+  SIGNAL_RULES,
+  StoreSignalsService,
+  nameKey,
+  withinEdits,
+  type SignalKind,
+  type StoreSignalRecord,
+} from '../internal/signals.service.js';
 export { appealPage } from '../internal/appeal-page.js';
 export { AppealController } from '../internal/appeal.controller.js';
 export { ReportsController } from '../internal/reports.controller.js';

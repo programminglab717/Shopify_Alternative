@@ -8,11 +8,15 @@ import {
   REPORT_REASONS,
   ReportsService,
   RightsComplaintsService,
+  SIGNAL_KINDS,
+  StoreSignalsService,
   TakedownsService,
   VerificationsService,
   type AppealRecord,
   type ReportRecord,
   type RightsComplaintRecord,
+  type SignalKind,
+  type StoreSignalRecord,
   type TakedownRecord,
   type VerificationLevel,
   type VerificationReview,
@@ -86,6 +90,13 @@ import { approveVerification, refuseVerification, revokeVerification } from './v
 //   pnpm --filter @hatti/core trust-reports counters [--all]
 //   pnpm --filter @hatti/core trust-reports refuse-counter ipc_… --by Ayesha --note "…"
 //   pnpm --filter @hatti/core trust-reports release-rights ipc_… --by Ayesha --note "Withdrawn"
+//
+// Signs of a scam store, found by the worker each day (TNS-02, ADR-842): a young store keeping
+// paid orders unshipped, a catalogue copied from an older store, a name that is a verified
+// store's. Each is looked into; one found to be nothing is cleared, and not raised again:
+//
+//   pnpm --filter @hatti/core trust-reports signals [--all]
+//   pnpm --filter @hatti/core trust-reports clear-signal quick-deals --kind prepaid_unshipped --by Ayesha --note "Pre-orders"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -110,7 +121,9 @@ const USAGE =
   '       trust-reports uphold-rights <complaint> --by <who> --note <why, as the owner is told>\n' +
   '       trust-reports counters [--all]\n' +
   '       trust-reports refuse-counter <complaint> --by <who> --note <why, as the owner is told>\n' +
-  '       trust-reports release-rights <complaint> --by <who> --note <why, as the owner is told>';
+  '       trust-reports release-rights <complaint> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports signals [--all]\n' +
+  `       trust-reports clear-signal <shop> --kind <${SIGNAL_KINDS.join('|')}> --by <who> --note <why>`;
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -125,6 +138,8 @@ type Command =
   | { command: 'verifications'; all: boolean }
   | { command: 'senders'; all: boolean }
   | { command: 'rights'; all: boolean }
+  | { command: 'signals'; all: boolean }
+  | { command: 'clear-signal'; shop: string; kind: SignalKind; by: string; note: string }
   | { command: 'dismiss-rights'; id: string; complaint: string; by: string; note: string }
   | { command: 'uphold-rights'; id: string; complaint: string; by: string; note: string }
   | { command: 'counters'; all: boolean }
@@ -165,8 +180,20 @@ const verifications = new VerificationsService(
 );
 const senders = new SmsSendersService(database);
 const rights = new RightsComplaintsService(database);
+const signals = new StoreSignalsService(database);
 try {
-  if (parsed.command === 'rights') {
+  if (parsed.command === 'signals') {
+    const found = await signals.list({ all: parsed.all });
+    if (found.length === 0) console.log(parsed.all ? 'No sign found yet.' : 'No sign stands.');
+    for (const signal of found) console.log(signalLine(signal));
+  } else if (parsed.command === 'clear-signal') {
+    if (await signals.clear(parsed.shop, parsed.kind, parsed.by, parsed.note)) {
+      console.log(`Cleared: ${parsed.kind} of ${parsed.shop}.`);
+    } else {
+      console.error(`No ${parsed.kind} stands for ${parsed.shop}: see the signals.`);
+      process.exitCode = 1;
+    }
+  } else if (parsed.command === 'rights') {
     const found = await rights.list({ all: parsed.all });
     if (found.length === 0) {
       console.log(parsed.all ? 'No rights complaint yet.' : 'No rights complaint is open.');
@@ -569,10 +596,22 @@ function parseCommand(args: string[]): Command {
       note: { type: 'string' },
       reason: { type: 'string' },
       level: { type: 'string' },
+      kind: { type: 'string' },
     },
   });
   const [command, id, ...rest] = positionals;
   if (rest.length > 0) throw new Error(`Unexpected: ${rest.join(' ')}`);
+  if (command === 'clear-signal') {
+    if (!id) throw new Error('Name the shop, by its handle');
+    const kind = values.kind as SignalKind | undefined;
+    if (!kind || !SIGNAL_KINDS.includes(kind)) {
+      throw new Error(`Say which sign: --kind ${SIGNAL_KINDS.join('|')}`);
+    }
+    if (!values.by?.trim() || !values.note?.trim()) {
+      throw new Error('Say who you are (--by) and why it is nothing (--note)');
+    }
+    return { command, shop: id, kind, by: values.by, note: values.note };
+  }
   if (
     command === 'list' ||
     command === 'takedowns' ||
@@ -580,7 +619,8 @@ function parseCommand(args: string[]): Command {
     command === 'verifications' ||
     command === 'senders' ||
     command === 'rights' ||
-    command === 'counters'
+    command === 'counters' ||
+    command === 'signals'
   ) {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
@@ -676,4 +716,17 @@ function parseCommand(args: string[]): Command {
     return { command, shop: id, reason, by, note };
   }
   return { command, id, report: tryFromPublicId(id, 'storeReport') ?? id, by, note };
+}
+
+/** A sign as the list shows it: the store, what was found, since when, and who cleared it. */
+function signalLine(signal: StoreSignalRecord): string {
+  const found = Object.entries(signal.detail)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(' ');
+  return (
+    `${signal.shopHandle} (${signal.shopName}) · ${signal.kind} · ${found}` +
+    ` · seen ${signal.firstSeenAt.toISOString().slice(0, 10)} to ` +
+    `${signal.lastSeenAt.toISOString().slice(0, 10)}` +
+    (signal.clearedAt ? ` · cleared by ${signal.clearedBy}: ${signal.note}` : '')
+  );
 }
