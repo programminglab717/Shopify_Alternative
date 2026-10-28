@@ -52,6 +52,8 @@ import { AccountingJournalResolver } from './graphql/accounting-journal.resolver
 import { CustomerCohortsResolver } from './graphql/customer-cohorts.resolver.js';
 import { AffiliateResolver } from './graphql/affiliate.resolver.js';
 import { CustomerCohortsService } from './customer-cohorts.service.js';
+import { CustomerRfmService } from './customer-rfm.service.js';
+import { CustomerRfmResolver } from './graphql/customer-rfm.resolver.js';
 import { AffiliatesService } from './affiliates.service.js';
 import { SavedSearchResolver } from './graphql/saved-search.resolver.js';
 import {
@@ -131,6 +133,8 @@ import { SubscriptionService } from './subscriptions.js';
     SalesReportExportService,
     AccountingJournalService,
     CustomerCohortsService,
+    CustomerRfmService,
+    CustomerRfmResolver,
     AffiliatesService,
     TransferReceiptService,
     SavedSearchService,

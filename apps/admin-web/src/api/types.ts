@@ -3175,6 +3175,38 @@ export interface SegmentPreviewData {
   segmentPreview: { memberCount: number; members: CustomerListItem[] };
 }
 
+export type RfmGroupName =
+  | 'CHAMPIONS'
+  | 'POTENTIAL_LOYALISTS'
+  | 'NEW_CUSTOMERS'
+  | 'LOYAL'
+  | 'NEEDS_ATTENTION'
+  | 'ABOUT_TO_SLEEP'
+  | 'CANT_LOSE'
+  | 'AT_RISK'
+  | 'LOST';
+
+/** Customers of one cell of the RFM grid (ADR-887). */
+export interface RfmGroupValue {
+  name: RfmGroupName;
+  recency: 'RECENT' | 'SLIPPING' | 'LAPSED';
+  frequency: 'ONCE' | 'FEW' | 'MANY';
+  customers: number;
+  amountSpent: { amount: string };
+  averageOrders: number | null;
+  /** The segment query that finds them. */
+  query: string;
+}
+
+export interface CustomerRfmData {
+  customerRfm: {
+    recentDays: number;
+    lapsedDays: number;
+    customers: number;
+    groups: RfmGroupValue[];
+  };
+}
+
 export interface SegmentMutationData {
   [field: string]: {
     segment?: { id: string } | null;

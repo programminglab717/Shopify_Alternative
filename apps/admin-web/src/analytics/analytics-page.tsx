@@ -21,6 +21,7 @@ import { CourierPerformance } from './courier-performance';
 import { Bars, Figure } from './figures';
 import { type Days, PeriodTabs, usePeriod } from './period';
 import { Journal } from './journal';
+import { Rfm } from './rfm';
 import { Searches } from './searches';
 import { StockReport } from './stock-report';
 import { LiveView, Visits } from './visits';
@@ -280,6 +281,7 @@ export function AnalyticsPage() {
       <Visits from={from} before={before} previousFrom={previousFrom} interval={interval} />
       <Searches days={days} />
       <Cohorts />
+      <Rfm />
       <CodHealth from={from} before={before} />
       <CourierPerformance from={from} before={before} />
       <StockReport days={days} />

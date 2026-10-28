@@ -4001,6 +4001,28 @@ export const SearchRuleDeleteMutation = /* GraphQL */ `
 `;
 
 /** Customers in cohorts by the month of their first order, and who came back (ANL-04, ADR-775). */
+/** Customers by how recently and often they buy, each group a segment's query (ANL-04, ADR-887). */
+export const CustomerRfmQuery = /* GraphQL */ `
+  query CustomerRfm($recentDays: Int, $lapsedDays: Int) {
+    customerRfm(recentDays: $recentDays, lapsedDays: $lapsedDays) {
+      recentDays
+      lapsedDays
+      customers
+      groups {
+        name
+        recency
+        frequency
+        customers
+        amountSpent {
+          amount
+        }
+        averageOrders
+        query
+      }
+    }
+  }
+`;
+
 export const CustomerCohortsQuery = /* GraphQL */ `
   query CustomerCohorts($months: Int) {
     customerCohorts(months: $months) {

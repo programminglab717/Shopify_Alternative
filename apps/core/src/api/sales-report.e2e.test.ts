@@ -524,6 +524,48 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 
+  it('groups customers by how recently and often they buy, each a segment (ANL-04, ADR-887)', async () => {
+    const RFM = `query ($recent: Int, $lapsed: Int) {
+      customerRfm(recentDays: $recent, lapsedDays: $lapsed) {
+        recentDays lapsedDays customers
+        groups { name recency frequency customers amountSpent { amount } averageOrders query }
+      }
+    }`;
+    const rfm = (await gql(tokens.owner, RFM, {})).data?.customerRfm;
+    expect(rfm).toMatchObject({ recentDays: 30, lapsedDays: 90 });
+    expect(rfm.groups).toHaveLength(9);
+    expect(rfm.groups[0]).toMatchObject({
+      name: 'CHAMPIONS',
+      recency: 'RECENT',
+      frequency: 'MANY',
+    });
+    // The orders above were placed today, none delivered yet: new customers, all of them.
+    const fresh = rfm.groups.find((group: Json) => group.name === 'NEW_CUSTOMERS');
+    expect(fresh.customers).toBe(rfm.customers);
+    expect(fresh.customers).toBeGreaterThan(0);
+    expect(fresh.query).toBe('delivered_orders <= 1 AND last_order_date > -30d');
+    // Saved as a segment, it finds the same customers.
+    const segments = await issueToken(['write_segments', 'read_customers']);
+    const saved = await gql(
+      segments,
+      `mutation ($query: String!) {
+        segmentCreate(name: "New customers", query: $query) {
+          segment { memberCount } userErrors { message }
+        }
+      }`,
+      { query: fresh.query },
+    );
+    expect(saved.data?.segmentCreate).toEqual({
+      segment: { memberCount: fresh.customers },
+      userErrors: [],
+    });
+
+    const backwards = await gql(tokens.owner, RFM, { recent: 90, lapsed: 30 });
+    expect(backwards.errors?.[0]?.message).toBe('Lapsed must be longer ago than recent');
+    const denied = await gql(tokens.products, RFM, {});
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('keeps affiliates, what they earn and what the shop paid them (MKT-08, ADR-776)', async () => {
     const created = await gql(
       tokens.marketing,
