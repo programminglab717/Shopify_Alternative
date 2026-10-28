@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ExpansionStoreService } from './expansion-stores.service.js';
 import { CollectionService } from './collection.service.js';
 import { CollectionResolver } from './graphql/collection.resolver.js';
 import { ProductMediaResolver } from './graphql/media.resolver.js';
@@ -59,6 +60,7 @@ import { MetafieldService } from './metafields.js';
  */
 @Module({
   providers: [
+    ExpansionStoreService,
     DigitalDeliveryService,
     ProductService,
     OptionService,
@@ -111,6 +113,7 @@ import { MetafieldService } from './metafields.js';
   // The search the storefront asks for, and the links to digital products' files (ADR-814).
   controllers: [StorefrontSearchController, DigitalDownloadController],
   exports: [
+    ExpansionStoreService,
     ProductService,
     OptionService,
     VariantService,

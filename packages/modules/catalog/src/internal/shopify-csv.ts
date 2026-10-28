@@ -579,3 +579,25 @@ function decodeEntities(text: string): string {
     return ENTITIES[name.toLowerCase()] ?? entity;
   });
 }
+
+/**
+ * The file `csv` with its prices, compare-at prices and costs multiplied by `rate`, to two places,
+ * for an expansion store priced in its own currency (CH-11, ADR-859); every other cell as it was.
+ */
+export function rescaledShopifyPrices(csv: string, rate: number): string {
+  const rows = parseCsv(csv);
+  const [headings, ...body] = rows;
+  if (!headings) return csv;
+  const columns = [COLUMNS.price, COLUMNS.compareAtPrice, COLUMNS.cost]
+    .map((name) => headings.indexOf(name))
+    .filter((index) => index >= 0);
+  for (const row of body) {
+    for (const index of columns) {
+      const cell = row[index]?.trim();
+      if (!cell) continue;
+      const value = Number(cell.replace(/,/g, ''));
+      if (Number.isFinite(value)) row[index] = (Math.round(value * rate * 100) / 100).toFixed(2);
+    }
+  }
+  return toCsv([headings, ...body]);
+}

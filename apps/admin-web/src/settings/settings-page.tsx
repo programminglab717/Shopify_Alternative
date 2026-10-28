@@ -76,6 +76,7 @@ interface Section {
     | '/$shopId/settings/export'
     | '/$shopId/settings/verification'
     | '/$shopId/settings/apps'
+    | '/$shopId/settings/expansion-stores'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/custom-data'
     | '/$shopId/settings/messages'
@@ -197,6 +198,13 @@ const SECTIONS: readonly Section[] = [
     hint: 'settings.staffHint',
     icon: UserCog,
     gate: gate(RUNS_SHOP, 'read_settings'),
+  },
+  {
+    to: '/$shopId/settings/expansion-stores',
+    label: 'settings.expansion',
+    hint: 'settings.expansionHint',
+    icon: Globe,
+    gate: gate(['owner'], 'write_products'),
   },
   {
     to: '/$shopId/settings/apps',

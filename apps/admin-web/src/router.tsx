@@ -89,6 +89,7 @@ import { HelpPage } from './help/help-page';
 import { ExpertsPage } from './help/experts-page';
 import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
+import { ExpansionStoresPage } from './settings/expansion-stores-page';
 import { AppFramePage } from './settings/app-frame-page';
 import { AppChargePage } from './settings/app-charge-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
@@ -821,6 +822,13 @@ const settingsApps = createRoute({
   component: AppsPage,
 });
 
+// Other shops of the owner's, kept in step with this one's products (ADR-859).
+const settingsExpansionStores = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/expansion-stores',
+  component: ExpansionStoresPage,
+});
+
 // An app's one-time charge for the owner to answer (ADR-854).
 const settingsAppCharge = createRoute({
   getParentRoute: () => shop,
@@ -1140,6 +1148,7 @@ export const routeTree = root.addChildren([
     settingsApps,
     settingsAppFrame,
     settingsAppCharge,
+    settingsExpansionStores,
     settingsWhatsApp,
     marketing,
     marketingTemplates,

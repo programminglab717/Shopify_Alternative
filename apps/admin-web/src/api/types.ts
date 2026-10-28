@@ -4677,6 +4677,26 @@ export interface AppPurchaseAnswerData {
   };
 }
 
+/** Another shop of the owner's that products are copied to (CH-11, ADR-859). */
+export interface ExpansionStore {
+  shopId: string;
+  name: string;
+  currencyCode: string;
+  priceRate: string;
+  copiedAt: string | null;
+  lastCopy: { created: number; updated: number; problems: number } | null;
+}
+
+export interface ExpansionStoresData {
+  expansionStores: ExpansionStore[];
+}
+
+export interface ExpansionStorePayloadData {
+  expansionStoreSave?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
+  expansionStoreCopy?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
+  expansionStoreRemove?: { userErrors: UserError[] };
+}
+
 export interface AppSessionData {
   appSession: { name: string; url: string; expiresAt: string } | null;
 }

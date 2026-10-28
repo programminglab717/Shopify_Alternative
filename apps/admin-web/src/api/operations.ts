@@ -9729,6 +9729,72 @@ export const AppPurchaseDeclineMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const EXPANSION_STORE = /* GraphQL */ `
+  fragment ExpansionStoreFields on ExpansionStore {
+    shopId
+    name
+    currencyCode
+    priceRate
+    copiedAt
+    lastCopy {
+      created
+      updated
+      problems
+    }
+  }
+`;
+
+/** The shop's expansion stores (CH-11, ADR-859). */
+export const ExpansionStoresQuery = /* GraphQL */ `
+  query ExpansionStores {
+    expansionStores {
+      ...ExpansionStoreFields
+    }
+  }
+  ${EXPANSION_STORE}
+`;
+
+export const ExpansionStoreSaveMutation = /* GraphQL */ `
+  mutation ExpansionStoreSave($shopId: ID!, $priceRate: String!) {
+    expansionStoreSave(shopId: $shopId, priceRate: $priceRate) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
+`;
+
+export const ExpansionStoreCopyMutation = /* GraphQL */ `
+  mutation ExpansionStoreCopy($shopId: ID!) {
+    expansionStoreCopy(shopId: $shopId) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
+`;
+
+export const ExpansionStoreRemoveMutation = /* GraphQL */ `
+  mutation ExpansionStoreRemove($shopId: ID!) {
+    expansionStoreRemove(shopId: $shopId) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const CustomAppsQuery = /* GraphQL */ `
   query CustomApps {
     customApps {

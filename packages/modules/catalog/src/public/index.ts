@@ -97,6 +97,7 @@ export {
   PRODUCT_IMPORT_LIMITS,
   SHOPIFY_PRODUCT_HEADINGS,
   htmlToText,
+  rescaledShopifyPrices,
   textToHtml,
   writeShopifyProducts,
   type ShopifyRowProblem,
@@ -340,3 +341,9 @@ export {
   deliverDigitalIn,
   type DigitalLine,
 } from '../internal/digital-deliveries.js';
+export {
+  EXPANSION_STORE_LIMITS,
+  ExpansionStoreService,
+  type ExpansionStoreRecord,
+  type ExpansionCopyResult,
+} from '../internal/expansion-stores.service.js';
