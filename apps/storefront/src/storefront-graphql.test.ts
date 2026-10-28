@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parse, validate } from 'graphql';
 import type { CartActionResult, CartJson } from '@hatti/storefront-api';
 import { MemoryStore } from '@hatti/storefront-data';
 import { describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import {
   STOREFRONT_API_LIMITS,
+  STOREFRONT_API_SCHEMA,
   storefrontApiAnswer,
   storefrontTokenOf,
   type StorefrontApiShop,
@@ -315,5 +319,77 @@ describe('The Storefront API (DEV-02, ADR-848)', () => {
     const deep = `{ products(first: 1) { nodes { variants(first: 1) { nodes { product { variants(first: 1) { nodes { product { variants(first: 1) { nodes { product { variants(first: 1) { nodes { title } } } } } } } } } } } } } }`;
     expect((await ask(deep)).errors?.[0]?.message).toContain('deep at most');
     expect((await storefrontApiAnswer({}, api())).errors?.[0]?.message).toBe('Give the query');
+  });
+});
+
+// The headless starter (OS-19, ADR-869) lives outside the workspace, as a project of its own to
+// copy; what it asks the Storefront API is checked here, so it keeps working as the API changes.
+const STARTER_QUERIES = fileURLToPath(
+  new URL('../../../starters/next-storefront/lib/queries.ts', import.meta.url),
+);
+
+/** Each query the starter's queries file holds, by its constant's name. */
+function starterQueries(): Record<string, string> {
+  const source = readFileSync(STARTER_QUERIES, 'utf8');
+  const found: Record<string, string> = {};
+  for (const match of source.matchAll(/export const (\w+) = \/\* GraphQL \*\/ `([^`]*)`/g)) {
+    found[match[1]!] = match[2]!;
+  }
+  return found;
+}
+
+describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
+  it('asks only what the Storefront API answers, whole', () => {
+    const queries = starterQueries();
+    expect(Object.keys(queries).sort()).toEqual([
+      'CART_CREATE_MUTATION',
+      'CART_LINES_ADD_MUTATION',
+      'CART_LINES_REMOVE_MUTATION',
+      'CART_LINES_UPDATE_MUTATION',
+      'CART_QUERY',
+      'COLLECTION_QUERY',
+      'PRODUCTS_QUERY',
+      'PRODUCT_QUERY',
+      'SHOP_QUERY',
+    ]);
+    for (const [name, query] of Object.entries(queries)) {
+      expect(query, name).not.toContain('${');
+      expect(
+        validate(STOREFRONT_API_SCHEMA, parse(query)).map((error) => error.message),
+        name,
+      ).toEqual([]);
+    }
+  });
+
+  it('browses the shop, and keeps a cart to its checkout, as the starter does', async () => {
+    const q = starterQueries();
+    const at = api();
+    expect((await ask(q.SHOP_QUERY!, {}, at)).data.shop.name).toBe('Zari');
+    const listed = (await ask(q.PRODUCTS_QUERY!, { first: 24, after: null, query: null }, at)).data
+      .products;
+    expect(listed.nodes.length).toBeGreaterThan(0);
+    expect(listed.nodes[0].priceRange.minVariantPrice.currencyCode).toBe('PKR');
+    const product = (await ask(q.PRODUCT_QUERY!, { handle: lawn.handle }, at)).data.product;
+    expect(product.title).toBe(lawn.title);
+    const variant = product.variants.nodes[0].id as string;
+
+    const made = (
+      await ask(q.CART_CREATE_MUTATION!, { lines: [{ merchandiseId: variant, quantity: 2 }] }, at)
+    ).data.cartCreate;
+    expect(made.userErrors).toEqual([]);
+    const cart = (await ask(q.CART_QUERY!, { id: made.cart.id }, at)).data.cart;
+    expect(cart.totalQuantity).toBe(2);
+    expect(cart.checkoutUrl).toMatch(/^https:\/\/zari\.hatti\.pk\//);
+    expect(cart.lines.nodes[0].merchandise.product.handle).toBe(lawn.handle);
+
+    const line = cart.lines.nodes[0].id as string;
+    await ask(
+      q.CART_LINES_UPDATE_MUTATION!,
+      { cartId: made.cart.id, lines: [{ id: line, quantity: 3 }] },
+      at,
+    );
+    expect((await ask(q.CART_QUERY!, { id: made.cart.id }, at)).data.cart.totalQuantity).toBe(3);
+    await ask(q.CART_LINES_REMOVE_MUTATION!, { cartId: made.cart.id, lineIds: [line] }, at);
+    expect((await ask(q.CART_QUERY!, { id: made.cart.id }, at)).data.cart.totalQuantity).toBe(0);
   });
 });

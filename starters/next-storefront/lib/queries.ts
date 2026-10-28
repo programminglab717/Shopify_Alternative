@@ -1,0 +1,212 @@
+// What the storefront asks of the shop's Storefront API. Each query is whole, without
+// interpolation, so Hatti's tests check it against the API's schema (ADR-869).
+
+export const SHOP_QUERY = /* GraphQL */ `
+  query Shop {
+    shop {
+      name
+      primaryDomain {
+        url
+      }
+    }
+  }
+`;
+
+export const PRODUCTS_QUERY = /* GraphQL */ `
+  query Products($first: Int!, $after: String, $query: String) {
+    products(first: $first, after: $after, query: $query) {
+      nodes {
+        id
+        handle
+        title
+        availableForSale
+        featuredImage {
+          url(transform: { maxWidth: 600 })
+          altText
+          width
+          height
+        }
+        priceRange {
+          minVariantPrice {
+            amount
+            currencyCode
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+export const PRODUCT_QUERY = /* GraphQL */ `
+  query Product($handle: String!) {
+    product(handle: $handle) {
+      id
+      handle
+      title
+      descriptionHtml
+      availableForSale
+      options {
+        name
+        values
+      }
+      images(first: 10) {
+        nodes {
+          url(transform: { maxWidth: 1200 })
+          altText
+          width
+          height
+        }
+      }
+      variants(first: 100) {
+        nodes {
+          id
+          title
+          availableForSale
+          price {
+            amount
+            currencyCode
+          }
+          compareAtPrice {
+            amount
+            currencyCode
+          }
+          selectedOptions {
+            name
+            value
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const COLLECTION_QUERY = /* GraphQL */ `
+  query Collection($handle: String!, $first: Int!) {
+    collection(handle: $handle) {
+      title
+      descriptionHtml
+      products(first: $first) {
+        nodes {
+          id
+          handle
+          title
+          availableForSale
+          featuredImage {
+            url(transform: { maxWidth: 600 })
+            altText
+            width
+            height
+          }
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const CART_QUERY = /* GraphQL */ `
+  query Cart($id: ID!) {
+    cart(id: $id) {
+      id
+      checkoutUrl
+      totalQuantity
+      cost {
+        subtotalAmount {
+          amount
+          currencyCode
+        }
+        totalAmount {
+          amount
+          currencyCode
+        }
+      }
+      lines(first: 100) {
+        nodes {
+          id
+          quantity
+          merchandise {
+            ... on ProductVariant {
+              id
+              title
+              product {
+                handle
+                title
+              }
+              image {
+                url(transform: { maxWidth: 200 })
+                altText
+              }
+            }
+          }
+          cost {
+            totalAmount {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const CART_CREATE_MUTATION = /* GraphQL */ `
+  mutation CartCreate($lines: [CartLineInput!]) {
+    cartCreate(input: { lines: $lines }) {
+      cart {
+        id
+      }
+      userErrors {
+        message
+      }
+    }
+  }
+`;
+
+export const CART_LINES_ADD_MUTATION = /* GraphQL */ `
+  mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
+    cartLinesAdd(cartId: $cartId, lines: $lines) {
+      cart {
+        id
+      }
+      userErrors {
+        message
+      }
+    }
+  }
+`;
+
+export const CART_LINES_UPDATE_MUTATION = /* GraphQL */ `
+  mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+    cartLinesUpdate(cartId: $cartId, lines: $lines) {
+      cart {
+        id
+      }
+      userErrors {
+        message
+      }
+    }
+  }
+`;
+
+export const CART_LINES_REMOVE_MUTATION = /* GraphQL */ `
+  mutation CartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
+    cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+      cart {
+        id
+      }
+      userErrors {
+        message
+      }
+    }
+  }
+`;

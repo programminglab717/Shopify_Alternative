@@ -321,6 +321,9 @@ const SDL = /* GraphQL */ `
 
 const SCHEMA = buildSchema(SDL);
 
+/** The Storefront API's schema, for what checks queries against it: the headless starter's (ADR-869). */
+export const STOREFRONT_API_SCHEMA = SCHEMA;
+
 /** The carts of the shop, as the core keeps them (ADR-042). */
 export interface StorefrontApiCarts {
   read(shopId: string, token: string | null): Promise<CartJson | null>;
