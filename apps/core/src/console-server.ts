@@ -5,6 +5,7 @@ import { supportSenderOf } from './billing.js';
 import { consoleSignInOf, loadConsoleConfig } from './config.js';
 import { createConsoleApi } from './console/console-app.js';
 import { onShutdown } from './shutdown.js';
+import { createStorage } from './storage.js';
 
 // Hatti's console's server (ADR-876): a process of its own, which the console's address alone
 // passes requests to, never the API's. It holds the system login the queues of Hatti's people
@@ -27,11 +28,15 @@ const identityDatabase = new Database({
   applicationName: 'core-console:identity',
   onError: (error) => logger.warn({ err: error }, 'idle identity database connection failed'),
 });
+// The API's own address in development, as the API takes it.
+const publicUrl = config.PUBLIC_URL ?? 'http://localhost:4000';
 const app = await createConsoleApi({
   database,
   identityDb: identityDatabase.app,
   console: consoleSignInOf(config),
   supportSender: supportSenderOf(config),
+  storage: createStorage(config, publicUrl),
+  publicUrl,
   logger,
   trustProxy: config.TRUST_PROXY,
 });

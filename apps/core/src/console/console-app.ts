@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
+import { PublicSite } from '@hatti/api';
 import { SupportService, type SupportWhatsAppSender } from '@hatti/billing/public';
 import type { Database, Db } from '@hatti/db';
 import {
@@ -10,11 +11,14 @@ import {
   type ConsoleSignInSettings,
 } from '@hatti/identity/public';
 import type { Logger } from '@hatti/logger';
+import type { ObjectStorage } from '@hatti/storage';
+import { VerificationsService } from '@hatti/trust/public';
 import { Controller, Get, Module, type DynamicModule } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
 import { ConsoleController } from './console.controller.js';
+import { CONSOLE_DATABASE, ConsoleTrustController } from './trust.controller.js';
 
 export interface CreateConsoleOptions {
   /** With the system login (hatti_system), which reads every shop's. */
@@ -24,6 +28,10 @@ export interface CreateConsoleOptions {
   console: ConsoleSignInSettings;
   /** Answers to requests written on WhatsApp go back there (ADR-560); none without it. */
   supportSender?: SupportWhatsAppSender | null;
+  /** Where verifications' documents are kept, as the API keeps them (ADR-465). */
+  storage: ObjectStorage;
+  /** The core's public address, where a takedown's link to appeal by goes (ADR-462). */
+  publicUrl: string;
   logger: Logger;
   trustProxy?: boolean;
 }
@@ -42,7 +50,12 @@ class ConsoleModule {
   static forRoot(options: CreateConsoleOptions): DynamicModule {
     return {
       module: ConsoleModule,
-      controllers: [ConsoleHealthController, ConsoleAuthController, ConsoleController],
+      controllers: [
+        ConsoleHealthController,
+        ConsoleAuthController,
+        ConsoleController,
+        ConsoleTrustController,
+      ],
       providers: [
         {
           provide: ConsoleAuthService,
@@ -53,6 +66,12 @@ class ConsoleModule {
           provide: SupportService,
           useValue: new SupportService(options.database, null, options.supportSender ?? null),
         },
+        { provide: CONSOLE_DATABASE, useValue: options.database },
+        {
+          provide: VerificationsService,
+          useValue: new VerificationsService(options.database, options.storage),
+        },
+        { provide: PublicSite, useValue: new PublicSite(options.publicUrl) },
       ],
     };
   }

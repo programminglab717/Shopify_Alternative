@@ -1096,8 +1096,17 @@ const consoleSchema = z
     META_GRAPH_URL: messageSending.META_GRAPH_URL,
     META_GRAPH_VERSION: messageSending.META_GRAPH_VERSION,
     ...supportWhatsApp,
+    /**
+     * The core's public address, where a takedown's link to appeal by goes (ADR-462), and local
+     * storage's links to verifications' documents (ADR-877); the API's in development.
+     */
+    PUBLIC_URL: env.httpUrl().optional(),
+    // Where verifications' documents are kept, as the API keeps them (ADR-465).
+    ...storage,
   })
-  .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED);
+  .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED)
+  .refine(storageComplete, STORAGE_COMPLETE)
+  .refine(storageShared, STORAGE_SHARED);
 
 /** Hatti's provider, as the console signs in through it. */
 export function consoleSignInOf(config: ConsoleConfig): ConsoleSignInSettings {

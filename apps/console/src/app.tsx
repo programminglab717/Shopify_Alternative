@@ -12,6 +12,9 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { ActionsLogPage } from './actions-log';
+import { ReportsPage } from './reports';
+import { StoresPage } from './stores';
+import { VerificationsPage } from './verifications';
 import { consoleCall, whenSignedOut } from './api';
 import { keepSession, sessionOf } from './session';
 import { SignInPage, SignedInPage } from './sign-in';
@@ -34,12 +37,21 @@ function Shell() {
   };
   const link = 'rounded-control px-3 py-2 hover:bg-canvas [&.active]:font-semibold';
   return (
-    <div className="mx-auto flex min-h-screen max-w-4xl flex-col gap-4 p-4">
+    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-4 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
-        <nav className="flex items-center gap-1" aria-label="Console">
+        <nav className="flex flex-wrap items-center gap-1" aria-label="Console">
           <span className="mr-2 font-semibold">Hatti console</span>
           <Link to="/support" className={link}>
             Support requests
+          </Link>
+          <Link to="/reports" className={link}>
+            Reports
+          </Link>
+          <Link to="/stores" search={{}} className={link}>
+            Stores down
+          </Link>
+          <Link to="/verifications" className={link}>
+            Verifications
           </Link>
           <Link to="/log" className={link}>
             Log
@@ -111,6 +123,29 @@ const supportRoute = createRoute({
   component: SupportRequestsPage,
 });
 
+const reportsRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/reports',
+  component: ReportsPage,
+});
+
+const storesRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/stores',
+  // A store to take down, from its report.
+  validateSearch: (search: Record<string, unknown>): { shop?: string; reason?: string } => ({
+    shop: text(search.shop),
+    reason: text(search.reason),
+  }),
+  component: StoresPage,
+});
+
+const verificationsRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/verifications',
+  component: VerificationsPage,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => signedInLayout,
   path: '/log',
@@ -120,7 +155,14 @@ const logRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   signInRoute,
   signedInRoute,
-  signedInLayout.addChildren([homeRoute, supportRoute, logRoute]),
+  signedInLayout.addChildren([
+    homeRoute,
+    supportRoute,
+    reportsRoute,
+    storesRoute,
+    verificationsRoute,
+    logRoute,
+  ]),
 ]);
 
 export function createConsoleRouter(history?: RouterHistory) {
