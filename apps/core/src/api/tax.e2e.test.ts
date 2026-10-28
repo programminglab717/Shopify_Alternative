@@ -411,6 +411,7 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
       province filerStatus tier1
       withholding { digitalPercent cashOnDeliveryPercent }
       guidance { code status }
+      filerCheck { checkedAt due smsBody }
     }`;
     const before = await gql(tokens.reader, `{ taxSettings ${PROFILE} }`);
     expect(before.data?.taxSettings).toEqual({
@@ -424,6 +425,8 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
         { code: 'JOIN_ACTIVE_TAXPAYERS', status: 'TO_DO' },
         { code: 'NAME_PROVINCE', status: 'TO_DO' },
       ],
+      // Never checked: asked to (TAX-08, ADR-837).
+      filerCheck: { checkedAt: null, due: 'NEVER', smsBody: null },
     });
     const updated = await mutate(
       tokens.owner,
@@ -454,6 +457,7 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
           { code: 'DIGITAL_INVOICING', status: 'NOTE' },
           { code: 'TIER1_RETURNS', status: 'NOTE' },
         ],
+        filerCheck: { checkedAt: expect.any(String), due: null, smsBody: 'ATL 1234567' },
       },
       userErrors: [],
     });

@@ -21,6 +21,12 @@ const SETTINGS = {
     { code: 'JOIN_ACTIVE_TAXPAYERS', status: 'TO_DO' },
     { code: 'NAME_PROVINCE', status: 'TO_DO' },
   ],
+  filerCheck: {
+    checkedAt: null as string | null,
+    due: 'NEVER' as 'NEVER' | 'NEW_LIST' | null,
+    listOf: '2026-02-28T19:00:00Z',
+    smsBody: null as string | null,
+  },
   updatedAt: null,
   categories: [{ code: 'REDUCED', name: 'Reduced rate', rate: 10 }],
 };
@@ -96,6 +102,13 @@ function core(role: StaffRole, codes: [string | null, string | null] = [null, nu
           };
         }
         settings = { ...settings, ...input };
+        // Said, the filer status was checked (ADR-837).
+        if (input.filerStatus) {
+          settings = {
+            ...settings,
+            filerCheck: { ...settings.filerCheck, checkedAt: '2026-10-27T09:00:00Z', due: null },
+          };
+        }
         return { taxSettingsUpdate: { taxSettings: settings, userErrors: [] } };
       }
       case 'Product':
@@ -187,6 +200,34 @@ describe("The shop's sales tax", () => {
       expect(sentOf(fake, 'TaxSettingsUpdate')).toEqual([
         { input: { province: 'SINDH', filerStatus: 'ACTIVE', tier1: true } },
       ]),
+    );
+  });
+
+  it('helps check the Active Taxpayers List by SMS, and keeps what the shop found (TAX-08, ADR-837)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/tax');
+
+    expect(await screen.findByText(/You haven’t said whether you’re on the list/)).toBeTruthy();
+    // No NTN: a CNIC typed here writes the SMS, and goes nowhere else.
+    expect(screen.queryByRole('link', { name: /to 9966/ })).toBeNull();
+    type('Your CNIC, to check', '35202-1234567-1');
+    const sms = screen.getByRole('link', { name: 'Text “ATL 3520212345671” to 9966' });
+    expect(sms.getAttribute('href')).toBe('sms:9966?&body=ATL%203520212345671');
+
+    fireEvent.click(screen.getByRole('button', { name: 'I’m on the list' }));
+    expect(await screen.findByText(/On the list, as you checked on 27 Oct 2026/)).toBeTruthy();
+    expect(sentOf(fake, 'TaxSettingsUpdate')).toEqual([{ input: { filerStatus: 'ACTIVE' } }]);
+    // The form below shows it, and saving something else doesn't send the old status back.
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("On FBR's Active Taxpayers List?") as HTMLSelectElement).value,
+      ).toBe('ACTIVE'),
+    );
+    fireEvent.click(screen.getByLabelText(/A Tier-1 retailer/));
+    fireEvent.click(screen.getByRole('button', { name: 'Save sales tax' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'TaxSettingsUpdate').at(-1)).toEqual({ input: { tier1: true } }),
     );
   });
 

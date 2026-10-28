@@ -9,7 +9,9 @@ import { taxSettings } from './schema.js';
 import { TaxSettingsService } from './tax-settings.service.js';
 import {
   NO_TAX,
+  activeTaxpayersListOf,
   checkTaxCategories,
+  filerCheck,
   checkTaxRate,
   includedTax,
   lineRateOf,
@@ -161,6 +163,39 @@ describe('taxesByRate', () => {
         [1_000, 7n],
         [1_800, 120n],
       ]),
+    );
+  });
+});
+
+describe('The Active Taxpayers List (TAX-08, ADR-837)', () => {
+  it("is the one FBR published on the latest 1 March, in Pakistan's time", () => {
+    const list = (iso: string) => activeTaxpayersListOf(new Date(iso)).toISOString();
+    // 1 March begins at 19:00 UTC on the last day of February.
+    expect(list('2027-02-28T18:59:59Z')).toBe('2026-02-28T19:00:00.000Z');
+    expect(list('2027-02-28T19:00:00Z')).toBe('2027-02-28T19:00:00.000Z');
+    expect(list('2026-10-27T09:00:00Z')).toBe('2026-02-28T19:00:00.000Z');
+    expect(list('2028-01-10T09:00:00Z')).toBe('2027-02-28T19:00:00.000Z');
+  });
+
+  it('asks a shop to check once it never said, or said before the latest list, with the SMS to send', () => {
+    const now = new Date('2027-03-05T09:00:00Z');
+    const said = (iso: string | null, status: 'active' | 'inactive' | 'unknown' = 'active') =>
+      filerCheck(
+        { ntn: '1234567-8', filerStatus: status, filerCheckedAt: iso ? new Date(iso) : null },
+        now,
+      );
+    expect(said('2027-03-02T09:00:00Z')).toEqual({
+      checkedAt: new Date('2027-03-02T09:00:00Z'),
+      due: null,
+      listOf: new Date('2027-02-28T19:00:00Z'),
+      // A company's NTN without its check digit.
+      smsBody: 'ATL 1234567',
+    });
+    expect(said('2027-02-20T09:00:00Z').due).toBe('new_list');
+    expect(said(null).due).toBe('never');
+    expect(said('2027-03-02T09:00:00Z', 'unknown').due).toBe('never');
+    expect(filerCheck({ ...NO_TAX, ntn: '35202-1234567-1' }, now).smsBody).toBe(
+      'ATL 3520212345671',
     );
   });
 });
@@ -401,10 +436,36 @@ describe.skipIf(!server)('TaxSettingsService', () => {
       ntn: '1234567-8',
     });
     expect((await outbox()).map(([, payload]) => payload)).toEqual([
-      { changed: ['ntn', 'strn', 'province', 'filerStatus', 'tier1'] },
+      { changed: ['ntn', 'strn', 'province', 'filerStatus', 'tier1', 'filerCheckedAt'] },
       { changed: ['province'] },
     ]);
     expect(await service.get(b)).toEqual(NO_TAX);
+  });
+
+  it('keeps when the shop last checked the Active Taxpayers List, and asks again after a new one (ADR-837)', async () => {
+    const now = new Date();
+    expect(filerCheck(NO_TAX, now)).toEqual({
+      checkedAt: null,
+      due: 'never',
+      listOf: activeTaxpayersListOf(now),
+      smsBody: null,
+    });
+    unwrap(await service.update(a, { ntn: '35202-1234567-1' }));
+    // Not given, the filer status was not checked.
+    expect((await service.get(a)).filerCheckedAt).toBeNull();
+    const checked = unwrap(await service.update(a, { filerStatus: 'inactive' }));
+    expect(checked.filerCheckedAt).toBeInstanceOf(Date);
+    expect(filerCheck(checked, now)).toMatchObject({ due: null, smsBody: 'ATL 3520212345671' });
+    // Said again as it was: checked again, nothing else changed.
+    const again = unwrap(await service.update(a, { filerStatus: 'inactive' }));
+    expect(again.filerCheckedAt!.getTime()).toBeGreaterThanOrEqual(
+      checked.filerCheckedAt!.getTime(),
+    );
+    expect((await outbox()).map(([, payload]) => payload)).toEqual([
+      { changed: ['ntn'] },
+      { changed: ['filerStatus', 'filerCheckedAt'] },
+      { changed: ['filerCheckedAt'] },
+    ]);
   });
 
   it('keeps the categories the shop gives, replacing them all (ADR-097)', async () => {

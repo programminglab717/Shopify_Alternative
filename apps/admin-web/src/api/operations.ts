@@ -7400,6 +7400,12 @@ const TAX_SETTINGS = /* GraphQL */ `
       code
       status
     }
+    filerCheck {
+      checkedAt
+      due
+      listOf
+      smsBody
+    }
     updatedAt
     categories {
       code

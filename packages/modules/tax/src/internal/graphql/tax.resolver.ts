@@ -2,6 +2,7 @@ import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@ha
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { TaxSettingsService } from '../tax-settings.service.js';
 import {
+  filerCheck,
   taxGuidance,
   withholdingRates,
   type FilerStatus as FilerStatusValue,
@@ -9,8 +10,10 @@ import {
   type TaxSettingsRecord,
 } from '../tax.js';
 import {
+  FilerCheckDue,
   FilerStatus,
   TaxCategory,
+  TaxFilerCheck,
   TaxGuidanceCode,
   TaxGuidanceStatus,
   TaxProvince,
@@ -76,6 +79,13 @@ function toTaxSettings(record: TaxSettingsRecord): TaxSettings {
       code: step.code.toUpperCase() as TaxGuidanceCode,
       status: step.status.toUpperCase() as TaxGuidanceStatus,
     })),
+    filerCheck: (() => {
+      const check = filerCheck(record, new Date());
+      return Object.assign(new TaxFilerCheck(), {
+        ...check,
+        due: check.due && (check.due.toUpperCase() as FilerCheckDue),
+      });
+    })(),
     updatedAt: record.updatedAt,
   });
 }

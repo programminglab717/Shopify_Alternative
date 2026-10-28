@@ -1,4 +1,4 @@
-import { CircleCheck, CircleDashed, Info, Plus, Save, Trash2 } from 'lucide-react';
+import { CircleCheck, CircleDashed, Info, MessageSquare, Plus, Save, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { TaxSettingsQuery, TaxSettingsUpdateMutation } from '../api/operations';
@@ -11,11 +11,11 @@ import type {
   TaxSettingsUpdateData,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
-import { formatMoney } from '../i18n/format';
+import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
-import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -393,6 +393,92 @@ function TaxGuidance({ settings }: { settings: TaxSettings }) {
   );
 }
 
+/** A CNIC's 13 digits as typed, "35202-1234567-1", or null. */
+const cnicOf = (typed: string) => {
+  const digits = typed.replace(/[\s-]/g, '');
+  return /^\d{13}$/.test(digits) ? digits : null;
+};
+
+/** An SMS to FBR's 9966 written for the phone's messages app, on Android and iOS alike. */
+const smsTo9966 = (body: string) => `sms:9966?&body=${encodeURIComponent(body)}`;
+
+/**
+ * Checking the Active Taxpayers List (TAX-08, ADR-837): when the shop last said whether it is
+ * on it, and why to check again, a new list each 1 March; the SMS FBR answers, written for the
+ * phone's messages app from its NTN, or from a CNIC typed here and kept nowhere; and what it
+ * found, said in a tap.
+ */
+function FilerCheck({ settings }: { settings: TaxSettings }) {
+  const { t, locale } = useLocale();
+  const timezone = useShopTimezone();
+  const update = useAdminMutation<TaxSettingsUpdateData, { input: Record<string, unknown> }>(
+    TaxSettingsUpdateMutation,
+  );
+  const [cnic, setCnic] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const check = settings.filerCheck;
+  const body = check.smsBody ?? (cnicOf(cnic) && `ATL ${cnicOf(cnic)}`);
+
+  const say = async (filerStatus: FilerStatus) => {
+    setProblem(null);
+    try {
+      const { taxSettingsUpdate } = await update.mutateAsync({ input: { filerStatus } });
+      const error = taxSettingsUpdate.userErrors[0];
+      if (error) setProblem(error.message);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <FormSection title={t('tax.filerCheck')} hint={t('tax.filerCheckHint')}>
+      {check.due === 'NEVER' ? (
+        <Alert tone="warning">{t('tax.filerNever')}</Alert>
+      ) : check.due === 'NEW_LIST' ? (
+        <Alert tone="warning">
+          {t('tax.filerNewList', { date: formatDate(check.listOf, timezone, locale) })}
+        </Alert>
+      ) : (
+        <p className="text-sm">
+          {t(settings.filerStatus === 'ACTIVE' ? 'tax.filerOn' : 'tax.filerOff', {
+            date: formatDate(check.checkedAt!, timezone, locale),
+          })}
+        </p>
+      )}
+      {!check.smsBody && (
+        <TextField
+          label={t('tax.filerCnic')}
+          hint={t('tax.filerCnicHint')}
+          value={cnic}
+          inputMode="numeric"
+          ltr
+          placeholder="35202-1234567-1"
+          onChange={(event) => setCnic(event.target.value)}
+        />
+      )}
+      {body && (
+        <a
+          href={smsTo9966(body)}
+          className="flex items-center gap-2 self-start font-medium text-primary underline-offset-4 hover:underline"
+        >
+          <MessageSquare aria-hidden className="size-5" />
+          {t('tax.filerSms', { body })}
+        </a>
+      )}
+      <p className="text-sm text-secondary">{t('tax.filerAnswer')}</p>
+      <span className="flex flex-wrap gap-2">
+        <Button variant="secondary" busy={update.isPending} onClick={() => void say('ACTIVE')}>
+          {t('tax.filerSayOn')}
+        </Button>
+        <Button variant="secondary" busy={update.isPending} onClick={() => void say('INACTIVE')}>
+          {t('tax.filerSayOff')}
+        </Button>
+      </span>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </FormSection>
+  );
+}
+
 /**
  * The shop's sales tax (TAX-01, ADR-096, ADR-097): whether it charges it and at what rate,
  * included in its prices, on delivery too; the NTN and STRN its invoices name; and rates of its
@@ -417,7 +503,9 @@ export function TaxPage() {
       ) : (
         <>
           <TaxGuidance settings={query.data.taxSettings} />
-          <TaxForm settings={query.data.taxSettings} />
+          <FilerCheck settings={query.data.taxSettings} />
+          {/* Afresh once the filer status is said above, so the form never sends the old one. */}
+          <TaxForm key={query.data.taxSettings.filerStatus} settings={query.data.taxSettings} />
           <FbrPosSection settings={query.data.taxSettings} />
         </>
       )}

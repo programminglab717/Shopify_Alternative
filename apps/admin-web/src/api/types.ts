@@ -3605,6 +3605,13 @@ export interface TaxSettings {
   tier1: boolean;
   withholding: { digitalPercent: number; cashOnDeliveryPercent: number };
   guidance: { code: TaxGuidanceCode; status: 'DONE' | 'TO_DO' | 'NOTE' }[];
+  /** Checking the Active Taxpayers List, and when to again (TAX-08, ADR-837). */
+  filerCheck: {
+    checkedAt: string | null;
+    due: 'NEVER' | 'NEW_LIST' | null;
+    listOf: string;
+    smsBody: string | null;
+  };
   updatedAt: string | null;
   categories: TaxCategory[];
 }

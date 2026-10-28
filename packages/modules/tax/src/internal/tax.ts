@@ -71,6 +71,8 @@ export interface TaxSettingsRecord {
   province: TaxProvince | null;
   /** Whether it is on FBR's Active Taxpayers List, as it says. */
   filerStatus: FilerStatus;
+  /** When it last said so (TAX-08, ADR-837); null for never. */
+  filerCheckedAt: Date | null;
   /** Whether it is a Tier-1 retailer, as it says. */
   tier1: boolean;
   /** Null while the shop has set none. */
@@ -86,6 +88,7 @@ export const NO_TAX: TaxSettingsRecord = {
   strn: null,
   province: null,
   filerStatus: 'unknown',
+  filerCheckedAt: null,
   tier1: false,
   updatedAt: null,
 };
@@ -363,4 +366,46 @@ export function taxGuidance(
       : []),
     ...(profile.tier1 ? [{ code: 'tier1_returns' as const, status: 'note' as const }] : []),
   ];
+}
+
+/**
+ * The day FBR published the Active Taxpayers List in force at `now` (ADR-837): each 1 March, in
+ * Pakistan's time (UTC+5), under s.181A of the Income Tax Ordinance. A shop is added during the
+ * year once it files late and pays the surcharge, but the list it was on is replaced each March.
+ */
+export function activeTaxpayersListOf(now: Date): Date {
+  const pakistan = new Date(now.getTime() + 5 * 3_600_000);
+  const year = pakistan.getUTCFullYear();
+  const thisYear = Date.UTC(year, 2, 1) - 5 * 3_600_000;
+  return new Date(now.getTime() >= thisYear ? thisYear : Date.UTC(year - 1, 2, 1) - 5 * 3_600_000);
+}
+
+/** Why a shop should check its filer status now: never said, or said before the latest list. */
+export type FilerCheckDue = 'never' | 'new_list';
+
+/**
+ * Helping a shop check whether it is on the Active Taxpayers List (TAX-08, ADR-837), which FBR
+ * answers by SMS and on its site alone: when it last said, whether to check again and why, the
+ * list in force, and the SMS FBR's service at 9966 answers, "ATL" and its NTN's seven digits or a
+ * sole trader's CNIC, where its NTN is known.
+ */
+export function filerCheck(
+  profile: Pick<TaxSettingsRecord, 'ntn' | 'filerStatus' | 'filerCheckedAt'>,
+  now: Date,
+): { checkedAt: Date | null; due: FilerCheckDue | null; listOf: Date; smsBody: string | null } {
+  const listOf = activeTaxpayersListOf(now);
+  const due: FilerCheckDue | null =
+    profile.filerCheckedAt === null || profile.filerStatus === 'unknown'
+      ? 'never'
+      : profile.filerCheckedAt.getTime() < listOf.getTime()
+        ? 'new_list'
+        : null;
+  const digits = profile.ntn?.replace(/\D/g, '') ?? '';
+  const number = digits.length === 13 ? digits : digits.length === 8 ? digits.slice(0, 7) : null;
+  return {
+    checkedAt: profile.filerCheckedAt,
+    due,
+    listOf,
+    smsBody: number && `ATL ${number}`,
+  };
 }

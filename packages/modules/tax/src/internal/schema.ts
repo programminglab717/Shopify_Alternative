@@ -34,6 +34,8 @@ export const taxSettings = taxSchema.table('settings', {
   province: text('province').$type<TaxProvince>(),
   /** Whether it is on FBR's Active Taxpayers List: active, inactive or unknown. */
   filerStatus: text('filer_status').$type<FilerStatus>().notNull().default('unknown'),
+  /** When it last said whether it is on the list (TAX-08, ADR-837); null for never. */
+  filerCheckedAt: timestamp('filer_checked_at', { withTimezone: true }),
   /** Whether it is a Tier-1 retailer. */
   tier1: boolean('tier1').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

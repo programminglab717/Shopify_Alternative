@@ -105,6 +105,49 @@ export class TaxWithholding {
   cashOnDeliveryPercent!: number;
 }
 
+export enum FilerCheckDue {
+  NEVER = 'NEVER',
+  NEW_LIST = 'NEW_LIST',
+}
+
+registerEnumType(FilerCheckDue, {
+  name: 'FilerCheckDue',
+  description:
+    'Why the shop should check whether it is on the Active Taxpayers List: it has NEVER said, or FBR published a NEW_LIST since it last did.',
+});
+
+@ObjectType({
+  description:
+    "Helping the shop check whether it is on FBR's Active Taxpayers List (TAX-08, ADR-837), " +
+    'which FBR answers by SMS and on its site alone.',
+})
+export class TaxFilerCheck {
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When the shop last said whether it is on the list; null for never.',
+  })
+  checkedAt!: Date | null;
+
+  @Field(() => FilerCheckDue, {
+    nullable: true,
+    description: 'Why it should check now; null while what it said holds.',
+  })
+  due!: FilerCheckDue | null;
+
+  @Field(() => GraphQLISODateTime, {
+    description: 'When FBR published the list in force: each 1 March, in Pakistan.',
+  })
+  listOf!: Date;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'What to text to 9966 for FBR to say whether the shop is on the list: "ATL" and its NTN\'s ' +
+      "seven digits, or a sole trader's CNIC. Null while its NTN is unknown.",
+  })
+  smsBody!: string | null;
+}
+
 @ObjectType({
   description:
     'The sales tax the shop charges (TAX-01): a rate included in the prices of what it sells, as ' +
@@ -171,6 +214,11 @@ export class TaxSettings {
     description: 'What it has done to register as an online seller must, and what is left.',
   })
   guidance!: TaxGuidanceStep[];
+
+  @Field(() => TaxFilerCheck, {
+    description: 'Checking whether it is on the Active Taxpayers List, and when to again.',
+  })
+  filerCheck!: TaxFilerCheck;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,

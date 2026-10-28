@@ -5003,6 +5003,20 @@ const en = {
     'For a Tier-1 retailer, the 2% gateways and couriers collect is an advance against your own sales tax: file your returns each month.',
   'tax.withholding':
     'Couriers and payment gateways withhold {digital}% of what customers pay online, and {cod}% of cash on delivery, as income tax.',
+  'tax.filerCheck': 'Are you on the Active Taxpayers List?',
+  'tax.filerCheckHint':
+    'Couriers and payment gateways withhold twice as much income tax from shops not on FBR’s list. FBR publishes a new list each 1 March.',
+  'tax.filerNever':
+    'You haven’t said whether you’re on the list. Until you do, Hatti takes it you’re not.',
+  'tax.filerNewList': 'FBR published a new list on {date}. Check you’re still on it.',
+  'tax.filerOn': 'On the list, as you checked on {date}.',
+  'tax.filerOff': 'Not on the list, as you checked on {date}. File your return to join it.',
+  'tax.filerCnic': 'Your CNIC, to check',
+  'tax.filerCnicHint': 'Only to write the SMS below; Hatti doesn’t keep it.',
+  'tax.filerSms': 'Text “{body}” to 9966',
+  'tax.filerAnswer': 'FBR answers by SMS. Then say what it said:',
+  'tax.filerSayOn': 'I’m on the list',
+  'tax.filerSayOff': 'I’m not on it',
   'tax.guidanceWhere': 'Rules change each budget: check with your tax adviser.',
   'tax.iris': "FBR's IRIS",
   'fbr.title': 'Reporting to FBR',
@@ -11173,6 +11187,21 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'ٹیئر ون ریٹیلر کے لیے گیٹ وے اور کورئیر کا لیا گیا 2% آپ کے اپنے سیلز ٹیکس کا ایڈوانس ہے: ہر مہینے ریٹرن جمع کرائیں۔',
   'tax.withholding':
     'کورئیر اور پیمنٹ گیٹ وے آن لائن ادائیگی کا {digital}% اور کیش آن ڈیلیوری کا {cod}% انکم ٹیکس کے طور پر کاٹتے ہیں۔',
+  'tax.filerCheck': 'کیا آپ ایکٹو ٹیکس پیئرز لسٹ میں ہیں؟',
+  'tax.filerCheckHint':
+    'کوریئر اور پیمنٹ گیٹ وے FBR کی لسٹ میں نہ ہونے والی دکانوں سے دگنا انکم ٹیکس کاٹتے ہیں۔ FBR ہر سال یکم مارچ کو نئی لسٹ جاری کرتا ہے۔',
+  'tax.filerNever':
+    'آپ نے نہیں بتایا کہ آپ لسٹ میں ہیں یا نہیں۔ جب تک نہ بتائیں، Hatti یہی سمجھتا ہے کہ آپ لسٹ میں نہیں۔',
+  'tax.filerNewList': 'FBR نے {date} کو نئی لسٹ جاری کی۔ دیکھ لیں کہ آپ اب بھی اس میں ہیں۔',
+  'tax.filerOn': 'لسٹ میں ہیں، جیسا آپ نے {date} کو دیکھا۔',
+  'tax.filerOff':
+    'لسٹ میں نہیں، جیسا آپ نے {date} کو دیکھا۔ لسٹ میں آنے کے لیے اپنا ریٹرن جمع کرائیں۔',
+  'tax.filerCnic': 'دیکھنے کے لیے آپ کا شناختی کارڈ نمبر',
+  'tax.filerCnicHint': 'صرف نیچے والا SMS لکھنے کے لیے؛ Hatti اسے محفوظ نہیں کرتا۔',
+  'tax.filerSms': '“{body}” لکھ کر 9966 پر بھیجیں',
+  'tax.filerAnswer': 'FBR SMS سے جواب دیتا ہے۔ پھر بتائیں کہ اس نے کیا کہا:',
+  'tax.filerSayOn': 'میں لسٹ میں ہوں',
+  'tax.filerSayOff': 'میں لسٹ میں نہیں',
   'tax.guidanceWhere': 'قواعد ہر بجٹ میں بدلتے ہیں: اپنے ٹیکس مشیر سے تصدیق کریں۔',
   'tax.iris': 'ایف بی آر کا IRIS',
   'fbr.title': 'ایف بی آر کو رپورٹنگ',

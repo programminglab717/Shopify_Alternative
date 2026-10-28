@@ -37,7 +37,10 @@ export interface TaxSettingsInput {
   strn?: string | null;
   /** The province its business is registered in (ADR-500); null for none. */
   province?: TaxProvince | null;
-  /** Whether it is on FBR's Active Taxpayers List; null leaves it. */
+  /**
+   * Whether it is on FBR's Active Taxpayers List; null leaves it. Given, even as it was, it is
+   * what the shop found when it last checked (ADR-837).
+   */
   filerStatus?: FilerStatus | null;
   /** Whether it is a Tier-1 retailer; null leaves it. */
   tier1?: boolean | null;
@@ -112,13 +115,17 @@ export class TaxSettingsService {
         ...(next.filerStatus !== before.filerStatus ? ['filerStatus'] : []),
         ...(next.tier1 !== before.tier1 ? ['tier1'] : []),
       ];
+      // Said, even as it was: the shop checked the list (ADR-837).
+      const checked = input.filerStatus !== undefined && input.filerStatus !== null;
+      if (checked) changed.push('filerCheckedAt');
       if (changed.length === 0) return { ok: true, value: before };
+      const stamp = checked ? { filerCheckedAt: sql`now()` } : {};
       await tx
         .insert(taxSettings)
-        .values({ shopId: tenant.shopId, ...next })
+        .values({ shopId: tenant.shopId, ...next, ...stamp })
         .onConflictDoUpdate({
           target: taxSettings.shopId,
-          set: { ...next, updatedAt: sql`now()` },
+          set: { ...next, ...stamp, updatedAt: sql`now()` },
         });
       await appendEvent<TaxSettingsUpdatedPayload>(tx, tenant.shopId, {
         type: TaxEvents.SettingsUpdated,
@@ -171,6 +178,7 @@ export async function taxSettingsIn(
     strn: row.strn,
     province: row.province,
     filerStatus: row.filerStatus,
+    filerCheckedAt: row.filerCheckedAt,
     tier1: row.tier1,
     updatedAt: row.updatedAt,
   };

@@ -5914,6 +5914,14 @@ enum FileUseKind {
 }
 
 """
+Why the shop should check whether it is on the Active Taxpayers List: it has NEVER said, or FBR published a NEW_LIST since it last did.
+"""
+enum FilerCheckDue {
+  NEVER
+  NEW_LIST
+}
+
+"""
 Whether the shop is on FBR's Active Taxpayers List, as it says: ACTIVE, INACTIVE, or UNKNOWN, taken as not on it.
 """
 enum FilerStatus {
@@ -19368,6 +19376,25 @@ input TaxCategoryInput {
 }
 
 """
+Helping the shop check whether it is on FBR's Active Taxpayers List (TAX-08, ADR-837), which FBR answers by SMS and on its site alone.
+"""
+type TaxFilerCheck {
+  """When the shop last said whether it is on the list; null for never."""
+  checkedAt: DateTime
+
+  """Why it should check now; null while what it said holds."""
+  due: FilerCheckDue
+
+  """When FBR published the list in force: each 1 March, in Pakistan."""
+  listOf: DateTime!
+
+  """
+  What to text to 9966 for FBR to say whether the shop is on the list: "ATL" and its NTN's seven digits, or a sole trader's CNIC. Null while its NTN is unknown.
+  """
+  smsBody: String
+}
+
+"""
 A step of registering with FBR as an online seller (ONB-12, ADR-500): an NTN; sales tax registration; the Active Taxpayers List; the business's province; FBR's digital invoicing, for one registered for sales tax; and a Tier-1 retailer's monthly returns.
 """
 enum TaxGuidanceCode {
@@ -19430,6 +19457,11 @@ type TaxSettings {
   Rates of its own for some products, in the shop's order; they apply while the shop charges tax at all.
   """
   categories: [TaxCategory!]!
+
+  """
+  Checking whether it is on the Active Taxpayers List, and when to again.
+  """
+  filerCheck: TaxFilerCheck!
   filerStatus: FilerStatus!
 
   """

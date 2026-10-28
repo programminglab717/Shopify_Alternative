@@ -21,6 +21,12 @@ const SETTINGS = {
   tier1: true,
   withholding: { digitalPercent: 2, cashOnDeliveryPercent: 4 },
   guidance: [{ code: 'REGISTER_NTN', status: 'DONE' }],
+  filerCheck: {
+    checkedAt: '2026-03-02T09:00:00Z',
+    due: null,
+    listOf: '2026-02-28T19:00:00Z',
+    smsBody: null,
+  },
   updatedAt: null,
   categories: [],
 };
