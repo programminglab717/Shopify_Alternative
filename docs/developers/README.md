@@ -180,6 +180,21 @@ earnings. A theme's own files are JSON over one of Hatti's themes, so `hatti the
 * A gateway's **sandbox account** takes payments that move no money, said so on the order. Outside
   production, Hatti's own test gateway does too (ADR-151).
 
+## Hatti's review
+
+Hatti's people look at each public app, theme and expert profile before shops see it, from the
+command line where Hatti runs (`pnpm --filter @hatti/core partner-apps`, `partner-themes`,
+`partner-experts`). Until the owner settles what is checked (OWN-46, OWN-47, OWN-49), they look
+for:
+
+* **Apps:** a working install on the partner's development store; scopes the app needs and no
+  more; an https address and redirect URLs on the partner's own domain; a privacy policy saying
+  what it keeps of shoppers.
+* **Themes:** a preview on the development store that works on a phone, in Urdu and English;
+  no images of others' work; a description that says what it is for; a price in range.
+* **Experts:** a real business, with past work to see; services they offer, in the cities they
+  name; no phone numbers or links in the profile to take shops off Hatti.
+
 ## Not yet
 
 * PHP and Python clients.

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Experts for hire
+
+* **Partners:** partners keep an expert profile of the services they offer shops, from store
+  setup to product photography and ads. Hatti lists each. A shop's owner or a manager finds
+  experts under Help › Hire an expert and sends one an enquiry, which the expert reads on their
+  partner page and gets by email (PRT-03, [ADR-855](../architecture/13-decision-log.md#adr-855--experts-partners-keep-a-profile-of-the-services-they-offer-shops-listed-after-hatti-looks-and-a-shops-owner-or-a-manager-sends-one-an-enquiry-from-the-admin-emailed-to-the-expert)). What Hatti checks, and any fee, is OWN-49.
+* 4563 tests (6 new).
+
 ### edf4203 · Apps' charges in rupees
 
 * **Developers:** public apps charge the shop once, in rupees. The owner approves the charge in

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-854 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-855 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -862,6 +862,7 @@
 | 852 | Apps open inside the admin with a minute's session token signed with their client secret, and offer the storefront scripts that load once the shop turns them on | Accepted |
 | 853 | The theme store: partners offer themes from their development stores, free or for Rs 1,000 to Rs 100,000; Hatti lists each after a look; a shop installs a free one at once or buys a paid one with an invoice of Hatti's, and the designer earns 80% | Accepted |
 | 854 | Public apps charge shops once in rupees: the owner approves a charge in the admin and pays it as an invoice of Hatti's, a test on development stores, and the app's partner earns 80% | Accepted |
+| 855 | Experts: partners keep a profile of the services they offer shops, listed after Hatti looks, and a shop's owner or a manager sends one an enquiry from the admin, emailed to the expert | Accepted |
 
 ---
 
@@ -28076,3 +28077,44 @@
   * **Apps taking payment through their own gateways:** rejected. Merchants would give card or
     wallet details to every app, and Hatti couldn't stand behind what they bought.
   * **Charging from message credit:** rejected, as for themes (ADR-853).
+
+## ADR-855 · Experts: partners keep a profile of the services they offer shops, listed after Hatti looks, and a shop's owner or a manager sends one an enquiry from the admin, emailed to the expert
+
+* **Context:**
+  * PRT-03 asks for an experts marketplace: setup, photography, ads and migration services.
+  * Agencies and freelancers already join as partners (ADR-504) and ask shops for access for a
+    while (ADR-488). Merchants had no way to find them from Hatti.
+* **Decision:**
+  * **The profile:** a partner keeps an expert profile on their partner page
+    (`/auth/partner/expert`):
+    * a line on what they do, and more about their work;
+    * the services they offer, of store setup, design, product photography, ads, moving from
+      another platform, apps and writing;
+    * up to ten cities, as they name them ("Online" among them), and the languages they work
+      in, Urdu or English;
+    * a starting price in whole rupees, or none to say "ask".
+  * **Review:** shops see a profile once Hatti's people list it, with `pnpm --filter @hatti/core
+    partner-experts list | list-expert <expt_…> | unlist <expt_…>`. It stays listed as the partner
+    changes it; Hatti takes it back where it must.
+  * **Finding experts:** Help › Hire an expert lists them (`/auth/experts`), filtered by service
+    and city, those whose profiles changed latest first.
+  * **Enquiries:** the shop's owner or a manager sends an expert an enquiry for the shop, about
+    one of the services they offer (`/auth/experts/<id>/enquiries`).
+    * The expert reads it on their partner page for 90 days (`/auth/partner/enquiries`), with the
+      shop's name and handle, to ask for access by, and who sent it, with their email to answer.
+    * It is emailed to the expert too, in their language, where their address is verified.
+    * One person sends ten a day at most, and one a day to each expert.
+* **Consequences:**
+  * Merchants find setup, design, photography and ads help inside Hatti, and experts get work
+    from Hatti's shops, with no fee either way for now.
+  * What Hatti checks before listing an expert, whether it takes a fee for leads, and how
+    complaints about an expert are handled are the owner's to decide (OWN-49).
+  * Not yet:
+    * reviews of experts by the shops that hired them;
+    * paying an expert through Hatti;
+    * a public directory outside the admin.
+* **Alternatives:**
+  * **Experts' phone numbers on their profiles:** rejected for now. Enquiries through Hatti keep
+    the count of leads and a record of who asked, and email answers keep both sides' numbers
+    private until they choose.
+  * **A chat between shop and expert in the inbox:** more than needs building first; email does.
