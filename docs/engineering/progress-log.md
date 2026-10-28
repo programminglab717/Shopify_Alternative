@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Voice-note orders
+### 3ab7942 · Voice-note orders
 
 * **Customers:** a WhatsApp voice note, "do lawn suit medium, aik khussa", is heard and
   answered with the shop's checkout holding what was found, and the pages of what needs a size
