@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-877 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-878 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -885,6 +885,7 @@
 | 875 | Daraz sync: a shop connects its Daraz seller account through Daraz's own page; every ten minutes Hatti brings Daraz's new orders in as prepaid marketplace orders, follows their cancellations, and gives Daraz each matching SKU's stock, and prices where asked, from one location | Accepted |
 | 876 | Hatti's console: its own people sign in through Hatti's identity provider with their security keys, to a server of its own that holds the system login the API never does; sessions last a working day, and each thing done is logged before it is done; shops' support requests are its first queue | Accepted |
 | 877 | The console's trust queues: shoppers' reports decided, stores taken down and restored, owners' appeals refused, and shops' verifications decided or taken back, as the agent signed in; a verification's documents linked only when an agent asks, which is logged | Accepted |
+| 878 | The console's other trust queues: rights complaints upheld or dismissed and store owners' answers refused or their listings let go, listings screening held by mistake cleared, signs of scam stores cleared, and shops' SMS sender names approved, refused or taken back | Accepted |
 
 ---
 
@@ -29120,3 +29121,28 @@
 * **Alternatives:**
   * **Every verification's document links in the list:** each agent who opened the page would
     reach every CNIC, with nothing logged.
+
+## ADR-878 · The console's other trust queues: rights complaints upheld or dismissed and store owners' answers refused or their listings let go, listings screening held by mistake cleared, signs of scam stores cleared, and shops' SMS sender names approved, refused or taken back
+
+* **Context:** after ADR-877, `trust-reports` still held rights complaints and their answers
+  (ADR-474 to ADR-476), listings screening held as prohibited (ADR-473), signs of scam stores
+  (ADR-842) and shops' SMS sender names (ADR-469).
+* **Decision:** the console takes them over, each decision the signed-in agent's, logged before
+  it is made, and the shop told as the command tells it.
+  * **Rights complaints:** those open, the soonest due first, with whose right, who complains and
+    how to reach them, and the listings named.
+    * Upheld: the listings are held off sale, and the store's owner is told who complained and
+      given the link to answer by.
+    * Dismissed: the agent is told to write to the complainant with why.
+  * **Owners' answers:** each refused with why, the listings staying held; or the listings let go,
+    which upholds the answer.
+  * **Listings held as prohibited:** a product, by its ID, cleared for its words as they are.
+  * **Signs of scam stores:** those standing, with what the worker found. One looked into and
+    found to be nothing is cleared with why, and not raised again.
+  * **SMS sender names:** those waiting, approved once operators registered the name for a shop
+    Hatti has verified, or refused with why. A shop's name can be taken back by its handle.
+* **Consequences:**
+  * Every trust queue of `trust-reports` is in the console. The command remains for whoever runs
+    Hatti.
+  * Shops' billing transfers, partners' reviews, the status page and couriers' city names are
+    still commands, and come to the console next.

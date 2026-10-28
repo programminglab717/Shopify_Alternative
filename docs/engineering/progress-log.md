@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### The console's other trust queues
+
+* **Rights:** rights complaints are upheld or dismissed in the console; store owners' answers are
+  refused, or their listings let go ([ADR-878](../architecture/13-decision-log.md#adr-878--the-consoles-other-trust-queues-rights-complaints-upheld-or-dismissed-and-store-owners-answers-refused-or-their-listings-let-go-listings-screening-held-by-mistake-cleared-signs-of-scam-stores-cleared-and-shops-sms-sender-names-approved-refused-or-taken-back)).
+* **Listings:** a listing held as prohibited by mistake is cleared.
+* **Scam signs:** signs of scam stores are cleared when they turn out to be nothing.
+* **Sender names:** shops' SMS sender names are approved, refused or taken back.
+* Every trust queue is now in the console. Billing transfers, partners' reviews and the status
+  page are next.
+* 4762 tests (7 new).
+
 ### 0ce74db · The console's trust queues
 
 * **Reports:** Hatti's people decide shoppers' reports of stores in the console, as the agent
