@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Headless starter
+### 96e5213 · Headless starter
 
 * **`starters/next-storefront`:** a Next.js storefront for a Hatti shop on its Storefront API:
   products, search, collections, a cart, and the shop's own checkout. It is copied, given the
