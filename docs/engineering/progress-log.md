@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The console's other trust queues
+### 9e797e7 · The console's other trust queues
 
 * **Rights:** rights complaints are upheld or dismissed in the console; store owners' answers are
   refused, or their listings let go ([ADR-878](../architecture/13-decision-log.md#adr-878--the-consoles-other-trust-queues-rights-complaints-upheld-or-dismissed-and-store-owners-answers-refused-or-their-listings-let-go-listings-screening-held-by-mistake-cleared-signs-of-scam-stores-cleared-and-shops-sms-sender-names-approved-refused-or-taken-back)).
