@@ -12,6 +12,8 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { ActionsLogPage } from './actions-log';
+import { CitiesPage } from './cities';
+import { ShopPage, ShopsPage } from './lookup';
 import { PartnersPage, PayoutsPage } from './partners';
 import { ReportsPage } from './reports';
 import { RightsPage } from './rights';
@@ -46,6 +48,9 @@ function Shell() {
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
         <nav className="flex flex-wrap items-center gap-1" aria-label="Console">
           <span className="mr-2 font-semibold">Hatti console</span>
+          <Link to="/shops" search={{}} className={link}>
+            Shops
+          </Link>
           <Link to="/support" className={link}>
             Support requests
           </Link>
@@ -78,6 +83,9 @@ function Shell() {
           </Link>
           <Link to="/payouts" className={link}>
             Payouts
+          </Link>
+          <Link to="/cities" className={link}>
+            City names
           </Link>
           <Link to="/log" className={link}>
             Log
@@ -214,6 +222,27 @@ const payoutsRoute = createRoute({
   component: PayoutsPage,
 });
 
+const shopsRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/shops',
+  validateSearch: (search: Record<string, unknown>): { query?: string } => ({
+    query: text(search.query),
+  }),
+  component: ShopsPage,
+});
+
+const shopRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/shops/$shopId',
+  component: ShopPage,
+});
+
+const citiesRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/cities',
+  component: CitiesPage,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => signedInLayout,
   path: '/log',
@@ -236,6 +265,9 @@ const routeTree = rootRoute.addChildren([
     statusRoute,
     partnersRoute,
     payoutsRoute,
+    shopsRoute,
+    shopRoute,
+    citiesRoute,
     logRoute,
   ]),
 ]);

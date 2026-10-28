@@ -25,6 +25,7 @@ import { ConsoleController } from './console.controller.js';
 import { ConsoleOpsController } from './ops.controller.js';
 import { ConsolePartnersController } from './partners.controller.js';
 import { ConsoleRightsController } from './rights.controller.js';
+import { CONSOLE_IDENTITY_DB, ConsoleShopsController } from './shops.controller.js';
 import { ConsoleSignalsController } from './signals.controller.js';
 import { CONSOLE_DATABASE, ConsoleTrustController } from './trust.controller.js';
 
@@ -67,6 +68,7 @@ class ConsoleModule {
         ConsoleSignalsController,
         ConsoleOpsController,
         ConsolePartnersController,
+        ConsoleShopsController,
       ],
       providers: [
         {
@@ -79,6 +81,7 @@ class ConsoleModule {
           useValue: new SupportService(options.database, null, options.supportSender ?? null),
         },
         { provide: CONSOLE_DATABASE, useValue: options.database },
+        { provide: CONSOLE_IDENTITY_DB, useValue: options.identityDb },
         {
           provide: VerificationsService,
           useValue: new VerificationsService(options.database, options.storage),

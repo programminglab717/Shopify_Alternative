@@ -241,3 +241,38 @@ export interface PartnerOwed {
   owed: string;
   entries: number;
 }
+
+/** A shop as the console finds it (ADR-881). */
+export interface ShopFound {
+  id: string;
+  name: string;
+  handle: string;
+  status: 'active' | 'suspended' | 'closed';
+  development: boolean;
+  plan: string;
+  createdAt: string;
+}
+
+/** A shop's standing at a glance. */
+export interface ShopStanding {
+  shop: ShopFound;
+  owner: { name: string; email: string | null; phone: string | null } | null;
+  verified: string[];
+  openReports: number;
+  openSupportRequests: number;
+  standingSignals: number;
+  downSince: string | null;
+  supportAccess: { until: string; note: string | null } | null;
+  actions: { email: string; action: string; subject: string | null; at: string }[];
+}
+
+/** Couriers' names for cities (ADR-260). */
+export interface CourierCities {
+  shops: {
+    cityKey: string;
+    city: string;
+    names: { courierCity: string; shops: number }[];
+    shared: string | null;
+  }[];
+  hatti: { city: string; courierCity: string }[];
+}
