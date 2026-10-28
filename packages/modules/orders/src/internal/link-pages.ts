@@ -39,7 +39,12 @@ import {
   payOnlineForm,
 } from './online-payment-page.js';
 import type { OnlineGateway } from './online-payments.js';
-import type { OrderLinkView, ReviewableProduct } from './order-link.service.js';
+import type {
+  OrderLinkView,
+  ReviewableProduct,
+  SubscriptionLinkView,
+} from './order-link.service.js';
+import { dayText } from './subscriptions.js';
 import type { PostPurchaseOffer } from './post-purchase-offer.js';
 import { RETURN_NOTE_MAX, type ReturnOffer } from './return-request.service.js';
 import type { TrackingView } from './tracking.service.js';
@@ -146,6 +151,10 @@ const LABELS = {
   returnInstead: { en: 'What would you like instead?', ur: 'بدلے میں آپ کیا چاہیں گے؟' },
   returnNote: { en: 'Anything to add (optional)', ur: 'مزید کچھ کہنا ہو (اختیاری)' },
   sendReturn: { en: 'Ask for a return', ur: 'واپسی کی درخواست بھیجیں' },
+  skipNext: { en: 'Skip the next order', ur: 'اگلا آرڈر چھوڑ دیں' },
+  pauseSubscription: { en: 'Pause', ur: 'روک دیں' },
+  resumeSubscription: { en: 'Resume', ur: 'دوبارہ شروع کریں' },
+  cancelSubscription: { en: 'Cancel the subscription', ur: 'سبسکرپشن منسوخ کریں' },
 } satisfies Record<string, Words>;
 
 /** Why an item goes back, as the order's page offers it (ADR-675). */
@@ -297,6 +306,7 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           added: Boolean(options.added) && !problem,
           storeCredit: view.storeCredit,
           returns: view.returns,
+          subscription: view.subscription,
           asked: Boolean(options.asked) && !problem,
         });
       }
@@ -830,6 +840,8 @@ function statusPage(
     returns?: ReturnOffer | null;
     /** The return they asked for was taken just now. */
     asked?: boolean;
+    /** The subscription the order is of (ADR-862), to skip, pause, resume or cancel. */
+    subscription?: SubscriptionLinkView | null;
   },
 ): LinkPage {
   const {
@@ -849,6 +861,7 @@ function statusPage(
     storeCredit = 0n,
     returns = null,
     asked = false,
+    subscription = null,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -894,6 +907,8 @@ function statusPage(
             storeCreditWords(amount(storeCredit, order.currency), shop.name),
             'center small',
           ),
+        // The subscription it is of (ADR-862).
+        subscription && subscriptionSection(subscription),
       ],
       // Paying online answers with a gateway's page: the form goes on there.
       { formTargets: gatewayOrigins(onlinePayment?.gateways ?? []) },
@@ -1652,11 +1667,62 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
   }
 }
 
+/**
+ * The subscription an order is of (CAT-16, ADR-862): its plan, and while it goes on, when its next
+ * order is placed, with buttons to skip that order, pause or resume it, and cancel it.
+ */
+function subscriptionSection(subscription: SubscriptionLinkView): Html {
+  const next = dayText(subscription.nextOrderOn);
+  const plan = `${subscription.planName}, ${subscription.discountPercent}% off`;
+  const words: Sentence =
+    subscription.status === 'cancelled'
+      ? {
+          en: `Your subscription (${plan}) is cancelled: no more orders are placed.`,
+          ur: html`آپ کی سبسکرپشن (${text(plan)}) منسوخ ہے: مزید آرڈر نہیں دیے جائیں گے۔`,
+        }
+      : subscription.status === 'paused'
+        ? {
+            en: `Your subscription (${plan}) is paused: no orders are placed until you resume it.`,
+            ur: html`آپ کی سبسکرپشن (${text(plan)}) رکی ہوئی ہے: دوبارہ شروع کرنے تک کوئی آرڈر نہیں
+            دیا جائے گا۔`,
+          }
+        : {
+            en: `You subscribed: ${plan}. Your next order is placed on ${next}, and confirmed with you before it's sent.`,
+            ur: html`آپ نے سبسکرائب کیا ہے: ${text(plan)}۔ آپ کا اگلا آرڈر ${ltr(next)} کو دیا جائے
+            گا، اور بھیجنے سے پہلے آپ سے کنفرم کیا جائے گا۔`,
+          };
+  const button = (action: string, label: Words, variant = '') =>
+    html`<button class="button ${variant} stack" type="submit" name="action" value="${action}">
+      ${say('bilingual', label)}
+    </button>`;
+  return html`<section class="subscription">
+    ${paragraphs(words, 'center')}
+    ${
+      subscription.status !== 'cancelled' &&
+      html`<form method="post">
+        ${
+          subscription.status === 'active'
+            ? html`${button('subscription_skip', LABELS.skipNext, 'secondary')}
+              ${button('subscription_pause', LABELS.pauseSubscription, 'secondary')}`
+            : button('subscription_resume', LABELS.resumeSubscription)
+        }
+        ${button('subscription_cancel', LABELS.cancelSubscription, 'danger')}
+      </form>`
+    }
+  </section>`;
+}
+
 /** Why the customer can no longer do `action` here, and whom to ask instead. */
 function tooLateWords(
-  action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell' | 'return',
+  action:
+    'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell' | 'return' | 'subscription',
 ): Sentence {
   switch (action) {
+    case 'subscription':
+      return {
+        en: 'This subscription was cancelled. Ask the shop in your chat to start another.',
+        ur: 'یہ سبسکرپشن منسوخ ہو چکی ہے۔ نئی شروع کرنے کے لیے اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
     case 'cancel':
       return {
         en: "This order can't be cancelled here any more. Ask the shop in your chat.",

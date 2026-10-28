@@ -347,3 +347,16 @@ export {
   type ExpansionStoreRecord,
   type ExpansionCopyResult,
 } from '../internal/expansion-stores.service.js';
+export {
+  SELLING_PLAN_LIMITS,
+  SELLING_PLAN_PROPERTY,
+  SellingPlanEvents,
+  SellingPlanService,
+  planOfLine,
+  planPrice,
+  sellingPlanPropertyOf,
+  sellingPlansForIn,
+  sellingPlansIn,
+  type SellingPlanInterval,
+  type SellingPlanRecord,
+} from '../internal/selling-plans.js';

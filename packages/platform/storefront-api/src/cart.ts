@@ -246,6 +246,12 @@ export interface CartLineJson {
   preorderShipsOn?: string;
   /** The days its stitching adds before it ships, where it is stitched (ADR-803); absent if not. */
   stitchedDays?: number;
+  /**
+   * The selling plan it is subscribed on (CAT-16, ADR-862), its `_selling_plan` property naming
+   * one its product is sold on: priced at the plan's discount, `compareAtPrice` each without it.
+   * Absent for a line bought once.
+   */
+  sellingPlan?: { id: string; name: string; discountPercent: number; compareAtPrice: number };
 }
 
 export interface CartJson {

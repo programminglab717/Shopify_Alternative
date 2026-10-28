@@ -2,9 +2,13 @@ import { createHash } from 'node:crypto';
 import {
   isStitched,
   personalisationPrice,
+  planOfLine,
+  planPrice,
+  sellingPlanPropertyOf,
   stitchingPrice,
   stitchingProblem,
   type PersonalisationField,
+  type SellingPlanRecord,
   type StitchingOffer,
 } from '@hatti/catalog/public';
 import { typedCode } from '@hatti/pricing/public';
@@ -344,6 +348,8 @@ export function cartJson(
   facts: ReadonlyMap<string, VariantFacts>,
   asked: ReadonlyMap<string, readonly PersonalisationField[]> = new Map(),
   stitching: ReadonlyMap<string, StitchingOffer> = new Map(),
+  /** The selling plans each product is sold on (ADR-862). */
+  plans: ReadonlyMap<string, readonly SellingPlanRecord[]> = new Map(),
 ): CartJson {
   const lines = cart.lines.filter((line) => facts.get(line.variantId)?.forSale);
   const inCart = totals(lines);
@@ -351,10 +357,12 @@ export function cartJson(
     const variant = facts.get(line.variantId)!;
     const all = inCart.get(line.variantId)!;
     const short = variant.sellable !== null && all > variant.sellable;
-    const price =
-      variant.price +
+    // Subscribed on a plan its product is sold on, the variant's price less the plan's discount.
+    const plan = planOfLine(plans.get(variant.productId), line.properties);
+    const extras =
       personalisationPrice(asked.get(variant.productId) ?? [], line.properties) +
       stitchingPrice(stitching.get(variant.productId), line.properties);
+    const price = (plan ? planPrice(variant.price, plan.discountPercent) : variant.price) + extras;
     return {
       key: lineKey(line),
       variantId: line.variantId,
@@ -371,6 +379,14 @@ export function cartJson(
       taxCode: variant.taxCode,
       maxQuantity: short ? Math.max(0, variant.sellable! - (all - line.quantity)) : null,
       ...(variant.preorderShipsOn && { preorderShipsOn: variant.preorderShipsOn }),
+      ...(plan && {
+        sellingPlan: {
+          id: sellingPlanPropertyOf(plan.id),
+          name: plan.name,
+          discountPercent: plan.discountPercent,
+          compareAtPrice: Number(variant.price + extras),
+        },
+      }),
       // Stitched, the days its stitching adds (ADR-803).
       ...(stitching.has(variant.productId) &&
         isStitched(line.properties) && {

@@ -6145,3 +6145,41 @@ export interface WorkflowPayloadData {
 export interface WorkflowDeleteData {
   workflowDelete: { deletedWorkflowId: string | null; userErrors: UserError[] };
 }
+
+/** How the shop sells by subscription (CAT-16, ADR-862). */
+export interface SellingPlan {
+  id: string;
+  name: string;
+  intervalUnit: 'WEEK' | 'MONTH';
+  intervalCount: number;
+  discountPercent: number;
+  productTag: string | null;
+}
+
+export interface OrderSubscription {
+  id: string;
+  status: 'ACTIVE' | 'PAUSED' | 'CANCELLED';
+  planName: string;
+  interval: string;
+  discountPercent: number;
+  nextOrderOn: string;
+  ordersPlaced: number;
+  name: string | null;
+  city: string | null;
+  lastError: string | null;
+  lastOrderId: string | null;
+}
+
+export interface SubscriptionsData {
+  sellingPlans: SellingPlan[];
+  orderSubscriptions: OrderSubscription[];
+}
+
+export interface SellingPlanPayloadData {
+  sellingPlanCreate?: { sellingPlan: SellingPlan | null; userErrors: UserError[] };
+  sellingPlanDelete?: { deletedSellingPlanId: string | null; userErrors: UserError[] };
+}
+
+export interface OrderSubscriptionChangeData {
+  orderSubscriptionChange: { subscription: OrderSubscription | null; userErrors: UserError[] };
+}

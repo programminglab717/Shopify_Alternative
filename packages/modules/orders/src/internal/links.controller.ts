@@ -238,6 +238,16 @@ export class OrderLinkController {
       case 'upsell':
         view = await this.links.takeOffer(token, field(body, 'variant'));
         break;
+      case 'subscription_skip':
+      case 'subscription_pause':
+      case 'subscription_resume':
+      case 'subscription_cancel':
+        // The subscription the order is of (ADR-862).
+        view = await this.links.changeSubscription(
+          token,
+          action.slice('subscription_'.length) as 'skip' | 'pause' | 'resume' | 'cancel',
+        );
+        break;
       case 'pay': {
         // To the gateway the customer chose (ADR-219), linked or by its form (ADR-163), or the
         // page again with why not.

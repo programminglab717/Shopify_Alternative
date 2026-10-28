@@ -90,6 +90,7 @@ import { ExpertsPage } from './help/experts-page';
 import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { ExpansionStoresPage } from './settings/expansion-stores-page';
+import { SubscriptionsPage } from './settings/subscriptions-page';
 import { WorkflowsPage } from './settings/workflows-page';
 import { AppFramePage } from './settings/app-frame-page';
 import { AppChargePage } from './settings/app-charge-page';
@@ -830,6 +831,13 @@ const settingsExpansionStores = createRoute({
   component: ExpansionStoresPage,
 });
 
+// The shop's selling plans and its customers' subscriptions (ADR-862).
+const settingsSubscriptions = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/subscriptions',
+  component: SubscriptionsPage,
+});
+
 // The shop's workflows: triggers, conditions and actions (ADR-861).
 const settingsWorkflows = createRoute({
   getParentRoute: () => shop,
@@ -1158,6 +1166,7 @@ export const routeTree = root.addChildren([
     settingsAppCharge,
     settingsExpansionStores,
     settingsWorkflows,
+    settingsSubscriptions,
     settingsWhatsApp,
     marketing,
     marketingTemplates,

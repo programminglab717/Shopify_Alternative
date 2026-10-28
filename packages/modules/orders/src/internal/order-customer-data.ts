@@ -70,6 +70,10 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
          SET customer_id = ${intoId}, version = version + 1, updated_at = now()
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
     await mergeReviewsIn(tx, shopId, fromId, intoId);
+    // Their subscriptions are the customer kept's (ADR-862).
+    await tx.execute(sql`
+      UPDATE orders.subscriptions SET customer_id = ${intoId}, updated_at = now()
+       WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
   },
 
   async erase(tx, shopId, customer, actor) {
@@ -77,6 +81,9 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
     const { actorKind, actorId } = actorColumns(actor);
     // The reviews they wrote on their orders' pages (ADR-399) carry their name, and are their words.
     await eraseReviewsIn(tx, shopId, customerId);
+    // Their subscriptions hold their address and number (ADR-862): no more orders are placed.
+    await tx.execute(sql`
+      DELETE FROM orders.subscriptions WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
     // Drafts name no customer, and a completed one holds its order's address: they go first.
     await tx.execute(sql`
       DELETE FROM orders.draft_orders d

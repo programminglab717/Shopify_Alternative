@@ -95,6 +95,7 @@ import {
   ORDER_SEGMENT_FACTS,
   OrderExportService,
   SalesReportService,
+  SubscriptionService,
 } from '@hatti/orders/public';
 import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
@@ -123,6 +124,7 @@ import { PushCampaigns } from './push-campaigns.js';
 import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
+import { SubscriptionOrders, SubscriptionSweeps } from './subscriptions.js';
 import { WorkflowRuns, WorkflowTriggers } from './workflows.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
 import {
@@ -224,6 +226,7 @@ export interface EventConsumers {
   webhooks?: WebhookFanOut;
   automations?: AutomationTriggers;
   workflows?: WorkflowTriggers;
+  subscriptions?: SubscriptionOrders;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -258,6 +261,7 @@ export function eventHandlers(
     webhooks,
     automations,
     workflows,
+    subscriptions,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -400,6 +404,11 @@ export function eventHandlers(
   if (workflows) {
     for (const type of WorkflowTriggers.EVENTS) {
       registry.on(type, (event) => workflows.handle(event));
+    }
+  }
+  if (subscriptions) {
+    for (const type of SubscriptionOrders.EVENTS) {
+      registry.on(type, (event) => subscriptions.handle(event));
     }
   }
   return registry;
@@ -560,6 +569,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         domains: new DomainNotices(database, new MessagesService(database)),
         storeExports: new StoreExportNotices(database, new MessagesService(database)),
         planOrders: new PlanOrders(database, new MessagesService(database), workerOrders(database)),
+        // Orders subscribed on the shop's selling plans made subscriptions (ADR-862).
+        subscriptions: new SubscriptionOrders(workerSubscriptions(database)),
         // Apps' webhooks need their secrets opened to be sent (ADR-397).
         ...(config.ENCRYPTION_KEYS && {
           webhooks: new WebhookFanOut(new WebhookService(database, config.ENCRYPTION_KEYS)),
@@ -713,6 +724,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => reviewRequests.stop());
+    // Subscriptions' orders placed as they fall due, each confirmed as any other (ADR-862).
+    const subscriptionSweeps = new SubscriptionSweeps(workerSubscriptions(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => subscriptionSweeps.stop());
     // Apps' webhooks posted, signed with each app's secret, and tried again for two days (ADR-397).
     if (config.ENCRYPTION_KEYS) {
       const webhookDeliveries = new WebhookDeliveries(
@@ -1122,4 +1138,9 @@ function edgeCacheOf(config: WorkerConfig): EdgeCache {
   return config.CLOUDFLARE_ZONE_ID && config.CLOUDFLARE_API_TOKEN
     ? new CloudflareCache({ zoneId: config.CLOUDFLARE_ZONE_ID, token: config.CLOUDFLARE_API_TOKEN })
     : NO_EDGE_CACHE;
+}
+
+/** Customers' subscriptions, their orders placed as staff's are (ADR-862). */
+function workerSubscriptions(database: Database): SubscriptionService {
+  return new SubscriptionService(database, workerOrders(database), new VariantService(database));
 }

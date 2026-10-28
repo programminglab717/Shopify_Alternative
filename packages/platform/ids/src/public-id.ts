@@ -174,6 +174,10 @@ export const ID_PREFIXES = {
   workflowRun: 'wrun',
   // A trigger or an action an app offers the shop's workflows (ADR-861).
   flowExtension: 'fext',
+  // A shop's selling plan: "Every month, 10% off" (ADR-862).
+  sellingPlan: 'slpl',
+  // A customer's subscription: an order placed again each interval (ADR-862).
+  orderSubscription: 'osub',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

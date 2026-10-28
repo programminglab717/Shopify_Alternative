@@ -10636,6 +10636,9 @@ type Mutation {
   """
   orderSplit(id: ID!, input: OrderSplitInput!): OrderSplitPayload!
 
+  """Skips a subscription's next order, pauses, resumes or cancels it."""
+  orderSubscriptionChange(change: OrderSubscriptionChange!, id: ID!): OrderSubscriptionPayload!
+
   """
   Changes the shipping address (before anything ships), email, note or tags.
   """
@@ -11102,6 +11105,15 @@ type Mutation {
 
   """Renames a segment or changes its query."""
   segmentUpdate(id: ID!, name: String, query: String): SegmentUpdatePayload!
+
+  """Makes a selling plan: ten a shop at most."""
+  sellingPlanCreate(input: SellingPlanInput!): SellingPlanPayload!
+
+  """Deletes a selling plan: subscriptions made with it keep going."""
+  sellingPlanDelete(id: ID!): SellingPlanDeletePayload!
+
+  """Changes a selling plan: subscriptions made already keep it as it was."""
+  sellingPlanUpdate(id: ID!, input: SellingPlanInput!): SellingPlanPayload!
 
   """
   Sets the shop's logo, one of its files, which its checkout's page shows in place of its name, or its square logo, which its link page shows; or takes either away.
@@ -13176,6 +13188,67 @@ enum OrderStatus {
   CANCELLED
   CLOSED
   OPEN
+}
+
+"""
+A customer's subscription (CAT-16, ADR-862): an order placed again each interval, the same items to the same address at its plan's price, by cash on delivery, each confirmed with the customer as any other.
+"""
+type OrderSubscription {
+  city: String
+  createdAt: DateTime!
+  customerId: ID!
+  discountPercent: Int!
+  id: ID!
+
+  """"Every month", "Every 2 weeks"."""
+  interval: String!
+
+  """
+  Why its last due order couldn't be placed; tried each day, skipped after three.
+  """
+  lastError: String
+  lastOrderId: ID
+  lines: [OrderSubscriptionLine!]!
+
+  """Who it goes to; null once erased."""
+  name: String
+
+  """The day its next order is placed, YYYY-MM-DD in Pakistan's time."""
+  nextOrderOn: String!
+
+  """Its orders so far, the first among them."""
+  ordersPlaced: Int!
+  originOrderId: ID!
+
+  """Its plan's name as it was when they subscribed: "Every month"."""
+  planName: String!
+  status: OrderSubscriptionStatus!
+}
+
+"""
+SKIP its next order, the one after placed an interval later; PAUSE it, no orders placed until RESUME; or CANCEL it, for good.
+"""
+enum OrderSubscriptionChange {
+  CANCEL
+  PAUSE
+  RESUME
+  SKIP
+}
+
+type OrderSubscriptionLine {
+  quantity: Int!
+  variantId: ID!
+}
+
+type OrderSubscriptionPayload {
+  subscription: OrderSubscription
+  userErrors: [UserError!]!
+}
+
+enum OrderSubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAUSED
 }
 
 """Fields left out stay as they are."""
@@ -16527,6 +16600,11 @@ type Query {
     locationId: ID
   ): [OrderStageCount!]!
 
+  """
+  The shop's subscriptions, the latest first (50 unless given, 100 at most).
+  """
+  orderSubscriptions(first: Int, status: OrderSubscriptionStatus): [OrderSubscription!]!
+
   """Orders, newest first."""
   orders(
     after: String
@@ -16910,6 +16988,9 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): SegmentConnection!
+
+  """The shop's selling plans, in the order made."""
+  sellingPlans: [SellingPlan!]!
 
   """
   What the shop has left to set up before it sells: the admin's setup checklist.
@@ -18316,6 +18397,49 @@ type SelectedOption {
 
   """The value, e.g. "M"."""
   value: String!
+}
+
+"""
+How the shop sells by subscription (CAT-16, ADR-862): "Every month, 10% off", for its products of a tag, or all of them. A shopper subscribes on a product's page; their order is placed again each interval, by cash on delivery, at the plan's price.
+"""
+type SellingPlan {
+  """What it takes off the items' prices, 0 to 50 percent."""
+  discountPercent: Int!
+  id: ID!
+
+  """Every this many weeks or months: 1 to 12."""
+  intervalCount: Int!
+  intervalUnit: SellingPlanInterval!
+  name: String!
+
+  """
+  The tag of the products it is for, ignoring case; null for all of them.
+  """
+  productTag: String
+  updatedAt: DateTime!
+}
+
+type SellingPlanDeletePayload {
+  deletedSellingPlanId: ID
+  userErrors: [UserError!]!
+}
+
+input SellingPlanInput {
+  discountPercent: Int!
+  intervalCount: Int!
+  intervalUnit: SellingPlanInterval!
+  name: String!
+  productTag: String
+}
+
+enum SellingPlanInterval {
+  MONTH
+  WEEK
+}
+
+type SellingPlanPayload {
+  sellingPlan: SellingPlan
+  userErrors: [UserError!]!
 }
 
 """

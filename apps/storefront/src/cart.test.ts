@@ -103,6 +103,17 @@ describe('Cart requests', () => {
       discount: 'EID10,FREESHIP',
     });
     expect(cartBody('clear', { anything: 1 }).body).toEqual({});
+    // A plan chosen in a product's form, as Shopify's selling_plan (ADR-862).
+    expect(
+      cartBody('add', parseForm('id=v1&selling_plan=slpl_1&properties[Name]=Sana')).body,
+    ).toEqual({
+      items: [
+        { variantId: 'v1', quantity: 1, properties: { Name: 'Sana', _selling_plan: 'slpl_1' } },
+      ],
+    });
+    expect(cartBody('add', parseForm('id=v1&selling_plan=')).body).toEqual({
+      items: [{ variantId: 'v1', quantity: 1, properties: {} }],
+    });
   });
 
   it("knows Shopify's cart paths and the cart's cookies", () => {

@@ -1,3 +1,4 @@
+import { toPublicId } from '@hatti/ids';
 import { describe, expect, it } from 'vitest';
 import {
   CART_LIMITS,
@@ -445,5 +446,43 @@ describe('cart lines', () => {
     expect(json.subtotal).toBe(10_500_00);
     // Without what the products ask, the catalog's price alone.
     expect(cartJson(cart, facts).items[0]!.price).toBe(2_000_00);
+  });
+
+  it("prices a line subscribed on its product's selling plan at the plan's discount (ADR-862)", () => {
+    const plan = {
+      id: '01937c4e-0000-7000-8000-0000000000aa',
+      name: 'Every month',
+      intervalUnit: 'month' as const,
+      intervalCount: 1,
+      discountPercent: 10,
+      productTag: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const subscribed = { _selling_plan: 'slpl_01jcy4w000e00800000000005a' };
+    const named = { _selling_plan: toPublicId('sellingPlan', plan.id) };
+    const json = cartJson(
+      {
+        ...EMPTY_CART,
+        lines: [line(SHAWL, 2, named), line(LAWN, 1, named), line(SHAWL, 1, subscribed)],
+      },
+      FACTS,
+      new Map(),
+      new Map(),
+      new Map([['product-of-Shawl', [plan]]]),
+    );
+    expect(json.items.map((item) => [item.price, item.sellingPlan?.name ?? null])).toEqual([
+      [2_700_00, 'Every month'],
+      // The lawn is sold on no plan, and the other plan is none of the shawl's.
+      [4_500_00, null],
+      [3_000_00, null],
+    ]);
+    expect(json.items[0]!.sellingPlan).toEqual({
+      id: named._selling_plan,
+      name: 'Every month',
+      discountPercent: 10,
+      compareAtPrice: 3_000_00,
+    });
+    expect(json.subtotal).toBe(2 * 2_700_00 + 4_500_00 + 3_000_00);
   });
 });

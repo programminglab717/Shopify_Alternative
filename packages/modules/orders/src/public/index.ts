@@ -493,3 +493,14 @@ export type {
   RiskReasonValue,
 } from '../internal/schema.js';
 export { FULFILLMENT_EVENT_STATUSES } from '../internal/schema.js';
+export {
+  SUBSCRIPTION_LIMITS,
+  SUBSCRIPTION_PROPERTY,
+  SubscriptionService,
+  addDays,
+  changeSubscriptionIn,
+  nextOrderDay,
+  subscriptionOfOrderIn,
+  type SubscriptionRecord,
+  type SubscriptionStatus,
+} from '../internal/subscriptions.js';

@@ -80,6 +80,8 @@ import { SavedSearchService } from './saved-search.service.js';
 import { TodayService } from './today.service.js';
 import { OrderTrackingService } from './tracking.service.js';
 import { TransferReceiptService } from './transfer-receipt.service.js';
+import { SubscriptionResolver } from './graphql/subscriptions.resolver.js';
+import { SubscriptionService } from './subscriptions.js';
 
 /**
  * Needs {@link Database}, PublicSite and ObjectStorage providers from the host application, which
@@ -94,6 +96,8 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderService,
     DraftOrderService,
     OrderLinkService,
+    SubscriptionService,
+    SubscriptionResolver,
     FulfillmentService,
     RiskSettingsService,
     OrderDocumentService,
@@ -168,6 +172,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderService,
     DraftOrderService,
     OrderLinkService,
+    SubscriptionService,
     FulfillmentService,
     RiskSettingsService,
     OrderDocumentService,

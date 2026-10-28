@@ -1973,6 +1973,52 @@ describe('Storefront rendering', () => {
     expect(plain.html).not.toContain('product__stitching"');
   });
 
+  it("offers a product its shop's selling plans, at their prices, by its tag (ADR-862)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const chai = { ...first!, tags: [...first!.tags, 'Subscribe'] };
+    const variant = chai.variants[0]!;
+    const shop = new MemoryStore({
+      ...sample,
+      shop: {
+        ...sample.shop,
+        sellingPlans: [
+          {
+            id: 'slpl_month',
+            name: 'Every month',
+            intervalUnit: 'month',
+            intervalCount: 1,
+            discountPercent: 10,
+            productTag: 'subscribe',
+          },
+          {
+            id: 'slpl_tea',
+            name: 'Every week',
+            intervalUnit: 'week',
+            intervalCount: 1,
+            discountPercent: 5,
+            productTag: 'tea',
+          },
+        ],
+      },
+      products: [chai, ...rest],
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${chai.handle}` }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain('<legend>Purchase options</legend>');
+    expect(flat).toContain('<input type="radio" name="selling_plan" value="" checked>');
+    expect(flat).toContain('<input type="radio" name="selling_plan" value="slpl_month">');
+    const off = Math.floor((variant.price * 90) / 100);
+    expect(flat).toContain(
+      `Subscribe: Every month, Rs ${(off / 100).toLocaleString('en', { maximumFractionDigits: 2 })} (10% off)`,
+    );
+    // Only the plans of its tags, or of all products.
+    expect(flat).not.toContain('slpl_tea');
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('<fieldset class="product__selling-plans">');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

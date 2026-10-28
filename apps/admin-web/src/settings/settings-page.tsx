@@ -23,6 +23,7 @@ import {
   UserCog,
   Warehouse,
   Workflow as WorkflowIcon,
+  Repeat,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { StaffMemberRole } from '../api/types';
@@ -78,6 +79,7 @@ interface Section {
     | '/$shopId/settings/verification'
     | '/$shopId/settings/apps'
     | '/$shopId/settings/workflows'
+    | '/$shopId/settings/subscriptions'
     | '/$shopId/settings/expansion-stores'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/custom-data'
@@ -217,6 +219,13 @@ const SECTIONS: readonly Section[] = [
       RUNS_SHOP,
       (shop) => can(shop, 'read_settings') && hasCapability(shop, 'manage_apps'),
     ),
+  },
+  {
+    to: '/$shopId/settings/subscriptions',
+    label: 'settings.subscriptions',
+    hint: 'settings.subscriptionsHint',
+    icon: Repeat,
+    gate: gate(RUNS_SHOP, (shop) => can(shop, 'read_products') && can(shop, 'read_orders')),
   },
   {
     to: '/$shopId/settings/workflows',

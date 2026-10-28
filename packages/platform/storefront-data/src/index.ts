@@ -32,6 +32,7 @@ export {
   type ProductReviewsDoc,
   type ReviewDoc,
   type SeoDoc,
+  type SellingPlanDoc,
   type ShopDoc,
   type SitemapEntry,
   type SitemapEntryDoc,

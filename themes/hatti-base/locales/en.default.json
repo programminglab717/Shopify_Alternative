@@ -155,6 +155,12 @@
           "trouser_waist": "Trouser waist",
           "trouser_bottom": "Trouser bottom"
         }
+      },
+      "selling_plans": {
+        "title": "Purchase options",
+        "once": "Buy once ({{ price }})",
+        "plan": "Subscribe: {{ name }}, {{ price }} ({{ percent }}% off)",
+        "note": "Each delivery is a new order, confirmed with you and paid at the door. Skip, pause or cancel from your order's page."
       }
     },
     "wishlist": {

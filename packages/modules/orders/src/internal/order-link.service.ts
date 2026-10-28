@@ -16,6 +16,11 @@ import {
   type OrderReview,
   type ReviewInput,
 } from '@hatti/catalog/public';
+import {
+  changeSubscriptionIn,
+  subscriptionOfOrderIn,
+  type SubscriptionChange,
+} from './subscriptions.js';
 import { storeCreditAccountsIn } from '@hatti/customers/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
@@ -175,7 +180,18 @@ export type OrderLinkView =
        * and its page takes one, as JazzCash's does (ADR-163).
        */
       gatewayForm?: GatewayFormStart;
+      /** The subscription the order is of (ADR-862); null for none. */
+      subscription: SubscriptionLinkView | null;
     };
+
+/** A subscription as an order's page shows it (ADR-862). */
+export interface SubscriptionLinkView {
+  planName: string;
+  discountPercent: number;
+  status: 'active' | 'paused' | 'cancelled';
+  /** YYYY-MM-DD. */
+  nextOrderOn: string;
+}
 
 /**
  * Links for orders' customers: a page where they see their order and, while a cash-on-delivery
@@ -214,6 +230,26 @@ export class OrderLinkService {
       const why = await this.offers.takeLocked(tx, shopId, order, variantId);
       if (why === 'gone') return { kind: 'too_late', action: 'upsell' };
       return why === 'refused' ? { kind: 'refused' } : null;
+    });
+  }
+
+  /**
+   * Skips the next order of the subscription the link's order is of, pauses, resumes or cancels
+   * it (ADR-862), as its customer asked: too late once it was cancelled.
+   */
+  async changeSubscription(token: string, change: SubscriptionChange): Promise<OrderLinkView> {
+    return this.#act(token, async (tx, shopId, order) => {
+      const record = (await loadOrder(tx, shopId, order.id))!;
+      const subscription = await subscriptionOfOrderIn(tx, shopId, record);
+      if (!subscription || record.customerErasedAt) {
+        return { kind: 'too_late', action: 'subscription' };
+      }
+      const why = await changeSubscriptionIn(tx, shopId, subscription.id, change, {
+        actor: 'system',
+        orderId: order.id,
+        who: 'The customer',
+      });
+      return why ? { kind: 'too_late', action: 'subscription' } : null;
     });
   }
 
@@ -588,9 +624,28 @@ export class OrderLinkService {
       returns: await returnOfferIn(tx, shopId, record),
       offer: this.offers ? await this.offers.offerIn(tx, shopId, record) : null,
       storeCredit: await customerCreditIn(tx, shopId, record),
+      subscription: await subscriptionViewIn(tx, shopId, record),
       problem,
     };
   }
+}
+
+/** The subscription the order is of, as its page shows it; null for none, or one erased. */
+async function subscriptionViewIn(
+  tx: Tx,
+  shopId: string,
+  order: OrderRecord,
+): Promise<SubscriptionLinkView | null> {
+  if (order.customerErasedAt) return null;
+  const subscription = await subscriptionOfOrderIn(tx, shopId, order);
+  return (
+    subscription && {
+      planName: subscription.planName,
+      discountPercent: subscription.discountPercent,
+      status: subscription.status,
+      nextOrderOn: subscription.nextOrderOn,
+    }
+  );
 }
 
 /** What the order's customer has of store credit in its currency (ADR-596): 0 for none. */

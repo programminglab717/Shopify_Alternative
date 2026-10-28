@@ -254,10 +254,16 @@ export function cartBody<A extends CartActionName>(
       const listed = listOf(params.items);
       const items = (listed ?? [params]).map((item) => {
         const fields = isRecord(item) ? item : {};
+        // A plan chosen in a product's form, as Shopify's `selling_plan`, goes in a hidden
+        // property the core prices the line by (ADR-862).
+        const plan = fields.selling_plan ?? fields.sellingPlan;
         return {
           variantId: String(fields.id ?? ''),
           quantity: number(fields.quantity ?? 1) as number,
-          properties: texts(fields.properties),
+          properties: {
+            ...texts(fields.properties),
+            ...(typeof plan === 'string' && plan !== '' && { _selling_plan: plan }),
+          },
         };
       });
       return { body: { items } as CartBodies[A], single: listed === null };
@@ -459,6 +465,21 @@ export function ajaxLineItem(
       name: option.name,
       value: variant?.options[index] ?? '',
     })),
+    // Subscribed, its plan and the price without it, as Shopify's allocation says (ADR-862).
+    selling_plan_allocation: item.sellingPlan
+      ? {
+          selling_plan: {
+            id: item.sellingPlan.id,
+            name: item.sellingPlan.name,
+            price_adjustments: [
+              { position: 1, value_type: 'percentage', value: item.sellingPlan.discountPercent },
+            ],
+          },
+          price: item.price,
+          compare_at_price: item.sellingPlan.compareAtPrice,
+          per_delivery_price: item.price,
+        }
+      : null,
     price: item.price,
     original_price: item.price,
     discounted_price: item.price,

@@ -97,7 +97,8 @@ export type LinkProblem =
    */
   | {
       kind: 'too_late';
-      action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell' | 'return';
+      action:
+        'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell' | 'return' | 'subscription';
     }
   /**
    * A return asked for that was not taken (ADR-675): no item chosen, an item without its reason,

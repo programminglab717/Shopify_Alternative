@@ -5,8 +5,10 @@ import {
   digitalProductIdsIn,
   dropFactsIn,
   personalisationIn,
+  sellingPlansForIn,
   stitchingIn,
   type PersonalisationField,
+  type SellingPlanRecord,
   type StitchingOffer,
 } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
@@ -163,7 +165,7 @@ export class CartService {
       const cart = await withDiscount(
         tx,
         shopId,
-        cartJson(content, listed, asked.fields, asked.stitching),
+        cartJson(content, listed, asked.fields, asked.stitching, asked.plans),
         discountCodes,
       );
       const expiresAt = sql`now() + ${`${CART_DAYS} days`}::interval`;
@@ -448,6 +450,7 @@ async function askedOf(
 ): Promise<{
   fields: Map<string, PersonalisationField[]>;
   stitching: Map<string, StitchingOffer>;
+  plans: Map<string, SellingPlanRecord[]>;
 }> {
   const products = [
     ...new Set(lines.flatMap((line) => facts.get(line.variantId)?.productId ?? [])),
@@ -455,6 +458,7 @@ async function askedOf(
   return {
     fields: await personalisationIn(tx, shopId, products),
     stitching: await stitchingIn(tx, shopId, products),
+    plans: await sellingPlansForIn(tx, shopId, products),
   };
 }
 
@@ -466,7 +470,7 @@ async function priced(
   facts: ReadonlyMap<string, VariantFacts>,
 ): Promise<CartJson> {
   const asked = await askedOf(tx, shopId, facts, cart.lines);
-  return cartJson(cart, facts, asked.fields, asked.stitching);
+  return cartJson(cart, facts, asked.fields, asked.stitching, asked.plans);
 }
 
 /**

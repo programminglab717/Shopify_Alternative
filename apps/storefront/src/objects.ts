@@ -12,6 +12,7 @@ import type {
   MetafieldsDoc,
   PageDoc,
   ProductDoc,
+  SellingPlanDoc,
   ShopDoc,
   StoreDoc,
   StoreData,
@@ -147,6 +148,46 @@ export interface ObjectContext {
    * as the shop's document has it: put in the picture's address.
    */
   pictures?: Readonly<Record<string, string>>;
+  /** The shop's selling plans (ADR-862), as its document has them, once it is read. */
+  sellingPlans?: readonly SellingPlanDoc[];
+}
+
+/**
+ * The selling plan groups a product is sold on (CAT-16, ADR-862), as Shopify's
+ * `product.selling_plan_groups`: one, "Subscribe and save", holding the shop's plans for all its
+ * products and those for a tag it has, each with its percentage off; none for a product on no
+ * plan. A product form's `selling_plan` field names the plan its line is subscribed on.
+ */
+export function sellingPlanGroups(
+  plans: readonly SellingPlanDoc[] | undefined,
+  doc: Pick<ProductDoc, 'tags'>,
+): Record<string, unknown>[] {
+  const tags = new Set(doc.tags.map((tag) => tag.toLowerCase()));
+  const offered = (plans ?? []).filter(
+    (plan) => plan.productTag === null || tags.has(plan.productTag.toLowerCase()),
+  );
+  if (offered.length === 0) return [];
+  const option = 'Delivery every';
+  return [
+    {
+      id: 'subscribe-and-save',
+      name: 'Subscribe and save',
+      app_id: null,
+      options: [{ name: option, position: 1, values: offered.map((plan) => plan.name) }],
+      selling_plans: offered.map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        description: null,
+        group_id: 'subscribe-and-save',
+        recurring_deliveries: true,
+        options: [{ name: option, position: 1, value: plan.name }],
+        price_adjustments: [{ position: 1, value_type: 'percentage', value: plan.discountPercent }],
+        // Hatti's own: how often, for the theme's words.
+        interval_unit: plan.intervalUnit,
+        interval_count: plan.intervalCount,
+      })),
+    },
+  ];
 }
 
 /**
@@ -364,6 +405,12 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     vendor: doc.vendor,
     type: doc.productType,
     tags: doc.tags,
+    // Its selling plans (ADR-862), read once the shop's document is: products are made into
+    // objects as it is fetched.
+    get selling_plan_groups() {
+      return sellingPlanGroups(ctx.sellingPlans, doc);
+    },
+    requires_selling_plan: false,
     price: Math.min(...prices),
     price_min: Math.min(...prices),
     price_max: Math.max(...prices),

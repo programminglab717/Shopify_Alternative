@@ -1,0 +1,28 @@
+{%- comment -%}
+  Subscribe and save (CAT-16, ADR-862): bought once, or on one of the shop's selling plans, each
+  delivery at the plan's price. The product form's `selling_plan` names the plan; empty, the line
+  is bought once. Each order of the subscription is confirmed as any other, and paid at the door.
+  Accepts: product.
+{%- endcomment -%}
+{%- assign group = product.selling_plan_groups | first -%}
+{%- if group -%}
+  {%- assign price = product.selected_or_first_available_variant.price -%}
+  {%- assign once = price | money -%}
+  <fieldset class="product__selling-plans">
+    <legend>{{ 'products.product.selling_plans.title' | t }}</legend>
+    <label class="pill">
+      <input type="radio" name="selling_plan" value="" checked>
+      <span>{{ 'products.product.selling_plans.once' | t: price: once }}</span>
+    </label>
+    {%- for plan in group.selling_plans -%}
+      {%- assign off = plan.price_adjustments.first.value -%}
+      {%- assign kept = 100 | minus: off -%}
+      {%- assign plan_price = price | times: kept | divided_by: 100 | money -%}
+      <label class="pill">
+        <input type="radio" name="selling_plan" value="{{ plan.id }}">
+        <span>{{ 'products.product.selling_plans.plan' | t: name: plan.name, price: plan_price, percent: off }}</span>
+      </label>
+    {%- endfor -%}
+    <p class="product__selling-plans-note">{{ 'products.product.selling_plans.note' | t }}</p>
+  </fieldset>
+{%- endif -%}

@@ -169,6 +169,17 @@ export interface EasternWearDoc {
   season?: AttributeWordDoc;
 }
 
+/** A selling plan as the storefront offers it (ADR-862), by its public ID. */
+export interface SellingPlanDoc {
+  id: string;
+  name: string;
+  intervalUnit: 'week' | 'month';
+  intervalCount: number;
+  discountPercent: number;
+  /** The tag of the products it is for, ignoring case; null for all of them. */
+  productTag: string | null;
+}
+
 export interface ProductDoc {
   id: string;
   /** Sold as a gift card (CAT-12, ADR-451): Liquid's `product.gift_card?`. Absent when it is not. */
@@ -568,6 +579,11 @@ export interface ShopDoc {
    * its app's name and its handle to tell it by. Absent for none.
    */
   appEmbeds?: { src: string; app: string; handle: string }[];
+  /**
+   * Its selling plans (CAT-16, ADR-862), in the order made: its products of a plan's tag, or all
+   * of them, are offered it on their pages. Absent for none.
+   */
+  sellingPlans?: SellingPlanDoc[];
   /**
    * True while Hatti has taken the store down (ADR-461): its storefront answers every page with
    * Hatti's page saying so. Absent while it is not, as in documents written before stores could be

@@ -12595,3 +12595,86 @@ export const WorkflowDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const SELLING_PLAN = /* GraphQL */ `
+  fragment SellingPlanFields on SellingPlan {
+    id
+    name
+    intervalUnit
+    intervalCount
+    discountPercent
+    productTag
+  }
+`;
+
+const ORDER_SUBSCRIPTION = /* GraphQL */ `
+  fragment OrderSubscriptionFields on OrderSubscription {
+    id
+    status
+    planName
+    interval
+    discountPercent
+    nextOrderOn
+    ordersPlaced
+    name
+    city
+    lastError
+    lastOrderId
+  }
+`;
+
+/** The shop's selling plans and its customers' subscriptions (CAT-16, ADR-862). */
+export const SubscriptionsQuery = /* GraphQL */ `
+  query Subscriptions {
+    sellingPlans {
+      ...SellingPlanFields
+    }
+    orderSubscriptions(first: 100) {
+      ...OrderSubscriptionFields
+    }
+  }
+  ${SELLING_PLAN}
+  ${ORDER_SUBSCRIPTION}
+`;
+
+export const SellingPlanCreateMutation = /* GraphQL */ `
+  mutation SellingPlanCreate($input: SellingPlanInput!) {
+    sellingPlanCreate(input: $input) {
+      sellingPlan {
+        ...SellingPlanFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SELLING_PLAN}
+  ${USER_ERRORS}
+`;
+
+export const SellingPlanDeleteMutation = /* GraphQL */ `
+  mutation SellingPlanDelete($id: ID!) {
+    sellingPlanDelete(id: $id) {
+      deletedSellingPlanId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const OrderSubscriptionChangeMutation = /* GraphQL */ `
+  mutation OrderSubscriptionChange($id: ID!, $change: OrderSubscriptionChange!) {
+    orderSubscriptionChange(id: $id, change: $change) {
+      subscription {
+        ...OrderSubscriptionFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${ORDER_SUBSCRIPTION}
+  ${USER_ERRORS}
+`;

@@ -33,6 +33,8 @@ import {
   shownReviewsIn,
   shownSizeChartsIn,
   personalisationIn,
+  sellingPlansIn,
+  SellingPlanEvents,
   stitchingIn,
   videoPathOf,
   type BundleRecord,
@@ -57,7 +59,7 @@ import {
 } from '@hatti/messaging/public';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
-import { tryFromPublicId } from '@hatti/ids';
+import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import {
   FileEvents,
   fileVersionOf,
@@ -373,6 +375,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case AppEvents.Deleted:
       // Its apps' scripts turned on (ADR-852), which go with the apps the shop has.
       return [Items.shop];
+    case SellingPlanEvents.Updated:
+      // Its selling plans, its products' pages offer (ADR-862).
+      return [Items.shop];
     case OnlineStoreEvents.DomainCreated:
     case OnlineStoreEvents.DomainUpdated:
     case OnlineStoreEvents.DomainDeleted:
@@ -571,6 +576,7 @@ export const PUBLISHED_EVENTS = [
   AppEvents.Installed,
   AppEvents.Uninstalled,
   AppEvents.Deleted,
+  SellingPlanEvents.Updated,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
   OnlineStoreEvents.DomainDeleted,
@@ -1073,6 +1079,14 @@ export class StorefrontPublisher {
       (await storefrontLocationsIn(tx, shopId)).map(storeDoc),
       await storefrontTokensIn(tx, shopId),
       await appEmbedsIn(tx, shopId),
+      (await sellingPlansIn(tx, shopId)).map((plan) => ({
+        id: toPublicId('sellingPlan', plan.id),
+        name: plan.name,
+        intervalUnit: plan.intervalUnit,
+        intervalCount: plan.intervalCount,
+        discountPercent: plan.discountPercent,
+        productTag: plan.productTag,
+      })),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

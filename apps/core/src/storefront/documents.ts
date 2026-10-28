@@ -52,6 +52,7 @@ import {
   type PageDoc,
   type ProductDoc,
   type SeoDoc,
+  type SellingPlanDoc,
   type ShopDoc,
   type ThemeDoc,
   type EasternWearDoc,
@@ -699,6 +700,8 @@ export function shopDoc(
   storefrontTokens: readonly { digest: string; private: boolean }[] = [],
   /** The scripts of its apps it turned on (ADR-852). */
   appEmbeds: readonly { src: string; app: string; handle: string }[] = [],
+  /** Its selling plans (ADR-862). */
+  sellingPlans: readonly SellingPlanDoc[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -771,6 +774,7 @@ export function shopDoc(
     ...(stores.length > 0 && { stores: [...stores] }),
     ...(storefrontTokens.length > 0 && { storefrontTokens: [...storefrontTokens] }),
     ...(appEmbeds.length > 0 && { appEmbeds: appEmbeds.map((embed) => ({ ...embed })) }),
+    ...(sellingPlans.length > 0 && { sellingPlans: sellingPlans.map((plan) => ({ ...plan })) }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.
