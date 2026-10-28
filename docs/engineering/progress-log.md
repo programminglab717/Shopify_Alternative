@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Prices in shoppers' currencies
+### fdcadbc · Prices in shoppers' currencies
 
 * **Settings › Currencies:** a shop shows its prices in dirhams, riyals, pounds, dollars or euros
   as well, at a rate it fixes or the day's, which Hatti reads from a free open feed, rounded as it
