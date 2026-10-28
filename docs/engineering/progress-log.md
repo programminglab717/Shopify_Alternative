@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Subscriptions
+### b6f87e4 · Subscriptions
 
 * **Settings › Subscriptions:** staff make selling plans, "Every month, 10% off", for products of
   a tag or all of them. Product pages offer them, and a subscribed line is priced at the plan's
