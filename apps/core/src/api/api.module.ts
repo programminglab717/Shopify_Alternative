@@ -111,6 +111,7 @@ import {
   StaffInvitationCustomRoleResolver,
   StaffMemberCustomRoleResolver,
 } from './custom-roles.resolver.js';
+import { ShopSsoResolver } from './sso.resolver.js';
 import { SupportAccessResolver } from './support.resolver.js';
 
 /** Google's own addresses for Google Ads, with no credentials: no account connects. */
@@ -400,6 +401,7 @@ export class ApiModule {
         StaffMemberCustomRoleResolver,
         StaffInvitationCustomRoleResolver,
         SupportAccessResolver,
+        ShopSsoResolver,
         OrderAgreementResolver,
         AppSessionResolver,
         ThemeStoreResolver,

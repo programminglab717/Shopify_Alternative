@@ -11146,6 +11146,14 @@ type Mutation {
   """
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
 
+  """Ends the shop's single sign-on: staff sign in their own ways again."""
+  shopSsoDelete: Boolean!
+
+  """
+  Sets the shop's identity provider and its staff's email domains, or changes them. The owner alone, having signed in lately.
+  """
+  shopSsoUpdate(input: ShopSsoInput!): ShopSsoPayload!
+
   """
   Asks Hatti to verify the shop's owner, by their CNIC, or then the business, by its NTN, with photos of the documents. Hatti's people decide, usually within two working days; the documents are deleted once they do, and the CNIC kept as its last four digits. One request waits at a time. The owner's alone, who must have proved who they are lately.
   """
@@ -17022,6 +17030,9 @@ type Query {
     type: ShopPolicyType!
   ): ShopPolicyDraft!
 
+  """The shop's single sign-on; null while it has none. The owner alone."""
+  shopSso: ShopSso
+
   """The shop's verification by Hatti: its level, and its requests."""
   shopVerification: ShopVerification!
 
@@ -18686,6 +18697,49 @@ type ShopPolicyVersion {
   """As Shopify titles it: "Refund policy"."""
   title: String!
   type: ShopPolicyType!
+}
+
+"""
+The shop's single sign-on (ADM-09, ADR-864): the organisation's identity provider, any that speaks OpenID Connect, which signs in the shop's staff whose emails are of its domains.
+"""
+type ShopSso {
+  """Where the provider sends staff back: register it there."""
+  callbackUrl: String!
+  clientId: String!
+  emailDomains: [String!]!
+
+  """
+  The provider's issuer: https://login.microsoftonline.com/<tenant>/v2.0.
+  """
+  issuer: String!
+
+  """
+  The provider asks for a second factor itself: its sign-ins count as two-step.
+  """
+  providerMfa: Boolean!
+
+  """Its members other than the owner reach the shop only through it."""
+  required: Boolean!
+
+  """The client secret's last four characters."""
+  secretHint: String!
+  updatedAt: DateTime!
+}
+
+input ShopSsoInput {
+  clientId: String!
+
+  """Needed the first time; blank keeps it."""
+  clientSecret: String
+  emailDomains: [String!]!
+  issuer: String!
+  providerMfa: Boolean!
+  required: Boolean!
+}
+
+type ShopSsoPayload {
+  sso: ShopSso
+  userErrors: [UserError!]!
 }
 
 """The shop's verification by Hatti (ONB-11, ADR-465)."""

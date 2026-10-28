@@ -8,6 +8,7 @@ import { PartnerThemesService } from './partner-themes.service.js';
 import { CertificationService } from './certification.service.js';
 import { ExpertsService } from './experts.service.js';
 import { PartnersService } from './partners.service.js';
+import { ShopSsoService } from './sso.js';
 import { StaffService } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
@@ -38,6 +39,7 @@ export class IdentityModule {
         { provide: ExpertsService, useValue: new ExpertsService(options) },
         { provide: CertificationService, useValue: new CertificationService(options) },
         { provide: SupportAccessService, useValue: new SupportAccessService(options) },
+        { provide: ShopSsoService, useValue: new ShopSsoService(options) },
       ],
       exports: [
         IdentityService,
@@ -48,6 +50,7 @@ export class IdentityModule {
         PartnerThemesService,
         ExpertsService,
         CertificationService,
+        ShopSsoService,
       ],
     };
   }

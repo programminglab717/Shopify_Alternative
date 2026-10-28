@@ -4500,6 +4500,50 @@ const en = {
     'Last year your shop sold {lift} times its usual through it: reorders started here count on that.',
   'stock.season.noHistory':
     'Stock up on what sells for Eid: reorders count on it once a year of sales shows how much.',
+  'sso.signIn': 'Sign in with your organisation (SSO)',
+  'sso.workEmail': 'Work email',
+  'sso.workEmailHint': "Your organisation's sign-in opens next.",
+  'sso.continue': 'Continue',
+  'sso.title': 'Signing in',
+  'sso.signingIn': 'Signing you in…',
+  'sso.back': 'Back to sign in',
+  'sso.error.not_member':
+    "Your organisation signed you in, but you're not on this shop's staff with that email. Ask its owner to invite you.",
+  'sso.error.expired': 'This sign-in took too long or was used already. Start it again.',
+  'sso.error.refused': "Your organisation's sign-in didn't let you in.",
+  'sso.error.invalid': "Your organisation's answer couldn't be checked. Start again.",
+  'sso.error.unreachable':
+    "Your organisation's sign-in can't be reached now. Try again in a minute.",
+  'sso.error.no_sso': "No shop signs its staff in with your organisation's sign-in.",
+  'sso.error.notStarted': "This sign-in wasn't started in this tab. Start it again here.",
+  'sso.settingsTitle': 'Single sign-on',
+  'sso.settingsHint':
+    "Let your staff sign in with your organisation's accounts: Microsoft, Google Workspace, Okta or any provider that speaks OpenID Connect. Invite them first, with their work emails.",
+  'sso.callback': 'Register this address at your provider:',
+  'sso.issuer': 'Issuer URL',
+  'sso.issuerHint':
+    'As your provider names it, such as https://login.microsoftonline.com/<tenant>/v2.0',
+  'sso.clientId': 'Client ID',
+  'sso.clientSecret': 'Client secret',
+  'sso.secretKept': 'Leave it blank to keep the one ending {hint}.',
+  'sso.domains': 'Email domains',
+  'sso.domainsHint': 'Your staff’s work emails are of these, separated by commas: zari.pk',
+  'sso.providerMfa': 'Your provider asks for a second step',
+  'sso.providerMfaHint':
+    'Its sign-ins then count as two-step verified, as owners’ and managers’ must be.',
+  'sso.required': 'Staff sign in only through it',
+  'sso.requiredHint': 'Everyone but you, the owner, who keeps your own way in.',
+  'sso.save': 'Save single sign-on',
+  'sso.saved': 'Saved.',
+  'sso.remove': 'Turn off single sign-on',
+  'error.SSO_REQUIRED':
+    "This shop's staff sign in with their organisation's account. Sign out, then sign in with SSO.",
+  'error.SSO_NOT_SET_UP': "No shop signs its staff in with this email's organisation.",
+  'error.SSO_UNREACHABLE':
+    "Your organisation's sign-in can't be reached now. Try again in a minute.",
+  'error.SSO_EXPIRED': 'This sign-in has expired. Start it again.',
+  'error.SSO_SESSION':
+    'Signed in through your organisation, you can work in its shop alone. Sign in with your password to change your account.',
   'settings.workflows': 'Workflows',
   'settings.workflowsHint': 'Tag orders and customers, and get told, as things happen',
   'workflow.hint':
@@ -11081,6 +11125,48 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'پچھلے سال آپ کی دکان نے اس دوران معمول سے {lift} گنا بیچا: یہاں سے شروع کیے گئے آرڈرز اسی حساب سے ہیں۔',
   'stock.season.noHistory':
     'عید پر بکنے والی چیزوں کا اسٹاک بڑھائیں: ایک سال کی فروخت کے بعد آرڈرز اس کا حساب رکھیں گے۔',
+  'sso.signIn': 'اپنی تنظیم کے اکاؤنٹ سے سائن ان کریں (SSO)',
+  'sso.workEmail': 'دفتری ای میل',
+  'sso.workEmailHint': 'اس کے بعد آپ کی تنظیم کا سائن ان کھلے گا۔',
+  'sso.continue': 'جاری رکھیں',
+  'sso.title': 'سائن ان ہو رہا ہے',
+  'sso.signingIn': 'آپ کو سائن ان کیا جا رہا ہے…',
+  'sso.back': 'سائن ان پر واپس جائیں',
+  'sso.error.not_member':
+    'آپ کی تنظیم نے آپ کو سائن ان کیا، لیکن اس ای میل سے آپ اس دکان کے عملے میں شامل نہیں۔ مالک سے دعوت مانگیں۔',
+  'sso.error.expired': 'یہ سائن ان بہت دیر سے ہوا یا پہلے استعمال ہو چکا۔ دوبارہ شروع کریں۔',
+  'sso.error.refused': 'آپ کی تنظیم کے سائن ان نے آپ کو اجازت نہیں دی۔',
+  'sso.error.invalid': 'آپ کی تنظیم کا جواب جانچا نہیں جا سکا۔ دوبارہ شروع کریں۔',
+  'sso.error.unreachable': 'آپ کی تنظیم کا سائن ان ابھی دستیاب نہیں۔ ایک منٹ بعد کوشش کریں۔',
+  'sso.error.no_sso': 'کوئی دکان اپنے عملے کو آپ کی تنظیم کے سائن ان سے داخل نہیں کرتی۔',
+  'sso.error.notStarted': 'یہ سائن ان اس ٹیب میں شروع نہیں ہوا۔ یہیں دوبارہ شروع کریں۔',
+  'sso.settingsTitle': 'سنگل سائن آن',
+  'sso.settingsHint':
+    'اپنے عملے کو اپنی تنظیم کے اکاؤنٹس سے سائن ان کرنے دیں: مائیکروسافٹ، گوگل ورک اسپیس، اوکٹا یا کوئی بھی جو OpenID Connect سمجھتا ہو۔ پہلے انہیں ان کی دفتری ای میل سے مدعو کریں۔',
+  'sso.callback': 'یہ پتہ اپنے فراہم کنندہ کے ہاں درج کریں:',
+  'sso.issuer': 'جاری کنندہ کا URL',
+  'sso.issuerHint':
+    'جیسے آپ کا فراہم کنندہ لکھتا ہے، مثلاً https://login.microsoftonline.com/<tenant>/v2.0',
+  'sso.clientId': 'کلائنٹ آئی ڈی',
+  'sso.clientSecret': 'کلائنٹ سیکرٹ',
+  'sso.secretKept': '{hint} پر ختم ہونے والا رکھنے کے لیے خالی چھوڑ دیں۔',
+  'sso.domains': 'ای میل ڈومینز',
+  'sso.domainsHint': 'آپ کے عملے کی دفتری ای میلز انہی کی ہیں، کوما سے الگ: zari.pk',
+  'sso.providerMfa': 'آپ کا فراہم کنندہ دوسرا مرحلہ مانگتا ہے',
+  'sso.providerMfaHint':
+    'تب اس کے سائن ان دو مرحلہ تصدیق شدہ مانے جاتے ہیں، جیسا مالکوں اور منیجرز کے لیے ضروری ہے۔',
+  'sso.required': 'عملہ صرف اسی سے سائن ان کرے',
+  'sso.requiredHint': 'آپ، مالک، کے سوا سب؛ آپ کا اپنا راستہ کھلا رہتا ہے۔',
+  'sso.save': 'سنگل سائن آن محفوظ کریں',
+  'sso.saved': 'محفوظ ہو گیا۔',
+  'sso.remove': 'سنگل سائن آن بند کریں',
+  'error.SSO_REQUIRED':
+    'اس دکان کا عملہ اپنی تنظیم کے اکاؤنٹ سے سائن ان کرتا ہے۔ سائن آؤٹ کریں، پھر SSO سے سائن ان کریں۔',
+  'error.SSO_NOT_SET_UP': 'کوئی دکان اس ای میل کی تنظیم سے اپنے عملے کو سائن ان نہیں کرتی۔',
+  'error.SSO_UNREACHABLE': 'آپ کی تنظیم کا سائن ان ابھی دستیاب نہیں۔ ایک منٹ بعد کوشش کریں۔',
+  'error.SSO_EXPIRED': 'یہ سائن ان ختم ہو چکا۔ دوبارہ شروع کریں۔',
+  'error.SSO_SESSION':
+    'اپنے ادارے کے ذریعے سائن ان ہو کر آپ صرف اسی کی دکان میں کام کر سکتے ہیں۔ اپنا اکاؤنٹ بدلنے کے لیے پاس ورڈ سے سائن ان کریں۔',
   'settings.workflows': 'ورک فلو',
   'settings.workflowsHint': 'کچھ ہوتے ہی آرڈرز اور گاہکوں پر ٹیگ لگائیں، اور اطلاع پائیں',
   'workflow.hint':

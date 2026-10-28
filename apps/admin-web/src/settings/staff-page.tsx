@@ -34,6 +34,7 @@ import { AccessRequests } from './access-requests';
 import { RoleName, RoleOptions, RolesTab, useCustomRoles } from './custom-roles';
 import { SelectField } from './settings-form';
 import { apiRole, BackToSettings, MANAGES_STAFF, roleLabel } from './settings-page';
+import { SsoCard } from './sso-card';
 
 /** Roles from the most to the least power over the shop. */
 const ROLES: readonly StaffMemberRole[] = [
@@ -581,6 +582,7 @@ export function StaffPage() {
               run={run}
             />
           )}
+          {shop.role === 'owner' && <SsoCard />}
         </>
       )}
     </div>

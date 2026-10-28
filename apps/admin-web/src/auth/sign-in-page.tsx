@@ -13,6 +13,7 @@ import { TextField } from '../ui/field';
 import { AuthLayout } from './auth-layout';
 import { useSessionStore } from './context';
 import { GoogleButton } from './google';
+import { SsoSignIn } from './sso';
 import type { GoogleOptions } from './google';
 import type { Tokens } from './session';
 
@@ -429,6 +430,7 @@ export function SignInPage() {
                 {t('signIn.withGoogle')}
               </Button>
             )}
+            <SsoSignIn />
           </div>
         )}
         <Link to="/sign-up" className="text-primary underline-offset-4 hover:underline">

@@ -139,6 +139,8 @@ export async function startTestApi(
       phoneCodes: options.phoneCodes ?? null,
       google: options.google ?? null,
       emails: options.emails ?? null,
+      // Tests' identity providers run on this machine (ADR-864).
+      sso: { allowPrivateAddresses: true },
     },
     maskInternalErrors: true,
     storefrontKey: TEST_STOREFRONT_KEY,

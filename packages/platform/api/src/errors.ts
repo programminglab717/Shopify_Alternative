@@ -12,6 +12,8 @@ export const ErrorCode = {
   NoShopAccess: 'NO_SHOP_ACCESS',
   /** The role needs two-step verification and the session has not passed it. */
   MfaRequired: 'MFA_REQUIRED',
+  /** The shop admits its staff only through its identity provider (ADR-864): sign in with it. */
+  SsoRequired: 'SSO_REQUIRED',
   /**
    * A sensitive action from staff who have not proved who they are lately: they re-authenticate
    * (`POST /auth/reauthenticate`) and try again.

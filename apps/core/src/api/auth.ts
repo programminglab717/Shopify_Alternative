@@ -115,6 +115,14 @@ export function adminApiAuthentication(
           'Your role in this shop needs two-step verification. Turn it on and sign in again',
         );
         return;
+      case 'sso_required':
+        await deny(
+          reply,
+          403,
+          ErrorCode.SsoRequired,
+          "This shop's staff sign in through its organisation's single sign-on. Sign in with it",
+        );
+        return;
     }
   };
 }

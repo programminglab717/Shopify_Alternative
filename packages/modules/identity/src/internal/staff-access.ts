@@ -17,7 +17,9 @@ export type StaffAccessResult =
    */
   | { ok: false; reason: 'no_shop_access' }
   /** The role, or Hatti's support, needs two-step verification and this session has not passed it. */
-  | { ok: false; reason: 'mfa_required' };
+  | { ok: false; reason: 'mfa_required' }
+  /** The shop admits its staff but its owner only through its identity provider (ADR-864). */
+  | { ok: false; reason: 'sso_required' };
 
 interface Row extends Record<string, unknown> {
   user_id: string;
@@ -32,6 +34,8 @@ interface Row extends Record<string, unknown> {
   custom_role_id: string | null;
   custom_scopes: string[] | null;
   custom_capabilities: string[] | null;
+  /** The shop requires its identity provider, and this session is not one it began (ADR-864). */
+  sso_required: boolean;
 }
 
 /**
@@ -75,6 +79,8 @@ export class StaffAccessResolver {
       };
     }
     if (!role || !isStaffRole(role)) return { ok: false, reason: 'no_shop_access' };
+    // Its owner keeps a way in should the provider fail.
+    if (row.sso_required && role !== 'owner') return { ok: false, reason: 'sso_required' };
     if (MFA_REQUIRED_ROLES.has(role) && !row.mfa_verified) {
       return { ok: false, reason: 'mfa_required' };
     }

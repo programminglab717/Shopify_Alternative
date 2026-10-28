@@ -6198,3 +6198,22 @@ export interface StockSeason {
 export interface StockSeasonData {
   stockSeason: StockSeason | null;
 }
+
+/** The shop's single sign-on (ADM-09, ADR-864). */
+export interface ShopSso {
+  issuer: string;
+  clientId: string;
+  secretHint: string;
+  emailDomains: string[];
+  required: boolean;
+  providerMfa: boolean;
+  callbackUrl: string;
+}
+
+export interface ShopSsoData {
+  shopSso: ShopSso | null;
+}
+
+export interface ShopSsoUpdateData {
+  shopSsoUpdate: { sso: ShopSso | null; userErrors: UserError[] };
+}

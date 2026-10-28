@@ -148,3 +148,10 @@ export {
   type SupportGrantRecord,
   type SupportShopRecord,
 } from '../internal/support-access.service.js';
+export {
+  SSO_LIMITS,
+  ShopSsoService,
+  type ShopSsoInput,
+  type ShopSsoSettings,
+  type SsoOptions,
+} from '../internal/sso.js';

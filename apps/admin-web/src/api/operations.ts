@@ -12696,3 +12696,46 @@ export const OrderSubscriptionChangeMutation = /* GraphQL */ `
   ${ORDER_SUBSCRIPTION}
   ${USER_ERRORS}
 `;
+
+const SHOP_SSO = /* GraphQL */ `
+  fragment ShopSsoFields on ShopSso {
+    issuer
+    clientId
+    secretHint
+    emailDomains
+    required
+    providerMfa
+    callbackUrl
+  }
+`;
+
+/** The shop's single sign-on, for its owner (ADM-09, ADR-864). */
+export const ShopSsoQuery = /* GraphQL */ `
+  query ShopSso {
+    shopSso {
+      ...ShopSsoFields
+    }
+  }
+  ${SHOP_SSO}
+`;
+
+export const ShopSsoUpdateMutation = /* GraphQL */ `
+  mutation ShopSsoUpdate($input: ShopSsoInput!) {
+    shopSsoUpdate(input: $input) {
+      sso {
+        ...ShopSsoFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_SSO}
+  ${USER_ERRORS}
+`;
+
+export const ShopSsoDeleteMutation = /* GraphQL */ `
+  mutation ShopSsoDelete {
+    shopSsoDelete
+  }
+`;

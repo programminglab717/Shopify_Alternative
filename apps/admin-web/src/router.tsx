@@ -92,6 +92,7 @@ import { AppsPage } from './settings/apps-page';
 import { ExpansionStoresPage } from './settings/expansion-stores-page';
 import { SubscriptionsPage } from './settings/subscriptions-page';
 import { WorkflowsPage } from './settings/workflows-page';
+import { SsoCallbackPage } from './auth/sso';
 import { AppFramePage } from './settings/app-frame-page';
 import { AppChargePage } from './settings/app-charge-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
@@ -163,6 +164,7 @@ const PUBLIC_PATHS = [
   '/sign-up',
   '/invitation',
   '/oauth/authorize',
+  '/sso/callback',
   '/forgot-password',
   '/reset-password',
   '/verify-email',
@@ -1049,6 +1051,13 @@ const oauthAuthorize = createRoute({
   component: OAuthPage,
 });
 
+// Where an organisation's identity provider sends staff back (ADM-09, ADR-864).
+const ssoCallback = createRoute({
+  getParentRoute: () => root,
+  path: '/sso/callback',
+  component: SsoCallbackPage,
+});
+
 export const routeTree = root.addChildren([
   index,
   signIn,
@@ -1059,6 +1068,7 @@ export const routeTree = root.addChildren([
   partners,
   invitation,
   oauthAuthorize,
+  ssoCallback,
   forgotPassword,
   resetPassword,
   verifyEmail,

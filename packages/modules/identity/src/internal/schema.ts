@@ -96,6 +96,8 @@ export const sessions = identitySchema.table('sessions', {
   expiresAt: at('expires_at').notNull(),
   revokedAt: at('revoked_at'),
   revokedReason: text('revoked_reason'),
+  /** The shop whose identity provider began it (ADR-864); null for the rest. */
+  ssoShopId: uuid('sso_shop_id'),
 });
 
 export const mfaChallenges = identitySchema.table('mfa_challenges', {

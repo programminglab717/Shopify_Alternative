@@ -71,6 +71,7 @@ import {
 } from './email-feedback.js';
 import { AuthError, invalidCredentials, unauthenticated } from './errors.js';
 import { GoogleIdTokens, type GoogleAccount, type GoogleSignInSettings } from './google.js';
+import type { SsoHandoff, SsoOptions } from './sso.js';
 import {
   PASSKEY_LIMITS,
   challengeOf,
@@ -253,6 +254,8 @@ export interface IdentityServiceOptions {
   phoneCodes?: PhoneCodeSender | null;
   /** Hatti's client IDs at Google (ADR-164); without them, no one signs in with Google. */
   google?: GoogleSignInSettings | null;
+  /** Single sign-on through shops' identity providers (ADR-864); tests allow their own. */
+  sso?: SsoOptions | null;
   /**
    * Sends Hatti's own emails about accounts, whose links open the admin at `adminUrl` (ADR-165);
    * without it, no email is proved and no password reset.
@@ -375,6 +378,8 @@ export interface AuthenticatedSession {
   mfaVerified: boolean;
   /** When its user last proved who they are (ADR-103). */
   authenticatedAt: Date;
+  /** The shop whose provider began it, which alone it reaches (ADR-864); null for the rest. */
+  ssoShopId?: string | null;
 }
 
 export interface SessionInfo {
@@ -1371,6 +1376,46 @@ export class IdentityService {
     }
   }
 
+  /** Where the admin is, as Hatti's emails link it; null where none is set, as in some tests. */
+  get adminUrl(): string | null {
+    return this.options.emails?.adminUrl ?? null;
+  }
+
+  /**
+   * Begins the session of a member the shop's identity provider signed in (ADM-09, ADR-864), as
+   * its handoff says: two-step verified where the provider asks for a second factor itself, and
+   * marked as the provider's, as a shop requiring single sign-on admits its staff alone.
+   */
+  async signInThroughSso(handoff: SsoHandoff, client: ClientInfo): Promise<SignInResult> {
+    const [row] = await this.db
+      .select({
+        id: users.id,
+        email: users.email,
+        emailVerifiedAt: users.emailVerifiedAt,
+        name: users.name,
+        phoneE164: users.phoneE164,
+        phoneVerifiedAt: users.phoneVerifiedAt,
+        language: users.language,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, handoff.userId));
+    if (!row || row.status !== 'active') {
+      throw new AuthError('INVALID_CREDENTIALS', 401, 'This account cannot sign in');
+    }
+    const tokens = await this.db.transaction(async (tx) => {
+      await this.recordEvent(tx, row.id, 'sign_in_with_sso', client);
+      const tokens = await this.createSession(tx, row.id, handoff.providerMfa, client);
+      await tx
+        .update(sessions)
+        .set({ ssoShopId: handoff.shopId })
+        .where(eq(sessions.id, fromPublicId(tokens.session.id, 'session')));
+      return tokens;
+    });
+    await this.alertSignIn(row.id, tokens, client);
+    return { status: 'signed_in', user: toProfile(row, false), tokens };
+  }
+
   /**
    * Connects the Google account whose ID token is given to the signed-in user's own (ADR-164):
    * from then on it signs them in. Taken from a session whose user proved who they are lately,
@@ -2214,6 +2259,7 @@ export class IdentityService {
         userId: sessions.userId,
         mfaVerifiedAt: sessions.mfaVerifiedAt,
         authenticatedAt: sessions.authenticatedAt,
+        ssoShopId: sessions.ssoShopId,
       })
       .from(sessions)
       .innerJoin(users, and(eq(users.id, sessions.userId), eq(users.status, 'active')))
@@ -2231,6 +2277,7 @@ export class IdentityService {
       sessionId: row.sessionId,
       mfaVerified: row.mfaVerifiedAt !== null,
       authenticatedAt: row.authenticatedAt,
+      ssoShopId: row.ssoShopId,
     };
   }
 
@@ -2461,6 +2508,8 @@ export class IdentityService {
         and(
           eq(memberships.userId, auth.userId),
           eq(memberships.status, 'active'),
+          // A session a shop's provider began lists that shop alone (ADR-864).
+          auth.ssoShopId ? eq(memberships.shopId, auth.ssoShopId) : undefined,
           // A collaborator's shop goes from the list when their access ends (ADR-487).
           or(isNull(memberships.expiresAt), gt(memberships.expiresAt, this.now())),
         ),
@@ -2480,6 +2529,7 @@ export class IdentityService {
           eq(memberships.userId, auth.userId),
           eq(memberships.role, 'owner'),
           eq(shops.status, 'closed'),
+          auth.ssoShopId ? sql`false` : undefined,
           gt(shops.closedAt, new Date(this.now().getTime() - CLOSED_SHOP_DAYS * DAY_MS)),
         ),
       )

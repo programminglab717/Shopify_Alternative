@@ -1,5 +1,13 @@
 export type AuthErrorCode =
   | 'INVALID_INPUT'
+  /** No shop signs its staff in through the email's organisation (ADR-864). */
+  | 'SSO_NOT_SET_UP'
+  /** The organisation's identity provider can't be reached now. */
+  | 'SSO_UNREACHABLE'
+  /** The provider's answer was traded already, or too late. */
+  | 'SSO_EXPIRED'
+  /** A session the shop's provider began reaches that shop alone, not the account's settings. */
+  | 'SSO_SESSION'
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_TAKEN'
   | 'WEAK_PASSWORD'

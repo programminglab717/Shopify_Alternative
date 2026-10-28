@@ -46,6 +46,7 @@ import {
   type PartnerProfile,
   type PartnerStore,
 } from './partners.service.js';
+import { ShopSsoService } from './sso.js';
 import { SupportAccessService } from './support-access.service.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
@@ -100,6 +101,10 @@ const resetPasswordBody = z.object({
   password: z.string().max(1_024),
 });
 const googleBody = z.object({ idToken: z.string().max(4_096), language });
+const ssoStartBody = z
+  .object({ email: z.string().max(320).nullish(), shopId: z.string().max(64).nullish() })
+  .refine((body) => Boolean(body.email || body.shopId), 'Give an email or a shop');
+const ssoRedeemBody = z.object({ code: z.string().min(1).max(128) });
 const languageBody = z.object({ language: z.enum(['en', 'ur']) });
 const verifyBody = z
   .object({
@@ -353,6 +358,7 @@ export class AuthController {
     private readonly partnerThemes: PartnerThemesService,
     private readonly experts: ExpertsService,
     private readonly certification: CertificationService,
+    private readonly sso: ShopSsoService,
     @Optional() private readonly site?: PublicSite,
   ) {}
 
@@ -491,6 +497,77 @@ export class AuthController {
       nonce: options.nonce,
       expiresAt: options.expiresAt.toISOString(),
     };
+  }
+
+  /**
+   * Starts a sign-in through the identity provider of the shop whose staff's emails are of the
+   * domain of `{ email }`, or of `{ shopId }` (ADM-09, ADR-864): the provider's address to send
+   * the browser to, and the state for the admin to keep.
+   */
+  @Post('sso/start')
+  @HttpCode(200)
+  async ssoStart(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    noStore(reply);
+    const { email, shopId } = parse(ssoStartBody, body);
+    const started = await this.sso.start(
+      { email: email ?? null, shopId: shopId ? tryFromPublicId(shopId, 'shop') : null },
+      this.#ssoCallback(),
+    );
+    if ('problem' in started) {
+      throw new AuthError(
+        started.problem === 'no_sso' ? 'SSO_NOT_SET_UP' : 'SSO_UNREACHABLE',
+        started.problem === 'no_sso' ? 404 : 503,
+        started.problem === 'no_sso'
+          ? 'No shop signs its staff in with this email’s organisation'
+          : "The organisation's sign-in can't be reached now. Try again in a minute",
+      );
+    }
+    return started;
+  }
+
+  /**
+   * Where the provider sends the browser back: its answer taken, then on to the admin with a
+   * code to trade for the session, or why not.
+   */
+  @Get('sso/callback')
+  async ssoCallback(
+    @Query() query: Record<string, string | undefined>,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const finished = await this.sso.finish(
+      { code: query.code ?? null, state: query.state ?? null, error: query.error ?? null },
+      this.#ssoCallback(),
+    );
+    const admin = new URL('/sso/callback', this.identity.adminUrl ?? 'http://localhost:5173');
+    if ('handoff' in finished) {
+      admin.searchParams.set('code', finished.handoff);
+      admin.searchParams.set('state', query.state ?? '');
+    } else {
+      admin.searchParams.set('error', finished.problem);
+    }
+    noStore(reply);
+    await reply.redirect(admin.toString(), 303);
+  }
+
+  /** Trades the provider's answer, `{ code }`, for the member's session: once, within minutes. */
+  @Post('sso/redeem')
+  @HttpCode(200)
+  async ssoRedeem(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const handoff = await this.sso.takeHandoff(parse(ssoRedeemBody, body).code);
+    if (!handoff) {
+      throw new AuthError('SSO_EXPIRED', 400, 'This sign-in has expired. Start it again');
+    }
+    return signInJson(await this.identity.signInThroughSso(handoff, clientOf(request)));
+  }
+
+  /** The address providers send the browser back to, as each shop registers it there. */
+  #ssoCallback(): string {
+    return this.site?.url('/auth/sso/callback') ?? '/auth/sso/callback';
   }
 
   /**
@@ -690,13 +767,13 @@ export class AuthController {
   @Post('sign-out')
   @HttpCode(204)
   async signOut(@Req() request: FastifyRequest): Promise<void> {
-    await this.identity.signOut(await this.session(request), clientOf(request));
+    await this.identity.signOut(await this.anySession(request), clientOf(request));
   }
 
   @Get('me')
   async me(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     noStore(reply);
-    return this.identity.me(await this.session(request));
+    return this.identity.me(await this.anySession(request));
   }
 
   /**
@@ -711,7 +788,7 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     noStore(reply);
-    return this.identity.setLanguage(await this.session(request), parse(languageBody, body));
+    return this.identity.setLanguage(await this.anySession(request), parse(languageBody, body));
   }
 
   /**
@@ -853,7 +930,7 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     noStore(reply);
-    return this.identity.reauthenticationOptions(await this.session(request));
+    return this.identity.reauthenticationOptions(await this.anySession(request));
   }
 
   /**
@@ -869,7 +946,7 @@ export class AuthController {
   ) {
     noStore(reply);
     const sent = await this.identity.sendReauthenticationCode(
-      await this.session(request),
+      await this.anySession(request),
       parse(reauthenticationCodeBody, body),
       clientOf(request),
     );
@@ -895,7 +972,7 @@ export class AuthController {
     noStore(reply);
     const { password, code, passkey, googleIdToken, phoneCode } = parse(reauthenticateBody, body);
     const result = await this.identity.reauthenticate(
-      await this.session(request),
+      await this.anySession(request),
       { password, code, passkey: passkey && asAuthentication(passkey), googleIdToken, phoneCode },
       clientOf(request),
     );
@@ -1372,7 +1449,25 @@ export class AuthController {
     };
   }
 
-  private session(request: FastifyRequest): Promise<AuthenticatedSession> {
+  /**
+   * The session, for the account's own settings and the shops it may open: never one a shop's
+   * provider began, which reaches that shop alone (ADR-864). That shop's owner chose the provider,
+   * so it vouches for nothing else of the account's.
+   */
+  private async session(request: FastifyRequest): Promise<AuthenticatedSession> {
+    const session = await this.anySession(request);
+    if (session.ssoShopId) {
+      throw new AuthError(
+        'SSO_SESSION',
+        403,
+        'Signed in through your organisation, you can work in its shop alone. Sign in with your password to change your account',
+      );
+    }
+    return session;
+  }
+
+  /** The session, whichever way it began: to sign out, say who it is, or confirm them again. */
+  private anySession(request: FastifyRequest): Promise<AuthenticatedSession> {
     return this.identity.authenticate(bearerToken(request));
   }
 }
