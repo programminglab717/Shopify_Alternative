@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Customers answered by the AI
+### 16c078e · Customers answered by the AI
 
 * **Inbox:** on Growth and Pro, a shop may let the AI answer customers on WhatsApp and in its
   web chat. It answers from the shop's policies and the customer's own orders, and hands the
