@@ -1,7 +1,9 @@
+import { Link } from '@tanstack/react-router';
 import { BadgePercent, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  PaymentTermsOwedQuery,
   PriceListCreateMutation,
   PriceListDeleteMutation,
   PriceListPricesQuery,
@@ -10,6 +12,7 @@ import {
   PriceListUpdateMutation,
 } from '../api/operations';
 import type {
+  PaymentTermsOwedData,
   PriceListPayload,
   PriceListPricesData,
   PriceListPriceValue,
@@ -17,12 +20,13 @@ import type {
   PriceListValue,
   UserError,
 } from '../api/types';
-import { permits } from '../auth/permissions';
-import { ProductPicker, type PickedVariant } from '../drafts/new-draft-page';
+import { gate, permits } from '../auth/permissions';
+import { ProductPicker, TERMS_DAYS, type PickedVariant } from '../drafts/new-draft-page';
 import { errorText, userErrorText } from '../i18n/errors';
-import { formatMoney } from '../i18n/format';
+import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
-import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
+import { SelectField } from '../settings/settings-form';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -38,9 +42,11 @@ interface ListDraft {
   customerTag: string;
   percentOff: string;
   breaks: { minQuantity: string; percentOff: string }[];
+  /** Days to pay, empty for none (ADR-888). */
+  terms: string;
 }
 
-const BLANK: ListDraft = { name: '', customerTag: '', percentOff: '10', breaks: [] };
+const BLANK: ListDraft = { name: '', customerTag: '', percentOff: '10', breaks: [], terms: '' };
 
 function draftOf(list: PriceListValue): ListDraft {
   return {
@@ -51,6 +57,7 @@ function draftOf(list: PriceListValue): ListDraft {
       minQuantity: String(each.minQuantity),
       percentOff: each.percentOff,
     })),
+    terms: list.paymentTermsDays ? String(list.paymentTermsDays) : '',
   };
 }
 
@@ -67,6 +74,8 @@ export function listInput(draft: ListDraft) {
         percentOff: each.percentOff.trim(),
       };
     }),
+    // 0 takes a list's terms away.
+    paymentTermsDays: draft.terms === '' ? 0 : Number(draft.terms),
   };
 }
 
@@ -115,7 +124,7 @@ function ListForm({ list, onDone }: { list?: PriceListValue; onDone?: () => void
         : (await create.mutateAsync({ input })).priceListCreate;
       if (payload.userErrors.length > 0) {
         setErrors(payload.userErrors);
-        const shown = ['name', 'customerTag', 'percentOff', 'quantityBreaks'];
+        const shown = ['name', 'customerTag', 'percentOff', 'quantityBreaks', 'paymentTermsDays'];
         const other = payload.userErrors.find(
           (each) =>
             !shown.includes(fieldOf(each)[0] ?? '') ||
@@ -163,7 +172,22 @@ function ListForm({ list, onDone }: { list?: PriceListValue; onDone?: () => void
           onChange={(event) => setDraft({ ...draft, percentOff: event.target.value })}
           error={errorOn('percentOff')}
         />
+        <SelectField
+          label={t('priceLists.terms')}
+          value={draft.terms}
+          options={[
+            { value: '', label: t('priceLists.termsNone') },
+            ...[
+              ...TERMS_DAYS.map(String),
+              ...(draft.terms && !TERMS_DAYS.map(String).includes(draft.terms)
+                ? [draft.terms]
+                : []),
+            ].map((days) => ({ value: days, label: t('drafts.paymentTerms.days', { days }) })),
+          ]}
+          onChange={(terms) => setDraft({ ...draft, terms })}
+        />
       </div>
+      {errorOn('paymentTermsDays') && <Alert tone="danger">{errorOn('paymentTermsDays')}</Alert>}
       <fieldset className="flex flex-col gap-2">
         <legend className="font-medium">{t('priceLists.breaks')}</legend>
         <p className="text-secondary">{t('priceLists.breaksHint')}</p>
@@ -459,6 +483,9 @@ function ListCard({ list, edits }: { list: PriceListValue; edits: boolean }) {
             {t('priceLists.breakSummary', { percent: each.percentOff, count: each.minQuantity })}
           </li>
         ))}
+        {list.paymentTermsDays && (
+          <li>{t('priceLists.termsSummary', { days: list.paymentTermsDays })}</li>
+        )}
         <li className="text-secondary">{t('priceLists.priced', { count: list.pricedVariants })}</li>
       </ul>
       {problem && <Alert tone="danger">{problem}</Alert>}
@@ -504,6 +531,79 @@ function ListCard({ list, edits }: { list: PriceListValue; edits: boolean }) {
   );
 }
 
+/** Who sees what wholesale customers owe on terms: those who read orders and handle money. */
+export const READS_OWED = gate(['owner', 'manager', 'accountant'], 'read_orders');
+
+/**
+ * What wholesale customers owe on orders on payment terms (ADR-888), the most overdue first,
+ * each to their customer's page; nothing where none is owed.
+ */
+function TermsOwed() {
+  const { t, locale } = useLocale();
+  const shop = useShop();
+  const timezone = useShopTimezone();
+  const query = useAdminQuery<PaymentTermsOwedData>(['paymentTermsOwed'], PaymentTermsOwedQuery);
+  // Absent where an older core, or a fake one, leaves it out.
+  const owed = query.data?.paymentTermsOwed as PaymentTermsOwedData['paymentTermsOwed'] | undefined;
+  if (!owed || owed.customers.length === 0) return null;
+  return (
+    <Card className="p-4">
+      <section aria-labelledby="price-lists-owed" className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 id="price-lists-owed" className="font-semibold">
+            {t('priceLists.owed')}
+          </h2>
+          <p className="text-secondary">
+            {t('priceLists.owedTotal', {
+              owed: formatMoney(owed.owed.amount),
+              overdue: formatMoney(owed.overdue.amount),
+            })}
+          </p>
+        </div>
+        <ul className="flex flex-col divide-y divide-line">
+          {owed.customers.map((each) => (
+            <li key={each.customerId} className="flex flex-wrap items-baseline gap-x-3 py-2">
+              <Link
+                to="/$shopId/customers/$customerId"
+                params={{ shopId: shop.id, customerId: each.customerId }}
+                className="min-w-0 flex-1 font-medium underline-offset-4 hover:underline"
+                dir="auto"
+              >
+                {each.name || t('priceLists.owedNoName')}
+              </Link>
+              <span className="num">{formatMoney(each.owed.amount)}</span>
+              <span
+                className={`w-full text-[length:var(--hatti-type-body-sm-size)] ${
+                  Number(each.overdue.amount) > 0 ? 'text-danger' : 'text-secondary'
+                }`}
+              >
+                {Number(each.overdue.amount) > 0
+                  ? t('priceLists.owedOverdue', {
+                      count: each.orders,
+                      overdue: formatMoney(each.overdue.amount),
+                      date: formatDate(each.oldestDueAt, timezone, locale),
+                    })
+                  : t('priceLists.owedDue', {
+                      count: each.orders,
+                      date: formatDate(each.oldestDueAt, timezone, locale),
+                    })}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          to="/$shopId/orders"
+          params={{ shopId: shop.id }}
+          search={{ q: 'payment_terms:owed' }}
+          className="self-start text-primary underline-offset-4 hover:underline"
+        >
+          {t('priceLists.owedOrders')}
+        </Link>
+      </section>
+    </Card>
+  );
+}
+
 /**
  * Wholesale price lists (CUS-06, ADR-779): each for the customers with a tag, a share off every
  * item, prices of the shop's own for some variants, and more off as more of a variant is bought;
@@ -523,6 +623,7 @@ export function PriceListsPage() {
         {t('priceLists.title')}
       </h1>
       <p className="text-secondary">{t('priceLists.intro')}</p>
+      {permits(shop, READS_OWED) && <TermsOwed />}
       {edits && query.isSuccess && lists.length < PRICE_LIST_LIMITS.perShop && (
         <Card className="flex flex-col gap-3 p-4">
           <h2 className="font-semibold">{t('priceLists.new')}</h2>

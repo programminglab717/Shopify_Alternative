@@ -32,6 +32,7 @@ const DRAFT: DraftOrderDetail = {
   status: 'OPEN',
   source: 'WHATSAPP',
   paymentMethod: 'CASH_ON_DELIVERY',
+  paymentTermsDays: null,
   note: '',
   createdAt: LATER,
   linkExpiresAt: null,

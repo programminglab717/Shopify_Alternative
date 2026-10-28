@@ -286,6 +286,14 @@ export const OrderQuery = /* GraphQL */ `
       advanceDue {
         ...Money
       }
+      paymentTerms {
+        days
+        dueAt
+        owed {
+          ...Money
+        }
+        overdue
+      }
       transferReceipts {
         id
         createdAt
@@ -3426,6 +3434,7 @@ export const DraftOrderQuery = /* GraphQL */ `
       status
       source
       paymentMethod
+      paymentTermsDays
       note
       createdAt
       linkExpiresAt
@@ -12424,9 +12433,37 @@ const PRICE_LIST = /* GraphQL */ `
       minQuantity
       percentOff
     }
+    paymentTermsDays
     pricedVariants
     updatedAt
   }
+`;
+
+/** What wholesale customers owe on orders on payment terms, the most overdue first (ADR-888). */
+export const PaymentTermsOwedQuery = /* GraphQL */ `
+  query PaymentTermsOwed {
+    paymentTermsOwed(first: 50) {
+      owed {
+        ...Money
+      }
+      overdue {
+        ...Money
+      }
+      customers {
+        customerId
+        name
+        orders
+        owed {
+          ...Money
+        }
+        overdue {
+          ...Money
+        }
+        oldestDueAt
+      }
+    }
+  }
+  ${MONEY}
 `;
 
 /** The shop's price lists for wholesale customers (CUS-06, ADR-779). */

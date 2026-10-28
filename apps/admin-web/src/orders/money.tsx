@@ -596,6 +596,17 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           })}
         </p>
       )}
+      {order.paymentTerms && (
+        <p className={order.paymentTerms.overdue ? 'font-medium text-danger' : 'font-medium'}>
+          {cents(order.paymentTerms.owed.amount) === 0
+            ? t('money.termsPaid', { days: order.paymentTerms.days })
+            : t(order.paymentTerms.overdue ? 'money.termsOverdue' : 'money.termsDue', {
+                days: order.paymentTerms.days,
+                amount: formatMoney(order.paymentTerms.owed.amount),
+                date: formatDate(order.paymentTerms.dueAt, timezone, locale),
+              })}
+        </p>
+      )}
       {order.transferReceipts.length > 0 && (
         <div className="flex flex-col gap-2">
           <span className="text-secondary">{t('money.receipts')}</span>

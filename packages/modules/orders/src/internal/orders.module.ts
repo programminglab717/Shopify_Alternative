@@ -53,6 +53,8 @@ import { CustomerCohortsResolver } from './graphql/customer-cohorts.resolver.js'
 import { AffiliateResolver } from './graphql/affiliate.resolver.js';
 import { CustomerCohortsService } from './customer-cohorts.service.js';
 import { CustomerRfmService } from './customer-rfm.service.js';
+import { PaymentTermsService } from './payment-terms.service.js';
+import { PaymentTermsResolver } from './graphql/payment-terms.resolver.js';
 import { CustomerRfmResolver } from './graphql/customer-rfm.resolver.js';
 import { AffiliatesService } from './affiliates.service.js';
 import { SavedSearchResolver } from './graphql/saved-search.resolver.js';
@@ -135,6 +137,8 @@ import { SubscriptionService } from './subscriptions.js';
     CustomerCohortsService,
     CustomerRfmService,
     CustomerRfmResolver,
+    PaymentTermsService,
+    PaymentTermsResolver,
     AffiliatesService,
     TransferReceiptService,
     SavedSearchService,

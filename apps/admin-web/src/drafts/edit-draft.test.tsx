@@ -34,6 +34,7 @@ const DRAFT: DraftOrderDetail = {
   status: 'OPEN',
   source: 'WHATSAPP',
   paymentMethod: 'CASH_ON_DELIVERY',
+  paymentTermsDays: null,
   note: '',
   createdAt: LATER,
   linkExpiresAt: null,
@@ -118,6 +119,40 @@ describe('A draft changed while it is open', () => {
         },
       },
     ]);
+  });
+
+  it("keeps a wholesale draft's payment terms, or changes them (ADR-888)", async () => {
+    const fake = core({ ...DRAFT, paymentMethod: 'BANK_TRANSFER', paymentTermsDays: 45 });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/drafts/dft_1/edit');
+
+    await screen.findByRole('heading', { name: 'Change #D7' });
+    const terms = screen.getByLabelText('Payment terms') as HTMLSelectElement;
+    expect(terms.value).toBe('45');
+    expect([...terms.options].map((each) => each.text)).toEqual([
+      'As their price list gives',
+      'None: paid before it ships',
+      'Pay within 7 days',
+      'Pay within 15 days',
+      'Pay within 30 days',
+      'Pay within 45 days',
+      'Pay within 60 days',
+      'Pay within 90 days',
+    ]);
+    fireEvent.change(terms, { target: { value: '30' } });
+    await press('Save the draft');
+    await screen.findByRole('heading', { name: '#D7' });
+    expect(sent(fake).at(-1)!.input).toMatchObject({
+      paymentMethod: 'BANK_TRANSFER',
+      paymentTermsDays: 30,
+    });
+    cleanup();
+
+    // Paid on delivery, it has no terms to choose.
+    vi.stubGlobal('fetch', core(DRAFT).fetcher);
+    renderAdmin('/shop_1/drafts/dft_1/edit');
+    await screen.findByRole('heading', { name: 'Change #D7' });
+    expect(screen.queryByLabelText('Payment terms')).toBeNull();
   });
 
   it('changes the address keeping its area, landmark and pin, or takes it away', async () => {

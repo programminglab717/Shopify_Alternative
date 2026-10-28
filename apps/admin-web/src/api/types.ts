@@ -372,6 +372,8 @@ export interface OrderDetail {
   totalPrice: MoneyValue;
   /** What a cash-on-delivery order asks for in advance, by transfer, before it ships; zero for none. */
   advanceDue: MoneyValue;
+  /** A wholesale customer's terms (ADR-888): it shipped first, and is owed by `dueAt`. */
+  paymentTerms: { days: number; dueAt: string; owed: MoneyValue; overdue: boolean } | null;
   /** Receipts its customer sent through its page for its transfer or advance, oldest first. */
   transferReceipts: TransferReceiptValue[];
   /** The customer's link, while it has one: when it stops working, null while it lasts. */
@@ -1578,6 +1580,8 @@ export interface DraftOrderDetail {
   status: 'OPEN' | 'COMPLETED';
   source: string;
   paymentMethod: string;
+  /** Days its customer has to pay its order by transfer (ADR-888); null for none. */
+  paymentTermsDays: number | null;
   note: string;
   createdAt: string;
   linkExpiresAt: string | null;
@@ -6077,6 +6081,8 @@ export interface PriceListValue {
   /** In percent, as the shop writes it: "10". */
   percentOff: string;
   quantityBreaks: { minQuantity: number; percentOff: string }[];
+  /** Days its customers have to pay their orders by transfer (ADR-888); null for none. */
+  paymentTermsDays: number | null;
   pricedVariants: number;
   updatedAt: string;
 }
@@ -6624,4 +6630,20 @@ export interface DarazAccountPayloadData {
 
 export interface DarazSyncData {
   darazSync: { imported: number; cancelled: number; leftOut: number; pushed: number } | null;
+}
+
+/** What wholesale customers owe on payment terms (ADR-888). */
+export interface PaymentTermsOwedData {
+  paymentTermsOwed: {
+    owed: MoneyValue;
+    overdue: MoneyValue;
+    customers: {
+      customerId: string;
+      name: string;
+      orders: number;
+      owed: MoneyValue;
+      overdue: MoneyValue;
+      oldestDueAt: string;
+    }[];
+  };
 }

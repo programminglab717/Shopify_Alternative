@@ -146,6 +146,11 @@ export interface DraftValues {
   lines: Line[];
   source: DraftSource;
   payment: string;
+  /**
+   * Days a wholesale customer has to pay by transfer (ADR-888): empty for their price list's,
+   * "0" for none.
+   */
+  terms: string;
   delivery: string;
   /**
    * Where the customer picks it up (ADR-390): a location's ID, ANY_PICKUP for the only one
@@ -159,6 +164,9 @@ export interface DraftValues {
   address: DraftAddress | null;
 }
 
+/** The terms a wholesale customer is commonly given, in days (ADR-888). */
+export const TERMS_DAYS = [7, 15, 30, 45, 60, 90] as const;
+
 /** A draft picked up at the one location offering pickup, as none is named. */
 export const ANY_PICKUP = 'pickup';
 
@@ -168,6 +176,7 @@ const FIRST: DraftValues = {
   lines: [],
   source: 'WHATSAPP',
   payment: 'CASH_ON_DELIVERY',
+  terms: '',
   delivery: '',
   pickupAt: '',
   discount: '',
@@ -205,6 +214,9 @@ export function DraftForm({
   const [lines, setLines] = useState<Line[]>(initial.lines);
   const [source, setSource] = useState<DraftSource>(initial.source);
   const [payment, setPayment] = useState(initial.payment);
+  const [terms, setTerms] = useState(initial.terms);
+  const termsChoices = ['', '0', ...TERMS_DAYS.map(String)];
+  if (!termsChoices.includes(initial.terms)) termsChoices.push(initial.terms);
   const [delivery, setDelivery] = useState(initial.delivery);
   const [pickupAt, setPickupAt] = useState(initial.pickupAt);
   const places = useAdminQuery<LocationsData>(['locations'], LocationsQuery);
@@ -284,6 +296,7 @@ export function DraftForm({
         }),
         source,
         paymentMethod: payment,
+        ...(payment === 'BANK_TRANSFER' && terms !== '' && { paymentTermsDays: Number(terms) }),
         ...(pickupAt
           ? {
               deliveryMethod: 'PICKUP',
@@ -401,6 +414,22 @@ export function DraftForm({
             onChange={setPayment}
           />
         </Pair>
+        {payment === 'BANK_TRANSFER' && (
+          <SelectField
+            label={t('drafts.paymentTerms')}
+            value={terms}
+            options={termsChoices.map((each) => ({
+              value: each,
+              label:
+                each === ''
+                  ? t('drafts.paymentTerms.list')
+                  : each === '0'
+                    ? t('drafts.paymentTerms.none')
+                    : t('drafts.paymentTerms.days', { days: each }),
+            }))}
+            onChange={setTerms}
+          />
+        )}
         {ways.length > 1 && (
           <SelectField
             label={t('drafts.deliveryMethod')}

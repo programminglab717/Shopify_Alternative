@@ -114,6 +114,7 @@ import {
   orderName,
   stageOf,
   transferOwed,
+  PAYMENT_TERMS_MOST_DAYS,
 } from './rules.js';
 import { OnlinePayments } from './online-payments.js';
 import {
@@ -155,6 +156,11 @@ export interface OrderCreateInput {
    * ships (ADR-083): it waits for it, and the courier collects the rest.
    */
   advanceDue?: string | null;
+  /**
+   * Days its wholesale customer has to pay it, 1 to 120 (ADR-888): bank transfer only. It ships
+   * without waiting for the money.
+   */
+  paymentTermsDays?: number | null;
   shippingPrice?: string | null;
   discount?: string | null;
   /** Where it ships from, and where its stock is committed; chosen (ADR-355) if left out. */
@@ -213,6 +219,11 @@ export interface OrderToPlace {
    * with `advance` or `advanceDue`.
    */
   riskAdvance?: { due: bigint; from: number } | null;
+  /**
+   * Days its customer has to pay it by transfer (ADR-888), 1 to 120; bank transfer only. It
+   * ships without waiting, and is owed until paid.
+   */
+  paymentTermsDays?: number | null;
   /** What it charges for paying on delivery, as checkout adds it (CHK-08); cash on delivery only. */
   codFee?: bigint;
   /**
@@ -502,6 +513,7 @@ export class OrderService {
       discount,
       advance,
       advanceDue,
+      paymentTermsDays: input.paymentTermsDays ?? null,
       locationId: input.locationId ?? null,
       deliveryMethod: input.deliveryMethod ?? 'shipping',
       note,
@@ -542,6 +554,25 @@ export class OrderService {
     if (askedAhead > 0n && riskAdvance) {
       throw new Error('An order asks for an advance whatever its risk, or by it: not both');
     }
+    // Paid by transfer some days after it ships, as a wholesale customer agreed (ADR-888).
+    const termsDays = order.paymentTermsDays ?? null;
+    if (termsDays !== null) {
+      if (!Number.isInteger(termsDays) || termsDays < 1 || termsDays > PAYMENT_TERMS_MOST_DAYS) {
+        return failOne(
+          [...order.field, 'paymentTermsDays'],
+          'INVALID',
+          `Payment terms are 1 to ${PAYMENT_TERMS_MOST_DAYS} days`,
+        );
+      }
+      if (paymentMethod !== 'bank_transfer') {
+        return failOne(
+          [...order.field, 'paymentTermsDays'],
+          'INVALID',
+          'Payment terms are for paying by bank transfer',
+        );
+      }
+    }
+    const paymentDueAt = termsDays === null ? null : new Date(Date.now() + termsDays * 86_400_000);
     // Paid online through one of the shop's gateways, which it must have (ADR-152).
     if (
       paymentMethod === 'online' &&
@@ -802,9 +833,12 @@ export class OrderService {
           amountPaid,
           total,
           advanceDue,
+          paymentDueAt,
         }),
         paymentMethod,
         deliveryMethod,
+        paymentTermsDays: termsDays,
+        paymentDueAt,
         currency,
         subtotal,
         discount,
@@ -897,7 +931,8 @@ export class OrderService {
       placement.actor,
       'created',
       `Order ${orderName(number)} placed ${placement.how}: ${formatMoney(money(total, currency))}, ` +
-        PAYMENT_METHOD_TEXT[paymentMethod],
+        PAYMENT_METHOD_TEXT[paymentMethod] +
+        (termsDays === null ? '' : ` on ${termsDays} days' terms`),
     );
     if (limit && planMonth && planOrder) {
       if (planOrder.overLimit) {

@@ -32,6 +32,14 @@ export class PriceList {
   @Field(() => [PriceListQuantityBreak], { description: 'The fewest units first.' })
   quantityBreaks!: PriceListQuantityBreak[];
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days its customers have to pay their orders by transfer (CUS-06, ADR-888): a draft for ' +
+      'them is on these terms unless it says otherwise. Null for none.',
+  })
+  paymentTermsDays!: number | null;
+
   @Field(() => Int, { description: 'How many variants have a price of their own in it.' })
   pricedVariants!: number;
 
@@ -90,6 +98,12 @@ export class PriceListInput {
     description: 'Up to five, the fewest units first; an empty list takes them all away.',
   })
   quantityBreaks?: PriceListQuantityBreakInput[] | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Days its customers have to pay, 1 to 120; 0 takes the terms away.',
+  })
+  paymentTermsDays?: number | null;
 }
 
 @InputType()

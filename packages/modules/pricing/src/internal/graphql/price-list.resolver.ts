@@ -42,6 +42,7 @@ function toPriceList(record: PriceListRecord): PriceList {
     name: record.name,
     customerTag: record.customerTag,
     percentOff: percentText(record.percentOffBps),
+    paymentTermsDays: record.paymentTermsDays,
     quantityBreaks: record.quantityBreaks.map((each) =>
       Object.assign(new PriceListQuantityBreak(), {
         minQuantity: each.minQuantity,
@@ -94,6 +95,7 @@ export class PriceListResolver {
       customerTag: input.customerTag ?? '',
       percentOff: input.percentOff,
       quantityBreaks: input.quantityBreaks,
+      paymentTermsDays: input.paymentTermsDays || null,
     });
     return Object.assign(new PriceListPayload(), {
       priceList: result.ok ? toPriceList(result.value) : null,

@@ -141,6 +141,14 @@ export class DraftOrder {
   })
   advanceDue!: Money;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days its customer has to pay its order by transfer (ADR-888): as given, or their price ' +
+      "list's. Null for none.",
+  })
+  paymentTermsDays!: number | null;
+
   @Field(() => Money, {
     description: 'What the courier will collect at the door: what the advance leaves.',
   })
@@ -279,6 +287,14 @@ export class DraftOrderInput {
       'collects the rest. Not with advancePaid.',
   })
   advanceDue?: string | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days its customer has to pay its order, 1 to 120, BANK_TRANSFER only (ADR-888); 0 for ' +
+      "none. Left out, a bank-transfer draft's customer gets their price list's terms.",
+  })
+  paymentTermsDays?: number | null;
 
   @Field(() => String, { nullable: true })
   shippingPrice?: string | null;

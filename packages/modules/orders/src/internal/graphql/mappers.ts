@@ -28,7 +28,7 @@ import type {
   ReturnRecord,
 } from '../records.js';
 import { hiddenAddressOf } from '../plan-orders.js';
-import { draftName, orderName, returnName } from '../rules.js';
+import { draftName, orderName, returnName, termsOwed } from '../rules.js';
 import type {
   BankAccountValue,
   CancelReasonValue,
@@ -58,6 +58,7 @@ import {
   FulfillmentClaimStatus,
   FulfillmentLineItem,
   FulfillmentStatus,
+  OrderPaymentTerms,
   Order,
   MailingAddress,
   OrderAgreement,
@@ -274,6 +275,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     amountRefunded: amount(record.amountRefunded),
     codAmount: amount(record.codAmount),
     advanceDue: amount(record.advanceDue),
+    paymentTerms: termsOf(record, amount),
     bankAccount: record.bankAccount && toBankAccount(record.bankAccount),
     note: record.note,
     giftMessage: record.giftMessage,
@@ -613,6 +615,7 @@ export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): D
     taxesIncluded: true,
     advancePaid: amount(record.advancePaid),
     advanceDue: amount(record.advanceDue),
+    paymentTermsDays: record.paymentTermsDays,
     codAmount: amount(record.codAmount),
     deliveryMethod: upper<OrderDeliveryMethod>(record.deliveryMethod),
     note: record.note,
@@ -642,5 +645,17 @@ export function toDraftOrderConnection(
       hasNextPage,
       endCursor: edges.at(-1)?.cursor ?? null,
     }),
+  });
+}
+
+/** An order's terms as the API gives them (ADR-888); null for an order without. */
+function termsOf(record: OrderRecord, amount: (minor: bigint) => Money): OrderPaymentTerms | null {
+  const owed = termsOwed(record);
+  if (!owed || record.paymentTermsDays === null || !record.paymentDueAt) return null;
+  return Object.assign(new OrderPaymentTerms(), {
+    days: record.paymentTermsDays,
+    dueAt: record.paymentDueAt,
+    owed: amount(owed.owed),
+    overdue: owed.overdue,
   });
 }

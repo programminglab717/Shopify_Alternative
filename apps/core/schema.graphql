@@ -5731,6 +5731,11 @@ type DraftOrder {
   paymentMethod: OrderPaymentMethod!
 
   """
+  Days its customer has to pay its order by transfer (ADR-888): as given, or their price list's. Null for none.
+  """
+  paymentTermsDays: Int
+
+  """
   The customer's mobile number (E.164), masked as on orders; null until the draft has their address.
   """
   phone: String
@@ -5837,6 +5842,11 @@ input DraftOrderInput {
   Default CASH_ON_DELIVERY. A PREPAID draft is completed once the customer has paid; a BANK_TRANSFER draft's order waits at AWAITING_PAYMENT for the transfer.
   """
   paymentMethod: OrderPaymentMethod
+
+  """
+  Days its customer has to pay its order, 1 to 120, BANK_TRANSFER only (ADR-888); 0 for none. Left out, a bank-transfer draft's customer gets their price list's terms.
+  """
+  paymentTermsDays: Int
 
   """In a chat, the address often comes after the items."""
   shippingAddress: MailingAddressInput
@@ -12461,6 +12471,11 @@ type Order {
   paymentMethod: OrderPaymentMethod!
 
   """
+  A wholesale customer's terms (CUS-06, ADR-888): days to pay by transfer, by when, and what is owed. It ships without waiting for the money. Null for an order without terms.
+  """
+  paymentTerms: OrderPaymentTerms
+
+  """
   The customer's mobile number (E.164). Staff other than owners and managers see it masked, "0300 ••••567"; confirmation agents reveal it with orderPhoneReveal, which is logged. Null once their details are erased.
   """
   phone: String
@@ -12701,6 +12716,11 @@ input OrderCreateInput {
   Default CASH_ON_DELIVERY. A BANK_TRANSFER order waits at AWAITING_PAYMENT, with the shop's account from bankTransferSettings if it has one, on or off at checkout; an ONLINE one too, for its customer to pay through the shop's payment gateway from its link.
   """
   paymentMethod: OrderPaymentMethod
+
+  """
+  Days a wholesale customer has to pay it, 1 to 120 (ADR-888): BANK_TRANSFER only. It ships without waiting for the money, and is owed until paid, overdue past its due date.
+  """
+  paymentTermsDays: Int
   shippingAddress: MailingAddressInput!
   shippingPrice: String
   tags: [String!]
@@ -13207,6 +13227,19 @@ enum OrderPaymentMethod {
   Paid in full when placed, e.g. by a transfer or wallet payment already seen.
   """
   PREPAID
+}
+
+"""A wholesale customer's terms on an order (ADR-888)."""
+type OrderPaymentTerms {
+  """Days to pay from when it was placed."""
+  days: Int!
+  dueAt: DateTime!
+
+  """Whether something is owed past its due date."""
+  overdue: Boolean!
+
+  """Its total less what was received; zero once paid."""
+  owed: Money!
 }
 
 type OrderPhoneRevealPayload {
@@ -14448,6 +14481,33 @@ type PaymentSettlementRowError {
   row: Int!
 }
 
+"""A wholesale customer who owes on payment terms (ADR-888)."""
+type PaymentTermsCustomer {
+  customerId: ID!
+
+  """As their latest order owed names them."""
+  name: String!
+
+  """The earliest due date of their orders owed."""
+  oldestDueAt: DateTime!
+
+  """Their orders on terms still owed."""
+  orders: Int!
+
+  """Of what they owe, what is past its due date."""
+  overdue: Money!
+  owed: Money!
+}
+
+"""
+What wholesale customers owe on orders on payment terms (CUS-06, ADR-888): the most overdue first.
+"""
+type PaymentTermsOwed {
+  customers: [PaymentTermsCustomer!]!
+  overdue: Money!
+  owed: Money!
+}
+
 """A month in the shop's time zone, and what its statements came to."""
 type PayoutMonth {
   """Gateways' fees and couriers' charges."""
@@ -15132,6 +15192,11 @@ type PriceList {
   id: ID!
   name: String!
 
+  """
+  Days its customers have to pay their orders by transfer (CUS-06, ADR-888): a draft for them is on these terms unless it says otherwise. Null for none.
+  """
+  paymentTermsDays: Int
+
   """Off every item without a price of its own, in percent: "10"."""
   percentOff: String!
 
@@ -15156,6 +15221,9 @@ input PriceListInput {
 
   """Up to 100 characters."""
   name: String
+
+  """Days its customers have to pay, 1 to 120; 0 takes the terms away."""
+  paymentTermsDays: Int
 
   """0% to 90%, to two places; 0 for none."""
   percentOff: String
@@ -17556,6 +17624,14 @@ type Query {
 
   """The gateways' settlements the shop imported, the newest first."""
   paymentSettlements(first: Int = 50): [PaymentSettlement!]!
+
+  """
+  What wholesale customers owe on orders on payment terms (CUS-06, ADR-888), the most overdue first: each customer's orders owed, what they come to and what is past due.
+  """
+  paymentTermsOwed(
+    """Customers at most, 1 to 100; 50 when left out."""
+    first: Int
+  ): PaymentTermsOwed!
 
   """
   Payouts and tax withheld (ANL-09, TAX-03): what gateways and couriers paid the shop over a period, as the statements it imported say, less their fees and the tax they withheld; by who paid, by month in the shop's time zone, and each statement that withheld tax. Staff need to be an owner, a manager or an accountant.

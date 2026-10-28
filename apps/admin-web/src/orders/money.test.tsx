@@ -229,6 +229,34 @@ describe("An order's money, on its page", () => {
     );
     expect(refundable({ amountPaid: rupees('100'), amountRefunded: rupees('100') })).toBe('0');
   });
+  it("says a wholesale order's terms: what is owed by when, overdue past it (ADR-888)", async () => {
+    const terms = (overdue: boolean) =>
+      order('2700', {
+        paymentMethod: 'BANK_TRANSFER',
+        stage: 'IN_TRANSIT',
+        paymentTerms: {
+          days: 30,
+          dueAt: '2026-11-27T19:00:00Z',
+          owed: rupees('5000'),
+          overdue,
+        },
+      });
+    vi.stubGlobal('fetch', core('owner', terms(false)).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const money = await screen.findByRole('region', { name: 'Payments and refunds' });
+    expect(within(money).getByText("On 30 days' terms: Rs 5,000 due by 28 Nov 2026.")).toBeTruthy();
+    // Not waiting for the transfer before it ships: it shipped on terms.
+    expect(within(money).queryByText(/Waiting for/)).toBeNull();
+    cleanup();
+
+    vi.stubGlobal('fetch', core('owner', terms(true)).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const late = await screen.findByRole('region', { name: 'Payments and refunds' });
+    expect(
+      within(late).getByText("On 30 days' terms: Rs 5,000 overdue since 28 Nov 2026.").className,
+    ).toContain('text-danger');
+  });
+
   it("shows the order's invoice number and a refund's credit note (ADR-497)", async () => {
     const fake = core(
       'owner',

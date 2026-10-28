@@ -12,6 +12,7 @@ const WHOLESALE: PriceListValue = {
   customerTag: 'wholesale',
   percentOff: '20',
   quantityBreaks: [{ minQuantity: 12, percentOff: '5' }],
+  paymentTermsDays: 30,
   pricedVariants: 2,
   updatedAt: '2026-10-20T09:00:00Z',
 };
@@ -44,6 +45,31 @@ function priceListsCore() {
     switch (operation) {
       case 'PriceLists':
         return { priceLists: lists };
+      case 'PaymentTermsOwed':
+        return {
+          paymentTermsOwed: {
+            owed: pkr('85000'),
+            overdue: pkr('40000'),
+            customers: [
+              {
+                customerId: 'cust_4',
+                name: 'Bilal Traders',
+                orders: 2,
+                owed: pkr('70000'),
+                overdue: pkr('40000'),
+                oldestDueAt: '2026-10-20T19:00:00Z',
+              },
+              {
+                customerId: 'cust_5',
+                name: 'Noor Boutique',
+                orders: 1,
+                owed: pkr('15000'),
+                overdue: pkr('0'),
+                oldestDueAt: '2026-11-30T19:00:00Z',
+              },
+            ],
+          },
+        };
       case 'PriceListCreate': {
         if (String(input.customerTag).toLowerCase() === 'wholesale') {
           return {
@@ -66,6 +92,7 @@ function priceListsCore() {
           customerTag: String(input.customerTag),
           percentOff: String(input.percentOff),
           quantityBreaks: input.quantityBreaks as PriceListValue['quantityBreaks'],
+          paymentTermsDays: Number(input.paymentTermsDays) || null,
           pricedVariants: 0,
         };
         lists = [...lists, made];
@@ -142,6 +169,7 @@ describe('Price lists in the admin (CUS-06, ADR-779)', () => {
           { minQuantity: '24', percentOff: '7.5 ' },
           { minQuantity: 'six', percentOff: '10' },
         ],
+        terms: '',
       }),
     ).toEqual({
       name: 'Retailers',
@@ -151,6 +179,8 @@ describe('Price lists in the admin (CUS-06, ADR-779)', () => {
         { minQuantity: 24, percentOff: '7.5' },
         { minQuantity: 0, percentOff: '10' },
       ],
+      // No terms: 0 takes a list's away.
+      paymentTermsDays: 0,
     });
     expect(variantName(PRICES[0]!)).toBe('Kurta · Red / M');
     expect(variantName(PRICES[1]!)).toBe('Lawn suit');
@@ -166,6 +196,8 @@ describe('Price lists in the admin (CUS-06, ADR-779)', () => {
     expect(within(card).getByText('20% off everything')).toBeTruthy();
     expect(within(card).getByText('5% more off from 12 units')).toBeTruthy();
     expect(within(card).getByText('2 variants with a price of their own')).toBeTruthy();
+    // Its customers pay within a month (ADR-888).
+    expect(within(card).getByText('Pay within 30 days of ordering, by transfer')).toBeTruthy();
 
     type('Name', 'Retailers');
     type('Customer tag', 'WHOLESALE');
@@ -177,6 +209,7 @@ describe('Price lists in the admin (CUS-06, ADR-779)', () => {
     await press('Add a break');
     type('From (units)', '24');
     type('Further off (%)', '7.5');
+    fireEvent.change(screen.getByLabelText('Payment terms'), { target: { value: '15' } });
     await press('Add price list');
     await screen.findByRole('heading', { name: 'Retailers' });
     expect(sentOf(core, 'PriceListCreate').at(-1)).toEqual({
@@ -185,8 +218,25 @@ describe('Price lists in the admin (CUS-06, ADR-779)', () => {
         customerTag: 'retail',
         percentOff: '5',
         quantityBreaks: [{ minQuantity: 24, percentOff: '7.5' }],
+        paymentTermsDays: 15,
       },
     });
+  });
+
+  it('lists who owes on payment terms, the most overdue first, each to their page (ADR-888)', async () => {
+    vi.stubGlobal('fetch', priceListsCore().fetcher);
+    renderAdmin('/shop_1/products/price-lists');
+    const owed = await screen.findByRole('region', { name: 'Owed on payment terms' });
+    expect(within(owed).getByText('Rs 85,000 owed, Rs 40,000 of it overdue.')).toBeTruthy();
+    const bilal = within(owed).getByRole('link', { name: 'Bilal Traders' });
+    expect(bilal.getAttribute('href')).toBe('/shop_1/customers/cust_4');
+    expect(bilal.closest('li')!.textContent).toContain(
+      '2 orders, Rs 40,000 overdue since 21 Oct 2026',
+    );
+    expect(within(owed).getByText('1 order, due 1 Dec 2026')).toBeTruthy();
+    expect(
+      within(owed).getByRole('link', { name: 'See the orders owed' }).getAttribute('href'),
+    ).toContain('payment_terms');
   });
 
   it("changes a list's own prices, takes one out, adds a variant, and deletes the list", async () => {

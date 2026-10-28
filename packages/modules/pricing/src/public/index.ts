@@ -46,6 +46,7 @@ export {
   PRICE_LIST_LIMITS,
   PriceListService,
   listPricesIn,
+  listTermsIn,
   type LineToPrice,
   type ListPrice,
   type PriceListRecord,

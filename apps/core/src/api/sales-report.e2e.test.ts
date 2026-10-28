@@ -646,4 +646,62 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     const denied = await gql(tokens.products, '{ affiliates { id } }', {});
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
+  it('takes a wholesale order on payment terms, shipping first and owed until paid (CUS-06, ADR-888)', async () => {
+    const product = (
+      await gql(
+        tokens.owner,
+        `mutation {
+          productCreate(input: { title: "Lawn bale", status: ACTIVE, variants: [{ price: "12,000" }] }) {
+            product { variants { id } }
+          }
+        }`,
+      )
+    ).data?.productCreate.product;
+    const place = (terms: number, method = 'BANK_TRANSFER') =>
+      gql(
+        tokens.owner,
+        `mutation ($variantId: ID!, $terms: Int) {
+          orderCreate(input: {
+            lineItems: [{ variantId: $variantId, quantity: 1 }],
+            paymentMethod: ${method}, paymentTermsDays: $terms,
+            shippingAddress: { name: "Bilal Traders", phone: "0321 7654321",
+                               address1: "Shop 4, Azam Cloth Market", city: "Lahore" }
+          }) {
+            order { id stage paymentTerms { days dueAt owed { amount } overdue } }
+            userErrors { field code message }
+          }
+        }`,
+        { variantId: product.variants[0].id, terms },
+      );
+    const placed = (await place(30)).data?.orderCreate;
+    expect(placed.userErrors).toEqual([]);
+    expect(placed.order).toMatchObject({
+      stage: 'TO_PACK',
+      paymentTerms: { days: 30, owed: { amount: '12000.00' }, overdue: false },
+    });
+    expect(Date.parse(placed.order.paymentTerms.dueAt) - Date.now()).toBeGreaterThan(
+      29 * 86_400_000,
+    );
+    expect((await place(30, 'CASH_ON_DELIVERY')).data?.orderCreate.userErrors).toEqual([
+      {
+        field: ['input', 'paymentTermsDays'],
+        code: 'INVALID',
+        message: 'Payment terms are for paying by bank transfer',
+      },
+    ]);
+
+    const OWED = `{
+      paymentTermsOwed { owed { amount } overdue { amount } customers { name orders owed { amount } } }
+      orders(first: 5, query: "payment_terms:owed") { nodes { id } }
+    }`;
+    const owed = (await gql(tokens.owner, OWED)).data;
+    expect(owed?.paymentTermsOwed).toEqual({
+      owed: { amount: '12000.00' },
+      overdue: { amount: '0.00' },
+      customers: [{ name: 'Bilal Traders', orders: 1, owed: { amount: '12000.00' } }],
+    });
+    expect(owed?.orders.nodes).toEqual([{ id: placed.order.id }]);
+    const denied = await gql(tokens.products, '{ paymentTermsOwed { owed { amount } } }');
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
 });

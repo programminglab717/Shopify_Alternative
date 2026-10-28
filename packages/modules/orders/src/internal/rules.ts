@@ -157,6 +157,8 @@ export interface StageInputs {
   advanceDue: bigint;
   /** When it was marked packed; null while it is not. */
   packedAt: Date | null;
+  /** When an order on payment terms is to be paid by (ADR-888): it ships without waiting. */
+  paymentDueAt?: Date | null;
 }
 
 /** What an order's parcels add up to. */
@@ -225,15 +227,18 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
 /**
  * What an order waits for before it ships: a bank-transfer order, or one paid online (ADR-152),
  * what it has not received of its total (ADR-074); a cash-on-delivery order, what it has not
- * received of the advance it asks for (ADR-083); nothing otherwise. Refunds since do not count,
- * so a refunded transfer does not wait for its money again.
+ * received of the advance it asks for (ADR-083); nothing otherwise, nor for an order on payment
+ * terms, which ships first and is paid by its due date (ADR-888). Refunds since do not count, so
+ * a refunded transfer does not wait for its money again.
  */
 export function transferOwed(order: {
   paymentMethod: PaymentMethodValue;
   amountPaid: bigint;
   total: bigint;
   advanceDue: bigint;
+  paymentDueAt?: Date | null;
 }): bigint {
+  if (order.paymentDueAt) return 0n;
   const awaited =
     order.paymentMethod === 'bank_transfer' || order.paymentMethod === 'online'
       ? order.total
@@ -317,6 +322,7 @@ export function awaitsTransfer(order: {
   amountPaid: bigint;
   total: bigint;
   advanceDue: bigint;
+  paymentDueAt?: Date | null;
 }): boolean {
   return transferOwed(order) > 0n;
 }
@@ -396,4 +402,28 @@ export const PICKUP_NOT_SHIPPED =
 /** Stages at which an order is done, so it closes. */
 export function isFinalStage(stage: OrderStageValue): boolean {
   return stage === 'completed' || stage === 'returned' || stage === 'lost';
+}
+
+/** The most days a wholesale customer may have to pay an order (ADR-888). */
+export const PAYMENT_TERMS_MOST_DAYS = 120;
+
+/**
+ * What an order on payment terms still owes (ADR-888), and whether it is overdue at `at`: its
+ * total less what it received, while it is not cancelled; null for an order without terms.
+ */
+export function termsOwed(
+  order: {
+    status: OrderStatusValue;
+    paymentDueAt?: Date | null;
+    amountPaid: bigint;
+    total: bigint;
+  },
+  at: Date = new Date(),
+): { owed: bigint; overdue: boolean } | null {
+  if (!order.paymentDueAt) return null;
+  const owed =
+    order.status === 'cancelled' || order.amountPaid >= order.total
+      ? 0n
+      : order.total - order.amountPaid;
+  return { owed, overdue: owed > 0n && order.paymentDueAt.getTime() < at.getTime() };
 }

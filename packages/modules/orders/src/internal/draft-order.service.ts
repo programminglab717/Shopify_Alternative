@@ -18,7 +18,7 @@ import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { customerTagsOfPhoneIn } from '@hatti/customers/public';
-import { listPricesIn, redeemDiscountIn } from '@hatti/pricing/public';
+import { listPricesIn, listTermsIn, redeemDiscountIn } from '@hatti/pricing/public';
 import { ObjectStorage } from '@hatti/storage';
 import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
@@ -65,7 +65,14 @@ import {
   pickupLocationIn,
 } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
-import { LIMITS, LINK_DAYS_AFTER_END, advanceRefusal, codLimitError, draftName } from './rules.js';
+import {
+  LIMITS,
+  LINK_DAYS_AFTER_END,
+  PAYMENT_TERMS_MOST_DAYS,
+  advanceRefusal,
+  codLimitError,
+  draftName,
+} from './rules.js';
 import {
   DRAFT_ORDER_SOURCES,
   draftOrders,
@@ -107,6 +114,11 @@ export interface DraftOrderInput {
    * order its customer confirms waits for it (ADR-085). Not beside `advancePaid`.
    */
   advanceDue?: string | null;
+  /**
+   * Days its customer has to pay its order by transfer, 1 to 120 (ADR-888); 0 for none. Left
+   * out, a new bank-transfer draft's customer gets their price list's terms.
+   */
+  paymentTermsDays?: number | null;
   shippingPrice?: string | null;
   /** An amount off the items, in place of a code. */
   discount?: string | null;
@@ -194,6 +206,8 @@ interface CheckedDraft {
   paymentMethod?: PaymentMethodValue;
   advance?: bigint;
   advanceDue?: bigint;
+  /** null for none. */
+  paymentTermsDays?: number | null;
   shipping?: bigint;
   discount?: bigint;
   discountCode?: string | null;
@@ -737,6 +751,7 @@ export class DraftOrderService {
         discountCodes: draft.discountCode ? [draft.discountCode] : [],
         advance: draft.advancePaid,
         advanceDue: draft.advanceDue,
+        paymentTermsDays: draft.paymentTermsDays,
         locationId: draft.locationId,
         deliveryMethod: draft.deliveryMethod,
         note: draft.note,
@@ -836,10 +851,12 @@ export class DraftOrderService {
     if (errors.length > 0) return { ok: false, errors };
 
     const shippingAddress = pick(checked.address, current?.shippingAddress ?? null);
+    const tagsOf = async () =>
+      shippingAddress?.phone ? customerTagsOfPhoneIn(tx, shopId, shippingAddress.phone) : [];
     // A wholesale customer's lines are priced from their price list, where none is given
     // (CUS-06, ADR-778).
     if (lines && checked.lines && shippingAddress?.phone) {
-      const tags = await customerTagsOfPhoneIn(tx, shopId, shippingAddress.phone);
+      const tags = await tagsOf();
       const listed = await listPricesIn(
         tx,
         shopId,
@@ -866,6 +883,10 @@ export class DraftOrderService {
       paymentMethod: checked.paymentMethod ?? current?.paymentMethod ?? 'cash_on_delivery',
       advancePaid: checked.advance ?? current?.advancePaid ?? 0n,
       advanceDue: checked.advanceDue ?? current?.advanceDue ?? 0n,
+      paymentTermsDays:
+        checked.paymentTermsDays !== undefined
+          ? checked.paymentTermsDays
+          : (current?.paymentTermsDays ?? null),
       shipping: checked.shipping ?? current?.shipping ?? 0n,
       discount: checked.discount ?? current?.discount ?? 0n,
       // A code given stays until removed, or an amount off is given in its place (ADR-521).
@@ -941,6 +962,27 @@ export class DraftOrderService {
       if (refused) return failOne(['input', 'discount'], 'INVALID', refused);
     }
     const total = subtotal - next.discount + next.shipping;
+    // A wholesale customer's terms, as their price list gives them (ADR-888), on a bank-transfer
+    // draft that says none of its own yet.
+    if (
+      next.paymentMethod === 'bank_transfer' &&
+      checked.paymentTermsDays === undefined &&
+      next.paymentTermsDays === null &&
+      (!current || checked.paymentMethod !== undefined || checked.address !== undefined)
+    ) {
+      next.paymentTermsDays = await listTermsIn(tx, shopId, await tagsOf());
+    }
+    if (next.paymentTermsDays !== null && next.paymentMethod !== 'bank_transfer') {
+      if (checked.paymentTermsDays !== undefined) {
+        return failOne(
+          ['input', 'paymentTermsDays'],
+          'INVALID',
+          'Payment terms are for paying by bank transfer',
+        );
+      }
+      // Paid otherwise now: its terms go.
+      next.paymentTermsDays = null;
+    }
     const noAdvance = advanceRefusal(next.paymentMethod);
     if (noAdvance && next.advancePaid > 0n) {
       return failOne(['input', 'advancePaid'], 'INVALID', noAdvance);
@@ -1053,6 +1095,7 @@ const CHANGES = [
   ['paymentMethod', 'paymentMethod'],
   ['advancePaid', 'advancePaid'],
   ['advanceDue', 'advanceDue'],
+  ['paymentTermsDays', 'paymentTermsDays'],
   ['shippingPrice', 'shipping'],
   ['discount', 'discount'],
   ['discountCode', 'discountCode'],
@@ -1126,6 +1169,17 @@ function checkDraft(
       : (check.price(['input', name], input[name], currency) ?? 0n);
   checked.advance = amount('advancePaid');
   checked.advanceDue = amount('advanceDue');
+  if (input.paymentTermsDays !== undefined) {
+    const days = input.paymentTermsDays || null;
+    if (days !== null && (!Number.isInteger(days) || days < 1 || days > PAYMENT_TERMS_MOST_DAYS)) {
+      check.addMessage(
+        ['input', 'paymentTermsDays'],
+        'INVALID',
+        `Payment terms are 1 to ${PAYMENT_TERMS_MOST_DAYS} days`,
+      );
+    }
+    checked.paymentTermsDays = days;
+  }
   checked.shipping = amount('shippingPrice');
   checked.discount = amount('discount');
   if (input.discountCode !== undefined) {
@@ -1281,6 +1335,7 @@ export function toDraftRecord(row: DraftOrderRow): DraftOrderRecord {
     total: row.total,
     advancePaid: row.advancePaid,
     advanceDue: row.advanceDue,
+    paymentTermsDays: row.paymentTermsDays,
     codAmount:
       row.paymentMethod === 'cash_on_delivery' ? row.total - row.advancePaid - row.advanceDue : 0n,
     phone: row.phone,

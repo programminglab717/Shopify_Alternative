@@ -4,6 +4,7 @@ import {
   bigint,
   boolean,
   integer,
+  smallint,
   jsonb,
   pgSchema,
   primaryKey,
@@ -121,6 +122,8 @@ export const priceLists = pricingSchema.table(
     /** Hundredths of a percent off every item without a price of its own. */
     percentOffBps: integer('percent_off_bps').notNull().default(0),
     quantityBreaks: jsonb('quantity_breaks').$type<QuantityBreakValue[]>().notNull().default([]),
+    /** Days its customers have to pay their orders by transfer (ADR-888); null for none. */
+    paymentTermsDays: smallint('payment_terms_days'),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -36,6 +36,7 @@ export function valuesOf(draft: DraftOrderDetail): DraftValues {
     })),
     source: (SOURCES.includes(draft.source) ? draft.source : 'MANUAL') as DraftSource,
     payment: draft.paymentMethod,
+    terms: draft.paymentTermsDays ? String(draft.paymentTermsDays) : '',
     delivery: amountText(draft.totalShippingPrice.amount),
     pickupAt: draft.deliveryMethod === 'PICKUP' ? (draft.location?.id ?? ANY_PICKUP) : '',
     // A code's discount is the code's to set again (ADR-521).

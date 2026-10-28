@@ -29,7 +29,7 @@ describe('Orders searches', () => {
       error:
         "Orders can't be filtered by stag; filters are stage, status, confirmation_status, " +
         'financial_status, fulfillment_status, payment_method, source, risk_level, tag, ' +
-        'has_transfer_receipt, assignee, location_id',
+        'has_transfer_receipt, assignee, location_id, payment_terms',
     });
     expect(parseOrderSearch('risk_level:extreme')).toEqual({
       ok: false,

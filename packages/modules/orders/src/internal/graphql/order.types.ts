@@ -147,6 +147,21 @@ registerEnumType(RefundMethod, {
   },
 });
 
+@ObjectType({ description: "A wholesale customer's terms on an order (ADR-888)." })
+export class OrderPaymentTerms {
+  @Field(() => Int, { description: 'Days to pay from when it was placed.' })
+  days!: number;
+
+  @Field(() => GraphQLISODateTime)
+  dueAt!: Date;
+
+  @Field(() => Money, { description: 'Its total less what was received; zero once paid.' })
+  owed!: Money;
+
+  @Field({ description: 'Whether something is owed past its due date.' })
+  overdue!: boolean;
+}
+
 @ObjectType({
   description:
     "A refund's credit note (TAX-05, ADR-496): money given back on an order whose invoice was " +
@@ -1396,6 +1411,14 @@ export class Order {
   })
   advanceDue!: Money;
 
+  @Field(() => OrderPaymentTerms, {
+    nullable: true,
+    description:
+      "A wholesale customer's terms (CUS-06, ADR-888): days to pay by transfer, by when, and " +
+      'what is owed. It ships without waiting for the money. Null for an order without terms.',
+  })
+  paymentTerms!: OrderPaymentTerms | null;
+
   @Field(() => BankAccount, {
     nullable: true,
     description:
@@ -1769,6 +1792,14 @@ export class OrderCreateInput {
       'with advancePaid.',
   })
   advanceDue?: string | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days a wholesale customer has to pay it, 1 to 120 (ADR-888): BANK_TRANSFER only. It ' +
+      'ships without waiting for the money, and is owed until paid, overdue past its due date.',
+  })
+  paymentTermsDays?: number | null;
 
   @Field(() => String, { nullable: true })
   shippingPrice?: string | null;

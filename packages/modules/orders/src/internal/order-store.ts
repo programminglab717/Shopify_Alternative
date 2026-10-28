@@ -65,6 +65,8 @@ interface OrderJsonRow extends Record<string, unknown> {
   amount_refunded: string;
   cod_amount: string;
   advance_due: string;
+  payment_terms_days: number | null;
+  payment_due_at: string | Date | null;
   prepay_credit: string | null;
   prepay_credited_at: string | null;
   door_parcel_id: string | null;
@@ -252,6 +254,8 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     amountRefunded: BigInt(row.amount_refunded),
     codAmount: BigInt(row.cod_amount),
     advanceDue: BigInt(row.advance_due),
+    paymentTermsDays: row.payment_terms_days,
+    paymentDueAt: toDateOrNull(row.payment_due_at),
     prepayCredit: row.prepay_credit === null ? null : BigInt(row.prepay_credit),
     prepayCreditedAt: toDateOrNull(row.prepay_credited_at),
     doorParcelId: row.door_parcel_id,
@@ -463,7 +467,8 @@ export async function loadOrders(
            o.subtotal, o.discount,
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
            o.online_discount, o.total, o.discount_codes, o.automatic_discounts, o.amount_paid,
-           o.amount_refunded, o.cod_amount, o.advance_due, o.prepay_credit,
+           o.amount_refunded, o.cod_amount, o.advance_due, o.payment_terms_days,
+           o.payment_due_at, o.prepay_credit,
            o.prepay_credited_at, o.door_parcel_id, o.upsold_at, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.gift_message, o.tags,
            o.delivery_expected_on::text AS delivery_expected_on, o.delivery_slot_starts_at,

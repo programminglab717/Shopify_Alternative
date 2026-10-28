@@ -329,6 +329,12 @@ export interface OrderRecord {
    */
   advanceDue: bigint;
   /**
+   * Days its wholesale customer has to pay it by transfer (ADR-888), and when by; null for an
+   * order without terms. It ships without waiting, and is owed until paid.
+   */
+  paymentTermsDays: number | null;
+  paymentDueAt: Date | null;
+  /**
    * The store credit its customer was offered for paying the rest of a cash-on-delivery order
    * online before it is packed (MKT-04, ADR-432); null for none.
    */
@@ -461,6 +467,11 @@ export interface DraftOrderRecord {
    * order its customer confirms waits for it (ADR-085).
    */
   advanceDue: bigint;
+  /**
+   * Days its customer has to pay its order by transfer (ADR-888), as the draft gives them or
+   * their price list does; null for none.
+   */
+  paymentTermsDays: number | null;
   /** What the courier will collect at the door: what the advance, paid or asked for, leaves. */
   codAmount: bigint;
   /** The customer's number and address, once they send them; both or neither. */

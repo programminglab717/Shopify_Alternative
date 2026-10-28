@@ -29,6 +29,8 @@ export const PRICE_LIST_LIMITS = {
   breaks: 5,
   /** Variants with a price of their own in one list. */
   prices: 2_000,
+  /** The most days a list's customers may have to pay (ADR-888). */
+  termsDays: 120,
 } as const;
 
 /** A share in percent, to two places: "10", "7.5" or "12.25". */
@@ -44,6 +46,8 @@ export interface PriceListRecord {
   percentOffBps: number;
   /** More off as more of a variant is bought, the quantities rising. */
   quantityBreaks: QuantityBreakValue[];
+  /** Days its customers have to pay their orders by transfer (ADR-888); null for none. */
+  paymentTermsDays: number | null;
   /** How many variants have a price of their own in it. */
   pricedVariants: number;
   version: number;
@@ -57,6 +61,8 @@ export interface PriceListInput {
   /** In percent, to two places: "10" or "7.5"; none for no share off. */
   percentOff?: string | null;
   quantityBreaks?: { minQuantity: number; percentOff: string }[] | null;
+  /** 1 to 120; none for paying before it ships, as everyone. */
+  paymentTermsDays?: number | null;
 }
 
 /** Fields left out stay as they are. */
@@ -65,6 +71,8 @@ export interface PriceListUpdateInput {
   customerTag?: string | null;
   percentOff?: string | null;
   quantityBreaks?: { minQuantity: number; percentOff: string }[] | null;
+  /** 0 removes its terms. */
+  paymentTermsDays?: number | null;
 }
 
 /** A variant's price in a list, in minor units, with what the admin names it by (ADR-779). */
@@ -149,6 +157,7 @@ export class PriceListService {
     const customerTag = checkTag(check, input.customerTag);
     const percentOffBps = checkPercent(check, ['input', 'percentOff'], input.percentOff ?? '0');
     const quantityBreaks = checkBreaks(check, input.quantityBreaks ?? []);
+    const paymentTermsDays = checkTerms(check, input.paymentTermsDays ?? null);
     if (!check.ok || !name || !customerTag || percentOffBps === null || !quantityBreaks) {
       return { ok: false, errors: check.errors };
     }
@@ -177,6 +186,7 @@ export class PriceListService {
             customerTag,
             percentOffBps,
             quantityBreaks,
+            paymentTermsDays,
           })
           .returning();
         await changed(tx, tenant.shopId, PricingEvents.PriceListCreated, row!);
@@ -192,7 +202,10 @@ export class PriceListService {
   ): Promise<MutationResult<PriceListRecord>> {
     const check = new InputChecker();
     const changes: Partial<
-      Pick<PriceListRow, 'name' | 'customerTag' | 'percentOffBps' | 'quantityBreaks'>
+      Pick<
+        PriceListRow,
+        'name' | 'customerTag' | 'percentOffBps' | 'quantityBreaks' | 'paymentTermsDays'
+      >
     > = {};
     if (input.name !== undefined) {
       const name = checkName(check, input.name);
@@ -209,6 +222,9 @@ export class PriceListService {
     if (input.quantityBreaks !== undefined) {
       const breaks = checkBreaks(check, input.quantityBreaks ?? []);
       if (breaks) changes.quantityBreaks = breaks;
+    }
+    if (input.paymentTermsDays !== undefined) {
+      changes.paymentTermsDays = checkTerms(check, input.paymentTermsDays || null);
     }
     if (!check.ok) return { ok: false, errors: check.errors };
     return this.#unique(() =>
@@ -458,6 +474,7 @@ function toRecord(row: PriceListRow, pricedVariants: number): PriceListRecord {
     customerTag: row.customerTag,
     percentOffBps: row.percentOffBps,
     quantityBreaks: row.quantityBreaks,
+    paymentTermsDays: row.paymentTermsDays,
     pricedVariants,
     version: row.version,
     createdAt: row.createdAt,
@@ -548,4 +565,41 @@ function checkBreaks(
     checked.push({ minQuantity, percentOffBps: bps });
   }
   return check.ok ? checked : null;
+}
+
+/** Days to pay, 1 to 120, or none (ADR-888). */
+function checkTerms(check: InputChecker, days: number | null): number | null {
+  if (days === null) return null;
+  if (!Number.isInteger(days) || days < 1 || days > PRICE_LIST_LIMITS.termsDays) {
+    check.addMessage(
+      ['input', 'paymentTermsDays'],
+      'INVALID',
+      `Payment terms are 1 to ${PRICE_LIST_LIMITS.termsDays} days`,
+    );
+    return null;
+  }
+  return days;
+}
+
+/**
+ * The days a customer with `tags` has to pay an order by transfer, as their price lists give
+ * them (ADR-888): the longest of theirs, as the lowest of their prices wins; null for none.
+ */
+export async function listTermsIn(
+  tx: Tx,
+  shopId: string,
+  tags: readonly string[],
+): Promise<number | null> {
+  const folded = [...new Set(tags.map((tag) => tag.trim().toLowerCase()))].filter(Boolean);
+  if (folded.length === 0) return null;
+  const [found] = await tx
+    .select({ days: sql<number | null>`max(${priceLists.paymentTermsDays})::int` })
+    .from(priceLists)
+    .where(
+      and(
+        eq(priceLists.shopId, shopId),
+        sql`lower(${priceLists.customerTag}) = ANY(${sql.param(folded)}::text[])`,
+      ),
+    );
+  return found?.days ?? null;
 }

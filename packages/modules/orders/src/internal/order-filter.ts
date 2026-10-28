@@ -63,6 +63,8 @@ export const ORDER_SEARCH_FILTERS = {
   assignee: null,
   /** The location it ships from, by its ID, `loc_…` (ADR-356). */
   location_id: null,
+  /** On a wholesale customer's terms and still owed, or owed past its due date (ADR-888). */
+  payment_terms: ['owed', 'overdue'],
 } as const satisfies Record<string, readonly string[] | null>;
 
 export type OrderSearchKey = keyof typeof ORDER_SEARCH_FILTERS;
@@ -120,6 +122,11 @@ function searchFilterCondition({ key, value }: OrderSearchFilter, me: string | n
       return sql`EXISTS (SELECT 1 FROM unnest(o.tags) AS t(tag) WHERE lower(t.tag) = lower(${value}))`;
     case 'has_transfer_receipt':
       return transferReceiptCondition(value === 'true');
+    case 'payment_terms': {
+      const owed = sql`o.payment_due_at IS NOT NULL AND o.status <> 'cancelled'
+                       AND o.amount_paid < o.total`;
+      return value === 'overdue' ? sql`${owed} AND o.payment_due_at < now()` : owed;
+    }
     default:
       // The key is one of the module's, so a column of its own name.
       return sql`${sql.identifier('o')}.${sql.identifier(key)} = ${value}`;

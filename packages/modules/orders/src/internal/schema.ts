@@ -408,6 +408,12 @@ export const orders = ordersSchema.table(
      */
     advanceDue: money('advance_due').notNull().default(0n),
     /**
+     * Days a wholesale customer has to pay it by transfer (CUS-06, ADR-888), 1 to 120: it ships
+     * without waiting for the money, and is owed until paid, overdue past `paymentDueAt`.
+     */
+    paymentTermsDays: smallint('payment_terms_days'),
+    paymentDueAt: timestamp('payment_due_at', { withTimezone: true }),
+    /**
      * The store credit its customer was offered for paying the rest of a cash-on-delivery order
      * online before it ships (MKT-04, ADR-432); minor units, null for none.
      */
@@ -816,6 +822,8 @@ export const draftOrders = ordersSchema.table(
      * its order waits for it (ADR-085).
      */
     advanceDue: money('advance_due').notNull().default(0n),
+    /** The days its customer has to pay its order, by transfer (ADR-888); null for none. */
+    paymentTermsDays: smallint('payment_terms_days'),
     /** The customer's number and address, both or neither. */
     phone: text('phone'),
     email: text('email'),
