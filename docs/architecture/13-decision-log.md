@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-843 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-844 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -851,6 +851,7 @@
 | 841 | An account of several shops sees each one's sales today and the orders waiting to be confirmed and packed on the shop chooser, and what they come to together | Accepted |
 | 842 | Signs of scam stores: the worker looks across stores four times a day for young stores keeping paid orders unshipped, catalogues copied from older stores and names that read as verified stores', for Hatti's people to look into or clear | Accepted |
 | 843 | Bulk operations: bulkOperationRunQuery runs one of the shop's lists a page at a time in the background, as the caller, and writes each node to a JSONL file that a link gives for a week | Accepted |
+| 844 | A merchant asks of their numbers in English, Urdu or Roman Urdu: the AI reads the question alone into one of Hatti's reports, which Hatti runs and shows with what the question was taken to ask | Accepted |
 
 ---
 
@@ -27530,3 +27531,30 @@
     customers and stock (ADR-059, ADR-133) cover what shops bring.
   * It runs in the API process that started it. A worker running them waits for files too big
     for one process.
+
+## ADR-844 · A merchant asks of their numbers in English, Urdu or Roman Urdu: the AI reads the question alone into one of Hatti's reports, which Hatti runs and shows with what the question was taken to ask
+
+* **Context:** ANL-08 asks for AI analytics questions, in Urdu or English. Shop owners here
+  think in questions like "pichle hafte kitni sale hui?", not in reports. An AI that writes the
+  answer from the shop's numbers would send them to the provider and could get the numbers
+  wrong.
+* **Decision:**
+  * **The AI sees the question alone** and reads it, through the gateway's one tool (ADR-463),
+    into one of the reports custom reports run (ADR-817):
+    * its rows: by day, week or month, by product, by channel, by visit source or by campaign;
+    * up to four of that report's columns;
+    * one of the moving periods.
+    It may choose only from these lists. True profit's lines (ADR-529) aren't among them on
+    plans without them. A question that isn't of the shop's numbers is said to be, in the
+    question's language.
+  * **Hatti runs the report** as custom reports run, with the asker's access (`read_orders`), and
+    shows it on the analytics page with what the question was taken to ask: its rows and its
+    period. The merchant judges the reading by those, and the numbers are Hatti's own.
+  * **`reportQuestionAsk` and `reportQuestions`:**
+    * fifty questions a shop a day, each kept with its outcome and tokens (migration 0359);
+    * each answer spends an AI credit (ADR-533), a use of its own;
+    * without the AI set up (OWN-11) the box isn't shown.
+* **Consequences:**
+  * A question no report answers ("which customer spends most?") is said so. Reports of customers
+    wait for custom reports to have them.
+  * The model is the configured one (OWN-11): Anthropic's API, or one that speaks it.

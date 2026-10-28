@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Questions of the shop's numbers
+
+* **Analytics:** a merchant asks in English, Urdu or Roman Urdu; the AI reads the question alone
+  into one of Hatti's reports, which Hatti runs and shows with what it took the question to ask
+  (ANL-08, [ADR-844](../architecture/13-decision-log.md#adr-844--a-merchant-asks-of-their-numbers-in-english-urdu-or-roman-urdu-the-ai-reads-the-question-alone-into-one-of-hattis-reports-which-hatti-runs-and-shows-with-what-the-question-was-taken-to-ask)). Done in code; it answers once the AI is set up (OWN-11).
+* 4458 tests (8 new: 6, and 2 checks of the admin's new operations).
+
 ### e5443e2 · Bulk operations
 
 * **Admin API:** `bulkOperationRunQuery` runs one of the shop's lists a page at a time in the
