@@ -15,6 +15,8 @@ import { ActionsLogPage } from './actions-log';
 import { ReportsPage } from './reports';
 import { RightsPage } from './rights';
 import { SendersPage, SignalsPage } from './shops';
+import { StatusPage } from './status';
+import { TransfersPage } from './transfers';
 import { StoresPage } from './stores';
 import { VerificationsPage } from './verifications';
 import { consoleCall, whenSignedOut } from './api';
@@ -63,6 +65,12 @@ function Shell() {
           </Link>
           <Link to="/senders" className={link}>
             Sender names
+          </Link>
+          <Link to="/transfers" className={link}>
+            Transfers
+          </Link>
+          <Link to="/status" className={link}>
+            Status page
           </Link>
           <Link to="/log" className={link}>
             Log
@@ -175,6 +183,18 @@ const sendersRoute = createRoute({
   component: SendersPage,
 });
 
+const transfersRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/transfers',
+  component: TransfersPage,
+});
+
+const statusRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/status',
+  component: StatusPage,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => signedInLayout,
   path: '/log',
@@ -193,6 +213,8 @@ const routeTree = rootRoute.addChildren([
     rightsRoute,
     signalsRoute,
     sendersRoute,
+    transfersRoute,
+    statusRoute,
     logRoute,
   ]),
 ]);

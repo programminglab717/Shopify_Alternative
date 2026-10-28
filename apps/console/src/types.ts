@@ -156,3 +156,36 @@ export interface SmsSender {
   decidedBy: string | null;
   answer: string | null;
 }
+
+/** A transfer a shop's owner said they made into Hatti's account (ADR-254). */
+export interface BillingTransfer {
+  id: string;
+  shop: { id: string; name: string };
+  invoiceName: string;
+  reference: string;
+  /** As Hatti writes rupees: "Rs 2,999". */
+  amount: string;
+  reportedAt: string;
+}
+
+/** An incident or maintenance on Hatti's status page (ADR-498). */
+export interface Incident {
+  id: string;
+  kind: 'incident' | 'maintenance';
+  impact: 'degraded' | 'outage';
+  components: string[];
+  title: string;
+  titleUr: string | null;
+  status: string;
+  startsAt: string;
+  endsAt: string | null;
+  resolvedAt: string | null;
+  createdBy: string;
+  updates: {
+    status: string;
+    body: string;
+    bodyUr: string | null;
+    postedBy: string;
+    postedAt: string;
+  }[];
+}

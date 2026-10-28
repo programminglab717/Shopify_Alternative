@@ -18,6 +18,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
 import { ConsoleController } from './console.controller.js';
+import { ConsoleOpsController } from './ops.controller.js';
 import { ConsoleRightsController } from './rights.controller.js';
 import { ConsoleSignalsController } from './signals.controller.js';
 import { CONSOLE_DATABASE, ConsoleTrustController } from './trust.controller.js';
@@ -59,6 +60,7 @@ class ConsoleModule {
         ConsoleTrustController,
         ConsoleRightsController,
         ConsoleSignalsController,
+        ConsoleOpsController,
       ],
       providers: [
         {
