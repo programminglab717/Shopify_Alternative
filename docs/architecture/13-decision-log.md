@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-888 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-889 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -896,6 +896,7 @@
 | 886 | Workflows wait and check: a wait of an hour to a week before the next action, and a check that goes on only where its conditions hold of the order as it is then, with the order's stage and confirmation to check | Accepted |
 | 887 | Customers by how recently and often they buy: RFM on a grid of three by three, by the days since their last order against two lines the shop picks and by their delivered orders, each group a segment's query | Accepted |
 | 888 | Payment terms for wholesale customers: an order paid by transfer within 1 to 120 days ships without waiting for the money, owed until paid and overdue past its date, its terms from the draft or the customer's price list | Accepted |
+| 889 | An age gate: a shop selling what is only for adults asks each visitor to confirm an age from 13 to 25 before its pages show, in the browser, the answer kept a month | Accepted |
 
 ---
 
@@ -29477,3 +29478,28 @@
       Meta approves;
     * credit limits per customer;
     * the storefront's order page saying the terms.
+
+## ADR-889 · An age gate: a shop selling what is only for adults asks each visitor to confirm an age from 13 to 25 before its pages show, in the browser, the answer kept a month
+
+* **Context:** OS-15 asks for password protection, maintenance mode and an age gate. The first
+  two are built (ADR-054, ADR-252). Shops selling vapes, energy drinks, fragrances with alcohol
+  or adult-only goods are asked by their platforms and payment partners to confirm a visitor's
+  age before showing the store. Shopify leaves this to apps.
+* **Decision:**
+  * **The online store's preferences** keep the age to confirm, 13 to 25, or none
+    (`ageGateMinimum`, migration 0390). `onlineStorePreferencesUpdate` sets it; 0 takes it
+    away. The shop's document carries it as `ageGate`.
+  * **The gate is the browser's**, as the consent banner is (ADR-551): pages are the same for
+    every visitor and kept at the edge.
+    * The head of every shopper's page carries a script that hides the page at once and asks, in
+      the page's language: "This store is for those 18 or older. Are you 18 or older?"
+    * Yes keeps the answer in a cookie of the shop's (`hatti_age`, the age confirmed) for a
+      month, and shows the page. A shop raising its age asks again; lowering it does not.
+    * No says the store isn't for them, and the page stays hidden.
+    * Previews and the theme editor are not gated, for the shop to see its pages.
+  * **The admin's storefront settings** turn it on with the age to ask.
+* **Consequences:**
+  * A visitor's say-so is all it asks, as Shopify's apps do; it proves no age. Checking an ID
+    is for a partner, should a shop's goods ever need it.
+  * Search engines' crawlers that run scripts see the gate as visitors do; a shop selling
+    adult-only goods expects that.

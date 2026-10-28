@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15) next. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages and articles (DEV-02) next. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### An age gate for the online store
+
+* **Gate:** a shop selling what is only for adults asks visitors to confirm an age, 13 to 25,
+  before its pages show; the answer is kept a month ([ADR-889](../architecture/13-decision-log.md#adr-889--an-age-gate-a-shop-selling-what-is-only-for-adults-asks-each-visitor-to-confirm-an-age-from-13-to-25-before-its-pages-show-in-the-browser-the-answer-kept-a-month)).
+* **Where:** a script in the head of every shopper's page, so pages stay kept at the edge;
+  previews and the editor are not gated. The admin's storefront settings choose the age.
+* 4829 tests (7 new).
 
 ### c0b16b7 · Payment terms for wholesale customers
 
