@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Filer-status checks
+### 16cc959 · Filer-status checks
 
 * **Tax:** Hatti keeps when the shop last said whether it is on FBR's Active Taxpayers List, asks
   again once FBR publishes each 1 March's list, and the admin writes the SMS to 9966 that checks
