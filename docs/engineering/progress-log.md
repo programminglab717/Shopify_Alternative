@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Order routing
+### fb65f87 · Order routing
 
 * **Orders:** each location names the cities and provinces it ships to first, and an order goes
   out from one that has all of it and serves its customer's city, else their province, before the
