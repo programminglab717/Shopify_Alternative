@@ -22,6 +22,7 @@ import {
   Truck,
   UserCog,
   Warehouse,
+  Workflow as WorkflowIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { StaffMemberRole } from '../api/types';
@@ -76,6 +77,7 @@ interface Section {
     | '/$shopId/settings/export'
     | '/$shopId/settings/verification'
     | '/$shopId/settings/apps'
+    | '/$shopId/settings/workflows'
     | '/$shopId/settings/expansion-stores'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/custom-data'
@@ -215,6 +217,13 @@ const SECTIONS: readonly Section[] = [
       RUNS_SHOP,
       (shop) => can(shop, 'read_settings') && hasCapability(shop, 'manage_apps'),
     ),
+  },
+  {
+    to: '/$shopId/settings/workflows',
+    label: 'settings.workflows',
+    hint: 'settings.workflowsHint',
+    icon: WorkflowIcon,
+    gate: gate(RUNS_SHOP, (shop) => hasCapability(shop, 'manage_apps')),
   },
   {
     to: '/$shopId/settings/billing',

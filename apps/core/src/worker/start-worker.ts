@@ -1,5 +1,5 @@
 import { PublicSite, StorefrontSite, SystemDnsLookup } from '@hatti/api';
-import { HttpWebhookSender, WebhookService } from '@hatti/apps/public';
+import { HttpWebhookSender, WebhookService, WorkflowService } from '@hatti/apps/public';
 import { AiGateway } from '@hatti/ai';
 import {
   AiCreditsService,
@@ -123,6 +123,7 @@ import { PushCampaigns } from './push-campaigns.js';
 import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
+import { WorkflowRuns, WorkflowTriggers } from './workflows.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
 import {
   FbrDigitalInvoicingClient,
@@ -222,6 +223,7 @@ export interface EventConsumers {
   planOrders?: PlanOrders;
   webhooks?: WebhookFanOut;
   automations?: AutomationTriggers;
+  workflows?: WorkflowTriggers;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -255,6 +257,7 @@ export function eventHandlers(
     planOrders,
     webhooks,
     automations,
+    workflows,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -392,6 +395,11 @@ export function eventHandlers(
   if (automations) {
     for (const type of AutomationTriggers.EVENTS) {
       registry.on(type, (event) => automations.handle(event));
+    }
+  }
+  if (workflows) {
+    for (const type of WorkflowTriggers.EVENTS) {
+      registry.on(type, (event) => workflows.handle(event));
     }
   }
   return registry;
@@ -555,6 +563,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         // Apps' webhooks need their secrets opened to be sent (ADR-397).
         ...(config.ENCRYPTION_KEYS && {
           webhooks: new WebhookFanOut(new WebhookService(database, config.ENCRYPTION_KEYS)),
+          // The shop's workflows' runs, made as their triggers are heard (ADR-861).
+          workflows: new WorkflowTriggers(new WorkflowService(database, config.ENCRYPTION_KEYS)),
           // The shop's automations, sent from its own number, whose token is sealed (ADR-425).
           automations: new AutomationTriggers(
             workerAutomations(database, config.ENCRYPTION_KEYS),
@@ -715,6 +725,23 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       ).start(config.WEBHOOK_INTERVAL_MS);
       closers.push(() => webhookDeliveries.stop());
+      // The shop's workflows run: their conditions checked, their actions done in turn, and
+      // apps' actions posted signed with each app's secret, tried again for a day (ADR-861).
+      const vapid = vapidKeysOf(config);
+      const workflowRuns = new WorkflowRuns(
+        new WorkflowService(database, config.ENCRYPTION_KEYS),
+        workerOrders(database),
+        new CustomerService(database),
+        database,
+        new HttpWebhookSender(
+          config.WEBHOOK_PRIVATE_ADDRESSES
+            ? { protocols: ['http:', 'https:'], allowAddress: () => true }
+            : {},
+        ),
+        new PushService(database, vapid && new WebPushSender(vapid)),
+        logger,
+      ).start(config.WEBHOOK_INTERVAL_MS);
+      closers.push(() => workflowRuns.stop());
     } else {
       logger.warn('ENCRYPTION_KEYS is not set: no webhooks are sent to apps');
     }

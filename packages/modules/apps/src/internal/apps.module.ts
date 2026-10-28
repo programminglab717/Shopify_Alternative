@@ -7,7 +7,9 @@ import { AppEmbedResolver } from './graphql/app-embeds.resolver.js';
 import { AppInstallsResolver } from './graphql/app-installs.resolver.js';
 import { CustomAppResolver } from './graphql/apps.resolver.js';
 import { WebhookResolver } from './graphql/webhooks.resolver.js';
+import { WorkflowResolver } from './graphql/workflows.resolver.js';
 import { WebhookService } from './webhooks.service.js';
+import { WorkflowService } from './workflows.service.js';
 
 /** Needs {@link Database} and {@link SecretBox} providers from the host application. */
 @Module({
@@ -21,6 +23,8 @@ import { WebhookService } from './webhooks.service.js';
     AppEmbedService,
     AppEmbedResolver,
     AppChargeService,
+    WorkflowService,
+    WorkflowResolver,
   ],
   exports: [
     CustomAppService,
@@ -28,6 +32,7 @@ import { WebhookService } from './webhooks.service.js';
     AppInstallsService,
     AppEmbedService,
     AppChargeService,
+    WorkflowService,
   ],
 })
 export class AppsModule {}

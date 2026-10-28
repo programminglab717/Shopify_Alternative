@@ -168,6 +168,12 @@ export const ID_PREFIXES = {
   expert: 'expt',
   // A theme of the theme store, offered by a designer (ADR-853).
   themeListing: 'thls',
+  // A shop's workflow: a trigger, conditions and actions (ADR-861).
+  workflow: 'wkfl',
+  // One run of a workflow, for one event (ADR-861).
+  workflowRun: 'wrun',
+  // A trigger or an action an app offers the shop's workflows (ADR-861).
+  flowExtension: 'fext',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

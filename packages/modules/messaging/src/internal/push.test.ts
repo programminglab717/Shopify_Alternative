@@ -104,6 +104,7 @@ describe('Whom each kind of news is pushed to (ADR-581)', () => {
       'customer_refused',
       'order_assigned',
       'order_mentioned',
+      'workflow_alert',
     ]);
     const books = recipient('usr', 'accountant', 'en', {
       scopes: ['read_orders'],

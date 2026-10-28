@@ -40,6 +40,8 @@ export const PUSH_KINDS = [
   'conversation_assigned',
   // A customer waiting past the shop's time to answer (ADR-762).
   'conversation_overdue',
+  // What a workflow of the shop's tells its staff (ADR-861).
+  'workflow_alert',
 ] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
@@ -58,6 +60,7 @@ export const PUSH_ROLES: Record<PushKind, readonly StaffRole[]> = {
   conversation_message: ['owner', 'manager', 'confirmation_agent'],
   conversation_assigned: ['owner', 'manager', 'confirmation_agent'],
   conversation_overdue: ['owner', 'manager', 'confirmation_agent'],
+  workflow_alert: ['owner', 'manager'],
 };
 
 /**
@@ -78,6 +81,7 @@ export const PUSH_NEEDS: Record<PushKind, AccessScope | StaffCapability> = {
   conversation_message: 'write_conversations',
   conversation_assigned: 'write_conversations',
   conversation_overdue: 'write_conversations',
+  workflow_alert: 'read_orders',
 };
 
 /** Whether `recipient` is told of news of `kind`: their role's work, which they may do. */

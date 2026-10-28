@@ -1479,6 +1479,44 @@ export class OrderService {
   }
 
   /**
+   * Adds tags to an order and takes others away, ignoring case, for a workflow of the shop's
+   * (DEV-11, ADR-861): its timeline says which did. Orders past the plan's limit too, as tags
+   * change nothing staff do with them.
+   */
+  async retag(
+    shopId: string,
+    id: string,
+    change: { add?: readonly string[]; remove?: readonly string[] },
+    workflowName: string,
+  ): Promise<MutationResult<OrderRecord>> {
+    return this.db.tenant(shopId, async (tx) => {
+      const order = await lockOrder(tx, shopId, id);
+      if (!order) return failOne<OrderRecord>(['id'], 'NOT_FOUND', 'Order not found');
+      const removed = new Set((change.remove ?? []).map((tag) => tag.toLowerCase()));
+      const tags = order.tags.filter((tag) => !removed.has(tag.toLowerCase()));
+      for (const tag of change.add ?? []) {
+        if (!tags.some((each) => each.toLowerCase() === tag.toLowerCase())) tags.push(tag);
+      }
+      if (tags.length > INPUT_LIMITS.tags) {
+        return failOne<OrderRecord>(
+          ['input', 'tags'],
+          'TOO_MANY',
+          `The order would have more than ${INPUT_LIMITS.tags} tags`,
+        );
+      }
+      const result = await this.updateLocked(
+        tx,
+        shopId,
+        order,
+        { tags },
+        { actor: 'system', message: () => `Workflow “${workflowName}” changed the tags` },
+      );
+      if (!result.ok) return result;
+      return { ok: true, value: (await loadOrder(tx, shopId, id))! };
+    });
+  }
+
+  /**
    * Changes an order locked in the caller's transaction, as {@link update} does, to values checked
    * already, with who did it for its timeline: the caller, or the customer through their link.
    * `message` words the timeline entry from what changed, "shipping address, note"; "Changed the

@@ -38,7 +38,8 @@ type PushKind =
   | 'ORDER_MENTIONED'
   | 'CONVERSATION_MESSAGE'
   | 'CONVERSATION_ASSIGNED'
-  | 'CONVERSATION_OVERDUE';
+  | 'CONVERSATION_OVERDUE'
+  | 'WORKFLOW_ALERT';
 
 /** A member's own orders and comments, whatever their role, if they may see orders (ADR-633). */
 const OWN_WORK = gate(
@@ -133,6 +134,12 @@ const KINDS: {
     gate: gate(['owner', 'manager', 'marketer'], 'write_content'),
     label: 'push.commentPending',
     hint: 'push.commentPendingHint',
+  },
+  {
+    kind: 'WORKFLOW_ALERT',
+    gate: gate(['owner', 'manager'], 'read_orders'),
+    label: 'push.workflowAlert',
+    hint: 'push.workflowAlertHint',
   },
 ];
 

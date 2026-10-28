@@ -12473,3 +12473,125 @@ export const ReportQuestionAskMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const FLOW_EXTENSION = /* GraphQL */ `
+  fragment FlowExtensionFields on FlowExtension {
+    id
+    appName
+    kind
+    title
+    description
+    resource
+    fields {
+      key
+      label
+      type
+      required
+    }
+  }
+`;
+
+const WORKFLOW = /* GraphQL */ `
+  fragment WorkflowFields on Workflow {
+    id
+    name
+    trigger
+    extension {
+      ...FlowExtensionFields
+    }
+    match
+    conditions {
+      field
+      operator
+      value
+    }
+    actions {
+      type
+      tags
+      title
+      message
+      extensionId
+      properties {
+        key
+        value
+      }
+    }
+    enabled
+    lastRunStatus
+    lastRunAt
+  }
+  ${FLOW_EXTENSION}
+`;
+
+/** The shop's workflows (DEV-11, ADR-861), and what its apps offer them. */
+export const WorkflowsQuery = /* GraphQL */ `
+  query Workflows {
+    workflows {
+      ...WorkflowFields
+    }
+    flowExtensions {
+      ...FlowExtensionFields
+    }
+  }
+  ${WORKFLOW}
+`;
+
+export const WorkflowRunsQuery = /* GraphQL */ `
+  query WorkflowRuns($workflowId: ID!) {
+    workflowRuns(workflowId: $workflowId, first: 20) {
+      id
+      status
+      orderId
+      customerId
+      steps {
+        action
+        outcome
+        detail
+      }
+      attempts
+      createdAt
+    }
+  }
+`;
+
+export const WorkflowCreateMutation = /* GraphQL */ `
+  mutation WorkflowCreate($input: WorkflowInput!) {
+    workflowCreate(input: $input) {
+      workflow {
+        ...WorkflowFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${WORKFLOW}
+  ${USER_ERRORS}
+`;
+
+export const WorkflowUpdateMutation = /* GraphQL */ `
+  mutation WorkflowUpdate($id: ID!, $input: WorkflowInput!) {
+    workflowUpdate(id: $id, input: $input) {
+      workflow {
+        ...WorkflowFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${WORKFLOW}
+  ${USER_ERRORS}
+`;
+
+export const WorkflowDeleteMutation = /* GraphQL */ `
+  mutation WorkflowDelete($id: ID!) {
+    workflowDelete(id: $id) {
+      deletedWorkflowId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

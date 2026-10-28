@@ -6178,6 +6178,103 @@ enum FiscalInvoiceStatus {
 }
 
 """
+A trigger or an action an app offers the shop's workflows (DEV-11, ADR-861), as a Shopify Flow extension is.
+"""
+type FlowExtension {
+  """The app offering it."""
+  appId: ID!
+  appName: String!
+  description: String!
+  fields: [FlowField!]!
+
+  """The app's own name for it: "review-posted"."""
+  handle: String!
+  id: ID!
+  kind: FlowExtensionKind!
+  resource: FlowResource!
+  title: String!
+  updatedAt: DateTime!
+
+  """Where an action is posted."""
+  url: String
+}
+
+type FlowExtensionDeletePayload {
+  deletedFlowExtensionId: ID
+  userErrors: [UserError!]!
+}
+
+input FlowExtensionInput {
+  description: String
+  fields: [FlowFieldInput!]
+  handle: String!
+  kind: FlowExtensionKind!
+  resource: FlowResource!
+  title: String!
+
+  """An action's https address."""
+  url: String
+}
+
+"""
+A trigger an app fires for the shop's workflows, or an action it is sent.
+"""
+enum FlowExtensionKind {
+  ACTION
+  TRIGGER
+}
+
+type FlowExtensionPayload {
+  flowExtension: FlowExtension
+  userErrors: [UserError!]!
+}
+
+"""A field an app's trigger sends, or its action is sent."""
+type FlowField {
+  """Lowercase letters, digits and underscores: "rating"."""
+  key: String!
+  label: String!
+  required: Boolean!
+  type: FlowFieldType!
+}
+
+input FlowFieldInput {
+  key: String!
+  label: String!
+  required: Boolean
+  type: FlowFieldType!
+}
+
+enum FlowFieldType {
+  BOOLEAN
+  NUMBER
+  TEXT
+}
+
+type FlowProperty {
+  key: String!
+  value: String!
+}
+
+input FlowPropertyInput {
+  key: String!
+  value: String!
+}
+
+"""
+What an app's trigger or action is about: an order, whose ID the app sends with the trigger or is sent with the action, and needs read_orders for; a customer, read_customers; or none.
+"""
+enum FlowResource {
+  CUSTOMER
+  NONE
+  ORDER
+}
+
+type FlowTriggerReceivePayload {
+  userErrors: [UserError!]!
+}
+
+"""
 What matters in an image (ADR-257), in percent of the image shown, across and down from its top left: themes keep it in sight as they fill a frame with the image.
 """
 type FocalPoint {
@@ -10009,6 +10106,21 @@ type Mutation {
   fiscalInvoiceRetry(id: ID!): FiscalInvoiceRetryPayload!
 
   """
+  Takes back the calling app's trigger or action: workflows stop using it.
+  """
+  flowExtensionDelete(handle: String!, kind: FlowExtensionKind!): FlowExtensionDeletePayload!
+
+  """
+  Offers the calling app's workflow trigger or action, or changes it by its kind and handle. One about orders needs the app to read them; about customers, to read customers.
+  """
+  flowExtensionSet(input: FlowExtensionInput!): FlowExtensionPayload!
+
+  """
+  Fires the calling app's trigger, as Shopify's flowTriggerReceive does: about the order or customer its resource names, with its fields. Each enabled workflow on it runs once.
+  """
+  flowTriggerReceive(customerId: ID, handle: String!, orderId: ID, properties: [FlowPropertyInput!]): FlowTriggerReceivePayload!
+
+  """
   Claims a lost parcel's worth from the courier that lost it, or what of a parcel that came back was written off as damaged, or `amount`: the claim is the parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes (for lost parcels) or otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager or an accountant.
   """
   fulfillmentClaimCreate(
@@ -11357,6 +11469,15 @@ type Mutation {
   Asks Meta how the shop's templates stand, as its webhook says of them as it decides.
   """
   whatsAppTemplatesSync: WhatsAppTemplatesSyncPayload!
+
+  """Makes a workflow: on unless asked otherwise."""
+  workflowCreate(input: WorkflowInput!): WorkflowPayload!
+
+  """Deletes a workflow and its runs."""
+  workflowDelete(id: ID!): WorkflowDeletePayload!
+
+  """Changes a workflow, all of it: runs from now on do as it now says."""
+  workflowUpdate(id: ID!, input: WorkflowInput!): WorkflowPayload!
 }
 
 """
@@ -16103,6 +16224,11 @@ type Query {
     status: FiscalInvoiceStatus
   ): [FiscalInvoice!]!
 
+  """
+  The calling app's workflow triggers and actions; for the owner and managers, every app's.
+  """
+  flowExtensions: [FlowExtension!]!
+
   """A gift card by ID, or null."""
   giftCard(id: ID!): GiftCard
 
@@ -17020,6 +17146,15 @@ type Query {
   The shop's own WhatsApp templates on the number it has connected, the latest first; none without one.
   """
   whatsAppTemplates: [WhatsAppTemplate!]!
+  workflow(id: ID!): Workflow
+
+  """
+  A workflow's runs of the last 30 days, the latest first (20, 100 at most).
+  """
+  workflowRuns(first: Int, workflowId: ID!): [WorkflowRun!]!
+
+  """The shop's workflows: the owner's and managers'."""
+  workflows: [Workflow!]!
 }
 
 """A friend's order a customer's code brought (ADR-807)."""
@@ -21079,4 +21214,167 @@ enum WhatsAppTemplateStatus {
 type WhatsAppTemplatesSyncPayload {
   userErrors: [UserError!]!
   whatsAppTemplates: [WhatsAppTemplate!]!
+}
+
+"""
+The shop's own automation (DEV-11, ADR-861): a trigger, conditions on what it is about, and actions done in turn.
+"""
+type Workflow {
+  actions: [WorkflowAction!]!
+  conditions: [WorkflowCondition!]!
+  createdAt: DateTime!
+  enabled: Boolean!
+
+  """An app's trigger; null for Hatti's own, and once the app took it back."""
+  extension: FlowExtension
+  id: ID!
+  lastRunAt: DateTime
+  lastRunStatus: WorkflowRunStatus
+  match: WorkflowMatch!
+  name: String!
+  trigger: WorkflowTriggerType!
+  updatedAt: DateTime!
+}
+
+"""An action of a workflow, with what its type takes."""
+type WorkflowAction {
+  """An app's action."""
+  extensionId: ID
+  message: String
+  properties: [FlowProperty!]!
+
+  """The tags added or taken away."""
+  tags: [String!]!
+
+  """A push's title: {{order.number}} fills."""
+  title: String
+  type: WorkflowActionType!
+}
+
+input WorkflowActionInput {
+  extensionId: ID
+  message: String
+  properties: [FlowPropertyInput!]
+  tags: [String!]
+  title: String
+  type: WorkflowActionType!
+}
+
+"""
+What a workflow does: tags added to or taken from the order or its customer; the owner's and managers' phones told; or APP_ACTION, an action an app offers, posted to it signed.
+"""
+enum WorkflowActionType {
+  ADD_CUSTOMER_TAGS
+  ADD_ORDER_TAGS
+  APP_ACTION
+  NOTIFY_STAFF
+  REMOVE_CUSTOMER_TAGS
+  REMOVE_ORDER_TAGS
+}
+
+type WorkflowCondition {
+  """What it reads: "order.total", "customer.tags", "trigger.rating"."""
+  field: String!
+  operator: WorkflowConditionOperator!
+  value: String!
+}
+
+input WorkflowConditionInput {
+  field: String!
+  operator: WorkflowConditionOperator!
+  value: String!
+}
+
+"""
+How a condition compares: numbers by EQUALS to AT_MOST; words by EQUALS, NOT_EQUALS, CONTAINS and NOT_CONTAINS, ignoring case; lists, as tags, by INCLUDES and EXCLUDES.
+"""
+enum WorkflowConditionOperator {
+  AT_LEAST
+  AT_MOST
+  CONTAINS
+  EQUALS
+  EXCLUDES
+  GREATER_THAN
+  INCLUDES
+  LESS_THAN
+  NOT_CONTAINS
+  NOT_EQUALS
+}
+
+type WorkflowDeletePayload {
+  deletedWorkflowId: ID
+  userErrors: [UserError!]!
+}
+
+input WorkflowInput {
+  actions: [WorkflowActionInput!]!
+  conditions: [WorkflowConditionInput!]
+
+  """On unless given."""
+  enabled: Boolean
+
+  """The app's trigger, for APP."""
+  extensionId: ID
+  match: WorkflowMatch
+  name: String!
+  trigger: WorkflowTriggerType!
+}
+
+"""Whether all a workflow's conditions must hold, or any of them."""
+enum WorkflowMatch {
+  ALL
+  ANY
+}
+
+type WorkflowPayload {
+  userErrors: [UserError!]!
+  workflow: Workflow
+}
+
+"""One run of a workflow, for one event: kept 30 days."""
+type WorkflowRun {
+  attempts: Int!
+  createdAt: DateTime!
+  customerId: ID
+  finishedAt: DateTime
+  id: ID!
+  orderId: ID
+  status: WorkflowRunStatus!
+  steps: [WorkflowStep!]!
+}
+
+"""
+PENDING until its actions are done, or an app answers; SKIPPED where its conditions did not hold; FAILED where an action could not be done, or an app's did not answer in a day.
+"""
+enum WorkflowRunStatus {
+  DONE
+  FAILED
+  PENDING
+  SKIPPED
+}
+
+type WorkflowStep {
+  action: WorkflowActionType!
+  detail: String
+  outcome: WorkflowStepOutcome!
+}
+
+enum WorkflowStepOutcome {
+  DONE
+  FAILED
+  SKIPPED
+}
+
+"""
+What starts a workflow (DEV-11, ADR-861): an order placed, confirmed, paid or cancelled; its parcel delivered or returned; a customer created; or APP, a trigger an app offers.
+"""
+enum WorkflowTriggerType {
+  APP
+  CUSTOMER_CREATED
+  ORDER_CANCELLED
+  ORDER_CONFIRMED
+  ORDER_CREATED
+  ORDER_DELIVERED
+  ORDER_PAID
+  ORDER_RETURNED
 }

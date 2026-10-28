@@ -6032,3 +6032,116 @@ export interface ReportQuestionAskData {
     userErrors: UserError[];
   };
 }
+
+export type WorkflowTriggerType =
+  | 'ORDER_CREATED'
+  | 'ORDER_CONFIRMED'
+  | 'ORDER_PAID'
+  | 'ORDER_CANCELLED'
+  | 'ORDER_DELIVERED'
+  | 'ORDER_RETURNED'
+  | 'CUSTOMER_CREATED'
+  | 'APP';
+
+export type WorkflowConditionOperator =
+  | 'EQUALS'
+  | 'NOT_EQUALS'
+  | 'GREATER_THAN'
+  | 'LESS_THAN'
+  | 'AT_LEAST'
+  | 'AT_MOST'
+  | 'CONTAINS'
+  | 'NOT_CONTAINS'
+  | 'INCLUDES'
+  | 'EXCLUDES';
+
+export type WorkflowActionType =
+  | 'ADD_ORDER_TAGS'
+  | 'REMOVE_ORDER_TAGS'
+  | 'ADD_CUSTOMER_TAGS'
+  | 'REMOVE_CUSTOMER_TAGS'
+  | 'NOTIFY_STAFF'
+  | 'APP_ACTION';
+
+export type WorkflowRunStatus = 'PENDING' | 'DONE' | 'SKIPPED' | 'FAILED';
+
+/** A trigger or an action an app offers the shop's workflows (DEV-11, ADR-861). */
+export interface FlowExtension {
+  id: string;
+  appName: string;
+  kind: 'TRIGGER' | 'ACTION';
+  title: string;
+  description: string;
+  resource: 'ORDER' | 'CUSTOMER' | 'NONE';
+  fields: { key: string; label: string; type: 'TEXT' | 'NUMBER' | 'BOOLEAN'; required: boolean }[];
+}
+
+export interface WorkflowCondition {
+  field: string;
+  operator: WorkflowConditionOperator;
+  value: string;
+}
+
+export interface WorkflowAction {
+  type: WorkflowActionType;
+  tags: string[];
+  title: string | null;
+  message: string | null;
+  extensionId: string | null;
+  properties: { key: string; value: string }[];
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  trigger: WorkflowTriggerType;
+  extension: FlowExtension | null;
+  match: 'ALL' | 'ANY';
+  conditions: WorkflowCondition[];
+  actions: WorkflowAction[];
+  enabled: boolean;
+  lastRunStatus: WorkflowRunStatus | null;
+  lastRunAt: string | null;
+}
+
+export interface WorkflowsData {
+  workflows: Workflow[];
+  flowExtensions: FlowExtension[];
+}
+
+export interface WorkflowRun {
+  id: string;
+  status: WorkflowRunStatus;
+  orderId: string | null;
+  customerId: string | null;
+  steps: {
+    action: WorkflowActionType;
+    outcome: 'DONE' | 'FAILED' | 'SKIPPED';
+    detail: string | null;
+  }[];
+  attempts: number;
+  createdAt: string;
+}
+
+export interface WorkflowRunsData {
+  workflowRuns: WorkflowRun[];
+}
+
+export interface WorkflowInput {
+  name: string;
+  trigger: WorkflowTriggerType;
+  extensionId: string | null;
+  match: 'ALL' | 'ANY';
+  conditions: WorkflowCondition[];
+  actions: WorkflowAction[];
+  enabled: boolean;
+}
+
+export interface WorkflowPayloadData {
+  workflowCreate?: { workflow: Workflow | null; userErrors: UserError[] };
+  workflowUpdate?: { workflow: Workflow | null; userErrors: UserError[] };
+}
+
+export interface WorkflowDeleteData {
+  workflowDelete: { deletedWorkflowId: string | null; userErrors: UserError[] };
+}

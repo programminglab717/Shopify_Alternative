@@ -48,7 +48,7 @@ function amount(minor: string, currency: string): string {
  * The shop's staff, to tell in their language, with what they may do there (ADR-581), through
  * identity's function (ADR-193).
  */
-async function recipientsIn(tx: Tx, shopId: string): Promise<PushRecipient[]> {
+export async function recipientsIn(tx: Tx, shopId: string): Promise<PushRecipient[]> {
   return (await staffPhonesIn(tx, shopId)).map(
     ({ userId, role, language, scopes, capabilities }) => ({
       userId,

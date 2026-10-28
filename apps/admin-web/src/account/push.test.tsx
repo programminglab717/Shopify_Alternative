@@ -103,7 +103,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
 
     const card = await screen.findByRole('region', { name: 'Notifications on this device' });
     const lowStock = await within(card).findByRole('checkbox', { name: /Low stock/ });
-    expect(within(card).getAllByRole('checkbox')).toHaveLength(13);
+    expect(within(card).getAllByRole('checkbox')).toHaveLength(14);
     fireEvent.click(lowStock);
     fireEvent.click(within(card).getByRole('button', { name: 'Turn on notifications' }));
     await waitFor(() =>
@@ -125,6 +125,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'CONVERSATION_ASSIGNED',
             'CONVERSATION_OVERDUE',
             'COMMENT_PENDING',
+            'WORKFLOW_ALERT',
           ],
         },
       }),
@@ -149,6 +150,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
             'CONVERSATION_ASSIGNED',
             'CONVERSATION_OVERDUE',
             'COMMENT_PENDING',
+            'WORKFLOW_ALERT',
           ],
         },
       }),
@@ -229,6 +231,7 @@ describe("The shop's news on a member of staff's phone (APP-03, ADR-506)", () =>
       expect.stringMatching(/^Customers who refused a parcel/),
       expect.stringMatching(/^Orders given to you/),
       expect.stringMatching(/^Comments naming you/),
+      expect.stringMatching(/^Workflows telling you/),
     ]);
   });
 
