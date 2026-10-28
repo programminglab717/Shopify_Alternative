@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Bulk operations
+
+* **Admin API:** `bulkOperationRunQuery` runs one of the shop's lists a page at a time in the
+  background as the caller, and writes each node to a JSONL file; `currentBulkOperation` gives
+  how it went and the file's link (DEV-10, [ADR-843](../architecture/13-decision-log.md#adr-843--bulk-operations-bulkoperationrunquery-runs-one-of-the-shops-lists-a-page-at-a-time-in-the-background-as-the-caller-and-writes-each-node-to-a-jsonl-file-that-a-link-gives-for-a-week)). Export done in code; imports by JSONL wait.
+* 4450 tests (2 new).
+
 ### 8b34552 · Signs of scam stores
 
 * **Trust:** the worker looks across stores four times a day for young stores keeping paid orders

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-842 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-843 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -850,6 +850,7 @@
 | 840 | The changes staff make most on a phone wait in the browser while it is offline, with the Idempotency-Key they were first sent with, and go in order once it is back online | Accepted |
 | 841 | An account of several shops sees each one's sales today and the orders waiting to be confirmed and packed on the shop chooser, and what they come to together | Accepted |
 | 842 | Signs of scam stores: the worker looks across stores four times a day for young stores keeping paid orders unshipped, catalogues copied from older stores and names that read as verified stores', for Hatti's people to look into or clear | Accepted |
+| 843 | Bulk operations: bulkOperationRunQuery runs one of the shop's lists a page at a time in the background, as the caller, and writes each node to a JSONL file that a link gives for a week | Accepted |
 
 ---
 
@@ -27497,3 +27498,35 @@
 * **Alternatives:**
   * **Holding a store's payouts on a sign:** Hatti doesn't hold shops' money; gateways and
     couriers pay shops directly.
+
+## ADR-843 · Bulk operations: bulkOperationRunQuery runs one of the shop's lists a page at a time in the background, as the caller, and writes each node to a JSONL file that a link gives for a week
+
+* **Context:** DEV-10 asks for bulk operations: async export to files. An app that wants every
+  order or product pages through the Admin API itself, against its query budget (ADR-576), and
+  Shopify's apps expect `bulkOperationRunQuery`.
+* **Decision:**
+  * **`bulkOperationRunQuery(query)`, as Shopify's,** takes a query of one list at its top, with
+    its nodes or its edges' node:
+    * no first, last, after or before, since it pages the list itself;
+    * no variables or fragments;
+    * not a mutation.
+    It is checked against the API's schema before it starts, so a wrong field is said at once.
+  * **The API runs it in the background, as the caller.** Each page goes through the API's own
+    GraphQL engine with the caller's tenant: their scopes and guards apply as to any query, and
+    a list they can't read fails with ACCESS_DENIED. 250 nodes a page, each written as a line of
+    JSON.
+    * **Its pages cost nothing of the query budget.** Instead, one runs at a time for a caller (an
+      app's token or a member of staff), kept in `apps.bulk_operations` (migration 0358).
+    * **The file goes to storage once written,** and `url` gives it for a week. At most a million
+      nodes or 500 MB; past that it fails TOO_LARGE.
+  * **`currentBulkOperation`** says the caller's latest: running with how many nodes so far, or
+    how it ended, with the file's size and link, or why it failed. `bulkOperationCancel` stops a
+    running one before its next page.
+  * A run not finished in two hours is taken to have died with the process that ran it: TIMEOUT.
+* **Consequences:**
+  * Nested lists are written inside their node, as the query's own `first` gives them, rather
+    than as lines of their own with `__parentId`, as Shopify's are.
+  * `bulkOperationRunMutation` (imports from a JSONL file) waits: the CSV imports of products,
+    customers and stock (ADR-059, ADR-133) cover what shops bring.
+  * It runs in the API process that started it. A worker running them waits for files too big
+    for one process.
