@@ -9,9 +9,10 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
+import { FBR_DEFAULT_UNIT } from '@hatti/pk';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { InventoryService } from '../inventory.service.js';
-import { untrackedItem } from '../item-store.js';
+import { untrackedItem, type FbrItemFields } from '../item-store.js';
 import type { InventoryItemRecord } from '../records.js';
 import {
   InventoryAdjustQuantitiesInput,
@@ -96,6 +97,51 @@ export class InventoryItemResolver {
     return (await loader.load(item.variantId)) ?? null;
   }
 
+  #fbr(tenant: TenantContext, loaders: RequestLoaders, item: InventoryItem) {
+    return loaders
+      .get<string, FbrItemFields>('inventory.fbr', (variantIds) =>
+        this.service.fbrItemFieldsOf(tenant, variantIds),
+      )
+      .load(item.variantId);
+  }
+
+  @ResolveField(() => String, {
+    description:
+      "The unit of measure FBR's digital invoicing names it in (CAT-19, ADR-895): FBR's " +
+      'default, "Numbers, pieces, units", unless set.',
+  })
+  async fbrUnitOfMeasure(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: InventoryItem,
+  ): Promise<string> {
+    return (await this.#fbr(tenant, loaders, item))?.unit ?? FBR_DEFAULT_UNIT;
+  }
+
+  @ResolveField(() => String, {
+    nullable: true,
+    description: 'The schedule of the SRO it is sold under, sent to FBR with it (ADR-895).',
+  })
+  async sroScheduleNumber(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: InventoryItem,
+  ): Promise<string | null> {
+    return (await this.#fbr(tenant, loaders, item))?.sroScheduleNo ?? null;
+  }
+
+  @ResolveField(() => String, {
+    nullable: true,
+    description: "Its serial number in that SRO's schedule (ADR-895).",
+  })
+  async sroItemSerialNumber(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: InventoryItem,
+  ): Promise<string | null> {
+    return (await this.#fbr(tenant, loaders, item))?.sroItemSerialNo ?? null;
+  }
+
   @ResolveField(() => InventoryChangeConnection, {
     description: 'Changes to its quantities, newest first.',
   })
@@ -126,6 +172,9 @@ export class InventoryItemResolver {
       tracked: input.tracked,
       inventoryPolicy: input.inventoryPolicy ? toPolicyValue(input.inventoryPolicy) : null,
       harmonizedSystemCode: input.harmonizedSystemCode,
+      fbrUnit: input.fbrUnitOfMeasure,
+      sroScheduleNo: input.sroScheduleNumber,
+      sroItemSerialNo: input.sroItemSerialNumber,
     });
     return Object.assign(new InventoryItemUpdatePayload(), {
       inventoryItem: result.ok ? toInventoryItem(result.value) : null,

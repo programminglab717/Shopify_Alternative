@@ -1,5 +1,5 @@
 import type { Tx } from '@hatti/db';
-import { harmonizedSystemCodesIn, type LocationRecord } from '@hatti/inventory/public';
+import { fbrItemFieldsIn, type LocationRecord } from '@hatti/inventory/public';
 import { recordFiscalDocumentsIn } from '@hatti/tax/public';
 import { sql } from 'drizzle-orm';
 import { fiscalCreditNoteOf, fiscalInvoiceOf } from './fiscal.js';
@@ -132,7 +132,7 @@ export async function issueInvoicesIn(
     fiscal.push({ order, invoice });
   }
   if (fiscal.length > 0) {
-    const hsCodes = await harmonizedSystemCodesIn(
+    const fbrFields = await fbrItemFieldsIn(
       tx,
       shopId,
       fiscal.flatMap(({ order }) => order.lines.map((line) => line.variantId)),
@@ -145,7 +145,7 @@ export async function issueInvoicesIn(
           order,
           invoice.name,
           invoice.issuedAt,
-          hsCodes,
+          fbrFields,
           locations.get(order.locationId) ?? null,
         ),
       ),

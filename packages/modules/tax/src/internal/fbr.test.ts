@@ -251,6 +251,38 @@ describe("What FBR's digital invoicing is sent of an invoice (TAX-04, ADR-562)",
     expect(diInvoiceRequest(own, 'sandbox', '62044200').scenarioId).toBe('SN002');
   });
 
+  it("sends an item's own unit and SRO, its sale at a reduced rate under one (CAT-19, ADR-895)", () => {
+    const body = diInvoiceBody(
+      {
+        ...SOLD,
+        items: [
+          {
+            ...SOLD.items[0]!,
+            rate: 500,
+            unit: 'Pair',
+            sroScheduleNo: '6th Schd Table I',
+            sroItemSerialNo: '151',
+          },
+          { ...SOLD.items[1]!, unit: null },
+        ],
+      },
+      SELLER,
+      'Asia/Karachi',
+    );
+    expect(body.items[0]).toMatchObject({
+      uoM: 'Pair',
+      sroScheduleNo: '6th Schd Table I',
+      sroItemSerialNo: '151',
+      saleType: 'Goods at Reduced Rate',
+      rate: '5%',
+    });
+    expect(body.items[1]).toMatchObject({
+      uoM: 'Numbers, pieces, units',
+      sroScheduleNo: '',
+      sroItemSerialNo: '',
+    });
+  });
+
   it('writes rates as FBR does, an item not taxed as exempt, and a CNIC as its digits', () => {
     const rated = (rate: number | null) =>
       diInvoiceBody(

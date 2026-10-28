@@ -52,6 +52,11 @@ export interface FiscalItem {
   discount: bigint;
   /** Its own PCT code, 8 digits (ADR-557); the shop's is used for those without. */
   pctCode?: string | null;
+  /** FBR's unit of measure for it (CAT-19, ADR-895); FBR's default for those without. */
+  unit?: string | null;
+  /** The SRO schedule and item serial of a reduced rate or exemption it is sold under. */
+  sroScheduleNo?: string | null;
+  sroItemSerialNo?: string | null;
 }
 
 /** Who an invoice is to, as its order has it: digital invoicing names the buyer, IMS asks none. */

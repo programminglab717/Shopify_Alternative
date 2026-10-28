@@ -1,9 +1,10 @@
+import { FBR_DEFAULT_UNIT, FBR_UNITS } from '@hatti/pk';
 import { useState } from 'react';
 import { InventoryItemUpdateMutation } from '../api/operations';
 import type { ProductDetail, UserError } from '../api/types';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
-import { CheckField } from '../settings/settings-form';
+import { CheckField, SelectField } from '../settings/settings-form';
 import { useAdminMutation } from '../shell/shop-context';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -14,7 +15,93 @@ type Input = {
   tracked?: boolean;
   inventoryPolicy?: 'CONTINUE' | 'DENY';
   harmonizedSystemCode?: string;
+  fbrUnitOfMeasure?: string;
+  sroScheduleNumber?: string;
+  sroItemSerialNumber?: string;
 };
+
+type Item = Variant['inventoryItem'];
+
+/** FBR's unit and SRO for one variant (CAT-19, ADR-895), each saved as it is chosen or left. */
+function FbrFields({
+  item,
+  title,
+  save,
+}: {
+  item: Item;
+  title: string | null;
+  save: (input: Input) => Promise<{ error: string | null; item: Partial<Item> | null }>;
+}) {
+  const { t } = useLocale();
+  const [unit, setUnit] = useState(item.fbrUnitOfMeasure ?? FBR_DEFAULT_UNIT);
+  const [schedule, setSchedule] = useState(item.sroScheduleNumber ?? '');
+  const [serial, setSerial] = useState(item.sroItemSerialNumber ?? '');
+  const [problem, setProblem] = useState<string | null>(null);
+  const kept = {
+    unit: item.fbrUnitOfMeasure ?? FBR_DEFAULT_UNIT,
+    schedule: item.sroScheduleNumber ?? '',
+    serial: item.sroItemSerialNumber ?? '',
+  };
+  const [saved, setSaved] = useState(kept);
+
+  const change = async (input: Input) => {
+    setProblem(null);
+    const result = await save(input);
+    if (result.error) {
+      setProblem(result.error);
+      return;
+    }
+    const now = {
+      unit: result.item?.fbrUnitOfMeasure ?? FBR_DEFAULT_UNIT,
+      schedule: result.item?.sroScheduleNumber ?? '',
+      serial: result.item?.sroItemSerialNumber ?? '',
+    };
+    setSaved(now);
+    setUnit(now.unit);
+    setSchedule(now.schedule);
+    setSerial(now.serial);
+  };
+  const of = (label: string) => (title ? t('stockRules.fieldOf', { label, title }) : label);
+
+  return (
+    <details className="rounded-control border border-line p-3">
+      <summary className="cursor-pointer font-medium">{of(t('stockRules.fbr'))}</summary>
+      <div className="mt-3 flex flex-col gap-2">
+        <p className="text-secondary">{t('stockRules.fbrHint')}</p>
+        <SelectField
+          label={of(t('stockRules.unit'))}
+          value={unit}
+          options={FBR_UNITS.map((each) => ({ value: each, label: each }))}
+          onChange={(value) => {
+            setUnit(value);
+            void change({ fbrUnitOfMeasure: value === FBR_DEFAULT_UNIT ? '' : value });
+          }}
+        />
+        <TextField
+          label={of(t('stockRules.sroSchedule'))}
+          hint={t('stockRules.sroScheduleHint')}
+          maxLength={50}
+          value={schedule}
+          onChange={(event) => setSchedule(event.target.value)}
+          onBlur={() => {
+            if (schedule.trim() !== saved.schedule) void change({ sroScheduleNumber: schedule });
+          }}
+        />
+        <TextField
+          label={of(t('stockRules.sroSerial'))}
+          maxLength={20}
+          ltr
+          value={serial}
+          onChange={(event) => setSerial(event.target.value)}
+          onBlur={() => {
+            if (serial.trim() !== saved.serial) void change({ sroItemSerialNumber: serial });
+          }}
+        />
+        {problem && <Alert tone="danger">{problem}</Alert>}
+      </div>
+    </details>
+  );
+}
 
 /** An HS code as typed, its dots and spaces aside, as the core keeps it. */
 const hsDigits = (typed: string) => typed.replace(/[\s.]/g, '');
@@ -28,7 +115,7 @@ function VariantRules({ variant, named }: { variant: Variant; named: boolean }) 
   const update = useAdminMutation<
     {
       inventoryItemUpdate: {
-        inventoryItem: { harmonizedSystemCode: string | null } | null;
+        inventoryItem: Partial<Item> | null;
         userErrors: UserError[];
       };
     },
@@ -55,6 +142,17 @@ function VariantRules({ variant, named }: { variant: Variant; named: boolean }) 
       else setHsCode(result.inventoryItem?.harmonizedSystemCode ?? '');
     } catch (failure) {
       setHsProblem(errorText(failure, t));
+    }
+  };
+
+  /** Saves FBR's fields, saying what the core kept or why it refused. */
+  const saveFbr = async (input: Input) => {
+    try {
+      const result = (await update.mutateAsync({ id: item.id, input })).inventoryItemUpdate;
+      const error = result.userErrors[0];
+      return { error: error ? error.message : null, item: result.inventoryItem };
+    } catch (failure) {
+      return { error: errorText(failure, t), item: null };
     }
   };
 
@@ -108,6 +206,7 @@ function VariantRules({ variant, named }: { variant: Variant; named: boolean }) 
         onChange={(event) => setHsCode(event.target.value)}
         onBlur={() => void saveHsCode()}
       />
+      <FbrFields item={item} title={named ? variant.title : null} save={saveFbr} />
     </>
   );
   if (!named) return <div className="flex flex-col gap-2">{fields}</div>;

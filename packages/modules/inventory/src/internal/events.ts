@@ -54,11 +54,22 @@ export interface LocationDeletedPayload {
 /** The aggregate is the variant: an item is the stock side of one variant. */
 export interface InventoryItemUpdatedPayload {
   productId: string;
-  changed: ('tracked' | 'inventoryPolicy' | 'harmonizedSystemCode')[];
+  changed: (
+    | 'tracked'
+    | 'inventoryPolicy'
+    | 'harmonizedSystemCode'
+    | 'fbrUnit'
+    | 'sroScheduleNo'
+    | 'sroItemSerialNo'
+  )[];
   tracked: boolean;
   inventoryPolicy: InventoryPolicyValue;
   /** Its HS code now (ADR-557), null for none; left out where stock recorded started tracking it. */
   harmonizedSystemCode?: string | null;
+  /** FBR's unit and SRO now (ADR-895), where changed. */
+  fbrUnit?: string | null;
+  sroScheduleNo?: string | null;
+  sroItemSerialNo?: string | null;
   version: number;
 }
 

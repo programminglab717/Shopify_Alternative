@@ -184,6 +184,30 @@ export class InventoryItemInput {
       'Blank clears it; null leaves it.',
   })
   harmonizedSystemCode?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The unit of measure FBR's digital invoicing names it in, one of its list, such as " +
+      '"Numbers, pieces, units", "Pair" or "KG" (CAT-19). Blank clears it; null leaves it.',
+  })
+  fbrUnitOfMeasure?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The schedule of the SRO it is sold under at a reduced rate or exempt, up to 50 ' +
+      'characters. Blank clears it; null leaves it.',
+  })
+  sroScheduleNumber?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Its serial number in that SRO's schedule, up to 20 characters; needs the schedule. " +
+      'Blank clears it; null leaves it.',
+  })
+  sroItemSerialNumber?: string | null;
 }
 
 @InputType()

@@ -442,9 +442,20 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       `mutation ($id: ID!) {
          inventoryItemUpdate(
            id: $id
-           input: { inventoryPolicy: CONTINUE, harmonizedSystemCode: "6403.99.00" }
+           input: {
+             inventoryPolicy: CONTINUE
+             harmonizedSystemCode: "6403.99.00"
+             fbrUnitOfMeasure: "Pair"
+           }
          ) {
-           inventoryItem { inventoryPolicy tracked harmonizedSystemCode } userErrors { code }
+           inventoryItem {
+             inventoryPolicy
+             tracked
+             harmonizedSystemCode
+             fbrUnitOfMeasure
+             sroScheduleNumber
+           }
+           userErrors { code }
          }
        }`,
       { id: size9 },
@@ -453,6 +464,8 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       inventoryPolicy: 'CONTINUE',
       tracked: true,
       harmonizedSystemCode: '64039900',
+      fbrUnitOfMeasure: 'Pair',
+      sroScheduleNumber: null,
     });
     const history = await gql(
       tokens.aStockReader,

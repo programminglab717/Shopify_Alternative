@@ -7452,6 +7452,11 @@ type InventoryItem {
   ): InventoryChangeConnection!
 
   """
+  The unit of measure FBR's digital invoicing names it in (CAT-19, ADR-895): FBR's default, "Numbers, pieces, units", unless set.
+  """
+  fbrUnitOfMeasure: String!
+
+  """
   Its harmonized system code, as Shopify's: the tariff code customs and FBR know its goods by, its digits alone; FBR is sent its 8 digits as the item's PCT code (ADR-557).
   """
   harmonizedSystemCode: String
@@ -7468,16 +7473,39 @@ type InventoryItem {
   inventoryLevels: [InventoryLevel!]!
   inventoryPolicy: InventoryPolicy!
 
+  """Its serial number in that SRO's schedule (ADR-895)."""
+  sroItemSerialNumber: String
+
+  """
+  The schedule of the SRO it is sold under, sent to FBR with it (ADR-895).
+  """
+  sroScheduleNumber: String
+
   """Whether sales are checked against stock. Recording stock turns it on."""
   tracked: Boolean!
 }
 
 input InventoryItemInput {
   """
+  The unit of measure FBR's digital invoicing names it in, one of its list, such as "Numbers, pieces, units", "Pair" or "KG" (CAT-19). Blank clears it; null leaves it.
+  """
+  fbrUnitOfMeasure: String
+
+  """
   Its harmonized system code, 6 to 13 digits, dots and spaces as typed: "6204.42.00". Blank clears it; null leaves it.
   """
   harmonizedSystemCode: String
   inventoryPolicy: InventoryPolicy
+
+  """
+  Its serial number in that SRO's schedule, up to 20 characters; needs the schedule. Blank clears it; null leaves it.
+  """
+  sroItemSerialNumber: String
+
+  """
+  The schedule of the SRO it is sold under at a reduced rate or exempt, up to 50 characters. Blank clears it; null leaves it.
+  """
+  sroScheduleNumber: String
   tracked: Boolean
 }
 

@@ -39,7 +39,9 @@ export {
 } from '../internal/inventory.service.js';
 export {
   availableForSale,
+  fbrItemFieldsIn,
   harmonizedSystemCodesIn,
+  type FbrItemFields,
   sellableQuantity,
 } from '../internal/item-store.js';
 // Pre-orders (CAT-14, ADR-403): the day each product on pre-order ships by, for orders' lines and

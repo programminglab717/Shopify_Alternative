@@ -76,6 +76,10 @@ export const items = inventorySchema.table(
       .default('deny'),
     /** Its harmonized system code, 6 to 13 digits (CAT-19, ADR-557); null for none. */
     harmonizedSystemCode: text('harmonized_system_code'),
+    /** FBR's unit of measure for it (ADR-895); null for FBR's default. */
+    fbrUnit: text('fbr_unit'),
+    sroScheduleNo: text('sro_schedule_no'),
+    sroItemSerialNo: text('sro_item_serial_no'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

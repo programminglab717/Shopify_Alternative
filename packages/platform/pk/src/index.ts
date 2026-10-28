@@ -25,6 +25,7 @@ export {
   type PkSeason,
   type PkSeasonKey,
 } from './seasons.js';
+export { FBR_DEFAULT_UNIT, FBR_SRO_LIMITS, FBR_UNITS, isFbrUnit, type FbrUnit } from './fbr.js';
 export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
 export {

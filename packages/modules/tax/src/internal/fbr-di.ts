@@ -34,9 +34,13 @@ const UNNAMED_BUYER = 'Customer';
 /** FBR's unit for goods counted as pieces. */
 const UNIT = 'Numbers, pieces, units';
 
-/** FBR's kinds of sale: goods taxed at the standard rate, or goods not taxed. */
+/**
+ * FBR's kinds of sale: goods taxed at the standard rate, at a reduced rate under an SRO
+ * (ADR-895), or not taxed.
+ */
 const SALE_TYPES = {
   taxed: 'Goods at standard rate (default)',
+  reduced: 'Goods at Reduced Rate',
   untaxed: 'Exempt goods',
 } as const;
 
@@ -178,7 +182,7 @@ export function diInvoiceBody(
         ...(item.pctCode && { hsCode: diHsCodeOf(item.pctCode) }),
         productDescription: item.name,
         rate: diRateOf(item.rate),
-        uoM: UNIT,
+        uoM: item.unit || UNIT,
         quantity: item.quantity,
         totalValues: rupees(item.total),
         valueSalesExcludingST: rupees(item.total - item.tax),
@@ -187,11 +191,16 @@ export function diInvoiceBody(
         salesTaxWithheldAtSource: 0,
         extraTax: '',
         furtherTax: 0,
-        sroScheduleNo: '',
+        sroScheduleNo: item.sroScheduleNo ?? '',
         fedPayable: 0,
         discount: rupees(item.discount),
-        saleType: item.rate === null ? SALE_TYPES.untaxed : SALE_TYPES.taxed,
-        sroItemSerialNo: '',
+        saleType:
+          item.rate === null
+            ? SALE_TYPES.untaxed
+            : item.sroScheduleNo
+              ? SALE_TYPES.reduced
+              : SALE_TYPES.taxed,
+        sroItemSerialNo: item.sroItemSerialNo ?? '',
       })),
     },
     seller,

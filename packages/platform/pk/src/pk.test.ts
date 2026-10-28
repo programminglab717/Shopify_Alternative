@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   CITY_REACH_KM,
+  FBR_DEFAULT_UNIT,
+  FBR_UNITS,
+  isFbrUnit,
   PK_CITIES,
   PK_CITY_AREAS,
   areaSuggestions,
@@ -353,5 +356,17 @@ describe('map points', () => {
     expect(distanceKm(findCity('Hyderabad')!.centre, karachi)).toBeGreaterThan(CITY_REACH_KM);
     // Every listed city's centre is in Pakistan.
     for (const city of PK_CITIES) expect(inPakistan(city.centre), city.id).toBe(true);
+  });
+});
+
+describe("FBR's units of measure (CAT-19, ADR-895)", () => {
+  it('knows its units as written, each once, the default among them', () => {
+    expect(new Set(FBR_UNITS).size).toBe(FBR_UNITS.length);
+    expect(isFbrUnit(FBR_DEFAULT_UNIT)).toBe(true);
+    expect([isFbrUnit('Pair'), isFbrUnit('pair'), isFbrUnit('Pieces')]).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 });

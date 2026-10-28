@@ -3365,6 +3365,15 @@ const en = {
   'stockRules.continueOf': 'Keep selling {title} when out of stock',
   'stockRules.continueHint': 'For what you make to order: its stock goes below zero.',
   'stockRules.hsCode': 'HS code',
+  'stockRules.fieldOf': '{label} of {title}',
+  'stockRules.fbr': "FBR's unit and SRO",
+  'stockRules.fbrHint':
+    "For invoices FBR's digital invoicing is sent. Leave them as they are unless your tax adviser says otherwise.",
+  'stockRules.unit': 'Unit of measure',
+  'stockRules.sroSchedule': 'SRO schedule',
+  'stockRules.sroScheduleHint':
+    'Of a reduced rate or exemption it is sold under, as "6th Schd Table I".',
+  'stockRules.sroSerial': 'Serial number in the SRO',
   'stockRules.hsCodeOf': 'HS code of {title}',
   'stockRules.hsHint':
     'For customs, and the PCT code FBR is told of, like 6204.42.00. It is saved when you leave it.',
@@ -10416,6 +10425,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stockRules.continueOf': 'اسٹاک ختم ہونے پر بھی {title} بیچتے رہیں',
   'stockRules.continueHint': 'جو آپ آرڈر پر بناتے ہیں: اس کا اسٹاک صفر سے نیچے جاتا ہے۔',
   'stockRules.hsCode': 'HS کوڈ',
+  'stockRules.fieldOf': '{title} کا {label}',
+  'stockRules.fbr': 'FBR کی اکائی اور SRO',
+  'stockRules.fbrHint':
+    'FBR کی ڈیجیٹل انوائسنگ کو بھیجے گئے انوائسز کے لیے۔ جب تک ٹیکس مشیر نہ کہے، انہیں ویسے ہی رہنے دیں۔',
+  'stockRules.unit': 'پیمائش کی اکائی',
+  'stockRules.sroSchedule': 'SRO شیڈول',
+  'stockRules.sroScheduleHint': 'کم شرح یا چھوٹ کا، جس کے تحت یہ بکتا ہے، جیسے "6th Schd Table I"۔',
+  'stockRules.sroSerial': 'SRO میں سیریل نمبر',
   'stockRules.hsCodeOf': '{title} کا HS کوڈ',
   'stockRules.hsHint':
     'کسٹمز کے لیے، اور FBR کو بتایا جانے والا PCT کوڈ، جیسے 6204.42.00۔ خانہ چھوڑنے پر یہ محفوظ ہو جاتا ہے۔',

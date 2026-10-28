@@ -10,6 +10,9 @@ interface Item {
   tracked: boolean;
   inventoryPolicy: 'CONTINUE' | 'DENY';
   harmonizedSystemCode?: string | null;
+  fbrUnitOfMeasure?: string;
+  sroScheduleNumber?: string | null;
+  sroItemSerialNumber?: string | null;
 }
 
 const NOT_HS = 'must be an HS code of 6 to 13 digits, as "6204.42.00"';
@@ -116,9 +119,29 @@ function core(role: StaffRole, sizes: boolean) {
           ]),
         );
         const kept = Object.values(items).find((item) => item.id === variables.id);
+        // As the core keeps FBR's fields: blank is none, and a serial needs its schedule.
+        if (kept?.sroItemSerialNumber && !kept.sroScheduleNumber) {
+          return {
+            inventoryItemUpdate: {
+              inventoryItem: null,
+              userErrors: [
+                {
+                  field: ['input', 'sroItemSerialNo'],
+                  code: 'INVALID',
+                  message: "needs the SRO's schedule number too",
+                },
+              ],
+            },
+          };
+        }
         return {
           inventoryItemUpdate: {
-            inventoryItem: { harmonizedSystemCode: kept?.harmonizedSystemCode ?? null },
+            inventoryItem: {
+              harmonizedSystemCode: kept?.harmonizedSystemCode ?? null,
+              fbrUnitOfMeasure: kept?.fbrUnitOfMeasure || 'Numbers, pieces, units',
+              sroScheduleNumber: kept?.sroScheduleNumber?.trim() || null,
+              sroItemSerialNumber: kept?.sroItemSerialNumber?.trim() || null,
+            },
             userErrors: [],
           },
         };
@@ -231,6 +254,34 @@ describe("A product's stock rules", () => {
     renderAdmin('/shop_1/products/prod_1');
     const rules = await screen.findByRole('region', { name: 'Stock rules' });
     expect((within(rules).getByLabelText('HS code') as HTMLInputElement).value).toBe('');
+  });
+
+  it("keeps FBR's unit and SRO of a product, a serial only with its schedule (CAT-19, ADR-895)", async () => {
+    const fake = core('manager', false);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+    const rules = await screen.findByRole('region', { name: 'Stock rules' });
+    fireEvent.click(within(rules).getByText("FBR's unit and SRO"));
+    const unit = within(rules).getByLabelText('Unit of measure') as HTMLSelectElement;
+    expect(unit.value).toBe('Numbers, pieces, units');
+    fireEvent.change(unit, { target: { value: 'Pair' } });
+    const serial = within(rules).getByLabelText('Serial number in the SRO') as HTMLInputElement;
+    fireEvent.change(serial, { target: { value: '151' } });
+    fireEvent.blur(serial);
+    expect(await within(rules).findByText("needs the SRO's schedule number too")).toBeTruthy();
+    const schedule = within(rules).getByLabelText('SRO schedule') as HTMLInputElement;
+    fireEvent.change(schedule, { target: { value: '6th Schd Table I' } });
+    fireEvent.blur(schedule);
+    await waitFor(() => expect(within(rules).queryByText(/schedule number too/)).toBeNull());
+    fireEvent.change(unit, { target: { value: 'Numbers, pieces, units' } });
+    await waitFor(() =>
+      expect(sentOf(fake, 'InventoryItemUpdate')).toEqual([
+        { id: 'item_1', input: { fbrUnitOfMeasure: 'Pair' } },
+        { id: 'item_1', input: { sroItemSerialNumber: '151' } },
+        { id: 'item_1', input: { sroScheduleNumber: '6th Schd Table I' } },
+        { id: 'item_1', input: { fbrUnitOfMeasure: '' } },
+      ]),
+    );
   });
 
   it('is not there for a packer', async () => {

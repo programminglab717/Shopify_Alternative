@@ -1179,6 +1179,9 @@ const PRODUCT = /* GraphQL */ `
         tracked
         inventoryPolicy
         harmonizedSystemCode
+        fbrUnitOfMeasure
+        sroScheduleNumber
+        sroItemSerialNumber
         inventoryLevels {
           available
           location {
@@ -1446,6 +1449,9 @@ export const InventoryItemUpdateMutation = /* GraphQL */ `
         tracked
         inventoryPolicy
         harmonizedSystemCode
+        fbrUnitOfMeasure
+        sroScheduleNumber
+        sroItemSerialNumber
       }
       userErrors {
         ...Problems

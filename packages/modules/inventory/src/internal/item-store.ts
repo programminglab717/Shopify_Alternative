@@ -101,6 +101,50 @@ export async function loadItems(
  * The HS codes of those of `variantIds` that have one (CAT-19, ADR-557), by variant, in the
  * caller's transaction: for the documents and reports that name them.
  */
+/** What FBR is sent of an item beside its name and price (CAT-19, ADR-557, ADR-895). */
+export interface FbrItemFields {
+  /** Its HS code's digits. */
+  hsCode: string | null;
+  /** FBR's unit of measure; null for FBR's default. */
+  unit: string | null;
+  /** The SRO schedule and item serial of a reduced rate or exemption it is sold under. */
+  sroScheduleNo: string | null;
+  sroItemSerialNo: string | null;
+}
+
+/** FBR's fields of those of `variantIds` that have any, for invoices (ADR-895). */
+export async function fbrItemFieldsIn(
+  tx: Tx,
+  shopId: string,
+  variantIds: readonly string[],
+): Promise<Map<string, FbrItemFields>> {
+  if (variantIds.length === 0) return new Map();
+  const { rows } = await tx.execute<{
+    variant_id: string;
+    hs_code: string | null;
+    fbr_unit: string | null;
+    sro_schedule_no: string | null;
+    sro_item_serial_no: string | null;
+  }>(sql`
+    SELECT variant_id, harmonized_system_code AS hs_code, fbr_unit, sro_schedule_no,
+           sro_item_serial_no
+      FROM inventory.items
+     WHERE shop_id = ${shopId}
+       AND num_nonnulls(harmonized_system_code, fbr_unit, sro_schedule_no) > 0
+       AND variant_id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])`);
+  return new Map(
+    rows.map((row) => [
+      row.variant_id,
+      {
+        hsCode: row.hs_code,
+        unit: row.fbr_unit,
+        sroScheduleNo: row.sro_schedule_no,
+        sroItemSerialNo: row.sro_item_serial_no,
+      },
+    ]),
+  );
+}
+
 export async function harmonizedSystemCodesIn(
   tx: Tx,
   shopId: string,

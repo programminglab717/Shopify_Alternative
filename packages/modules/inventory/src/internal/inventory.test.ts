@@ -448,6 +448,64 @@ describe.skipIf(!server)('InventoryService', () => {
     ]);
   });
 
+  it("keeps an item's FBR unit and SRO beside its HS code, for invoices (CAT-19, ADR-895)", async () => {
+    const fields = () => f.inventory.fbrItemFieldsOf(f.a, variants);
+    unwrap(
+      await f.inventory.updateItem(f.a, variants[0]!, {
+        fbrUnit: 'Pair',
+        sroScheduleNo: ' 6th Schd Table I ',
+        sroItemSerialNo: '151',
+      }),
+    );
+    unwrap(await f.inventory.updateItem(f.a, variants[1]!, { harmonizedSystemCode: '62044200' }));
+    expect(await fields()).toEqual(
+      new Map([
+        [
+          variants[0],
+          {
+            hsCode: null,
+            unit: 'Pair',
+            sroScheduleNo: '6th Schd Table I',
+            sroItemSerialNo: '151',
+          },
+        ],
+        [
+          variants[1],
+          { hsCode: '62044200', unit: null, sroScheduleNo: null, sroItemSerialNo: null },
+        ],
+      ]),
+    );
+    expect(errorsOf(await f.inventory.updateItem(f.a, variants[2]!, { fbrUnit: 'pairs' }))).toEqual(
+      [['input.fbrUnit', 'INVALID']],
+    );
+    expect(
+      errorsOf(await f.inventory.updateItem(f.a, variants[2]!, { sroItemSerialNo: '12' })),
+    ).toEqual([['input.sroItemSerialNo', 'INVALID']]);
+    expect(
+      errorsOf(await f.inventory.updateItem(f.a, variants[2]!, { sroScheduleNo: 'x'.repeat(51) })),
+    ).toEqual([['input.sroScheduleNo', 'TOO_LONG']]);
+    // The schedule can't go while its serial stays; blank clears each.
+    expect(
+      errorsOf(await f.inventory.updateItem(f.a, variants[0]!, { sroScheduleNo: '' })),
+    ).toEqual([['input.sroItemSerialNo', 'INVALID']]);
+    unwrap(
+      await f.inventory.updateItem(f.a, variants[0]!, {
+        fbrUnit: '',
+        sroScheduleNo: '',
+        sroItemSerialNo: '',
+      }),
+    );
+    expect([...(await fields()).keys()]).toEqual([variants[1]]);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.aggregate_id === variants[0])
+        .map((event) => [event.payload.changed, event.payload.fbrUnit]),
+    ).toEqual([
+      [['fbrUnit', 'sroScheduleNo', 'sroItemSerialNo'], 'Pair'],
+      [['fbrUnit', 'sroScheduleNo', 'sroItemSerialNo'], null],
+    ]);
+  });
+
   it('updates item settings, recording what changed', async () => {
     const updated = unwrap(
       await f.inventory.updateItem(f.a, variants[0]!, {

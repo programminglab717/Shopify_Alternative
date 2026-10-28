@@ -10,12 +10,15 @@ import {
 import { VariantService } from '@hatti/catalog/public';
 import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, appendEvents } from '@hatti/events';
+import { FBR_SRO_LIMITS, isFbrUnit } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { InventoryEvents, type InventoryItemUpdatedPayload } from './events.js';
 import {
   availableForSale,
+  fbrItemFieldsIn,
   harmonizedSystemCodesIn,
+  type FbrItemFields,
   loadItems,
   sellableQuantity,
   sellsWithoutLimit,
@@ -106,7 +109,16 @@ export interface InventoryItemUpdateInput {
   inventoryPolicy?: InventoryPolicyValue | null;
   /** 6 to 13 digits, dots and spaces as typed (ADR-557); blank clears it, null leaves it. */
   harmonizedSystemCode?: string | null;
+  /** One of FBR's units (ADR-895); blank clears it, null leaves it. */
+  fbrUnit?: string | null;
+  /** An SRO's schedule number and its item's serial; blank clears each, null leaves it. */
+  sroScheduleNo?: string | null;
+  sroItemSerialNo?: string | null;
 }
+
+/** A text field as typed: undefined leaves it, blank clears it, else trimmed. */
+const typedOf = (value: string | null | undefined): string | null | undefined =>
+  value === undefined || value === null ? undefined : value.trim() || null;
 
 /** An HS code as typed, "6204.42.00", as its digits; undefined when it is not one. */
 export function harmonizedSystemCodeOf(typed: string): string | null | undefined {
@@ -259,6 +271,14 @@ export class InventoryService {
     );
   }
 
+  /** FBR's fields of those of `variantIds` that have any (ADR-895); for batch loaders. */
+  fbrItemFieldsOf(
+    tenant: TenantContext,
+    variantIds: readonly string[],
+  ): Promise<Map<string, FbrItemFields>> {
+    return this.db.tenant(tenant.shopId, (tx) => fbrItemFieldsIn(tx, tenant.shopId, variantIds));
+  }
+
   /** The items of those of `variantIds` whose stock was ever recorded; for batch loaders. */
   itemsOf(tenant: TenantContext, variantIds: readonly string[]) {
     if (variantIds.length === 0) return Promise.resolve(new Map<string, InventoryItemRecord>());
@@ -357,6 +377,26 @@ export class InventoryService {
         'must be an HS code of 6 to 13 digits, as "6204.42.00"',
       );
     }
+    const fbrUnit = typedOf(input.fbrUnit);
+    if (fbrUnit && !isFbrUnit(fbrUnit)) {
+      return failOne(['input', 'fbrUnit'], 'INVALID', "must be one of FBR's units of measure");
+    }
+    const sroScheduleNo = typedOf(input.sroScheduleNo);
+    const sroItemSerialNo = typedOf(input.sroItemSerialNo);
+    if ((sroScheduleNo?.length ?? 0) > FBR_SRO_LIMITS.scheduleNo) {
+      return failOne(
+        ['input', 'sroScheduleNo'],
+        'TOO_LONG',
+        `is ${FBR_SRO_LIMITS.scheduleNo} characters at most`,
+      );
+    }
+    if ((sroItemSerialNo?.length ?? 0) > FBR_SRO_LIMITS.itemSerialNo) {
+      return failOne(
+        ['input', 'sroItemSerialNo'],
+        'TOO_LONG',
+        `is ${FBR_SRO_LIMITS.itemSerialNo} characters at most`,
+      );
+    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const products = await this.variants.productIdsOf(tx, tenant.shopId, [variantId]);
       const productId = products.get(variantId);
@@ -371,6 +411,9 @@ export class InventoryService {
         tracked: false,
         inventoryPolicy: 'deny' as const,
         harmonizedSystemCode: null,
+        fbrUnit: null,
+        sroScheduleNo: null,
+        sroItemSerialNo: null,
         version: 0,
       };
       const tracked = input.tracked ?? before.tracked;
@@ -382,6 +425,22 @@ export class InventoryService {
       if (harmonizedSystemCode !== before.harmonizedSystemCode) {
         changed.push('harmonizedSystemCode');
       }
+      const fbr = {
+        fbrUnit: fbrUnit === undefined ? before.fbrUnit : fbrUnit,
+        sroScheduleNo: sroScheduleNo === undefined ? before.sroScheduleNo : sroScheduleNo,
+        sroItemSerialNo: sroItemSerialNo === undefined ? before.sroItemSerialNo : sroItemSerialNo,
+      };
+      // A serial is of a schedule's: none without one.
+      if (fbr.sroItemSerialNo && !fbr.sroScheduleNo) {
+        return failOne(
+          ['input', 'sroItemSerialNo'],
+          'INVALID',
+          "needs the SRO's schedule number too",
+        );
+      }
+      for (const key of ['fbrUnit', 'sroScheduleNo', 'sroItemSerialNo'] as const) {
+        if (fbr[key] !== before[key]) changed.push(key);
+      }
 
       if (changed.length > 0) {
         const [written] = existing
@@ -391,6 +450,7 @@ export class InventoryService {
                 tracked,
                 inventoryPolicy,
                 harmonizedSystemCode,
+                ...fbr,
                 version: sql`${items.version} + 1`,
                 updatedAt: sql`now()`,
               })
@@ -405,6 +465,7 @@ export class InventoryService {
                 tracked,
                 inventoryPolicy,
                 harmonizedSystemCode,
+                ...fbr,
               })
               .returning({ version: items.version });
         await appendEvent<InventoryItemUpdatedPayload>(tx, tenant.shopId, {
@@ -417,6 +478,11 @@ export class InventoryService {
             tracked,
             inventoryPolicy,
             harmonizedSystemCode,
+            ...Object.fromEntries(
+              (['fbrUnit', 'sroScheduleNo', 'sroItemSerialNo'] as const)
+                .filter((key) => changed.includes(key))
+                .map((key) => [key, fbr[key]]),
+            ),
             version: written!.version,
           },
         });

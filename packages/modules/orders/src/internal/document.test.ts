@@ -487,6 +487,13 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
         )
       ).rows;
 
+    // The chappals are sold by the pair, under an SRO (ADR-895).
+    await f.admin.query(
+      `UPDATE inventory.items
+          SET fbr_unit = 'Pair', sro_schedule_no = '6th Schd Table I', sro_item_serial_no = '151'
+        WHERE variant_id = $1`,
+      [size8],
+    );
     const order = await f.order(f.a, [kurta, size8], {
       shippingPrice: '250',
       discount: '500',
@@ -494,6 +501,15 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     });
     unwrap(await print([order.id]));
     const [invoice] = await kept();
+    expect(
+      (invoice!.payload as { items: { uoM: string; sroItemSerialNo: string }[] }).items.map(
+        (item) => [item.uoM, item.sroItemSerialNo],
+      ),
+    ).toEqual([
+      ['Numbers, pieces, units', ''],
+      ['Pair', '151'],
+      ['Numbers, pieces, units', ''],
+    ]);
     expect(invoice).toMatchObject({
       system: 'digital_invoicing',
       kind: 'invoice',
