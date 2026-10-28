@@ -20,6 +20,7 @@ import {
   reportColumnsOf,
   type CustomReportInput as CustomReportValues,
   type CustomReportRecord,
+  type CustomReportResult as CustomReportRunResult,
   type ReportBreakdown,
   type ReportColumnKind,
   type ReportPeriod,
@@ -55,6 +56,41 @@ function overOf(args: CustomReportRunArgs): { placedFrom: Date; placedBefore: Da
     throw badUserInput('Give placedFrom and placedBefore together, or neither');
   }
   return { placedFrom: args.placedFrom, placedBefore: args.placedBefore };
+}
+
+/** What a report shows, as the API gives it: amounts in major units, products by public ID. */
+export function toReportResult(
+  result: CustomReportRunResult,
+  breakdown: ReportBreakdown,
+  currency: CurrencyCode,
+): CustomReportResult {
+  const { columns, rows, totals, placedFrom, placedBefore } = result;
+  const text = (values: ReportValue[]) =>
+    values.map((value, index) => valueText(value, columns[index]!.kind, currency));
+  return Object.assign(new CustomReportResult(), {
+    placedFrom,
+    placedBefore,
+    columns: columns.map((column) =>
+      Object.assign(new CustomReportColumn(), {
+        ...column,
+        kind: column.kind.toUpperCase() as CustomReportColumnKind,
+        trueProfit: Boolean(reportColumnsOf(breakdown)[column.key as keyof object]?.trueProfit),
+      }),
+    ),
+    rows: rows.map((row) =>
+      Object.assign(new CustomReportRow(), {
+        key:
+          breakdown === 'product' && row.key
+            ? toPublicId('product', row.key)
+            : breakdown === 'source' && row.key
+              ? row.key.toUpperCase()
+              : row.key,
+        label: row.label,
+        values: text(row.values),
+      }),
+    ),
+    totals: totals && text(totals),
+  });
 }
 
 /**
@@ -133,35 +169,7 @@ export class CustomReportResolver {
       over,
     );
     if (!result.ok) throw badUserInput(result.errors[0]!.message);
-    const { columns, rows, totals, placedFrom, placedBefore } = result.value;
-    const text = (values: ReportValue[]) =>
-      values.map((value, index) => valueText(value, columns[index]!.kind, tenant.currency));
-    return Object.assign(new CustomReportResult(), {
-      placedFrom,
-      placedBefore,
-      columns: columns.map((column) =>
-        Object.assign(new CustomReportColumn(), {
-          ...column,
-          kind: column.kind.toUpperCase() as CustomReportColumnKind,
-          trueProfit: Boolean(
-            reportColumnsOf(report.breakdown)[column.key as keyof object]?.trueProfit,
-          ),
-        }),
-      ),
-      rows: rows.map((row) =>
-        Object.assign(new CustomReportRow(), {
-          key:
-            report.breakdown === 'product' && row.key
-              ? toPublicId('product', row.key)
-              : report.breakdown === 'source' && row.key
-                ? row.key.toUpperCase()
-                : row.key,
-          label: row.label,
-          values: text(row.values),
-        }),
-      ),
-      totals: totals && text(totals),
-    });
+    return toReportResult(result.value, report.breakdown, tenant.currency);
   }
 
   @Mutation(() => CustomReportPayload, {

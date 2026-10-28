@@ -5809,3 +5809,20 @@ export interface ShopGlanceData {
     today: { sales: { count: number; total: { amount: string; currencyCode: string } } };
   };
 }
+
+/** Asking of the shop's numbers (ADR-844). */
+export interface ReportQuestionsData {
+  reportQuestions: { available: boolean; usedToday: number; limitPerDay: number };
+}
+
+export interface ReportQuestionAskData {
+  reportQuestionAsk: {
+    answer: {
+      breakdown: string;
+      columns: string[];
+      period: string;
+      report: CustomReportResultValue;
+    } | null;
+    userErrors: UserError[];
+  };
+}

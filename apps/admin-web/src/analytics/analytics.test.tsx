@@ -82,6 +82,8 @@ const NO_VISITS: Record<string, unknown> = {
     },
   },
   InventoryReport: { inventoryReport: NO_STOCK },
+  // Hatti's AI answering questions of the numbers (ADR-844): not set up.
+  ReportQuestions: { reportQuestions: { available: false, usedToday: 0, limitPerDay: 50 } },
   StorefrontLiveView: { storefrontLiveView: { visitorsNow: 0, today: none } },
   StorefrontSessions: {
     storefrontSessions: { totals: none, periods: [] },
@@ -526,6 +528,68 @@ describe('Analytics in the admin', () => {
     await screen.findByText('50 on hand now');
     expect(screen.queryByText('At cost')).toBeNull();
     expect(screen.queryByText('Rs 45,000')).toBeNull();
+  });
+
+  it('answers a question of the numbers with the report Hatti ran, and says why it can’t (ADR-844)', async () => {
+    const core = fakeCore('owner', (operation, variables) => {
+      if (operation === 'ReportQuestions') {
+        return { reportQuestions: { available: true, usedToday: 0, limitPerDay: 50 } };
+      }
+      if (operation in NO_VISITS) return NO_VISITS[operation];
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
+      if (operation === 'Sales') throw new Error('not this test');
+      if (operation !== 'ReportQuestionAsk') throw new Error(`unexpected ${operation}`);
+      if (variables.question === 'kal mausam?') {
+        return {
+          reportQuestionAsk: {
+            answer: null,
+            userErrors: [
+              { field: ['question'], code: 'INVALID', message: 'Ye numbers ka sawal nahi' },
+            ],
+          },
+        };
+      }
+      return {
+        reportQuestionAsk: {
+          answer: {
+            breakdown: 'DAY',
+            columns: ['orders', 'total_sales'],
+            period: 'LAST_7_DAYS',
+            report: {
+              placedFrom: '2026-10-19T19:00:00Z',
+              placedBefore: '2026-10-26T19:00:00Z',
+              columns: [
+                { key: 'orders', title: 'Orders', kind: 'NUMBER' },
+                { key: 'total_sales', title: 'Total sales', kind: 'AMOUNT' },
+              ],
+              rows: [{ key: null, label: '2026-10-20', values: ['3', '9000.00'] }],
+              totals: ['3', '9000.00'],
+            },
+          },
+          userErrors: [],
+        },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/analytics');
+
+    fireEvent.change(await screen.findByLabelText('Your question'), {
+      target: { value: ' Pichle hafte kitni sale hui? ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    expect(await screen.findByText('Read as: Each day, Last 7 days')).toBeTruthy();
+    // The day's row, and the period's total.
+    expect(screen.getAllByRole('cell', { name: 'Rs 9,000' })).toHaveLength(2);
+    expect(
+      core.sent
+        .filter((each) => each.operation === 'ReportQuestionAsk')
+        .map((each) => each.variables),
+    ).toEqual([{ question: 'Pichle hafte kitni sale hui?' }]);
+
+    fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'kal mausam?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    expect(await screen.findByText('Ye numbers ka sawal nahi')).toBeTruthy();
+    expect(screen.queryByText('Read as: Each day, Last 7 days')).toBeNull();
   });
 
   it('works out whole days in the shop’s time zone and the change from before', () => {

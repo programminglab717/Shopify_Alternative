@@ -12062,3 +12062,45 @@ export const ShopGlanceQuery = /* GraphQL */ `
     }
   }
 `;
+
+/** Asking of the shop's numbers (ANL-08, ADR-844): whether the shop may, and an answer. */
+export const ReportQuestionsQuery = /* GraphQL */ `
+  query ReportQuestions {
+    reportQuestions {
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
+export const ReportQuestionAskMutation = /* GraphQL */ `
+  mutation ReportQuestionAsk($question: String!) {
+    reportQuestionAsk(question: $question) {
+      answer {
+        breakdown
+        columns
+        period
+        report {
+          placedFrom
+          placedBefore
+          columns {
+            key
+            title
+            kind
+          }
+          rows {
+            key
+            label
+            values
+          }
+          totals
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

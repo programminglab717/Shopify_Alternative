@@ -33,6 +33,8 @@ import { OrderDocumentResolver } from './graphql/document.resolver.js';
 import { OrderLinkResolver } from './graphql/order-link.resolver.js';
 import { DraftOrderResolver } from './graphql/draft-order.resolver.js';
 import { CustomReportResolver } from './graphql/custom-report.resolver.js';
+import { ReportQuestionResolver } from './graphql/report-question.resolver.js';
+import { ReportQuestionService } from './report-questions.js';
 import { ExportScheduleResolver } from './graphql/export-schedule.resolver.js';
 import { OrderExportResolver } from './graphql/export.resolver.js';
 import { FulfillmentResolver } from './graphql/fulfillment.resolver.js';
@@ -128,6 +130,8 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderDocumentResolver,
     OrderExportResolver,
     CustomReportResolver,
+    ReportQuestionService,
+    ReportQuestionResolver,
     ExportScheduleResolver,
     RefundResolver,
     DraftOrderResolver,

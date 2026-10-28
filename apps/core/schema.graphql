@@ -1565,6 +1565,43 @@ enum BroadcastStatus {
 }
 
 """
+All of one of the shop's lists at once (DEV-10, ADR-843), as Shopify's bulk operations: its nodes in a JSONL file, a line each.
+"""
+type BulkOperation {
+  completedAt: DateTime
+  createdAt: DateTime!
+
+  """
+  Why it failed: the code of the query’s first error, TOO_LARGE past a million nodes or 500 MB, or TIMEOUT for one that stopped running.
+  """
+  errorCode: String
+
+  """The file's bytes, once written."""
+  fileSize: Int
+  id: ID!
+
+  """The nodes written so far."""
+  objectCount: Int!
+  query: String!
+  status: BulkOperationStatus!
+
+  """Where the file is, for a week: a line of JSON for each node."""
+  url: String
+}
+
+type BulkOperationPayload {
+  bulkOperation: BulkOperation
+  userErrors: [UserError!]!
+}
+
+enum BulkOperationStatus {
+  CANCELED
+  COMPLETED
+  FAILED
+  RUNNING
+}
+
+"""
 The hours in which the Confirmation Desk calls customers, in the shop's time zone, as clocks: "10:00" to "21:00".
 """
 type CallingHours {
@@ -9230,6 +9267,14 @@ type Mutation {
   """
   broadcastCreate(input: BroadcastInput!): BroadcastPayload!
 
+  """Stops a running bulk operation."""
+  bulkOperationCancel(id: ID!): BulkOperationPayload!
+
+  """
+  Runs a query for all of one list in the background, as the caller, a page at a time, writing each node to a JSONL file: one list at its top, with its nodes or edges, and without first, last, after or before. The scopes it needs are the list’s own. Its pages cost nothing of the query budget; one runs at a time for a caller.
+  """
+  bulkOperationRunQuery(query: String!): BulkOperationPayload!
+
   """
   Changes the shop's rules for cash on delivery, for checkouts from now on. Those not given stay as they are.
   """
@@ -10613,6 +10658,11 @@ type Mutation {
 
   """Turns the shop's referral programme on or off, or changes its credit."""
   referralProgramUpdate(input: ReferralProgramInput!): ReferralProgramUpdatePayload!
+
+  """
+  Answers a question of the shop's numbers, such as "How much did I sell last week?" or "Is mahine sab se zyada kya bika?", with the report that answers it. The AI sees the question alone, never the numbers. 50 a day; each answer spends an AI credit.
+  """
+  reportQuestionAsk(question: String!): ReportQuestionPayload!
 
   """
   Cancels a return still on its way back, as when its customer keeps the items after all.
@@ -15622,6 +15672,9 @@ type Query {
   """The couriers shops book parcels with here."""
   couriers: [Courier!]!
 
+  """The caller's latest bulk operation: running, or how it ended."""
+  currentBulkOperation: BulkOperation
+
   """The shop's custom apps, the latest first (DEV-04, ADR-395)."""
   customApps: [CustomApp!]!
   customReport(id: ID!): CustomReport
@@ -16348,6 +16401,9 @@ type Query {
   """The referrals the shop's codes brought, latest first."""
   referrals(first: Int! = 50): [Referral!]!
 
+  """Whether the shop may ask, and how many it has."""
+  reportQuestions: ReportQuestions!
+
   """
   Returns shoppers asked for from their delivered orders' pages, the oldest first: those waiting (REQUESTED) are for staff to approve or decline.
   """
@@ -16879,6 +16935,29 @@ type RefundReceipt {
   Where it is shown, for an hour from when it was asked for, named for its order and the refund's place among its refunds: "Refund receipt #1023-1.jpg".
   """
   url: String!
+}
+
+"""
+The report that answers a question, with what the question was taken to ask: its rows, columns and period, as a custom report saves them.
+"""
+type ReportAnswer {
+  breakdown: CustomReportBreakdown!
+  columns: [String!]!
+  period: CustomReportPeriod!
+  report: CustomReportResult!
+}
+
+type ReportQuestionPayload {
+  answer: ReportAnswer
+  userErrors: [UserError!]!
+}
+
+"""Asking questions of the shop’s numbers (ANL-08, ADR-844)."""
+type ReportQuestions {
+  """Whether Hatti answers: false until its AI is set up."""
+  available: Boolean!
+  limitPerDay: Int!
+  usedToday: Int!
 }
 
 """

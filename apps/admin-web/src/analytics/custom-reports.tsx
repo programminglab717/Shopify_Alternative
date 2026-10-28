@@ -294,7 +294,7 @@ export function ReportsPage() {
 }
 
 /** What a report shows: a row each, the period's total last for one of sales. */
-function ReportTable({ result }: { result: CustomReportResultValue }) {
+export function ReportTable({ result }: { result: CustomReportResultValue }) {
   const { t } = useLocale();
   if (result.rows.length === 0) return <p className="text-secondary">{t('analytics.noSales')}</p>;
   return (

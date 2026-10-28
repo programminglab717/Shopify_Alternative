@@ -1,3 +1,4 @@
+import { AskNumbers } from './ask';
 import { Link } from '@tanstack/react-router';
 import { Download, Gauge, Table2 } from 'lucide-react';
 import { useState } from 'react';
@@ -193,6 +194,7 @@ export function AnalyticsPage() {
         {t('analytics.title')}
       </h1>
       <LiveView />
+      <AskNumbers />
       <PeriodTabs days={days} onChange={setDays} />
       {query.isPending ? (
         <Loading label={t('state.loading')} />
