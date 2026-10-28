@@ -17,7 +17,7 @@ import {
   type ConversationAssignedPayload,
 } from './events.js';
 import type { Page, StatusUpdate } from './messages.service.js';
-import { WHATSAPP_CLOUD, WhatsAppCloudProvider } from './providers.js';
+import { WHATSAPP_CLOUD, WhatsAppCloudProvider, type MediaResult } from './providers.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import type { InboundMessage } from './whatsapp-webhook.js';
 
@@ -55,6 +55,8 @@ export interface ConversationMessageRecord {
   error: string | null;
   /** A reply the AI wrote for the shop (MSG-07, ADR-849). */
   byAi: boolean;
+  /** What a voice note was heard to say (MSG-11, ADR-871); null for any other message. */
+  transcript: string | null;
 }
 
 /**
@@ -148,6 +150,7 @@ type ConversationRow = {
   message_status: ReplyStatusValue | null;
   message_error: string | null;
   message_by_ai: boolean | null;
+  message_transcript: string | null;
 };
 
 type MessageRow = {
@@ -159,6 +162,7 @@ type MessageRow = {
   status: ReplyStatusValue | null;
   error: string | null;
   by_ai: boolean;
+  transcript: string | null;
 };
 
 /** What WhatsApp's statuses may move a reply on from: never back, and failed only undelivered. */
@@ -200,6 +204,59 @@ export async function claimCartIn(
     : null;
 }
 
+/** A voice note claimed to be heard (ADR-871): where it came from, and its audio's ID. */
+export interface ClaimedVoiceNote {
+  conversationId: string;
+  customerPhone: string;
+  /** The shop's own number it came to; null for Hatti's shared one. */
+  viaPhoneNumberId: string | null;
+  mediaId: string;
+}
+
+/**
+ * The voice note in the inbound WhatsApp message `messageId` (MSG-11, ADR-871), claimed once to
+ * be heard: null for a message that holds none, or one claimed already.
+ */
+export async function claimVoiceNoteIn(
+  tx: Tx,
+  shopId: string,
+  messageId: string,
+): Promise<ClaimedVoiceNote | null> {
+  const { rows } = await tx.execute<{
+    conversation_id: string;
+    customer_phone: string;
+    via_phone_number_id: string | null;
+    media_id: string;
+  }>(sql`
+    UPDATE messaging.conversation_messages m SET voice_claimed_at = now()
+      FROM messaging.conversations c
+     WHERE m.shop_id = ${shopId} AND m.id = ${messageId} AND m.direction = 'inbound'
+       AND m.media_kind = 'audio' AND m.media_id IS NOT NULL AND m.voice_claimed_at IS NULL
+       AND c.shop_id = m.shop_id AND c.id = m.conversation_id AND c.channel = 'whatsapp'
+    RETURNING m.conversation_id, c.customer_phone, c.via_phone_number_id, m.media_id`);
+  const row = rows[0];
+  return row
+    ? {
+        conversationId: row.conversation_id,
+        customerPhone: row.customer_phone,
+        viaPhoneNumberId: row.via_phone_number_id,
+        mediaId: row.media_id,
+      }
+    : null;
+}
+
+/** Keeps what the voice note `messageId` was heard to say, for the shop's staff to read. */
+export async function keepTranscriptIn(
+  tx: Tx,
+  shopId: string,
+  messageId: string,
+  transcript: string,
+): Promise<void> {
+  await tx.execute(sql`
+    UPDATE messaging.conversation_messages SET transcript = ${transcript.slice(0, 4000)}
+     WHERE shop_id = ${shopId} AND id = ${messageId}`);
+}
+
 @Injectable()
 export class ConversationsService {
   constructor(
@@ -238,10 +295,10 @@ export class ConversationsService {
       const conversationId = rows[0]!.id;
       const kept = await tx.execute<{ id: string }>(sql`
         INSERT INTO messaging.conversation_messages
-               (shop_id, conversation_id, direction, body, media_kind, provider_message_id, at,
-                cart)
+               (shop_id, conversation_id, direction, body, media_kind, media_id,
+                provider_message_id, at, cart)
         VALUES (${shopId}, ${conversationId}, 'inbound', ${message.text}, ${message.mediaKind},
-                ${message.id}, ${at},
+                ${message.mediaId ?? null}, ${message.id}, ${at},
                 ${message.cart ? JSON.stringify(message.cart) : null}::jsonb)
             ON CONFLICT (shop_id, provider_message_id) WHERE provider_message_id IS NOT NULL
             DO NOTHING
@@ -339,7 +396,7 @@ export class ConversationsService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<MessageRow>(sql`
         SELECT m.id, m.direction, m.body, m.media_kind, m.at, m.status, m.error,
-               m.actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai
+               m.actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai, m.transcript
           FROM messaging.conversation_messages m
          WHERE m.shop_id = ${tenant.shopId} AND m.conversation_id = ${conversationId}
            ${
@@ -578,7 +635,7 @@ export class ConversationsService {
           VALUES (${tenant.shopId}, ${id}, 'outbound', ${text}, ${providerMessageId}, ${at},
                   'sent', ${actor.actorKind}, ${actor.actorId})
           RETURNING id, direction, body, media_kind, at, status, error,
-                    actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai`);
+                    actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai, transcript`);
         const message = rows[0]!;
         // The customer waited for this answer: how long, and who gave it (ADR-763). The AI's
         // answers are not staff's, and leave what staff have to read as it was.
@@ -649,6 +706,21 @@ export class ConversationsService {
    * The number a reply goes from: the shop's own, where the customer last wrote to it and it is
    * still connected; Hatti's shared number where they wrote to that. None otherwise.
    */
+  /**
+   * The media `mediaId` of a message that came to the number `viaPhoneNumberId` (the shop's own)
+   * or to Hatti's shared one, fetched with that number's token (ADR-871).
+   */
+  async mediaOf(
+    shopId: string,
+    viaPhoneNumberId: string | null,
+    mediaId: string,
+    maxBytes: number,
+  ): Promise<MediaResult> {
+    const provider = await this.#replyingNumber(shopId, viaPhoneNumberId);
+    if (!provider) return { ok: false, tooLarge: false, error: 'The number is not connected' };
+    return provider.media(mediaId, maxBytes);
+  }
+
   async #replyingNumber(
     shopId: string,
     viaPhoneNumberId: string | null,
@@ -754,11 +826,12 @@ function conversationSelect(shopId: string) {
            ${ANSWER_BY} AS answer_by,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
            m.id AS message_id, m.direction, m.body, m.media_kind, m.at,
-           m.status AS message_status, m.error AS message_error, m.by_ai AS message_by_ai
+           m.status AS message_status, m.error AS message_error, m.by_ai AS message_by_ai,
+           m.transcript AS message_transcript
       FROM messaging.conversations c
       LEFT JOIN LATERAL (
         SELECT l.id, l.direction, l.body, l.media_kind, l.at, l.status, l.error,
-               l.actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai
+               l.actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai, l.transcript
           FROM messaging.conversation_messages l
          WHERE l.shop_id = c.shop_id AND l.conversation_id = c.id
          ORDER BY l.at DESC, l.id DESC LIMIT 1) m ON true
@@ -802,6 +875,7 @@ function toConversation(row: ConversationRow): ConversationRecord {
             status: row.message_status,
             error: row.message_error,
             by_ai: row.message_by_ai ?? false,
+            transcript: row.message_transcript,
           })
         : null,
     lastMessageAtExactly: row.last_message_at_exactly,
@@ -818,5 +892,6 @@ function toMessage(row: MessageRow): ConversationMessageRecord {
     status: row.status,
     error: row.error,
     byAi: row.by_ai,
+    transcript: row.transcript ?? null,
   };
 }

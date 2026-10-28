@@ -1249,6 +1249,13 @@ describe("WhatsApp's webhook", () => {
                   type: 'image',
                   image: { id: 'media-1', mime_type: 'image/jpeg' },
                 },
+                {
+                  from: '923004445556',
+                  id: 'wamid.voice',
+                  timestamp: '1790940360',
+                  type: 'audio',
+                  audio: { id: '1234567890', mime_type: 'audio/ogg; codecs=opus', voice: true },
+                },
                 { from: '+92 300', type: 'text', text: { body: 'stop' } },
               ],
             },
@@ -1307,7 +1314,7 @@ describe("WhatsApp's webhook", () => {
           to: '106540352242922',
           mediaKind: null,
         },
-        // A photo: what it is, its words none.
+        // A photo: what it is, its words none, and its media's ID to fetch it by (ADR-871).
         {
           from: '+923004445556',
           text: null,
@@ -1317,6 +1324,19 @@ describe("WhatsApp's webhook", () => {
           id: 'wamid.photo',
           to: '106540352242922',
           mediaKind: 'image',
+          mediaId: 'media-1',
+        },
+        // A voice note, likewise.
+        {
+          from: '+923004445556',
+          text: null,
+          replyTo: null,
+          payload: null,
+          at: new Date(1790940360_000),
+          id: 'wamid.voice',
+          to: '106540352242922',
+          mediaKind: 'audio',
+          mediaId: '1234567890',
         },
       ],
       templates: [],

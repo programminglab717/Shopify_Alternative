@@ -44,6 +44,8 @@ import { WHATSAPP_SIGNUP, WhatsAppAccountsService } from './whatsapp-accounts.se
 import type { WhatsAppSignupSettings } from './whatsapp-business.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 import { VOICE_WEBHOOK, type VoiceWebhookSettings } from './voice-webhook.js';
+import { VOICE_ORDERS_HEARD, VoiceOrderService } from './voice-orders.service.js';
+import { VoiceOrderResolver } from './graphql/voice-order.resolver.js';
 import {
   VoiceWebhookController,
   WHATSAPP_WEBHOOK,
@@ -60,7 +62,8 @@ import { WebPushSender, type VapidKeys } from './web-push.js';
  * replies, the inbox cannot answer customers (ADR-546); without Hatti's support number, nothing
  * written to WhatsApp is taken for Hatti's people, and with it, what is written to it goes to the
  * SUPPORT_INBOX the host binds, if any (ADR-560). Without the voice gateway's secret, its webhook
- * answers 404, and no call's end is heard (ADR-611).
+ * answers 404, and no call's end is heard (ADR-611). Unless the host says it hears voice notes,
+ * shops cannot have theirs read into orders (ADR-871).
  */
 @Module({})
 export class MessagingModule {
@@ -71,6 +74,8 @@ export class MessagingModule {
     replies?: WhatsAppReplySettings | null;
     supportLine?: SupportLineSettings | null;
     voice?: VoiceWebhookSettings | null;
+    /** Whether the host hears voice notes (ADR-871): its speech-to-text server and AI set up. */
+    voiceOrders?: boolean;
   }): DynamicModule {
     return {
       module: MessagingModule,
@@ -92,6 +97,7 @@ export class MessagingModule {
         { provide: WHATSAPP_REPLIES, useValue: options.replies ?? null },
         { provide: SUPPORT_LINE, useValue: options.supportLine ?? null },
         { provide: VOICE_WEBHOOK, useValue: options.voice ?? null },
+        { provide: VOICE_ORDERS_HEARD, useValue: options.voiceOrders ?? false },
         {
           provide: PUSH_SENDER,
           useValue: options.push ? new WebPushSender(options.push) : null,
@@ -123,6 +129,8 @@ export class MessagingModule {
         WebChatResolver,
         SupportAgentService,
         SupportAgentResolver,
+        VoiceOrderService,
+        VoiceOrderResolver,
         SmsSendersService,
         SmsSenderResolver,
         PushService,

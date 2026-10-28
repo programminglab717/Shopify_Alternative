@@ -107,6 +107,15 @@ export class ConversationMessage {
 
   @Field({ description: 'A reply the AI wrote for the shop (MSG-07, ADR-849).' })
   byAi!: boolean;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'What a voice note was heard to say, where the shop takes orders by voice note (MSG-11, ' +
+      'ADR-871): as the speech-to-text server heard it, so it may be wrong. Null for any other ' +
+      'message, and for a voice note not heard.',
+  })
+  transcript!: string | null;
 }
 
 @ObjectType()

@@ -84,6 +84,7 @@ const app = await createApi({
   storefrontUrl: config.STOREFRONT_URL,
   storefrontDnsTarget: config.STOREFRONT_DNS_TARGET,
   hattiPass: config.HATTI_PASS,
+  voiceOrders: Boolean(config.SPEECH_TO_TEXT_URL && config.AI_API_KEY && config.AI_MODEL),
   mapTiles:
     config.MAP_TILES_URL && config.MAP_TILES_ATTRIBUTION
       ? new MapTiles(config.MAP_TILES_URL, config.MAP_TILES_ATTRIBUTION)

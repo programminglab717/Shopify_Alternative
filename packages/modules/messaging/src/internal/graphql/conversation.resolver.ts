@@ -281,5 +281,6 @@ function toMessage(record: ConversationMessageRecord): ConversationMessage {
     status: record.status && (record.status.toUpperCase() as ConversationReplyStatus),
     error: record.error,
     byAi: record.byAi,
+    transcript: record.transcript,
   });
 }

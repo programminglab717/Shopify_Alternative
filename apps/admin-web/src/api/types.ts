@@ -1741,6 +1741,22 @@ export interface SearchRuleValue {
   hiddenProducts: { id: string; title: string }[];
 }
 
+/** Whether the shop takes orders by voice note (ADR-871). */
+export interface VoiceOrdersValue {
+  enabled: boolean;
+  available: boolean;
+  usedToday: number;
+  limitPerDay: number;
+}
+
+export interface VoiceOrdersData {
+  voiceOrders: VoiceOrdersValue;
+}
+
+export interface VoiceOrdersSetData {
+  voiceOrdersSet: VoiceOrdersValue;
+}
+
 /** Whether the shop's search reads shoppers' photos (ADR-870). */
 export interface PhotoSearchValue {
   enabled: boolean;
@@ -5520,6 +5536,8 @@ export interface ConversationMessageValue {
   error: string | null;
   /** A reply the AI wrote for the shop (ADR-849); absent where the query didn't ask. */
   byAi?: boolean;
+  /** What a voice note was heard to say (ADR-871); absent where the query didn't ask. */
+  transcript?: string | null;
 }
 
 /** The AI answering the shop's customers (MSG-07, ADR-849). */

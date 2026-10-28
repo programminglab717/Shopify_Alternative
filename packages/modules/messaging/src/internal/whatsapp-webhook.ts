@@ -22,6 +22,8 @@ export interface InboundMessage {
   to: string | null;
   /** What else it held, as WhatsApp names it: "image", "audio"; null for words and buttons. */
   mediaKind: string | null;
+  /** WhatsApp's ID for what else it held, to fetch it by (ADR-871): a voice note's audio. */
+  mediaId?: string | null;
   /**
    * A cart from the shop's WhatsApp catalogue (CH-02, ADR-856): each item as the catalogue names
    * it, the variant's ID from the catalog feed, and how many; absent for any other message.
@@ -58,6 +60,9 @@ export function signatureValid(
 }
 
 const STATUSES = new Set(['sent', 'delivered', 'read', 'failed']);
+
+/** WhatsApp's kinds of media a message holds, each with the ID it is fetched by. */
+const MEDIA = new Set(['audio', 'image', 'video', 'document', 'sticker']);
 
 /** The statuses and messages in a webhook's body; anything else in it is left out. */
 export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
@@ -113,6 +118,7 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
           field(field(field(message, 'interactive'), 'button_reply'), 'id');
         const type = field(message, 'type');
         const id = field(message, 'id');
+        const mediaId = typeof type === 'string' ? field(field(message, type), 'id') : undefined;
         inbound.push({
           from: `+${from}`,
           text: typeof text === 'string' ? text.slice(0, 4096) : null,
@@ -127,6 +133,9 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
             /^[a-z_]{1,30}$/.test(type)
               ? type
               : null,
+          ...(MEDIA.has(String(type)) &&
+            typeof mediaId === 'string' &&
+            /^[0-9A-Za-z_-]{1,200}$/.test(mediaId) && { mediaId }),
           ...(type === 'order' && { cart: cartOf(field(message, 'order')) }),
         });
       }

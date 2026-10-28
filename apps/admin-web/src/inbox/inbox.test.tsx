@@ -55,7 +55,10 @@ const THREAD = [
   }),
   message('m3', 'OUTBOUND', 'We have it in green and blue', { status: 'READ', byAi: true }),
   message('m4', 'INBOUND', null, { mediaKind: 'image' }),
-  message('m5', 'INBOUND', null, { mediaKind: 'contacts' }),
+  message('m5', 'INBOUND', null, {
+    mediaKind: 'audio',
+    transcript: 'do lawn suit medium bhej dein',
+  }),
   message('m6', 'INBOUND', 'Green please'),
 ];
 
@@ -289,10 +292,13 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
     // and is on their phone; how each reply went.
     expect(await screen.findByText('Green please')).toBeTruthy();
     expect(screen.getByText('Photo')).toBeTruthy();
-    expect(screen.getByText('Attachment')).toBeTruthy();
+    expect(screen.getByText('Voice note')).toBeTruthy();
     expect(
       screen.getAllByText("It is on the customer's phone: Hatti does not keep files."),
     ).toHaveLength(2);
+    // What a voice note was heard as, where the shop takes orders by them (ADR-871).
+    expect(screen.getByText('Heard as')).toBeTruthy();
+    expect(screen.getByText('do lawn suit medium bhej dein')).toBeTruthy();
     expect(screen.getByText('Read')).toBeTruthy();
     expect(screen.queryByText('Salam, is the lawn suit in stock?')).toBeNull();
 

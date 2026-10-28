@@ -77,6 +77,10 @@ export const WHATSAPP_CLOUD = 'whatsapp_cloud';
  */
 export const SES_EMAIL = 'ses';
 
+/** A message's media as WhatsApp gave it, or why it could not be had. */
+export type MediaResult =
+  { ok: true; data: Buffer; mediaType: string } | { ok: false; tooLarge: boolean; error: string };
+
 export interface WhatsAppCloudOptions {
   /** Meta's Graph API: https://graph.facebook.com. */
   baseUrl: string;
@@ -131,6 +135,53 @@ export class WhatsAppCloudProvider implements MessageProvider {
    */
   async sendText(recipient: string, text: string): Promise<SendResult> {
     return this.#post(recipient, { type: 'text', text: { body: text, preview_url: true } });
+  }
+
+  /**
+   * A message's media, fetched by WhatsApp's ID for it (ADR-871): where it is, asked of the Graph
+   * API, then its bytes, both with the number's token; refused past `maxBytes`.
+   */
+  async media(mediaId: string, maxBytes: number): Promise<MediaResult> {
+    const { baseUrl, version, accessToken, timeoutMs } = this.options;
+    const headers = { authorization: `Bearer ${accessToken}` };
+    const signal = () => AbortSignal.timeout(timeoutMs ?? 10_000);
+    try {
+      const found = await fetch(
+        `${baseUrl.replace(/\/+$/, '')}/${version}/${encodeURIComponent(mediaId)}`,
+        { headers, signal: signal() },
+      );
+      const about = (await found.json().catch(() => ({}))) as {
+        url?: unknown;
+        mime_type?: unknown;
+        file_size?: unknown;
+        error?: { code?: number; message?: string };
+      };
+      if (!found.ok || typeof about.url !== 'string' || !about.url.startsWith('https://')) {
+        return {
+          ok: false,
+          tooLarge: false,
+          error: clip(
+            `WhatsApp ${about.error?.code ?? found.status}: ${about.error?.message ?? 'no media'}`,
+          ),
+        };
+      }
+      if (typeof about.file_size === 'number' && about.file_size > maxBytes) {
+        return { ok: false, tooLarge: true, error: `${about.file_size} bytes` };
+      }
+      const file = await fetch(about.url, { headers, signal: signal() });
+      if (!file.ok) return { ok: false, tooLarge: false, error: `WhatsApp ${file.status}` };
+      const data = Buffer.from(await file.arrayBuffer());
+      if (data.length > maxBytes)
+        return { ok: false, tooLarge: true, error: `${data.length} bytes` };
+      return {
+        ok: true,
+        data,
+        mediaType:
+          typeof about.mime_type === 'string' ? about.mime_type : 'application/octet-stream',
+      };
+    } catch (error) {
+      return { ok: false, tooLarge: false, error: `WhatsApp not reached: ${errorText(error)}` };
+    }
   }
 
   async #post(recipient: string, content: Record<string, unknown>): Promise<SendResult> {

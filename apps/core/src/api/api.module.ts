@@ -194,6 +194,8 @@ export interface ApiModuleOptions {
   mapTiles?: MapTiles | null;
   /** Whether checkout offers Hatti Pass (ADR-867); off unless set. */
   hattiPass?: boolean;
+  /** Whether the worker hears voice notes (ADR-871): its speech-to-text server and AI set up. */
+  voiceOrders?: boolean;
   /** Where apps' functions run (ADR-868); a worker of the API's own unless given. */
   functionRunner?: FunctionRunner;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
@@ -398,6 +400,7 @@ export class ApiModule {
           replies: options.whatsAppReplies ?? null,
           supportLine: options.supportLine ?? null,
           voice: options.voice ?? null,
+          voiceOrders: options.voiceOrders ?? false,
         }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
         BillingModule.forRoot({

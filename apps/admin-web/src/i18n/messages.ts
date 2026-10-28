@@ -2745,6 +2745,15 @@ const en = {
   'settings.whatsapp': 'Your WhatsApp number',
   'settings.whatsappHint': "Your shop's own number, which your broadcasts go from",
   'supportAgent.title': 'AI answers',
+  'voiceOrders.title': 'Orders by voice note',
+  'voiceOrders.hint':
+    'Customers send a WhatsApp voice note of what they want, in Urdu, Punjabi or English. Hatti hears it, finds what they asked for, and answers with your checkout holding it.',
+  'voiceOrders.on': 'Take orders by voice note',
+  'voiceOrders.how':
+    'Each voice note heard spends one AI credit. What was heard shows under it in the inbox, for your staff to check; the audio is never kept. What it cannot find is left to your staff.',
+  'voiceOrders.today': '{count} of {limit} voice notes heard in the last day.',
+  'voiceOrders.unavailable': 'Orders by voice note are not available here yet.',
+  'inbox.heard': 'Heard as',
   'supportAgent.hint':
     'The AI answers customers on WhatsApp and in your online store’s chat, from your policies and their own orders, and hands the chat to your team when it should.',
   'supportAgent.on': 'Let the AI answer customers',
@@ -9446,6 +9455,15 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'settings.whatsapp': 'آپ کا واٹس ایپ نمبر',
   'settings.whatsappHint': 'آپ کی دکان کا اپنا نمبر، جس سے آپ کے براڈکاسٹ جاتے ہیں',
   'supportAgent.title': 'AI جوابات',
+  'voiceOrders.title': 'وائس نوٹ سے آرڈر',
+  'voiceOrders.hint':
+    'گاہک واٹس ایپ پر وائس نوٹ بھیجیں کہ انہیں کیا چاہیے، اردو، پنجابی یا انگریزی میں۔ ہٹی اسے سنتی ہے، چیزیں ڈھونڈتی ہے، اور آپ کے چیک آؤٹ کے لنک سے جواب دیتی ہے۔',
+  'voiceOrders.on': 'وائس نوٹ سے آرڈر لیں',
+  'voiceOrders.how':
+    'ہر سنا گیا وائس نوٹ ایک AI کریڈٹ خرچ کرتا ہے۔ جو سنا گیا وہ ان باکس میں اس کے نیچے دکھتا ہے تاکہ آپ کا عملہ دیکھ سکے؛ آواز کبھی رکھی نہیں جاتی۔ جو نہ ملے وہ آپ کے عملے پر چھوڑا جاتا ہے۔',
+  'voiceOrders.today': 'پچھلے ایک دن میں {limit} میں سے {count} وائس نوٹ سنے گئے۔',
+  'voiceOrders.unavailable': 'وائس نوٹ سے آرڈر یہاں ابھی دستیاب نہیں۔',
+  'inbox.heard': 'یوں سنا گیا',
   'supportAgent.hint':
     'AI واٹس ایپ اور آپ کے آن لائن اسٹور کی چیٹ میں گاہکوں کو آپ کی پالیسیوں اور ان کے اپنے آرڈرز سے جواب دیتی ہے، اور ضرورت ہو تو چیٹ آپ کی ٹیم کو سونپ دیتی ہے۔',
   'supportAgent.on': 'AI کو گاہکوں کو جواب دینے دیں',

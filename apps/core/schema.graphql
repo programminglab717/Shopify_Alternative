@@ -3337,6 +3337,11 @@ type ConversationMessage {
 
   """How the shop's reply went; null for what the customer wrote."""
   status: ConversationReplyStatus
+
+  """
+  What a voice note was heard to say, where the shop takes orders by voice note (MSG-11, ADR-871): as the speech-to-text server heard it, so it may be wrong. Null for any other message, and for a voice note not heard.
+  """
+  transcript: String
 }
 
 type ConversationMessageConnection {
@@ -11561,6 +11566,11 @@ type Mutation {
   urlRedirectsStraighten: UrlRedirectsStraightenPayload!
 
   """
+  Turns hearing customers’ voice notes on or off. Each voice note read spends one of the shop’s AI credits.
+  """
+  voiceOrdersSet(enabled: Boolean!): VoiceOrders!
+
+  """
   Turns the chat on the shop's online store on or off, or changes its greeting.
   """
   webChatSettingsUpdate(input: WebChatSettingsInput!): WebChatSettingsUpdatePayload!
@@ -17392,6 +17402,9 @@ type Query {
   """
   urlRedirectsExport: UrlRedirectsExport!
 
+  """Whether the shop takes orders by voice note."""
+  voiceOrders: VoiceOrders!
+
   """The chat on the shop's online store."""
   webChatSettings: WebChatSettings!
 
@@ -21369,6 +21382,23 @@ enum VitalRating {
   GOOD
   NEEDS_IMPROVEMENT
   POOR
+}
+
+"""
+Voice-note orders (MSG-11, ADR-871): whether customers' WhatsApp voice notes are heard by Hatti's own speech-to-text server, read by the AI into what they order, and answered with the shop's checkout holding it. Each voice note read is one of the shop's AI credits; staff read what was heard in the inbox.
+"""
+type VoiceOrders {
+  """Whether Hatti hears voice notes here: false until it is set up."""
+  available: Boolean!
+
+  """Whether the shop turned it on."""
+  enabled: Boolean!
+
+  """Voice notes a shop has heard a day at most."""
+  limitPerDay: Int!
+
+  """Voice notes heard in the last day."""
+  usedToday: Int!
 }
 
 """

@@ -9,7 +9,10 @@ export {
 export {
   CONVERSATION_WINDOW_MS,
   claimCartIn,
+  claimVoiceNoteIn,
+  keepTranscriptIn,
   ConversationsService,
+  type ClaimedVoiceNote,
   OVERDUE_SWEEP_LIMIT,
   overdueConversationsIn,
   shopsWithReplyTargetIn,
@@ -60,6 +63,7 @@ export {
   WHATSAPP_CLOUD,
   WhatsAppCloudProvider,
   type MessageChannel,
+  type MediaResult,
   type MessageProvider,
   type OutgoingMessage,
   type PhoneChannel,
@@ -302,3 +306,12 @@ export {
   type SupportAgentOutcome,
   type SupportAgentTask,
 } from '../internal/support-agent.service.js';
+export {
+  VOICE_ORDER_DAY,
+  VoiceOrderService,
+  recordVoiceOrderIn,
+  voiceOrdersOnIn,
+  voiceOrdersSinceIn,
+  type VoiceOrderOutcome,
+  type VoiceOrderSetting,
+} from '../internal/voice-orders.service.js';

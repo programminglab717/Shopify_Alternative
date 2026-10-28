@@ -350,6 +350,18 @@ const aiGateway = {
   AI_BASE_URL: env.httpUrl().optional(),
 };
 
+/**
+ * Hatti's own speech-to-text server (ADR-871), which hears customers' WhatsApp voice notes for the
+ * shops that take orders by them: whisper.cpp's server at its /inference address, or any that
+ * answers as OpenAI's transcriptions do, with a key where it asks for one. Without it, voice notes
+ * wait for staff, unheard.
+ */
+const speechToText = {
+  SPEECH_TO_TEXT_URL: env.httpUrl().optional(),
+  SPEECH_TO_TEXT_KEY: env.secret(8).optional(),
+  SPEECH_TO_TEXT_MODEL: z.string().trim().min(1).max(200).optional(),
+};
+
 const aiPaired = (config: { AI_API_KEY?: string; AI_MODEL?: string }) =>
   (config.AI_API_KEY === undefined) === (config.AI_MODEL === undefined);
 const AI_PAIRED = { path: ['AI_MODEL'], message: 'Set both AI_API_KEY and AI_MODEL, or neither' };
@@ -541,6 +553,7 @@ const apiSchema = z
     SUPPORT_HOURS_UR: z.string().trim().min(1).max(100).optional(),
     ...supportWhatsApp,
     ...aiGateway,
+    ...speechToText,
     /**
      * The map tiles checkout's map to move the address's pin on is drawn from (ADR-719): a
      * provider's raster tiles by a template with {z}, {x} and {y} after its host, such as
@@ -913,6 +926,7 @@ const workerSchema = z
       }),
     ...messageSending,
     ...aiGateway,
+    ...speechToText,
     ...storage,
     ...webPush,
   })

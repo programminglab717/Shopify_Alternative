@@ -110,6 +110,16 @@ function Message({ message, timezone }: { message: ConversationMessageValue; tim
           </span>
         </span>
       )}
+      {message.transcript && (
+        <figure className="flex flex-col gap-0.5">
+          <figcaption className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+            {t('inbox.heard')}
+          </figcaption>
+          <blockquote dir="auto" className="break-words whitespace-pre-wrap italic">
+            {message.transcript}
+          </blockquote>
+        </figure>
+      )}
       {message.body && (
         <p dir="auto" className="break-words whitespace-pre-wrap">
           {message.body}

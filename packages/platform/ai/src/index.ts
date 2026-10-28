@@ -61,3 +61,15 @@ export {
   readPhotoForSearch,
   type PhotoSearchReading,
 } from './photo-search.js';
+export {
+  SPEECH_LIMITS,
+  SpeechToText,
+  type SpeechResult,
+  type SpeechToTextOptions,
+} from './speech.js';
+export {
+  VOICE_ORDER_LIMITS,
+  readVoiceOrder,
+  type VoiceOrderItem,
+  type VoiceOrderReading,
+} from './voice-order.js';

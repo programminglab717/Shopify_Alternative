@@ -3846,6 +3846,30 @@ export const SearchRulesQuery = /* GraphQL */ `
   }
 `;
 
+/** Whether the shop takes orders by WhatsApp voice note (MSG-11, ADR-871). */
+export const VoiceOrdersQuery = /* GraphQL */ `
+  query VoiceOrders {
+    voiceOrders {
+      enabled
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
+/** Turns hearing customers' voice notes on or off (ADR-871). */
+export const VoiceOrdersSetMutation = /* GraphQL */ `
+  mutation VoiceOrdersSet($enabled: Boolean!) {
+    voiceOrdersSet(enabled: $enabled) {
+      enabled
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
 /** Whether the shop's search reads shoppers' photos (SRC-07, ADR-870). */
 export const PhotoSearchQuery = /* GraphQL */ `
   query PhotoSearch {
@@ -11378,6 +11402,7 @@ const CONVERSATION_MESSAGE = /* GraphQL */ `
     status
     error
     byAi
+    transcript
   }
 `;
 

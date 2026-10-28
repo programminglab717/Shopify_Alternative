@@ -78,8 +78,14 @@ function core(role: StaffRole, requests: Request[] = []) {
     updatedAt: null as string | null,
   };
   let agent = { enabled: false, available: true, answeredToday: 0, limitPerDay: 200 };
+  let voice = { enabled: false, available: true, usedToday: 0, limitPerDay: 200 };
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'VoiceOrders':
+        return { voiceOrders: voice };
+      case 'VoiceOrdersSet':
+        voice = { ...voice, enabled: Boolean(variables.enabled), usedToday: 2 };
+        return { voiceOrdersSet: voice };
       case 'SupportAgent':
         return { supportAgent: agent };
       case 'SupportAgentUpdate':
@@ -368,6 +374,24 @@ describe('Customer messages', () => {
     fireEvent.click(on);
     expect(await within(card).findByText('Answered today: 3 of 200')).toBeTruthy();
     expect(sentOf(fake, 'SupportAgentUpdate')).toEqual([{ enabled: true }]);
+  });
+
+  it('takes orders by voice note, saying what it costs and how many it heard (ADR-871)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const card = await screen.findByRole('region', { name: 'Orders by voice note' });
+    const on = (await within(card).findByLabelText(
+      'Take orders by voice note',
+    )) as HTMLInputElement;
+    expect(on.checked).toBe(false);
+    expect(within(card).getByText(/Each voice note heard spends one AI credit/)).toBeTruthy();
+    fireEvent.click(on);
+    expect(
+      await within(card).findByText('2 of 200 voice notes heard in the last day.'),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'VoiceOrdersSet')).toEqual([{ enabled: true }]);
   });
 
   it('lists the messages sent, by status, with their orders and why one failed', async () => {

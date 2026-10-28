@@ -1,6 +1,6 @@
 import { PublicSite, StorefrontSite, SystemDnsLookup } from '@hatti/api';
 import { HttpWebhookSender, WebhookService, WorkflowService } from '@hatti/apps/public';
-import { AiGateway } from '@hatti/ai';
+import { AiGateway, SpeechToText } from '@hatti/ai';
 import {
   AiCreditsService,
   BillingService,
@@ -115,6 +115,7 @@ import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { PartnerEarnings } from './partner-earnings.js';
 import { WhatsAppCarts } from './whatsapp-carts.js';
+import { VoiceOrders } from './voice-orders.js';
 import { OverdueOrderMessages } from './overdue-order-messages.js';
 import { OverdueConversationPushes, OverdueOrderPushes, PushNotices } from './push-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
@@ -212,6 +213,7 @@ export interface EventConsumers {
   codPrepaid?: CodPrepaidOffers;
   aiReplies?: AiCustomerReplies;
   whatsappCarts?: WhatsAppCarts;
+  voiceOrders?: VoiceOrders;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   partnerEarnings?: PartnerEarnings;
@@ -247,6 +249,7 @@ export function eventHandlers(
     codPrepaid,
     aiReplies,
     whatsappCarts,
+    voiceOrders,
     parcelSteps,
     billing,
     partnerEarnings,
@@ -328,6 +331,13 @@ export function eventHandlers(
     for (const type of WhatsAppCarts.EVENTS) {
       registry.on(type, async (event) => {
         await whatsappCarts.handle(event);
+      });
+    }
+  }
+  if (voiceOrders) {
+    for (const type of VoiceOrders.EVENTS) {
+      registry.on(type, async (event) => {
+        await voiceOrders.handle(event);
       });
     }
   }
@@ -552,6 +562,29 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
             new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
           ),
         }),
+        // Customers' voice notes heard and answered with an order (ADR-871), where the shop
+        // turned it on: by Hatti's own speech-to-text server, then its AI.
+        ...(config.AI_API_KEY &&
+          config.AI_MODEL &&
+          config.SPEECH_TO_TEXT_URL && {
+            voiceOrders: new VoiceOrders(
+              database,
+              new ProductService(database),
+              replies,
+              new SpeechToText({
+                url: config.SPEECH_TO_TEXT_URL,
+                ...(config.SPEECH_TO_TEXT_KEY && { apiKey: config.SPEECH_TO_TEXT_KEY }),
+                ...(config.SPEECH_TO_TEXT_MODEL && { model: config.SPEECH_TO_TEXT_MODEL }),
+              }),
+              new AiGateway({
+                apiKey: config.AI_API_KEY,
+                model: config.AI_MODEL,
+                ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
+              }),
+              new AiCreditsService(database),
+              new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
+            ),
+          }),
         billing: new BillingNotices(database, new MessagesService(database)),
         partnerEarnings: new PartnerEarnings(database),
         push: new PushNotices(database, pushes),

@@ -2,6 +2,7 @@ import { PlanAllowance, failOne, type MutationResult, type TenantContext } from 
 import { Database, toDate, type Tx } from '@hatti/db';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { voiceOrdersOnIn } from './voice-orders.service.js';
 
 // The shop's AI support agent (MSG-07, ADR-849): once the shop turns it on, the AI answers its
 // customers' messages, on WhatsApp and in its web chat, from what the worker gives it of the
@@ -50,6 +51,7 @@ type HistoryRow = {
   actor_kind: string | null;
   at: Date | string;
   cart: boolean;
+  media_kind: string | null;
 };
 
 async function answeredSince(tx: Tx, shopId: string, since: Date): Promise<number> {
@@ -135,7 +137,7 @@ export class SupportAgentService {
          WHERE shop_id = ${shopId} AND conversation_id = ${conversationId}`);
       if (asked[0]?.handed || asked[0]?.answered) return null;
       const { rows } = await tx.execute<HistoryRow>(sql`
-        SELECT id, direction, body, actor_kind, at, cart IS NOT NULL AS cart
+        SELECT id, direction, body, actor_kind, at, cart IS NOT NULL AS cart, media_kind
           FROM messaging.conversation_messages
          WHERE shop_id = ${shopId} AND conversation_id = ${conversationId}
          ORDER BY at DESC, id DESC
@@ -144,6 +146,8 @@ export class SupportAgentService {
       if (!latest || latest.id !== messageId || latest.direction !== 'inbound') return null;
       // A cart from the shop's WhatsApp catalogue is answered with its checkout (ADR-856).
       if (latest.cart) return null;
+      // A voice note, where the shop takes orders by them, is heard and answered so (ADR-871).
+      if (latest.media_kind === 'audio' && (await voiceOrdersOnIn(tx, shopId))) return null;
       // Staff answered in the last day: theirs to go on with.
       if (
         rows.some(
