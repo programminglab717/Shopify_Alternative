@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Bulk operations
+### e5443e2 · Bulk operations
 
 * **Admin API:** `bulkOperationRunQuery` runs one of the shop's lists a page at a time in the
   background as the caller, and writes each node to a JSONL file; `currentBulkOperation` gives
