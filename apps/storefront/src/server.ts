@@ -97,6 +97,7 @@ import {
   type LoginForm,
   type LoginProblem,
 } from './accounts.js';
+import { AGENT_LIMITS, AGENT_PATHS, mcpAnswer, ucpProfile } from './agents.js';
 import { blogFeed, collectionFeed, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
@@ -245,6 +246,8 @@ const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
  * but room for many behind one mobile network's address.
  */
 const PUSH_CHANGES = { name: 'push-changes', limit: 20, windowMs: 60_000 };
+/** Calls of the store's MCP endpoint (ADR-847), an agent's address's, in a minute. */
+const AGENT_CALLS = { name: 'agent-calls', limit: 120, windowMs: 60_000 };
 
 /**
  * Sign-ups an address may make a minute through shops' forms (ADR-189): a shopper signs up once,
@@ -2284,6 +2287,59 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/search', '/ur/search']) app.get(path, search);
+
+  /**
+   * The shop for AI shopping agents (OS-23, ADR-847): its UCP profile, which says where its store
+   * MCP endpoint is and what its tools do; and the endpoint, JSON-RPC 2.0 over POST, whose tools
+   * search and read the shop's products and make carts that its own checkout takes. Nothing while
+   * the shop is behind its password.
+   */
+  app.get(AGENT_PATHS.profile, async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    try {
+      if (await lockOf(request, found)) return await notFound(reply, 'This shop is not open yet.');
+      return await reply
+        .header('cache-control', CRAWLER_CACHE)
+        .header('cache-tag', shopTag(found.shopId))
+        .header('access-control-allow-origin', '*')
+        .type('application/json; charset=utf-8')
+        .send(JSON.stringify(ucpProfile(await originOf(request, found))));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  });
+  // Nothing streams from it: MCP's GET, for events, is not taken.
+  app.get(AGENT_PATHS.mcp, (_request, reply) =>
+    reply.code(405).header('allow', 'POST').header('cache-control', 'no-store').send(),
+  );
+  app.post(AGENT_PATHS.mcp, { bodyLimit: AGENT_LIMITS.body }, async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    if (!isJson(request)) return reply.code(415).send({ message: 'Send JSON-RPC as JSON.' });
+    if (limiter !== null && !(await limiter.hit(AGENT_CALLS, request.ip)).allowed) {
+      return reply.code(429).send({ message: 'Too many calls. Please wait a minute.' });
+    }
+    try {
+      if (await lockOf(request, found)) return await notFound(reply, 'This shop is not open yet.');
+      const shop = await found.store.shop();
+      const answer = await mcpAnswer(request.body, {
+        store: found.store,
+        search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),
+        origin: await originOf(request, found),
+        name: shop.name,
+        currency: 'PKR',
+      });
+      if (!answer) return await reply.code(202).send();
+      return await reply.type('application/json; charset=utf-8').send(JSON.stringify(answer));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply.code(503).send({ message: 'The shop cannot be reached just now.' });
+    }
+  });
 
   /**
    * Predictive search (ADR-046), as Shopify's: the products that could be what a shopper is

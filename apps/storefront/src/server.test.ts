@@ -2746,6 +2746,60 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it('answers AI shopping agents: its UCP profile and its store MCP endpoint (OS-23, ADR-847)', async () => {
+    const app = server();
+    const profile = await app.inject({
+      method: 'GET',
+      url: '/.well-known/ucp',
+      headers: { host: 'localhost' },
+    });
+    expect([profile.statusCode, profile.headers['cache-control']]).toEqual([
+      200,
+      'public, max-age=0, s-maxage=3600',
+    ]);
+    expect(profile.json().ucp.services['dev.ucp.shopping'][0].endpoint).toBe(
+      'http://localhost/api/mcp',
+    );
+    const rpc = (body: unknown, headers: Record<string, string> = {}) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/mcp',
+        headers: { host: 'localhost', 'content-type': 'application/json', ...headers },
+        payload: JSON.stringify(body),
+      });
+    core.found = [lawn.id];
+    const searched = await rpc({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'search_catalog', arguments: { catalog: { query: 'lawn' } } },
+    });
+    expect([searched.statusCode, searched.headers['cache-control']]).toEqual([200, 'no-store']);
+    expect(searched.json().result.structuredContent.products[0].url).toBe(
+      `http://localhost/products/${lawn.handle}`,
+    );
+    expect(core.searches.at(-1)).toMatchObject({ terms: 'lawn' });
+    // A notification has no answer; GET streams nothing; and it takes JSON alone.
+    expect((await rpc({ jsonrpc: '2.0', method: 'notifications/initialized' })).statusCode).toBe(
+      202,
+    );
+    expect(
+      (await app.inject({ method: 'GET', url: '/api/mcp', headers: { host: 'localhost' } }))
+        .statusCode,
+    ).toBe(405);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/mcp',
+          headers: { host: 'localhost', 'content-type': 'text/plain' },
+          payload: '{}',
+        })
+      ).statusCode,
+    ).toBe(415);
+    await app.close();
+  });
+
   it("gives a blog's Atom feed at its address with .atom, kept at the edge as its page is (ADR-209)", async () => {
     const app = server();
     const get = (url: string, host = 'localhost') =>
