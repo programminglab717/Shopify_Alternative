@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Offline-tolerant actions
+
+* **Admin:** confirming, packing, collected, a call's outcome and a comment wait on the phone
+  while it is offline, with the key they were first sent with, and go in order once it is back;
+  those the core refuses stay with why (APP-05, [ADR-840](../architecture/13-decision-log.md#adr-840--the-changes-staff-make-most-on-a-phone-wait-in-the-browser-while-it-is-offline-with-the-idempotency-key-they-were-first-sent-with-and-go-in-order-once-it-is-back-online)). Done in code.
+* **Email campaigns (MKT-03)** wait on who pays for marketing email through SES (OWN-43).
+* 4443 tests (3 new).
+
 ### fb65f87 · Order routing
 
 * **Orders:** each location names the cities and provinces it ships to first, and an order goes

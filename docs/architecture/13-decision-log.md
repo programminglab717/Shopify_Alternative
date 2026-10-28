@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-839 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-840 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -847,6 +847,7 @@
 | 837 | Hatti keeps when a shop last said whether it is on FBR's Active Taxpayers List, asks it to check again after each 1 March's new list, and writes the SMS to 9966 that checks it | Accepted |
 | 838 | Express checkout: a signed-in shopper whose session proved their number places the order in a tap, to their book's default address, paid on delivery, where nothing else is asked of it | Accepted |
 | 839 | Order routing: a location names the cities and provinces it ships to first, and an order goes out from one that has all of it and serves its customer's city, else their province, before the primary | Accepted |
+| 840 | The changes staff make most on a phone wait in the browser while it is offline, with the Idempotency-Key they were first sent with, and go in order once it is back online | Accepted |
 
 ---
 
@@ -27410,3 +27411,37 @@
   * An order still ships from one location: one split among them by itself waits (debt 13).
   * Routing doesn't weigh distance or courier rates. Shops here name their branches' cities,
     which says more.
+
+## ADR-840 · The changes staff make most on a phone wait in the browser while it is offline, with the Idempotency-Key they were first sent with, and go in order once it is back online
+
+* **Context:** APP-05 asks for actions that survive bad networks: queued and synced. Staff
+  confirm and pack orders on phones, often on weak mobile data. The admin already shows what it
+  last saw offline (ADR-295, ADR-514), but a change made then failed with "Hatti could not be
+  reached", and was lost unless done again.
+* **Decision:**
+  * **Only some changes wait:**
+    * confirming an order, or orders at once;
+    * marking orders packed, or collected;
+    * a confirmation call's outcome;
+    * a comment.
+    Each says what happened rather than asks for what should, so it is still right when sent
+    late. Cancelling, refunds, money and settings fail as before.
+  * **One that can't reach the network is kept in the browser** (`hatti.outbox` in local
+    storage), with its operation, variables and the Idempotency-Key it was first sent with. The
+    screen says it is saved on the phone and sent once it is back online.
+  * **The admin sends what waits, in order:**
+    * when the browser comes back online, and every half a minute while any waits;
+    * from one tab at a time, by the Web Locks API where the browser has it, one round at a time
+      in a tab;
+    * each with its own key, so a change the core took before the network failed runs once
+      (ADR-030).
+    Above every page it says how many changes wait.
+  * **A change the core refuses** stays, saying what it was and why, until staff dismiss it.
+    That is a field's `userErrors` or an error that isn't the network's. It is not sent again.
+  * **Signing out forgets what waits:** it was the member's, and the next to sign in on the
+    phone may be someone else.
+* **Consequences:**
+  * The core keeps keys for a day, so a change that waits longer may run twice if its first try
+    reached the core. Confirming or packing twice changes nothing; a comment may be written twice.
+  * What waits is in one browser alone. A change made offline on one phone and differently on
+    another goes in whichever order they reach the core.
