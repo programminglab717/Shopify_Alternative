@@ -8,6 +8,10 @@ import {
   ConsoleAuthController,
   ConsoleAuthService,
   ConsoleGuard,
+  ExpertsService,
+  PartnerAppsService,
+  PartnerThemesService,
+  PartnersService,
   type ConsoleSignInSettings,
 } from '@hatti/identity/public';
 import type { Logger } from '@hatti/logger';
@@ -19,6 +23,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { NestLogger } from '../logging.js';
 import { ConsoleController } from './console.controller.js';
 import { ConsoleOpsController } from './ops.controller.js';
+import { ConsolePartnersController } from './partners.controller.js';
 import { ConsoleRightsController } from './rights.controller.js';
 import { ConsoleSignalsController } from './signals.controller.js';
 import { CONSOLE_DATABASE, ConsoleTrustController } from './trust.controller.js';
@@ -61,6 +66,7 @@ class ConsoleModule {
         ConsoleRightsController,
         ConsoleSignalsController,
         ConsoleOpsController,
+        ConsolePartnersController,
       ],
       providers: [
         {
@@ -78,6 +84,17 @@ class ConsoleModule {
           useValue: new VerificationsService(options.database, options.storage),
         },
         { provide: PublicSite, useValue: new PublicSite(options.publicUrl) },
+        // Partners' work, read and reviewed with the identity login (ADR-880).
+        {
+          provide: PartnerAppsService,
+          useValue: new PartnerAppsService({ db: options.identityDb }),
+        },
+        {
+          provide: PartnerThemesService,
+          useValue: new PartnerThemesService({ db: options.identityDb }),
+        },
+        { provide: ExpertsService, useValue: new ExpertsService({ db: options.identityDb }) },
+        { provide: PartnersService, useValue: new PartnersService({ db: options.identityDb }) },
       ],
     };
   }

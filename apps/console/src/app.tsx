@@ -12,6 +12,7 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { ActionsLogPage } from './actions-log';
+import { PartnersPage, PayoutsPage } from './partners';
 import { ReportsPage } from './reports';
 import { RightsPage } from './rights';
 import { SendersPage, SignalsPage } from './shops';
@@ -71,6 +72,12 @@ function Shell() {
           </Link>
           <Link to="/status" className={link}>
             Status page
+          </Link>
+          <Link to="/partners" className={link}>
+            Partners
+          </Link>
+          <Link to="/payouts" className={link}>
+            Payouts
           </Link>
           <Link to="/log" className={link}>
             Log
@@ -195,6 +202,18 @@ const statusRoute = createRoute({
   component: StatusPage,
 });
 
+const partnersRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/partners',
+  component: PartnersPage,
+});
+
+const payoutsRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/payouts',
+  component: PayoutsPage,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => signedInLayout,
   path: '/log',
@@ -215,6 +234,8 @@ const routeTree = rootRoute.addChildren([
     sendersRoute,
     transfersRoute,
     statusRoute,
+    partnersRoute,
+    payoutsRoute,
     logRoute,
   ]),
 ]);

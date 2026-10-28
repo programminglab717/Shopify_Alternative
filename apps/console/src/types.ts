@@ -189,3 +189,55 @@ export interface Incident {
     postedAt: string;
   }[];
 }
+
+/** A partner's public app (ADR-851). */
+export interface PartnerApp {
+  clientId: string;
+  name: string;
+  partner: string;
+  appUrl: string;
+  redirectUrls: string[];
+  scopes: string[];
+  listed: boolean;
+  createdAt: string;
+}
+
+/** A designer's theme for the theme store (ADR-853). */
+export interface PartnerTheme {
+  id: string;
+  name: string;
+  description: string;
+  designer: string;
+  base: string;
+  /** "Rs 5,000", or null for a free theme. */
+  price: string | null;
+  listed: boolean;
+  preview: { shopId: string; themeId: string };
+  updatedAt: string;
+}
+
+/** A partner's expert profile (ADR-855). */
+export interface ExpertProfile {
+  id: string;
+  businessName: string;
+  website: string | null;
+  headline: string;
+  about: string;
+  services: string[];
+  cities: string[];
+  languages: string[];
+  startingPrice: string | null;
+  certified: boolean;
+  listed: boolean;
+  updatedAt: string;
+}
+
+/** A partner owed their share (ADR-505). */
+export interface PartnerOwed {
+  id: string;
+  businessName: string;
+  email: string;
+  payout: { title: string; iban: string } | null;
+  owed: string;
+  entries: number;
+}
