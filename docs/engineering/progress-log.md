@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Point of sale
+### f18650e · Point of sale
 
 * **Registers:** a shop adds a register for each counter, selling from a location's shelf, and
   opens it each day with the cash in the drawer (POS-01, POS-07, [ADR-872](../architecture/13-decision-log.md#adr-872--point-of-sale-registers-that-sell-from-a-locations-shelf-in-cash-sessions-closed-with-a-z-report-till-sales-kept-apart-from-orders-paid-in-cash-card-transfer-or-wallet-linked-to-a-customer-by-number-rung-up-in-the-admin-offline-too)).
