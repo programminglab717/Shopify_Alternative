@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Buy buttons
+
+* **Products:** an active product's page gives a snippet to paste into a blog, another website
+  or a link page. It shows the product with its photo, price and variants, in English or Urdu,
+  and Buy now opens the shop's checkout holding it (CH-08, [ADR-860](../architecture/13-decision-log.md#adr-860--buy-buttons-a-snippet-puts-a-product-on-any-website-drawn-by-a-script-the-shops-storefront-serves-from-its-public-product-data-buy-now-opening-its-checkout-through-a-cart-permalink)).
+* 4589 tests (6 new).
+
 ### 505d2ca · Expansion stores
 
 * **Settings:** an owner makes another shop they own an expansion store of this one, at a price

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-859 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-860 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -867,6 +867,7 @@
 | 857 | A TikTok catalogue reads the shop's catalog feed, whose address the online store's TikTok tab gives, as Meta's and Google's do | Accepted |
 | 858 | Partners are certified by Hatti's course: six lessons and ten questions in English and Urdu on the partner page, scored by Hatti, eight right for a year's certificate that shops see on experts | Accepted |
 | 859 | Expansion stores: an owner copies a shop's products to another shop they own, its prices at a rate, through the product export and import, and copies again to update them | Accepted |
+| 860 | Buy buttons: a snippet puts a product on any website, drawn by a script the shop's storefront serves from its public product data, Buy now opening its checkout through a cart permalink | Accepted |
 
 ---
 
@@ -28263,3 +28264,43 @@
     and couriers abroad.
   * **Copying product by product through the Admin API:** a second copy of what the import
     already does and checks.
+
+## ADR-860 · Buy buttons: a snippet puts a product on any website, drawn by a script the shop's storefront serves from its public product data, Buy now opening its checkout through a cart permalink
+
+* **Context:**
+  * CH-08 asks for buy buttons and embeds, as Shopify's Buy Button: a product on a blog,
+    another website or a link page, bought from there.
+  * The Storefront API (ADR-848) reads products with a public token, but a token is shown once
+    and kept as its digest, so the admin could not put one into a snippet later. Cart permalinks
+    (ADR-709) already open a shop's checkout holding a variant.
+* **Decision:**
+  * **The script:** each storefront serves `/buy-button.js`, the same for every shop.
+    * It finds the address it was served from, and reads each element marked
+      `data-hatti-buy-button="<handle>"`.
+    * It draws the product in a shadow root of its own, so that the page's styles and its own
+      leave each other alone: photo, title linking to the product's page, price with the
+      compare-at price struck through, a choice of variants, and Buy now.
+    * It speaks English, or Urdu with `data-language="ur"`, right to left.
+    * Words go in as text, never as markup.
+    * Buy now is a link to the shop's checkout holding the chosen variant
+      (`/cart/<variant>:1`), opened in a new tab; a variant sold out says so.
+  * **The product:** `/buy-button/products/<handle>` answers JSON for any site to read
+    (`Access-Control-Allow-Origin: *`): the product's handle, title, address, first photo,
+    and each variant's ID, title, price and whether it can be had.
+    * It is as public as the product's page: nothing for a product the storefront doesn't show,
+      nor while the shop is behind its password.
+    * It is kept at the edge as pages are, and forgotten with them.
+  * **In the admin:** an active product's page gives the snippet, in English or Urdu, to copy.
+* **Consequences:**
+  * A shop sells from a blog, a partner's site or a link page with two lines pasted, and the
+    order is its own, through its checkout.
+  * Not yet:
+    * a cart across products, staying on the other site;
+    * collections as embeds;
+    * a choice of colours and layout, as Shopify's builder offers.
+* **Alternatives:**
+  * **The Storefront API from the snippet:** needs a token in the page, which the admin can't
+    give again, and a cart made through the core for every click. A permalink makes it when the
+    shopper arrives.
+  * **An iframe of the product's page:** heavy, not sized to the page around it, and themed as
+    the store rather than as a button.
