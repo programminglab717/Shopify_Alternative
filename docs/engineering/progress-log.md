@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Developers' tools
+### 46e2014 · Developers' tools
 
 * **Developers:** `@hatti/admin-client` is a TypeScript client for the Admin API. It waits out
   throttles, keeps a mutation's idempotency key across tries, reads connections a page at a time
