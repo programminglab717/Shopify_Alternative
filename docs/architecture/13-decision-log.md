@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-890 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-891 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -898,6 +898,7 @@
 | 888 | Payment terms for wholesale customers: an order paid by transfer within 1 to 120 days ships without waiting for the money, owed until paid and overdue past its date, its terms from the draft or the customer's price list | Accepted |
 | 889 | An age gate: a shop selling what is only for adults asks each visitor to confirm an age from 13 to 25 before its pages show, in the browser, the answer kept a month | Accepted |
 | 890 | The Storefront API serves the shop's menus, pages, blogs, articles and policies, as Shopify's names and shapes them, from its storefront documents | Accepted |
+| 891 | The forecast's seasons include those on the same days each year: the summer lawn launch, the run-up to Independence Day, the winter collection and the wedding season, the moon's season counted on where two meet | Accepted |
 
 ---
 
@@ -29527,3 +29528,31 @@
   * The headless starter can build a whole store, not only its catalog.
   * Still not done (ADR-848): customer accounts, `@inContext` for Urdu, metafields, and
     cost-based limits with persisted queries.
+
+## ADR-891 · The forecast's seasons include those on the same days each year: the summer lawn launch, the run-up to Independence Day, the winter collection and the wedding season, the moon's season counted on where two meet
+
+* **Context:** ADR-863 forecast stock for Ramadan and the run-up to Eid ul Adha. It left the
+  seasons on the same days each year for later. A lawn brand sells most from February to April,
+  a formal-wear shop through the winter weddings, and a flag and badge seller in August.
+* **Decision:**
+  * **`@hatti/pk`'s seasons** add four, with the dates the marketing calendar has them
+    (ADR-484), so the two agree:
+    * the summer lawn launch, 15 February to 30 April;
+    * the run-up to Independence Day, 1 to 14 August;
+    * the winter collection, October;
+    * the wedding season, 1 November to 14 February.
+  * These four do not meet each other. Each knows whether it follows the moon.
+  * **A season's lift** is read as before (ADR-863), from the same season a year before, which
+    for these is 365 days back.
+  * **Where seasons meet,** the one counted on is the moon's: Ramadan in the lawn launch is
+    Ramadan, which shoppers buy for. Otherwise it is the season on today, or the next to begin
+    within 90 days.
+  * **The API and admin:** `StockSeasonKey` gives the four new keys. The stock page names them,
+    and its words for a shop without a year of history fit any season.
+* **Consequences:**
+  * Reorders started in January count on how the shop sold through last year's weddings, and in
+    February on the lawn launch.
+  * Short sales (11.11, White Friday, 12.12) stay promotions on the marketing calendar, not
+    seasons: their days are too few to read a lift from.
+  * Still not done: a forecast by week or a chart of it, and the days a supplier takes to
+    deliver.

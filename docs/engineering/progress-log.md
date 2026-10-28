@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08) next. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); a forecast by week and suppliers' lead times (INV-08) next. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### The forecast's seasons on the same days each year
+
+* **Seasons:** the summer lawn launch, the run-up to Independence Day, the winter collection and
+  the wedding season, beside Ramadan and Eid ul Adha ([ADR-891](../architecture/13-decision-log.md#adr-891--the-forecasts-seasons-include-those-on-the-same-days-each-year-the-summer-lawn-launch-the-run-up-to-independence-day-the-winter-collection-and-the-wedding-season-the-moons-season-counted-on-where-two-meet)).
+* **Where they meet,** the moon's is counted on.
+* 4836 tests (3 new).
 
 ### 5890194 · The Storefront API's menus, pages, blogs and policies
 
