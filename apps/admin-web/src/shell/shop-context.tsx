@@ -1,8 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext } from 'react';
+import { ApiError } from '../api/client';
 import { ShopQuery } from '../api/operations';
 import { useSessionStore } from '../auth/context';
 import type { ShopAccess } from '../auth/session';
+import { QUEUEABLE, QUEUED, enqueue, isUnreachable, operationOf } from '../offline/outbox';
 
 const ShopContext = createContext<ShopAccess | null>(null);
 
@@ -47,9 +49,19 @@ export function useAdminMutation<T, V extends Record<string, unknown>>(document:
   const store = useSessionStore();
   const shop = useShop();
   const queryClient = useQueryClient();
+  const operation = operationOf(document);
   return useMutation({
-    mutationFn: (variables: V) =>
-      store.graphql<T>(shop.id, document, variables, { idempotencyKey: crypto.randomUUID() }),
+    mutationFn: async (variables: V) => {
+      const idempotencyKey = crypto.randomUUID();
+      try {
+        return await store.graphql<T>(shop.id, document, variables, { idempotencyKey });
+      } catch (error) {
+        // Offline, the changes staff make most on a phone wait on it to be sent (ADR-840).
+        if (!operation || !QUEUEABLE.has(operation) || !isUnreachable(error)) throw error;
+        enqueue({ id: idempotencyKey, shopId: shop.id, operation, document, variables });
+        throw new ApiError(0, QUEUED, 'Saved on this phone, to send once it is back online');
+      }
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin', shop.id] }),
   });
 }

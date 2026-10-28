@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeCore, LATER, press, renderAdmin, signedIn } from '../test-support';
 
@@ -151,6 +151,48 @@ describe('The Confirmation Desk', () => {
       expect.arrayContaining(['OrderPhoneReveal', 'OrderConfirm']),
     );
     expect(core.sent.filter((each) => each.operation === 'ConfirmationQueueNext')).toHaveLength(3);
+  });
+
+  it("keeps a call's outcome on the phone while offline, and sends it once it's back (APP-05, ADR-840)", async () => {
+    // The network fails for the call's outcome until it comes back.
+    let offline = true;
+    const keys: string[] = [];
+    vi.stubGlobal('fetch', async (path: string, init?: RequestInit) => {
+      if (String(init?.body ?? '').includes('mutation OrderConfirmationCall(')) {
+        keys.push(new Headers(init!.headers).get('idempotency-key')!);
+        if (offline) throw new TypeError('Failed to fetch');
+      }
+      return core.fetcher(path, init);
+    });
+    renderAdmin('/shop_1/desk');
+    await screen.findByText('2 due');
+    await press('Take the next order');
+    await screen.findByText('How did the call go?');
+    await press('No answer');
+    expect(
+      await screen.findByText('No internet: saved on this phone, and sent once it’s back online.'),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText('1 change saved on this phone, sent once it’s back online'),
+    ).toBeTruthy();
+
+    offline = false;
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByText('1 change saved on this phone, sent once it’s back online'),
+      ).toBeNull(),
+    );
+    // Sent with the key it was first tried with, so that it runs once.
+    expect(new Set(keys).size).toBe(1);
+    expect(
+      core.sent
+        .filter((each) => each.operation === 'OrderConfirmationCall')
+        .map((each) => each.variables),
+    ).toEqual([{ id: 'ord_1', outcome: 'NO_ANSWER', note: null, callBackAt: null }]);
+    expect(window.localStorage.getItem('hatti.outbox')).toBeNull();
   });
 
   it('lists who is on duty, and puts the agent on and off duty for the hours chosen (ADR-654)', async () => {

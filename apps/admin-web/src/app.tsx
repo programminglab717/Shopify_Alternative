@@ -1,3 +1,4 @@
+import { OutboxSender } from './offline/outbox-sender';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
@@ -46,6 +47,7 @@ export function App() {
       <AppNotices />
       <SessionProvider store={session}>
         <QueryClientProvider client={queryClient}>
+          <OutboxSender />
           <RouterProvider router={router} />
         </QueryClientProvider>
       </SessionProvider>

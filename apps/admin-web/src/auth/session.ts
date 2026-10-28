@@ -1,3 +1,4 @@
+import { forgetAll } from '../offline/outbox';
 import { ApiError, authRequest, graphqlRequest, type Fetch } from '../api/client';
 
 // A staff member's session with the core (ADR-020, ADR-265): opaque tokens from `/auth`, kept in
@@ -162,6 +163,8 @@ export class SessionStore {
   async signOut(): Promise<void> {
     const tokens = this.#tokens;
     this.#set(null);
+    // What waited to be sent was this member's, and goes with them (ADR-840).
+    forgetAll();
     if (!tokens) return;
     try {
       await authRequest(this.fetcher, '/auth/sign-out', {

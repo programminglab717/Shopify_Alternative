@@ -1,3 +1,4 @@
+import { OutboxSender } from './offline/outbox-sender';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
@@ -292,6 +293,7 @@ export function renderAdmin(path: string) {
     <LocaleProvider initial="en">
       <SessionProvider store={session}>
         <QueryClientProvider client={queryClient}>
+          <OutboxSender />
           <RouterProvider router={router} />
         </QueryClientProvider>
       </SessionProvider>
