@@ -52,6 +52,17 @@ export {
 export { TranslatedStore, translated, translatedProduct } from './translations.js';
 export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';
 export {
+  SESSION_DIMENSIONS,
+  SESSION_SOURCE_LIMITS,
+  arrivalOf,
+  landingPageOf,
+  sessionOriginOf,
+  sessionSourceOf,
+  type SessionArrival,
+  type SessionDimension,
+  type SessionOrigin,
+} from './sources.js';
+export {
   StorefrontVitals,
   VITALS,
   VITAL_DEVICES,

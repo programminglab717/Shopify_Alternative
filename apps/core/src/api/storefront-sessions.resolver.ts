@@ -7,9 +7,12 @@ import {
 } from '@hatti/api';
 import { Database } from '@hatti/db';
 import {
+  SESSION_ORIGIN_LIMITS,
   SESSION_REPORT_LIMITS,
   SessionDaysService,
+  SessionOriginsService,
   conversionRate,
+  type SessionOriginDimension,
   type SessionCounts,
   type SessionIntervalValue,
 } from '@hatti/online-store/public';
@@ -26,6 +29,7 @@ import {
   ObjectType,
   Query,
   Resolver,
+  registerEnumType,
 } from '@nestjs/graphql';
 import type { Redis } from 'ioredis';
 import { REDIS } from './constants.js';
@@ -110,6 +114,75 @@ export class StorefrontSessionsArgs {
   interval!: SalesInterval;
 }
 
+export enum StorefrontSessionsBy {
+  SOURCE = 'SOURCE',
+  LANDING_PAGE = 'LANDING_PAGE',
+  DEVICE = 'DEVICE',
+}
+
+registerEnumType(StorefrontSessionsBy, {
+  name: 'StorefrontSessionsBy',
+  description: "What the online store's sessions are counted by (ANL-02, ADR-884).",
+  valuesMap: {
+    SOURCE: {
+      description:
+        "Where they came from: a campaign's utm_source, a site by the name merchants know it " +
+        '("google", "instagram", "whatsapp") or its host, or "direct".',
+    },
+    LANDING_PAGE: { description: 'The path of the page each began on: "/collections/eid".' },
+    DEVICE: { description: '"mobile" for phones and tablets, "desktop" for the rest.' },
+  },
+});
+
+@ObjectType({ description: 'Sessions of one source, landing page or device.' })
+export class StorefrontSessionsValue {
+  @Field({ description: 'The source, path or device; "(other)" for those past the most.' })
+  value!: string;
+
+  @Field(() => Int)
+  sessions!: number;
+}
+
+@ObjectType({
+  description:
+    "A period's sessions by where they came from, their landing page or device (ADR-884): each " +
+    'counted once, as it began, by the day as the sessions are.',
+})
+export class StorefrontSessionsByReport {
+  @Field(() => Int, {
+    description:
+      "The period's sessions counted so: those whose first page's script said where they came from.",
+  })
+  total!: number;
+
+  @Field(() => [StorefrontSessionsValue], {
+    description: 'The most sessions first, those past `first` together as "(other)", last.',
+  })
+  values!: StorefrontSessionsValue[];
+}
+
+@ArgsType()
+export class StorefrontSessionsByArgs {
+  @Field(() => GraphQLISODateTime, {
+    description: "Sessions from the day this falls on, in the shop's time zone.",
+  })
+  from!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    description: `Sessions to the day before this falls on; at most ${SESSION_REPORT_LIMITS.days} days after from.`,
+  })
+  before!: Date;
+
+  @Field(() => StorefrontSessionsBy)
+  by!: StorefrontSessionsBy;
+
+  @Field(() => Int, {
+    defaultValue: 20,
+    description: `Values given by name, 1 to ${SESSION_ORIGIN_LIMITS.first}.`,
+  })
+  first!: number;
+}
+
 const toSessions = (counts: SessionCounts): StorefrontSessions =>
   Object.assign(new StorefrontSessions(), { ...counts, conversionRate: conversionRate(counts) });
 
@@ -117,6 +190,7 @@ const toSessions = (counts: SessionCounts): StorefrontSessions =>
 export class StorefrontSessionsResolver {
   constructor(
     private readonly days: SessionDaysService,
+    private readonly origins: SessionOriginsService,
     private readonly db: Database,
     @Inject(REDIS) private readonly redis: Redis | null,
   ) {}
@@ -146,6 +220,30 @@ export class StorefrontSessionsResolver {
           sessions: toSessions(period),
         }),
       ),
+    });
+  }
+
+  @Query(() => StorefrontSessionsByReport, {
+    description:
+      "The online store's sessions over a period by where they came from, the page they landed " +
+      'on or their device (ANL-02, ADR-884), as Shopify reports them. Kept from the storefronts ' +
+      'every minute.',
+  })
+  @RequireScopes('read_orders')
+  async storefrontSessionsBy(
+    @CurrentTenant() tenant: TenantContext,
+    @Args() args: StorefrontSessionsByArgs,
+  ): Promise<StorefrontSessionsByReport> {
+    const result = await this.origins.report(tenant, {
+      from: args.from,
+      before: args.before,
+      by: args.by.toLowerCase() as SessionOriginDimension,
+      first: args.first,
+    });
+    if (!result.ok) throw badUserInput(result.errors[0]!.message);
+    return Object.assign(new StorefrontSessionsByReport(), {
+      total: result.value.total,
+      values: result.value.values.map((each) => Object.assign(new StorefrontSessionsValue(), each)),
     });
   }
 

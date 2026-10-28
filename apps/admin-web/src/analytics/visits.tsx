@@ -1,8 +1,15 @@
 /** The online store's visits (ANL-02, ADR-180): who is on it now, and how far a period's went. */
-import { StorefrontLiveViewQuery, StorefrontSessionsQuery } from '../api/operations';
+import { useState } from 'react';
+import {
+  StorefrontLiveViewQuery,
+  StorefrontSessionsByQuery,
+  StorefrontSessionsQuery,
+} from '../api/operations';
 import type {
   StorefrontLiveViewData,
   StorefrontSessionCounts,
+  StorefrontSessionsBy,
+  StorefrontSessionsByData,
   StorefrontSessionsData,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
@@ -125,6 +132,97 @@ function Funnel({ totals }: { totals: StorefrontSessionCounts }) {
   );
 }
 
+/** What sessions can be seen by, and the tab each is under. */
+const BY: readonly { by: StorefrontSessionsBy; label: MessageKey }[] = [
+  { by: 'SOURCE', label: 'analytics.bySource' },
+  { by: 'LANDING_PAGE', label: 'analytics.byLandingPage' },
+  { by: 'DEVICE', label: 'analytics.byDevice' },
+];
+
+/** Values the core gives that merchants read better in their own words. */
+const NAMED: Readonly<Record<string, MessageKey>> = {
+  direct: 'analytics.origin.direct',
+  mobile: 'analytics.origin.mobile',
+  desktop: 'analytics.origin.desktop',
+  '(other)': 'analytics.origin.other',
+};
+
+/**
+ * The period's sessions by where they came from, the page they landed on or their device (ADR-884):
+ * the ten with the most, each with its share of the sessions counted so.
+ */
+export function SessionsBy({ from, before }: { from: string; before: string }) {
+  const { t } = useLocale();
+  const [by, setBy] = useState<StorefrontSessionsBy>('SOURCE');
+  const query = useAdminQuery<StorefrontSessionsByData>(
+    ['storefrontSessionsBy'],
+    StorefrontSessionsByQuery,
+    { from, before, by },
+    { keepPrevious: true },
+  );
+  const report = query.data?.storefrontSessionsBy;
+  let body;
+  if (query.isPending) body = <Loading label={t('state.loading')} />;
+  else if (query.isError)
+    body = (
+      <p role="alert" className="text-danger">
+        {errorText(query.error, t)}
+      </p>
+    );
+  else if (!report || report.total === 0) {
+    body = <p className="text-secondary">{t('analytics.noOrigins')}</p>;
+  } else {
+    body = (
+      <ul className="flex flex-col gap-3">
+        {report.values.map(({ value, sessions }) => {
+          const share = sessions / report.total;
+          const named = NAMED[value];
+          return (
+            <li key={value} className="flex flex-col gap-1">
+              <div className="flex items-baseline gap-3">
+                <span className="min-w-0 flex-1 truncate" dir="auto">
+                  {named ? t(named) : value}
+                </span>
+                <span className="text-secondary">
+                  {t('analytics.sessionsCount', { count: formatCount(sessions) })}
+                </span>
+                <span className="num w-14 text-end font-medium">{percentOne(share)}</span>
+              </div>
+              <span aria-hidden className="h-2 overflow-hidden rounded-full bg-line">
+                <span
+                  className="block h-full rounded-full bg-primary"
+                  style={{ width: `${Math.max(share * 100, 1)}%` }}
+                />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+  return (
+    <FormSection title={t('analytics.origins')} hint={t('analytics.originsHint')}>
+      <div role="tablist" aria-label={t('analytics.origins')} className="flex flex-wrap gap-2">
+        {BY.map((each) => (
+          <button
+            key={each.by}
+            type="button"
+            role="tab"
+            aria-selected={by === each.by}
+            onClick={() => setBy(each.by)}
+            className={`min-h-10 rounded-full border px-4 ${
+              by === each.by ? 'border-primary bg-primary text-on-primary' : 'border-line'
+            }`}
+          >
+            {t(each.label)}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel">{body}</div>
+    </FormSection>
+  );
+}
+
 /**
  * The online store's sessions over the period the page shows, against the period as long before:
  * how many, their conversion rate, how far they went towards an order, and day by day (week by
@@ -183,6 +281,7 @@ export function Visits({
             />
           </div>
           <Funnel totals={totals} />
+          <SessionsBy from={from} before={before} />
           <Bars
             title={t('analytics.sessionsOverTime')}
             bars={periods.map((period) => ({

@@ -3786,6 +3786,22 @@ export const StorefrontSessionsQuery = /* GraphQL */ `
   ${STOREFRONT_SESSION_COUNTS}
 `;
 
+/**
+ * The online store's sessions over a period by where they came from, the page they landed on or
+ * their device, the ten with the most first (ANL-02, ADR-884).
+ */
+export const StorefrontSessionsByQuery = /* GraphQL */ `
+  query StorefrontSessionsBy($from: DateTime!, $before: DateTime!, $by: StorefrontSessionsBy!) {
+    storefrontSessionsBy(from: $from, before: $before, by: $by, first: 10) {
+      total
+      values {
+        value
+        sessions
+      }
+    }
+  }
+`;
+
 /** Who is on the online store now, and today's sessions so far (ANL-02, ADR-180). */
 export const StorefrontLiveViewQuery = /* GraphQL */ `
   query StorefrontLiveView {

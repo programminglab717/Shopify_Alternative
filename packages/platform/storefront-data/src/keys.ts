@@ -153,6 +153,19 @@ export class StorefrontKeys {
     return `${this.prefix}:{${shopId}}:an:${day}:searches`;
   }
 
+  /**
+   * A day's sessions by where they came from, their landing page and their device, in its time
+   * zone: a hash of "{dimension} {value}" to sessions (ADR-884).
+   */
+  sessionOrigins(shopId: string, day: string): string {
+    return `${this.prefix}:{${shopId}}:an:${day}:origins`;
+  }
+
+  /** A session counted by where it came from, kept while it lasts so it counts once (ADR-884). */
+  sessionBegan(shopId: string, session: string): string {
+    return `${this.prefix}:{${shopId}}:an:began:${session}`;
+  }
+
   /** The shop's sessions by when each was last seen, in milliseconds: a sorted set. */
   live(shopId: string): string {
     return `${this.prefix}:{${shopId}}:an:live`;

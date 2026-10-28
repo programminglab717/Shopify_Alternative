@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { SESSION_COOKIE, SESSION_SCRIPT, VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 
 /** A shopper's page loaded, its head's script run with the cookie it had: what it set and sent. */
-function load(cookie: string | null, protocol = 'https:') {
+function load(cookie: string | null, protocol = 'https:', world: Record<string, unknown> = {}) {
   const jar = { value: cookie ? `other=1; ${SESSION_COOKIE}=${cookie}` : 'other=1', set: '' };
   const beacons: string[] = [];
+  const bodies: string[] = [];
   runInNewContext(SESSION_SCRIPT, {
     document: {
+      referrer: 'https://l.instagram.com/',
       get cookie() {
         return jar.value;
       },
@@ -16,14 +18,22 @@ function load(cookie: string | null, protocol = 'https:') {
         jar.set = value;
       },
     },
-    location: { protocol },
-    navigator: { sendBeacon: (url: string) => beacons.push(url) },
+    location: { protocol, pathname: '/collections/eid-lawn', search: '?utm_source=eid_sale' },
+    navigator: {
+      sendBeacon: (url: string, body: string) => {
+        beacons.push(url);
+        bodies.push(body);
+      },
+    },
     crypto: webcrypto,
     btoa,
     String,
     Uint8Array,
+    JSON,
+    URLSearchParams,
+    ...world,
   });
-  return { set: jar.set, beacons };
+  return { set: jar.set, beacons, bodies };
 }
 
 describe('sessions (ADR-180)', () => {
@@ -37,6 +47,13 @@ describe('sessions (ADR-180)', () => {
     const next = load(id!);
     expect(next.set).toBe(first.set);
     expect(next.beacons).toEqual([VISIT_PATH]);
+    // Only the first page says where the session came from, and the page it landed on (ADR-884).
+    expect(first.bodies.map((body) => JSON.parse(body))).toEqual([
+      { b: 1, l: '/collections/eid-lawn', r: 'https://l.instagram.com/', s: 'eid_sale' },
+    ]);
+    expect(next.bodies).toEqual(['']);
+    // A browser that cannot say so still counts the visit.
+    expect(load(null, 'https:', { URLSearchParams: undefined }).bodies).toEqual(['']);
     // Another browser's is another session; one that is no ID is replaced; over http, not Secure.
     expect(load(null).set).not.toBe(first.set);
     expect(load('not an id').set).toMatch(/^hatti_session=[\w-]{22}; /);

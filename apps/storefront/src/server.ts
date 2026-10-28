@@ -27,6 +27,8 @@ import {
   type ShopDoc,
   type StoreData,
   type ThemeDoc,
+  arrivalOf,
+  sessionOriginOf,
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
@@ -149,7 +151,7 @@ import {
   takenDownPage,
 } from './report-page.js';
 import { StorefrontLogs } from './error-logs.js';
-import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
+import { VISIT_BODY_MAX, VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { EXPERIMENT_COOKIE, experimentArm, experimentCookie } from './experiments.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
@@ -1000,10 +1002,35 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
-   * A shopper's page seen, as its script says (ADR-180): counted among its shop's sessions and
-   * who is on it now. Answered with nothing, never kept.
+   * Where a session came from, the page it landed on and its device, as its first page's script
+   * says (ADR-884): counted once a session. Not a robot's, staff's previews or the sample shop's,
+   * and never failing the request.
    */
-  app.post(VISIT_PATH, async (request, reply) => {
+  const began = async (request: FastifyRequest, found: Found): Promise<void> => {
+    if (!activity || found.preview || !(found.store instanceof RedisStore)) return;
+    const arrival = arrivalOf(request.body);
+    const session = sessionOf(request.headers.cookie);
+    const userAgent = request.headers['user-agent'];
+    if (!arrival || !session || isRobot(userAgent)) return;
+    try {
+      const timezone = (await found.store.shop()).timezone ?? 'Asia/Karachi';
+      await activity.began(
+        found.shopId,
+        timezone,
+        session,
+        sessionOriginOf(arrival, request.hostname, userAgent),
+      );
+    } catch {
+      // A count missed is no reason to fail a shopper.
+    }
+  };
+
+  /**
+   * A shopper's page seen, as its script says (ADR-180): counted among its shop's sessions and
+   * who is on it now, and, a session's first, by where it came from (ADR-884). Answered with
+   * nothing, never kept.
+   */
+  app.post(VISIT_PATH, { bodyLimit: VISIT_BODY_MAX }, async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const found = await shopFor(request, reply);
     if (!found) return reply.code(404).send();
@@ -1015,6 +1042,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       : true;
     if (!allowed) return reply.code(429).send();
     await counted(request, found, 'visited');
+    await began(request, found);
     return reply.code(204).send();
   });
 

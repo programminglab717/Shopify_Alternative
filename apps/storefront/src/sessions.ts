@@ -3,7 +3,8 @@
 // for every shopper, so a script in each page's head keeps the session's ID in a cookie of the
 // shop's, made when there is none and kept for half an hour from each page, and tells the
 // storefront of the page; the storefront counts the session's cart, checkout and order itself,
-// from the same cookie.
+// from the same cookie. A session's first page tells it, too, where the session came from and
+// the page it landed on (ADR-884).
 
 /** The cookie keeping a session's ID: 22 URL-safe characters, random. */
 export const SESSION_COOKIE = 'hatti_session';
@@ -13,6 +14,9 @@ export const SESSION_MINUTES = 30;
 
 /** Where a page's script tells the storefront it was seen. */
 export const VISIT_PATH = '/.hatti/visit';
+
+/** The most a page's script sends with a visit: where its session came from (ADR-884). */
+export const VISIT_BODY_MAX = 4096;
 
 const SESSION_ID = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -38,6 +42,7 @@ export const SESSION_SCRIPT = `(function () {
   try {
     var found = document.cookie.match(/(?:^|;\\s*)${SESSION_COOKIE}=([\\w-]{16,64})(?:;|$)/);
     var id = found && found[1];
+    var began = !id;
     if (!id) {
       var bytes = new Uint8Array(16);
       crypto.getRandomValues(bytes);
@@ -46,7 +51,14 @@ export const SESSION_SCRIPT = `(function () {
     }
     document.cookie = '${SESSION_COOKIE}=' + id + '; Max-Age=${SESSION_MINUTES * 60}; Path=/; SameSite=Lax' +
       (location.protocol === 'https:' ? '; Secure' : '');
-    if (navigator.sendBeacon) navigator.sendBeacon('${VISIT_PATH}');
-    else fetch('${VISIT_PATH}', { method: 'POST', keepalive: true });
+    var body = '';
+    if (began) {
+      try {
+        body = JSON.stringify({ b: 1, l: location.pathname, r: document.referrer,
+          s: new URLSearchParams(location.search).get('utm_source') });
+      } catch (error) {}
+    }
+    if (navigator.sendBeacon) navigator.sendBeacon('${VISIT_PATH}', body);
+    else fetch('${VISIT_PATH}', { method: 'POST', keepalive: true, body: body });
   } catch (error) {}
 })();`;

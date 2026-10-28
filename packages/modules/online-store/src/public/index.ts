@@ -206,3 +206,12 @@ export {
   shopRedirectsOf,
   type UrlRedirectInput,
 } from '../internal/url-redirect.service.js';
+export {
+  OTHER as SESSION_ORIGIN_OTHER,
+  SESSION_ORIGIN_DIMENSIONS,
+  SESSION_ORIGIN_LIMITS,
+  SessionOriginsService,
+  type SessionOriginCount,
+  type SessionOriginDimension,
+  type SessionOriginsReport,
+} from '../internal/session-origins.service.js';

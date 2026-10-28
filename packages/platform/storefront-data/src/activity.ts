@@ -1,5 +1,6 @@
 import type { Redis } from 'ioredis';
 import { ACTIVITY_STEPS, StorefrontKeys, type ActivityStep } from './keys.js';
+import { SESSION_DIMENSIONS, type SessionDimension, type SessionOrigin } from './sources.js';
 
 // What shoppers do on a shop's storefront, counted as Shopify's analytics count it (ANL-02,
 // ADR-180): each day's sessions, in the shop's time zone, and those of them that added to the
@@ -19,6 +20,9 @@ export const ACTIVITY = {
 
 /** A day's sessions, and those of them that took each step. */
 export type ActivityCounts = Record<ActivityStep, number>;
+
+/** How long a session lasts after its last page, as its cookie does (ADR-180). */
+const SESSION_SECONDS = 30 * 60;
 
 /** The time zone a shop's days fall in when its document names none. */
 const DEFAULT_TIME_ZONE = 'Asia/Karachi';
@@ -78,6 +82,57 @@ export class StorefrontActivity {
     at = new Date(),
   ): Promise<void> {
     await exec(this.#counted(shopId, localDay(at, timeZone), ['sessions', step], session));
+  }
+
+  /**
+   * `session` began at `at`, from `origin` (ADR-884): one more of that day's sessions by where it
+   * came from, its landing page and its device. Counted once a session, however often its page
+   * says it began, as one whose browser keeps no cookie would.
+   */
+  async began(
+    shopId: string,
+    timeZone: string,
+    session: string,
+    origin: SessionOrigin,
+    at = new Date(),
+  ): Promise<void> {
+    const first = await this.redis.set(
+      this.keys.sessionBegan(shopId, session),
+      '1',
+      'EX',
+      SESSION_SECONDS,
+      'NX',
+    );
+    if (first !== 'OK') return;
+    const day = localDay(at, timeZone);
+    const key = this.keys.sessionOrigins(shopId, day);
+    const pipeline = this.redis.pipeline();
+    for (const dimension of SESSION_DIMENSIONS)
+      pipeline.hincrby(key, `${dimension} ${origin[dimension]}`, 1);
+    await exec(
+      pipeline
+        .expire(key, ACTIVITY.keepDays * 24 * 60 * 60)
+        .sadd(this.keys.activityChanged(), `${shopId} ${day}`),
+    );
+  }
+
+  /** A day's sessions so far by where they came from, their landing page and their device. */
+  async origins(
+    shopId: string,
+    day: string,
+  ): Promise<Record<SessionDimension, Record<string, number>>> {
+    const counted = await this.redis.hgetall(this.keys.sessionOrigins(shopId, day));
+    const origins = Object.fromEntries(SESSION_DIMENSIONS.map((each) => [each, {}])) as Record<
+      SessionDimension,
+      Record<string, number>
+    >;
+    for (const [field, sessions] of Object.entries(counted)) {
+      const at = field.indexOf(' ');
+      const dimension = field.slice(0, at) as SessionDimension;
+      if (at > 0 && dimension in origins)
+        origins[dimension][field.slice(at + 1)] = Number(sessions);
+    }
+    return origins;
   }
 
   /**

@@ -1,8 +1,10 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
+import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { SessionOriginsService } from '@hatti/online-store/public';
 import {
   StorefrontActivity,
   StorefrontKeys,
@@ -13,7 +15,7 @@ import {
 } from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 import { startTestApi, type TestApi } from '../testing/api.js';
 
@@ -147,6 +149,71 @@ describe.skipIf(!server || !redisUrl)('Admin GraphQL API: storefront sessions (A
     expect(backwards.errors?.[0]).toMatchObject({
       message: 'Before must be later than from',
       extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
+  it('gives sessions by where they came from, their landing page and device (ADR-884)', async () => {
+    const database = new Database({ appUrl: testDb.appUrl, applicationName: 'origins-test' });
+    onTestFinished(() => database.close());
+    const origins = new SessionOriginsService(database);
+    // A day of 102 landing pages: the 100 with the most sessions by name, the rest as "(other)".
+    const pages = Object.fromEntries(
+      Array.from({ length: 102 }, (_, index) => [`/products/p${index}`, index + 1]),
+    );
+    await origins.keep(shopA, '2026-10-04', {
+      source: { google: 30, instagram: 8, direct: 2 },
+      landing_page: pages,
+      device: { mobile: 35, desktop: 5 },
+    });
+    await origins.keep(shopA, '2026-10-05', {
+      source: { instagram: 7, whatsapp: 5 },
+      landing_page: { '/': 12 },
+      device: { mobile: 12 },
+    });
+    await origins.keep(shopB, '2026-10-05', {
+      source: { google: 99 },
+      landing_page: {},
+      device: {},
+    });
+    const BY = (by: string, first = 20) =>
+      `{ storefrontSessionsBy(from: "2026-10-03T19:00:00Z", before: "2026-10-05T19:00:00Z",
+                              by: ${by}, first: ${first}) { total values { value sessions } } }`;
+    expect(await call(tokens.a, BY('SOURCE'))).toEqual({
+      total: 52,
+      values: [
+        { value: 'google', sessions: 30 },
+        { value: 'instagram', sessions: 15 },
+        { value: 'whatsapp', sessions: 5 },
+        { value: 'direct', sessions: 2 },
+      ],
+    });
+    expect(await call(tokens.a, BY('SOURCE', 2))).toEqual({
+      total: 52,
+      values: [
+        { value: 'google', sessions: 30 },
+        { value: 'instagram', sessions: 15 },
+        { value: '(other)', sessions: 7 },
+      ],
+    });
+    const landing = await call(tokens.a, BY('LANDING_PAGE', 2));
+    expect(landing.values).toEqual([
+      { value: '/products/p101', sessions: 102 },
+      { value: '/products/p100', sessions: 101 },
+      // The other 98 named, the day's own "(other)" of the two least, and "/".
+      { value: '(other)', sessions: landing.total - 203 },
+    ]);
+    const { rows } = await admin.query(
+      `SELECT count(*)::int AS kept FROM online_store.session_origins
+        WHERE shop_id = $1 AND day = '2026-10-04' AND dimension = 'landing_page'`,
+      [shopA],
+    );
+    expect(rows[0]).toEqual({ kept: 101 });
+    expect(await call(tokens.a, BY('DEVICE'))).toEqual({
+      total: 52,
+      values: [
+        { value: 'mobile', sessions: 47 },
+        { value: 'desktop', sessions: 5 },
+      ],
     });
   });
 

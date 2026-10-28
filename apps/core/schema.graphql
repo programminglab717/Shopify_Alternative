@@ -17821,6 +17821,21 @@ type Query {
     interval: SalesInterval! = DAY
   ): StorefrontSessionsReport!
 
+  """
+  The online store's sessions over a period by where they came from, the page they landed on or their device (ANL-02, ADR-884), as Shopify reports them. Kept from the storefronts every minute.
+  """
+  storefrontSessionsBy(
+    """Sessions to the day before this falls on; at most 366 days after from."""
+    before: DateTime!
+    by: StorefrontSessionsBy!
+
+    """Values given by name, 1 to 50."""
+    first: Int! = 20
+
+    """Sessions from the day this falls on, in the shop's time zone."""
+    from: DateTime!
+  ): StorefrontSessionsByReport!
+
   """A supplier by ID."""
   supplier(id: ID!): Supplier
 
@@ -20588,6 +20603,35 @@ type StorefrontSessions {
   sessions: Int!
 }
 
+"""What the online store's sessions are counted by (ANL-02, ADR-884)."""
+enum StorefrontSessionsBy {
+  """"mobile" for phones and tablets, "desktop" for the rest."""
+  DEVICE
+
+  """The path of the page each began on: "/collections/eid"."""
+  LANDING_PAGE
+
+  """
+  Where they came from: a campaign's utm_source, a site by the name merchants know it ("google", "instagram", "whatsapp") or its host, or "direct".
+  """
+  SOURCE
+}
+
+"""
+A period's sessions by where they came from, their landing page or device (ADR-884): each counted once, as it began, by the day as the sessions are.
+"""
+type StorefrontSessionsByReport {
+  """
+  The period's sessions counted so: those whose first page's script said where they came from.
+  """
+  total: Int!
+
+  """
+  The most sessions first, those past `first` together as "(other)", last.
+  """
+  values: [StorefrontSessionsValue!]!
+}
+
 """A day's, week's or month's sessions."""
 type StorefrontSessionsPeriod {
   sessions: StorefrontSessions!
@@ -20603,6 +20647,14 @@ type StorefrontSessionsReport {
   """
   periods: [StorefrontSessionsPeriod!]!
   totals: StorefrontSessions!
+}
+
+"""Sessions of one source, landing page or device."""
+type StorefrontSessionsValue {
+  sessions: Int!
+
+  """The source, path or device; "(other)" for those past the most."""
+  value: String!
 }
 
 """Someone the shop buys goods from."""

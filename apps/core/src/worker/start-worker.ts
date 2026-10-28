@@ -88,6 +88,7 @@ import {
   LinkTapsService,
   PageService,
   SessionDaysService,
+  SessionOriginsService,
   ThemeService,
 } from '@hatti/online-store/public';
 import {
@@ -864,7 +865,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     const sessionsRedis = createRedis(config.REDIS_URL, 'worker');
     const sessions = new StorefrontSessions(
       new StorefrontActivity(sessionsRedis),
-      { days: new SessionDaysService(database), taps: new LinkTapsService(database) },
+      {
+        days: new SessionDaysService(database),
+        origins: new SessionOriginsService(database),
+        taps: new LinkTapsService(database),
+      },
       logger,
     ).start(config.SESSIONS_INTERVAL_MS);
     // Shops' theme experiments counted, and ended on their last day or when their draft sells

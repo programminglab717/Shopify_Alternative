@@ -22,7 +22,7 @@ const counts = (
 /** A fake core with the shop's sales, COD health, couriers and stock quiet, and its visits as given. */
 function core(visits: { now: ReturnType<typeof counts>; before: ReturnType<typeof counts> }) {
   let visitorsNow = 3;
-  const fake = fakeCore('manager', (operation) => {
+  const fake = fakeCore('manager', (operation, variables) => {
     switch (operation) {
       case 'Sales':
       case 'CodHealth':
@@ -42,12 +42,35 @@ function core(visits: { now: ReturnType<typeof counts>; before: ReturnType<typeo
           },
           previous: { totals: visits.before },
         };
+      case 'StorefrontSessionsBy':
+        return { storefrontSessionsBy: ORIGINS[String(variables.by)] };
       default:
         throw new Error(`unexpected ${operation}`);
     }
   });
   return fake;
 }
+
+/** The month's sessions by where they came from, their landing page and device (ADR-884). */
+const ORIGINS: Record<string, { total: number; values: { value: string; sessions: number }[] }> = {
+  SOURCE: {
+    total: 1240,
+    values: [
+      { value: 'instagram', sessions: 620 },
+      { value: 'direct', sessions: 310 },
+      { value: 'google', sessions: 248 },
+      { value: '(other)', sessions: 62 },
+    ],
+  },
+  LANDING_PAGE: { total: 1240, values: [{ value: '/collections/eid-lawn', sessions: 1240 }] },
+  DEVICE: {
+    total: 1240,
+    values: [
+      { value: 'mobile', sessions: 1116 },
+      { value: 'desktop', sessions: 124 },
+    ],
+  },
+};
 
 const asked = (fake: ReturnType<typeof core>, operation: string) =>
   fake.sent.filter((each) => each.operation === operation).map((each) => each.variables);
@@ -99,6 +122,40 @@ describe("The online store's visits in analytics", () => {
     expect(Date.parse(String(quarter.from)) - Date.parse(String(quarter.previousFrom))).toBe(
       90 * DAY_MS,
     );
+  });
+
+  it('shows where sessions came from, the pages they landed on and their devices (ADR-884)', async () => {
+    const fake = core({ now: counts(1240, 120, 60, 38), before: counts(1000, 90, 50, 30) });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/analytics');
+
+    const origins = (
+      await screen.findByRole('heading', { name: 'Where sessions came from' })
+    ).closest('section')!;
+    const row = async (name: string) =>
+      (await within(origins).findByText(name)).closest('li')!.textContent;
+    expect(await row('instagram')).toBe('instagram620 sessions50.0%');
+    expect(await row('Direct, or a link with no site before it')).toBe(
+      'Direct, or a link with no site before it310 sessions25.0%',
+    );
+    expect(await row('Others')).toBe('Others62 sessions5.0%');
+    const month = asked(fake, 'StorefrontSessions')[0]!;
+    expect(asked(fake, 'StorefrontSessionsBy')[0]).toEqual({
+      from: month.from,
+      before: month.before,
+      by: 'SOURCE',
+    });
+
+    fireEvent.click(within(origins).getByRole('tab', { name: 'Device' }));
+    expect(await row('Phone or tablet')).toBe('Phone or tablet1,116 sessions90.0%');
+    expect(await row('Computer')).toBe('Computer124 sessions10.0%');
+    fireEvent.click(within(origins).getByRole('tab', { name: 'Landing page' }));
+    expect(await row('/collections/eid-lawn')).toBe('/collections/eid-lawn1,240 sessions100.0%');
+    expect(asked(fake, 'StorefrontSessionsBy').map((each) => each.by)).toEqual([
+      'SOURCE',
+      'DEVICE',
+      'LANDING_PAGE',
+    ]);
   });
 
   it('says who is on the store now and how today has gone, asking again every half minute', async () => {

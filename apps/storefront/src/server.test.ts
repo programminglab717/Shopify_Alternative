@@ -6192,9 +6192,32 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     };
     // A shopper's page carries the script that tells of it.
     const home = await app.inject({ method: 'GET', url: '/', headers: shopper });
-    expect(home.body).toContain(`navigator.sendBeacon('/.hatti/visit')`);
-    const seen = await app.inject({ method: 'POST', url: '/.hatti/visit', headers: shopper });
+    expect(home.body).toContain(`navigator.sendBeacon('/.hatti/visit', body)`);
+    // Its first page says where the session came from (ADR-884); its next pages, nothing.
+    const arrival = JSON.stringify({
+      b: 1,
+      l: '/collections/eid',
+      r: 'https://l.instagram.com/',
+      s: null,
+    });
+    const seen = await app.inject({
+      method: 'POST',
+      url: '/.hatti/visit',
+      headers: { ...shopper, 'content-type': 'text/plain;charset=UTF-8' },
+      payload: arrival,
+    });
     expect([seen.statusCode, seen.headers['cache-control']]).toEqual([204, 'no-store']);
+    await app.inject({
+      method: 'POST',
+      url: '/.hatti/visit',
+      headers: { ...shopper, 'content-type': 'text/plain;charset=UTF-8' },
+      payload: arrival,
+    });
+    expect(await activity.origins(zari, today)).toEqual({
+      source: { instagram: 1 },
+      landing_page: { '/collections/eid': 1 },
+      device: { mobile: 1 },
+    });
     // Nothing counted for a robot, without a session or for a session that is no ID.
     for (const headers of [
       { ...shopper, 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },

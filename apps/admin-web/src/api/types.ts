@@ -1718,6 +1718,18 @@ export interface StorefrontSessionsData {
   previous: { totals: StorefrontSessionCounts };
 }
 
+/** What the online store's sessions are counted by (ADR-884). */
+export type StorefrontSessionsBy = 'SOURCE' | 'LANDING_PAGE' | 'DEVICE';
+
+export interface StorefrontSessionsByData {
+  storefrontSessionsBy: {
+    /** The period's sessions counted so: those whose first page said where they came from. */
+    total: number;
+    /** The most sessions first; those past the most together as "(other)", last. */
+    values: { value: string; sessions: number }[];
+  };
+}
+
 export interface StorefrontLiveViewData {
   storefrontLiveView: { visitorsNow: number; today: StorefrontSessionCounts };
 }

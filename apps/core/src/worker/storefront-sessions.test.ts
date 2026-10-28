@@ -6,6 +6,7 @@ import { newId } from '@hatti/ids';
 import {
   LinkTapsService,
   SessionDaysService,
+  SessionOriginsService,
   linkHash,
   type SessionCounts,
 } from '@hatti/online-store/public';
@@ -67,6 +68,7 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
   it("keeps each shop's days counted since the last sweep, their latest counts in place", async () => {
     const sweeps = new StorefrontSessions(activity, {
       days: new SessionDaysService(database),
+      origins: new SessionOriginsService(database),
       taps: new LinkTapsService(database),
     });
     await activity.visited(a, karachi, 'session-1', late);
@@ -99,6 +101,33 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
     );
   });
 
+  it("keeps each day's sessions by where they came from beside them (ADR-884)", async () => {
+    const sweeps = new StorefrontSessions(activity, {
+      days: new SessionDaysService(database),
+      origins: new SessionOriginsService(database),
+      taps: new LinkTapsService(database),
+    });
+    const origins = async () =>
+      (
+        await admin.query<{ dimension: string; value: string; sessions: number }>(
+          `SELECT dimension, value, sessions FROM online_store.session_origins
+            WHERE shop_id = $1 AND day = '2026-10-04' ORDER BY dimension, value`,
+          [a],
+        )
+      ).rows;
+    const from = (source: string) =>
+      ({ source, landing_page: '/collections/eid-lawn', device: 'mobile' }) as const;
+    await activity.began(a, karachi, 'session-5', from('instagram'), late);
+    await activity.began(a, karachi, 'session-6', from('google'), late);
+    await sweeps.sweep();
+    expect(await origins()).toEqual([
+      { dimension: 'device', value: 'mobile', sessions: 2 },
+      { dimension: 'landing_page', value: '/collections/eid-lawn', sessions: 2 },
+      { dimension: 'source', value: 'google', sessions: 1 },
+      { dimension: 'source', value: 'instagram', sessions: 1 },
+    ]);
+  });
+
   it('gives back a day it could not keep, for the next sweep', async () => {
     let failing = true;
     const days = new SessionDaysService(database);
@@ -108,6 +137,7 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
     } as SessionDaysService;
     const sweeps = new StorefrontSessions(activity, {
       days: flaky,
+      origins: new SessionOriginsService(database),
       taps: new LinkTapsService(database),
     });
     await activity.visited(b, karachi, 'session-4', late);
@@ -122,6 +152,7 @@ describe.skipIf(!server || !redisUrl)('Storefront sessions kept by the worker (A
   it("keeps each day's taps on the link page's links beside its sessions (ADR-204)", async () => {
     const sweeps = new StorefrontSessions(activity, {
       days: new SessionDaysService(database),
+      origins: new SessionOriginsService(database),
       taps: new LinkTapsService(database),
     });
     const taps = async () =>

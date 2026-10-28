@@ -30,6 +30,7 @@ import { PresentmentCurrencyService } from './presentment-currencies.js';
 import { ThemeExperimentService } from './theme-experiments.js';
 import { ThemeExperimentResolver } from './graphql/theme-experiment.resolver.js';
 import { SessionDaysService } from './session-days.service.js';
+import { SessionOriginsService } from './session-origins.service.js';
 import { StorefrontFiltersService } from './storefront-filters.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
 import { StorefrontContentSearchController } from './content-search.js';
@@ -82,6 +83,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     TranslationService,
     TranslationResolver,
     SessionDaysService,
+    SessionOriginsService,
     LinkTapsService,
     LinkTapsResolver,
   ],
@@ -103,6 +105,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     UrlRedirectService,
     PolicyService,
     SessionDaysService,
+    SessionOriginsService,
     LinkTapsService,
     TranslationService,
   ],
