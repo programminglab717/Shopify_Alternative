@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Functions
+### 91a860f · Functions
 
 * **Apps:** an app gives the shop's checkout a WebAssembly function that hides ways to pay, such
   as cash on delivery above an amount, or refuses an order, saying why. It runs sandboxed, 50 ms
