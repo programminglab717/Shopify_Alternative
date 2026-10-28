@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Express checkout
+### ecebbeb · Express checkout
 
 * **Checkout:** a signed-in shopper whose session proved their number places the order in a tap,
   to their book's default address, paid on delivery, where nothing else is asked of it; anything
