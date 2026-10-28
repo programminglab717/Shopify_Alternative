@@ -16,6 +16,18 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Hatti's console
+
+* **Console:** Hatti's people now have a console of their own, at its own address. They sign in
+  through Hatti's identity provider with their security keys ([ADR-876](../architecture/13-decision-log.md#adr-876--hattis-console-its-own-people-sign-in-through-hattis-identity-provider-with-their-security-keys-to-a-server-of-its-own-that-holds-the-system-login-the-api-never-does-sessions-last-a-working-day-and-each-thing-done-is-logged-before-it-is-done-shops-support-requests-are-its-first-queue)).
+* **Its own server:** it holds the database's system login, which the public API never does.
+* **Sessions and log:** sessions reach the console alone, last a working day and end after half
+  an hour unused. Each thing done there is logged, by whom, before it is done.
+* **First queue:** shops' support requests, answered as the agent signed in. Reports, verifications,
+  transfers and partners' reviews follow.
+* **Needs you:** Hatti's provider, its keys and the console's address (OWN-64).
+* 4748 tests (10 new).
+
 ### d92591d · Daraz sync
 
 * **Connecting:** a shop connects its Daraz seller account from Settings › Daraz, through

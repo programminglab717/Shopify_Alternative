@@ -114,7 +114,9 @@ an attacker, but it affects availability in the same way.
   ([ADR-156](./13-decision-log.md#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)): the owner lets support look for 15 minutes to a day, and the owner or a manager
   ends it; Hatti's agents, marked by Hatti and signed in with a second factor, read with every
   read scope, numbers masked, change nothing, and each of their queries goes on the shop's audit
-  log before it runs. Single sign-on with hardware keys comes with Hatti's own console.
+  log before it runs. Hatti's own console signs its people in through Hatti's identity provider
+  with their security keys, to a server of its own that the public API never is, and logs each
+  thing done there before it is done ([ADR-876](./13-decision-log.md#adr-876--hattis-console-its-own-people-sign-in-through-hattis-identity-provider-with-their-security-keys-to-a-server-of-its-own-that-holds-the-system-login-the-api-never-does-sessions-last-a-working-day-and-each-thing-done-is-logged-before-it-is-done-shops-support-requests-are-its-first-queue)).
 * Break-glass accounts are sealed, alarmed and reviewed after every use.
 
 ### 2.3 Shoppers

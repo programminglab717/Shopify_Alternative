@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-875 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-876 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -883,6 +883,7 @@
 | 873 | Orders at the till: click-and-collect orders handed over there with what they owe, and orders sent home from there, confirmed in person; the money taken counted in the register's session | Accepted |
 | 874 | Cashiers at a shared till: each member of staff's own PIN, kept as a scrypt verifier, signs them in for a shift; the till's sales carry a sealed token naming who rang them up, offline too; five wrong PINs lock the till's sign-ins | Accepted |
 | 875 | Daraz sync: a shop connects its Daraz seller account through Daraz's own page; every ten minutes Hatti brings Daraz's new orders in as prepaid marketplace orders, follows their cancellations, and gives Daraz each matching SKU's stock, and prices where asked, from one location | Accepted |
+| 876 | Hatti's console: its own people sign in through Hatti's identity provider with their security keys, to a server of its own that holds the system login the API never does; sessions last a working day, and each thing done is logged before it is done; shops' support requests are its first queue | Accepted |
 
 ---
 
@@ -29036,3 +29037,53 @@
   * **A CSV export for Seller Center:** stock would be out of step between uploads.
   * **A paid connector (multichannel SaaS):** a monthly fee per shop, and the shop's Daraz
     tokens with a third party.
+
+## ADR-876 · Hatti's console: its own people sign in through Hatti's identity provider with their security keys, to a server of its own that holds the system login the API never does; sessions last a working day, and each thing done is logged before it is done; shops' support requests are its first queue
+
+* **Context:**
+  * Hatti's people answer shops' requests, decide on reports, verifications and transfers, and
+    review partners' apps, themes and profiles through commands that whoever runs Hatti runs
+    with the database's system login (ADR-508, ADR-460, ADR-465, ADR-254, ADR-851). Support
+    agents are identity accounts Hatti marks (ADR-156).
+  * 11 §2.2 asks that Hatti's employees sign in with single sign-on and hardware security keys,
+    and the roadmap a console of Hatti's own.
+* **Decision:**
+  * **A console of its own:** a web app (`apps/console`) at its own address, never the
+    admin's, and a server of its own (`pnpm --filter @hatti/core console`), which the console's
+    address alone passes `/console/api` to.
+    * The server holds the system login, which reads every shop's, for the queues; the public
+      API never holds it, and serves no console route.
+    * The page runs its own scripts alone, is never framed or indexed, and keeps its session in
+      the tab.
+  * **Signing in:** through Hatti's own identity provider over OpenID Connect, as a shop's staff
+    sign in through theirs (ADR-864): the code flow with PKCE, a state and a nonce, and the ID
+    token checked against the provider's keys.
+    * The provider asks Hatti's people for their security keys. Where it says how they signed in
+      (`amr`), one of the ways Hatti names (`hwk`) must be among them.
+    * Its confirmed email must be a support agent's account (ADR-156). Removing an agent, or
+      their account, ends their console sessions at once.
+    * The tab that began the sign-in alone takes its answer, and the code for the session is
+      traded once, within two minutes.
+  * **Sessions** reach the console alone, and no shop. They last a working day (10 hours), end
+    after 30 minutes unused, and end on signing out.
+  * **The log:** each thing done in the console is written down before it is done, with who,
+    what and to what, in a table the identity login can only add to. The console shows it.
+  * **First queue, shops' support requests:** those waiting, the most urgent then the oldest
+    first, late ones marked; each answered as the agent signed in, which the shop's admin shows
+    and WhatsApp carries where they wrote there (ADR-560).
+  * The OpenID Connect relying party is one, shared with shops' single sign-on.
+* **Consequences:**
+  * Hatti's people answer shops from a browser, signed in with keys, and every answer is
+    accounted for by name; the system login stays out of the public API.
+  * The commands remain, for whoever runs Hatti. The console takes over their queues one at a
+    time: reports and takedowns, verifications, transfers, SMS senders, partners' reviews and
+    the status page next.
+  * The console is in English, for Hatti's people; what shops wrote in Urdu shows in Urdu.
+  * Hatti's provider, its keys and the console's address are the owner's to set up (OWN-64).
+* **Alternatives:**
+  * **The console inside the merchant admin:** a flaw in the admin would reach Hatti's people's
+    sessions, and the API would need the system login.
+  * **Hatti's people signing in with their admin accounts' passwords and second factors:** no
+    keys required, and an employee who leaves keeps their account until someone notices.
+  * **A hosted internal-tools builder (Retool and the like):** paid per seat, and the system
+    login with a third party.
