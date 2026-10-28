@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Visual search
+### cbd74cb · Visual search
 
 * **Shoppers:** a "Search with a photo" button on the search page, where the theme's setting
   asks. The AI reads the photo into the words shops title their products with, and the shopper
