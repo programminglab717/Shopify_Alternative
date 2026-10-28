@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-874 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-875 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -882,6 +882,7 @@
 | 872 | Point of sale: registers that sell from a location's shelf in cash sessions closed with a Z report; till sales kept apart from orders, paid in cash, card, transfer or wallet, linked to a customer by number; rung up in the admin, offline too | Accepted |
 | 873 | Orders at the till: click-and-collect orders handed over there with what they owe, and orders sent home from there, confirmed in person; the money taken counted in the register's session | Accepted |
 | 874 | Cashiers at a shared till: each member of staff's own PIN, kept as a scrypt verifier, signs them in for a shift; the till's sales carry a sealed token naming who rang them up, offline too; five wrong PINs lock the till's sign-ins | Accepted |
+| 875 | Daraz sync: a shop connects its Daraz seller account through Daraz's own page; every ten minutes Hatti brings Daraz's new orders in as prepaid marketplace orders, follows their cancellations, and gives Daraz each matching SKU's stock, and prices where asked, from one location | Accepted |
 
 ---
 
@@ -28992,3 +28993,46 @@
     busy counter.
   * **Checking the PIN on the device:** the device would hold every member's verifier, and an
     offline sale's cashier could not be trusted.
+
+## ADR-875 · Daraz sync: a shop connects its Daraz seller account through Daraz's own page; every ten minutes Hatti brings Daraz's new orders in as prepaid marketplace orders, follows their cancellations, and gives Daraz each matching SKU's stock, and prices where asked, from one location
+
+* **Context:**
+  * CH-06 asks for Daraz sync: products, stock and orders. Daraz is Pakistan's largest
+    marketplace, and many of Hatti's shops sell on it too.
+  * Stock kept by hand in two places oversells: a suit sold on Daraz is still for sale on the
+    online store, and the other way round.
+  * Daraz's Open Platform is Lazada's: an app key and secret, a seller's authorisation by OAuth,
+    and calls signed with HMAC-SHA256. It is free to use for a registered app.
+* **Decision:**
+  * **Connecting:** in Settings › Daraz, the owner goes to Daraz's page to let Hatti in, and
+    comes back to `/daraz/callback` with a code.
+    * The link carries a state sealed with Hatti's keys for the shop, so a code is only taken
+      from the link the shop asked for. The tab remembers which shop asked.
+    * The code is exchanged for the seller's tokens, kept sealed, and refreshed before they end.
+      Disconnecting forgets them.
+  * **Orders, every ten minutes** (worker, `DARAZ_SYNC_INTERVAL_MS`), from the last read on:
+    * A new Daraz order (pending, packed or ready to ship) becomes the shop's order: source
+      marketplace, tagged `daraz`, paid, its lines matched by SKU to the shop's active variants
+      at what the buyer paid, and its stock taken at the chosen location. Each Daraz order comes
+      in once.
+    * An order with a SKU the shop doesn't have is left out and listed, with why, on the
+      settings page.
+    * Cancelled on Daraz: cancelled here, its stock back.
+  * **Stock and prices:** each SKU's available stock at the location (and its price, where the
+    shop asks) is given to Daraz when it changed since it was last given.
+  * **Products** are listed on Daraz by the shop, under the SKUs they have here; Hatti matches
+    by SKU.
+  * **Keep in step now** runs the same sync at once.
+* **Consequences:**
+  * Stock sold anywhere reaches Daraz within ten minutes, and Daraz's orders join the shop's
+    own: one place to pack and to count.
+  * Daraz collects and settles its orders' money itself, so the orders come in paid and Hatti's
+    payouts don't include them. Daraz's own shipping labels stay on Daraz.
+  * Products aren't created on Daraz from Hatti: Daraz's categories each need their own
+    attributes, which a shop fills better on Seller Center. A later step can add it.
+  * The protocol is built to Lazada's published scheme, which Daraz shares; Hatti's app must be
+    registered on Daraz's Open Platform and tried in its sandbox before shops use it (OWN-63).
+* **Alternatives:**
+  * **A CSV export for Seller Center:** stock would be out of step between uploads.
+  * **A paid connector (multichannel SaaS):** a monthly fee per shop, and the shop's Daraz
+    tokens with a third party.

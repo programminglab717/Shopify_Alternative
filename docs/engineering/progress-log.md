@@ -16,6 +16,19 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Daraz sync
+
+* **Connecting:** a shop connects its Daraz seller account from Settings › Daraz, through
+  Daraz's own page (CH-06, [ADR-875](../architecture/13-decision-log.md#adr-875--daraz-sync-a-shop-connects-its-daraz-seller-account-through-darazs-own-page-every-ten-minutes-hatti-brings-darazs-new-orders-in-as-prepaid-marketplace-orders-follows-their-cancellations-and-gives-daraz-each-matching-skus-stock-and-prices-where-asked-from-one-location)).
+* **Orders:** every ten minutes, Daraz's new orders come in as the shop's own, paid and tagged
+  `daraz`; ones Daraz cancels are cancelled here. Orders with a SKU the shop lacks are listed
+  with why.
+* **Stock:** each SKU's stock at the chosen location, and its price where the shop asks, goes to
+  Daraz when it changes.
+* **Needs you:** registering Hatti's app on Daraz's Open Platform and trying it in Daraz's
+  sandbox (OWN-63).
+* 4738 tests (19 new).
+
 ### cfedec9 · Cashiers at the till
 
 * **PINs:** each member of staff sets their own till PIN. At a shared tablet, a cashier signs in
