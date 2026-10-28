@@ -6759,6 +6759,83 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     await app.close();
   });
 
+  it('shows a share of shoppers the draft of a theme experiment, each keeping their arm, counted apart (ADR-866)', async () => {
+    const shopId = randomUUID();
+    const sample = sampleStore();
+    const experiment = { id: 'texp_draft', themeId: 'thm-draft', version: 2, share: 50 };
+    await publish(shopId, 'trial', { ...sample, shop: { ...sample.shop, experiment } });
+    await queue.add(shopId, ['sample']);
+    await queue.drain(shopId, async ({ writer }) => {
+      await writer.putExperimentTheme({
+        id: 'thm-draft',
+        version: 2,
+        base: 'hatti-base',
+        files: {
+          // The draft's announcement: the offer the experiment tries.
+          'sections/header-group.json': JSON.stringify({
+            type: 'header',
+            name: 'Header group',
+            sections: {
+              announcement: {
+                type: 'announcement-bar',
+                settings: { text: 'Eid sale: 20% off everything' },
+              },
+              header: { type: 'header', settings: { menu: 'main-menu' } },
+            },
+            order: ['announcement', 'header'],
+          }),
+        },
+      });
+    });
+    const app = server();
+    const shopper = {
+      host: 'trial.localhost',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36',
+    };
+    const page = (headers: Record<string, string>) =>
+      app.inject({ method: 'GET', url: '/', headers: { ...shopper, ...headers } });
+
+    // In the draft's arm, the draft, the shopper's own.
+    const draft = await page({
+      cookie: 'hatti_ab=texp_draft.b; hatti_session=AbCdEfGhIjKlMnOpQrStUv',
+    });
+    expect(draft.body).toContain('Eid sale: 20% off everything');
+    expect(draft.headers['cache-control']).toBe('private, no-store');
+    expect(draft.headers['set-cookie']).toBeUndefined();
+    // In the live theme's, the live theme, kept at the edge as ever.
+    const live = await page({ cookie: 'hatti_ab=texp_draft.a' });
+    expect(live.body).not.toContain('Eid sale: 20% off everything');
+    expect(String(live.headers['cache-control'])).toMatch(/^public/);
+    // A new shopper is put in an arm, and keeps it.
+    const first = await page({});
+    expect(String(first.headers['set-cookie'])).toMatch(
+      /^hatti_ab=texp_draft\.[ab]; Max-Age=2678400; Path=\/; SameSite=Lax$/,
+    );
+    expect(first.headers['cache-control']).toBe('private, no-store');
+    // A robot sees the live theme, and is put in no arm.
+    const robot = await app.inject({
+      method: 'GET',
+      url: '/',
+      headers: { host: 'trial.localhost', 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
+    });
+    expect(robot.body).not.toContain('Eid sale: 20% off everything');
+    expect(robot.headers['set-cookie']).toBeUndefined();
+
+    // The draft's session is counted in its arm.
+    const seen = await app.inject({
+      method: 'POST',
+      url: '/.hatti/visit',
+      headers: {
+        ...shopper,
+        cookie: 'hatti_ab=texp_draft.b; hatti_session=AbCdEfGhIjKlMnOpQrStUv',
+      },
+    });
+    expect(seen.statusCode).toBe(204);
+    const counts = await new StorefrontActivity(redis, keys).experimentCounts(shopId, 'texp_draft');
+    expect([counts.a.sessions, counts.b.sessions]).toEqual([0, 1]);
+    await app.close();
+  });
+
   it('keeps the currency a shopper picks, their pages theirs alone, and suggests one abroad (ADR-865)', async () => {
     const shopId = randomUUID();
     const sample = sampleStore();

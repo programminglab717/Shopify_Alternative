@@ -178,6 +178,8 @@ export const ID_PREFIXES = {
   sellingPlan: 'slpl',
   // A customer's subscription: an order placed again each interval (ADR-862).
   orderSubscription: 'osub',
+  // A shop's theme experiment: a draft theme shown a share of its shoppers (ADR-866).
+  themeExperiment: 'texp',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

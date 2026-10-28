@@ -150,6 +150,7 @@ import {
 } from './report-page.js';
 import { StorefrontLogs } from './error-logs.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
+import { EXPERIMENT_COOKIE, experimentArm, experimentCookie } from './experiments.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
@@ -529,6 +530,16 @@ interface Found {
   editor: boolean;
   /** The currency the shopper picked (ADR-865), from their cookie; null for rupees. */
   currency: string | null;
+  /**
+   * The arm of the shop's running theme experiment the shopper is in (ADR-866), once a page
+   * asked: as their cookie keeps it, or as they were put in now, for the answer to keep. Null
+   * until asked, or with no experiment.
+   */
+  experiment: { id: string; arm: 'a' | 'b'; assigned: boolean } | null;
+  /** The experiment cookie the request came with. */
+  experimentCookie: string | null;
+  /** Whether a robot asked, which always sees the live theme. */
+  robot: boolean;
 }
 
 /**
@@ -626,17 +637,23 @@ export class ShopThemes {
     } = {},
   ) {}
 
-  /** The theme `shop`'s pages are rendered with: its own, or the platform theme. */
-  async for(shopId: string, shop: ShopDoc, store: StoreData): Promise<Theme> {
+  /**
+   * The theme `shop`'s pages are rendered with: its own, or the platform theme; or, for a shopper
+   * in the second arm of its running experiment (ADR-866), the experiment's draft.
+   */
+  async for(shopId: string, shop: ShopDoc, store: StoreData, arm: 'a' | 'b' = 'a'): Promise<Theme> {
+    const draft = arm === 'b' && shop.experiment ? shop.experiment : null;
     // Documents written before shops had themes have none.
-    const wanted = shop.theme ?? null;
+    const wanted = draft ? { id: draft.themeId, version: draft.version } : (shop.theme ?? null);
     if (!wanted) return this.base;
     const key = `${shopId}:${wanted.id}:${wanted.version}`;
     const kept = this.#kept(key);
     if (kept) return kept;
     let loading = this.#loading.get(key);
     if (!loading) {
-      loading = this.#load(shopId, wanted, store, key).finally(() => this.#loading.delete(key));
+      loading = this.#load(shopId, wanted, store, key, Boolean(draft)).finally(() =>
+        this.#loading.delete(key),
+      );
       this.#loading.set(key, loading);
     }
     return loading;
@@ -647,8 +664,9 @@ export class ShopThemes {
     wanted: { id: string; version: number },
     store: StoreData,
     key: string,
+    draft = false,
   ): Promise<Theme> {
-    const doc = await store.theme();
+    const doc = await (draft ? store.experimentTheme() : store.theme());
     if (!doc) return this.base;
     // Written since the shop's document was read, or not yet: shown, but not kept as the version
     // the shop's document names.
@@ -795,6 +813,26 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   });
   // An answer that sets a cookie is the shopper's own, whatever its handler said: never kept.
   app.addHook('onSend', async (request, reply, payload) => {
+    // A shopper put in an arm of the shop's theme experiment keeps it; a page of its draft is
+    // theirs alone (ADR-866).
+    const found = await requestShops.get(request)?.catch(() => null);
+    if (found?.experiment) {
+      if (found.experiment.assigned && !reply.hasHeader('set-cookie')) {
+        reply.header('set-cookie', experimentCookie(found.experiment, { secure }));
+      } else if (found.experiment.assigned) {
+        const kept = reply.getHeader('set-cookie');
+        reply.header('set-cookie', [
+          ...(Array.isArray(kept) ? kept : [String(kept)]),
+          experimentCookie(found.experiment, { secure }),
+        ]);
+      }
+      if (
+        found.experiment.arm === 'b' &&
+        /^public/.test(String(reply.getHeader('cache-control')))
+      ) {
+        reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
+      }
+    }
     if (reply.hasHeader('set-cookie') && /^public/.test(String(reply.getHeader('cache-control')))) {
       reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
     }
@@ -908,6 +946,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       preview,
       editor: preview !== null && framed && editorOrigins.length > 0,
       currency: currencyCookieOf(request.headers.cookie),
+      experiment: null,
+      experimentCookie: cookieOf(request.headers.cookie, EXPERIMENT_COOKIE),
+      robot: isRobot(request.headers['user-agent']),
     };
   };
 
@@ -925,10 +966,22 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const session = sessionOf(request.headers.cookie);
     if (!session || isRobot(request.headers['user-agent'])) return;
     try {
-      const timezone = (await found.store.shop()).timezone ?? 'Asia/Karachi';
+      const doc = await found.store.shop();
+      const timezone = doc.timezone ?? 'Asia/Karachi';
       await (step === 'visited'
         ? activity.visited(found.shopId, timezone, session)
         : activity.reached(found.shopId, timezone, session, step));
+      // Counted in the arm of the shop's theme experiment its cookie keeps, too (ADR-866).
+      const arm = experimentArm(doc.experiment, found.experimentCookie, false);
+      if (arm && !arm.assigned) {
+        await activity.experimented(
+          found.shopId,
+          arm.id,
+          arm.arm,
+          session,
+          step === 'visited' ? undefined : step,
+        );
+      }
     } catch {
       // A count missed is no reason to fail a shopper.
     }
@@ -1263,11 +1316,17 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       .send(waiting.html);
   });
 
-  /** The theme the shop's pages are rendered in: the one previewed, else its main theme. */
+  /**
+   * The theme the shop's pages are rendered in: the one previewed, else its main theme, or the
+   * draft of its running experiment for a shopper in its second arm (ADR-866).
+   */
   const themeFor =
     (shop: Found) =>
-    (doc: ShopDoc): Theme | Promise<Theme> =>
-      shop.preview?.theme ?? themes.for(shop.shopId, doc, shop.store);
+    (doc: ShopDoc): Theme | Promise<Theme> => {
+      if (shop.preview) return shop.preview.theme;
+      shop.experiment ??= experimentArm(doc.experiment, shop.experimentCookie, shop.robot);
+      return themes.for(shop.shopId, doc, shop.store, shop.experiment?.arm);
+    };
 
   /**
    * The shop's address, as search engines are told it (OS-09): its primary domain, else its

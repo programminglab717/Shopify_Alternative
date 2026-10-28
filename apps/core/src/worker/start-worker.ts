@@ -178,6 +178,7 @@ import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
 import { StatusShopNotices } from './status-shop-notices.js';
 import { CurrencyRates } from './currency-rates.js';
+import { ThemeExperiments } from './theme-experiments.js';
 import { LegalChangeNotices } from './legal-notices.js';
 import { OrderTemplates } from './order-templates.js';
 import { StatusProbes } from './status-probes.js';
@@ -826,8 +827,16 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       { days: new SessionDaysService(database), taps: new LinkTapsService(database) },
       logger,
     ).start(config.SESSIONS_INTERVAL_MS);
+    // Shops' theme experiments counted, and ended on their last day or when their draft sells
+    // clearly worse (ADR-866).
+    const experiments = new ThemeExperiments(
+      database,
+      new StorefrontActivity(sessionsRedis),
+      logger,
+    ).start(config.SESSIONS_INTERVAL_MS);
     closers.push(async () => {
       await sessions.stop();
+      await experiments.stop();
       sessionsRedis.disconnect();
     });
     // Storefronts whose publisher gave up on them, built once their shops go quiet (ADR-225).

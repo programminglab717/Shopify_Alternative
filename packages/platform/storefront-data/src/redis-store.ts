@@ -119,6 +119,10 @@ export class RedisStore implements StoreData {
     return parse(await this.#get(this.keys.theme(this.shopId)));
   }
 
+  async experimentTheme(): Promise<ThemeDoc | null> {
+    return parse(await this.#get(this.keys.experimentTheme(this.shopId)));
+  }
+
   async handles(kind: HandledKind): Promise<string[]> {
     this.roundTrips += 1;
     return this.#redis.hkeys(this.keys.ids(this.shopId, kind));

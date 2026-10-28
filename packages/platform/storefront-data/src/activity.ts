@@ -13,6 +13,8 @@ export const ACTIVITY = {
   liveMinutes: 5,
   /** How long a day's counts stay in Valkey, for the worker to keep them. */
   keepDays: 3,
+  /** How long a theme experiment's counts stay after its last session: its longest run, and more. */
+  experimentDays: 35,
 } as const;
 
 /** A day's sessions, and those of them that took each step. */
@@ -98,6 +100,45 @@ export class StorefrontActivity {
   async linkTaps(shopId: string, day: string): Promise<Record<string, number>> {
     const counted = await this.redis.hgetall(this.keys.linkTaps(shopId, day));
     return Object.fromEntries(Object.entries(counted).map(([url, taps]) => [url, Number(taps)]));
+  }
+
+  /**
+   * `session` in arm `arm` of the shop's theme experiment `experimentId` (OS-22, ADR-866): among
+   * its sessions, and those that took `step` where one is given. Kept as long as an experiment
+   * runs, and a while after for the worker to take its last counts.
+   */
+  async experimented(
+    shopId: string,
+    experimentId: string,
+    arm: 'a' | 'b',
+    session: string,
+    step?: Exclude<ActivityStep, 'sessions'>,
+  ): Promise<void> {
+    const pipeline = this.redis.pipeline();
+    for (const each of step ? (['sessions', step] as const) : (['sessions'] as const)) {
+      const key = this.keys.experiment(shopId, experimentId, arm, each);
+      pipeline.pfadd(key, session).expire(key, ACTIVITY.experimentDays * 24 * 60 * 60);
+    }
+    await exec(pipeline);
+  }
+
+  /** A theme experiment's counts so far, each arm's sessions and their steps. */
+  async experimentCounts(
+    shopId: string,
+    experimentId: string,
+  ): Promise<Record<'a' | 'b', ActivityCounts>> {
+    const pipeline = this.redis.pipeline();
+    for (const arm of ['a', 'b'] as const) {
+      for (const step of ACTIVITY_STEPS) {
+        pipeline.pfcount(this.keys.experiment(shopId, experimentId, arm, step));
+      }
+    }
+    const results = await exec(pipeline);
+    const arm = (offset: number) =>
+      Object.fromEntries(
+        ACTIVITY_STEPS.map((step, index) => [step, Number(results[offset + index] ?? 0)]),
+      ) as ActivityCounts;
+    return { a: arm(0), b: arm(ACTIVITY_STEPS.length) };
   }
 
   /** How many sessions saw a page in the five minutes to `at`. */

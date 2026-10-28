@@ -39,6 +39,7 @@ export {
   type SitemapEntryDoc,
   type StoreData,
   type StoreDocuments,
+  type ExperimentDoc,
   type ThemeDoc,
   type TranslationsDoc,
   type MetafieldsDoc,

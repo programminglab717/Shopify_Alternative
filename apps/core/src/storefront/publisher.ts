@@ -102,6 +102,7 @@ import {
   shopRedirectsOf,
   shopTranslationsOf,
   shownStorefrontFiltersIn,
+  runningExperimentIn,
   shownCurrenciesIn,
   storefrontTokensIn,
   type ArticleChangedPayload,
@@ -351,9 +352,15 @@ export function itemsFor(event: DomainEvent): string[] {
     case InventoryEvents.LocationDeleted:
       // It may have been listed for customers to visit (ADR-828).
       return [Items.shop];
-    case OnlineStoreEvents.ThemeUpdated:
-      // Only the main theme shows; the others are being prepared.
-      return (event.payload as unknown as ThemeUpdatedPayload).role === 'main' ? [Items.shop] : [];
+    case OnlineStoreEvents.ThemeUpdated: {
+      // Only the main theme shows, and a draft a running experiment shows some shoppers
+      // (ADR-866); the others are being prepared.
+      const payload = event.payload as unknown as ThemeUpdatedPayload;
+      return payload.role === 'main' || payload.experiment ? [Items.shop] : [];
+    }
+    case OnlineStoreEvents.ThemeExperimentUpdated:
+      // The experiment the shop runs, and its draft (ADR-866).
+      return [Items.shop];
     case OnlineStoreEvents.ThemePublished:
     case OnlineStoreEvents.PreferencesUpdated:
     case CheckoutEvents.DeliverySettingsUpdated:
@@ -582,6 +589,7 @@ export const PUBLISHED_EVENTS = [
   AppEvents.Deleted,
   SellingPlanEvents.Updated,
   OnlineStoreEvents.PresentmentCurrenciesUpdated,
+  OnlineStoreEvents.ThemeExperimentUpdated,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
   OnlineStoreEvents.DomainDeleted,
@@ -1019,6 +1027,13 @@ export class StorefrontPublisher {
     const theme = main ? themeDoc(main) : null;
     if (theme) await writer.putTheme(theme);
     else await writer.dropTheme();
+    // The draft a running experiment shows some shoppers (ADR-866), written before the document
+    // naming it, as the main theme is.
+    const running = await runningExperimentIn(tx, shopId);
+    const draft = running ? await this.services.themes.themeOf(tx, shopId, running.themeId) : null;
+    const experiment = running && draft ? themeDoc(draft) : null;
+    if (experiment) await writer.putExperimentTheme(experiment);
+    else await writer.dropExperimentTheme();
     const stored = await this.redis.get(this.#keys.shop(shopId));
     const before = stored ? (JSON.parse(stored) as ShopDoc) : null;
     const previous = before?.handle ?? null;
@@ -1093,6 +1108,14 @@ export class StorefrontPublisher {
         productTag: plan.productTag,
       })),
       await shownCurrenciesIn(tx, shopId),
+      running && experiment
+        ? {
+            id: toPublicId('themeExperiment', running.id),
+            themeId: experiment.id,
+            version: experiment.version,
+            share: running.share,
+          }
+        : null,
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

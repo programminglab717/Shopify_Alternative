@@ -51,6 +51,8 @@ export const OnlineStoreEvents = {
    * (ADR-865): its document carries them, with their rates.
    */
   PresentmentCurrenciesUpdated: 'presentment_currencies.updated',
+  /** A theme experiment started or ended (ADR-866): the shop's document names the running one. */
+  ThemeExperimentUpdated: 'theme_experiment.updated',
 } as const;
 
 export interface ThemeCreatedPayload {
@@ -63,6 +65,8 @@ export interface ThemeUpdatedPayload {
   changed: string[];
   role: ThemeRoleValue;
   version: number;
+  /** A draft a running experiment shows some shoppers (ADR-866): its storefront follows it too. */
+  experiment?: true;
 }
 
 /** A theme became the main one. */

@@ -36,6 +36,18 @@ export {
   type CurrencyRateRecord,
   type PresentmentCurrencyRecord,
 } from '../internal/presentment-currencies.js';
+export {
+  EXPERIMENT_LIMITS,
+  ThemeExperimentService,
+  endExperimentIn,
+  guardrailTripped,
+  recordExperimentResultsIn,
+  runningExperimentIn,
+  verdictOf,
+  zScoreOf,
+  type ExperimentResults,
+  type ThemeExperimentRecord,
+} from '../internal/theme-experiments.js';
 export type {
   ArticleImageRecord,
   ArticleRecord,

@@ -12777,3 +12777,72 @@ export const PresentmentCurrenciesSetMutation = /* GraphQL */ `
   ${PRESENTMENT_CURRENCY}
   ${USER_ERRORS}
 `;
+
+const THEME_EXPERIMENT = /* GraphQL */ `
+  fragment ThemeExperimentFields on ThemeExperiment {
+    id
+    name
+    themeId
+    share
+    startedAt
+    endsAt
+    endedAt
+    endedReason
+    live {
+      sessions
+      addedToCart
+      reachedCheckout
+      converted
+      conversionRate
+    }
+    draft {
+      sessions
+      addedToCart
+      reachedCheckout
+      converted
+      conversionRate
+    }
+    verdict
+    countedAt
+  }
+`;
+
+/** The shop's theme experiments (OS-22, ADR-866). */
+export const ThemeExperimentsQuery = /* GraphQL */ `
+  query ThemeExperiments {
+    themeExperiments {
+      ...ThemeExperimentFields
+    }
+  }
+  ${THEME_EXPERIMENT}
+`;
+
+export const ThemeExperimentStartMutation = /* GraphQL */ `
+  mutation ThemeExperimentStart($input: ThemeExperimentInput!) {
+    themeExperimentStart(input: $input) {
+      themeExperiment {
+        ...ThemeExperimentFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME_EXPERIMENT}
+  ${USER_ERRORS}
+`;
+
+export const ThemeExperimentEndMutation = /* GraphQL */ `
+  mutation ThemeExperimentEnd($id: ID!) {
+    themeExperimentEnd(id: $id) {
+      themeExperiment {
+        ...ThemeExperimentFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME_EXPERIMENT}
+  ${USER_ERRORS}
+`;

@@ -41,6 +41,11 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:theme`;
   }
 
+  /** The files of the theme a running experiment shows some of the shop's shoppers (ADR-866). */
+  experimentTheme(shopId: string): string {
+    return `${this.#base(shopId)}:theme-b`;
+  }
+
   /** The shop's menus, a hash by handle, written whole. */
   menus(shopId: string): string {
     return `${this.#base(shopId)}:menus`;
@@ -122,6 +127,14 @@ export class StorefrontKeys {
    */
   linkTaps(shopId: string, day: string): string {
     return `${this.prefix}:{${shopId}}:an:${day}:taps`;
+  }
+
+  /**
+   * The sessions a theme experiment showed one of its arms, or those of them that took `step`
+   * (ADR-866): a HyperLogLog of their IDs, as a day's are.
+   */
+  experiment(shopId: string, experimentId: string, arm: 'a' | 'b', step: ActivityStep): string {
+    return `${this.prefix}:{${shopId}}:ab:${experimentId}:${arm}:${step}`;
   }
 
   /**

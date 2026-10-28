@@ -11348,6 +11348,14 @@ type Mutation {
   """Deletes a theme other than the main one."""
   themeDelete(id: ID!): ThemeDeletePayload!
 
+  """Ends a running experiment: every shopper sees the live theme again."""
+  themeExperimentEnd(id: ID!): ThemeExperimentPayload!
+
+  """
+  Starts showing a draft theme to a share of shoppers, the rest the live theme, for up to 30 days: one experiment at a time.
+  """
+  themeExperimentStart(input: ThemeExperimentInput!): ThemeExperimentPayload!
+
   """
   Deletes the shop's own files from a theme, so the platform theme's show again.
   """
@@ -17203,6 +17211,11 @@ type Query {
   taxSettings: TaxSettings!
   theme(id: ID!): OnlineStoreTheme
 
+  """
+  The shop's theme experiments, the newest first: the running one, and those before.
+  """
+  themeExperiments: [ThemeExperiment!]!
+
   """The theme store's themes, the latest first."""
   themeStore: [ThemeListing!]!
 
@@ -20406,6 +20419,69 @@ type ThemeCreatePayload {
 
 type ThemeDeletePayload {
   deletedThemeId: ID
+  userErrors: [UserError!]!
+}
+
+"""
+A theme experiment (OS-22, ADR-866): a draft of the shop’s theme shown a share of its shoppers, the rest shown the live one, each keeping the theme first shown them.
+"""
+type ThemeExperiment {
+  """When its counts were taken."""
+  countedAt: DateTime
+
+  """The draft’s arm."""
+  draft: ThemeExperimentArm!
+  endedAt: DateTime
+
+  """
+  Why it ended: staff, time, guardrail (its draft sold clearly worse) or theme_changed (a theme was published, or its draft deleted).
+  """
+  endedReason: String
+
+  """When it ends by itself."""
+  endsAt: DateTime!
+  id: ID!
+
+  """The live theme’s arm."""
+  live: ThemeExperimentArm!
+  name: String!
+
+  """The percent of shoppers shown the draft."""
+  share: Int!
+  startedAt: DateTime!
+
+  """The draft theme shown in the second arm."""
+  themeId: ID!
+
+  """
+  too_early, until each arm has 200 sessions; then b_better or b_worse where the draft’s share of sessions that ordered differs, at 95% confidence, and no_difference where it doesn’t.
+  """
+  verdict: String!
+}
+
+"""An arm of a theme experiment: its sessions and their steps (ADR-180)."""
+type ThemeExperimentArm {
+  addedToCart: Int!
+
+  """The share of its sessions that ordered, from 0 to 1."""
+  conversionRate: Float!
+  converted: Int!
+  reachedCheckout: Int!
+  sessions: Int!
+}
+
+input ThemeExperimentInput {
+  """How many days it runs, 1 to 30."""
+  days: Int!
+  name: String!
+
+  """The percent of shoppers shown the draft, 1 to 50."""
+  share: Int!
+  themeId: ID!
+}
+
+type ThemeExperimentPayload {
+  themeExperiment: ThemeExperiment
   userErrors: [UserError!]!
 }
 

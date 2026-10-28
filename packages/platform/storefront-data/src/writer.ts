@@ -132,6 +132,17 @@ export class ShopWriter {
     return this.#set([[this.keys.theme(this.shopId), doc]]);
   }
 
+  /** The theme a running experiment shows some of the shop's shoppers (ADR-866). */
+  putExperimentTheme(doc: ThemeDoc): Promise<void> {
+    return this.#set([[this.keys.experimentTheme(this.shopId), doc]]);
+  }
+
+  /** The shop runs no experiment. */
+  async dropExperimentTheme(): Promise<void> {
+    const keys = [this.keys.lock(this.shopId), this.keys.experimentTheme(this.shopId)];
+    this.#check(await this.redis.sfDel(keys.length, ...keys, this.token, this.lockMs));
+  }
+
   /** The shop shows the platform theme as it is. */
   async dropTheme(): Promise<void> {
     const keys = [this.keys.lock(this.shopId), this.keys.theme(this.shopId)];

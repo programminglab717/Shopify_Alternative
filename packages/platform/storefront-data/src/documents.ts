@@ -180,6 +180,15 @@ export interface SellingPlanDoc {
   productTag: string | null;
 }
 
+/** A shop's running theme experiment, as its storefront splits its shoppers (ADR-866). */
+export interface ExperimentDoc {
+  id: string;
+  themeId: string;
+  version: number;
+  /** The percent of shoppers shown the experiment's theme, 1 to 50. */
+  share: number;
+}
+
 /**
  * A currency the shop shows its prices in besides rupees (OS-21, ADR-865), at the rate the
  * document was written with: rupees for one unit, "76.4521", and how its prices are rounded.
@@ -595,6 +604,11 @@ export interface ShopDoc {
    */
   sellingPlans?: SellingPlanDoc[];
   /**
+   * Its running theme experiment (OS-22, ADR-866): the theme it shows the share of its shoppers
+   * in the experiment's second arm, at the version written with the document. Absent for none.
+   */
+  experiment?: ExperimentDoc;
+  /**
    * The currencies it shows its prices in besides rupees (OS-21, ADR-865), in its picker's
    * order: shoppers who pick one see its prices in it, and checkout charges rupees. Absent for
    * none.
@@ -934,6 +948,8 @@ export interface StoreData {
   policy(type: string, locale?: string): Promise<string | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
+  /** The theme a running experiment shows some of its shoppers (OS-22, ADR-866); null for none. */
+  experimentTheme(): Promise<ThemeDoc | null>;
   /**
    * The handle of every product, collection, page, blog or article the storefront shows, for its
    * sitemaps, an article's with its blog's: in no order, in one round trip.
@@ -958,6 +974,8 @@ export interface StoreDocuments {
   blogs?: BlogDoc[];
   articles?: ArticleDoc[];
   theme?: ThemeDoc;
+  /** The theme a running experiment shows some of its shoppers (ADR-866). */
+  experimentTheme?: ThemeDoc;
   /** Targets by path. */
   redirects?: Record<string, string>;
   /** Policies' bodies by type, and in other languages by {@link policyField}. */
@@ -1062,6 +1080,10 @@ export class MemoryStore implements StoreData {
 
   theme(): Promise<ThemeDoc | null> {
     return this.#answer(this.documents.theme ?? null);
+  }
+
+  experimentTheme(): Promise<ThemeDoc | null> {
+    return this.#answer(this.documents.experimentTheme ?? null);
   }
 
   handles(kind: HandledKind): Promise<string[]> {

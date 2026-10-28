@@ -27,6 +27,8 @@ import { PageService } from './page.service.js';
 import { PolicyService } from './policy.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { PresentmentCurrencyService } from './presentment-currencies.js';
+import { ThemeExperimentService } from './theme-experiments.js';
+import { ThemeExperimentResolver } from './graphql/theme-experiment.resolver.js';
 import { SessionDaysService } from './session-days.service.js';
 import { StorefrontFiltersService } from './storefront-filters.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
@@ -65,6 +67,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     PreferencesResolver,
     PresentmentCurrencyService,
     PresentmentCurrencyResolver,
+    ThemeExperimentService,
+    ThemeExperimentResolver,
     StorefrontFiltersService,
     StorefrontFiltersResolver,
     DomainService,

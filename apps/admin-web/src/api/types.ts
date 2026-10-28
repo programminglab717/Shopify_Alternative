@@ -6245,3 +6245,37 @@ export interface PresentmentCurrenciesSetData {
     userErrors: UserError[];
   };
 }
+
+/** An arm of a theme experiment: its sessions and their steps (ADR-866). */
+export interface ThemeExperimentArm {
+  sessions: number;
+  addedToCart: number;
+  reachedCheckout: number;
+  converted: number;
+  conversionRate: number;
+}
+
+/** A draft theme shown a share of the shop's shoppers (OS-22, ADR-866). */
+export interface ThemeExperiment {
+  id: string;
+  name: string;
+  themeId: string;
+  share: number;
+  startedAt: string;
+  endsAt: string;
+  endedAt: string | null;
+  endedReason: 'staff' | 'time' | 'guardrail' | 'theme_changed' | null;
+  live: ThemeExperimentArm;
+  draft: ThemeExperimentArm;
+  verdict: 'too_early' | 'no_difference' | 'b_better' | 'b_worse';
+  countedAt: string | null;
+}
+
+export interface ThemeExperimentsData {
+  themeExperiments: ThemeExperiment[];
+}
+
+export interface ThemeExperimentPayloadData {
+  themeExperimentStart?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
+  themeExperimentEnd?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
+}

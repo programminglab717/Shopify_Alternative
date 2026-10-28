@@ -158,6 +158,10 @@ export class TranslatedStore implements StoreData {
     return this.store.theme();
   }
 
+  experimentTheme(): Promise<ThemeDoc | null> {
+    return this.store.experimentTheme();
+  }
+
   handles(kind: HandledKind): Promise<string[]> {
     return this.store.handles(kind);
   }

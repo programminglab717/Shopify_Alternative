@@ -3017,6 +3017,7 @@ describe('Storefront rendering', () => {
     const store: StoreData = {
       shop: () => memory.shop(),
       theme: () => memory.theme(),
+      experimentTheme: () => memory.experimentTheme(),
       productByHandle: (handle) => held(() => memory.productByHandle(handle))(),
       products: (ids) => held(() => memory.products(ids))(),
       collectionByHandle: (handle) => held(() => memory.collectionByHandle(handle))(),

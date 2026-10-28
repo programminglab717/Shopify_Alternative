@@ -30,6 +30,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { ThemeExperiments } from './theme-experiments';
 import { ThemeStore } from './theme-store';
 import { ScheduledNote, ThemeSchedule, ThemeVersions, VersionsButton } from './theme-versions';
 
@@ -336,6 +337,7 @@ export function ThemesTab() {
         </ul>
       </Card>
       <AddTheme themes={themes} library={query.data.platformThemes} />
+      <ThemeExperiments themes={themes} />
       <ThemeStore />
     </div>
   );

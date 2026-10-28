@@ -20,6 +20,7 @@ import {
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
 } from './events.js';
+import { endExperimentIn, runningExperimentIn } from './theme-experiments.js';
 import type {
   Page,
   ThemeEditorRecord,
@@ -420,6 +421,8 @@ export class ThemeService {
       })
       .where(and(eq(themes.shopId, shopId), eq(themes.id, id)))
       .returning();
+    // Another live theme is no longer the one an experiment compares its draft with (ADR-866).
+    await endExperimentIn(tx, shopId, 'theme_changed');
     await appendEvent<ThemePublishedPayload>(tx, shopId, {
       type: OnlineStoreEvents.ThemePublished,
       aggregateType: 'theme',
@@ -438,6 +441,8 @@ export class ThemeService {
         return failOne(['id'], 'INVALID', "The main theme can't be deleted; publish another first");
       }
       await tx.delete(themes).where(and(eq(themes.shopId, tenant.shopId), eq(themes.id, id)));
+      // An experiment of the draft ends with it (ADR-866).
+      await endExperimentIn(tx, tenant.shopId, 'theme_changed', { themeId: id });
       await appendEvent<ThemeDeletedPayload>(tx, tenant.shopId, {
         type: OnlineStoreEvents.ThemeDeleted,
         aggregateType: 'theme',
@@ -696,11 +701,17 @@ export class ThemeService {
       .set({ version: sql`${themes.version} + 1`, updatedAt: sql`now()` })
       .where(and(eq(themes.shopId, shopId), eq(themes.id, theme.id)))
       .returning();
+    const running = await runningExperimentIn(tx, shopId);
     await appendEvent<ThemeUpdatedPayload>(tx, shopId, {
       type: OnlineStoreEvents.ThemeUpdated,
       aggregateType: 'theme',
       aggregateId: theme.id,
-      payload: { changed: [...changed].sort(), role: updated!.role, version: updated!.version },
+      payload: {
+        changed: [...changed].sort(),
+        role: updated!.role,
+        version: updated!.version,
+        ...(running?.themeId === theme.id && { experiment: true as const }),
+      },
     });
     return toThemeRecord(updated!);
   }

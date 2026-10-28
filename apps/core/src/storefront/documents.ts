@@ -53,6 +53,7 @@ import {
   type ProductDoc,
   type SeoDoc,
   type CurrencyDoc,
+  type ExperimentDoc,
   type SellingPlanDoc,
   type ShopDoc,
   type ThemeDoc,
@@ -705,6 +706,8 @@ export function shopDoc(
   sellingPlans: readonly SellingPlanDoc[] = [],
   /** The currencies it shows its prices in besides rupees, at their rates (ADR-865). */
   currencies: readonly CurrencyDoc[] = [],
+  /** Its running theme experiment (ADR-866). */
+  experiment: ExperimentDoc | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -779,6 +782,7 @@ export function shopDoc(
     ...(appEmbeds.length > 0 && { appEmbeds: appEmbeds.map((embed) => ({ ...embed })) }),
     ...(sellingPlans.length > 0 && { sellingPlans: sellingPlans.map((plan) => ({ ...plan })) }),
     ...(currencies.length > 0 && { currencies: currencies.map((each) => ({ ...each })) }),
+    ...(experiment && { experiment: { ...experiment } }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.

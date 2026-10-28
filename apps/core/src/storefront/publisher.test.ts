@@ -63,6 +63,7 @@ import {
   PolicyService,
   PreferencesService,
   PresentmentCurrencyService,
+  ThemeExperimentService,
   StorefrontFiltersService,
   StorefrontTokenService,
   ThemeService,
@@ -96,6 +97,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TestDns } from '../testing/api.js';
 import { CurrencyRates } from '../worker/currency-rates.js';
+import { ThemeExperiments } from '../worker/theme-experiments.js';
 import { StorefrontSweep } from '../worker/storefront-sweep.js';
 import { Items, itemsFor, StorefrontPublisher } from './publisher.js';
 
@@ -823,6 +825,75 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       files: { 'config/settings_data.json': settings, 'templates/index.json': home },
     });
     expect((await store().shop()).theme).toEqual({ id: winter.id, version: published.version });
+  });
+
+  it("publishes a running theme experiment's draft beside the main theme, until it ends (ADR-866)", async () => {
+    const experiments = new ThemeExperimentService(database);
+    const main = await themes.main(tenant);
+    const draft = unwrap(await themes.create(tenant, { name: 'Eid offer', copyFrom: main.id }));
+    await deliver();
+    const start = (themeId: string, share = 20) =>
+      experiments.start(tenant, { name: 'Eid banner', themeId, share, days: 14 });
+    const refused = await start(main.id, 60);
+    expect(
+      refused.ok ? [] : refused.errors.map((each) => [each.field.join('.'), each.code]),
+    ).toEqual([['input.share', 'INVALID']]);
+    const live = await start(main.id);
+    expect(live.ok ? null : live.errors[0]?.code).toBe('INVALID');
+
+    const running = unwrap(await start(draft.id));
+    expect(await deliver()).toEqual(['theme_experiment.updated']);
+    expect((await store().shop()).experiment).toEqual({
+      id: toPublicId('themeExperiment', running.id),
+      themeId: draft.id,
+      version: draft.version,
+      share: 20,
+    });
+    expect((await store().experimentTheme())?.id).toBe(draft.id);
+    expect((await store().theme())?.id).toBe(main.id);
+    const twice = await start(draft.id);
+    expect(twice.ok ? null : twice.errors[0]?.code).toBe('TAKEN');
+
+    // Its draft followed as it changes; another draft not.
+    unwrap(
+      await themes.upsertFiles(tenant, draft.id, [
+        { filename: 'config/settings_data.json', body: '{"current":{}}' },
+      ]),
+    );
+    expect(await deliver()).toEqual(['theme.updated']);
+    expect((await store().shop()).experiment?.version).toBe(draft.version + 1);
+
+    // Its draft selling clearly worse ends it, and every shopper sees the live theme again.
+    let counts = {
+      a: { sessions: 1_000, added_to_cart: 120, reached_checkout: 80, converted: 40 },
+      b: { sessions: 1_000, added_to_cart: 90, reached_checkout: 40, converted: 15 },
+    };
+    const sweeps = new ThemeExperiments(database, { experimentCounts: async () => counts });
+    expect(await sweeps.sweep()).toEqual([{ id: running.id, reason: 'guardrail' }]);
+    expect(await deliver()).toEqual(['theme_experiment.updated']);
+    expect((await store().shop()).experiment).toBeUndefined();
+    expect(await store().experimentTheme()).toBeNull();
+    const [ended] = await experiments.list(tenant);
+    expect([ended!.endedReason, ended!.results.b.converted]).toEqual(['guardrail', 15]);
+
+    // One runs to its last day; another ends when a theme is published.
+    counts = {
+      a: { sessions: 50, added_to_cart: 5, reached_checkout: 3, converted: 1 },
+      b: { sessions: 50, added_to_cart: 5, reached_checkout: 3, converted: 2 },
+    };
+    const timed = unwrap(await start(draft.id));
+    expect(await sweeps.sweep()).toEqual([]);
+    expect(await sweeps.sweep(new Date(Date.now() + 15 * 86_400_000))).toEqual([
+      { id: timed.id, reason: 'time' },
+    ]);
+    unwrap(await start(draft.id));
+    const other = unwrap(await themes.create(tenant, { name: 'Winter', copyFrom: main.id }));
+    unwrap(await themes.publish(tenant, other.id));
+    expect((await experiments.list(tenant))[0]!.endedReason).toBe('theme_changed');
+    await deliver();
+    expect((await store().shop()).experiment).toBeUndefined();
+    unwrap(await themes.publish(tenant, main.id));
+    await deliver();
   });
 
   it('names what each picture its theme shows holds, so a file replaced is fetched afresh (ADR-670)', async () => {
