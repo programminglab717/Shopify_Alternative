@@ -1,0 +1,26 @@
+{
+  "name": "@hatti/admin-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A TypeScript client for Hatti's Admin API, for apps and integrations: GraphQL over fetch with the app's access token, retried when throttled by what extensions.cost says, idempotency keys for mutations, connections read a page at a time, and webhooks' signatures checked. No dependencies.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

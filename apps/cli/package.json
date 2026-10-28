@@ -1,0 +1,26 @@
+{
+  "name": "@hatti/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Hatti's command line for developers (DEV-08): a shop's themes listed, their files pulled to a directory and pushed back, and pushed as they are saved while a preview shows them, through the Admin API with a custom app's token.",
+  "type": "module",
+  "bin": {
+    "hatti": "./dist/main.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/admin-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -76,6 +76,7 @@
     "rxjs": "catalog:"
   },
   "devDependencies": {
+    "@hatti/admin-client": "workspace:*",
     "@nestjs/testing": "catalog:",
     "@types/busboy": "catalog:",
     "@types/node": "catalog:",
