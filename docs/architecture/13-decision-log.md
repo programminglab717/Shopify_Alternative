@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-896 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-897 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -904,6 +904,7 @@
 | 894 | The merchant copilot: a request in English, Urdu or Roman Urdu drafted into a discount code or a segment, which staff confirm before it is made, or a report, run | Accepted |
 | 895 | An inventory item keeps FBR's unit of measure and the SRO it is sold under, beside its HS code, and digital invoicing is sent them with each item | Accepted |
 | 896 | The copilot drafts broadcasts: a name, who it goes to as a segment query, its SMS words and when, staff choosing its WhatsApp template and its audience saved as a segment as they confirm it | Accepted |
+| 897 | Bulk mutations: bulkOperationRunMutation runs a mutation once for each line of a JSONL file of variables the caller staged, as the caller, in order, each answer a line of the file it writes | Accepted |
 
 ---
 
@@ -29719,3 +29720,33 @@
     delete.
   * The model does not see the shop's templates or segments. A draft cannot name an existing
     segment; its query says who.
+
+## ADR-897 · Bulk mutations: bulkOperationRunMutation runs a mutation once for each line of a JSONL file of variables the caller staged, as the caller, in order, each answer a line of the file it writes
+
+* **Context:** ADR-843 built bulk exports and left `bulkOperationRunMutation` for later. Apps
+  that move a catalogue or a customer list in from elsewhere expect Shopify's import: stage a
+  JSONL file of variables, then run one mutation for each line.
+* **Decision:**
+  * **Staging, as Shopify's:** `stagedUploadsCreate` takes `resource: BULK_MUTATION_VARIABLES`.
+    * It signs a PUT, for an hour, of a JSONL file up to 20 MiB, under the shop's own
+      `shops/<shop>/bulk-variables/` prefix.
+    * Its `resourceUrl` is the `stagedUploadPath` to give. No file record is made.
+    * It needs no scope of its own: the mutation's scopes apply as it runs. A shop's files still
+      need `write_files`. Variables staged among files are refused.
+  * **`bulkOperationRunMutation(mutation, stagedUploadPath)`:**
+    * Takes one mutation of one field, with variables, checked against the API's schema.
+    * Takes only the shop's own staged path, and only once uploaded.
+    * Runs in the background, as the caller, through the API's own engine, as bulk queries'
+      pages do: one line at a time, in order, up to 100,000 lines.
+    * Writes each answer, data and errors, as a line with its `__lineNumber` from 0, as
+      Shopify's. A line that isn't a JSON object is answered with an error of its own.
+    * Looks every 50 lines for a cancel. Removes the variables once run.
+  * **One query and one mutation** run at a time for a caller (migration 0395).
+    `currentBulkOperation(type: MUTATION)` says how the mutation stands; `BulkOperation.type`
+    says which it is.
+* **Consequences:**
+  * An app imports thousands of products or customers without its own paging or the query
+    budget, each line's problems kept beside it.
+  * Mutations that ask for an Idempotency-Key header fail line by line in a bulk run, which
+    has none. Each line's answer says so.
+  * It runs in the API process that started it, as bulk queries do (ADR-843).
