@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### TikTok catalogues
+### e3fae5a · TikTok catalogues
 
 * **Online store:** the TikTok tab gives the catalog feed's address and how to add it to a
   catalogue in TikTok's Catalog Manager, for catalogue ads showing the store's products (CH-04,
