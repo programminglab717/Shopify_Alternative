@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-860 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-861 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -868,6 +868,7 @@
 | 858 | Partners are certified by Hatti's course: six lessons and ten questions in English and Urdu on the partner page, scored by Hatti, eight right for a year's certificate that shops see on experts | Accepted |
 | 859 | Expansion stores: an owner copies a shop's products to another shop they own, its prices at a rate, through the product export and import, and copies again to update them | Accepted |
 | 860 | Buy buttons: a snippet puts a product on any website, drawn by a script the shop's storefront serves from its public product data, Buy now opening its checkout through a cart permalink | Accepted |
+| 861 | Workflows: a shop's own triggers, conditions and actions, as Shopify Flow's are, with triggers and actions apps offer them through the Admin API | Accepted |
 
 ---
 
@@ -28304,3 +28305,63 @@
     shopper arrives.
   * **An iframe of the product's page:** heavy, not sized to the page around it, and themed as
     the store rather than as a button.
+
+## ADR-861 · Workflows: a shop's own triggers, conditions and actions, as Shopify Flow's are, with triggers and actions apps offer them through the Admin API
+
+* **Context:**
+  * DEV-11 asks for automation triggers and actions for apps, as Shopify Flow gives apps
+    triggers they fire and actions they are sent. Hatti had no such engine: only its fixed
+    marketing automations (ADR-425) and staff alerts.
+  * Apps already have webhooks signed with their secrets (ADR-397), and staff already get
+    pushes on their phones (ADR-506).
+* **Decision:**
+  * **A workflow** is a trigger, conditions, and up to five actions done in turn. The owner and
+    managers make them (`manage_apps`), 50 a shop, in Settings › Workflows. They can start from
+    four made for Pakistani shops: big cash-on-delivery orders, high-risk orders, customers who
+    return parcels, loyal customers.
+  * **Triggers:**
+    * Hatti's own: an order placed, confirmed, paid or cancelled; its parcel delivered or
+      returned; a customer added.
+    * An app's: an app offers one with `flowExtensionSet` and fires it with `flowTriggerReceive`,
+      naming the order or customer it is about and giving its fields.
+  * **Conditions** read the order (total in rupees, payment method, where it came from, risk,
+    city, tags, discount codes, SKUs), its customer (tags, orders, amount spent, parcels
+    returned) and an app trigger's fields. All must hold, or any.
+  * **Actions:**
+    * tags added to or taken from the order or its customer, the order's timeline naming the
+      workflow;
+    * a push to the owner's and managers' phones, a kind of its own each member turns on;
+    * an app's action, posted to its https address signed with the app's secret, as its
+      webhooks are.
+    * Words in actions fill `{{order.name}}` and the like from what the trigger tells of. Each is
+      checked when the workflow is saved: a condition or an action needs what its trigger tells
+      of.
+  * **Running:**
+    * Each event makes one run of each enabled workflow it triggers, once however often it is
+      heard, and at most 500 runs of a workflow an hour.
+    * The worker's sweep checks a run's conditions once, of the order or customer as they are
+      then, and does its actions in turn.
+    * An app's action that doesn't answer is tried again from it, for a day; one refused (a 4xx
+      other than 429), or any other action that can't be done, is recorded, and the rest are done
+      still. Runs are kept 30 days and listed with their workflow.
+  * **Apps' part:**
+    * An app offers up to 20 triggers and actions. One about orders or customers needs the scope
+      to read them, as it is sent their IDs.
+    * Staff can't offer them for an app. An app taking its trigger back leaves the workflow
+      telling of none, and its action back fails the step.
+* **Consequences:**
+  * A merchant tags and is told of what matters to them without staff watching every order, and
+    apps (reviews, loyalty, couriers) plug into the same workflows.
+  * Not yet:
+    * waits ("a day later") and branches;
+    * actions that change more than tags: cancelling, holding for review, sending the customer
+      a WhatsApp message (which needs approved templates);
+    * scheduled triggers, and triggers on stock;
+    * apps declaring their triggers and actions once for every shop, in their partner
+      registration, rather than in each shop.
+  * Which plans include workflows is the owner's to decide (OWN-52).
+* **Alternatives:**
+  * **Webhooks alone:** an app could act on Hatti's webhooks, but the merchant would set nothing
+    up and see no runs.
+  * **A general rules language:** harder for a merchant to read than fields, comparisons and
+    values chosen from lists.

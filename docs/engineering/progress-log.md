@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Workflows
+
+* **Settings › Workflows:** the owner and managers make workflows: a trigger (an order placed,
+  confirmed, paid, cancelled, delivered or returned; a customer added; an app's), conditions on
+  the order and its customer, and actions in turn: tags, a push to their phones, or an app's
+  action posted signed. Four starting workflows for Pakistani shops (DEV-11, [ADR-861](../architecture/13-decision-log.md#adr-861--workflows-a-shops-own-triggers-conditions-and-actions-as-shopify-flows-are-with-triggers-and-actions-apps-offer-them-through-the-admin-api)).
+* **Apps** offer triggers and actions with `flowExtensionSet` and fire triggers with
+  `flowTriggerReceive`; the developer guide says how. Which plans include workflows is OWN-52.
+* 4604 tests (15 new, the admin's check of each new GraphQL operation among them).
+
 ### c69ae2c · Buy buttons
 
 * **Products:** an active product's page gives a snippet to paste into a blog, another website

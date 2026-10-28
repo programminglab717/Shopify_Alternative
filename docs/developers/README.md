@@ -172,6 +172,29 @@ and buy paid ones once; the designer earns 80% of each sale, paid out with partn
 earnings. A theme's own files are JSON over one of Hatti's themes, so `hatti theme pull` and
 `push` work on it like any other.
 
+## Workflows
+
+Shops make workflows in Settings › Workflows: a trigger, conditions, and actions (ADR-861). An
+app adds triggers it fires and actions it is sent, as a Shopify Flow extension does:
+
+```graphql
+mutation {
+  flowExtensionSet(input: {
+    kind: ACTION, handle: "ask-for-review", title: "Ask for a review", resource: ORDER
+    url: "https://your-app.example/flow"
+    fields: [{ key: "message", label: "Message", type: TEXT, required: true }]
+  }) { flowExtension { id } userErrors { field message } }
+}
+```
+
+* **An action** is posted to its `url` as JSON: `action`, `shop_id`, `workflow_id`, `run_id`,
+  `order_id` or `customer_id` as its resource says, and `properties`, the merchant's words with
+  `{{order.name}}` and the like filled in. Check `x-hatti-hmac-sha256` as for webhooks, and
+  answer 2xx. One that doesn't answer is tried again for a day; a 4xx other than 429 is not.
+* **A trigger** has no `url`. Fire it with `flowTriggerReceive(handle:, orderId:, properties:)`;
+  each enabled workflow on it runs once, and its conditions can read the fields you send.
+* One about orders needs `read_orders`; about customers, `read_customers`.
+
 ## Trying things safely
 
 * A **development store**, opened by a partner (ADR-504), is closed to shoppers until it is
