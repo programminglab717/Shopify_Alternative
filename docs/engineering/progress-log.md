@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The merchant copilot
+### ab502d7 · The merchant copilot
 
 * **A request in English, Urdu or Roman Urdu** is drafted into a discount code or a segment,
   which staff confirm before it is made, or a report, run ([ADR-894](../architecture/13-decision-log.md#adr-894--the-merchant-copilot-a-request-in-english-urdu-or-roman-urdu-drafted-into-a-discount-code-or-a-segment-which-staff-confirm-before-it-is-made-or-a-report-run)).
