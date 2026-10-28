@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Questions of the shop's numbers
+### e260b86 · Questions of the shop's numbers
 
 * **Analytics:** a merchant asks in English, Urdu or Roman Urdu; the AI reads the question alone
   into one of Hatti's reports, which Hatti runs and shows with what it took the question to ask
