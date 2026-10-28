@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Subscriptions
+
+* **Settings › Subscriptions:** staff make selling plans, "Every month, 10% off", for products of
+  a tag or all of them. Product pages offer them, and a subscribed line is priced at the plan's
+  discount (CAT-16, [ADR-862](../architecture/13-decision-log.md#adr-862--subscriptions-selling-plans-by-product-tag-a-subscribed-line-priced-at-its-plans-discount-and-the-order-placed-again-each-interval-by-cash-on-delivery-confirmed-as-any-other-the-customer-skipping-pausing-or-cancelling-from-its-page)).
+* **Orders:** the order becomes a subscription, placed again each interval by cash on delivery
+  and confirmed as any other. The customer skips, pauses or cancels from its page; staff from
+  settings. Which plans include it is OWN-53.
+* 4618 tests (14 new, the admin's check of each new GraphQL operation among them).
+
 ### 8366c0e · Workflows
 
 * **Settings › Workflows:** the owner and managers make workflows: a trigger (an order placed,

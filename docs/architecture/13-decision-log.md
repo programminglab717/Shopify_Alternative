@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-861 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-862 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -869,6 +869,7 @@
 | 859 | Expansion stores: an owner copies a shop's products to another shop they own, its prices at a rate, through the product export and import, and copies again to update them | Accepted |
 | 860 | Buy buttons: a snippet puts a product on any website, drawn by a script the shop's storefront serves from its public product data, Buy now opening its checkout through a cart permalink | Accepted |
 | 861 | Workflows: a shop's own triggers, conditions and actions, as Shopify Flow's are, with triggers and actions apps offer them through the Admin API | Accepted |
+| 862 | Subscriptions: selling plans by product tag, a subscribed line priced at its plan's discount, and the order placed again each interval by cash on delivery, confirmed as any other, the customer skipping, pausing or cancelling from its page | Accepted |
 
 ---
 
@@ -28365,3 +28366,54 @@
     up and see no runs.
   * **A general rules language:** harder for a merchant to read than fields, comparisons and
     values chosen from lists.
+
+## ADR-862 · Subscriptions: selling plans by product tag, a subscribed line priced at its plan's discount, and the order placed again each interval by cash on delivery, confirmed as any other, the customer skipping, pausing or cancelling from its page
+
+* **Context:**
+  * CAT-16 asks for subscriptions and selling plans, as Shopify's are, charged by wallet token
+    debit or card.
+  * Hatti keeps no card or wallet token (PAY-14 comes later, with a licensed partner), and most
+    Pakistani shoppers pay at the door.
+  * What sells by subscription here is what runs out: tea, rice, nappies, skincare.
+* **Decision:**
+  * **Selling plans** (`catalog.selling_plans`): the shop's, ten at most, made by staff who write
+    products. Each says how often, every 1 to 12 weeks or months, and its discount, 0 to 50%. It
+    is for the products of a tag, ignoring case, or for all of them. The shop's document lists
+    them, so a plan's change republishes one document, not every product.
+  * **On the storefront:**
+    * Themes read `product.selling_plan_groups` as Shopify's: one group, "Subscribe and save",
+      with each plan's percentage off.
+    * Hatti's theme offers "Buy once" or each plan on the product's page. The form's
+      `selling_plan` goes into the cart line's hidden `_selling_plan` property.
+    * The cart prices that line at the plan's discount off the variant's price, to the nearest
+      paisa, where the product is sold on that plan. It says so in `selling_plan_allocation`,
+      with the price without it.
+  * **Subscriptions** (`orders.subscriptions`):
+    * The worker makes them from orders whose lines were subscribed, one for each plan, once
+      however often the order is heard. Each keeps the plan as it was, the lines, the address,
+      and the delivery charge and fee the first order paid.
+    * Each interval the worker places the same items to the same address, at the plan's discount
+      off the items' prices then. It pays by cash on delivery, or bank transfer where the first
+      was so paid.
+    * Each order is tagged `subscription`, its lines name the subscription, and it is confirmed
+      with the customer as any other order is.
+    * An order that can't be placed (an item sold out, say) is tried on each of the next days,
+      then skipped after three, with why shown to staff.
+    * A subscription whose first order is cancelled before any other is placed is cancelled.
+      Customers merged keep theirs; erased, theirs go.
+  * **Changing it:**
+    * The customer, on any of its orders' pages once confirmed, skips the next order, pauses,
+      resumes or cancels. Each is on the order's timeline.
+    * Staff do the same in Settings › Subscriptions, where plans are made too.
+* **Consequences:**
+  * A shop sells by subscription without a card on file, and shoppers keep paying at the door.
+  * Not yet:
+    * charging a card or wallet each interval (PAY-14);
+    * a reminder message before each order, beyond its confirmation;
+    * plans for single variants, or a minimum number of orders;
+    * a shopper's own page listing all their subscriptions.
+  * Which plans include subscriptions is the owner's to decide (OWN-53).
+* **Alternatives:**
+  * **A draft for staff to send each interval:** more work for the shop, and orders forgotten.
+  * **The first order at full price:** Shopify discounts the first order too, and shoppers
+    expect it.
