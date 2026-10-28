@@ -503,3 +503,12 @@ export {
   type SubscriptionRecord,
   type SubscriptionStatus,
 } from '../internal/subscriptions.js';
+export {
+  POS_LIMITS,
+  POS_TENDER_METHODS,
+  PosService,
+  type PosRegisterRecord,
+  type PosSaleRecord,
+  type PosSessionReport,
+  type PosTenderMethod,
+} from '../internal/pos.service.js';

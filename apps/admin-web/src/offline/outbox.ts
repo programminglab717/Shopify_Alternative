@@ -16,6 +16,8 @@ export const QUEUEABLE: ReadonlySet<string> = new Set([
   'OrderMarkPickedUp',
   'OrderConfirmationCall',
   'OrderCommentCreate',
+  // A sale at the till (ADR-872): kept once by the till's own ID for it, whenever it is sent.
+  'PosSaleCreate',
 ]);
 
 /** A change kept to send: as it was first sent, with the key that makes it run once. */

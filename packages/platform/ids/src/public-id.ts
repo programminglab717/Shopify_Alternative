@@ -182,6 +182,11 @@ export const ID_PREFIXES = {
   themeExperiment: 'texp',
   // A function an app gives the shop's checkout (ADR-868).
   appFunction: 'afun',
+  // A register at the shop's till, its cash sessions, and its sales and their lines (ADR-872).
+  posRegister: 'preg',
+  posSession: 'pses',
+  posSale: 'psal',
+  posSaleLine: 'psln',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

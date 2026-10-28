@@ -21,12 +21,14 @@ import {
   UserRound,
   Users,
   Wallet,
+  Calculator,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
 import { READS_ANALYTICS } from '../analytics/analytics-page';
 import { RECONCILES_CASH } from '../cash/cash-page';
+import { SELLS_AT_TILL } from '../pos/pos-page';
 import { OPENS_ONLINE_STORE } from '../online-store/online-store-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { READS_INBOX } from '../inbox/inbox-page';
@@ -64,6 +66,7 @@ interface NavItem {
     | '/$shopId/online-store'
     | '/$shopId/analytics'
     | '/$shopId/cash'
+    | '/$shopId/pos'
     | '/$shopId/settings'
     | '/$shopId/help';
   label: MessageKey;
@@ -102,6 +105,7 @@ export const NAV: readonly NavItem[] = [
     primary: true,
   },
   { to: '/$shopId/returns', label: 'nav.returns', icon: Undo2, gate: READS_RETURNS },
+  { to: '/$shopId/pos', label: 'nav.pos', icon: Calculator, gate: SELLS_AT_TILL },
   { to: '/$shopId/products', label: 'nav.products', icon: Package },
   { to: '/$shopId/stock', label: 'nav.stock', icon: Boxes },
   {

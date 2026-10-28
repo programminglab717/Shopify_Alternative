@@ -36,6 +36,7 @@ import {
 import { AnalyticsPage } from './analytics/analytics-page';
 import { ReportPage, ReportsPage } from './analytics/custom-reports';
 import { CashPage } from './cash/cash-page';
+import { PosPage } from './pos/pos-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { PayoutsPage } from './cash/payouts-page';
 import { SettlementPage } from './cash/settlement-page';
@@ -490,6 +491,12 @@ const cash = createRoute({
   getParentRoute: () => shop,
   path: 'cash',
   component: CashPage,
+});
+
+const pos = createRoute({
+  getParentRoute: () => shop,
+  path: 'pos',
+  component: PosPage,
 });
 
 const collections = createRoute({
@@ -1121,6 +1128,7 @@ export const routeTree = root.addChildren([
     customReports,
     customReport,
     cash,
+    pos,
     statement,
     settlements,
     settlement,

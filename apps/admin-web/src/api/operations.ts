@@ -12927,3 +12927,252 @@ export const AppFunctionEnableMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** A cash session as its Z report gives it (POS-07, ADR-872). */
+const POS_SESSION = /* GraphQL */ `
+  fragment PosSessionParts on PosSession {
+    id
+    registerId
+    openedAt
+    closedAt
+    openingFloat {
+      amount
+    }
+    salesCount
+    gross {
+      amount
+    }
+    discounts {
+      amount
+    }
+    tax {
+      amount
+    }
+    returnsCount
+    returned {
+      amount
+    }
+    tenders {
+      method
+      amount {
+        amount
+      }
+    }
+    cashIn {
+      amount
+    }
+    cashOut {
+      amount
+    }
+    expectedCash {
+      amount
+    }
+    countedCash {
+      amount
+    }
+    difference {
+      amount
+    }
+    closingNote
+  }
+`;
+
+/** A sale at the till, as its receipt shows it (ADR-872). */
+const POS_SALE = /* GraphQL */ `
+  fragment PosSaleParts on PosSale {
+    id
+    name
+    clientId
+    customerId
+    subtotal {
+      amount
+    }
+    discount {
+      amount
+    }
+    tax {
+      amount
+    }
+    total {
+      amount
+    }
+    changeGiven {
+      amount
+    }
+    returned {
+      amount
+    }
+    note
+    soldAt
+    lines {
+      id
+      title
+      variantTitle
+      sku
+      quantity
+      unitPrice {
+        amount
+      }
+      total {
+        amount
+      }
+      returnedQuantity
+    }
+    tenders {
+      method
+      amount {
+        amount
+      }
+      reference
+    }
+  }
+`;
+
+/** The shop's registers, each with its open session (POS-01, ADR-872). */
+export const PosRegistersQuery = /* GraphQL */ `
+  query PosRegisters {
+    posRegisters {
+      id
+      name
+      locationId
+      openSessionId
+    }
+  }
+`;
+
+/** Adds a register, or renames or moves one. */
+export const PosRegisterSaveMutation = /* GraphQL */ `
+  mutation PosRegisterSave($input: PosRegisterInput!) {
+    posRegisterSave(input: $input) {
+      register {
+        id
+        name
+        locationId
+        openSessionId
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** What the register sells, with its shelf's stock, kept for when the till is offline. */
+export const PosCatalogQuery = /* GraphQL */ `
+  query PosCatalog($registerId: ID!) {
+    posCatalog(registerId: $registerId) {
+      variantId
+      productTitle
+      variantTitle
+      sku
+      barcode
+      price {
+        amount
+      }
+      available
+    }
+  }
+`;
+
+/** A cash session, as its Z report. */
+export const PosSessionQuery = /* GraphQL */ `
+  query PosSession($id: ID!) {
+    posSession(id: $id) {
+      ...PosSessionParts
+    }
+  }
+  ${POS_SESSION}
+`;
+
+/** Opens the register's session with its float. */
+export const PosSessionOpenMutation = /* GraphQL */ `
+  mutation PosSessionOpen($registerId: ID!, $openingFloat: String!) {
+    posSessionOpen(registerId: $registerId, openingFloat: $openingFloat) {
+      session {
+        ...PosSessionParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${POS_SESSION}
+  ${USER_ERRORS}
+`;
+
+/** Cash put into the drawer, or taken out. */
+export const PosCashMoveMutation = /* GraphQL */ `
+  mutation PosCashMove($sessionId: ID!, $out: Boolean!, $amount: String!, $note: String!) {
+    posCashMove(sessionId: $sessionId, out: $out, amount: $amount, note: $note) {
+      session {
+        ...PosSessionParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${POS_SESSION}
+  ${USER_ERRORS}
+`;
+
+/** Closes the session with the cash counted: its Z report. */
+export const PosSessionCloseMutation = /* GraphQL */ `
+  mutation PosSessionClose($sessionId: ID!, $countedCash: String!, $note: String) {
+    posSessionClose(sessionId: $sessionId, countedCash: $countedCash, note: $note) {
+      session {
+        ...PosSessionParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${POS_SESSION}
+  ${USER_ERRORS}
+`;
+
+/** A sale at the till; sent again from an offline till by its clientId, kept once. */
+export const PosSaleCreateMutation = /* GraphQL */ `
+  mutation PosSaleCreate($input: PosSaleInput!) {
+    posSaleCreate(input: $input) {
+      sale {
+        ...PosSaleParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${POS_SALE}
+  ${USER_ERRORS}
+`;
+
+/** A session's sales, the latest first. */
+export const PosSalesQuery = /* GraphQL */ `
+  query PosSales($sessionId: ID!) {
+    posSales(sessionId: $sessionId, first: 50) {
+      nodes {
+        ...PosSaleParts
+      }
+    }
+  }
+  ${POS_SALE}
+`;
+
+/** Units of a till sale brought back and paid back. */
+export const PosSaleReturnMutation = /* GraphQL */ `
+  mutation PosSaleReturn($input: PosReturnInput!) {
+    posSaleReturn(input: $input) {
+      sale {
+        ...PosSaleParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${POS_SALE}
+  ${USER_ERRORS}
+`;

@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { InputHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, Ref } from 'react';
 
 /**
  * A labelled text field (design system §5, §8): its label always shown, its hint and error tied
@@ -18,6 +18,8 @@ export function TextField({
   hint?: string;
   error?: string | null;
   ltr?: boolean;
+  /** The input itself, as the till focuses its search after each item (ADR-872). */
+  ref?: Ref<HTMLInputElement>;
 }) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;

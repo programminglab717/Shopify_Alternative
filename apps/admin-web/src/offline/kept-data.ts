@@ -20,7 +20,17 @@ export const KEPT_LIMITS = {
 };
 
 /** The pages whose data is kept, by the name after the shop in their query's key. */
-const KEPT_PAGES = new Set(['home', 'homeStock', 'orders', 'order', 'customers', 'customer']);
+const KEPT_PAGES = new Set([
+  'home',
+  'homeStock',
+  'orders',
+  'order',
+  'customers',
+  'customer',
+  // The till's registers and what they sell, to sell offline (ADR-872).
+  'posRegisters',
+  'posCatalog',
+]);
 
 export interface KeptQuery {
   key: QueryKey;

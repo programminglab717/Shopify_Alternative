@@ -146,6 +146,8 @@ describe('What a member may do in a shop (ADR-580)', () => {
       'nav.desk',
       'nav.shipping',
       'nav.returns',
+      // Selling at the till, as they change orders (ADR-872).
+      'nav.pos',
       'nav.products',
       'nav.stock',
       'nav.paymentLinks',
@@ -156,6 +158,7 @@ describe('What a member may do in a shop (ADR-580)', () => {
     expect(sections(lead(['read_settings'], ['manage_staff']))).toContain('nav.settings');
     expect(sections(lead(['read_orders'], ['reconcile_payments']))).toContain('nav.cash');
     expect(sections(lead(['read_orders'], []))).not.toContain('nav.cash');
+    expect(sections(lead(['read_orders'], []))).not.toContain('nav.pos');
   });
 });
 

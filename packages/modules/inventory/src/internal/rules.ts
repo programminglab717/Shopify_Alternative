@@ -59,6 +59,8 @@ export const STOCK_REASONS = {
   fulfill: 'fulfilled',
   /** Returned goods back on the shelf, the same reason as a merchant's restock. */
   restock: 'restock',
+  /** Sold over the counter at the shop's till (POS-01, ADR-872). */
+  sell: 'sold',
 } as const;
 
 /** A URI with a scheme, e.g. "hatti://orders/ord_…" or "https://erp.example.com/grn/42". */

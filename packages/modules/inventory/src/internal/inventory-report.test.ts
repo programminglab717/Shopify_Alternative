@@ -121,4 +121,25 @@ describe.skipIf(!server)('Inventory reports (ANL-05, ADR-455)', () => {
       rows: [],
     });
   });
+
+  it('counts what sold at the till, its last sale today (ADR-872)', async () => {
+    await f.reset();
+    const shop = await f.location(f.a, 'Shop');
+    const [dupatta] = await f.variantsOf(f.a, 'Chiffon Dupatta');
+    unwrap(
+      await f.inventory.setQuantities(f.a, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: dupatta!, locationId: shop.id, quantity: 4 }],
+      }),
+    );
+    await f.db.tenant(f.a.shopId, (tx: Tx) =>
+      f.stock.sell(tx, f.a, [{ variantId: dupatta!, locationId: shop.id, quantity: 3 }]),
+    );
+    const report = await reports.report(f.a, { days: 30, sort: 'sell_through', first: 50 });
+    expect(report).toMatchObject({ sold: 3, onHand: 1 });
+    expect(report.rows.map((row) => [row.productTitle, row.sold, row.daysSinceSale])).toEqual([
+      ['Chiffon Dupatta', 3, 0],
+    ]);
+  });
 });

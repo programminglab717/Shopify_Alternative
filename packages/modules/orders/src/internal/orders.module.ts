@@ -15,6 +15,8 @@ import { OrderSettingsService } from './order-settings.service.js';
 import { OrderSegmentFacts } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
+import { PosService } from './pos.service.js';
+import { PosResolver } from './graphql/pos.resolver.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { PastOrderService } from './past-orders.js';
 import { CustomerPastOrdersResolver, PastOrderResolver } from './graphql/past-order.resolver.js';
@@ -93,6 +95,8 @@ import { SubscriptionService } from './subscriptions.js';
   imports: [CatalogModule, InventoryModule, CustomersModule],
   controllers: [DraftLinkController, OrderLinkController, StorefrontTrackingController],
   providers: [
+    PosService,
+    PosResolver,
     OrderService,
     DraftOrderService,
     OrderLinkService,
@@ -169,6 +173,7 @@ import { SubscriptionService } from './subscriptions.js';
     CustomerPastOrdersResolver,
   ],
   exports: [
+    PosService,
     OrderService,
     DraftOrderService,
     OrderLinkService,

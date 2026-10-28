@@ -1,0 +1,294 @@
+import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
+import { generateAccessToken } from '@hatti/api';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { startTestApi, type TestApi } from '../testing/api.js';
+import { ADMIN_GRAPHQL_PATH } from './constants.js';
+
+const server = testDatabaseServer();
+
+// Responses are checked with matchers rather than static types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
+const SESSION = `id closedAt salesCount gross { amount } discounts { amount } returnsCount
+  returned { amount } tenders { method amount { amount } } cashIn { amount } cashOut { amount }
+  expectedCash { amount } countedCash { amount } difference { amount }`;
+
+const SALE = `id name clientId customerId subtotal { amount } discount { amount } total { amount }
+  changeGiven { amount } returned { amount }
+  lines { id title quantity unitPrice { amount } discount { amount } total { amount } returnedQuantity }
+  tenders { method amount { amount } reference }`;
+
+const SELL = `mutation ($input: PosSaleInput!) {
+  posSaleCreate(input: $input) { sale { ${SALE} } userErrors { field code message } } }`;
+
+const RETURN = `mutation ($input: PosReturnInput!) {
+  posSaleReturn(input: $input) { sale { ${SALE} } userErrors { field code message } } }`;
+
+describe.skipIf(!server)("The shop's till: registers, sessions, sales and returns (POS-01)", () => {
+  let testDb: TestDatabase;
+  let admin: pg.Client;
+  let api: TestApi;
+  let app: NestFastifyApplication;
+  const shop = newId();
+  let token = '';
+  let location = '';
+
+  async function issueToken(scopes: string[]): Promise<string> {
+    const { token, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'test', $2, $3, $4)`,
+      [shop, hash, hint, scopes],
+    );
+    return token;
+  }
+
+  async function gql(query: string, variables?: Record<string, unknown>) {
+    const response = await app.inject({
+      method: 'POST',
+      url: ADMIN_GRAPHQL_PATH,
+      headers: { 'x-hatti-access-token': token, 'idempotency-key': randomUUID() },
+      payload: { query, variables },
+    });
+    return response.json<{ data?: Json; errors?: Json[] }>();
+  }
+
+  async function data(query: string, variables?: Record<string, unknown>) {
+    const body = await gql(query, variables);
+    expect(body.errors).toBeUndefined();
+    return Object.values(body.data ?? {})[0] as Json;
+  }
+
+  /** A product of one variant at `price`, `quantity` of it in stock: its ID and the variant's. */
+  async function stocked(title: string, price: string, quantity: number) {
+    const created = await data(
+      `mutation ($input: ProductCreateInput!) {
+        productCreate(input: $input) {
+          product { id variants { id inventoryItem { id } } }
+        }
+      }`,
+      { input: { title, status: 'ACTIVE', variants: [{ price }] } },
+    );
+    const variant = created.product.variants[0];
+    await data(
+      `mutation ($input: InventorySetQuantitiesInput!) {
+        inventorySetQuantities(input: $input) { userErrors { code } }
+      }`,
+      {
+        input: {
+          name: 'available',
+          reason: 'received',
+          quantities: [
+            { inventoryItemId: variant.inventoryItem.id, locationId: location, quantity },
+          ],
+        },
+      },
+    );
+    return { product: created.product.id as string, variant: variant.id as string };
+  }
+
+  /** What a product's one variant has on hand and available. */
+  async function stock(productId: string): Promise<[number, number]> {
+    const read = await data(
+      `query ($id: ID!) {
+        product(id: $id) { variants { inventoryItem { inventoryLevels { onHand available } } } }
+      }`,
+      { id: productId },
+    );
+    const [level] = read.variants[0].inventoryItem.inventoryLevels;
+    return [level.onHand, level.available];
+  }
+
+  beforeAll(async () => {
+    testDb = await createTestDatabase(server);
+    admin = new pg.Client({ connectionString: testDb.adminUrl });
+    await admin.connect();
+    await admin.query(`INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari')`, [
+      shop,
+    ]);
+    token = await issueToken([
+      'write_products',
+      'write_inventory',
+      'write_locations',
+      'write_orders',
+      'write_settings',
+      'write_customers',
+    ]);
+    api = await startTestApi(testDb);
+    app = api.app;
+    location = (await gql('{ location { id } }')).data.location.id;
+  });
+
+  afterAll(async () => {
+    await api?.close();
+    await admin?.end();
+    await testDb?.drop();
+  });
+
+  it('sells from a register’s shelf, once, gives change, takes returns, and closes with a Z report', async () => {
+    const save = `mutation ($input: PosRegisterInput!) {
+      posRegisterSave(input: $input) { register { id name locationId openSessionId }
+        userErrors { field code } } }`;
+    const saved = await data(save, { input: { name: 'Counter 1', locationId: location } });
+    expect(saved.register).toMatchObject({ name: 'Counter 1', locationId: location });
+    const register = saved.register.id as string;
+    expect(
+      (await data(save, { input: { name: 'counter 1', locationId: location } })).userErrors,
+    ).toEqual([{ field: ['input', 'name'], code: 'TAKEN' }]);
+
+    const open = `mutation ($id: ID!, $float: String!) {
+      posSessionOpen(registerId: $id, openingFloat: $float) { session { ${SESSION} }
+        userErrors { field code } } }`;
+    const opened = await data(open, { id: register, float: '5,000' });
+    expect(opened.session.expectedCash.amount).toBe('5000.00');
+    const session = opened.session.id as string;
+    // One session a register at a time.
+    expect((await data(open, { id: register, float: '0' })).userErrors[0].code).toBe('INVALID');
+    expect((await data('{ posRegisters { openSessionId } }'))[0].openSessionId).toBe(session);
+
+    const suit = await stocked('Lawn Suit', '3,000', 5);
+    // None recorded on the shelf: it sells all the same, the count wrong, not the shopper.
+    const dupatta = await stocked('Chiffon Dupatta', '1,500', 0);
+    // What the till sells, with its shelf's stock, to find by title, SKU or barcode offline.
+    const catalog = await data(
+      `query ($id: ID!) { posCatalog(registerId: $id) {
+        variantId productTitle variantTitle price { amount } available } }`,
+      { id: register },
+    );
+    expect(catalog).toEqual([
+      {
+        variantId: dupatta.variant,
+        productTitle: 'Chiffon Dupatta',
+        variantTitle: 'Default Title',
+        price: { amount: '1500.00' },
+        available: 0,
+      },
+      {
+        variantId: suit.variant,
+        productTitle: 'Lawn Suit',
+        variantTitle: 'Default Title',
+        price: { amount: '3000.00' },
+        available: 5,
+      },
+    ]);
+    const clientId = randomUUID();
+    const sale = {
+      clientId,
+      sessionId: session,
+      lines: [
+        { variantId: suit.variant, quantity: 2 },
+        { variantId: dupatta.variant, quantity: 1 },
+      ],
+      discount: '500',
+      customerPhone: '0300 1234567',
+      tenders: [{ method: 'CASH', amount: '8,000' }],
+    };
+    const sold = await data(SELL, { input: sale });
+    expect(sold.userErrors).toEqual([]);
+    expect(sold.sale).toMatchObject({
+      name: '#P1',
+      clientId,
+      subtotal: { amount: '7500.00' },
+      discount: { amount: '500.00' },
+      total: { amount: '7000.00' },
+      changeGiven: { amount: '1000.00' },
+      tenders: [{ method: 'CASH', amount: { amount: '8000.00' }, reference: null }],
+    });
+    // The discount shared in proportion: 400 off the suits, 100 off the dupatta.
+    expect(sold.sale.lines.map((line: Json) => [line.title, line.total.amount])).toEqual([
+      ['Lawn Suit', '5600.00'],
+      ['Chiffon Dupatta', '1400.00'],
+    ]);
+    expect(sold.sale.customerId).toMatch(/^cus_/);
+    expect(await stock(suit.product)).toEqual([3, 3]);
+    expect(await stock(dupatta.product)).toEqual([-1, -1]);
+    // Sent again, as an offline till does: the same sale, nothing taken twice.
+    const again = await data(SELL, { input: sale });
+    expect(again.sale.id).toBe(sold.sale.id);
+    expect(await stock(suit.product)).toEqual([3, 3]);
+
+    // Change comes from cash alone; nothing is sold short of its total.
+    const card = await data(SELL, {
+      input: {
+        ...sale,
+        clientId: randomUUID(),
+        discount: null,
+        tenders: [{ method: 'CARD', amount: '9,000' }],
+      },
+    });
+    expect(card.userErrors[0].message).toBe('Change is given from cash alone');
+    const short = await data(SELL, {
+      input: { ...sale, clientId: randomUUID(), tenders: [{ method: 'CASH', amount: '100' }] },
+    });
+    expect(short.userErrors[0].message).toBe('What was paid is less than the total');
+
+    const move = `mutation ($id: ID!) {
+      posCashMove(sessionId: $id, out: true, amount: "2,000", note: "Bank deposit") {
+        session { ${SESSION} } userErrors { field code } } }`;
+    expect((await data(move, { id: session })).session.expectedCash.amount).toBe('10000.00');
+
+    // One suit back: what was paid for it back from the drawer, and it back on the shelf.
+    const [suitLine] = sold.sale.lines;
+    const returned = await data(RETURN, {
+      input: {
+        saleId: sold.sale.id,
+        sessionId: session,
+        lines: [{ lineId: suitLine.id, quantity: 1 }],
+        restock: true,
+        method: 'CASH',
+        reason: 'Wrong size',
+      },
+    });
+    expect(returned.sale.returned.amount).toBe('2800.00');
+    expect(returned.sale.lines[0].returnedQuantity).toBe(1);
+    expect(await stock(suit.product)).toEqual([4, 4]);
+    const more = await data(RETURN, {
+      input: {
+        saleId: sold.sale.id,
+        sessionId: session,
+        lines: [{ lineId: suitLine.id, quantity: 2 }],
+        restock: true,
+        method: 'CASH',
+      },
+    });
+    expect(more.userErrors[0].message).toBe('Only 1 of it can still come back');
+
+    const close = `mutation ($id: ID!) {
+      posSessionClose(sessionId: $id, countedCash: "7,000", note: "200 short") {
+        session { ${SESSION} } userErrors { field code } } }`;
+    const report = (await data(close, { id: session })).session;
+    expect(report).toMatchObject({
+      salesCount: 1,
+      gross: { amount: '7500.00' },
+      discounts: { amount: '500.00' },
+      returnsCount: 1,
+      returned: { amount: '2800.00' },
+      cashOut: { amount: '2000.00' },
+      // 5,000 float + 8,000 taken − 1,000 change − 2,000 banked − 2,800 paid back.
+      expectedCash: { amount: '7200.00' },
+      countedCash: { amount: '7000.00' },
+      difference: { amount: '-200.00' },
+      tenders: [{ method: 'CASH', amount: { amount: '4200.00' } }],
+    });
+    expect(report.closedAt).not.toBeNull();
+    // Nothing is sold on a closed session.
+    const late = await data(SELL, { input: { ...sale, clientId: randomUUID() } });
+    expect(late.userErrors[0].message).toBe('The register’s session is closed');
+
+    const listed = await data(
+      `query ($id: ID!) { posSales(sessionId: $id) { nodes { name } pageInfo { hasNextPage } } }`,
+      { id: session },
+    );
+    expect(listed.nodes).toEqual([{ name: '#P1' }]);
+    const theirs = await data(`query ($id: ID!) { posSales(customerId: $id) { nodes { name } } }`, {
+      id: sold.sale.customerId,
+    });
+    expect(theirs.nodes).toEqual([{ name: '#P1' }]);
+  });
+});

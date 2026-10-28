@@ -6337,3 +6337,108 @@ export interface AppFunctionEnableData {
     userErrors: UserError[];
   };
 }
+
+/** How a sale at the till was paid (ADR-872). */
+export type PosTenderMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'WALLET';
+
+export interface PosRegisterValue {
+  id: string;
+  name: string;
+  locationId: string;
+  openSessionId: string | null;
+}
+
+export interface PosRegistersData {
+  posRegisters: PosRegisterValue[];
+}
+
+export interface PosRegisterSaveData {
+  posRegisterSave: { register: PosRegisterValue | null; userErrors: UserError[] };
+}
+
+/** A variant as the till sells it; `available` null for stock not tracked. */
+export interface PosCatalogItemValue {
+  variantId: string;
+  productTitle: string;
+  variantTitle: string;
+  sku: string | null;
+  barcode: string | null;
+  price: { amount: string };
+  available: number | null;
+}
+
+export interface PosCatalogData {
+  posCatalog: PosCatalogItemValue[] | null;
+}
+
+type Amount = { amount: string };
+
+/** A cash session as its Z report. */
+export interface PosSessionValue {
+  id: string;
+  registerId: string;
+  openedAt: string;
+  closedAt: string | null;
+  openingFloat: Amount;
+  salesCount: number;
+  gross: Amount;
+  discounts: Amount;
+  tax: Amount;
+  returnsCount: number;
+  returned: Amount;
+  tenders: { method: PosTenderMethod; amount: Amount }[];
+  cashIn: Amount;
+  cashOut: Amount;
+  expectedCash: Amount;
+  countedCash: Amount | null;
+  difference: Amount | null;
+  closingNote: string | null;
+}
+
+export interface PosSessionData {
+  posSession: PosSessionValue | null;
+}
+
+export interface PosSessionPayloadData {
+  posSessionOpen?: { session: PosSessionValue | null; userErrors: UserError[] };
+  posCashMove?: { session: PosSessionValue | null; userErrors: UserError[] };
+  posSessionClose?: { session: PosSessionValue | null; userErrors: UserError[] };
+}
+
+export interface PosSaleValue {
+  id: string;
+  name: string;
+  clientId: string;
+  customerId: string | null;
+  subtotal: Amount;
+  discount: Amount;
+  tax: Amount;
+  total: Amount;
+  changeGiven: Amount;
+  returned: Amount;
+  note: string;
+  soldAt: string;
+  lines: {
+    id: string;
+    title: string;
+    variantTitle: string;
+    sku: string | null;
+    quantity: number;
+    unitPrice: Amount;
+    total: Amount;
+    returnedQuantity: number;
+  }[];
+  tenders: { method: PosTenderMethod; amount: Amount; reference: string | null }[];
+}
+
+export interface PosSaleCreateData {
+  posSaleCreate: { sale: PosSaleValue | null; userErrors: UserError[] };
+}
+
+export interface PosSalesData {
+  posSales: { nodes: PosSaleValue[] };
+}
+
+export interface PosSaleReturnData {
+  posSaleReturn: { sale: PosSaleValue | null; userErrors: UserError[] };
+}

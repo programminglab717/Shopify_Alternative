@@ -33,7 +33,7 @@ export interface InventoryReportRow {
   /** At all the shop's locations, now. */
   onHand: number;
   available: number;
-  /** Units sold in the period: committed to orders, less those released. */
+  /** Units sold in the period: committed to orders, less those released, and sold at the till. */
   sold: number;
   /**
    * Of what it had to sell, sold plus what is available now, the share sold, in percent; null for
@@ -126,12 +126,17 @@ export class InventoryReportService {
         ),
         sales AS (
           SELECT m.variant_id,
-                 GREATEST(coalesce(sum(m.delta) FILTER (WHERE m.created_at >= ${since.toISOString()}), 0), 0)::int AS sold,
-                 max(m.created_at) FILTER (WHERE a.reason = 'committed' AND m.delta > 0) AS last_sold_at
+                 GREATEST(coalesce(sum(CASE WHEN a.reason = 'sold' THEN -m.delta ELSE m.delta END)
+                   FILTER (WHERE m.created_at >= ${since.toISOString()}), 0), 0)::int AS sold,
+                 max(m.created_at)
+                   FILTER (WHERE (a.reason = 'committed' AND m.delta > 0) OR a.reason = 'sold')
+                   AS last_sold_at
             FROM inventory.movements m
             JOIN inventory.adjustments a ON a.shop_id = m.shop_id AND a.id = m.adjustment_id
-           WHERE m.shop_id = ${tenant.shopId} AND m.quantity_name = 'committed'
-             AND a.reason IN ('committed', 'commitment_released')
+           WHERE m.shop_id = ${tenant.shopId}
+             -- Orders' units as they were committed, and the till's as it sold them (ADR-872).
+             AND ((m.quantity_name = 'committed' AND a.reason IN ('committed', 'commitment_released'))
+                  OR (m.quantity_name = 'on_hand' AND a.reason = 'sold'))
              AND m.created_at <= ${at.toISOString()}
            GROUP BY m.variant_id
         ),

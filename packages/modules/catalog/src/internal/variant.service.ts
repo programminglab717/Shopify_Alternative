@@ -54,6 +54,18 @@ export interface VariantSnapshot {
   taxCode: string | null;
 }
 
+/** A variant as the till finds it: by its title, SKU or barcode (ADR-872). */
+export interface VariantForSale {
+  variantId: string;
+  productId: string;
+  productTitle: string;
+  variantTitle: string;
+  sku: string | null;
+  barcode: string | null;
+  /** Minor units in the shop currency. */
+  price: bigint;
+}
+
 export interface VariantsResult {
   product: ProductRecord;
   /** The variants created or updated, in input order. */
@@ -128,6 +140,33 @@ export class VariantService {
       .from(variants)
       .where(and(eq(variants.shopId, shopId), inArray(variants.id, [...new Set(variantIds)])));
     return new Map(rows.map((row) => [row.id, row.productId]));
+  }
+
+  /**
+   * The variants the shop's till sells (ADR-872): those of its active products, by product title
+   * and position, with what the till looks them up by, at most `limit`. Runs in the caller's
+   * tenant transaction `tx`.
+   */
+  async forSaleIn(tx: Tx, shopId: string, limit: number): Promise<VariantForSale[]> {
+    const rows = await tx
+      .select({
+        variantId: variants.id,
+        productId: variants.productId,
+        productTitle: products.title,
+        variantTitle: variants.title,
+        sku: variants.sku,
+        barcode: variants.barcode,
+        price: variants.price,
+      })
+      .from(variants)
+      .innerJoin(
+        products,
+        and(eq(products.shopId, variants.shopId), eq(products.id, variants.productId)),
+      )
+      .where(and(eq(variants.shopId, shopId), eq(products.status, 'active')))
+      .orderBy(products.title, products.id, variants.position)
+      .limit(limit);
+    return rows;
   }
 
   /**

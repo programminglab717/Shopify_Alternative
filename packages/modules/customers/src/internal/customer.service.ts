@@ -84,7 +84,8 @@ export interface ListCustomersOptions {
 export interface OrderCustomerDetails {
   /** Mobile number in E.164 form. */
   phone: string;
-  name: string;
+  /** None for a shopper at the till who gave their number alone (ADR-872). */
+  name: string | null;
   email: string | null;
 }
 

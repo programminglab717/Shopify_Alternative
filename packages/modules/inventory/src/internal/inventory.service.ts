@@ -307,6 +307,26 @@ export class InventoryService {
     );
   }
 
+  /**
+   * What of each of `variantIds` is available at `locationId`, in the caller's transaction: for
+   * the till's shelf (ADR-872). Null for stock not tracked; nought where none is recorded there.
+   */
+  async availableAt(
+    tx: Tx,
+    shopId: string,
+    locationId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, number | null>> {
+    const loaded = await loadItems(tx, shopId, variantIds);
+    return new Map(
+      variantIds.map((id) => {
+        const item = loaded.get(id);
+        if (!item?.tracked) return [id, null];
+        return [id, item.levels.find((level) => level.location.id === locationId)?.available ?? 0];
+      }),
+    );
+  }
+
   /** The item of a variant, or null if the shop has no such variant. */
   async item(tenant: TenantContext, variantId: string): Promise<InventoryItemRecord | null> {
     return this.db.tenant(tenant.shopId, async (tx) => {

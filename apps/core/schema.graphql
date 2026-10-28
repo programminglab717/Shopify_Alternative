@@ -10872,6 +10872,33 @@ type Mutation {
   """
   photoSearchSet(enabled: Boolean!): PhotoSearch!
 
+  """Cash put into the drawer, or taken out, with why."""
+  posCashMove(amount: String!, note: String!, out: Boolean!, sessionId: ID!): PosSessionPayload!
+
+  """Takes a register away once its session is closed; its sales stay."""
+  posRegisterArchive(id: ID!): PosRegisterArchivePayload!
+
+  """Adds a register, or renames one or moves it to another location."""
+  posRegisterSave(input: PosRegisterInput!): PosRegisterPayload!
+
+  """
+  A sale at the till: its units off the register's location's shelf, paid as tendered, change given from cash. A sale whose clientId was kept already is that sale.
+  """
+  posSaleCreate(input: PosSaleInput!): PosSalePayload!
+
+  """
+  Units of a till sale brought back: paid back from the session's drawer or as asked, and back on the shelf unless written off.
+  """
+  posSaleReturn(input: PosReturnInput!): PosSalePayload!
+
+  """
+  Closes the session with the cash counted in its drawer: its Z report, saying whether the drawer is short or over.
+  """
+  posSessionClose(countedCash: String!, note: String, sessionId: ID!): PosSessionPayload!
+
+  """Opens a cash session on the register, with its float in the drawer."""
+  posSessionOpen(openingFloat: String!, registerId: ID!): PosSessionPayload!
+
   """
   Sets the currencies the shop shows its prices in, in its picker’s order, replacing those it had; none to show rupees alone.
   """
@@ -14465,6 +14492,249 @@ type PlatformTheme {
   name: String!
 }
 
+"""A variant as the till sells it, with what its shelf has."""
+type PosCatalogItem {
+  """Available at the register's location; null for stock not tracked."""
+  available: Int
+
+  """What a scanner reads off its label."""
+  barcode: String
+  price: Money!
+  productId: ID!
+  productTitle: String!
+  sku: String
+  variantId: ID!
+  variantTitle: String!
+}
+
+"""
+A register at the shop's till (POS-01, ADR-872): it sells from one of the shop's locations, in cash sessions staff open and close.
+"""
+type PosRegister {
+  id: ID!
+
+  """The location whose shelf its sales come off."""
+  locationId: ID!
+  name: String!
+
+  """Its session open now; null when none is."""
+  openSessionId: ID
+}
+
+type PosRegisterArchivePayload {
+  archivedRegisterId: ID
+  userErrors: [UserError!]!
+}
+
+input PosRegisterInput {
+  """The register to change; none for a new one."""
+  id: ID
+  locationId: ID!
+  name: String!
+}
+
+type PosRegisterPayload {
+  register: PosRegister
+  userErrors: [UserError!]!
+}
+
+input PosReturnInput {
+  lines: [PosReturnLineInput!]!
+  method: PosTenderMethod!
+  reason: String
+
+  """Back on the shelf; false for goods written off."""
+  restock: Boolean!
+  saleId: ID!
+
+  """The session whose drawer pays it back."""
+  sessionId: ID!
+}
+
+input PosReturnLineInput {
+  lineId: ID!
+  quantity: Int!
+}
+
+"""A sale at the till: its lines, and how it was paid."""
+type PosSale {
+  """Cash handed back."""
+  changeGiven: Money!
+
+  """The till's own ID for it."""
+  clientId: ID!
+
+  """Its customer; null for a walk-in."""
+  customerId: ID
+  discount: Money!
+  id: ID!
+  lines: [PosSaleLine!]!
+  locationId: ID!
+
+  """"#P12", the shop’s own run of till receipts."""
+  name: String!
+  note: String!
+  registerId: ID!
+
+  """Paid back for units brought back."""
+  returned: Money!
+  sessionId: ID!
+
+  """When the till sold it."""
+  soldAt: DateTime!
+  subtotal: Money!
+
+  """The sales tax included in its prices."""
+  tax: Money!
+  tenders: [PosTender!]!
+  total: Money!
+}
+
+type PosSaleConnection {
+  """The latest first."""
+  nodes: [PosSale!]!
+  pageInfo: PageInfo!
+}
+
+input PosSaleInput {
+  """
+  The till's own ID for the sale, a UUID it makes: a sale sent again with it, as an offline till does, is the sale kept the first time.
+  """
+  clientId: ID!
+  customerName: String
+
+  """
+  The customer's mobile number, to link the sale to them; none for a walk-in.
+  """
+  customerPhone: String
+
+  """Off the whole sale, in major units."""
+  discount: String
+  lines: [PosSaleLineInput!]!
+  note: String
+  sessionId: ID!
+
+  """When the till sold it, for a sale sent later: within 7 days."""
+  soldAt: DateTime
+  tenders: [PosTenderInput!]!
+}
+
+type PosSaleLine {
+  """Its share of the sale's discount."""
+  discount: Money!
+  id: ID!
+  quantity: Int!
+
+  """Units brought back."""
+  returnedQuantity: Int!
+  sku: String
+
+  """The sales tax included in it."""
+  tax: Money!
+  title: String!
+
+  """What was paid for it."""
+  total: Money!
+  unitPrice: Money!
+  variantId: ID!
+  variantTitle: String!
+}
+
+input PosSaleLineInput {
+  """
+  Replaces the variant's price, in major units: one agreed at the counter.
+  """
+  price: String
+  quantity: Int!
+  variantId: ID!
+}
+
+type PosSalePayload {
+  sale: PosSale
+  userErrors: [UserError!]!
+}
+
+"""
+A register's cash session, as its Z report gives it: what it sold, how it was paid, and what its drawer should hold.
+"""
+type PosSession {
+  cashIn: Money!
+  cashOut: Money!
+  closedAt: DateTime
+  closingNote: String
+
+  """What was counted as it closed."""
+  countedCash: Money
+
+  """
+  Counted less expected: below zero short, above zero over; null while open.
+  """
+  difference: Money
+  discounts: Money!
+
+  """What the drawer should hold now, or held as it closed."""
+  expectedCash: Money!
+
+  """What its sales came to before discounts."""
+  gross: Money!
+  id: ID!
+  openedAt: DateTime!
+
+  """Cash in the drawer as it opened."""
+  openingFloat: Money!
+  registerId: ID!
+
+  """Paid back for units brought back."""
+  returned: Money!
+  returnsCount: Int!
+  salesCount: Int!
+
+  """The sales tax included in its prices."""
+  tax: Money!
+  tenders: [PosTenderTotal!]!
+}
+
+type PosSessionPayload {
+  session: PosSession
+  userErrors: [UserError!]!
+}
+
+type PosTender {
+  amount: Money!
+  method: PosTenderMethod!
+
+  """The terminal's or transfer's reference."""
+  reference: String
+}
+
+input PosTenderInput {
+  """In major units. Cash tendered may be more than the total: the change."""
+  amount: String!
+  method: PosTenderMethod!
+  reference: String
+}
+
+"""How a sale at the till was paid, or paid back."""
+enum PosTenderMethod {
+  """A bank transfer or Raast to the shop's account."""
+  BANK_TRANSFER
+
+  """A card on the shop's own terminal."""
+  CARD
+
+  """Cash in the drawer."""
+  CASH
+
+  """JazzCash or Easypaisa to the shop's account."""
+  WALLET
+}
+
+type PosTenderTotal {
+  """Taken by it, less what was paid back and change given."""
+  amount: Money!
+  method: PosTenderMethod!
+}
+
 type PresentmentCurrenciesSetPayload {
   presentmentCurrencies: [PresentmentCurrency!]
   userErrors: [UserError!]!
@@ -16926,6 +17196,21 @@ type Query {
   Hatti's own themes a shop may begin a theme with, Hatti Base first (ADR-730).
   """
   platformThemes: [PlatformTheme!]!
+
+  """
+  What the register sells, at most 5000 variants of the shop's active products, with its location's stock: for the till to find by title, SKU or barcode, and to keep for when it is offline. Null for no such register.
+  """
+  posCatalog(registerId: ID!): [PosCatalogItem!]
+
+  """The shop's registers, by name."""
+  posRegisters: [PosRegister!]!
+  posSale(id: ID!): PosSale
+
+  """The shop's till sales, the latest first: a session's, or a customer's."""
+  posSales(before: String, customerId: ID, first: Int! = 25, sessionId: ID): PosSaleConnection!
+
+  """A cash session, as its Z report."""
+  posSession(id: ID!): PosSession
 
   """
   The currencies the shop shows its prices in besides rupees, in its picker's order.

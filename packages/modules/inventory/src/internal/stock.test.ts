@@ -342,6 +342,23 @@ describe.skipIf(!server)('StockService', () => {
     });
   });
 
+  it('sells over the counter: on hand falls, what orders were promised stays theirs (ADR-872)', async () => {
+    await stockAt(warehouse, variants[0]!, 3);
+    expect((await run((tx) => f.stock.commit(tx, f.a, [line(variants[0]!, 2)]))).ok).toBe(true);
+    const sold = await run((tx) =>
+      f.stock.sell(tx, f.a, [line(variants[0]!, 2)], {
+        referenceDocumentUri: 'hatti://pos-sales/1',
+      }),
+    );
+    expect(sold.ok && sold.adjustment?.changes).toMatchObject([
+      { name: 'on_hand', delta: -2, quantityAfter: 1, reason: 'sold' },
+    ]);
+    expect(await level(variants[0]!)).toMatchObject({ onHand: 1, committed: 2, available: -1 });
+    // The goods were in the shopper's hands: never short, whatever the count said.
+    expect((await run((tx) => f.stock.sell(tx, f.a, [line(variants[0]!, 5)]))).ok).toBe(true);
+    expect(await level(variants[0]!)).toMatchObject({ onHand: -4, committed: 2 });
+  });
+
   it('rejects quantities that are not whole numbers from 1', async () => {
     await expect(run((tx) => f.stock.commit(tx, f.a, [line(variants[0]!, 0)]))).rejects.toThrow(
       RangeError,

@@ -103,6 +103,10 @@ function lineChange(
       return { ...none, committed: -Math.min(quantity, level.committed), onHand: -quantity };
     case 'restock':
       return { ...none, onHand: quantity };
+    case 'sell':
+      // Handed over at the till: the goods were on the shelf whatever the count said, so on hand
+      // falls by all of them, and what other orders were promised stays theirs.
+      return { ...none, onHand: -quantity };
   }
 }
 
@@ -132,6 +136,7 @@ function mergeLines(lines: readonly StockLine[]): StockLine[] {
  * - `commit` promises units to a placed order; `releaseCommitment` undoes it on cancellation.
  * - `fulfill` ships committed units: on hand and committed both fall.
  * - `restock` puts units that came back on the shelf: on hand rises.
+ * - `sell` hands units over at the till: on hand falls, whatever was available.
  * - `recommit` commits and releases an order's units at once, as editing its items does.
  *
  * Reserving and committing check available stock under a row lock, so two buyers can never
@@ -180,6 +185,14 @@ export class StockService {
 
   restock(tx: Tx, caller: StockCaller, lines: readonly StockLine[], options: StockOptions = {}) {
     return this.#apply(tx, caller, 'restock', lines, options, false);
+  }
+
+  /**
+   * Sells units over the counter (POS-01, ADR-872): on hand falls, nothing committed changes, and
+   * it is never short, as the goods were in the shopper's hands.
+   */
+  sell(tx: Tx, caller: StockCaller, lines: readonly StockLine[], options: StockOptions = {}) {
+    return this.#apply(tx, caller, 'sell', lines, options, false);
   }
 
   /**

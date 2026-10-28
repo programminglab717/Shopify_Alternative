@@ -135,6 +135,7 @@ export type { OptionInput, VariantFieldsInput } from '../internal/variant-input.
 export {
   VariantService,
   type VariantCreateInput,
+  type VariantForSale,
   type VariantSnapshot,
   type VariantUpdateInput,
 } from '../internal/variant.service.js';

@@ -72,6 +72,12 @@ export const OrderEvents = {
    * shop is told (ADR-263): near the limit, or at it.
    */
   PlanOrdersCounted: 'plan_orders.counted',
+  /** A sale at the shop's till (POS-01, ADR-872). */
+  PosSaleCompleted: 'pos_sale.completed',
+  /** Units of a till sale brought back and paid back. */
+  PosSaleReturned: 'pos_sale.returned',
+  /** A register's cash session closed with its drawer counted: its Z report. */
+  PosSessionClosed: 'pos_session.closed',
 } as const;
 
 /** How many of its month's orders a shop's plan allows it has placed (ADR-263). */
