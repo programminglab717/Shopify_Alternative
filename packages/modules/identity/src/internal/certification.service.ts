@@ -117,8 +117,9 @@ export class CertificationService {
     const passed = score >= PASS_MARK;
     const now = this.now();
     await this.db.execute(sql`
-      INSERT INTO identity.certification_attempts (partner_id, course_version, score, passed)
-      VALUES (${userId}, ${COURSE_VERSION}, ${score}, ${passed})`);
+      INSERT INTO identity.certification_attempts
+             (partner_id, course_version, score, passed, created_at)
+      VALUES (${userId}, ${COURSE_VERSION}, ${score}, ${passed}, ${now.toISOString()})`);
     if (passed) {
       const expires = new Date(now.getTime() + CERTIFICATION_LIMITS.validDays * DAY_MS);
       await this.db.execute(sql`
