@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Expansion stores
+### 505d2ca · Expansion stores
 
 * **Settings:** an owner makes another shop they own an expansion store of this one, at a price
   rate. Copying sends this shop's products there, priced at the rate, and copying again updates
