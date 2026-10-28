@@ -314,6 +314,33 @@ describe("The storefront's preferences and redirects", () => {
     );
   });
 
+  it('asks visitors their age before the storefront shows, once an age is chosen (ADR-889)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const gate = await screen.findByRole('region', { name: 'Age check' });
+    const save = within(gate).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    const age = within(gate).getByLabelText('Visitors must be') as HTMLSelectElement;
+    expect(age.value).toBe('0');
+    expect([...age.options].map((each) => each.text)).toEqual([
+      'No age check',
+      '18 or older',
+      '21 or older',
+      '13 or older',
+      '16 or older',
+      '25 or older',
+    ]);
+    expect(save.disabled).toBe(true);
+    fireEvent.change(age, { target: { value: '18' } });
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { ageGateMinimum: 18 },
+      }),
+    );
+  });
+
   it('changes a redirect in place, and says what the core refuses', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);

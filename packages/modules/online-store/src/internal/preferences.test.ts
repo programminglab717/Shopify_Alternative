@@ -44,6 +44,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     returns: { days: null, exchangesOnly: false },
     hidePoweredBy: false,
     consentBanner: false,
+    ageGateMinimum: null,
     storefrontFilters: null,
   };
 
@@ -90,8 +91,25 @@ describe.skipIf(!server)('PreferencesService', () => {
       returns: { days: null, exchangesOnly: false },
       hidePoweredBy: false,
       consentBanner: false,
+      ageGateMinimum: null,
       storefrontFilters: null,
     });
+  });
+
+  it('asks visitors their age, 13 to 25, until the gate is taken away (ADR-889)', async () => {
+    expect(unwrap(await f.preferences.update(f.a, { ageGateMinimum: 18 }))).toMatchObject({
+      ageGateMinimum: 18,
+    });
+    // Left out, it stays; 0 takes it away.
+    unwrap(await f.preferences.update(f.a, { returnDays: 7 }));
+    expect((await f.preferences.get(f.a)).ageGateMinimum).toBe(18);
+    for (const age of [12, 26, 18.5]) {
+      expect(errorsOf(await f.preferences.update(f.a, { ageGateMinimum: age }))).toEqual([
+        ['ageGateMinimum', 'INVALID', 'An age gate asks for an age from 13 to 25'],
+      ]);
+    }
+    unwrap(await f.preferences.update(f.a, { ageGateMinimum: 0 }));
+    expect((await f.preferences.get(f.a)).ageGateMinimum).toBeNull();
   });
 
   it('asks shoppers before the pixels load, or stops asking, on any plan (ADR-551)', async () => {

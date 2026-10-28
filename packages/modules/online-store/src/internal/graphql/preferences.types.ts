@@ -189,6 +189,14 @@ export class OnlineStorePreferences {
       'to no ad platform.',
   })
   consentBanner!: boolean;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'The age the storefront asks visitors to confirm before it shows (OS-15, ADR-889), 13 to ' +
+      '25: those who say they are old enough are not asked again for a month. Null for no gate.',
+  })
+  ageGateMinimum!: number | null;
 }
 
 @InputType()
@@ -362,6 +370,14 @@ export class OnlineStorePreferencesInput {
       'Left as it is if not given.',
   })
   consentBanner?: boolean | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Asks visitors to confirm they are this old, 13 to 25, before the storefront shows ' +
+      '(ADR-889); 0 takes the gate away. Left as it is if not given.',
+  })
+  ageGateMinimum?: number | null;
 }
 
 @ObjectType()

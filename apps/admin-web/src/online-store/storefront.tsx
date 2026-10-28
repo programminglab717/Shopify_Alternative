@@ -16,7 +16,7 @@ import { localInput } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { FormSection } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
-import { CheckField } from '../settings/settings-form';
+import { CheckField, SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
@@ -308,6 +308,40 @@ function ConsentForm({ preferences }: { preferences: StorefrontPreferences }) {
   );
 }
 
+/** The ages a shop's age gate may ask for (ADR-889), the most common first. */
+const GATE_AGES = [18, 21, 13, 16, 25] as const;
+
+/**
+ * An age gate (OS-15, ADR-889): visitors confirm they are old enough before the storefront shows,
+ * not asked again for a month.
+ */
+function AgeGateForm({ preferences }: { preferences: StorefrontPreferences }) {
+  const { t } = useLocale();
+  const saved = preferences.ageGateMinimum ?? 0;
+  const [age, setAge] = useState(String(saved));
+  const input = Number(age) === saved ? {} : { ageGateMinimum: Number(age) };
+  return (
+    <PreferencesForm
+      title={t('storefront.ageGate')}
+      hint={t('storefront.ageGateHint')}
+      input={input}
+    >
+      <SelectField
+        label={t('storefront.ageGateAge')}
+        value={age}
+        options={[
+          { value: '0', label: t('storefront.ageGateNone') },
+          ...GATE_AGES.map((each) => ({
+            value: String(each),
+            label: t('storefront.ageGateAt', { age: each }),
+          })),
+        ]}
+        onChange={setAge}
+      />
+    </PreferencesForm>
+  );
+}
+
 /**
  * Rules the shop adds to its robots.txt (ADR-055), and a tester (ADR-616): an address and a
  * crawler tried against the robots.txt the storefront would serve with the rules as written, saved
@@ -435,6 +469,7 @@ export function StorefrontPreferencesTab() {
       <ReturnsForm preferences={preferences} />
       <BrandingForm preferences={preferences} />
       <ConsentForm preferences={preferences} />
+      <AgeGateForm preferences={preferences} />
       <HomeUrduCard />
     </div>
   );

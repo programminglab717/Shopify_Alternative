@@ -6417,6 +6417,7 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
     returnExchangesOnly
     hidePoweredBy
     consentBanner
+    ageGateMinimum
     robotsTxtRules
   }
 `;

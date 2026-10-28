@@ -237,6 +237,8 @@ export const preferences = onlineStoreSchema.table('preferences', {
   hidePoweredBy: boolean('hide_powered_by').notNull().default(false),
   /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
   consentBanner: boolean('consent_banner').notNull().default(false),
+  /** The age its storefront asks visitors to confirm, 13 to 25 (ADR-889); null for no gate. */
+  ageGateMinimum: smallint('age_gate_minimum'),
   /**
    * The filters its collection and search pages show, in their order (ADR-568); null for every
    * filter the platform has, in its order.

@@ -797,6 +797,8 @@ export function shopDoc(
     ...(preferences.hidePoweredBy && { hidePoweredBy: true as const }),
     // Asking shoppers before the pixels load (ADR-551), likewise.
     ...(preferences.consentBanner && { consentBanner: true as const }),
+    // Asking visitors' age (ADR-889), likewise.
+    ...(preferences.ageGateMinimum && { ageGate: preferences.ageGateMinimum }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

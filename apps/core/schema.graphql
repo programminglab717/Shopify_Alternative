@@ -11985,6 +11985,11 @@ type OnlineStoreFiltersUpdatePayload {
 """What the shop sets for its storefront as a whole."""
 type OnlineStorePreferences {
   """
+  The age the storefront asks visitors to confirm before it shows (OS-15, ADR-889), 13 to 25: those who say they are old enough are not asked again for a month. Null for no gate.
+  """
+  ageGateMinimum: Int
+
+  """
   Whether the storefront asks shoppers before the shop's ad platforms' pixels load (ADR-551): a banner until they accept or decline, and orders of those who declined sent to no ad platform.
   """
   consentBanner: Boolean!
@@ -12060,6 +12065,11 @@ type OnlineStorePreferences {
 }
 
 input OnlineStorePreferencesInput {
+  """
+  Asks visitors to confirm they are this old, 13 to 25, before the storefront shows (ADR-889); 0 takes the gate away. Left as it is if not given.
+  """
+  ageGateMinimum: Int
+
   """
   Asks shoppers before the shop's ad platforms' pixels load, or stops asking (ADR-551). Left as it is if not given.
   """

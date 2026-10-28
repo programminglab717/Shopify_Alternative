@@ -2859,6 +2859,11 @@ export interface StorefrontPreferences {
   hidePoweredBy: boolean;
   /** Whether the storefront asks shoppers before the ad platforms' pixels load (ADR-551). */
   consentBanner: boolean;
+  /**
+   * The age the storefront asks visitors to confirm (ADR-889); null for none, absent where a
+   * fake core leaves it out.
+   */
+  ageGateMinimum?: number | null;
   /** Rules the shop adds to its robots.txt (ADR-055); absent where a fake core leaves it out. */
   robotsTxtRules?: string;
 }

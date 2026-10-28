@@ -649,6 +649,11 @@ export interface ShopDoc {
    */
   consentBanner?: true;
   /**
+   * The age its storefront asks visitors to confirm before its pages show (OS-15, ADR-889).
+   * Absent while it asks none.
+   */
+  ageGate?: number;
+  /**
    * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
    * Absent or empty for none, as in documents written before shops had them.
    */

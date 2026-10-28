@@ -54,6 +54,7 @@ import {
   type ObjectContext,
   type SearchFound,
 } from './objects.js';
+import { ageGateTags } from './age-gate.js';
 import {
   CONSENT_STYLE,
   consentScript,
@@ -850,11 +851,13 @@ export class PageRenderer {
           ? alternateLinks([...theme.locales.keys()], theme.defaultLocale, addressIn)
           : '',
       // The shop's pixels, Meta's and TikTok's, and Google's tag, while it has them (ADR-144,
-      // ADR-543, ADR-548): shoppers' pages alone, after its consent banner while it asks (ADR-551).
+      // ADR-543, ADR-548): shoppers' pages alone, after its consent banner while it asks (ADR-551),
+      // and its age gate first, while it asks visitors' age (ADR-889).
       pixel:
         request.preview || request.editor
           ? ''
-          : pixelTags(
+          : ageGateTags(shopDoc.ageGate, locale) +
+            pixelTags(
               shopDoc,
               name === 'product'
                 ? pixelProduct(resource.product as Record<string, unknown> | undefined)

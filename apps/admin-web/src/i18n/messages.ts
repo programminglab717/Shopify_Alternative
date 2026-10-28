@@ -2106,6 +2106,12 @@ const en = {
   'storefront.consentOn':
     'A banner asks each shopper until they accept or decline. Pixels load only once they accept, and orders of those who did not go to no ad platform.',
   'storefront.consentOff': 'Your pixels load on every page, as they do now.',
+  'storefront.ageGate': 'Age check',
+  'storefront.ageGateHint':
+    'For stores selling what is only for adults: visitors confirm their age before your store shows, and are not asked again for a month.',
+  'storefront.ageGateAge': 'Visitors must be',
+  'storefront.ageGateNone': 'No age check',
+  'storefront.ageGateAt': '{age} or older',
   'storefront.robots': 'What search engines may crawl',
   'storefront.robotsHint':
     'Your robots.txt already keeps crawlers out of carts, checkout and searches. Add rules of your own, one a line, and try an address before you save them.',
@@ -9104,6 +9110,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.consentOn':
     'ایک بینر ہر خریدار سے پوچھتا ہے جب تک وہ قبول یا انکار نہ کرے۔ پکسلز صرف قبول کرنے پر لوڈ ہوتے ہیں، اور انکار کرنے والوں کے آرڈر کسی اشتہاری پلیٹ فارم کو نہیں جاتے۔',
   'storefront.consentOff': 'آپ کے پکسلز ہر صفحے پر لوڈ ہوتے ہیں، جیسے ابھی ہوتے ہیں۔',
+  'storefront.ageGate': 'عمر کی تصدیق',
+  'storefront.ageGateHint':
+    'صرف بالغوں کے لیے سامان بیچنے والے اسٹورز کے لیے: وزیٹرز آپ کا اسٹور دیکھنے سے پہلے اپنی عمر کی تصدیق کرتے ہیں، اور ایک مہینے تک دوبارہ نہیں پوچھا جاتا۔',
+  'storefront.ageGateAge': 'وزیٹرز کی عمر ہو',
+  'storefront.ageGateNone': 'عمر کی تصدیق نہیں',
+  'storefront.ageGateAt': '{age} سال یا زیادہ',
   'storefront.robots': 'سرچ انجن کیا دیکھ سکتے ہیں',
   'storefront.robotsHint':
     'آپ کی robots.txt پہلے ہی کرالرز کو کارٹ، چیک آؤٹ اور سرچ سے دور رکھتی ہے۔ اپنے اصول شامل کریں، ہر لائن میں ایک، اور محفوظ کرنے سے پہلے کوئی ایڈریس آزما لیں۔',

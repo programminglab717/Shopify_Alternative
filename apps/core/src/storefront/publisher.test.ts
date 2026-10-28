@@ -2399,6 +2399,17 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).consentBanner).toBeUndefined();
   });
 
+  it('publishes the age the shop asks its visitors, and leaves it out while it asks none (ADR-889)', async () => {
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).ageGate).toBeUndefined();
+    unwrap(await preferences.update(tenant, { ageGateMinimum: 21 }));
+    await deliver();
+    expect((await store().shop()).ageGate).toBe(21);
+    unwrap(await preferences.update(tenant, { ageGateMinimum: 0 }));
+    await deliver();
+    expect((await store().shop()).ageGate).toBeUndefined();
+  });
+
   it('publishes the filters the shop chose, a metafield’s by its definition’s name, and leaves them out while it chose none (ADR-568)', async () => {
     const filters = new StorefrontFiltersService(database);
     const metafields = new MetafieldService(database);

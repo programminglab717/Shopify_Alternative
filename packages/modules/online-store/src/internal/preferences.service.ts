@@ -88,7 +88,15 @@ export interface PreferencesInput {
    * is if absent.
    */
   consentBanner?: boolean | null;
+  /**
+   * The age its storefront asks visitors to confirm before it shows, 13 to 25 (OS-15, ADR-889);
+   * 0 takes the gate away. Left as it is if absent.
+   */
+  ageGateMinimum?: number | null;
 }
+
+/** The ages an age gate may ask for (ADR-889). */
+export const AGE_GATE_LIMITS = { least: 13, most: 25 } as const;
 
 /** The longest return window a shop may give, in days (ADR-468). */
 export const RETURN_LIMITS = { days: 90 } as const;
@@ -351,7 +359,23 @@ export class PreferencesService {
         },
         hidePoweredBy: input.hidePoweredBy ?? was.hidePoweredBy,
         consentBanner: input.consentBanner ?? was.consentBanner,
+        ageGateMinimum:
+          input.ageGateMinimum === undefined || input.ageGateMinimum === null
+            ? was.ageGateMinimum
+            : input.ageGateMinimum || null,
       };
+      if (
+        next.ageGateMinimum !== null &&
+        (!Number.isInteger(next.ageGateMinimum) ||
+          next.ageGateMinimum < AGE_GATE_LIMITS.least ||
+          next.ageGateMinimum > AGE_GATE_LIMITS.most)
+      ) {
+        return failOne(
+          ['ageGateMinimum'],
+          'INVALID',
+          `An age gate asks for an age from ${AGE_GATE_LIMITS.least} to ${AGE_GATE_LIMITS.most}`,
+        );
+      }
       if (next.passwordEnabled && next.password === null) {
         return failOne(
           ['password'],
@@ -391,6 +415,7 @@ export class PreferencesService {
           : []),
         ...(next.hidePoweredBy !== was.hidePoweredBy ? ['hidePoweredBy'] : []),
         ...(next.consentBanner !== was.consentBanner ? ['consentBanner'] : []),
+        ...(next.ageGateMinimum !== was.ageGateMinimum ? ['ageGateMinimum'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -419,6 +444,7 @@ export class PreferencesService {
         returnExchangesOnly: next.returns.exchangesOnly,
         hidePoweredBy: next.hidePoweredBy,
         consentBanner: next.consentBanner,
+        ageGateMinimum: next.ageGateMinimum,
       };
       const [row] = await tx
         .insert(preferences)
@@ -568,6 +594,7 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
     },
     hidePoweredBy: row?.hidePoweredBy ?? false,
     consentBanner: row?.consentBanner ?? false,
+    ageGateMinimum: row?.ageGateMinimum ?? null,
     // As the online store checked them when they were chosen (ADR-568).
     storefrontFilters:
       row?.storefrontFilters?.map((filter) => ({

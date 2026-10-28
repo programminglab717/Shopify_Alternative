@@ -115,6 +115,7 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
     returnExchangesOnly: view.returns.exchangesOnly,
     hidePoweredBy: view.hidePoweredBy,
     consentBanner: view.consentBanner,
+    ageGateMinimum: view.ageGateMinimum,
     sharingImage:
       view.sharingImage &&
       Object.assign(new SharingImage(), {

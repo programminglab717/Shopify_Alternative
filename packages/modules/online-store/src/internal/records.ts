@@ -294,6 +294,8 @@ export interface PreferencesRecord {
   hidePoweredBy: boolean;
   /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
   consentBanner: boolean;
+  /** The age its storefront asks visitors to confirm before it shows (ADR-889); null for none. */
+  ageGateMinimum: number | null;
   /**
    * The filters its collection and search pages show, in their order (SRC-03, ADR-568); null
    * while it chose none: every filter the platform has, in the platform's order.
