@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Daraz sync
+### d92591d · Daraz sync
 
 * **Connecting:** a shop connects its Daraz seller account from Settings › Daraz, through
   Daraz's own page (CH-06, [ADR-875](../architecture/13-decision-log.md#adr-875--daraz-sync-a-shop-connects-its-daraz-seller-account-through-darazs-own-page-every-ten-minutes-hatti-brings-darazs-new-orders-in-as-prepaid-marketplace-orders-follows-their-cancellations-and-gives-daraz-each-matching-skus-stock-and-prices-where-asked-from-one-location)).
