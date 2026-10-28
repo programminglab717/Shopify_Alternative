@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Combined listings as one card
+### 400b795 · Combined listings as one card
 
 * **A combined listing the shop chooses is one card** in its collections: the first of its
   products in each collection's order stands for the rest, and Hatti Base's card names their
