@@ -391,6 +391,11 @@ const apiSchema = z
     PORT: env.port().default(4000),
     /** Set when running behind a load balancer or Cloudflare, so client IPs are right. */
     TRUST_PROXY: env.flag().default(false),
+    /**
+     * Whether checkout offers Hatti Pass, shoppers' details for any Hatti shop (ADR-867). Off until
+     * Hatti's privacy policy says Hatti keeps them (OWN-57).
+     */
+    HATTI_PASS: env.flag().default(false),
     /** GraphiQL at /graphiql. Defaults to on in development only. */
     GRAPHIQL: env.flag().optional(),
     /**

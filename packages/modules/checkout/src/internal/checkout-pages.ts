@@ -81,6 +81,7 @@ import {
 } from './delivery.js';
 import type { AddressGap } from './address-quality.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
+import { PASS_FIELD } from './hatti-pass.js';
 import { checkoutTotals } from './totals.js';
 
 /** A checkout's page and its HTTP status. */
@@ -373,6 +374,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         problem.kind !== 'gift_card' &&
         !(problem.kind === 'recall' && !RECALL_DONE.includes(problem.state)) &&
         banner(problemWords(problem, ways)),
+      // Filled in from the shopper's Hatti Pass: theirs to forget, here (ADR-867).
+      problem?.kind === 'recall' && problem.state === 'filled_pass' && passForget(form.phone),
       // Its stock held for the shopper meanwhile (ADR-715).
       view.heldUntil && heldNotice(view.heldUntil),
       // A signed-in shopper's order in a tap, to their default address (CHK-21, ADR-838).
@@ -443,6 +446,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             },
           })}
           ${marketingChoices(shop.name, view.marketing, form.marketing)}
+          ${view.offersPass && passChoice(form.pass === '1')}
           ${
             // Digital products alone: nowhere to deliver them (ADR-815).
             !view.digital &&
@@ -660,6 +664,36 @@ function marketingChoices(
       <span><span lang="en">${words.en}</span><span lang="ur" dir="rtl">${words.ur}</span></span>
     </label>`;
   });
+}
+
+/** Forgetting the shopper's Hatti Pass, whose number they just proved (ADR-867). */
+function passForget(phone: string): Html {
+  return html`<form method="post" class="section">
+    <input type="hidden" name="action" value="pass_forget" />
+    <input type="hidden" name="phone" value="${phone}" />
+    <button class="button secondary" type="submit">
+      ${say('bilingual', { en: 'Forget my Hatti Pass', ur: 'میرا ہٹی پاس مٹا دیں' })}
+    </button>
+  </form>`;
+}
+
+/**
+ * Saving the order's details to the shopper's Hatti Pass (CUS-08, ADR-867), for any Hatti shop's
+ * checkout: unticked until they tick it, and saved once they prove the number with a code.
+ */
+function passChoice(checked: boolean): Html {
+  return html`<label class="choice">
+    <input type="checkbox" name="${PASS_FIELD}" value="1" ${checked && html`checked`} />
+    <span
+      ><span lang="en"
+        >Save my name and address to Hatti Pass, to fill them in at any Hatti shop's checkout once I
+        prove my number. Hatti keeps them until I forget them.</span
+      ><span lang="ur" dir="rtl"
+        >میرا نام اور پتہ ہٹی پاس میں محفوظ کریں، تاکہ نمبر کی تصدیق کے بعد ہر ہٹی دکان کے چیک آؤٹ
+        پر بھر جائیں۔ ہٹی انہیں تب تک رکھتی ہے جب تک میں انہیں مٹا نہ دوں۔</span
+      ></span
+    >
+  </label>`;
 }
 
 /**
@@ -1748,10 +1782,12 @@ const RECALL_STATUS: Record<RecallState, number> = {
   expired: 422,
   invalid: 422,
   too_many: 429,
+  filled_pass: 200,
+  pass_forgotten: 200,
 };
 
 /** Where the number is proved and the form filled in, or found to have nothing to fill it from. */
-const RECALL_DONE: readonly RecallState[] = ['filled', 'nothing'];
+const RECALL_DONE: readonly RecallState[] = ['filled', 'nothing', 'filled_pass', 'pass_forgotten'];
 
 /**
  * Express checkout (CHK-21, ADR-838): a signed-in shopper, whose number their session proved
@@ -1917,6 +1953,17 @@ function recallWords(problem: Extract<CheckoutProblem, { kind: 'recall' }>): Sen
       return {
         en: 'We filled in the address of your last order. Check it before you place your order.',
         ur: 'ہم نے آپ کے پچھلے آرڈر کا پتہ بھر دیا ہے۔ آرڈر دینے سے پہلے اسے دیکھ لیں۔',
+      };
+    case 'filled_pass':
+      return {
+        en: 'We filled in your details from your Hatti Pass. Check them before you place your order.',
+        ur: 'ہم نے آپ کی معلومات آپ کے ہٹی پاس سے بھر دی ہیں۔ آرڈر دینے سے پہلے انہیں دیکھ لیں۔',
+      };
+    case 'pass_forgotten':
+      return {
+        en: `Your Hatti Pass for ${phone} is forgotten. No Hatti shop fills your details in from it now.`,
+        ur: html`${ltr(phone)} کا آپ کا ہٹی پاس مٹا دیا گیا۔ اب کوئی ہٹی دکان اس سے آپ کی معلومات
+        نہیں بھرتی۔`,
       };
     case 'nothing':
       return {

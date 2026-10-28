@@ -37,6 +37,7 @@ import { REMINDER_LINK_PATH } from './abandoned.js';
 import { AbandonedCheckoutService } from './abandoned.service.js';
 import { checkoutPage } from './checkout-pages.js';
 import { MARKETING_FIELDS } from './marketing.js';
+import { PASS_FIELD } from './hatti-pass.js';
 import { PaymentLinkService } from './payment-link.service.js';
 import {
   CHECKOUT_PATH,
@@ -410,6 +411,8 @@ async function posted(
         },
         options,
       );
+    case 'pass_forget':
+      return checkouts.forgetPass(token, { phone: field(body, 'phone') }, options);
     case 'use_address':
       return checkouts.useAddress(token, field(body, 'address'), options);
     case 'express':
@@ -478,6 +481,8 @@ function formOf(body: unknown): CheckoutForm {
     marketing: MARKETING_CHANNELS.filter(
       (channel) => field(body, MARKETING_FIELDS[channel]) === '1',
     ).join(' '),
+    // The box to save the order's details to the shopper's Hatti Pass (ADR-867).
+    pass: field(body, PASS_FIELD) === '1' ? '1' : '',
     // The pin, where the shopper added their location (ADR-259).
     latitude: field(body, 'latitude').slice(0, 20),
     longitude: field(body, 'longitude').slice(0, 20),

@@ -83,6 +83,7 @@ const app = await createApi({
   localStoragePath: LOCAL_STORAGE_PATH,
   storefrontUrl: config.STOREFRONT_URL,
   storefrontDnsTarget: config.STOREFRONT_DNS_TARGET,
+  hattiPass: config.HATTI_PASS,
   mapTiles:
     config.MAP_TILES_URL && config.MAP_TILES_ATTRIBUTION
       ? new MapTiles(config.MAP_TILES_URL, config.MAP_TILES_ATTRIBUTION)

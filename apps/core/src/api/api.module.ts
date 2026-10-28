@@ -17,7 +17,7 @@ import {
   type SupportContact,
 } from '@hatti/billing/public';
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
-import { CheckoutModule, DropTokens } from '@hatti/checkout/public';
+import { CheckoutModule, DropTokens, HattiPassSetting } from '@hatti/checkout/public';
 import { RedisDropTokens } from '../drop-tokens.js';
 import { MessagingDeliveryCodes } from '../delivery-codes.js';
 import { SecretBox } from '@hatti/crypto';
@@ -186,6 +186,8 @@ export interface ApiModuleOptions {
   ai?: AiGateway | null;
   /** The tiles of checkout's map to move the pin on (ADR-719), where configured; without them, no map. */
   mapTiles?: MapTiles | null;
+  /** Whether checkout offers Hatti Pass (ADR-867); off unless set. */
+  hattiPass?: boolean;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
   couriers?: Couriers;
   /**
@@ -254,6 +256,7 @@ class InfrastructureModule {
         { provide: ObjectStorage, useValue: options.storage },
         { provide: AiGateway, useValue: options.ai ?? null },
         { provide: MapTiles, useValue: options.mapTiles ?? null },
+        { provide: HattiPassSetting, useValue: new HattiPassSetting(options.hattiPass ?? false) },
         // The codes customers give the shop's own riders, sent as messages are (ADR-824).
         {
           provide: DeliveryCodeSender,

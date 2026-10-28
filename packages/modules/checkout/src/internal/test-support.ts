@@ -34,6 +34,7 @@ import { AutomaticDiscountService, DiscountCodeService } from '@hatti/pricing/pu
 import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
+import { HattiPassSetting } from './hatti-pass.js';
 import { CheckoutService } from './checkout.service.js';
 import type { DropTokens } from './drop-tokens.js';
 import { CodRulesService } from './cod-rules.service.js';
@@ -259,6 +260,10 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       new MessagesService(db),
       payments,
       new PublicSite('https://hatti.test'),
+      null,
+      null,
+      // Hatti Pass offered, as once its privacy policy says so (ADR-867).
+      new HattiPassSetting(true),
     ),
     checkoutsWith: (dropTokens: DropTokens) =>
       new CheckoutService(
@@ -343,6 +348,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       await admin.query(`
         DELETE FROM checkout.checkouts;
         DELETE FROM checkout.number_proofs;
+        DELETE FROM platform.hatti_passes;
         DELETE FROM checkout.number_codes;
         DELETE FROM checkout.account_sessions;
         DELETE FROM checkout.account_data_exports;

@@ -176,6 +176,7 @@ function openView(
     storeCredit: false,
     giftCard: null,
     marketing: [],
+    offersPass: true,
     paymentLink: null,
     pickup: [],
     gift: null,

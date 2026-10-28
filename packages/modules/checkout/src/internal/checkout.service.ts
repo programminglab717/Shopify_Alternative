@@ -125,6 +125,7 @@ import { checkouts } from './schema.js';
 import { orderItemsIn } from './discount-items.js';
 import { checkoutTotals } from './totals.js';
 import { StockHolds } from './stock-holds.js';
+import { HattiPassSetting, forgetPassIn, passAddressIn, savePassIn } from './hatti-pass.js';
 import { DropTokens, type DropClaim } from './drop-tokens.js';
 import { storefrontUrlIn } from './storefront-url.js';
 import { trustBadgesIn } from './trust-badge.service.js';
@@ -207,6 +208,11 @@ export interface CheckoutForm {
    * "whatsapp email" (ADR-187); blank, or absent, for none.
    */
   marketing?: string;
+  /**
+   * "1" to save the order's name, email and address to the shopper's Hatti Pass, for any Hatti
+   * shop's checkout (CUS-08, ADR-867), once they prove the number; blank, or absent, not to.
+   */
+  pass?: string;
   /**
    * The address's pin, as its script filled it in where the shopper added their location
    * (ADR-259): degrees, both blank, or absent, for none.
@@ -331,6 +337,7 @@ export const EMPTY_FORM: CheckoutForm = {
   storeCredit: '',
   storeCreditAmount: '',
   marketing: '',
+  pass: '',
   latitude: '',
   longitude: '',
   pickup: '',
@@ -486,7 +493,15 @@ export type CheckoutProblem =
 
 /** How a returning shopper's ask for their saved address went (ADR-447). */
 export type RecallState =
-  'sent' | Exclude<CodeCheck, 'verified' | 'none'> | 'invalid' | 'filled' | 'nothing';
+  | 'sent'
+  | Exclude<CodeCheck, 'verified' | 'none'>
+  | 'invalid'
+  | 'filled'
+  | 'nothing'
+  /** Filled in from the shopper's Hatti Pass, the shop having no order of theirs (ADR-867). */
+  | 'filled_pass'
+  /** The shopper's Hatti Pass forgotten, as they asked. */
+  | 'pass_forgotten';
 
 export interface CheckoutShop {
   name: string;
@@ -607,6 +622,11 @@ export type CheckoutView =
       storeCredit: boolean;
       /** The channels the page offers a box for the shop's news and offers on (ADR-187). */
       marketing: readonly MarketingChannelValue[];
+      /**
+       * Whether the page offers the shopper's Hatti Pass (ADR-867): to fill the address in from,
+       * and to save the order's to. Not for digital products alone, which go to no address.
+       */
+      offersPass: boolean;
       /** The payment link it was opened from (ADR-248), for the order placed; null for a cart's. */
       paymentLink: { id: string; title: string } | null;
       /** Where the shopper may pick the order up instead (ADR-391): none, where nowhere offers it. */
@@ -704,6 +724,8 @@ export class CheckoutService {
     @Optional() @Inject(MapTiles) private readonly mapTiles?: MapTiles | null,
     /** Drops' token pools (ADR-821); without them, a drop's orders take stock as any other. */
     @Optional() @Inject(DropTokens) private readonly dropTokens?: DropTokens | null,
+    /** Whether checkout offers Hatti Pass (ADR-867); off without it. */
+    @Optional() @Inject(HattiPassSetting) private readonly hattiPass?: HattiPassSetting | null,
   ) {}
 
   /** Stock held while shoppers check out (ADR-715). */
@@ -1000,7 +1022,9 @@ export class CheckoutService {
           )
         : 0n;
       const withCredit = credit > 0n ? { ...view, creditBalance: credit } : view;
-      const saved = await savedAddressIn(tx, found.shopId, phone);
+      // The shop's own last order of the number's, else the shopper's Hatti Pass (ADR-867).
+      const own = await savedAddressIn(tx, found.shopId, phone);
+      const saved = own ?? (view.offersPass ? await passAddressIn(tx, phone) : null);
       if (!saved) {
         return {
           ...withCredit,
@@ -1031,7 +1055,48 @@ export class CheckoutService {
           kind: 'recall',
           phone: maskPkMobile(phone),
           channel: asked.channel,
-          state: 'filled',
+          state: own ? 'filled' : 'filled_pass',
+        },
+      };
+    });
+  }
+
+  /**
+   * Forgets the shopper's Hatti Pass (ADR-867), once they proved the number in this checkout, or
+   * in this browser lately; else asks for a code to prove it, as "Ordered here before?" does.
+   */
+  async forgetPass(
+    token: string,
+    asked: { phone: string },
+    options: { shopId?: string; client?: CheckoutClient } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    const phone = new InputChecker().mobile(['phone'], asked.phone, { required: true });
+    const proof = options.client?.proof;
+    const forgot = phone
+      ? await this.db.tenant(found.shopId, async (tx) => {
+          const proved =
+            (await numberVerifiedIn(tx, found.shopId, found.checkoutId, phone)) ??
+            (proof ? await provedByBrowserIn(tx, found.shopId, proof, phone) : null);
+          if (!proved) return null;
+          await forgetPassIn(tx, phone);
+          return phone;
+        })
+      : null;
+    if (!forgot) {
+      return this.recall(token, { phone: asked.phone, code: null, channel: 'whatsapp' }, options);
+    }
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const view = await this.#view(tx, found, false, { ...EMPTY_FORM, phone: asked.phone });
+      if (view.kind !== 'open') return view;
+      return {
+        ...view,
+        problem: {
+          kind: 'recall',
+          phone: maskPkMobile(forgot),
+          channel: 'whatsapp',
+          state: 'pass_forgotten',
         },
       };
     });
@@ -1394,17 +1459,19 @@ export class CheckoutService {
       const rules = view.payments.codRules;
       // Store credit, where the shopper asked to pay with it and the page offered it (ADR-186).
       const withCredit = view.storeCredit && form.storeCredit === '1';
+      // The order's details saved to the shopper's Hatti Pass, where they ticked its box (ADR-867).
+      const withPass = form.pass === '1' && view.offersPass;
       // Whether the number was proved with a code here, where the shop asks for one (ADR-148), or
       // the shopper would spend its store credit.
       const asksCode = paymentMethod === 'cash_on_delivery' && rules.verifyFromScore !== null;
       const codedAt =
-        withCredit || asksCode
+        withCredit || asksCode || withPass
           ? await numberVerifiedIn(tx, found.shopId, found.checkoutId, address.phone)
           : null;
       // Or by the shopper's session signed in to their account with it (ADR-586), by a code sent
       // to it: enough to spend its credit too (ADR-609), as the account's page shows it.
       const sessionAt =
-        !codedAt && (withCredit || asksCode) && client?.account
+        !codedAt && (withCredit || asksCode || withPass) && client?.account
           ? await provedBySessionIn(tx, found.shopId, client.account, address.phone)
           : null;
       // Or proved in this browser lately (ADR-199): enough where the shop's risk rules ask, never
@@ -1420,6 +1487,9 @@ export class CheckoutService {
       if (creditUpTo === 'invalid') {
         return { ...view, form, problem: { kind: 'store_credit_amount' } };
       }
+      // A Hatti Pass is saved for the number once the shopper proves it is theirs, as its credit
+      // is spent: no one keeps their details under another's number.
+      if (withPass && !codedAt && !sessionAt) throw new NeedsCode();
       if (withCredit) {
         // The number's credit is the shopper's to spend once they prove it is theirs, by a code
         // here or signed in with it.
@@ -1655,6 +1725,10 @@ export class CheckoutService {
           })),
         });
       }
+      // Where it goes to an address, the shopper's Hatti Pass keeps it (ADR-867).
+      if (withPass && !pickupAt) {
+        await savePassIn(tx, found.shopId, { address, email: placed.value.email });
+      }
       // One more order through its link, which the page's lock on it kept from closing meanwhile.
       if (view.paymentLink) await countLinkOrderIn(tx, found.shopId, view.paymentLink.id);
       await tx
@@ -1887,6 +1961,7 @@ export class CheckoutService {
       storeCredit,
       ...(provedCredit !== null && { creditBalance: provedCredit }),
       marketing: await checkoutMarketingIn(tx, shopId),
+      offersPass: !digital && (this.hattiPass?.on ?? false),
       paymentLink: link && { id: link.id, title: link.title },
       pickup: digital ? [] : await this.#pickupPoints(tx, shopId),
       ...(digital && { digital: true as const }),
