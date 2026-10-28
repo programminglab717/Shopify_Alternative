@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-880 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-881 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -888,6 +888,7 @@
 | 878 | The console's other trust queues: rights complaints upheld or dismissed and store owners' answers refused or their listings let go, listings screening held by mistake cleared, signs of scam stores cleared, and shops' SMS sender names approved, refused or taken back | Accepted |
 | 879 | The console's operations: shops' transfers into Hatti's account confirmed, for what came where it was not what was said, or refused with why; and the status page's incidents and maintenance posted and updated until they end | Accepted |
 | 880 | Partners' work in the console: public apps, theme-store themes and expert profiles listed for every shop once checked, or taken back; and partners' payouts marked paid by the bank transfer's reference | Accepted |
+| 881 | Shops looked up in the console by name, handle or ID, each with its standing at a glance and every look logged; and couriers' names for cities reviewed, kept and forgotten there | Accepted |
 
 ---
 
@@ -29191,3 +29192,30 @@
       should do;
     * couriers' city names;
     * closed shops' purges, which can't be undone.
+
+## ADR-881 · Shops looked up in the console by name, handle or ID, each with its standing at a glance and every look logged; and couriers' names for cities reviewed, kept and forgotten there
+
+* **Context:**
+  * Hatti's people answering a shop had no way to see it whole: its plan, its owner, whether
+    Hatti verified it, and what waits of it. They read the database.
+  * Couriers' city names (ADR-260) were the last command of a daily queue.
+* **Decision:**
+  * **Shops:** found by a part of their name or handle, or by their ID, the latest first, with
+    their plan and status. A shop's page gives its standing at a glance:
+    * its owner and how to reach them;
+    * the levels Hatti verified it at;
+    * its open reports, waiting support requests and standing signs of a scam, each linking to
+      its queue;
+    * whether it is down, and since when;
+    * whether its owner lets support look now, until when and why;
+    * what was done to it in the console, the latest first.
+    It links on to taking the store down. Each look is logged, as it shows the owner's details.
+    A search's `%` and `_` are words like any other, never wildcards.
+  * **Couriers' city names:** by courier, Hatti's own names, which come first, and the names
+    shops gave, how many gave each, and whether they are shared, disputed or not yet.
+    * Hatti's name for a city is kept, which settles one shops named wrong.
+    * Or it is forgotten, and shops' names count again.
+* **Consequences:**
+  * Support starts from the shop. Every queue of `courier-cities` and the trust, billing and
+    partner commands is in the console.
+  * Still commands: adding and removing agents, and purging closed shops.

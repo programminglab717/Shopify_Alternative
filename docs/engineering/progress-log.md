@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Shops and city names in the console
+
+* **Shops:** Hatti's people find a shop by name, handle or ID, and see its standing: its owner,
+  verification, what waits of it, whether support may look, and what was done to it. Each look
+  is logged ([ADR-881](../architecture/13-decision-log.md#adr-881--shops-looked-up-in-the-console-by-name-handle-or-id-each-with-its-standing-at-a-glance-and-every-look-logged-and-couriers-names-for-cities-reviewed-kept-and-forgotten-there)).
+* **City names:** couriers' city names are reviewed, kept and forgotten there.
+* 4775 tests (4 new).
+
 ### 703e794 · Partners' work in the console
 
 * **Reviews:** partners' public apps, theme-store themes and expert profiles are listed in the
