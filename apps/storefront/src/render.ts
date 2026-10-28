@@ -272,6 +272,8 @@ interface PreparedPage {
   alternates: string;
   /** The shop's Meta pixel's script for the page, in its head; empty without one (ADR-144). */
   pixel: string;
+  /** The scripts of the shop's apps it turned on (ADR-852), in its head; empty for none. */
+  apps: string;
   /** The bar saying checkout alone is paused, in its head; empty while it is not (ADR-604). */
   pausedBar: string;
   /** The script reporting a shopper's search, in its head; empty on other pages (ADR-683). */
@@ -559,7 +561,8 @@ export class PageRenderer {
             `<script data-hatti-vitals data-template="${vitalTemplateOf(templateFile)}">` +
             `${VITALS_SCRIPT}</script>${prepared.pixel}${prepared.pausedBar}` +
             prepared.searchReport +
-            pwaHead(locale === 'ur', this.options.pushPublicKey));
+            pwaHead(locale === 'ur', this.options.pushPublicKey)) +
+      prepared.apps;
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,
@@ -824,6 +827,9 @@ export class PageRenderer {
                 : null,
               { locale, prefix: locale === theme.defaultLocale ? '' : `/${locale}` },
             ),
+      // Its apps' scripts it turned on (ADR-852), in previews and the editor too, for the shop to
+      // see its pages as shoppers will.
+      apps: appEmbedTags(shopDoc),
       // Checkout alone paused (ADR-604): shoppers' pages say so while it is.
       pausedBar:
         shopDoc.maintenance?.checkoutOnly &&
@@ -1084,6 +1090,20 @@ function pixelTags(
     `<script data-hatti-consent>${consentScript(locale, privacy)}</script>` +
     scripts.map((script) => tag(onceConsented(script))).join('')
   );
+}
+
+/**
+ * The script tags of the apps' scripts the shop turned on (DEV-06, ADR-852): each loaded async,
+ * after the page, named by its app's handle for it.
+ */
+export function appEmbedTags(shop: ShopDoc): string {
+  return (shop.appEmbeds ?? [])
+    .filter((embed) => embed.src.startsWith('https://'))
+    .map(
+      (embed) =>
+        `<script src="${escapeHtml(embed.src)}" async data-hatti-app="${escapeHtml(embed.handle)}"></script>`,
+    )
+    .join('');
 }
 
 /**

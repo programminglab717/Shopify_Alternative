@@ -160,6 +160,8 @@ export const ID_PREFIXES = {
   storefrontAccessToken: 'sfat',
   // An app a partner registered for shops to install (ADR-851).
   partnerApp: 'papp',
+  // A script an app offers the shop's storefront, which the shop turns on (ADR-852).
+  appEmbed: 'aemb',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

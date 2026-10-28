@@ -88,6 +88,7 @@ import { VerificationPage } from './settings/verification-page';
 import { HelpPage } from './help/help-page';
 import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
+import { AppFramePage } from './settings/app-frame-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AdSpendPage } from './marketing/ad-spend-page';
 import { AffiliatesPage } from './marketing/affiliates-page';
@@ -811,6 +812,13 @@ const settingsApps = createRoute({
   component: AppsPage,
 });
 
+// A public app opened inside the admin (ADR-852).
+const settingsAppFrame = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/apps/$appId',
+  component: AppFramePage,
+});
+
 const settingsWhatsApp = createRoute({
   getParentRoute: () => shop,
   path: 'settings/whatsapp',
@@ -1113,6 +1121,7 @@ export const routeTree = root.addChildren([
     settingsVerification,
     settingsCustomData,
     settingsApps,
+    settingsAppFrame,
     settingsWhatsApp,
     marketing,
     marketingTemplates,

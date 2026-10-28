@@ -10,6 +10,8 @@ export const AppEvents = {
   /** A public app installed on the shop, or uninstalled from it (ADR-851). */
   Installed: 'app.installed',
   Uninstalled: 'app.uninstalled',
+  /** An app's storefront scripts offered, changed, removed, or turned on or off (ADR-852). */
+  EmbedsUpdated: 'app_embeds.updated',
 } as const;
 
 /** A custom app made, changed, given a new token or secret, or removed. */

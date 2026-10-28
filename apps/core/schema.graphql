@@ -321,6 +321,57 @@ type AffiliateUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+A script an app offers the shop's storefront, as a theme app embed (DEV-06, ADR-852): loaded on its pages once the owner or a manager turns it on.
+"""
+type AppEmbed {
+  """The app offering it."""
+  appId: ID!
+  appName: String!
+
+  """Whether the storefront loads it: off until the shop turns it on."""
+  enabled: Boolean!
+
+  """The app's own name for it, unique among its scripts: "reviews-widget"."""
+  handle: String!
+  id: ID!
+  name: String!
+
+  """Its https address, loaded async on every storefront page."""
+  src: String!
+  updatedAt: DateTime!
+}
+
+type AppEmbedDeletePayload {
+  deletedAppEmbedId: ID
+  userErrors: [UserError!]!
+}
+
+input AppEmbedInput {
+  handle: String!
+  name: String!
+  src: String!
+}
+
+type AppEmbedPayload {
+  appEmbed: AppEmbed
+  userErrors: [UserError!]!
+}
+
+"""
+An installed app opened inside the admin (DEV-06, ADR-852): the address its frame loads, carrying a session token the app checks with its client secret.
+"""
+type AppSession {
+  expiresAt: DateTime!
+  name: String!
+
+  """A JWT signed HS256 with the client secret, lasting a minute."""
+  token: String!
+
+  """The app's address, with `shop`, `embedded=1` and `id_token`."""
+  url: String!
+}
+
 type AppUninstallPayload {
   uninstalledAppId: ID
   userErrors: [UserError!]!
@@ -9169,6 +9220,19 @@ type Mutation {
   """
   affiliateUpdate(input: AffiliateUpdateInput!): AffiliateUpdatePayload!
 
+  """Takes back the calling app's storefront script."""
+  appEmbedDelete(handle: String!): AppEmbedDeletePayload!
+
+  """
+  Turns an app's storefront script on or off: the owner's and managers' to do.
+  """
+  appEmbedEnable(enabled: Boolean!, id: ID!): AppEmbedPayload!
+
+  """
+  Offers the calling app's storefront script, or changes it by its handle. Off until the shop turns it on, and off again when its address changes.
+  """
+  appEmbedSet(input: AppEmbedInput!): AppEmbedPayload!
+
   """Uninstalls a public app: its token stops working at once."""
   appUninstall(id: ID!): AppUninstallPayload!
 
@@ -15301,6 +15365,16 @@ type Query {
   The shop's affiliates, the latest added first, each with what their orders came to, worked out from the orders when asked.
   """
   affiliates: [Affiliate!]!
+
+  """
+  The calling app's storefront scripts; for staff, every app's the shop has.
+  """
+  appEmbeds: [AppEmbed!]!
+
+  """
+  Opens the installed app `id` inside the admin; null for no such app installed.
+  """
+  appSession(id: ID!): AppSession
   article(id: ID!): Article
 
   """

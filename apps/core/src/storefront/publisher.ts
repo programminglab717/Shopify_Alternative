@@ -1,4 +1,5 @@
 import { PublicSite, shopProfile } from '@hatti/api';
+import { AppEvents, appEmbedsIn } from '@hatti/apps/public';
 import {
   CatalogEvents,
   CollectionService,
@@ -366,6 +367,12 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.StorefrontAccessTokensUpdated:
       // The Storefront API's tokens' digests (ADR-848).
       return [Items.shop];
+    case AppEvents.EmbedsUpdated:
+    case AppEvents.Installed:
+    case AppEvents.Uninstalled:
+    case AppEvents.Deleted:
+      // Its apps' scripts turned on (ADR-852), which go with the apps the shop has.
+      return [Items.shop];
     case OnlineStoreEvents.DomainCreated:
     case OnlineStoreEvents.DomainUpdated:
     case OnlineStoreEvents.DomainDeleted:
@@ -560,6 +567,10 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.CommentDeleted,
   OnlineStoreEvents.PreferencesUpdated,
   OnlineStoreEvents.StorefrontAccessTokensUpdated,
+  AppEvents.EmbedsUpdated,
+  AppEvents.Installed,
+  AppEvents.Uninstalled,
+  AppEvents.Deleted,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
   OnlineStoreEvents.DomainDeleted,
@@ -1061,6 +1072,7 @@ export class StorefrontPublisher {
       })),
       (await storefrontLocationsIn(tx, shopId)).map(storeDoc),
       await storefrontTokensIn(tx, shopId),
+      await appEmbedsIn(tx, shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

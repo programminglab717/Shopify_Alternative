@@ -94,6 +94,15 @@ function core() {
       installedAt: EARLIER,
     },
   ];
+  let embeds: Record<string, unknown>[] = [
+    {
+      id: 'aemb_1',
+      appName: 'Reviews Pro',
+      name: 'Reviews widget',
+      src: 'https://cdn.reviews.example.pk/widget.js',
+      enabled: false,
+    },
+  ];
   let subscriptions: Record<string, unknown>[] = [
     {
       id: 'whs_1',
@@ -230,6 +239,28 @@ function core() {
               userErrors: [],
             },
           };
+        case 'AppEmbeds':
+          return { appEmbeds: embeds };
+        case 'AppEmbedEnable':
+          embeds = embeds.map((each) =>
+            each.id === variables.id ? { ...each, enabled: variables.enabled } : each,
+          );
+          return {
+            appEmbedEnable: {
+              appEmbed: { id: variables.id, enabled: variables.enabled },
+              userErrors: [],
+            },
+          };
+        case 'AppSession':
+          return variables.id === 'tok_9'
+            ? {
+                appSession: {
+                  name: 'Reviews Pro',
+                  url: 'https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=jwt',
+                  expiresAt: LATER,
+                },
+              }
+            : { appSession: null };
         case 'InstalledApps':
           return { installedApps: installed };
         case 'AppUninstall':
@@ -472,5 +503,32 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
     fireEvent.click(within(section).getByRole('button', { name: 'Uninstall' }));
     await waitFor(() => expect(sentOf(fake, 'AppUninstall')).toEqual([{ id: 'tok_9' }]));
     expect(await within(section).findByText('No app is installed.')).toBeTruthy();
+  });
+
+  it("opens an installed app inside the admin, and turns apps' storefront scripts on (DEV-06)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/apps');
+
+    const scripts = await screen.findByRole('region', { name: "Apps' storefront scripts" });
+    expect(await within(scripts).findByText('Reviews widget')).toBeTruthy();
+    expect(within(scripts).getByText('Off')).toBeTruthy();
+    fireEvent.click(within(scripts).getByRole('button', { name: 'Turn on Reviews widget' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'AppEmbedEnable')).toEqual([{ id: 'aemb_1', enabled: true }]),
+    );
+    expect(await within(scripts).findByText('On')).toBeTruthy();
+
+    const installed = await screen.findByRole('region', { name: 'Installed apps' });
+    fireEvent.click(await within(installed).findByRole('link', { name: 'Open Reviews Pro' }));
+    const frame = (await screen.findByTitle('Reviews Pro, inside Hatti')) as HTMLIFrameElement;
+    expect(frame.src).toBe('https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=jwt');
+    expect(sentOf(fake, 'AppSession')).toEqual([{ id: 'tok_9' }]);
+  });
+
+  it('says so of an app not installed', async () => {
+    vi.stubGlobal('fetch', core().fetcher);
+    renderAdmin('/shop_1/settings/apps/tok_404');
+    expect(await screen.findByText('This app is not installed on the shop.')).toBeTruthy();
   });
 });

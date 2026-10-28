@@ -37,3 +37,10 @@ export {
   type WebhookSweep,
 } from '../internal/webhooks.service.js';
 export { AppInstallsService, type InstalledAppRecord } from '../internal/app-installs.service.js';
+export {
+  APP_EMBED_LIMITS,
+  AppEmbedService,
+  appEmbedsIn,
+  type AppEmbedInput,
+  type AppEmbedRecord,
+} from '../internal/app-embeds.service.js';

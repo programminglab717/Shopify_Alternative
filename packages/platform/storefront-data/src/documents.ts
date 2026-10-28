@@ -564,6 +564,11 @@ export interface ShopDoc {
    */
   storefrontTokens?: { digest: string; private: boolean }[];
   /**
+   * The scripts of its apps it turned on (DEV-06, ADR-852), each loaded async on its pages, with
+   * its app's name and its handle to tell it by. Absent for none.
+   */
+  appEmbeds?: { src: string; app: string; handle: string }[];
+  /**
    * True while Hatti has taken the store down (ADR-461): its storefront answers every page with
    * Hatti's page saying so. Absent while it is not, as in documents written before stores could be
    * taken down.

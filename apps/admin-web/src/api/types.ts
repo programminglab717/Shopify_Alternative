@@ -4616,6 +4616,30 @@ export interface AppUninstallData {
   appUninstall: { uninstalledAppId: string | null; userErrors: UserError[] };
 }
 
+export interface AppSessionData {
+  appSession: { name: string; url: string; expiresAt: string } | null;
+}
+
+/** A script an app offers the storefront, which the shop turns on (DEV-06, ADR-852). */
+export interface AppEmbed {
+  id: string;
+  appName: string;
+  name: string;
+  src: string;
+  enabled: boolean;
+}
+
+export interface AppEmbedsData {
+  appEmbeds: AppEmbed[];
+}
+
+export interface AppEmbedEnableData {
+  appEmbedEnable: {
+    appEmbed: { id: string; enabled: boolean } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface StorefrontAccessTokenDeleteData {
   storefrontAccessTokenDelete: {
     deletedStorefrontAccessTokenId: string | null;

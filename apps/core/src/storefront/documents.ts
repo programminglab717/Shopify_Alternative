@@ -697,6 +697,8 @@ export function shopDoc(
   stores: readonly StoreDoc[] = [],
   /** Its Storefront API tokens' digests (ADR-848). */
   storefrontTokens: readonly { digest: string; private: boolean }[] = [],
+  /** The scripts of its apps it turned on (ADR-852). */
+  appEmbeds: readonly { src: string; app: string; handle: string }[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -768,6 +770,7 @@ export function shopDoc(
     // The locations it lists (ADR-828), left out while it lists none, likewise.
     ...(stores.length > 0 && { stores: [...stores] }),
     ...(storefrontTokens.length > 0 && { storefrontTokens: [...storefrontTokens] }),
+    ...(appEmbeds.length > 0 && { appEmbeds: appEmbeds.map((embed) => ({ ...embed })) }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.

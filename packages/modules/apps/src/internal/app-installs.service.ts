@@ -92,6 +92,29 @@ export class AppInstallsService {
     return rows.map(toRecord);
   }
 
+  /**
+   * What an embedded app's session token is signed with (ADR-852): the installed app `id`'s
+   * registered ID and its client secret, unsealed; null for none installed.
+   */
+  async sessionKeyOf(
+    tenant: TenantContext,
+    id: string,
+  ): Promise<{ publicAppId: string; name: string; secret: string } | null> {
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<{ public_app_id: string; name: string; webhook_secret: string }>(sql`
+        SELECT public_app_id, name, webhook_secret FROM apps.access_tokens
+         WHERE shop_id = ${tenant.shopId} AND id = ${id} AND public_app_id IS NOT NULL
+           AND revoked_at IS NULL`),
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      publicAppId: row.public_app_id,
+      name: row.name,
+      secret: this.box.decrypt(row.webhook_secret, sealedFor(tenant.shopId, id)).toString('utf8'),
+    };
+  }
+
   /** Uninstalls the app `id`: its token stops working at once. */
   async uninstall(tenant: TenantContext, id: string): Promise<MutationResult<InstalledAppRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {

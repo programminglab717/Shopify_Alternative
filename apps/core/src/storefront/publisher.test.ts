@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { createHash, randomBytes } from 'node:crypto';
+import { AppEmbedService } from '@hatti/apps/public';
 import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import {
   CollectionService,
@@ -2194,6 +2195,52 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await tokens.delete(tenant, made.record.id));
     await deliver();
     expect((await store().shop()).storefrontTokens).toBeUndefined();
+  });
+
+  it("publishes the scripts of the shop's apps it turned on, and follows them (ADR-852)", async () => {
+    const embeds = new AppEmbedService(database);
+    const appId = newId();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, id, name, token_hash, token_hint)
+       VALUES ($1, $2, 'Reviews Pro', $3, 'abcd')`,
+      [shopId, appId, randomBytes(32)],
+    );
+    const app: TenantContext = { ...tenant, actor: { kind: 'app', tokenId: appId } };
+    const owner: TenantContext = {
+      ...tenant,
+      actor: {
+        kind: 'staff',
+        userId: newId(),
+        sessionId: newId(),
+        role: 'owner',
+        authenticatedAt: new Date(),
+      },
+    };
+    const offered = unwrap(
+      await embeds.set(app, {
+        handle: 'reviews',
+        name: 'Reviews widget',
+        src: 'https://cdn.reviews.example.pk/widget.js',
+      }),
+    );
+    expect(await deliver()).toEqual(['app_embeds.updated']);
+    // Off until the shop turns it on.
+    expect((await store().shop()).appEmbeds).toBeUndefined();
+    unwrap(await embeds.enable(owner, offered.id, true));
+    await deliver();
+    expect((await store().shop()).appEmbeds).toEqual([
+      { src: 'https://cdn.reviews.example.pk/widget.js', app: 'Reviews Pro', handle: 'reviews' },
+    ]);
+    // A new address turns it off again, for the shop to look at what it now loads.
+    unwrap(
+      await embeds.set(app, {
+        handle: 'reviews',
+        name: 'Reviews widget',
+        src: 'https://cdn.reviews.example.pk/widget-v2.js',
+      }),
+    );
+    await deliver();
+    expect((await store().shop()).appEmbeds).toBeUndefined();
   });
 
   it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {

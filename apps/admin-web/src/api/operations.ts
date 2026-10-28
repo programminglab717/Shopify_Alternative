@@ -9577,6 +9577,43 @@ export const AppUninstallMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+export const AppSessionQuery = /* GraphQL */ `
+  query AppSession($id: ID!) {
+    appSession(id: $id) {
+      name
+      url
+      expiresAt
+    }
+  }
+`;
+
+export const AppEmbedsQuery = /* GraphQL */ `
+  query AppEmbeds {
+    appEmbeds {
+      id
+      appName
+      name
+      src
+      enabled
+    }
+  }
+`;
+
+export const AppEmbedEnableMutation = /* GraphQL */ `
+  mutation AppEmbedEnable($id: ID!, $enabled: Boolean!) {
+    appEmbedEnable(id: $id, enabled: $enabled) {
+      appEmbed {
+        id
+        enabled
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const CustomAppsQuery = /* GraphQL */ `
   query CustomApps {
     customApps {

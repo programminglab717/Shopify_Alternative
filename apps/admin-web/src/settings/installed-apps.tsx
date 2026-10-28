@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { PackageCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { AppUninstallMutation, InstalledAppsQuery } from '../api/operations';
@@ -6,7 +7,7 @@ import { errorText } from '../i18n/errors';
 import { formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
-import { useAdminMutation, useAdminQuery, useShopTimezone } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { scopeLabel } from './app-scopes';
@@ -18,6 +19,7 @@ import { scopeLabel } from './app-scopes';
 export function InstalledApps() {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
+  const shopId = useShop().id;
   const query = useAdminQuery<InstalledAppsData>(['installedApps'], InstalledAppsQuery);
   const uninstall = useAdminMutation<AppUninstallData, { id: string }>(AppUninstallMutation);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -52,9 +54,15 @@ export function InstalledApps() {
           {apps.map((app) => (
             <li key={app.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
               <span className="flex flex-1 flex-col">
-                <span className="font-medium" dir="auto">
+                <Link
+                  to="/$shopId/settings/apps/$appId"
+                  params={{ shopId, appId: app.id }}
+                  className="font-medium underline"
+                  dir="auto"
+                  aria-label={t('installedApps.open', { name: app.name })}
+                >
                   {app.name}
-                </span>
+                </Link>
                 <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                   {t('installedApps.reaches', {
                     scopes: app.scopes.map((scope) => scopeLabel(scope, t)).join(', '),

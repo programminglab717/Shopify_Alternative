@@ -1,4 +1,12 @@
-import { CurrentTenant, RequireScopes, UserError, failOne, type TenantContext } from '@hatti/api';
+import {
+  CurrentTenant,
+  RequireScopes,
+  UserError,
+  deniedToRole,
+  failOne,
+  hasCapability,
+  type TenantContext,
+} from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import {
   Args,
@@ -60,6 +68,10 @@ export class AppInstallsResolver {
   @Query(() => [InstalledApp], { description: 'The public apps installed on the shop.' })
   @RequireScopes('read_settings')
   async installedApps(@CurrentTenant() tenant: TenantContext): Promise<InstalledApp[]> {
+    // The shop's staff see them; an app does not see what else the shop installed.
+    if (tenant.actor.kind === 'app') {
+      throw deniedToRole("Access denied. The shop's staff see its installed apps.");
+    }
     return (await this.installs.installed(tenant)).map(toInstalled);
   }
 
@@ -71,6 +83,9 @@ export class AppInstallsResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args('id', { type: () => ID }) id: string,
   ): Promise<AppUninstallPayload> {
+    if (!hasCapability(tenant.actor, 'manage_apps')) {
+      throw deniedToRole('Access denied. Only the owner and managers uninstall apps.');
+    }
     const uuid = tryFromPublicId(id, 'accessToken');
     const result = uuid
       ? await this.installs.uninstall(tenant, uuid)

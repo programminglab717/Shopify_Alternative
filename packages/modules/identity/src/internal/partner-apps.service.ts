@@ -209,6 +209,13 @@ export class PartnerAppsService {
     return toRecord(rows[0]);
   }
 
+  /** Where the app `id` opens inside the admin (ADR-852), and its client ID; null for none. */
+  async embedOf(id: string): Promise<{ clientId: string; appUrl: string } | null> {
+    const { rows } = await this.db.execute<{ client_id: string; app_url: string }>(sql`
+      SELECT client_id, app_url FROM identity.partner_apps WHERE id = ${id}`);
+    return rows[0] ? { clientId: rows[0].client_id, appUrl: rows[0].app_url } : null;
+  }
+
   /** For Hatti's review (ADR-851): every app, with its partner, those not yet listed first. */
   async all(): Promise<(PartnerAppRecord & { partner: string })[]> {
     const { rows } = await this.db.execute<AppRow & { business_name: string }>(sql`
