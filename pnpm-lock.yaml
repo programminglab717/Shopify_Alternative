@@ -463,6 +463,9 @@ importers:
       fastify:
         specifier: 'catalog:'
         version: 5.12.5
+      graphql:
+        specifier: 'catalog:'
+        version: 16.14.2
       ioredis:
         specifier: 'catalog:'
         version: 6.0.0

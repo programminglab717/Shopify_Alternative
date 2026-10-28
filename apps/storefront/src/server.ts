@@ -98,6 +98,11 @@ import {
   type LoginProblem,
 } from './accounts.js';
 import { AGENT_LIMITS, AGENT_PATHS, mcpAnswer, ucpProfile } from './agents.js';
+import {
+  STOREFRONT_TOKEN_HEADERS,
+  storefrontApiAnswer,
+  storefrontTokenOf,
+} from './storefront-graphql.js';
 import { blogFeed, collectionFeed, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
@@ -246,6 +251,16 @@ const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
  * but room for many behind one mobile network's address.
  */
 const PUSH_CHANGES = { name: 'push-changes', limit: 20, windowMs: 60_000 };
+/**
+ * Calls of the Storefront API (ADR-848) an address makes in a minute: with a public token, as a
+ * shopper's browser does; and with a private one, from the shop's own server, for its shoppers.
+ */
+const STOREFRONT_API_CALLS = { name: 'storefront-api', limit: 300, windowMs: 60_000 };
+const STOREFRONT_API_SERVER_CALLS = {
+  name: 'storefront-api-server',
+  limit: 6_000,
+  windowMs: 60_000,
+};
 /** Calls of the store's MCP endpoint (ADR-847), an agent's address's, in a minute. */
 const AGENT_CALLS = { name: 'agent-calls', limit: 120, windowMs: 60_000 };
 
@@ -2310,6 +2325,91 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       throw error;
     }
   });
+  /**
+   * The Storefront API (DEV-02, ADR-848), as Shopify's at /api/<version>/graphql.json: answered
+   * with one of the shop's tokens, public from browsers, private from a server; a cart it makes
+   * is checked out at /cart/c/<token>, its checkoutUrl.
+   */
+  const STOREFRONT_API_PATH = '/api/:version/graphql.json';
+  const API_VERSION = /^(\d{4}-\d{2}|unstable)$/;
+  const corsHeaders = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'POST, OPTIONS',
+    'access-control-allow-headers': `content-type, accept, ${STOREFRONT_TOKEN_HEADERS.public}, ${STOREFRONT_TOKEN_HEADERS.private}`,
+    'access-control-max-age': '86400',
+  };
+  app.options(STOREFRONT_API_PATH, (_request, reply) =>
+    reply.code(204).headers(corsHeaders).send(),
+  );
+  app.post(STOREFRONT_API_PATH, { bodyLimit: 64 * 1024 }, async (request, reply) => {
+    reply.headers(corsHeaders).header('cache-control', 'no-store');
+    const { version } = request.params as { version: string };
+    if (!API_VERSION.test(version)) {
+      return reply.code(404).send({ errors: [{ message: 'No such API version' }] });
+    }
+    const found = await shopFor(request, reply);
+    if (!found) return reply.code(404).send({ errors: [{ message: 'No shop answers here' }] });
+    if (!isJson(request)) return reply.code(415).send({ errors: [{ message: 'Send JSON' }] });
+    try {
+      const shop = await found.store.shop();
+      const kind = storefrontTokenOf(request.headers, shop.storefrontTokens);
+      if (!kind) {
+        return await reply.code(401).send({
+          errors: [{ message: "Give one of the shop's Storefront API tokens" }],
+        });
+      }
+      const bucket = kind === 'private' ? STOREFRONT_API_SERVER_CALLS : STOREFRONT_API_CALLS;
+      if (limiter !== null && !(await limiter.hit(bucket, request.ip)).allowed) {
+        return await reply
+          .code(429)
+          .send({ errors: [{ message: 'Too many calls: wait a minute' }] });
+      }
+      const answer = await storefrontApiAnswer(request.body, {
+        shopId: found.shopId,
+        store: found.store,
+        shop,
+        search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),
+        carts: core
+          ? {
+              read: (shopId, token) => core.read(shopId, token),
+              act: (shopId, token, action, body) =>
+                core.act(shopId, token, action as Parameters<typeof core.act>[2], body as never),
+            }
+          : null,
+        origin: await originOf(request, found),
+        currency: 'PKR',
+      });
+      return await reply.type('application/json; charset=utf-8').send(JSON.stringify(answer));
+    } catch (error) {
+      if (error instanceof StoreMissingError) {
+        return reply.code(404).send({ errors: [{ message: 'This shop is not open yet' }] });
+      }
+      if (!unreachable(request, error)) throw error;
+      return reply.code(503).send({ errors: [{ message: 'The shop cannot be reached just now' }] });
+    }
+  });
+  // A cart the Storefront API made, taken to the shop's checkout: kept as the shopper's cart too.
+  app.get('/cart/c/:token', async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const { token } = request.params as { token: string };
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
+      const cart = /^[\w.-]{1,200}$/.test(token) ? await core.read(found.shopId, token) : null;
+      if (!cart) return await reply.redirect('/cart', 303);
+      reply.header('set-cookie', cartCookies(token, cart.itemCount, { secure }));
+      return await toCheckout(request, reply, found.shopId, token, false, true);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .header('cache-control', 'no-store')
+        .type('text/plain; charset=utf-8')
+        .send('The cart cannot be reached just now. Please try again in a minute.\n');
+    }
+  });
+
   // Nothing streams from it: MCP's GET, for events, is not taken.
   app.get(AGENT_PATHS.mcp, (_request, reply) =>
     reply.code(405).header('allow', 'POST').header('cache-control', 'no-store').send(),

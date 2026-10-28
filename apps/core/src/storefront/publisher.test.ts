@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
 import {
   CollectionService,
@@ -62,6 +62,7 @@ import {
   PolicyService,
   PreferencesService,
   StorefrontFiltersService,
+  StorefrontTokenService,
   ThemeService,
   TranslationService,
   UrlRedirectService,
@@ -2178,6 +2179,21 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await locations.delete(tenant, gulberg.id));
     expect(await deliver()).toEqual(['location.deleted']);
     expect((await store().shop()).stores).toBeUndefined();
+  });
+
+  it("publishes the digests of the shop's Storefront API tokens, and follows them (ADR-848)", async () => {
+    const tokens = new StorefrontTokenService(database);
+    await deliver();
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).storefrontTokens).toBeUndefined();
+    const made = unwrap(await tokens.create(tenant, { title: 'App', kind: 'private' }));
+    expect(await deliver()).toEqual(['storefront_access_tokens.updated']);
+    expect((await store().shop()).storefrontTokens).toEqual([
+      { digest: createHash('sha256').update(made.accessToken).digest('hex'), private: true },
+    ]);
+    unwrap(await tokens.delete(tenant, made.record.id));
+    await deliver();
+    expect((await store().shop()).storefrontTokens).toBeUndefined();
   });
 
   it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {

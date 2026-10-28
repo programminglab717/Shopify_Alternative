@@ -18,6 +18,7 @@ import { PreferencesResolver } from './graphql/preferences.resolver.js';
 import { StorefrontFiltersResolver } from './graphql/storefront-filters.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
 import { TranslationResolver } from './graphql/translation.resolver.js';
+import { StorefrontTokenResolver } from './graphql/storefront-token.resolver.js';
 import { UrlRedirectResolver } from './graphql/url-redirect.resolver.js';
 import { LinkTapsService } from './link-taps.service.js';
 import { MenuService } from './menu.service.js';
@@ -31,6 +32,7 @@ import { StorefrontContentSearchController } from './content-search.js';
 import { ThemePreviewService } from './theme-preview.js';
 import { ThemeService } from './theme.service.js';
 import { TranslationService } from './translation.service.js';
+import { StorefrontTokenService } from './storefront-tokens.js';
 import { UrlRedirectService } from './url-redirect.service.js';
 
 /**
@@ -65,6 +67,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     DomainResolver,
     UrlRedirectService,
     UrlRedirectResolver,
+    StorefrontTokenService,
+    StorefrontTokenResolver,
     PolicyService,
     PolicyResolver,
     TranslationService,

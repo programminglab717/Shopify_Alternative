@@ -4576,6 +4576,36 @@ export interface CustomAppsData {
   customApps: CustomApp[];
 }
 
+/** A token the Storefront API answers a headless storefront by (DEV-02, ADR-848). */
+export interface StorefrontAccessToken {
+  id: string;
+  title: string;
+  private: boolean;
+  hint: string;
+  /** Given once, as it is made; null after. */
+  accessToken: string | null;
+  createdAt: string;
+}
+
+export interface StorefrontAccessTokensData {
+  shop: { url: string } | null;
+  storefrontAccessTokens: StorefrontAccessToken[];
+}
+
+export interface StorefrontAccessTokenCreateData {
+  storefrontAccessTokenCreate: {
+    storefrontAccessToken: StorefrontAccessToken | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface StorefrontAccessTokenDeleteData {
+  storefrontAccessTokenDelete: {
+    deletedStorefrontAccessTokenId: string | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface CustomAppInput {
   name?: string | null;
   scopes?: string[] | null;

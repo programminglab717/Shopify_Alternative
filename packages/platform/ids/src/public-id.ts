@@ -156,6 +156,8 @@ export const ID_PREFIXES = {
   pushCampaign: 'pcmp',
   // A bulk operation's run of a list to a file (ADR-843).
   bulkOperation: 'bulk',
+  // A token the Storefront API answers headless storefronts by (ADR-848).
+  storefrontAccessToken: 'sfat',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

@@ -10919,6 +10919,12 @@ type Mutation {
   """
   storeExportCreate: StoreExportCreatePayload!
 
+  """A new Storefront API token, given once; 100 a shop at most."""
+  storefrontAccessTokenCreate(input: StorefrontAccessTokenInput!): StorefrontAccessTokenCreatePayload!
+
+  """Deletes a Storefront API token: it stops working a moment later."""
+  storefrontAccessTokenDelete(id: ID!): StorefrontAccessTokenDeletePayload!
+
   """Adds a supplier, named uniquely in the shop."""
   supplierCreate(input: SupplierInput!): SupplierPayload!
 
@@ -16603,6 +16609,9 @@ type Query {
   """
   storeSpeed: StoreSpeed!
 
+  """The shop's Storefront API tokens, oldest first."""
+  storefrontAccessTokens: [StorefrontAccessToken!]!
+
   """
   Who is on the online store now, and today's sessions so far, from the storefronts' counts as they stand (ANL-02).
   """
@@ -19081,6 +19090,41 @@ type StoreSpeed {
 
   """Page views measured in the 28 days."""
   pageViews: Int!
+}
+
+"""
+A token the Storefront API answers a headless storefront or shopping app by (DEV-02, ADR-848), as Shopify's StorefrontAccessToken: public, sent from shoppers' browsers in X-Shopify-Storefront-Access-Token, or private, kept on a server and sent in Shopify-Storefront-Private-Token.
+"""
+type StorefrontAccessToken {
+  """The token itself: given once, as it is made, and null after."""
+  accessToken: String
+  createdAt: DateTime!
+
+  """Its last four characters, to tell it by."""
+  hint: String!
+  id: ID!
+
+  """Kept on a server, never sent from a page."""
+  private: Boolean!
+  title: String!
+}
+
+type StorefrontAccessTokenCreatePayload {
+  storefrontAccessToken: StorefrontAccessToken
+  userErrors: [UserError!]!
+}
+
+type StorefrontAccessTokenDeletePayload {
+  deletedStorefrontAccessTokenId: ID
+  userErrors: [UserError!]!
+}
+
+input StorefrontAccessTokenInput {
+  """A private token; public if not."""
+  private: Boolean = false
+
+  """What uses it, in 100 characters at most."""
+  title: String!
 }
 
 """

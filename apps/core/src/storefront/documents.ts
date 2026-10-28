@@ -695,6 +695,8 @@ export function shopDoc(
   waitingRooms: readonly WaitingRoomDoc[] = [],
   /** The locations it lists for customers to visit (ADR-828). */
   stores: readonly StoreDoc[] = [],
+  /** Its Storefront API tokens' digests (ADR-848). */
+  storefrontTokens: readonly { digest: string; private: boolean }[] = [],
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -765,6 +767,7 @@ export function shopDoc(
     ...(waitingRooms.length > 0 && { waitingRooms: [...waitingRooms] }),
     // The locations it lists (ADR-828), left out while it lists none, likewise.
     ...(stores.length > 0 && { stores: [...stores] }),
+    ...(storefrontTokens.length > 0 && { storefrontTokens: [...storefrontTokens] }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.

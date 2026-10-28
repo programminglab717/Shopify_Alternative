@@ -9502,6 +9502,57 @@ const CUSTOM_APP = /* GraphQL */ `
   }
 `;
 
+const STOREFRONT_TOKEN = /* GraphQL */ `
+  fragment StorefrontTokenFields on StorefrontAccessToken {
+    id
+    title
+    private
+    hint
+    accessToken
+    createdAt
+  }
+`;
+
+/** The shop's Storefront API tokens (DEV-02, ADR-848). */
+export const StorefrontAccessTokensQuery = /* GraphQL */ `
+  query StorefrontAccessTokens {
+    shop {
+      url
+    }
+    storefrontAccessTokens {
+      ...StorefrontTokenFields
+    }
+  }
+  ${STOREFRONT_TOKEN}
+`;
+
+export const StorefrontAccessTokenCreateMutation = /* GraphQL */ `
+  mutation StorefrontAccessTokenCreate($input: StorefrontAccessTokenInput!) {
+    storefrontAccessTokenCreate(input: $input) {
+      storefrontAccessToken {
+        ...StorefrontTokenFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${STOREFRONT_TOKEN}
+  ${USER_ERRORS}
+`;
+
+export const StorefrontAccessTokenDeleteMutation = /* GraphQL */ `
+  mutation StorefrontAccessTokenDelete($id: ID!) {
+    storefrontAccessTokenDelete(id: $id) {
+      deletedStorefrontAccessTokenId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const CustomAppsQuery = /* GraphQL */ `
   query CustomApps {
     customApps {

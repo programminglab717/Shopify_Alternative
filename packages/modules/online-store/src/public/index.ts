@@ -21,6 +21,13 @@ export {
   type UrlRedirectChangedPayload,
 } from '../internal/events.js';
 export { OnlineStoreModule } from '../internal/online-store.module.js';
+export {
+  STOREFRONT_TOKEN_LIMITS,
+  StorefrontTokenService,
+  storefrontTokenDigest,
+  storefrontTokensIn,
+  type StorefrontTokenRecord,
+} from '../internal/storefront-tokens.js';
 export type {
   ArticleImageRecord,
   ArticleRecord,

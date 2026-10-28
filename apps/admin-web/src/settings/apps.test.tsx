@@ -75,6 +75,16 @@ const RETRYING = {
 function core() {
   let confirmed = false;
   let apps: Record<string, unknown>[] = [SHEET, OLD];
+  let storefrontTokens: Record<string, unknown>[] = [
+    {
+      id: 'sfat_1',
+      title: 'Mobile app',
+      private: false,
+      hint: 'mno1',
+      accessToken: null,
+      createdAt: LATER,
+    },
+  ];
   let subscriptions: Record<string, unknown>[] = [
     {
       id: 'whs_1',
@@ -182,6 +192,32 @@ function core() {
           return {
             webhookSubscriptionDelete: {
               deletedWebhookSubscriptionId: variables.id,
+              userErrors: [],
+            },
+          };
+        case 'StorefrontAccessTokens':
+          return {
+            shop: { url: 'https://zari.hatti.pk' },
+            storefrontAccessTokens: storefrontTokens,
+          };
+        case 'StorefrontAccessTokenCreate': {
+          const input = variables.input as { title: string; private: boolean };
+          const made = {
+            id: 'sfat_2',
+            title: input.title,
+            private: input.private,
+            hint: 'Zz99',
+            accessToken: 'hsfp_shownOnceZz99',
+            createdAt: LATER,
+          };
+          storefrontTokens = [...storefrontTokens, { ...made, accessToken: null }];
+          return { storefrontAccessTokenCreate: { storefrontAccessToken: made, userErrors: [] } };
+        }
+        case 'StorefrontAccessTokenDelete':
+          storefrontTokens = storefrontTokens.filter((token) => token.id !== variables.id);
+          return {
+            storefrontAccessTokenDelete: {
+              deletedStorefrontAccessTokenId: variables.id,
               userErrors: [],
             },
           };
@@ -366,5 +402,40 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
         /^It is sent nothing yet\./,
       ),
     ).toBeTruthy();
+  });
+
+  it('makes Storefront API tokens, shown once with where they go, and deletes them (DEV-02)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings');
+
+    fireEvent.click(await screen.findByRole('link', { name: /Apps/ }));
+    const section = await screen.findByRole('region', { name: 'Storefront API' });
+    expect(
+      await within(section).findByText('https://zari.hatti.pk/api/2026-10/graphql.json'),
+    ).toBeTruthy();
+    expect(within(section).getByText('Mobile app')).toBeTruthy();
+
+    fireEvent.click(within(section).getByRole('button', { name: 'Make a Storefront API token' }));
+    type('What uses it', 'Headless site');
+    fireEvent.change(within(section).getByLabelText('Kind'), { target: { value: 'private' } });
+    fireEvent.click(within(section).getByRole('button', { name: 'Make the token' }));
+    expect(await within(section).findByText('hsfp_shownOnceZz99')).toBeTruthy();
+    expect(
+      within(section).getByText(
+        'Send it from your server alone, in the Shopify-Storefront-Private-Token header.',
+      ),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'StorefrontAccessTokenCreate')).toEqual([
+      { input: { title: 'Headless site', private: true } },
+    ]);
+    fireEvent.click(within(section).getByRole('button', { name: "I've copied it" }));
+    expect(within(section).queryByText('hsfp_shownOnceZz99')).toBeNull();
+
+    fireEvent.click(within(section).getByRole('button', { name: 'Delete Mobile app' }));
+    fireEvent.click(within(section).getByRole('button', { name: /^Remove/ }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontAccessTokenDelete')).toEqual([{ id: 'sfat_1' }]),
+    );
   });
 });

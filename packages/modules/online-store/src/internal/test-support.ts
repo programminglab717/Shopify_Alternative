@@ -123,6 +123,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
         DELETE FROM online_store.policy_versions;
         DELETE FROM online_store.domains;
         DELETE FROM online_store.url_redirects;
+        DELETE FROM online_store.storefront_access_tokens;
         DELETE FROM online_store.translations;
         DELETE FROM platform.outbox_events;`);
     },

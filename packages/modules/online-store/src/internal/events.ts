@@ -44,6 +44,8 @@ export const OnlineStoreEvents = {
   UrlRedirectsMoved: 'url_redirects.moved',
   PolicyUpdated: 'shop_policy.updated',
   TranslationsUpdated: 'translations.updated',
+  /** A Storefront API token made or deleted (ADR-848): the shop's document carries their digests. */
+  StorefrontAccessTokensUpdated: 'storefront_access_tokens.updated',
 } as const;
 
 export interface ThemeCreatedPayload {

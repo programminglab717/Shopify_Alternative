@@ -99,6 +99,7 @@ import {
   shopRedirectsOf,
   shopTranslationsOf,
   shownStorefrontFiltersIn,
+  storefrontTokensIn,
   type ArticleChangedPayload,
   type ArticleRecord,
   type ArticleUpdatedPayload,
@@ -362,6 +363,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case MessagingEvents.WebChatUpdated:
       // Whether its pages offer the chat, and what it says (ADR-810).
       return [Items.shop];
+    case OnlineStoreEvents.StorefrontAccessTokensUpdated:
+      // The Storefront API's tokens' digests (ADR-848).
+      return [Items.shop];
     case OnlineStoreEvents.DomainCreated:
     case OnlineStoreEvents.DomainUpdated:
     case OnlineStoreEvents.DomainDeleted:
@@ -555,6 +559,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.CommentUpdated,
   OnlineStoreEvents.CommentDeleted,
   OnlineStoreEvents.PreferencesUpdated,
+  OnlineStoreEvents.StorefrontAccessTokensUpdated,
   OnlineStoreEvents.DomainCreated,
   OnlineStoreEvents.DomainUpdated,
   OnlineStoreEvents.DomainDeleted,
@@ -1055,6 +1060,7 @@ export class StorefrontPublisher {
         admitPerMinute: room.admitPerMinute,
       })),
       (await storefrontLocationsIn(tx, shopId)).map(storeDoc),
+      await storefrontTokensIn(tx, shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

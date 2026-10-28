@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { collectMetrics } from '@hatti/telemetry/testing';
 import { fileURLToPath } from 'node:url';
 import {
@@ -2797,6 +2797,68 @@ describe('Carts', () => {
         })
       ).statusCode,
     ).toBe(415);
+    await app.close();
+  });
+
+  it("answers the Storefront API with the shop's tokens, and checks its carts out (DEV-02, ADR-848)", async () => {
+    const docs = sampleStore();
+    docs.shop = {
+      ...docs.shop,
+      storefrontTokens: [
+        { digest: createHash('sha256').update('hsf_public').digest('hex'), private: false },
+      ],
+    };
+    const app = server({ sample: new MemoryStore(docs) });
+    const api = (headers: Record<string, string>, body: unknown = { query: '{ shop { name } }' }) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/2026-10/graphql.json',
+        headers: { host: 'localhost', 'content-type': 'application/json', ...headers },
+        payload: JSON.stringify(body),
+      });
+    expect((await api({})).statusCode).toBe(401);
+    expect((await api({ 'x-shopify-storefront-access-token': 'nope' })).statusCode).toBe(401);
+    const answered = await api({ 'x-shopify-storefront-access-token': 'hsf_public' });
+    expect([answered.statusCode, answered.headers['access-control-allow-origin']]).toEqual([
+      200,
+      '*',
+    ]);
+    expect(answered.json()).toEqual({ data: { shop: { name: docs.shop.name } } });
+    const preflight = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/2026-10/graphql.json',
+      headers: { host: 'localhost' },
+    });
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers['access-control-allow-headers']).toContain(
+      'x-shopify-storefront-access-token',
+    );
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v9/graphql.json',
+          headers: { host: 'localhost', 'content-type': 'application/json' },
+          payload: '{}',
+        })
+      ).statusCode,
+    ).toBe(404);
+
+    // A cart it made, taken to checkout: kept as the shopper's cart, and sent on.
+    core.kept.set('headless-cart', cartOf(1));
+    const checkout = await app.inject({
+      method: 'GET',
+      url: '/cart/c/headless-cart',
+      headers: { host: 'localhost' },
+    });
+    expect([checkout.statusCode, checkout.headers.location]).toEqual([303, '/checkouts/c-secret']);
+    expect(String(checkout.headers['set-cookie'])).toContain('cart=headless-cart');
+    const gone = await app.inject({
+      method: 'GET',
+      url: '/cart/c/gone',
+      headers: { host: 'localhost' },
+    });
+    expect([gone.statusCode, gone.headers.location]).toEqual([303, '/cart']);
     await app.close();
   });
 

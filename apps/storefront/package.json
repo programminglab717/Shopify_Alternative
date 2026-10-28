@@ -23,6 +23,7 @@
     "@hatti/themes": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "fastify": "catalog:",
+    "graphql": "catalog:",
     "ioredis": "catalog:",
     "liquidjs": "catalog:"
   },

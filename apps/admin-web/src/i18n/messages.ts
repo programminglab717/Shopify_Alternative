@@ -4422,6 +4422,21 @@ const en = {
   'messages.kind.CHECKOUT_OFFER': 'Code offered for a checkout left',
   'settings.apps': 'Apps',
   'settings.appsHint': 'Tools your developer connects to the shop',
+  'storefrontApi.title': 'Storefront API',
+  'storefrontApi.hint':
+    'For a storefront or shopping app of your own: it reads your products and makes carts that your checkout takes, at this address.',
+  'storefrontApi.make': 'Make a Storefront API token',
+  'storefrontApi.name': 'What uses it',
+  'storefrontApi.kind': 'Kind',
+  'storefrontApi.public': 'Public: sent from shoppers’ browsers',
+  'storefrontApi.private': 'Private: kept on your server',
+  'storefrontApi.create': 'Make the token',
+  'storefrontApi.shownOnce': 'Copy the token for {title} now: it is not shown again.',
+  'storefrontApi.sendPublic': 'Send it in the X-Shopify-Storefront-Access-Token header.',
+  'storefrontApi.sendPrivate':
+    'Send it from your server alone, in the Shopify-Storefront-Private-Token header.',
+  'storefrontApi.remove': 'Delete {title}',
+  'storefrontApi.removeSure': 'Delete {title}? What uses it stops working.',
   'apps.title': 'Apps',
   'apps.hint':
     'Make an app for a tool your developer connects to the shop, such as a sheet or an accounting system. Give it only what it needs to reach.',
@@ -10653,6 +10668,21 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.CHECKOUT_OFFER': 'چھوڑے گئے چیک آؤٹ کے لیے پیش کیا گیا کوڈ',
   'settings.apps': 'ایپس',
   'settings.appsHint': 'وہ ٹولز جو آپ کا ڈویلپر دکان سے جوڑتا ہے',
+  'storefrontApi.title': 'اسٹور فرنٹ API',
+  'storefrontApi.hint':
+    'آپ کے اپنے اسٹور فرنٹ یا شاپنگ ایپ کے لیے: یہ آپ کی پروڈکٹس پڑھتی ہے اور کارٹ بناتی ہے جو آپ کا چیک آؤٹ لیتا ہے، اس پتے پر۔',
+  'storefrontApi.make': 'اسٹور فرنٹ API ٹوکن بنائیں',
+  'storefrontApi.name': 'کون استعمال کرے گا',
+  'storefrontApi.kind': 'قسم',
+  'storefrontApi.public': 'پبلک: خریداروں کے براؤزر سے بھیجا جاتا ہے',
+  'storefrontApi.private': 'پرائیویٹ: آپ کے سرور پر رہتا ہے',
+  'storefrontApi.create': 'ٹوکن بنائیں',
+  'storefrontApi.shownOnce': '{title} کا ٹوکن ابھی کاپی کریں: یہ دوبارہ نہیں دکھایا جائے گا۔',
+  'storefrontApi.sendPublic': 'اسے X-Shopify-Storefront-Access-Token ہیڈر میں بھیجیں۔',
+  'storefrontApi.sendPrivate':
+    'اسے صرف اپنے سرور سے Shopify-Storefront-Private-Token ہیڈر میں بھیجیں۔',
+  'storefrontApi.remove': '{title} حذف کریں',
+  'storefrontApi.removeSure': '{title} حذف کریں؟ جو اسے استعمال کرتا ہے وہ کام کرنا چھوڑ دے گا۔',
   'apps.title': 'ایپس',
   'apps.hint':
     'کسی ٹول کے لیے ایپ بنائیں جو آپ کا ڈویلپر دکان سے جوڑتا ہے، جیسے کوئی شیٹ یا اکاؤنٹنگ سسٹم۔ اسے صرف اتنی رسائی دیں جتنی اسے ضرورت ہے۔',

@@ -558,6 +558,12 @@ export interface ShopDoc {
    */
   stores?: StoreDoc[];
   /**
+   * Its Storefront API tokens (DEV-02, ADR-848), each as its SHA-256 digest in hex and whether it
+   * is private: what the storefront checks a headless storefront's token against. Absent for
+   * none, as in documents written before the Storefront API.
+   */
+  storefrontTokens?: { digest: string; private: boolean }[];
+  /**
    * True while Hatti has taken the store down (ADR-461): its storefront answers every page with
    * Hatti's page saying so. Absent while it is not, as in documents written before stores could be
    * taken down.
