@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Seasons in reorders
+
+* **Stock:** the stock page says when Ramadan or the run-up to Eid ul Adha begins, and how much
+  faster the shop sold through it last year. Reorders started from what runs low count on that
+  for the season's days, each variant at its own lift, or the shop's (INV-08, [ADR-863](../architecture/13-decision-log.md#adr-863--seasons-that-follow-the-moon-ramadan-and-the-run-up-to-eid-ul-adha-from-pakistans-islamic-dates-each-variants-lift-through-last-years-season-and-reorders-counting-on-it)).
+* 4625 tests (7 new, the admin's check of the new GraphQL operation among them).
+
 ### b6f87e4 · Subscriptions
 
 * **Settings › Subscriptions:** staff make selling plans, "Every month, 10% off", for products of

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-862 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-863 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -870,6 +870,7 @@
 | 860 | Buy buttons: a snippet puts a product on any website, drawn by a script the shop's storefront serves from its public product data, Buy now opening its checkout through a cart permalink | Accepted |
 | 861 | Workflows: a shop's own triggers, conditions and actions, as Shopify Flow's are, with triggers and actions apps offer them through the Admin API | Accepted |
 | 862 | Subscriptions: selling plans by product tag, a subscribed line priced at its plan's discount, and the order placed again each interval by cash on delivery, confirmed as any other, the customer skipping, pausing or cancelling from its page | Accepted |
+| 863 | Seasons that follow the moon: Ramadan and the run-up to Eid ul Adha from Pakistan's Islamic dates, each variant's lift through last year's season, and reorders counting on it | Accepted |
 
 ---
 
@@ -28417,3 +28418,46 @@
   * **A draft for staff to send each interval:** more work for the shop, and orders forgotten.
   * **The first order at full price:** Shopify discounts the first order too, and shoppers
     expect it.
+
+## ADR-863 · Seasons that follow the moon: Ramadan and the run-up to Eid ul Adha from Pakistan's Islamic dates, each variant's lift through last year's season, and reorders counting on it
+
+* **Context:**
+  * INV-08 asks for demand forecasts and reorder suggestions that know Pakistan's seasons:
+    Ramadan and the two Eids, when clothing, sweets, dates and gifts sell several times faster.
+  * Reorders counted on what sold in the last 30 days (ADR-368). That undercounts before
+    Ramadan, and the season comes about eleven days earlier each Gregorian year, so last year's
+    dates are not this year's.
+* **Decision:**
+  * **Seasons** (`@hatti/pk`): Ramadan, from its first day through the third day of Eid ul Fitr;
+    and the run-up to Eid ul Adha, from Dhu al-Qadah's 25th through the third day of Eid. Their
+    days come from the Umm al-Qura calendar a day later, as Pakistan's holidays do (ADR-594).
+    The same season the year before is the one about 354 days earlier.
+  * **A season's lift:**
+    * For each variant: its units a day in last year's season over its units a day in the 30
+      days before it, read from the stock ledger as what sold is (ADR-368).
+    * It is kept within a quarter and eight times. Where a variant has no such history, the
+      shop's lift is used, all its stock together.
+    * Nothing new is stored.
+  * **On the Admin API:**
+    * `stockSeason`: the season on, or the next within 90 days, with the shop's lift.
+    * `LowStockItem.season`: the same, with the variant's lift.
+    * `LowStockItem.forecast(days)`: the units expected over those days, at its pace, and on
+      the season's days at its pace times the lift.
+  * **In the admin:**
+    * The stock page says when the season begins and how much faster the shop sold through
+      it last year.
+    * A purchase order started from what runs low suggests enough for the days chosen, the
+      days in the season at the lift.
+* **Consequences:**
+  * A shop orders for Eid before it runs out, in proportion to how its own stock sold last
+    time. A shop in its first year is told to stock up, without numbers it doesn't have.
+  * Not yet:
+    * other seasons: weddings (winter), the start of school, the summer lawn launch, 11.11 and
+      White Friday;
+    * a forecast by week or a chart of it;
+    * the days a supplier takes to deliver.
+* **Alternatives:**
+  * **A statistical model (Holt-Winters, Prophet):** more to keep for little more than a ratio
+    can say, with a year of history at most for most shops.
+  * **The same Gregorian dates last year:** Ramadan moves eleven days a year, so last year's
+    February is not this year's season.
