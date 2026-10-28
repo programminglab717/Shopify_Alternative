@@ -16,6 +16,20 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Point of sale
+
+* **Registers:** a shop adds a register for each counter, selling from a location's shelf, and
+  opens it each day with the cash in the drawer (POS-01, POS-07, [ADR-872](../architecture/13-decision-log.md#adr-872--point-of-sale-registers-that-sell-from-a-locations-shelf-in-cash-sessions-closed-with-a-z-report-till-sales-kept-apart-from-orders-paid-in-cash-card-transfer-or-wallet-linked-to-a-customer-by-number-rung-up-in-the-admin-offline-too)).
+* **Selling:** items found by name or scanned; a discount and the customer's number; paid in
+  cash with change, by card, transfer or wallet; an 80 mm receipt. Offline, the sale is kept on
+  the device and sent once it is back (POS-02).
+* **Closing:** cash in and out, returns paid back and restocked, and the Z report with the
+  drawer counted: short or over.
+* **Next:** FBR's numbers on till receipts, staff PINs, click and collect at the till, and
+  ordering from the till for home delivery.
+* **Needs you:** the hardware to recommend, and a Cashier role (OWN-61).
+* 4705 tests (20 new).
+
 ### 3ab7942 · Voice-note orders
 
 * **Customers:** a WhatsApp voice note, "do lawn suit medium, aik khussa", is heard and

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-871 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-872 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -879,6 +879,7 @@
 | 869 | Headless: a Next.js starter on the Storefront API, a project of its own to copy, its queries checked against the API in the storefront's tests | Accepted |
 | 870 | Visual search: a shopper's photo read by the AI into the words a shop titles its products with, the shop's own search finding them; off until the shop turns it on, one AI credit a photo, 300 a day | Accepted |
 | 871 | Voice-note orders: a customer's WhatsApp voice note heard by Hatti's own whisper.cpp server, read by the AI into what it orders, and answered with the shop's checkout holding it; what was heard shown to staff, the audio never kept | Accepted |
+| 872 | Point of sale: registers that sell from a location's shelf in cash sessions closed with a Z report; till sales kept apart from orders, paid in cash, card, transfer or wallet, linked to a customer by number; rung up in the admin, offline too | Accepted |
 
 ---
 
@@ -28860,3 +28861,67 @@
     link lets the customer finish, as carts from the catalogue do.
   * **A paid speech API:** ruled out by cost.
   * **Placing the order at once:** a mishearing would become an order to cancel.
+
+## ADR-872 · Point of sale: registers that sell from a location's shelf in cash sessions closed with a Z report; till sales kept apart from orders, paid in cash, card, transfer or wallet, linked to a customer by number; rung up in the admin, offline too
+
+* **Context:**
+  * POS-01 to POS-08 ask for selling in the shop's own premises: a till with offline mode, local
+    hardware, FBR's POS integration, unified stock and customers, staff and cash management, and
+    the endless aisle. None was built.
+  * Hatti's orders are built for cash on delivery: every order has a customer by mobile number,
+    an address, a confirmation and a delivery. A walk-in at the counter gives none of these.
+  * Shops in Pakistan sell from Android tablets and phones, often on a weak connection.
+* **Decision:**
+  * **Registers:**
+    * A shop adds registers in the admin (owner or manager): each has a name and the location
+      whose shelf it sells from.
+    * A register sells in cash sessions. A session opens with the float counted into the drawer.
+      Cash put in or taken out is recorded with why.
+    * It closes with the drawer counted. Its Z report shows sales, discounts, returns, tax
+      included, what each way of paying took, and what the drawer should hold: float + cash taken
+      − change − cash paid back ± cash in and out. It says whether the drawer is short or over.
+  * **Till sales are not orders.** `orders.pos_sales`, with its lines and payments, numbered
+    #P1 onwards:
+    * Its units leave the register's location at once, through a new `sell` stock operation:
+      on hand falls, what orders were promised stays theirs, and it is never short, as the goods
+      were in the shopper's hands.
+    * It is paid in cash with change, by card on the shop's own terminal, by bank transfer or
+      Raast, or by JazzCash or Easypaisa, with a reference. Change comes from cash alone.
+    * A discount off the sale is shared over its lines; the sales tax included is worked out as
+      for orders.
+    * A customer's mobile number links it to them (a new customer if none has it); a walk-in
+      gives none.
+    * The inventory report counts till sales as sold.
+  * **Returns:** units of a till sale come back, paid back from the session's drawer or as
+    asked, in proportion to what was paid for them, and go back on the shelf unless written off.
+  * **Offline:**
+    * The till keeps the register and what it sells on the device.
+    * A sale made offline goes in the admin's outbox (ADR-840) with the till's own ID for it and
+      the time it was sold, and is sent once the device is back online. The core keeps it once
+      by that ID, up to seven days late.
+  * **In the admin:** Point of sale (owners, managers, and custom roles with `write_orders`):
+    * find items by name, or scan a barcode or SKU, as a scanner types it and Enter;
+    * the cart, a discount and the customer's number;
+    * paying, with quick cash amounts and the change to give;
+    * an 80 mm receipt printed from a tab of its own, offline too;
+    * the session's Z report, cash in and out, returns, and closing.
+  * Events: `pos_sale.completed`, `pos_sale.returned`, `pos_session.closed`.
+* **Consequences:**
+  * A shop sells at its counter from the stock it sells online, on the tablet it has, with a
+    connection or without.
+  * Till sales are not in the orders list or its reports yet, and not reported to FBR.
+  * Not yet:
+    * FBR's POS invoice numbers on till receipts (POS-04);
+    * staff switching on a shared device by PIN (POS-07);
+    * handing over click-and-collect orders at the till (POS-06);
+    * ordering from the till for home delivery (POS-08);
+    * the customer's page listing their till sales.
+  * Printers, scanners and cash drawers are the browser's: a printer the tablet prints to, a
+    scanner that types (OWN-61).
+* **Alternatives:**
+  * **Till sales as orders:** every order needs a customer's number and an address. Making them
+    optional would reach every part of COD.
+  * **A native Android app:** a second codebase to build, sign and update. The admin is
+    installable (ADR-514) and works offline already.
+  * **Printing over Web Bluetooth or WebUSB in ESC/POS:** Chrome alone, and printer by printer.
+    The system's print dialog reaches any printer the tablet has a driver for.
