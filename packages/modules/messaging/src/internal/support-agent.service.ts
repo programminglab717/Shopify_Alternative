@@ -49,6 +49,7 @@ type HistoryRow = {
   body: string | null;
   actor_kind: string | null;
   at: Date | string;
+  cart: boolean;
 };
 
 async function answeredSince(tx: Tx, shopId: string, since: Date): Promise<number> {
@@ -134,12 +135,15 @@ export class SupportAgentService {
          WHERE shop_id = ${shopId} AND conversation_id = ${conversationId}`);
       if (asked[0]?.handed || asked[0]?.answered) return null;
       const { rows } = await tx.execute<HistoryRow>(sql`
-        SELECT id, direction, body, actor_kind, at FROM messaging.conversation_messages
+        SELECT id, direction, body, actor_kind, at, cart IS NOT NULL AS cart
+          FROM messaging.conversation_messages
          WHERE shop_id = ${shopId} AND conversation_id = ${conversationId}
          ORDER BY at DESC, id DESC
          LIMIT 20`);
       const latest = rows[0];
       if (!latest || latest.id !== messageId || latest.direction !== 'inbound') return null;
+      // A cart from the shop's WhatsApp catalogue is answered with its checkout (ADR-856).
+      if (latest.cart) return null;
       // Staff answered in the last day: theirs to go on with.
       if (
         rows.some(

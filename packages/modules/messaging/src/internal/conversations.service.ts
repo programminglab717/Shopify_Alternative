@@ -169,6 +169,37 @@ const STATUS_FROM: Record<StatusUpdate['status'], readonly ReplyStatusValue[]> =
   failed: ['sent'],
 };
 
+/**
+ * The cart from the shop's WhatsApp catalogue in the inbound message `messageId` (ADR-856), with
+ * the conversation's customer, claimed once to answer: null for a message that holds none, or
+ * whose cart was answered already.
+ */
+export async function claimCartIn(
+  tx: Tx,
+  shopId: string,
+  messageId: string,
+): Promise<{
+  conversationId: string;
+  customerPhone: string;
+  items: { variantId: string; quantity: number }[];
+} | null> {
+  const { rows } = await tx.execute<{
+    conversation_id: string;
+    customer_phone: string;
+    cart: { variantId: string; quantity: number }[];
+  }>(sql`
+    UPDATE messaging.conversation_messages m SET cart_answered_at = now()
+      FROM messaging.conversations c
+     WHERE m.shop_id = ${shopId} AND m.id = ${messageId} AND m.direction = 'inbound'
+       AND m.cart IS NOT NULL AND m.cart_answered_at IS NULL
+       AND c.shop_id = m.shop_id AND c.id = m.conversation_id AND c.channel = 'whatsapp'
+    RETURNING m.conversation_id, c.customer_phone, m.cart`);
+  const row = rows[0];
+  return row
+    ? { conversationId: row.conversation_id, customerPhone: row.customer_phone, items: row.cart }
+    : null;
+}
+
 @Injectable()
 export class ConversationsService {
   constructor(
@@ -207,9 +238,11 @@ export class ConversationsService {
       const conversationId = rows[0]!.id;
       const kept = await tx.execute<{ id: string }>(sql`
         INSERT INTO messaging.conversation_messages
-               (shop_id, conversation_id, direction, body, media_kind, provider_message_id, at)
+               (shop_id, conversation_id, direction, body, media_kind, provider_message_id, at,
+                cart)
         VALUES (${shopId}, ${conversationId}, 'inbound', ${message.text}, ${message.mediaKind},
-                ${message.id}, ${at})
+                ${message.id}, ${at},
+                ${message.cart ? JSON.stringify(message.cart) : null}::jsonb)
             ON CONFLICT (shop_id, provider_message_id) WHERE provider_message_id IS NOT NULL
             DO NOTHING
         RETURNING id`);

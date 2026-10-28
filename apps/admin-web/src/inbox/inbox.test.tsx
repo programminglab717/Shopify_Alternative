@@ -2,7 +2,9 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UserError } from '../api/types';
 import type { StaffRole } from '../auth/session';
+import { translate } from '../i18n/locale';
 import { sectionsOf } from '../shell/shell';
+import { mediaLabel } from './inbox-page';
 import { fakeCore, LATER, press, renderAdmin, signedIn, type } from '../test-support';
 
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -169,6 +171,16 @@ function inboxCore(
 
 const sentOf = (core: ReturnType<typeof inboxCore>, operation: string) =>
   core.sent.filter((each) => each.operation === operation).map((each) => each.variables);
+
+describe('What customers send besides words (ADR-545)', () => {
+  it("names a cart from the shop's WhatsApp catalogue, and anything unknown as an attachment (ADR-856)", () => {
+    const t = (key: Parameters<typeof translate>[1]) => translate('en', key);
+    expect(mediaLabel('order', t)).toBe('A cart from your WhatsApp catalogue');
+    expect(mediaLabel('image', t)).toBe('Photo');
+    expect(mediaLabel('contacts', t)).toBe('Attachment');
+    expect(translate('ur', 'inbox.media.order')).toBe('آپ کے واٹس ایپ کیٹلاگ سے کارٹ');
+  });
+});
 
 describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () => {
   beforeEach(() => {

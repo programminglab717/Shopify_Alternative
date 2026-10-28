@@ -113,6 +113,7 @@ import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { PartnerEarnings } from './partner-earnings.js';
+import { WhatsAppCarts } from './whatsapp-carts.js';
 import { OverdueOrderMessages } from './overdue-order-messages.js';
 import { OverdueConversationPushes, OverdueOrderPushes, PushNotices } from './push-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
@@ -205,6 +206,7 @@ export interface EventConsumers {
   storeOpen?: StoreOpenNotices;
   codPrepaid?: CodPrepaidOffers;
   aiReplies?: AiCustomerReplies;
+  whatsappCarts?: WhatsAppCarts;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   partnerEarnings?: PartnerEarnings;
@@ -237,6 +239,7 @@ export function eventHandlers(
     storeOpen,
     codPrepaid,
     aiReplies,
+    whatsappCarts,
     parcelSteps,
     billing,
     partnerEarnings,
@@ -309,6 +312,13 @@ export function eventHandlers(
     for (const type of CodPrepaidOffers.EVENTS) {
       registry.on(type, async (event) => {
         await codPrepaid.handle(event);
+      });
+    }
+  }
+  if (whatsappCarts) {
+    for (const type of WhatsAppCarts.EVENTS) {
+      registry.on(type, async (event) => {
+        await whatsappCarts.handle(event);
       });
     }
   }
@@ -434,6 +444,25 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     );
     const vapid = vapidKeysOf(config);
     const pushes = new PushService(database, vapid && new WebPushSender(vapid));
+    // Replies to customers' WhatsApp messages, on the number they wrote to: Hatti's, or the
+    // shop's own, whose token is sealed.
+    const replies = new ConversationsService(
+      database,
+      {
+        baseUrl: config.META_GRAPH_URL,
+        version: config.META_GRAPH_VERSION,
+        shared:
+          config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_ACCESS_TOKEN
+            ? {
+                phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
+                accessToken: config.WHATSAPP_ACCESS_TOKEN,
+              }
+            : null,
+      },
+      config.ENCRYPTION_KEYS
+        ? new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null)
+        : null,
+    );
     const worker = createEventWorker({
       connection: workerRedis,
       registry: eventHandlers(logger, {
@@ -485,23 +514,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
                   new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
                 ),
               ),
-              new ConversationsService(
-                database,
-                {
-                  baseUrl: config.META_GRAPH_URL,
-                  version: config.META_GRAPH_VERSION,
-                  shared:
-                    config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_ACCESS_TOKEN
-                      ? {
-                          phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
-                          accessToken: config.WHATSAPP_ACCESS_TOKEN,
-                        }
-                      : null,
-                },
-                config.ENCRYPTION_KEYS
-                  ? new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null)
-                  : null,
-              ),
+              replies,
               new AiGateway({
                 apiKey: config.AI_API_KEY,
                 model: config.AI_MODEL,
@@ -510,6 +523,16 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
               new AiCreditsService(database),
             ),
           }),
+        // Carts from shops' WhatsApp catalogues, answered with their checkout (ADR-856): they
+        // come to shops' own numbers, whose tokens are sealed.
+        ...(config.ENCRYPTION_KEYS && {
+          whatsappCarts: new WhatsAppCarts(
+            database,
+            new VariantService(database),
+            replies,
+            new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
+          ),
+        }),
         billing: new BillingNotices(database, new MessagesService(database)),
         partnerEarnings: new PartnerEarnings(database),
         push: new PushNotices(database, pushes),

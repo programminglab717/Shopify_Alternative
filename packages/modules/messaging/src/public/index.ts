@@ -8,6 +8,7 @@ export {
 } from '../internal/charges.js';
 export {
   CONVERSATION_WINDOW_MS,
+  claimCartIn,
   ConversationsService,
   OVERDUE_SWEEP_LIMIT,
   overdueConversationsIn,

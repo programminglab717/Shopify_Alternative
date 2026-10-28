@@ -5,7 +5,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ConversationsService } from './conversations.service.js';
+import { ConversationsService, claimCartIn } from './conversations.service.js';
 import { MESSAGING_CUSTOMER_DATA } from './customer-data.js';
 import { MessagingEvents } from './events.js';
 import { WHATSAPP_CLOUD } from './providers.js';
@@ -141,6 +141,29 @@ describe.skipIf(!server)("The inbox: customers' WhatsApp messages (MSG-05, ADR-5
       'SELECT count(*)::int AS count FROM messaging.conversation_messages',
     );
     expect(rows[0]!.count).toBe(2);
+  });
+
+  it("keeps a cart from the shop's WhatsApp catalogue, to answer once (CH-02, ADR-856)", async () => {
+    await sent(b.shopId, BILAL, 'wamid.b-cart');
+    const cart = inbound({
+      from: BILAL,
+      text: null,
+      mediaKind: 'order',
+      cart: [{ variantId: 'v-1', quantity: 2 }],
+    });
+    expect(await inbox.recordInbound(cart)).toBe(b.shopId);
+    const { rows } = await admin.query<{ id: string; cart: unknown }>(
+      `SELECT id, cart FROM messaging.conversation_messages WHERE shop_id = $1 AND media_kind = 'order'`,
+      [b.shopId],
+    );
+    expect(rows[0]!.cart).toEqual([{ variantId: 'v-1', quantity: 2 }]);
+    const claim = () => db.tenant(b.shopId, (tx) => claimCartIn(tx, b.shopId, rows[0]!.id));
+    expect(await claim()).toEqual({
+      conversationId: expect.any(String),
+      customerPhone: BILAL,
+      items: [{ variantId: 'v-1', quantity: 2 }],
+    });
+    expect(await claim()).toBeNull();
   });
 
   it('keeps a message once however often the webhook names it, a photo as its kind', async () => {

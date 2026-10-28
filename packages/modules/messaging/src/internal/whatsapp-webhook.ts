@@ -22,6 +22,11 @@ export interface InboundMessage {
   to: string | null;
   /** What else it held, as WhatsApp names it: "image", "audio"; null for words and buttons. */
   mediaKind: string | null;
+  /**
+   * A cart from the shop's WhatsApp catalogue (CH-02, ADR-856): each item as the catalogue names
+   * it, the variant's ID from the catalog feed, and how many; absent for any other message.
+   */
+  cart?: { variantId: string; quantity: number }[] | null;
 }
 
 /** Meta's word of a shop's template (ADR-420): approved, rejected, paused or disabled. */
@@ -99,7 +104,9 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
         const text =
           field(field(message, 'text'), 'body') ??
           field(field(message, 'button'), 'text') ??
-          field(field(field(message, 'interactive'), 'button_reply'), 'title');
+          field(field(field(message, 'interactive'), 'button_reply'), 'title') ??
+          // A cart's note, as the customer wrote it beside it.
+          field(field(message, 'order'), 'text');
         const replyTo = field(field(message, 'context'), 'id');
         const payload =
           field(field(message, 'button'), 'payload') ??
@@ -120,11 +127,25 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
             /^[a-z_]{1,30}$/.test(type)
               ? type
               : null,
+          ...(type === 'order' && { cart: cartOf(field(message, 'order')) }),
         });
       }
     }
   }
   return { statuses, inbound, templates };
+}
+
+/** A catalogue order's items, each named and of 1 to 999; null for none worth keeping. */
+function cartOf(order: unknown): { variantId: string; quantity: number }[] | null {
+  const items: { variantId: string; quantity: number }[] = [];
+  for (const item of arrayOf(field(order, 'product_items')).slice(0, 50)) {
+    const id = field(item, 'product_retailer_id');
+    const quantity = Number(field(item, 'quantity'));
+    if (typeof id !== 'string' || !/^[0-9A-Za-z_-]{1,100}$/.test(id)) continue;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) continue;
+    items.push({ variantId: id, quantity });
+  }
+  return items.length > 0 ? items : null;
 }
 
 function field(value: unknown, name: string): unknown {

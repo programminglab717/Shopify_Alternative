@@ -120,7 +120,7 @@ const TABS: Record<
 };
 
 /** What WhatsApp names the things a customer sends besides words, which the admin has words for. */
-const MEDIA_KINDS = ['image', 'audio', 'video', 'document', 'location', 'sticker'];
+const MEDIA_KINDS = ['image', 'audio', 'video', 'document', 'location', 'sticker', 'order'];
 
 /** What a customer sent besides words, in the merchant's words: "Photo", or "Attachment". */
 export function mediaLabel(kind: string | null, t: Translate): string {

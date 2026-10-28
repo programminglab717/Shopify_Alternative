@@ -123,6 +123,22 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
         'پھر دیکھ کر محفوظ کریں۔',
     },
   },
+  {
+    id: 'whatsapp-catalogue',
+    title: { en: 'Selling from your WhatsApp catalogue', ur: 'واٹس ایپ کیٹلاگ سے فروخت' },
+    body: {
+      en:
+        'Copy your catalog feed’s address from the Meta tab of the Online store, and add it as a ' +
+        'data source of your catalogue in Meta’s Commerce Manager, then connect that catalogue to ' +
+        'your WhatsApp number. A customer who sends you a cart from it gets a link to your ' +
+        'checkout with those items, their number filled in; the cart shows in your inbox.',
+      ur:
+        'آن لائن اسٹور کے میٹا ٹیب سے اپنی کیٹلاگ فیڈ کا پتا کاپی کریں اور میٹا کے کامرس مینیجر میں ' +
+        'اپنے کیٹلاگ کے ڈیٹا سورس کے طور پر شامل کریں، پھر وہ کیٹلاگ اپنے واٹس ایپ نمبر سے جوڑیں۔ ' +
+        'جو گاہک اس سے کارٹ بھیجے، اسے ان چیزوں کے ساتھ آپ کے چیک آؤٹ کا لنک ملتا ہے، اس کا نمبر بھرا ہوا؛ ' +
+        'کارٹ آپ کے ان باکس میں نظر آتا ہے۔',
+    },
+  },
 ];
 
 /** The articles a search finds, by their words in either language; all of them for none. */
