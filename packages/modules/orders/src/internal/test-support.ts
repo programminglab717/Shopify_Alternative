@@ -189,6 +189,7 @@ export async function ordersFixture(
   const dataRegistry = new CustomerDataRegistry();
   dataRegistry.register(ORDER_CUSTOMER_DATA);
   dataRegistry.register(PAST_ORDER_CUSTOMER_DATA);
+  const edits = new OrderEditService(db, variants, locations, stock);
   const orders = new OrderService(
     db,
     variants,
@@ -198,6 +199,7 @@ export async function ordersFixture(
     blocklist,
     undefined,
     options.allowance,
+    edits,
   );
   const site = new PublicSite('https://hatti.test');
   const directory = await mkdtemp(join(tmpdir(), 'hatti-orders-'));
@@ -252,7 +254,7 @@ export async function ordersFixture(
     storeCredit: new StoreCreditService(db),
     savedSearches: new SavedSearchService(db),
     comments: new OrderCommentService(db),
-    edits: new OrderEditService(db, variants, locations, stock),
+    edits,
     returns: new ReturnService(db, variants, locations, stock, orders),
     async policy(owner, type, body) {
       const versionId = newId();
@@ -342,6 +344,7 @@ export async function ordersFixture(
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;
         DELETE FROM inventory.locations;
+        DELETE FROM inventory.settings;
         DELETE FROM customers.consent_events;
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;

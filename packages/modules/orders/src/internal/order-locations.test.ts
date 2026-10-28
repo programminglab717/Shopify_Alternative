@@ -117,6 +117,70 @@ describe.skipIf(!server)('Where an order ships from (INV-10)', () => {
     ).toEqual([['input.serves.provinces.0', 'INVALID']]);
   });
 
+  it('splits an order no one location has all of among those that do, once the shop allows (ADR-898)', async () => {
+    const karachi = await place('Karachi store', [[kurta, 3]]);
+    const lahore = await place('Lahore store', [[dupatta, 3]]);
+    const placing = () =>
+      f.orders.create(f.a, {
+        lineItems: [
+          { variantId: kurta, quantity: 2 },
+          { variantId: dupatta, quantity: 1 },
+        ],
+        shippingAddress: ADDRESS,
+        shippingPrice: '250',
+      });
+    // Not unless the shop allows it: refused at the primary, as before.
+    expect(!(await placing()).ok).toBe(true);
+    await f.admin.query(
+      `INSERT INTO inventory.settings (shop_id, low_stock_threshold, split_orders)
+       VALUES ($1, 5, true)`,
+      [f.a.shopId],
+    );
+    const order = unwrap(await placing());
+    // The kurtas, more of it, ship from Karachi with the delivery charge; the dupatta apart.
+    expect(order).toMatchObject({
+      locationId: karachi.id,
+      splitFrom: null,
+      splitParts: [{ orderId: expect.any(String), number: order.number + 1 }],
+    });
+    expect(order.lines.map((line) => [line.title, line.quantity])).toEqual([['Kurta', 2]]);
+    const { rows } = await f.admin.query<{
+      id: string;
+      location_id: string;
+      split_from_id: string;
+      shipping: string;
+      cod_fee: string;
+    }>(
+      `SELECT id, location_id, split_from_id, shipping::text, cod_fee::text FROM orders.orders
+        WHERE shop_id = $1 AND split_from_id IS NOT NULL`,
+      [f.a.shopId],
+    );
+    expect(rows).toEqual([
+      {
+        id: expect.any(String),
+        location_id: lahore.id,
+        split_from_id: order.id,
+        shipping: '0',
+        cod_fee: '0',
+      },
+    ]);
+    const part = (await f.orders.get(f.a, rows[0]!.id))!;
+    expect(part.lines.map((line) => [line.title, line.quantity])).toEqual([['Dupatta', 1]]);
+    // Each part's stock committed where it ships from.
+    expect(await levelAt(kurta, karachi.id)).toMatchObject({ committed: 2, available: 1 });
+    expect(await levelAt(dupatta, lahore.id)).toMatchObject({ committed: 1, available: 2 });
+    // Paid ahead, it isn't split: refused at the primary, as before.
+    const prepaid = await f.orders.create(f.a, {
+      lineItems: [
+        { variantId: kurta, quantity: 1 },
+        { variantId: dupatta, quantity: 1 },
+      ],
+      shippingAddress: ADDRESS,
+      paymentMethod: 'prepaid',
+    });
+    expect(!prepaid.ok && prepaid.errors[0]!.code).toBe('OUT_OF_STOCK');
+  });
+
   it('moves an order before it is packed, its stock committed where it goes and let go where it was', async () => {
     const primary = await f.primary(f.a);
     await f.stock(f.a, kurta, 5);

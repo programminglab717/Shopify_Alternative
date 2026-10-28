@@ -3,11 +3,82 @@ import { PlanAllowance, type PlanLimit } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { LocationService, storefrontLocationsIn } from './location.service.js';
+import { LocationService, splitLines, storefrontLocationsIn } from './location.service.js';
 import { FIRST_LOCATION_NAME, LIMITS } from './rules.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
 
 const server = testDatabaseServer();
+
+describe("An order's lines split among locations (INV-10, ADR-898)", () => {
+  const counted = new Set(['kurta', 'shawl', 'dupatta']);
+  const levels = (entries: [string, string, number][]) =>
+    new Map(entries.map(([location, variant, units]) => [`${location}:${variant}`, units]));
+
+  it('gives each line whole to the location with the most of them, the better ranked first', () => {
+    const lines = [
+      { variantId: 'kurta', quantity: 2 },
+      { variantId: 'shawl', quantity: 1 },
+      { variantId: 'dupatta', quantity: 1 },
+      { variantId: 'card', quantity: 1 },
+    ];
+    // Lahore has the kurtas and the shawl; Karachi, ranked first, the dupatta alone.
+    const lahoreMost = levels([
+      ['lhr', 'kurta', 5],
+      ['lhr', 'shawl', 1],
+      ['khi', 'dupatta', 3],
+      ['khi', 'kurta', 1],
+    ]);
+    expect(splitLines(lines, ['khi', 'lhr'], counted, lahoreMost)).toEqual([
+      'lhr',
+      'lhr',
+      'khi',
+      'lhr',
+    ]);
+    // One location has it all: no split.
+    expect(
+      splitLines(
+        lines,
+        ['khi', 'lhr'],
+        counted,
+        levels([
+          ['lhr', 'kurta', 5],
+          ['lhr', 'shawl', 1],
+          ['lhr', 'dupatta', 1],
+        ]),
+      ),
+    ).toBeNull();
+    // Two lines of one variant share what a location has.
+    expect(
+      splitLines(
+        [
+          { variantId: 'kurta', quantity: 2 },
+          { variantId: 'kurta', quantity: 2 },
+        ],
+        ['khi', 'lhr'],
+        counted,
+        levels([
+          ['khi', 'kurta', 3],
+          ['lhr', 'kurta', 2],
+        ]),
+      ),
+    ).toEqual(['khi', 'lhr']);
+    // What none has, or past three locations, isn't split.
+    expect(splitLines(lines, ['khi', 'lhr'], counted, levels([['lhr', 'kurta', 5]]))).toBeNull();
+    expect(
+      splitLines(
+        ['kurta', 'shawl', 'dupatta', 'kurta'].map((variantId) => ({ variantId, quantity: 1 })),
+        ['a', 'b', 'c', 'd'],
+        new Set(['kurta', 'shawl', 'dupatta']),
+        levels([
+          ['a', 'kurta', 1],
+          ['b', 'shawl', 1],
+          ['c', 'dupatta', 1],
+          ['d', 'kurta', 1],
+        ]),
+      ),
+    ).toBeNull();
+  });
+});
 
 describe.skipIf(!server)('LocationService', () => {
   let f: InventoryFixture;

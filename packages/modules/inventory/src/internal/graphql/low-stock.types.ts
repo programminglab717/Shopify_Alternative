@@ -10,12 +10,23 @@ export class InventorySettings {
       'shop says otherwise (INV-01).',
   })
   lowStockThreshold!: number;
+
+  @Field({
+    description:
+      'Whether an order paid on delivery, with nothing paid or asked in advance, that no one ' +
+      'location has all of is split among those that do, each part an order of its own shipped ' +
+      'from its location with no delivery charge (INV-10, ADR-898). Off until turned on.',
+  })
+  splitOrdersAcrossLocations!: boolean;
 }
 
 @InputType({ description: 'Fields left out stay as they are.' })
 export class InventorySettingsInput {
   @Field(() => Int, { nullable: true, description: '0 to 10,000 units.' })
   lowStockThreshold?: number | null;
+
+  @Field(() => Boolean, { nullable: true })
+  splitOrdersAcrossLocations?: boolean | null;
 }
 
 @ObjectType()

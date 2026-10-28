@@ -190,6 +190,57 @@ function pickupRefusal(location: { address1: string | null; city: string | null 
  * it out of stock totals and sales; only an empty location can be deactivated, and only one that
  * never held stock can be deleted.
  */
+/** The most locations an order is split among (ADR-898). */
+export const SPLIT_MOST_LOCATIONS = 3;
+
+/**
+ * Each of `lines` given whole to one of `locations`, ranked best first (ADR-898): again and
+ * again, the location that can take the most of the lines left, the better ranked where two can
+ * take as many. Lines of variants not `counted` go anywhere. Null where the first location takes
+ * them all, where some can't be taken, or where it takes more than SPLIT_MOST_LOCATIONS.
+ */
+export function splitLines(
+  lines: readonly { variantId: string; quantity: number }[],
+  locations: readonly string[],
+  counted: ReadonlySet<string>,
+  available: ReadonlyMap<string, number>,
+): string[] | null {
+  const chosen: (string | null)[] = lines.map(() => null);
+  const left = new Map(available);
+  for (let round = 0; round < SPLIT_MOST_LOCATIONS; round++) {
+    let best: { location: string; takes: number[] } | null = null;
+    for (const location of locations) {
+      const have = new Map<string, number>();
+      const takes: number[] = [];
+      lines.forEach((line, index) => {
+        if (chosen[index] !== null) return;
+        if (!counted.has(line.variantId)) {
+          takes.push(index);
+          return;
+        }
+        const key = `${location}:${line.variantId}`;
+        const there = have.get(key) ?? left.get(key) ?? 0;
+        if (there >= line.quantity) {
+          have.set(key, there - line.quantity);
+          takes.push(index);
+        }
+      });
+      if (takes.length > (best?.takes.length ?? 0)) best = { location, takes };
+    }
+    if (!best) return null;
+    for (const index of best.takes) {
+      chosen[index] = best.location;
+      const line = lines[index]!;
+      const key = `${best.location}:${line.variantId}`;
+      if (counted.has(line.variantId)) left.set(key, (left.get(key) ?? 0) - line.quantity);
+    }
+    if (chosen.every((location) => location !== null)) {
+      return round === 0 ? null : (chosen as string[]);
+    }
+  }
+  return null;
+}
+
 @Injectable()
 export class LocationService {
   constructor(
@@ -287,6 +338,53 @@ export class LocationService {
        LIMIT 1`);
     const found = rows[0] && (await this.locationsOf(tx, shopId, [rows[0].id])).get(rows[0].id);
     return found ?? this.primaryOf(tx, shopId);
+  }
+
+  /**
+   * How an order's `lines` split among locations when no one location has them all (INV-10,
+   * ADR-898): the location of each line, by its index, each line whole from one; the location
+   * with the most of them first, as {@link forOrderIn} ranks locations where they have as many,
+   * then the next for the rest, at most {@link SPLIT_MOST_LOCATIONS}. Null where one location has
+   * them all, or they can't be split so. Read without locks: committing the stock checks it again.
+   */
+  async splitFor(
+    tx: Tx,
+    shopId: string,
+    lines: readonly { variantId: string; quantity: number }[],
+    to: { city: string | null; provinceCode: string | null } | null = null,
+  ): Promise<string[] | null> {
+    if (lines.length < 2) return null;
+    const city = to?.city ? (findCity(to.city)?.name ?? to.city.trim()).toLowerCase() : null;
+    const province = to?.provinceCode ?? (to?.city ? (findCity(to.city)?.province ?? null) : null);
+    const variants = [...new Set(lines.map((line) => line.variantId))];
+    const { rows: ranked } = await tx.execute<{ id: string }>(sql`
+      SELECT loc.id
+        FROM inventory.locations loc
+       WHERE loc.shop_id = ${shopId} AND loc.is_active AND loc.fulfills_online_orders
+       ORDER BY coalesce(${city}::text = ANY (SELECT lower(c) FROM unnest(loc.serves_cities) c),
+                         false) DESC,
+                coalesce(${province}::text = ANY (loc.serves_provinces), false) DESC,
+                loc.is_primary DESC, lower(loc.name), loc.id`);
+    // What is tracked, and not on pre-order, counts: the rest goes from anywhere (ADR-403).
+    const { rows: counted } = await tx.execute<{ variant_id: string }>(sql`
+      SELECT i.variant_id
+        FROM inventory.items i
+        LEFT JOIN inventory.preorders p ON p.shop_id = i.shop_id AND p.product_id = i.product_id
+       WHERE i.shop_id = ${shopId} AND i.tracked AND p.product_id IS NULL
+         AND i.variant_id = ANY(${sql.param(variants)}::uuid[])`);
+    const { rows: levels } = await tx.execute<{
+      location_id: string;
+      variant_id: string;
+      available: number;
+    }>(sql`
+      SELECT location_id, variant_id, available FROM inventory.levels
+       WHERE shop_id = ${shopId} AND variant_id = ANY(${sql.param(variants)}::uuid[])`);
+    return splitLines(
+      lines,
+      ranked.map((row) => row.id),
+      new Set(counted.map((row) => row.variant_id)),
+      new Map(levels.map((row) => [`${row.location_id}:${row.variant_id}`, row.available])),
+    );
   }
 
   /**

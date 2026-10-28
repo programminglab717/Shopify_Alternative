@@ -3279,6 +3279,9 @@ const en = {
   'locations.keep': 'Keep it',
   'locations.add': 'Add a location',
   'locations.addHint': 'A warehouse, a shop or a stockroom: each holds stock of its own.',
+  'locations.splitOrders': 'Split orders among locations',
+  'locations.splitOrdersHint':
+    "When no one location has all of an order paid on delivery, send it in parts from those that do, each part an order of its own. The extra parcels go at your cost: customers aren't charged for their delivery.",
   'locations.addSubmit': 'Add location',
   'locations.added': '{name} was added.',
   'options.title': 'Options and variants',
@@ -10350,6 +10353,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'locations.keep': 'رہنے دیں',
   'locations.add': 'مقام شامل کریں',
   'locations.addHint': 'گودام، دکان یا اسٹاک روم: ہر ایک کا اپنا اسٹاک ہوتا ہے۔',
+  'locations.splitOrders': 'آرڈرز کو مقامات میں بانٹیں',
+  'locations.splitOrdersHint':
+    'جب کسی ایک مقام پر کیش آن ڈیلیوری آرڈر کی سب چیزیں نہ ہوں، تو جن مقامات پر ہوں وہاں سے حصوں میں بھیجیں، ہر حصہ اپنا الگ آرڈر۔ اضافی پارسل آپ کے خرچ پر جاتے ہیں: گاہکوں سے ان کی ڈیلیوری نہیں لی جاتی۔',
   'locations.addSubmit': 'مقام شامل کریں',
   'locations.added': '{name} شامل ہو گیا۔',
   'options.title': 'آپشنز اور ویریئنٹس',

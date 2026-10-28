@@ -162,6 +162,11 @@ export function daysLeft(available: number, sold: number): number | null {
 export interface InventorySettingsRecord {
   /** A variant is low on stock with this many units for sale online, or fewer (ADR-125). */
   lowStockThreshold: number;
+  /**
+   * Whether an order paid on delivery that no one location has all of is split among those that
+   * do, as orders of their own (INV-10, ADR-898). Off until the shop turns it on.
+   */
+  splitOrders: boolean;
   /** Null while the shop has the defaults. */
   updatedAt: Date | null;
 }
@@ -169,6 +174,7 @@ export interface InventorySettingsRecord {
 /** Fields left out stay as they are. */
 export interface InventorySettingsInput {
   lowStockThreshold?: number | null;
+  splitOrders?: boolean | null;
 }
 
 /** A variant running low or out of stock, with what staff need to reorder it. */
@@ -212,12 +218,21 @@ export async function inventorySettingsIn(
   tx: Tx,
   shopId: string,
 ): Promise<InventorySettingsRecord> {
-  const { rows } = await tx.execute<{ low_stock_threshold: number; updated_at: string }>(sql`
-    SELECT low_stock_threshold, updated_at FROM inventory.settings WHERE shop_id = ${shopId}`);
+  const { rows } = await tx.execute<{
+    low_stock_threshold: number;
+    split_orders: boolean;
+    updated_at: string;
+  }>(sql`
+    SELECT low_stock_threshold, split_orders, updated_at
+      FROM inventory.settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   return row
-    ? { lowStockThreshold: row.low_stock_threshold, updatedAt: toDateOrNull(row.updated_at) }
-    : { lowStockThreshold: LOW_STOCK_THRESHOLD.default, updatedAt: null };
+    ? {
+        lowStockThreshold: row.low_stock_threshold,
+        splitOrders: row.split_orders,
+        updatedAt: toDateOrNull(row.updated_at),
+      }
+    : { lowStockThreshold: LOW_STOCK_THRESHOLD.default, splitOrders: false, updatedAt: null };
 }
 
 /**
@@ -260,14 +275,20 @@ export class LowStockService {
     const { shopId } = tenant;
     return this.db.tenant(shopId, async (tx) => {
       const current = await inventorySettingsIn(tx, shopId);
-      if (threshold === undefined || threshold === current.lowStockThreshold) {
-        return { ok: true, value: current };
-      }
+      const next = {
+        lowStockThreshold: threshold ?? current.lowStockThreshold,
+        splitOrders: input.splitOrders ?? current.splitOrders,
+      };
+      const changed = (['lowStockThreshold', 'splitOrders'] as const).filter(
+        (key) => next[key] !== current[key],
+      );
+      if (changed.length === 0) return { ok: true, value: current };
       const { rows } = await tx.execute<{ version: number; updated_at: string }>(sql`
-        INSERT INTO inventory.settings (shop_id, low_stock_threshold)
-        VALUES (${shopId}, ${threshold})
+        INSERT INTO inventory.settings (shop_id, low_stock_threshold, split_orders)
+        VALUES (${shopId}, ${next.lowStockThreshold}, ${next.splitOrders})
         ON CONFLICT (shop_id) DO UPDATE
           SET low_stock_threshold = EXCLUDED.low_stock_threshold,
+              split_orders = EXCLUDED.split_orders,
               version = inventory.settings.version + 1, updated_at = now()
         RETURNING version, updated_at`);
       await appendEvent<InventorySettingsUpdatedPayload>(tx, shopId, {
@@ -275,15 +296,13 @@ export class LowStockService {
         aggregateType: 'inventory_settings',
         aggregateId: shopId,
         payload: {
-          changed: ['lowStockThreshold'],
-          lowStockThreshold: threshold,
+          changed: [...changed],
+          lowStockThreshold: next.lowStockThreshold,
+          ...(changed.includes('splitOrders') && { splitOrders: next.splitOrders }),
           version: rows[0]!.version,
         },
       });
-      return {
-        ok: true,
-        value: { lowStockThreshold: threshold, updatedAt: toDateOrNull(rows[0]!.updated_at) },
-      };
+      return { ok: true, value: { ...next, updatedAt: toDateOrNull(rows[0]!.updated_at) } };
     });
   }
 

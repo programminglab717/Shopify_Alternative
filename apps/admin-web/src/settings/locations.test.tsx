@@ -47,6 +47,7 @@ function core(role: StaffRole) {
     }),
     location('loc_2', 'Karachi shop'),
   ];
+  let splitOrders = false;
   const ok = (field: string, changed: object | null) => ({
     [field]: { location: changed, userErrors: [] },
   });
@@ -192,6 +193,13 @@ function core(role: StaffRole) {
           'locationLocalPickupDisable',
           locations.find((each) => each.id === variables.locationId)!,
         );
+      case 'InventorySplitOrders':
+        return { inventorySettings: { splitOrdersAcrossLocations: splitOrders } };
+      case 'InventorySettingsUpdate':
+        splitOrders = Boolean(
+          (variables.input as { splitOrdersAcrossLocations?: boolean }).splitOrdersAcrossLocations,
+        );
+        return { inventorySettingsUpdate: { userErrors: [] } };
       case 'LocationDelete':
         locations = locations.filter((each) => each.id !== variables.locationId);
         return { locationDelete: { deletedLocationId: variables.locationId, userErrors: [] } };
@@ -294,6 +302,23 @@ describe("The shop's locations", () => {
     });
     // Adding a location asks nothing of it: it ships anywhere until edited.
     expect(screen.queryAllByLabelText('Cities it ships to first')).toHaveLength(0);
+  });
+
+  it('splits orders among locations once the shop turns it on (INV-10, ADR-898)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/locations');
+    const split = (await screen.findByRole('checkbox', {
+      name: /^Split orders among locations/,
+    })) as HTMLInputElement;
+    expect(split.checked).toBe(false);
+    fireEvent.click(split);
+    await waitFor(() =>
+      expect(sentOf(fake, 'InventorySettingsUpdate')).toEqual([
+        { input: { splitOrdersAcrossLocations: true } },
+      ]),
+    );
+    expect(split.checked).toBe(true);
   });
 
   it('makes another active location the primary one', async () => {

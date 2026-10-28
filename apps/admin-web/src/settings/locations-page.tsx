@@ -22,6 +22,8 @@ import {
   LocationLocalPickupEnableMutation,
   LocationMakePrimaryMutation,
   ShopLocationsQuery,
+  InventorySettingsUpdateMutation,
+  InventorySplitOrdersQuery,
 } from '../api/operations';
 import type { LocationPayloadData, ShopLocation, ShopLocationsData, UserError } from '../api/types';
 import { errorText } from '../i18n/errors';
@@ -639,6 +641,54 @@ function LocationRow({ location }: { location: ShopLocation }) {
 }
 
 /**
+ * Whether an order paid on delivery that no one location has all of is split among those that
+ * do (INV-10, ADR-898), each part an order of its own, its parcel sent at the shop's cost.
+ */
+function SplitOrders() {
+  const { t } = useLocale();
+  const query = useAdminQuery<{ inventorySettings: { splitOrdersAcrossLocations: boolean } }>(
+    ['inventorySplitOrders'],
+    InventorySplitOrdersQuery,
+  );
+  const update = useAdminMutation<
+    { inventorySettingsUpdate: { userErrors: UserError[] } },
+    { input: { splitOrdersAcrossLocations: boolean } }
+  >(InventorySettingsUpdateMutation);
+  const [on, setOn] = useState<boolean | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  if (!query.data) return null;
+  const checked = on ?? query.data.inventorySettings.splitOrdersAcrossLocations;
+
+  const change = async (next: boolean) => {
+    setOn(next);
+    setProblem(null);
+    try {
+      const error = (await update.mutateAsync({ input: { splitOrdersAcrossLocations: next } }))
+        .inventorySettingsUpdate.userErrors[0];
+      if (error) {
+        setOn(!next);
+        setProblem(error.message);
+      }
+    } catch (failure) {
+      setOn(!next);
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <CheckField
+        label={t('locations.splitOrders')}
+        hint={t('locations.splitOrdersHint')}
+        checked={checked}
+        onChange={(next) => void change(next)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </Card>
+  );
+}
+
+/**
  * The shop's locations (INV-01): its warehouses and shops, with their addresses and the number
  * couriers call for pickups, which of them fulfil online orders; added, changed, taken out of use
  * once they hold no stock and wait on no orders, put back, and deleted if they never held stock.
@@ -673,6 +723,7 @@ export function LocationsPage() {
           </ul>
         </Card>
       )}
+      {(query.data?.locations.nodes.length ?? 0) > 1 && <SplitOrders />}
       <FormSection title={t('locations.add')} hint={t('locations.addHint')}>
         <LocationForm
           initial={EMPTY}

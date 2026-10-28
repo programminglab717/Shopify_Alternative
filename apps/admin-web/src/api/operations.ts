@@ -5395,6 +5395,15 @@ export const InventoryMoveMutation = /* GraphQL */ `
 `;
 
 /** What the shop calls low stock. */
+/** Whether orders split among locations where none has all of one (INV-10, ADR-898). */
+export const InventorySplitOrdersQuery = /* GraphQL */ `
+  query InventorySplitOrders {
+    inventorySettings {
+      splitOrdersAcrossLocations
+    }
+  }
+`;
+
 export const InventorySettingsUpdateMutation = /* GraphQL */ `
   mutation InventorySettingsUpdate($input: InventorySettingsInput!) {
     inventorySettingsUpdate(input: $input) {

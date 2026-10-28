@@ -139,7 +139,7 @@ interface Rewrite {
 }
 
 /** Who changes an order's items: staff or an app through the API, or its customer's page. */
-interface EditCaller {
+export interface EditCaller {
   shopId: string;
   actor: Actor | 'system';
 }
@@ -726,233 +726,245 @@ export class OrderEditService {
     const shipping =
       check.price(['input', 'shippingPrice'], input.shippingPrice, tenant.currency) ?? 0n;
     if (!check.ok) return { ok: false, errors: check.errors };
+    return this.db.tenant(tenant.shopId, (tx) => this.splitIn(tx, tenant, id, asked, shipping));
+  }
+
+  /**
+   * Splits order `id` as {@link split} does, in the caller's transaction: `asked` its lines and
+   * units sent apart, `shipping` the part's delivery charge. The part ships from `locationId`
+   * where given, its stock committed there already, as placing an order split among locations
+   * does (ADR-898); else from where the order does.
+   */
+  async splitIn(
+    tx: Tx,
+    tenant: EditCaller,
+    id: string,
+    asked: readonly { lineItemId: string; quantity: number; field: string[] }[],
+    shipping: bigint,
+    locationId: string | null = null,
+  ): Promise<MutationResult<{ order: OrderRecord; split: OrderRecord }>> {
     const { shopId } = tenant;
-
-    return this.db.tenant(
-      shopId,
-      async (tx): Promise<MutationResult<{ order: OrderRecord; split: OrderRecord }>> => {
-        const order = await lockOrder(tx, shopId, id);
-        if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
-        const refusal = splitRefusal(order);
-        if (refusal) return failOne(['id'], 'INVALID', refusal);
-        const current = await linesOf(tx, shopId, order.id);
-        const byId = new Map(current.map((line) => [line.id, line]));
-        const errors: FieldError[] = [];
-        for (const entry of asked) {
-          const line = byId.get(entry.lineItemId);
-          if (!line) {
-            errors.push({
-              field: [...entry.field, 'lineItemId'],
-              code: 'NOT_FOUND',
-              message: 'Line item not found on this order',
-            });
-          } else if (entry.quantity > line.quantity) {
-            errors.push({
-              field: [...entry.field, 'quantity'],
-              code: 'INVALID',
-              message: `The order has ${line.quantity} of "${itemName(line)}"`,
-            });
-          }
-        }
-        if (errors.length > 0) return { ok: false, errors };
-
-        const snapshots = await this.variants.snapshotsOf(
-          tx,
-          shopId,
-          current.map((line) => line.variantId),
-        );
-        const taxCode = (variantId: string) => snapshots.get(variantId)?.taxCode ?? null;
-        const sent = new Map(asked.map((entry) => [entry.lineItemId, entry.quantity]));
-        const kept: EditedLine[] = [];
-        const apart: EditedLine[] = [];
-        for (const line of current) {
-          const moving = sent.get(line.id) ?? 0;
-          const fields = { taxCode: taxCode(line.variantId), field: null };
-          if (line.quantity > moving) {
-            kept.push({ ...line, ...fields, quantity: line.quantity - moving });
-          }
-          if (moving > 0) {
-            apart.push({ ...line, ...fields, id: newId(), quantity: moving, createdAt: null });
-          }
-        }
-        if (kept.length === 0) {
-          return failOne(
-            ['input', 'lineItems'],
-            'INVALID',
-            'An order keeps at least one item: send apart less than all of it',
-          );
-        }
-
-        // The discount is shared by what the items cost. An order paid on delivery has nothing
-        // taken off for paying by transfer.
-        const currency = order.currency as CurrencyCode;
-        const cost = (items: readonly EditedLine[]) =>
-          items.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n);
-        const [keptDiscount, apartDiscount] = discountShares(
-          order.discount,
-          [cost(kept), cost(apart)],
-          currency,
-        );
-        let apartName = '';
-        const rewrite: Rewrite = {
-          current,
-          edited: kept,
-          discount: keptDiscount,
-          transferDiscount: order.transferDiscount,
-          onlineDiscount: order.onlineDiscount,
-          shipping: order.shipping,
-          stock: { commit: [], release: [] },
-          field: ['input'],
-          shortField: () => ['input'],
-          also: {},
-          kind: 'split',
-          message: (totals) =>
-            itemsWords(
-              'Split off ',
-              apart,
-              ` as ${apartName}` + (totals ? `; ${totals[0]} instead of ${totals[1]}` : ''),
-            ),
-          changed: keptDiscount === order.discount ? ['lineItems'] : ['lineItems', 'discount'],
-        };
-        const amounts = await this.#prepare(tx, tenant, order, rewrite);
-        if (!amounts.ok) return amounts;
-        // The part's amounts, as an order's with nothing on it yet; its stock is committed.
-        const partId = newId();
-        const nothing = { subtotal: 0n, total: 0n, codFee: 0n, codAmount: 0n, amountPaid: 0n };
-        const part = await this.#prepare(
-          tx,
-          tenant,
-          { ...order, ...nothing, id: partId },
-          {
-            ...rewrite,
-            current: [],
-            edited: apart,
-            discount: apartDiscount,
-            transferDiscount: 0n,
-            onlineDiscount: 0n,
-            shipping,
-            field: ['input', 'shippingPrice'],
-          },
-        );
-        if (!part.ok) return part;
-
-        const number = await nextOrderNumber(tx, shopId);
-        apartName = orderName(number);
-        const { subtotal, total, codAmount, tax } = part.value;
-        // Scored as the one order its customer placed, as the order is again.
-        let risk: RiskAssessment | null = null;
-        let held = false;
-        if (order.riskScore !== null && !order.customerErasedAt) {
-          const { assessment, settings } = await assessOrderRisk(tx, shopId, {
-            orderId: partId,
-            splitFromId: order.splitFromId ?? order.id,
-            customerId: order.customerId,
-            total,
-            currency,
-            units: apart.reduce((sum, line) => sum + line.quantity, 0),
-            address: order.shippingAddress as AddressValue,
-            placedAt: order.createdAt,
-          });
-          risk = assessment;
-          held =
-            order.confirmationStatus !== 'needs_review' &&
-            !holdsForRisk(settings, order.riskScore) &&
-            holdsForRisk(settings, assessment.score);
-        }
-        const statuses = {
-          status: 'open' as const,
-          confirmationStatus: held ? ('needs_review' as const) : order.confirmationStatus,
-          financialStatus: 'pending' as const,
-          fulfillmentStatus: 'unfulfilled' as const,
-          packedAt: null,
-        };
-        // The rest of the order as it is: its customer, address, note and tags, confirmation and
-        // calls, assignee, agreement, the visits that brought its customer (ADR-139) and when it
-        // was placed. Its link is its own, made when sent.
-        const [row] = await tx
-          .insert(orders)
-          .values({
-            ...order,
-            ...statuses,
-            // Part of a sale counted already, if at all (ADR-263).
-            planMonth: null,
-            overLimitAt: null,
-            id: partId,
-            number,
-            stage: stageOf({
-              ...statuses,
-              paymentMethod: order.paymentMethod,
-              deliveryMethod: order.deliveryMethod,
-              amountPaid: 0n,
-              total,
-              advanceDue: 0n,
-            }),
-            subtotal,
-            discount: apartDiscount,
-            shipping,
-            codFee: 0n,
-            taxRate: tax.rate,
-            totalTax: tax.total,
-            shippingTax: tax.charges,
-            transferDiscount: 0n,
-            onlineDiscount: 0n,
-            total,
-            amountPaid: 0n,
-            amountRefunded: 0n,
-            codAmount,
-            advanceDue: 0n,
-            ...(risk && riskColumns(risk)),
-            splitFromId: order.splitFromId ?? order.id,
-            linkTokenHash: null,
-            linkExpiresAt: null,
-            paidAt: null,
-            version: 1,
-            updatedAt: new Date(),
-          })
-          .returning();
-        await tx.insert(lines).values(lineValues(shopId, partId, apart, tax));
-        await addTimelineEntry(
-          tx,
-          shopId,
-          partId,
-          tenant.actor,
-          'split',
-          itemsWords(
-            `Split from ${orderName(order.number)}: `,
-            apart,
-            `; ${formatMoney(money(total, currency))}`,
-          ),
-        );
-        if (held) {
-          await addTimelineEntry(tx, shopId, partId, 'system', 'held', heldForRiskMessage(risk!));
-        }
-        await appendEvent<OrderCreatedPayload>(tx, shopId, {
-          type: OrderEvents.OrderCreated,
-          aggregateType: 'order',
-          aggregateId: partId,
-          payload: {
-            number,
-            customerId: order.customerId,
-            source: order.source,
-            paymentMethod: order.paymentMethod,
-            total: total.toString(),
-            currency,
-            riskLevel: row!.riskLevel,
-            stage: row!.stage,
-            version: row!.version,
-            splitFromId: row!.splitFromId!,
-          },
+    const order = await lockOrder(tx, shopId, id);
+    if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+    const refusal = splitRefusal(order);
+    if (refusal) return failOne(['id'], 'INVALID', refusal);
+    const current = await linesOf(tx, shopId, order.id);
+    const byId = new Map(current.map((line) => [line.id, line]));
+    const errors: FieldError[] = [];
+    for (const entry of asked) {
+      const line = byId.get(entry.lineItemId);
+      if (!line) {
+        errors.push({
+          field: [...entry.field, 'lineItemId'],
+          code: 'NOT_FOUND',
+          message: 'Line item not found on this order',
         });
-        await this.#write(tx, tenant, order, rewrite, amounts.value);
-        return {
-          ok: true,
-          value: {
-            order: (await loadOrder(tx, shopId, order.id))!,
-            split: (await loadOrder(tx, shopId, partId))!,
-          },
-        };
+      } else if (entry.quantity > line.quantity) {
+        errors.push({
+          field: [...entry.field, 'quantity'],
+          code: 'INVALID',
+          message: `The order has ${line.quantity} of "${itemName(line)}"`,
+        });
+      }
+    }
+    if (errors.length > 0) return { ok: false, errors };
+
+    const snapshots = await this.variants.snapshotsOf(
+      tx,
+      shopId,
+      current.map((line) => line.variantId),
+    );
+    const taxCode = (variantId: string) => snapshots.get(variantId)?.taxCode ?? null;
+    const sent = new Map(asked.map((entry) => [entry.lineItemId, entry.quantity]));
+    const kept: EditedLine[] = [];
+    const apart: EditedLine[] = [];
+    for (const line of current) {
+      const moving = sent.get(line.id) ?? 0;
+      const fields = { taxCode: taxCode(line.variantId), field: null };
+      if (line.quantity > moving) {
+        kept.push({ ...line, ...fields, quantity: line.quantity - moving });
+      }
+      if (moving > 0) {
+        apart.push({ ...line, ...fields, id: newId(), quantity: moving, createdAt: null });
+      }
+    }
+    if (kept.length === 0) {
+      return failOne(
+        ['input', 'lineItems'],
+        'INVALID',
+        'An order keeps at least one item: send apart less than all of it',
+      );
+    }
+
+    // The discount is shared by what the items cost. An order paid on delivery has nothing
+    // taken off for paying by transfer.
+    const currency = order.currency as CurrencyCode;
+    const cost = (items: readonly EditedLine[]) =>
+      items.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n);
+    const [keptDiscount, apartDiscount] = discountShares(
+      order.discount,
+      [cost(kept), cost(apart)],
+      currency,
+    );
+    let apartName = '';
+    const rewrite: Rewrite = {
+      current,
+      edited: kept,
+      discount: keptDiscount,
+      transferDiscount: order.transferDiscount,
+      onlineDiscount: order.onlineDiscount,
+      shipping: order.shipping,
+      stock: { commit: [], release: [] },
+      field: ['input'],
+      shortField: () => ['input'],
+      also: {},
+      kind: 'split',
+      message: (totals) =>
+        itemsWords(
+          'Split off ',
+          apart,
+          ` as ${apartName}` + (totals ? `; ${totals[0]} instead of ${totals[1]}` : ''),
+        ),
+      changed: keptDiscount === order.discount ? ['lineItems'] : ['lineItems', 'discount'],
+    };
+    const amounts = await this.#prepare(tx, tenant, order, rewrite);
+    if (!amounts.ok) return amounts;
+    // The part's amounts, as an order's with nothing on it yet; its stock is committed.
+    const partId = newId();
+    const nothing = { subtotal: 0n, total: 0n, codFee: 0n, codAmount: 0n, amountPaid: 0n };
+    const part = await this.#prepare(
+      tx,
+      tenant,
+      { ...order, ...nothing, id: partId },
+      {
+        ...rewrite,
+        current: [],
+        edited: apart,
+        discount: apartDiscount,
+        transferDiscount: 0n,
+        onlineDiscount: 0n,
+        shipping,
+        field: ['input', 'shippingPrice'],
       },
     );
+    if (!part.ok) return part;
+
+    const number = await nextOrderNumber(tx, shopId);
+    apartName = orderName(number);
+    const { subtotal, total, codAmount, tax } = part.value;
+    // Scored as the one order its customer placed, as the order is again.
+    let risk: RiskAssessment | null = null;
+    let held = false;
+    if (order.riskScore !== null && !order.customerErasedAt) {
+      const { assessment, settings } = await assessOrderRisk(tx, shopId, {
+        orderId: partId,
+        splitFromId: order.splitFromId ?? order.id,
+        customerId: order.customerId,
+        total,
+        currency,
+        units: apart.reduce((sum, line) => sum + line.quantity, 0),
+        address: order.shippingAddress as AddressValue,
+        placedAt: order.createdAt,
+      });
+      risk = assessment;
+      held =
+        order.confirmationStatus !== 'needs_review' &&
+        !holdsForRisk(settings, order.riskScore) &&
+        holdsForRisk(settings, assessment.score);
+    }
+    const statuses = {
+      status: 'open' as const,
+      confirmationStatus: held ? ('needs_review' as const) : order.confirmationStatus,
+      financialStatus: 'pending' as const,
+      fulfillmentStatus: 'unfulfilled' as const,
+      packedAt: null,
+    };
+    // The rest of the order as it is: its customer, address, note and tags, confirmation and
+    // calls, assignee, agreement, the visits that brought its customer (ADR-139) and when it
+    // was placed. Its link is its own, made when sent.
+    const [row] = await tx
+      .insert(orders)
+      .values({
+        ...order,
+        ...statuses,
+        // Part of a sale counted already, if at all (ADR-263).
+        planMonth: null,
+        overLimitAt: null,
+        id: partId,
+        number,
+        stage: stageOf({
+          ...statuses,
+          paymentMethod: order.paymentMethod,
+          deliveryMethod: order.deliveryMethod,
+          amountPaid: 0n,
+          total,
+          advanceDue: 0n,
+        }),
+        subtotal,
+        discount: apartDiscount,
+        shipping,
+        codFee: 0n,
+        taxRate: tax.rate,
+        totalTax: tax.total,
+        shippingTax: tax.charges,
+        transferDiscount: 0n,
+        onlineDiscount: 0n,
+        total,
+        amountPaid: 0n,
+        amountRefunded: 0n,
+        codAmount,
+        advanceDue: 0n,
+        ...(risk && riskColumns(risk)),
+        splitFromId: order.splitFromId ?? order.id,
+        locationId: locationId ?? order.locationId,
+        linkTokenHash: null,
+        linkExpiresAt: null,
+        paidAt: null,
+        version: 1,
+        updatedAt: new Date(),
+      })
+      .returning();
+    await tx.insert(lines).values(lineValues(shopId, partId, apart, tax));
+    await addTimelineEntry(
+      tx,
+      shopId,
+      partId,
+      tenant.actor,
+      'split',
+      itemsWords(
+        `Split from ${orderName(order.number)}: `,
+        apart,
+        `; ${formatMoney(money(total, currency))}`,
+      ),
+    );
+    if (held) {
+      await addTimelineEntry(tx, shopId, partId, 'system', 'held', heldForRiskMessage(risk!));
+    }
+    await appendEvent<OrderCreatedPayload>(tx, shopId, {
+      type: OrderEvents.OrderCreated,
+      aggregateType: 'order',
+      aggregateId: partId,
+      payload: {
+        number,
+        customerId: order.customerId,
+        source: order.source,
+        paymentMethod: order.paymentMethod,
+        total: total.toString(),
+        currency,
+        riskLevel: row!.riskLevel,
+        stage: row!.stage,
+        version: row!.version,
+        splitFromId: row!.splitFromId!,
+      },
+    });
+    await this.#write(tx, tenant, order, rewrite, amounts.value);
+    return {
+      ok: true,
+      value: {
+        order: (await loadOrder(tx, shopId, order.id))!,
+        split: (await loadOrder(tx, shopId, partId))!,
+      },
+    };
   }
 
   /**

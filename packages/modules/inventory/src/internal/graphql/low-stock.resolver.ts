@@ -57,7 +57,7 @@ export class LowStockResolver {
   }
 
   @Mutation(() => InventorySettingsUpdatePayload, {
-    description: 'Changes what the shop calls low stock.',
+    description: 'Changes what the shop calls low stock, and whether orders split among locations.',
   })
   @RequireScopes('write_inventory')
   async inventorySettingsUpdate(
@@ -66,6 +66,7 @@ export class LowStockResolver {
   ): Promise<InventorySettingsUpdatePayload> {
     const result = await this.lowStock.updateSettings(tenant, {
       ...(input.lowStockThreshold !== undefined && { lowStockThreshold: input.lowStockThreshold }),
+      splitOrders: input.splitOrdersAcrossLocations,
     });
     return Object.assign(new InventorySettingsUpdatePayload(), {
       inventorySettings: result.ok ? toSettings(result.value) : null,
@@ -325,7 +326,10 @@ export class LowStockItemResolver {
 }
 
 function toSettings(record: InventorySettingsRecord): InventorySettings {
-  return Object.assign(new InventorySettings(), { lowStockThreshold: record.lowStockThreshold });
+  return Object.assign(new InventorySettings(), {
+    lowStockThreshold: record.lowStockThreshold,
+    splitOrdersAcrossLocations: record.splitOrders,
+  });
 }
 
 function toLowStockItem(record: LowStockRecord): LowStockItem {

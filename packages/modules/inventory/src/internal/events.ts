@@ -92,9 +92,11 @@ export interface InventoryLevelUpdatedPayload {
 
 /** The aggregate is the shop: its inventory settings, such as what it calls low stock. */
 export interface InventorySettingsUpdatedPayload {
-  /** "lowStockThreshold". */
+  /** "lowStockThreshold", "splitOrders". */
   changed: string[];
   lowStockThreshold: number;
+  /** Where it changed (ADR-898). */
+  splitOrders?: boolean;
   version: number;
 }
 

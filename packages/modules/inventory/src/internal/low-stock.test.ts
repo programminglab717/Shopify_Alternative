@@ -61,12 +61,22 @@ describe.skipIf(!server)('Low stock', () => {
     ).variants.map((variant) => variant.id);
 
   it('keeps what the shop calls low: five until it says otherwise (ADR-125)', async () => {
-    expect(await lowStock.settings(f.a)).toEqual({ lowStockThreshold: 5, updatedAt: null });
+    expect(await lowStock.settings(f.a)).toEqual({
+      lowStockThreshold: 5,
+      splitOrders: false,
+      updatedAt: null,
+    });
     const changed = unwrap(await lowStock.updateSettings(f.a, { lowStockThreshold: 3 }));
     expect(changed.lowStockThreshold).toBe(3);
     // The same again, or nothing given, changes nothing.
     expect(unwrap(await lowStock.updateSettings(f.a, { lowStockThreshold: 3 }))).toEqual(changed);
     expect(unwrap(await lowStock.updateSettings(f.a, {}))).toEqual(changed);
+    // Orders split among locations once turned on (ADR-898); the threshold stays.
+    expect(unwrap(await lowStock.updateSettings(f.a, { splitOrders: true }))).toMatchObject({
+      lowStockThreshold: 3,
+      splitOrders: true,
+    });
+    expect((await lowStock.settings(f.b)).splitOrders).toBe(false);
     for (const [threshold, code] of [
       [-1, 'INVALID'],
       [10_001, 'INVALID'],
@@ -82,7 +92,10 @@ describe.skipIf(!server)('Low stock', () => {
       (await f.outbox())
         .filter((event) => event.event_type === 'inventory_settings.updated')
         .map((event) => event.payload),
-    ).toEqual([{ changed: ['lowStockThreshold'], lowStockThreshold: 3, version: 1 }]);
+    ).toEqual([
+      { changed: ['lowStockThreshold'], lowStockThreshold: 3, version: 1 },
+      { changed: ['splitOrders'], lowStockThreshold: 3, splitOrders: true, version: 2 },
+    ]);
   });
 
   it('counts and lists the variants running low or out, the fewest first', async () => {

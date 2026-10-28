@@ -37,6 +37,7 @@ import { newId } from '@hatti/ids';
 import {
   LocationService,
   StockService,
+  inventorySettingsIn,
   preordersIn,
   type LocationRecord,
 } from '@hatti/inventory/public';
@@ -75,6 +76,7 @@ import {
   UNREACHABLE_LIMITS,
   orderSettingsIn,
 } from './order-settings.service.js';
+import { OrderEditService } from './order-edit.service.js';
 import { assessOrderRisk, riskColumns } from './order-risk.js';
 import {
   actorColumns,
@@ -394,6 +396,13 @@ async function repeatedOrderIn(
 }
 
 /** How long ago `at` was, as a timeline says it: "20 minutes before", "2 days before". */
+/** The location most of an order's lines go from, the first named where two have as many. */
+function mostOf(splitAt: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const id of splitAt) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts].reduce((best, each) => (each[1] > best[1] ? each : best))[0];
+}
+
 function sinceText(at: Date): string {
   const minutes = Math.max(1, Math.round((Date.now() - at.getTime()) / 60_000));
   if (minutes < 60) return minutes === 1 ? 'a minute before' : `${minutes} minutes before`;
@@ -444,6 +453,8 @@ export class OrderService {
     @Optional() private readonly payments?: OnlinePayments,
     /** The orders a month the shop's plan allows (ADR-263); without it, as in most tests, any. */
     @Optional() private readonly allowance?: PlanAllowance,
+    /** Splits an order among locations as it is placed (ADR-898); without it, none is. */
+    @Optional() private readonly edits?: OrderEditService,
   ) {}
 
   async create(
@@ -712,14 +723,33 @@ export class OrderService {
       );
     }
 
+    // Where no one location has it all, its lines split among those that do, as the shop
+    // allows: each part an order of its own, split off once this one is placed (ADR-898).
+    const splitAt =
+      this.edits &&
+      !order.locationId &&
+      deliveryMethod === 'shipping' &&
+      paymentMethod === 'cash_on_delivery' &&
+      advance === 0n &&
+      askedAhead === 0n &&
+      !riskAdvance &&
+      priced.length > 1 &&
+      (await inventorySettingsIn(tx, shopId)).splitOrders &&
+      !(await this.#overLimit(tx, shopId, placement))
+        ? await this.locations.splitFor(tx, shopId, priced, address)
+        : null;
+    const shipsFrom = splitAt
+      ? (await this.locations.locationsOf(tx, shopId, [mostOf(splitAt)])).get(mostOf(splitAt))!
+      : location.value;
+
     // Stock first: an order exists only if its stock does.
     const orderId = newId();
     const committed = await this.stock.commit(
       tx,
       { shopId, actor: placement.actor },
-      priced.map((line) => ({
+      priced.map((line, index) => ({
         variantId: line.variantId,
-        locationId: location.value.id,
+        locationId: splitAt?.[index] ?? shipsFrom.id,
         quantity: line.quantity,
       })),
       { referenceDocumentUri: orderReference(orderId) },
@@ -860,7 +890,7 @@ export class OrderService {
         phone: address.phone,
         email,
         shippingAddress: address,
-        locationId: location.value.id,
+        locationId: shipsFrom.id,
         note: order.note,
         giftMessage: giftMessageOf(order.giftMessage),
         deliveryExpectedOn: order.deliveryExpectedOn ?? null,
@@ -890,10 +920,11 @@ export class OrderService {
       shopId,
       priced.map((line) => line.snapshot.productId),
     );
+    const lineIds = priced.map(() => newId());
     await tx.insert(lines).values(
       priced.map((line, index) => ({
         shopId,
-        id: newId(),
+        id: lineIds[index]!,
         orderId,
         position: line.position,
         variantId: line.variantId,
@@ -1004,7 +1035,49 @@ export class OrderService {
         version: row!.version,
       },
     });
+    if (splitAt) await this.#splitAmong(tx, placement, orderId, lineIds, splitAt, shipsFrom.id);
     return { ok: true, value: (await loadOrder(tx, shopId, orderId))! };
+  }
+
+  /** Whether the shop's plan has no room for another order this month (ADR-263). */
+  async #overLimit(tx: Tx, shopId: string, placement: Placement): Promise<boolean> {
+    if (placement.countsTowardPlan === false) return false;
+    const limit = (await this.allowance?.limitIn(tx, shopId, 'ordersPerMonth')) ?? null;
+    const month = limit ? await planMonthIn(tx, shopId) : null;
+    return Boolean(limit && month && planOrderOf(limit, month.counted).overLimit);
+  }
+
+  /**
+   * Splits order `orderId`, placed just now, among the locations `splitAt` gives each of its
+   * lines (ADR-898): those of each location but `main` an order of their own, shipped from there
+   * with no delivery charge, their stock committed there already. Its customer was told one
+   * total: the shop sends the other parcels at its cost.
+   */
+  async #splitAmong(
+    tx: Tx,
+    placement: Placement,
+    orderId: string,
+    lineIds: readonly string[],
+    splitAt: readonly string[],
+    main: string,
+  ): Promise<void> {
+    const loaded = await loadOrder(tx, placement.shopId, orderId);
+    const quantities = new Map(loaded!.lines.map((line) => [line.id, line.quantity]));
+    const caller = { shopId: placement.shopId, actor: placement.actor };
+    for (const locationId of [...new Set(splitAt)].filter((each) => each !== main)) {
+      const asked = lineIds
+        .filter((_, index) => splitAt[index] === locationId)
+        .map((lineItemId) => ({
+          lineItemId,
+          quantity: quantities.get(lineItemId)!,
+          field: ['lineItems'],
+        }));
+      const split = await this.edits!.splitIn(tx, caller, orderId, asked, 0n, locationId);
+      if (!split.ok) {
+        // Checked before its stock was committed: only a change in between gets here.
+        throw new Error(`An order split among locations was refused: ${split.errors[0]!.message}`);
+      }
+    }
   }
 
   get(tenant: TenantContext, id: string): Promise<OrderRecord | null> {
