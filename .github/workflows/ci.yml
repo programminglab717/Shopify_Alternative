@@ -17,7 +17,8 @@ jobs:
   check:
     name: Lint, typecheck, test
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # The whole suite takes 14 to 20 minutes on GitHub's runners now: room for it, and to grow.
+    timeout-minutes: 35
 
     services:
       postgres:
