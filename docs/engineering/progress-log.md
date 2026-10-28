@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Apps inside the admin and on the storefront
+### ea6c0be · Apps inside the admin and on the storefront
 
 * **Developers:** installed apps open inside the admin, their frames carrying a minute's session
   token the app checks with its secret. Apps offer the storefront scripts, such as a reviews
