@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The Storefront API's menus, pages, blogs and policies
+### 5890194 · The Storefront API's menus, pages, blogs and policies
 
 * **Queries:** menus, pages, blogs, articles and the shop's policies, as Shopify's Storefront API
   gives them, from the storefront documents ([ADR-890](../architecture/13-decision-log.md#adr-890--the-storefront-api-serves-the-shops-menus-pages-blogs-articles-and-policies-as-shopifys-names-and-shapes-them-from-its-storefront-documents)).
