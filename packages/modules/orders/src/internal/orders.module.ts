@@ -67,6 +67,7 @@ import {
 } from './graphql/transfer-receipt.resolver.js';
 import {
   DraftLinkController,
+  AffiliatePageController,
   OrderLinkController,
   StorefrontTrackingController,
 } from './links.controller.js';
@@ -104,7 +105,12 @@ import { SubscriptionService } from './subscriptions.js';
  */
 @Module({
   imports: [CatalogModule, InventoryModule, CustomersModule],
-  controllers: [DraftLinkController, OrderLinkController, StorefrontTrackingController],
+  controllers: [
+    DraftLinkController,
+    OrderLinkController,
+    StorefrontTrackingController,
+    AffiliatePageController,
+  ],
   providers: [
     PosService,
     PosCashierService,

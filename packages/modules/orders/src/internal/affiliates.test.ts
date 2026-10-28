@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { StorefrontSite } from '@hatti/api';
 import { AffiliatesService } from './affiliates.service.js';
+import { affiliatePage } from './link-pages.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -13,7 +15,7 @@ describe.skipIf(!server)('Affiliates (MKT-08, ADR-776)', () => {
 
   beforeAll(async () => {
     f = await ordersFixture(server!);
-    affiliates = new AffiliatesService(f.db);
+    affiliates = new AffiliatesService(f.db, undefined, new StorefrontSite('https://hatti.test'));
   });
 
   afterAll(async () => {
@@ -206,5 +208,53 @@ describe.skipIf(!server)('Affiliates (MKT-08, ADR-776)', () => {
     // Another shop's affiliates are its own.
     expect(await affiliates.list(f.b)).toEqual([]);
     expect(await affiliates.get(f.b, zara.id)).toBeNull();
+  });
+
+  it('shows an affiliate their own page by its secret, nothing of their customers, a new link ending the old (ADR-899)', async () => {
+    const zara = unwrap(
+      await affiliates.create(f.a, {
+        name: 'Zara Ahmed',
+        ref: 'zara',
+        discountCode: 'ZARA10',
+        commission: '10',
+      }),
+    );
+    await orderOf({ code: 'ZARA10' });
+    await orderOf({ last: '/?ref=zara', stage: 'in_transit' });
+    const path = unwrap(await affiliates.pageLink(f.a, zara.id));
+    expect(path).toMatch(/^\/a\/[A-Za-z0-9_-]{22}$/);
+    const token = path.slice(3);
+    const view = await affiliates.page(token);
+    expect(view).toMatchObject({
+      kind: 'page',
+      name: 'Zara Ahmed',
+      currency: 'PKR',
+      link: expect.stringMatching(/^https:\/\/.+\.hatti\.test\/\?ref=zara$/),
+      discountCode: 'ZARA10',
+      commissionBps: 1000,
+      ended: false,
+      stats: { orders: 2, delivered: 1, earned: 200_00n, pending: 200_00n, owed: 200_00n },
+    });
+    expect(view.kind === 'page' && view.orders.map((order) => order.stage)).toEqual([
+      'in_transit',
+      'delivered',
+    ]);
+    const html = affiliatePage(view).html;
+    expect(html).toContain('Rs 200');
+    expect(html).toContain('ZARA10');
+    // Their customers aren't on it: not by name, nor number.
+    const { rows } = await f.admin.query<{ name: string; phone: string }>(
+      `SELECT shipping_address ->> 'name' AS name, phone FROM orders.orders LIMIT 1`,
+    );
+    expect(html).not.toContain(rows[0]!.name);
+    expect(html).not.toContain(rows[0]!.phone);
+    // A new link ends the one before; a secret of no one's, or of another shape, finds nothing.
+    const again = unwrap(await affiliates.pageLink(f.a, zara.id));
+    expect((await affiliates.page(token)).kind).toBe('not_found');
+    expect((await affiliates.page(again.slice(3))).kind).toBe('page');
+    expect((await affiliates.page('x'.repeat(22))).kind).toBe('not_found');
+    expect((await affiliates.page('short')).kind).toBe('not_found');
+    expect(affiliatePage({ kind: 'not_found' }).status).toBe(404);
+    expect(errorsOf(await affiliates.pageLink(f.b, zara.id))).toEqual([['id', 'NOT_FOUND']]);
   });
 });

@@ -231,6 +231,20 @@ export class AffiliateUpdatePayload {
 }
 
 @ObjectType()
+export class AffiliatePageLinkCreatePayload {
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The new link to the affiliate's own page, to send them: it is shown this once, and the " +
+      'link before it no longer works.',
+  })
+  url!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class AffiliatePayoutRecordPayload {
   @Field(() => AffiliatePayout, { nullable: true })
   payout!: AffiliatePayout | null;

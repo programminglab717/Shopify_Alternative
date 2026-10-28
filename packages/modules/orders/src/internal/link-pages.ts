@@ -21,6 +21,7 @@ import {
   type PkProvinceCode,
 } from '@hatti/pk';
 import { shownLineProperties } from './documents.js';
+import type { AffiliatePageView } from './affiliates.service.js';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import {
@@ -2119,4 +2120,102 @@ function until(expiresAt: Date, timeZone: string): Html {
     { en: `This link works until ${when}.`, ur: html`یہ لنک ${ltr(when)} تک کام کرے گا۔` },
     'small muted',
   );
+}
+
+/** How an affiliate's order stands, for their page: earned, coming, or come back. */
+function affiliateStageWords(stage: string): Words {
+  return stage === 'delivered' || stage === 'completed'
+    ? { en: 'Delivered', ur: 'ڈیلیور ہو گیا' }
+    : stage === 'returned' || stage === 'lost'
+      ? { en: 'Came back', ur: 'واپس آ گیا' }
+      : { en: 'On its way', ur: 'راستے میں' };
+}
+
+/**
+ * An affiliate's own page, /a/<secret> (MKT-08, ADR-899): their link, code and share, what their
+ * orders came to and earned, what the shop paid them and owes, and their latest orders by number
+ * and stage, nothing of their customers. In English and Urdu.
+ */
+export function affiliatePage(view: AffiliatePageView): LinkPage {
+  if (view.kind === 'not_found') return notFoundPage();
+  const { shop, stats } = view;
+  const currency = view.currency as CurrencyCode;
+  const rs = (value: bigint) => amount(value, currency);
+  const row = (label: Words, value: HtmlValue, className = '') =>
+    html`<tr class="${className}">
+      <td>${say('bilingual', label)}</td>
+      <td class="num">${value}</td>
+    </tr>`;
+  const share = `${view.commissionBps / 100}%`;
+  return page(200, `${view.name} · ${shop.name}`, shop, [
+    shopName(shop),
+    heading({ en: `Your sales for ${shop.name}`, ur: `${shop.name} کے لیے آپ کی سیل` }),
+    paragraphs({ en: text(view.name), ur: text(view.name) }, 'center muted'),
+    view.ended &&
+      banner({
+        en: 'The shop ended your part. Orders placed before it still earn once delivered.',
+        ur: 'دکان نے آپ کا حصہ ختم کر دیا ہے۔ اس سے پہلے کے آرڈر ڈیلیور ہونے پر اب بھی کماتے ہیں۔',
+      }),
+    html`<section class="section">
+      <h2 class="label">
+        ${say('bilingual', { en: 'Your link and code', ur: 'آپ کا لنک اور کوڈ' })}
+      </h2>
+      <table>
+        ${view.link && row({ en: 'Link', ur: 'لنک' }, html`<code dir="ltr">${text(view.link)}</code>`)}
+        ${view.discountCode && row({ en: 'Code', ur: 'کوڈ' }, ltr(view.discountCode))}
+        ${row({ en: 'Your share', ur: 'آپ کا حصہ' }, ltr(share))}
+      </table>
+    </section>`,
+    html`<section class="section">
+      <h2 class="label">
+        ${say('bilingual', { en: 'What you brought', ur: 'آپ کے لائے ہوئے آرڈر' })}
+      </h2>
+      <table>
+        ${row({ en: 'Orders', ur: 'آرڈر' }, ltr(String(stats.orders)))}
+        ${row({ en: 'Delivered', ur: 'ڈیلیور ہوئے' }, ltr(String(stats.delivered)))}
+        ${row({ en: 'Sales delivered', ur: 'ڈیلیور ہوئی سیل' }, ltr(rs(stats.sales)))}
+        ${row({ en: 'Earned', ur: 'کمایا' }, ltr(rs(stats.earned)))}
+        ${row({ en: 'Earned once delivered', ur: 'ڈیلیور ہونے پر کمائیں گے' }, ltr(rs(stats.pending)))}
+        ${row({ en: 'Paid to you', ur: 'آپ کو ادا ہوا' }, ltr(rs(stats.paid)))}
+        ${row({ en: 'Owed to you', ur: 'آپ کا بقایا' }, ltr(rs(stats.owed)), 'total')}
+      </table>
+    </section>`,
+    html`<section class="section">
+      <h2 class="label">
+        ${say('bilingual', { en: 'Your latest orders', ur: 'آپ کے تازہ آرڈر' })}
+      </h2>
+      ${
+        view.orders.length === 0
+          ? paragraphs(
+              {
+                en: 'No orders yet. Share your link or code, and they show here.',
+                ur: 'ابھی کوئی آرڈر نہیں۔ اپنا لنک یا کوڈ شیئر کریں، آرڈر یہاں نظر آئیں گے۔',
+              },
+              'muted',
+            )
+          : html`<table>
+              ${view.orders.map(
+                (order) =>
+                  html`<tr>
+                    <td>
+                      ${ltr(orderName(order.number))} ·
+                      ${say('bilingual', affiliateStageWords(order.stage))}
+                      <br /><span class="small"
+                        >${ltr(
+                          order.placedAt.toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            timeZone: shop.timezone,
+                          }),
+                        )}</span
+                      >
+                    </td>
+                    <td class="num">${ltr(rs(order.commission))}</td>
+                  </tr>`,
+              )}
+            </table>`
+      }
+    </section>`,
+  ]);
 }

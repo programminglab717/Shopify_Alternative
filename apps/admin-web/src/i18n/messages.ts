@@ -5415,6 +5415,11 @@ const en = {
   'affiliates.payoutNoteHint': 'How you paid: JazzCash, bank transfer, cash',
   'affiliates.showActivity': 'Orders and payouts',
   'affiliates.edit': 'Edit',
+  'affiliates.pageMake': 'Link to their own page',
+  'affiliates.pageOnce':
+    'Their page shows their link, code, figures and latest orders, nothing of your customers. This link is shown once; a new one stops it.',
+  'affiliates.pageSend': 'Send on WhatsApp',
+  'affiliates.pageMessage': 'Your sales and earnings with us, as they stand: {url}',
   'affiliates.end': 'End their part',
   'affiliates.resume': 'Take them back',
   'affiliates.orders': 'Their latest orders',
@@ -12480,6 +12485,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'affiliates.payoutNoteHint': 'کیسے ادا کیا: جاز کیش، بینک ٹرانسفر، نقد',
   'affiliates.showActivity': 'آرڈر اور ادائیگیاں',
   'affiliates.edit': 'تبدیل کریں',
+  'affiliates.pageMake': 'ان کے اپنے صفحے کا لنک',
+  'affiliates.pageOnce':
+    'ان کے صفحے پر ان کا لنک، کوڈ، اعداد اور تازہ آرڈر ہوتے ہیں، آپ کے گاہکوں کا کچھ نہیں۔ یہ لنک ایک بار دکھایا جاتا ہے؛ نیا لنک اسے بند کر دیتا ہے۔',
+  'affiliates.pageSend': 'واٹس ایپ پر بھیجیں',
+  'affiliates.pageMessage': 'ہمارے ساتھ آپ کی سیل اور کمائی، جیسی اب ہے: {url}',
   'affiliates.end': 'ان کا حصہ ختم کریں',
   'affiliates.resume': 'دوبارہ شامل کریں',
   'affiliates.orders': 'ان کے تازہ ترین آرڈر',

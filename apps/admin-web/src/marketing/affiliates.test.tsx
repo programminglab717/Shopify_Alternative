@@ -91,6 +91,13 @@ function affiliatesCore() {
             },
           ],
         };
+      case 'AffiliatePageLinkCreate':
+        return {
+          affiliatePageLinkCreate: {
+            url: 'https://hatti.pk/a/AbCdEfGhIjKlMnOpQrStUv',
+            userErrors: [],
+          },
+        };
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -169,5 +176,21 @@ describe('Affiliates in the admin (MKT-08, ADR-777)', () => {
       expect(sentOf(core, 'AffiliateUpdate')).toEqual([{ input: { id: 'afl_1', active: false } }]),
     );
     expect(await within(card).findByText('Ended')).toBeTruthy();
+  });
+
+  it("makes a link to an affiliate's own page, shown once, to send them on WhatsApp (ADR-899)", async () => {
+    const core = affiliatesCore();
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/marketing/affiliates');
+    const card = (await screen.findByRole('heading', { name: 'Ayesha Khan' })).closest('li')!;
+    fireEvent.click(within(card).getByRole('button', { name: 'Link to their own page' }));
+    expect(await within(card).findByText('https://hatti.pk/a/AbCdEfGhIjKlMnOpQrStUv')).toBeTruthy();
+    expect(sentOf(core, 'AffiliatePageLinkCreate')).toEqual([{ id: 'afl_1' }]);
+    const send = within(card).getByRole('link', { name: 'Send on WhatsApp' });
+    expect(send.getAttribute('href')).toBe(
+      `https://wa.me/923001234567?text=${encodeURIComponent(
+        'Your sales and earnings with us, as they stand: https://hatti.pk/a/AbCdEfGhIjKlMnOpQrStUv',
+      )}`,
+    );
   });
 });

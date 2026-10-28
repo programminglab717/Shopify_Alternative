@@ -645,6 +645,23 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     });
     const denied = await gql(tokens.products, '{ affiliates { id } }', {});
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+
+    // Their own page, at a link made for them (ADR-899), private to whoever holds it.
+    const made = await gql(
+      tokens.marketing,
+      `mutation ($id: ID!) { affiliatePageLinkCreate(id: $id) { url userErrors { code } } }`,
+      { id: affiliate.id },
+    );
+    const url = new URL(made.data?.affiliatePageLinkCreate.url);
+    expect(url.pathname).toMatch(/^\/a\/[A-Za-z0-9_-]{22}$/);
+    const shown = await app.inject({ method: 'GET', url: url.pathname });
+    expect(shown.statusCode).toBe(200);
+    expect(shown.headers['cache-control']).toBe('no-store');
+    expect(shown.body).toContain('AYESHA10');
+    expect(shown.body).toContain('Rs 1,000');
+    expect((await app.inject({ method: 'GET', url: '/a/AbCdEfGhIjKlMnOpQrStUv' })).statusCode).toBe(
+      404,
+    );
   });
   it('takes a wholesale order on payment terms, shipping first and owed until paid (CUS-06, ADR-888)', async () => {
     const product = (

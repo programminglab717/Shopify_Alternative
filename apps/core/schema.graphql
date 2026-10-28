@@ -256,6 +256,14 @@ enum AffiliateOrderSource {
   LINK
 }
 
+type AffiliatePageLinkCreatePayload {
+  """
+  The new link to the affiliate's own page, to send them: it is shown this once, and the link before it no longer works.
+  """
+  url: String
+  userErrors: [UserError!]!
+}
+
 """What the shop recorded paying an affiliate."""
 type AffiliatePayout {
   amount: Money!
@@ -9829,6 +9837,11 @@ type Mutation {
   Adds an affiliate: their link is the storefront with ?ref= and their `ref`, and orders placed with their discount code are theirs too. Only orders placed from now count.
   """
   affiliateCreate(input: AffiliateCreateInput!): AffiliateCreatePayload!
+
+  """
+  Makes a link to an affiliate's own page (ADR-899), for the shop to send them: their link, code and share, their figures and latest orders, nothing of their customers. The link before it no longer works.
+  """
+  affiliatePageLinkCreate(id: ID!): AffiliatePageLinkCreatePayload!
 
   """
   Records that the shop paid an affiliate, as it did it: what is owed them goes down by it.

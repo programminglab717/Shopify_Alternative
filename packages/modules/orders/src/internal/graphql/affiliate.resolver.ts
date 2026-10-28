@@ -1,4 +1,11 @@
-import { CurrentTenant, Money, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import {
+  CurrentTenant,
+  Money,
+  PublicSite,
+  RequireScopes,
+  UserError,
+  type TenantContext,
+} from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
@@ -15,6 +22,7 @@ import {
   AffiliateCreatePayload,
   AffiliateOrder,
   AffiliateOrderSource,
+  AffiliatePageLinkCreatePayload,
   AffiliatePayout,
   AffiliatePayoutRecordInput,
   AffiliatePayoutRecordPayload,
@@ -31,7 +39,10 @@ import { uuidOf } from './mappers.js';
  */
 @Resolver()
 export class AffiliateResolver {
-  constructor(private readonly service: AffiliatesService) {}
+  constructor(
+    private readonly service: AffiliatesService,
+    private readonly site: PublicSite,
+  ) {}
 
   @Query(() => [Affiliate], {
     description:
@@ -93,6 +104,24 @@ export class AffiliateResolver {
     const result = await this.service.create(tenant, input);
     return Object.assign(new AffiliateCreatePayload(), {
       affiliate: result.ok ? toAffiliate(tenant, withoutOrders(result.value)) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => AffiliatePageLinkCreatePayload, {
+    description:
+      "Makes a link to an affiliate's own page (ADR-899), for the shop to send them: their " +
+      'link, code and share, their figures and latest orders, nothing of their customers. The ' +
+      'link before it no longer works.',
+  })
+  @RequireScopes('write_marketing_events')
+  async affiliatePageLinkCreate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<AffiliatePageLinkCreatePayload> {
+    const result = await this.service.pageLink(tenant, uuidOf('affiliate', id));
+    return Object.assign(new AffiliatePageLinkCreatePayload(), {
+      url: result.ok ? this.site.url(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { CircleOff, Copy, Handshake, Link2, Tag } from 'lucide-react';
+import { CircleOff, Copy, Handshake, Link2, MessageCircle, Tag } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -8,6 +8,7 @@ import {
   AffiliatePayoutRecordMutation,
   AffiliateUpdateMutation,
   AffiliatesQuery,
+  AffiliatePageLinkCreateMutation,
 } from '../api/operations';
 import type {
   AffiliateActivityData,
@@ -300,6 +301,75 @@ function Activity({ affiliate }: { affiliate: AffiliateValue }) {
 const money = (value: MoneyValue) => formatMoney(value.amount, value.currencyCode);
 
 /** An affiliate: their link and code, their figures, and what can be done. */
+/**
+ * A link to the affiliate's own page of their figures (ADR-899), made when asked and shown this
+ * once, to copy or send them on WhatsApp; a new one stops the one before.
+ */
+function PageLink({ affiliate }: { affiliate: AffiliateValue }) {
+  const { t } = useLocale();
+  const create = useAdminMutation<
+    { affiliatePageLinkCreate: { url: string | null; userErrors: UserError[] } },
+    { id: string }
+  >(AffiliatePageLinkCreateMutation);
+  const [url, setUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const make = async () => {
+    setProblem(null);
+    setCopied(false);
+    try {
+      const { affiliatePageLinkCreate } = await create.mutateAsync({ id: affiliate.id });
+      const error = affiliatePageLinkCreate.userErrors[0];
+      if (error) setProblem(userErrorText(error, t));
+      else setUrl(affiliatePageLinkCreate.url);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+  const whatsApp = url
+    ? `https://wa.me/${(affiliate.phone ?? '').replace(/\D/g, '')}?text=${encodeURIComponent(
+        t('affiliates.pageMessage', { url }),
+      )}`
+    : null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {url ? (
+        <div className="flex flex-col gap-2 rounded-control bg-canvas p-3">
+          <p className="text-secondary">{t('affiliates.pageOnce')}</p>
+          <span dir="ltr" className="break-all font-medium">
+            {url}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="tertiary"
+              icon={<Copy aria-hidden className="size-5" />}
+              onClick={() => void navigator.clipboard?.writeText(url).then(() => setCopied(true))}
+            >
+              {copied ? t('staff.copied') : t('staff.copy')}
+            </Button>
+            <a
+              href={whatsApp!}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-10 items-center gap-2 px-2 font-medium text-primary hover:underline"
+            >
+              <MessageCircle aria-hidden className="size-5" />
+              {t('affiliates.pageSend')}
+            </a>
+          </div>
+        </div>
+      ) : (
+        <Button variant="tertiary" busy={create.isPending} onClick={() => void make()}>
+          {t('affiliates.pageMake')}
+        </Button>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
 function AffiliateCard({ affiliate, shopUrl }: { affiliate: AffiliateValue; shopUrl: string }) {
   const { t } = useLocale();
   const update = useAdminMutation<{ affiliateUpdate: AffiliatePayload }, { input: object }>(
@@ -409,6 +479,7 @@ function AffiliateCard({ affiliate, shopUrl }: { affiliate: AffiliateValue; shop
       {open === 'payout' && <PayoutForm affiliate={affiliate} onDone={() => setOpen(null)} />}
       {open === 'edit' && <AffiliateForm affiliate={affiliate} onDone={() => setOpen(null)} />}
       {open === 'activity' && <Activity affiliate={affiliate} />}
+      <PageLink affiliate={affiliate} />
     </Card>
   );
 }

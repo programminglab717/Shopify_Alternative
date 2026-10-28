@@ -12419,6 +12419,19 @@ export const AffiliateCreateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A new link to an affiliate's own page of their figures (ADR-899), shown once. */
+export const AffiliatePageLinkCreateMutation = /* GraphQL */ `
+  mutation AffiliatePageLinkCreate($id: ID!) {
+    affiliatePageLinkCreate(id: $id) {
+      url
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const AffiliateUpdateMutation = /* GraphQL */ `
   mutation AffiliateUpdate($input: AffiliateUpdateInput!) {
     affiliateUpdate(input: $input) {

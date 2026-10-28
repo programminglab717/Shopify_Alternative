@@ -15,8 +15,15 @@ import {
   Res,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { AFFILIATE_PAGE_PATH, AffiliatesService } from './affiliates.service.js';
 import { DraftOrderService } from './draft-order.service.js';
-import { draftLinkPage, orderLinkPage, trackingPage, type LinkPage } from './link-pages.js';
+import {
+  affiliatePage,
+  draftLinkPage,
+  orderLinkPage,
+  trackingPage,
+  type LinkPage,
+} from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm, type LinkClient } from './links.js';
 import { MapTiles } from './location.js';
 import { OrderLinkService, type OrderLinkView, type ReviewForm } from './order-link.service.js';
@@ -132,6 +139,20 @@ export class DraftLinkController {
  * `rating_<product>` and `body_<product>`, ADR-399) and a return they ask for (`action=return`,
  * ADR-675). As for drafts, only a POST changes anything.
  */
+/**
+ * An affiliate's own page, /a/<secret> (MKT-08, ADR-899): their figures and latest orders, as
+ * they are now. GET alone: nothing on it changes anything. The secret is the only credential.
+ */
+@Controller(AFFILIATE_PAGE_PATH)
+export class AffiliatePageController {
+  constructor(private readonly affiliates: AffiliatesService) {}
+
+  @Get(':token')
+  async show(@Param('token') token: string, @Res() reply: FastifyReply): Promise<void> {
+    await send(reply, affiliatePage(await this.affiliates.page(token)));
+  }
+}
+
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
   constructor(

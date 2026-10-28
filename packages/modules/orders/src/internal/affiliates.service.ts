@@ -1,11 +1,41 @@
-import { InputChecker, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  StorefrontSite,
+  failOne,
+  shopProfile,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { Injectable } from '@nestjs/common';
+import { ObjectStorage } from '@hatti/storage';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { OrderEvents, type AffiliateChangedPayload, type AffiliatePaidPayload } from './events.js';
+import { linkShopIn } from './link-shop.js';
+import { linkHashOf, newLinkToken, type LinkShop } from './links.js';
 import { affiliatePayouts, affiliates, type AffiliateRow } from './schema.js';
+
+/** Where affiliates' own pages are: /a/<secret> (ADR-899). */
+export const AFFILIATE_PAGE_PATH = 'a';
+
+/** What an affiliate's own page shows (ADR-899): nothing of their customers. */
+export type AffiliatePageView =
+  | { kind: 'not_found' }
+  | {
+      kind: 'page';
+      shop: LinkShop;
+      currency: string;
+      name: string;
+      /** Their link to the shop's storefront; null without a storefront to name. */
+      link: string | null;
+      discountCode: string | null;
+      commissionBps: number;
+      ended: boolean;
+      stats: AffiliateStats;
+      orders: Omit<AffiliateOrderRecord, 'orderId'>[];
+    };
 
 /** What the shop keeps of its affiliates, at most. */
 export const AFFILIATE_LIMITS = {
@@ -162,7 +192,68 @@ function toAffiliateRecord(row: AffiliateRow): AffiliateRecord {
  */
 @Injectable()
 export class AffiliatesService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** For the shop's logo on affiliates' pages; without it, its name. */
+    @Optional() private readonly storage?: ObjectStorage,
+    /** For their link on their page; without it, none. */
+    @Optional() private readonly storefronts?: StorefrontSite,
+  ) {}
+
+  /**
+   * A new secret link to an affiliate's own page (ADR-899), the one before it no longer
+   * working: its path, /a/<secret>, for the shop to send them. Hatti keeps its digest alone.
+   */
+  async pageLink(tenant: TenantContext, id: string): Promise<MutationResult<string>> {
+    const { token, hash } = newLinkToken();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [row] = await tx
+        .update(affiliates)
+        .set({ pageTokenHash: hash, updatedAt: sql`now()` })
+        .where(and(eq(affiliates.shopId, tenant.shopId), eq(affiliates.id, id)))
+        .returning({ id: affiliates.id });
+      if (!row) return failOne(['id'], 'NOT_FOUND', 'Affiliate not found');
+      await appendEvent<AffiliateChangedPayload>(tx, tenant.shopId, {
+        type: OrderEvents.AffiliateUpdated,
+        aggregateType: 'affiliate',
+        aggregateId: id,
+        payload: { changed: ['pageLink'] },
+      });
+      return { ok: true, value: `/${AFFILIATE_PAGE_PATH}/${token}` };
+    });
+  }
+
+  /** What the affiliate behind a page's secret sees (ADR-899), as it is now. */
+  async page(token: string): Promise<AffiliatePageView> {
+    const hash = linkHashOf(token);
+    if (!hash) return { kind: 'not_found' };
+    const { rows } = await this.db.app.execute<{ shop_id: string; affiliate_id: string }>(
+      sql`SELECT * FROM orders.resolve_affiliate_page(${hash})`,
+    );
+    const found = rows[0];
+    if (!found) return { kind: 'not_found' };
+    const tenant = { shopId: found.shop_id } as TenantContext;
+    const report = (await this.list(tenant)).find((each) => each.id === found.affiliate_id);
+    if (!report) return { kind: 'not_found' };
+    const orders = await this.orders(tenant, report.id);
+    return this.db.tenant(found.shop_id, async (tx) => {
+      const profile = await shopProfile(tx, found.shop_id);
+      return {
+        kind: 'page' as const,
+        shop: await linkShopIn(tx, found.shop_id, this.storage),
+        currency: profile.currency,
+        name: report.name,
+        link: this.storefronts
+          ? `${this.storefronts.url(profile.handle)}/?ref=${report.ref}`
+          : null,
+        discountCode: report.discountCode,
+        commissionBps: report.commissionBps,
+        ended: report.endedAt !== null,
+        stats: report.stats,
+        orders: orders.map(({ orderId: _orderId, ...order }) => order),
+      };
+    });
+  }
 
   async create(
     tenant: TenantContext,

@@ -895,6 +895,8 @@ export const affiliates = ordersSchema.table(
     commissionBps: integer('commission_bps').notNull(),
     /** When the shop ended their part; orders placed after it earn them nothing. */
     endedAt: timestamp('ended_at', { withTimezone: true }),
+    /** The digest of their own page's secret (ADR-899); null until the shop makes one. */
+    pageTokenHash: bytea('page_token_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
