@@ -40,6 +40,7 @@ export {
 export {
   COPILOT_LIMITS,
   readCopilotRequest,
+  type BroadcastDraft,
   type CopilotChoices,
   type CopilotReading,
   type CopilotSegmentField,

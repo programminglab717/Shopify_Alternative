@@ -10,6 +10,7 @@ import {
   Args,
   Field,
   Float,
+  GraphQLISODateTime,
   Int,
   Mutation,
   ObjectType,
@@ -25,8 +26,16 @@ import { ReportAnswer } from './report-question.resolver.js';
 export enum CopilotDraftKind {
   DISCOUNT = 'DISCOUNT',
   SEGMENT = 'SEGMENT',
+  BROADCAST = 'BROADCAST',
   REPORT = 'REPORT',
 }
+
+export enum CopilotBroadcastChannel {
+  WHATSAPP = 'WHATSAPP',
+  SMS = 'SMS',
+}
+
+registerEnumType(CopilotBroadcastChannel, { name: 'CopilotBroadcastChannel' });
 
 registerEnumType(CopilotDraftKind, {
   name: 'CopilotDraftKind',
@@ -99,6 +108,34 @@ export class CopilotSegmentDraft {
   customers!: number;
 }
 
+@ObjectType({
+  description:
+    'A broadcast as the copilot drafted it (ADR-896), for staff to make with broadcastCreate: ' +
+    'its WhatsApp template chosen as they confirm it, and its audience saved as a segment first.',
+})
+export class CopilotBroadcastDraft {
+  @Field()
+  name!: string;
+
+  @Field(() => CopilotBroadcastChannel)
+  channel!: CopilotBroadcastChannel;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Who it goes to, in the segment query language; null for everyone who agreed.',
+  })
+  query!: string | null;
+
+  @Field(() => Int, { nullable: true, description: 'Customers the query matches now.' })
+  customers!: number | null;
+
+  @Field(() => String, { nullable: true, description: "For SMS, the shop's words." })
+  text!: string | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'Null for now.' })
+  sendAt!: Date | null;
+}
+
 @ObjectType({ description: 'A draft for staff to confirm, or a report already run.' })
 export class CopilotDraft {
   @Field(() => CopilotDraftKind)
@@ -109,6 +146,9 @@ export class CopilotDraft {
 
   @Field(() => CopilotSegmentDraft, { nullable: true })
   segment!: CopilotSegmentDraft | null;
+
+  @Field(() => CopilotBroadcastDraft, { nullable: true })
+  broadcast!: CopilotBroadcastDraft | null;
 
   @Field(() => ReportAnswer, { nullable: true })
   report!: ReportAnswer | null;
@@ -133,6 +173,14 @@ function toDraft(draft: Draft, currency: TenantContext['currency']): CopilotDraf
         ? Object.assign(new CopilotSegmentDraft(), {
             name: draft.name,
             query: draft.query,
+            customers: draft.customers,
+          })
+        : null,
+    broadcast:
+      draft.kind === 'broadcast'
+        ? Object.assign(new CopilotBroadcastDraft(), {
+            ...draft.broadcast,
+            channel: draft.broadcast.channel.toUpperCase() as CopilotBroadcastChannel,
             customers: draft.customers,
           })
         : null,
@@ -171,8 +219,8 @@ export class CopilotResolver {
   @Mutation(() => CopilotDraftPayload, {
     description:
       'Drafts what a request asks for, such as "Eid ke liye 15% off code bana do" or "customers ' +
-      'in Lahore who ordered twice": a discount code or a segment for staff to confirm, or a ' +
-      'report, run. The AI sees the request, the segment fields and the report choices, never ' +
+      'in Lahore who ordered twice": a discount code, a segment or a broadcast for staff to ' +
+      'confirm, or a report, run. The AI sees the request, the segment fields and the report choices, never ' +
       `the shop's data. ${COPILOT_DAILY} a day; each draft spends an AI credit.`,
   })
   @RequireScopes('read_orders')

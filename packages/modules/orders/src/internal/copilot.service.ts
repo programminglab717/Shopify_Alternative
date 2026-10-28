@@ -2,6 +2,7 @@ import {
   AiGateway,
   COPILOT_LIMITS,
   readCopilotRequest,
+  type BroadcastDraft,
   type CopilotReading,
   type DiscountDraft,
 } from '@hatti/ai';
@@ -25,11 +26,11 @@ import {
 } from './custom-reports.js';
 import { reportChoicesOf } from './report-questions.js';
 
-// The merchant copilot (AI-01, ADR-894): staff ask in English, Urdu or Roman Urdu, and the AI reads
-// the request alone, with the segment fields and report choices, into a draft of a discount code,
-// a customer segment or a report. Hatti checks the draft: a segment's query compiles and is
-// counted, a report is run. Nothing is made here: staff confirm a discount or segment through
-// the admin's own mutations. Fifty a day at most, each kept with what it cost; each draft spends
+// The merchant copilot (AI-01, ADR-894, ADR-896): staff ask in English, Urdu or Roman Urdu, and
+// the AI reads the request alone, with the segment fields and report choices, into a draft of a
+// discount code, a customer segment, a broadcast or a report. Hatti checks the draft: a segment's
+// or broadcast's query compiles and is counted, a report is run. Nothing is made here: staff
+// confirm a discount, segment or broadcast through the admin's own mutations. Fifty a day at most, each kept with what it cost; each draft spends
 // an AI credit.
 
 export const COPILOT_DAILY = 50;
@@ -38,6 +39,8 @@ export const COPILOT_DAILY = 50;
 export type CopilotDraft =
   | { kind: 'discount'; discount: DiscountDraft }
   | { kind: 'segment'; name: string; query: string; customers: number }
+  /** `customers` its query matches now; null for everyone who agreed to hear. */
+  | { kind: 'broadcast'; broadcast: BroadcastDraft; customers: number | null }
   | {
       kind: 'report';
       breakdown: ReportBreakdown;
@@ -138,6 +141,16 @@ export class CopilotService {
     return checked!;
   }
 
+  /** The customers `query` matches now; null where it does not compile. */
+  async #count(tenant: TenantContext, query: string): Promise<number | null> {
+    try {
+      return await this.segments.count(tenant, query);
+    } catch (error) {
+      if (!(error instanceof SegmentQueryError)) throw error;
+      return null;
+    }
+  }
+
   /** A reading checked into a draft: a segment compiled and counted, a report run. */
   async #check(
     tenant: TenantContext,
@@ -150,22 +163,24 @@ export class CopilotService {
         return null;
       case 'discount':
         return { ok: true, value: reading };
-      case 'segment':
-        try {
-          const customers = await this.segments.count(tenant, reading.query);
-          return {
-            ok: true,
-            value: { kind: 'segment', name: reading.name, query: reading.query, customers },
-          };
-        } catch (error) {
-          if (!(error instanceof SegmentQueryError)) throw error;
-          return failOne(
-            ['request'],
-            'INVALID',
-            'The copilot could not write that segment from the fields there are: say it ' +
-              'another way, or make it on the segments page',
-          );
+      case 'segment': {
+        const customers = await this.#count(tenant, reading.query);
+        return customers === null
+          ? unwritten
+          : {
+              ok: true,
+              value: { kind: 'segment', name: reading.name, query: reading.query, customers },
+            };
+      }
+      case 'broadcast': {
+        const { broadcast } = reading;
+        if (broadcast.sendAt && broadcast.sendAt.getTime() < now.getTime()) {
+          return failOne(['request'], 'INVALID', 'That time has passed: say a time to come');
         }
+        const customers = broadcast.query ? await this.#count(tenant, broadcast.query) : null;
+        if (broadcast.query && customers === null) return unwritten;
+        return { ok: true, value: { kind: 'broadcast', broadcast, customers } };
+      }
       case 'report': {
         const breakdown = reading.breakdown as ReportBreakdown;
         const period = reading.period as ReportPeriod;
@@ -191,6 +206,14 @@ export class CopilotService {
     }
   }
 }
+
+/** A segment or audience the model wrote that does not check against the shop's fields. */
+const unwritten: MutationResult<never> = failOne<never>(
+  ['request'],
+  'INVALID',
+  'The copilot could not write who that is from the fields there are: say it another way, or ' +
+    'make the segment on the segments page',
+);
 
 /** How many requests the shop made of the copilot in the day before `now`. */
 async function requestsSince(tx: Tx, shopId: string, now: Date): Promise<number> {

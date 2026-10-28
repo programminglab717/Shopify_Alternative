@@ -12722,6 +12722,14 @@ export const CopilotDraftMutation = /* GraphQL */ `
           query
           customers
         }
+        broadcast {
+          name
+          channel
+          query
+          customers
+          text
+          sendAt
+        }
         report {
           breakdown
           columns

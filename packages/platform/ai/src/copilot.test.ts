@@ -131,4 +131,53 @@ describe("The merchant copilot's drafts (AI-01, ADR-894)", () => {
     });
     expect((await read({ kind: 'delete_everything' })).ok).toBe(false);
   });
+
+  it('drafts a broadcast, its time in Pakistan, SMS with its words, and refuses one past its limits (ADR-896)', async () => {
+    expect(
+      await read({
+        kind: 'broadcast',
+        broadcast: {
+          name: 'Eid sale',
+          audience_query: "city = 'Lahore'",
+          send_at: '2027-03-05T18:30',
+          text: 'ignored for WhatsApp',
+        },
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        kind: 'broadcast',
+        broadcast: {
+          name: 'Eid sale',
+          channel: 'whatsapp',
+          query: "city = 'Lahore'",
+          text: null,
+          sendAt: new Date('2027-03-05T13:30:00Z'),
+        },
+      },
+    });
+    expect(
+      await read({
+        kind: 'broadcast',
+        broadcast: { name: 'Sale', channel: 'sms', text: 'Kal sale hai! 20% off' },
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        broadcast: { channel: 'sms', text: 'Kal sale hai! 20% off', query: null, sendAt: null },
+      },
+    });
+    for (const broadcast of [
+      { name: 'Sale', channel: 'sms' },
+      { name: 'Sale', channel: 'sms', text: 'x'.repeat(321) },
+      { name: 'Sale', send_at: '2027-02-20T10:00' },
+      { name: 'Sale', send_at: '2027-04-15T10:00' },
+      { name: 'Sale', send_at: '2027-03-05T25:00' },
+      { name: '' },
+    ]) {
+      expect((await read({ kind: 'broadcast', broadcast })).ok, JSON.stringify(broadcast)).toBe(
+        false,
+      );
+    }
+  });
 });

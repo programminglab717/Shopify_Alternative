@@ -4,25 +4,40 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ReportTable } from '../analytics/custom-reports';
 import {
+  BroadcastCreateMutation,
   CopilotDraftMutation,
   CopilotQuery,
   DiscountCodeCreateMutation,
   SegmentCreateMutation,
+  WhatsAppTemplatesQuery,
 } from '../api/operations';
 import type {
+  BroadcastInput,
+  CopilotBroadcastDraft,
   CopilotData,
   CopilotDiscountDraft,
   CopilotDraftData,
   CopilotDraftValue,
+  MessageLanguage,
   UserError,
+  WhatsAppTemplatesData,
 } from '../api/types';
 import { permits } from '../auth/permissions';
 import { KEEPS_SEGMENTS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
+import { MARKETS, SMS_TEXT_MAX } from '../marketing/broadcasts-page';
 import { errorText } from '../i18n/errors';
-import { endOfDayIn, formatCount, formatDate, formatMoney, startOfDayIn } from '../i18n/format';
+import {
+  endOfDayIn,
+  formatCount,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  startOfDayIn,
+} from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card } from '../ui/feedback';
@@ -203,6 +218,175 @@ function SegmentDraft({
   );
 }
 
+/** Words in Urdu's script are Urdu; SMS adds its own words in that language. */
+const languageOf = (text: string): MessageLanguage => (/[\u0600-\u06FF]/.test(text) ? 'UR' : 'EN');
+
+/**
+ * A drafted broadcast (ADR-896): its name changed as staff like, its WhatsApp template chosen
+ * from those approved, or its SMS words; its audience saved as a segment first, then it is made.
+ */
+function BroadcastDraft({
+  broadcast,
+  onDone,
+}: {
+  broadcast: CopilotBroadcastDraft;
+  onDone: () => void;
+}) {
+  const { t, locale } = useLocale();
+  const shop = useShop();
+  const timezone = useShopTimezone();
+  const sms = broadcast.channel === 'SMS';
+  const templates = useAdminQuery<WhatsAppTemplatesData>(
+    ['whatsAppTemplates'],
+    WhatsAppTemplatesQuery,
+    undefined,
+    { enabled: !sms },
+  );
+  const segment = useAdminMutation<Made, { name: string; query: string }>(SegmentCreateMutation);
+  const create = useAdminMutation<Made, { input: BroadcastInput }>(BroadcastCreateMutation);
+  const [name, setName] = useState(broadcast.name);
+  const [text, setText] = useState(broadcast.text ?? '');
+  const [templateId, setTemplateId] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [made, setMade] = useState(false);
+  // A segment saved before a broadcast refused is not saved twice.
+  const [segmentId, setSegmentId] = useState<string | null>(null);
+  const approved = (templates.data?.whatsAppTemplates ?? []).filter(
+    (each) => each.status === 'APPROVED',
+  );
+  const chosen = approved.find((each) => each.id === templateId) ?? approved[0] ?? null;
+  const ready = Boolean(name.trim()) && (sms ? Boolean(text.trim()) : chosen !== null);
+  const may = permits(shop, MARKETS) && (!broadcast.query || permits(shop, KEEPS_SEGMENTS));
+
+  const confirm = async () => {
+    setProblem(null);
+    try {
+      let audience = segmentId;
+      if (broadcast.query && !audience) {
+        const { segmentCreate } = await segment.mutateAsync({
+          name: name.trim(),
+          query: broadcast.query,
+        });
+        const error = segmentCreate!.userErrors[0];
+        if (error) {
+          setProblem(error.message);
+          return;
+        }
+        audience = (segmentCreate!.segment as { id: string }).id;
+        setSegmentId(audience);
+      }
+      const { broadcastCreate } = await create.mutateAsync({
+        input: sms
+          ? {
+              name: name.trim(),
+              channel: 'SMS',
+              text: text.trim(),
+              language: languageOf(text),
+              segmentId: audience,
+              sendAt: broadcast.sendAt,
+            }
+          : {
+              name: name.trim(),
+              templateId: chosen!.id,
+              segmentId: audience,
+              sendAt: broadcast.sendAt,
+            },
+      });
+      const error = broadcastCreate!.userErrors[0];
+      if (error) setProblem(error.message);
+      else setMade(true);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="font-medium">
+        {t(sms ? 'copilot.broadcastDraftSms' : 'copilot.broadcastDraft')}
+      </p>
+      <TextField
+        label={t('copilot.broadcastName')}
+        value={name}
+        maxLength={100}
+        dir="auto"
+        onChange={(event) => setName(event.target.value)}
+      />
+      <p className="text-secondary">
+        {broadcast.query
+          ? t('copilot.broadcastTo', { count: formatCount(broadcast.customers ?? 0) })
+          : t('copilot.broadcastToAll')}
+        {' · '}
+        {broadcast.sendAt
+          ? t('copilot.broadcastAt', { when: formatDateTime(broadcast.sendAt, timezone, locale) })
+          : t('copilot.broadcastNow')}
+      </p>
+      {broadcast.query && (
+        <code
+          dir="ltr"
+          className="rounded-control bg-canvas p-2 text-[length:var(--hatti-type-body-sm-size)]"
+        >
+          {broadcast.query}
+        </code>
+      )}
+      {sms ? (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="copilot-sms" className="font-medium">
+            {t('broadcasts.text')}
+          </label>
+          <textarea
+            id="copilot-sms"
+            value={text}
+            rows={3}
+            dir="auto"
+            maxLength={SMS_TEXT_MAX}
+            onChange={(event) => setText(event.target.value)}
+            className="rounded-control border border-line bg-surface px-3 py-2 text-text"
+          />
+        </div>
+      ) : templates.isPending ? null : chosen ? (
+        <>
+          <SelectField<string>
+            label={t('broadcasts.template')}
+            value={chosen.id}
+            options={approved.map((each) => ({ value: each.id, label: each.name }))}
+            onChange={setTemplateId}
+          />
+          <p
+            className="whitespace-pre-line rounded-control border border-line bg-canvas p-3"
+            dir="auto"
+          >
+            {chosen.body}
+          </p>
+        </>
+      ) : (
+        <Alert tone="warning">{t('broadcasts.noTemplate')}</Alert>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      {made ? (
+        <Alert tone="success">
+          {t('copilot.broadcastMade', { name: name.trim() })}{' '}
+          <Link
+            to="/$shopId/marketing"
+            params={{ shopId: shop.id }}
+            className="font-medium underline"
+          >
+            {t('copilot.seeBroadcasts')}
+          </Link>
+        </Alert>
+      ) : (
+        <Actions
+          can={may && ready}
+          confirm={t(broadcast.sendAt ? 'copilot.scheduleBroadcast' : 'copilot.sendBroadcast')}
+          busy={segment.isPending || create.isPending}
+          onConfirm={() => void confirm()}
+          onDone={onDone}
+        />
+      )}
+    </div>
+  );
+}
+
 /** Confirm, where staff may make it, or let the draft go. */
 function Actions({
   can,
@@ -231,8 +415,9 @@ function Actions({
 }
 
 /**
- * The merchant copilot (AI-01, ADR-894): a request in English, Urdu or Roman Urdu drafted into a
- * discount code or segment, which staff confirm before it is made, or a report, run. Shown only
+ * The merchant copilot (AI-01, ADR-894, ADR-896): a request in English, Urdu or Roman Urdu drafted
+ * into a discount code, segment or broadcast, which staff confirm before it is made, or a report,
+ * run. Shown only
  * where Hatti's AI is set up.
  */
 export function Copilot() {
@@ -291,6 +476,7 @@ export function Copilot() {
         {problem && <Alert tone="warning">{problem}</Alert>}
         {draft?.discount && <DiscountDraft discount={draft.discount} onDone={done} />}
         {draft?.segment && <SegmentDraft segment={draft.segment} onDone={done} />}
+        {draft?.broadcast && <BroadcastDraft broadcast={draft.broadcast} onDone={done} />}
         {draft?.report && (
           <div className="flex flex-col gap-2">
             <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">

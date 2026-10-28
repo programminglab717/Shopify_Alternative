@@ -6206,10 +6206,22 @@ export interface CopilotDiscountDraft {
   usageLimit: number | null;
 }
 
+/** A broadcast as the copilot drafted it (ADR-896): its template chosen as staff confirm it. */
+export interface CopilotBroadcastDraft {
+  name: string;
+  channel: BroadcastChannel;
+  /** Who it goes to; null for everyone who agreed to hear. */
+  query: string | null;
+  customers: number | null;
+  text: string | null;
+  sendAt: string | null;
+}
+
 export interface CopilotDraftValue {
-  kind: 'DISCOUNT' | 'SEGMENT' | 'REPORT';
+  kind: 'DISCOUNT' | 'SEGMENT' | 'BROADCAST' | 'REPORT';
   discount: CopilotDiscountDraft | null;
   segment: { name: string; query: string; customers: number } | null;
+  broadcast: CopilotBroadcastDraft | null;
   report: NonNullable<ReportQuestionAskData['reportQuestionAsk']['answer']> | null;
 }
 

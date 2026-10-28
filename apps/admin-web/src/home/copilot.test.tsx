@@ -23,6 +23,21 @@ const DISCOUNT = {
   report: null,
 };
 
+const BROADCAST = {
+  kind: 'BROADCAST',
+  discount: null,
+  segment: null,
+  broadcast: {
+    name: 'Lahore Eid sale',
+    channel: 'WHATSAPP',
+    query: "city = 'Lahore'",
+    customers: 40,
+    text: null,
+    sendAt: '2026-11-01T04:00:00.000Z',
+  },
+  report: null,
+};
+
 const SEGMENT = {
   kind: 'SEGMENT',
   discount: null,
@@ -36,7 +51,7 @@ const SEGMENT = {
 
 /** Home with nothing to do, the copilot set up, drafting each request as `drafts` says. */
 function core(role: StaffRole, drafts: Record<string, object>, available = true) {
-  return fakeCore(role, (operation, variables) => {
+  const fake = fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'SetupChecklist':
         return { setupChecklist: { done: 8, total: 8, steps: [] } };
@@ -61,6 +76,29 @@ function core(role: StaffRole, drafts: Record<string, object>, available = true)
         return { discountCodeCreate: { discountCode: { id: 'disc_1' }, userErrors: [] } };
       case 'SegmentCreate':
         return { segmentCreate: { segment: { id: 'seg_1' }, userErrors: [] } };
+      case 'WhatsAppTemplates':
+        return {
+          whatsAppTemplates: [
+            {
+              id: 'tpl_1',
+              name: 'eid_sale',
+              language: 'UR',
+              status: 'APPROVED',
+              body: 'Eid Mubarak! Sale shuru',
+            },
+            { id: 'tpl_2', name: 'draft_one', language: 'EN', status: 'PENDING', body: 'Not yet' },
+          ],
+        };
+      case 'BroadcastCreate':
+        // Refused once, as broadcasts are when the shop's number is not ready, then made.
+        return fake.sent.filter((each) => each.operation === 'BroadcastCreate').length === 1
+          ? {
+              broadcastCreate: {
+                broadcast: null,
+                userErrors: [{ field: ['input'], code: 'INVALID', message: 'Number not ready' }],
+              },
+            }
+          : { broadcastCreate: { broadcast: { id: 'bc_1' }, userErrors: [] } };
       case 'Home':
         return {
           shop: { timezone: 'Asia/Karachi' },
@@ -95,6 +133,7 @@ function core(role: StaffRole, drafts: Record<string, object>, available = true)
         throw new Error(`unexpected ${operation}`);
     }
   });
+  return fake;
 }
 
 const sentOf = (fake: ReturnType<typeof core>, operation: string) =>
@@ -166,6 +205,39 @@ describe('The merchant copilot on Home (AI-01, ADR-894)', () => {
     type('What should Hatti draft?', 'sab ko message bhejo');
     await press('Draft it');
     expect(await screen.findByText('Copilot messages nahi bhejta')).toBeTruthy();
+  });
+
+  it('drafts a broadcast, its audience saved once as a segment, its approved template chosen (ADR-896)', async () => {
+    const fake = core('marketer', { 'Lahore walon ko Eid sale ka message': BROADCAST });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1');
+    await screen.findByLabelText('What should Hatti draft?');
+    type('What should Hatti draft?', 'Lahore walon ko Eid sale ka message');
+    await press('Draft it');
+    expect(await screen.findByText('A WhatsApp broadcast')).toBeTruthy();
+    expect(
+      screen.getByText(
+        /^To the 40 customers this group matches who agreed to hear · goes 1 Nov 2026/,
+      ),
+    ).toBeTruthy();
+    expect(await screen.findByText('Eid Mubarak! Sale shuru')).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'eid_sale' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'draft_one' })).toBeNull();
+    await press('Schedule the broadcast');
+    expect(await screen.findByText('Number not ready')).toBeTruthy();
+    await press('Schedule the broadcast');
+    expect(await screen.findByText('Lahore Eid sale is on its way.')).toBeTruthy();
+    expect(sentOf(fake, 'SegmentCreate')).toEqual([
+      { name: 'Lahore Eid sale', query: "city = 'Lahore'" },
+    ]);
+    expect(sentOf(fake, 'BroadcastCreate').at(-1)).toEqual({
+      input: {
+        name: 'Lahore Eid sale',
+        templateId: 'tpl_1',
+        segmentId: 'seg_1',
+        sendAt: '2026-11-01T04:00:00.000Z',
+      },
+    });
   });
 
   it('lets a packer see a draft but not make it, and stays away where it is not set up', async () => {

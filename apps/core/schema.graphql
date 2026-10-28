@@ -3507,6 +3507,33 @@ type Copilot {
   usedToday: Int!
 }
 
+enum CopilotBroadcastChannel {
+  SMS
+  WHATSAPP
+}
+
+"""
+A broadcast as the copilot drafted it (ADR-896), for staff to make with broadcastCreate: its WhatsApp template chosen as they confirm it, and its audience saved as a segment first.
+"""
+type CopilotBroadcastDraft {
+  channel: CopilotBroadcastChannel!
+
+  """Customers the query matches now."""
+  customers: Int
+  name: String!
+
+  """
+  Who it goes to, in the segment query language; null for everyone who agreed.
+  """
+  query: String
+
+  """Null for now."""
+  sendAt: DateTime
+
+  """For SMS, the shop's words."""
+  text: String
+}
+
 """
 A discount code as the copilot drafted it, for staff to make with discountCodeCreate: exactly one of percentage, amount or freeShipping.
 """
@@ -3532,6 +3559,7 @@ type CopilotDiscountDraft {
 
 """A draft for staff to confirm, or a report already run."""
 type CopilotDraft {
+  broadcast: CopilotBroadcastDraft
   discount: CopilotDiscountDraft
   kind: CopilotDraftKind!
   report: ReportAnswer
@@ -3540,6 +3568,7 @@ type CopilotDraft {
 
 """What the copilot drafted (AI-01, ADR-894)."""
 enum CopilotDraftKind {
+  BROADCAST
   DISCOUNT
   REPORT
   SEGMENT
@@ -10140,7 +10169,7 @@ type Mutation {
   conversationUpdateStatus(id: ID!, status: ConversationStatus!): ConversationUpdatePayload!
 
   """
-  Drafts what a request asks for, such as "Eid ke liye 15% off code bana do" or "customers in Lahore who ordered twice": a discount code or a segment for staff to confirm, or a report, run. The AI sees the request, the segment fields and the report choices, never the shop's data. 50 a day; each draft spends an AI credit.
+  Drafts what a request asks for, such as "Eid ke liye 15% off code bana do" or "customers in Lahore who ordered twice": a discount code, a segment or a broadcast for staff to confirm, or a report, run. The AI sees the request, the segment fields and the report choices, never the shop's data. 50 a day; each draft spends an AI credit.
   """
   copilotDraft(request: String!): CopilotDraftPayload!
 

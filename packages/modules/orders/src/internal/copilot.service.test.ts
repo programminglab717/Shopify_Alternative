@@ -145,6 +145,48 @@ describe.skipIf(!server)('The merchant copilot (AI-01, ADR-894)', () => {
     ).toEqual([['base', 'TOO_MANY']]);
   });
 
+  it('drafts a broadcast, its audience counted, and refuses one whose time has passed (ADR-896)', async () => {
+    const { service, credits } = copilot((request) => ({
+      kind: 'broadcast',
+      broadcast:
+        request === 'kal subah sab ko'
+          ? { name: 'Morning sale', send_at: '2026-10-29T09:00' }
+          : request === 'aaj subah'
+            ? { name: 'Too late', send_at: '2026-10-28T09:00' }
+            : request === 'red lovers'
+              ? { name: 'Red', audience_query: 'favourite_colour = red' }
+              : {
+                  name: 'Repeat buyers',
+                  channel: 'sms',
+                  audience_query: 'number_of_orders >= 2',
+                  text: 'Eid sale kal se!',
+                },
+    }));
+    expect(unwrap(await service.draft(f.a, 'kal subah sab ko', true, NOW))).toEqual({
+      kind: 'broadcast',
+      broadcast: {
+        name: 'Morning sale',
+        channel: 'whatsapp',
+        query: null,
+        text: null,
+        sendAt: new Date('2026-10-29T04:00:00Z'),
+      },
+      customers: null,
+    });
+    expect(unwrap(await service.draft(f.a, 'repeat walon ko SMS', true, NOW))).toMatchObject({
+      broadcast: { channel: 'sms', query: 'number_of_orders >= 2', text: 'Eid sale kal se!' },
+      customers: 0,
+    });
+    // 15:00 in Pakistan on the 28th: nine in the morning has passed.
+    expect(errorsOf(await service.draft(f.a, 'aaj subah', true, NOW))).toEqual([
+      ['request', 'INVALID'],
+    ]);
+    expect(errorsOf(await service.draft(f.a, 'red lovers', true, NOW))).toEqual([
+      ['request', 'INVALID'],
+    ]);
+    expect(credits.spent).toEqual(['copilot', 'copilot']);
+  });
+
   it('runs a report drafted, and stops at the day’s limit', async () => {
     const { service } = copilot(() => ({
       kind: 'report',
