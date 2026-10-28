@@ -56,6 +56,14 @@ type AbandonedCheckoutOrder {
   name: String!
 }
 
+type AccountingJournalExportPayload {
+  """
+  "journal-2026-10-01-to-2026-10-31.csv", or "-xero.csv", "-quickbooks.csv", "-tally.xml": an entry a day. Null where refused.
+  """
+  file: OrderExportFile
+  userErrors: [UserError!]!
+}
+
 """
 A change the shop's staff or apps made (ADM-04, ADR-256): the event it recorded, by whom and to what; never what it recorded.
 """
@@ -7747,6 +7755,100 @@ type InventoryValue {
   value: Money!
 }
 
+"""An account the shop's journal posts to (ANL-10, ADR-885)."""
+enum JournalAccount {
+  """Where refunds were paid from."""
+  BANK
+
+  """Claims couriers paid; on plans with true profit."""
+  CLAIMS
+
+  """What the items kept cost."""
+  COST_OF_GOODS
+
+  """
+  What the shop and its couriers owe each other: their charges, less the claims they paid.
+  """
+  COURIERS
+
+  """Couriers' charges on their statements; on plans with true profit."""
+  COURIER_CHARGES
+
+  """Discounts given, without their tax."""
+  DISCOUNTS
+
+  """Fees for paying on delivery, without their tax."""
+  FEES
+
+  """Stock: what the items kept, and those written off, cost."""
+  INVENTORY
+
+  """
+  What the day's orders came to, owed by customers and couriers; refunds paid back to it.
+  """
+  RECEIVABLE
+
+  """Items that came back, without their tax."""
+  RETURNS
+
+  """Items at the prices sold, without their tax."""
+  SALES
+
+  """The sales tax the orders include."""
+  SALES_TAX
+
+  """Delivery charged, without its tax."""
+  SHIPPING
+
+  """Stock written off; on plans with true profit."""
+  WRITE_OFFS
+}
+
+"""What the journal is written for (ADR-885)."""
+enum JournalFormat {
+  """A line for each debit or credit, with its accounts' codes and names."""
+  CSV
+
+  """QuickBooks Online's journal entry import, by account name."""
+  QUICKBOOKS
+
+  """Tally's XML of journal vouchers, by ledger name."""
+  TALLY
+
+  """Xero's manual journal import, by account code."""
+  XERO
+}
+
+"""An account the journal posts to, as the shop's books know it."""
+type JournalLedger {
+  account: JournalAccount!
+
+  """Its code in the shop's books: what Xero posts by."""
+  code: String!
+
+  """Its name in the shop's books: what QuickBooks and Tally post by."""
+  name: String!
+
+  """Whether the shop named it; else Hatti's usual name and code."""
+  named: Boolean!
+}
+
+input JournalLedgerInput {
+  account: JournalAccount!
+
+  """At most 20 characters; blank with the name for Hatti's usual."""
+  code: String!
+
+  """At most 100 characters; blank with the code for Hatti's usual."""
+  name: String!
+}
+
+type JournalLedgersSetPayload {
+  """Every account; null where refused."""
+  journalLedgers: [JournalLedger!]
+  userErrors: [UserError!]!
+}
+
 """A licence key of a digital product: never the key, but its end."""
 type LicenceKey {
   """Its last four characters."""
@@ -9536,6 +9638,19 @@ input MoveInput {
 
 type Mutation {
   """
+  The shop's sales as a journal of debits and credits for its books (ANL-10, ADR-885): an entry for each day of the period in the shop's time zone, posting what its orders came to as salesReport has it, for Xero, QuickBooks or Tally to import, or as a CSV. True profit's lines on the plans that have them. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
+  """
+  accountingJournalExport(
+    format: JournalFormat! = CSV
+
+    """Orders placed before this; at most 366 days after placedFrom."""
+    placedBefore: DateTime!
+
+    """Orders placed at or after this."""
+    placedFrom: DateTime!
+  ): AccountingJournalExportPayload!
+
+  """
   Records what the shop spent on its ads (ADR-553), day by day, by platform and, where it says, by campaign as its links' utm_campaign names it: each replaces what that day had, and an amount of 0 takes it away. The sales report takes it off the orders' profit. At most 400 at a time, all or none.
   """
   adSpendSet(entries: [AdSpendInput!]!): AdSpendSetPayload!
@@ -10458,6 +10573,11 @@ type Mutation {
   Stock that arrived: each line's quantity added to on hand at the destination, in one adjustment with the reason "movement_received" naming the transfer, never more than is still on the way. Received in full, the transfer is RECEIVED. Needs an Idempotency-Key header.
   """
   inventoryTransferReceive(id: ID!, input: InventoryTransferReceiveInput!): InventoryTransferPayload!
+
+  """
+  Names and numbers the journal's accounts as the shop's books do (ADR-885); an account given with a blank code and name goes back to Hatti's usual. Staff need to be an owner, a manager or an accountant.
+  """
+  journalLedgersSet(accounts: [JournalLedgerInput!]!): JournalLedgersSetPayload!
 
   """Removes a licence key not yet given."""
   licenceKeyDelete(id: ID!): DigitalDeletePayload!
@@ -17118,6 +17238,11 @@ type Query {
 
   """What the shop's stock on hand is worth at what it costs the shop."""
   inventoryValue: InventoryValue!
+
+  """
+  The accounts the shop's journal posts to (ANL-10, ADR-885), as its books know them: those it named, the rest by Hatti's usual names and codes.
+  """
+  journalLedgers: [JournalLedger!]!
 
   """
   A digital product's licence keys, the latest added first: never the keys.

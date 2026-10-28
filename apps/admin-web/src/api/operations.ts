@@ -3693,6 +3693,62 @@ export const SalesReportExportMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The period's sales as a journal for the shop's books, by day (ANL-10, ADR-885). */
+export const AccountingJournalExportMutation = /* GraphQL */ `
+  mutation AccountingJournalExport(
+    $placedFrom: DateTime!
+    $placedBefore: DateTime!
+    $format: JournalFormat!
+  ) {
+    accountingJournalExport(placedFrom: $placedFrom, placedBefore: $placedBefore, format: $format) {
+      file {
+        filename
+        contentType
+        content
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+const JOURNAL_LEDGER = /* GraphQL */ `
+  fragment JournalLedgerFields on JournalLedger {
+    account
+    code
+    name
+    named
+  }
+`;
+
+/** The accounts the journal posts to, as the shop's books know them (ADR-885). */
+export const JournalLedgersQuery = /* GraphQL */ `
+  query JournalLedgers {
+    journalLedgers {
+      ...JournalLedgerFields
+    }
+  }
+  ${JOURNAL_LEDGER}
+`;
+
+/** Names and numbers the journal's accounts as the shop's books do (ADR-885). */
+export const JournalLedgersSetMutation = /* GraphQL */ `
+  mutation JournalLedgersSet($accounts: [JournalLedgerInput!]!) {
+    journalLedgersSet(accounts: $accounts) {
+      journalLedgers {
+        ...JournalLedgerFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${JOURNAL_LEDGER}
+  ${USER_ERRORS}
+`;
+
 export const SalesQuery = /* GraphQL */ `
   query Sales($placedFrom: DateTime!, $placedBefore: DateTime!, $interval: SalesInterval!) {
     salesReport(

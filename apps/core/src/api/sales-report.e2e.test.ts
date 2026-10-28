@@ -1,7 +1,9 @@
 import 'reflect-metadata';
+import { randomBytes } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
+import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { xlsxRows } from '@hatti/xlsx/testing';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
@@ -10,6 +12,18 @@ import { ADMIN_GRAPHQL_PATH } from './constants.js';
 import { startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
+
+/** A CSV's rows, its cells unquoted: those the journal writes. */
+const parseCsv = (text: string): string[][] =>
+  text
+    .replace(/^\uFEFF/, '')
+    .split('\r\n')
+    .filter((line) => line !== '')
+    .map((line) =>
+      [...line.matchAll(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)].map((cell) =>
+        cell[1]!.replace(/^"|"$/g, '').replace(/""/g, '"'),
+      ),
+    );
 
 // Responses are checked with matchers rather than static types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,6 +235,141 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     const tooLong = (await gql(tokens.owner, EXPORT, { ...period, from: '2025-01-01T00:00:00Z' }))
       .data?.salesReportExport;
     expect(tooLong).toMatchObject({ file: null, userErrors: [{ field: ['placedBefore'] }] });
+    const denied = await gql(tokens.products, EXPORT, period);
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
+  it("exports the sales as a journal for the shop's books, by its own accounts (ANL-10, ADR-885)", async () => {
+    const EXPORT = `mutation ($from: DateTime!, $before: DateTime!, $format: JournalFormat) {
+      accountingJournalExport(placedFrom: $from, placedBefore: $before, format: $format) {
+        file { filename contentType content }
+        userErrors { field code message }
+      }
+    }`;
+    const journalOf = async (token: string, format = 'CSV') => {
+      const exported = (await gql(token, EXPORT, { ...period, format })).data
+        ?.accountingJournalExport;
+      expect(exported.userErrors).toEqual([]);
+      return {
+        ...exported.file,
+        text: Buffer.from(exported.file.content, 'base64').toString('utf8'),
+      };
+    };
+    const csv = await journalOf(tokens.owner);
+    expect(csv.filename).toMatch(/^journal-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/);
+    const [heading, ...lines] = parseCsv(csv.text);
+    expect(heading).toEqual([
+      'Date',
+      'Entry',
+      'Account code',
+      'Account',
+      'Description',
+      'Debit',
+      'Credit',
+    ]);
+    // The day's orders, as the report has them: what they came to, owed; their items, sold.
+    const totals = (await gql(tokens.owner, SALES, period)).data?.salesReport.totals;
+    const posted = (account: string, column: 5 | 6) =>
+      lines
+        .filter((line) => line[3] === account)
+        .reduce((sum, line) => sum + Number(line[column] || 0), 0);
+    expect(posted('Sales', 6)).toBe(Number(totals.grossSales.amount));
+    expect(posted('Cost of goods sold', 5)).toBe(Number(totals.costOfGoods.amount));
+    const sum = (column: 5 | 6) =>
+      lines.reduce((total, line) => total + Number(line[column] || 0), 0);
+    expect(sum(5)).toBeCloseTo(sum(6), 2);
+    const tally = await journalOf(tokens.owner, 'TALLY');
+    expect(tally.filename).toMatch(/-tally\.xml$/);
+    expect(tally.text).toContain('<VOUCHER VCHTYPE="Journal" ACTION="Create">');
+
+    const LEDGERS = '{ journalLedgers { account code name named } }';
+    const ledgers = (await gql(tokens.owner, LEDGERS)).data?.journalLedgers;
+    expect(ledgers).toHaveLength(14);
+    expect(ledgers[1]).toEqual({ account: 'SALES', code: '4000', name: 'Sales', named: false });
+    const SET = `mutation ($accounts: [JournalLedgerInput!]!) {
+      journalLedgersSet(accounts: $accounts) {
+        journalLedgers { account code name named }
+        userErrors { field code message }
+      }
+    }`;
+    const online = { account: 'SALES', code: '41000', name: 'Online sales' };
+    // Apps read the accounts, but only the shop's staff name them.
+    const byApp = await gql(tokens.owner, SET, { accounts: [online] });
+    expect(byApp.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+
+    const staff = async (role: 'accountant' | 'marketer') => {
+      const email = `staff-${randomBytes(4).toString('hex')}@example.pk`;
+      const signedUp = await app.inject({
+        method: 'POST',
+        url: '/auth/sign-up',
+        payload: { email, password: 'correct horse battery staple', name: 'Sana Iqbal' },
+      });
+      const body = signedUp.json() as { accessToken: string; user: { id: string } };
+      await admin.query(
+        'INSERT INTO identity.memberships (user_id, shop_id, role) VALUES ($1, $2, $3)',
+        [fromPublicId(body.user.id, 'user'), shop, role],
+      );
+      // Accountants need two-step verification, as the staff's tests show.
+      const auth = (url: string, payload: Record<string, unknown>) =>
+        app.inject({
+          method: 'POST',
+          url,
+          payload,
+          headers: { authorization: `Bearer ${body.accessToken}` },
+        });
+      const { secret } = (await auth('/auth/two-step/totp/setup', {})).json() as {
+        secret: string;
+      };
+      await auth('/auth/two-step/totp/confirm', { code: totp(base32Decode(secret), Date.now()) });
+      return async (query: string, variables?: Record<string, unknown>) =>
+        (
+          await app.inject({
+            method: 'POST',
+            url: ADMIN_GRAPHQL_PATH,
+            headers: {
+              authorization: `Bearer ${body.accessToken}`,
+              'idempotency-key': newId(),
+              'x-hatti-shop-id': toPublicId('shop', shop),
+            },
+            payload: { query, variables },
+          })
+        ).json() as { data?: Record<string, Json> | null; errors?: Json[] };
+    };
+    const marketer = await staff('marketer');
+    expect((await marketer(SET, { accounts: [online] })).errors?.[0]?.message).toBe(
+      "Access denied. Only owners, managers and accountants name the journal's accounts.",
+    );
+    const accountant = await staff('accountant');
+    const set = (await accountant(SET, { accounts: [online] })).data?.journalLedgersSet;
+    expect(set.userErrors).toEqual([]);
+    expect(set.journalLedgers[1]).toEqual({ ...online, named: true });
+    // Two accounts by one name would be one in the shop's books.
+    const twice = (
+      await accountant(SET, {
+        accounts: [{ account: 'RETURNS', code: '4020', name: 'online SALES' }],
+      })
+    ).data?.journalLedgersSet;
+    expect(twice).toMatchObject({
+      journalLedgers: null,
+      userErrors: [{ field: ['accounts', '0', 'name'], code: 'TAKEN' }],
+    });
+    const named = parseCsv((await journalOf(tokens.owner)).text);
+    expect(named.some((line) => line[2] === '41000' && line[3] === 'Online sales')).toBe(true);
+    // Blank, it is Hatti's usual again.
+    const reset = (await accountant(SET, { accounts: [{ account: 'SALES', code: '', name: ' ' }] }))
+      .data?.journalLedgersSet;
+    expect(reset.journalLedgers[1]).toEqual({
+      account: 'SALES',
+      code: '4000',
+      name: 'Sales',
+      named: false,
+    });
+    const exported = await admin.query(
+      `SELECT count(*)::int AS n FROM platform.audit_log WHERE shop_id = $1 AND action = 'journal.exported'`,
+      [shop],
+    );
+    expect(exported.rows[0].n).toBe(3);
+
     const denied = await gql(tokens.products, EXPORT, period);
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });

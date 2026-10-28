@@ -3441,6 +3441,49 @@ export interface SalesReportExportData {
   };
 }
 
+/** What the journal is written for (ADR-885). */
+export type JournalFormat = 'CSV' | 'XERO' | 'QUICKBOOKS' | 'TALLY';
+
+export type JournalAccount =
+  | 'RECEIVABLE'
+  | 'SALES'
+  | 'DISCOUNTS'
+  | 'RETURNS'
+  | 'SHIPPING'
+  | 'FEES'
+  | 'SALES_TAX'
+  | 'COST_OF_GOODS'
+  | 'INVENTORY'
+  | 'BANK'
+  | 'COURIER_CHARGES'
+  | 'COURIERS'
+  | 'WRITE_OFFS'
+  | 'CLAIMS';
+
+/** An account the journal posts to, as the shop's books know it. */
+export interface JournalLedger {
+  account: JournalAccount;
+  code: string;
+  name: string;
+  /** Whether the shop named it; else Hatti's usual name and code. */
+  named: boolean;
+}
+
+export interface AccountingJournalExportData {
+  accountingJournalExport: {
+    file: { content: string; contentType: string; filename: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface JournalLedgersData {
+  journalLedgers: JournalLedger[];
+}
+
+export interface JournalLedgersSetData {
+  journalLedgersSet: { journalLedgers: JournalLedger[] | null; userErrors: UserError[] };
+}
+
 export interface ExportSchedule {
   id: string;
   frequency: OrderExportFrequency;

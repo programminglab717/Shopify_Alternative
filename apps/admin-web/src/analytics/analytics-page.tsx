@@ -20,6 +20,7 @@ import { Cohorts } from './cohorts';
 import { CourierPerformance } from './courier-performance';
 import { Bars, Figure } from './figures';
 import { type Days, PeriodTabs, usePeriod } from './period';
+import { Journal } from './journal';
 import { Searches } from './searches';
 import { StockReport } from './stock-report';
 import { LiveView, Visits } from './visits';
@@ -172,7 +173,8 @@ function ExportSales({
  * by day (by week over 90), what sold most, where the orders came from, the online store's visits
  * and how far they went, what shoppers searched it for (ADR-684), how its cash-on-delivery orders
  * turned out, and how its stock sold (ANL-05); for owners and managers, the way to how each agent
- * of the Confirmation Desk did; the period's sales as a workbook for the accountant (ADR-798).
+ * of the Confirmation Desk did; the period's sales as a workbook for the accountant (ADR-798),
+ * and as a journal for the shop's books (ADR-885).
  */
 export function AnalyticsPage() {
   const { t, locale } = useLocale();
@@ -281,6 +283,7 @@ export function AnalyticsPage() {
       <CodHealth from={from} before={before} />
       <CourierPerformance from={from} before={before} />
       <StockReport days={days} />
+      {permits(shop, EXPORTS_ORDERS) && <Journal from={from} before={before} />}
       <Link
         to="/$shopId/analytics/reports"
         params={{ shopId: shop.id }}
