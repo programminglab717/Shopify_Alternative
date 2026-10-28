@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### FBR's unit of measure and SRO on items
+### 796968b · FBR's unit of measure and SRO on items
 
 * **An item keeps** FBR's unit of measure and the SRO it is sold under, beside its HS code, set
   in the product's stock rules ([ADR-895](../architecture/13-decision-log.md#adr-895--an-inventory-item-keeps-fbrs-unit-of-measure-and-the-sro-it-is-sold-under-beside-its-hs-code-and-digital-invoicing-is-sent-them-with-each-item)).
