@@ -3499,6 +3499,69 @@ enum ConversionStatus {
   SKIPPED
 }
 
+"""Asking the merchant copilot (AI-01, ADR-894)."""
+type Copilot {
+  """Whether the copilot drafts: false until its AI is set up."""
+  available: Boolean!
+  limitPerDay: Int!
+  usedToday: Int!
+}
+
+"""
+A discount code as the copilot drafted it, for staff to make with discountCodeCreate: exactly one of percentage, amount or freeShipping.
+"""
+type CopilotDiscountDraft {
+  """Whole rupees off, as digits."""
+  amount: String
+  code: String!
+
+  """Its last day, YYYY-MM-DD; null for no end."""
+  endsOn: String
+  freeShipping: Boolean!
+
+  """Whole rupees, as digits."""
+  minimumSubtotal: String
+  oncePerCustomer: Boolean!
+  percentage: Float
+
+  """Its first day, YYYY-MM-DD; null for now."""
+  startsOn: String
+  title: String
+  usageLimit: Int
+}
+
+"""A draft for staff to confirm, or a report already run."""
+type CopilotDraft {
+  discount: CopilotDiscountDraft
+  kind: CopilotDraftKind!
+  report: ReportAnswer
+  segment: CopilotSegmentDraft
+}
+
+"""What the copilot drafted (AI-01, ADR-894)."""
+enum CopilotDraftKind {
+  DISCOUNT
+  REPORT
+  SEGMENT
+}
+
+type CopilotDraftPayload {
+  draft: CopilotDraft
+  userErrors: [UserError!]!
+}
+
+"""
+A segment as the copilot drafted it, for staff to save with segmentCreate.
+"""
+type CopilotSegmentDraft {
+  """Customers it matches now."""
+  customers: Int!
+  name: String!
+
+  """In the segment query language, checked against the shop."""
+  query: String!
+}
+
 """
 The language AI copy is written in: English, Urdu in its own script, or Roman Urdu, Urdu in Latin letters as shoppers write it on WhatsApp.
 """
@@ -10047,6 +10110,11 @@ type Mutation {
   Closes the conversation, read, or opens it again. The customer writing opens it again.
   """
   conversationUpdateStatus(id: ID!, status: ConversationStatus!): ConversationUpdatePayload!
+
+  """
+  Drafts what a request asks for, such as "Eid ke liye 15% off code bana do" or "customers in Lahore who ordered twice": a discount code or a segment for staff to confirm, or a report, run. The AI sees the request, the segment fields and the report choices, never the shop's data. 50 a day; each draft spends an AI credit.
+  """
+  copilotDraft(request: String!): CopilotDraftPayload!
 
   """
   Archives a courier account: no more bookings with it, and its bookings waiting are cancelled; its parcels are still followed. The default passes to the oldest left.
@@ -16942,6 +17010,9 @@ type Query {
     """Those of this status alone."""
     status: ConversionStatus
   ): ConversionEventConnection!
+
+  """Whether the shop may ask the copilot, and how often it has."""
+  copilot: Copilot!
 
   """
   The shop's courier accounts, the default first; archived ones if asked.

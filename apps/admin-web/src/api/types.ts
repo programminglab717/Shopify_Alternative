@@ -6183,6 +6183,36 @@ export interface ReportQuestionAskData {
   };
 }
 
+export interface CopilotData {
+  copilot: { available: boolean; usedToday: number; limitPerDay: number };
+}
+
+/** A discount code as the copilot drafted it (ADR-894): one of percentage, amount or free delivery. */
+export interface CopilotDiscountDraft {
+  code: string;
+  title: string | null;
+  percentage: number | null;
+  amount: string | null;
+  freeShipping: boolean;
+  minimumSubtotal: string | null;
+  /** YYYY-MM-DD. */
+  startsOn: string | null;
+  endsOn: string | null;
+  oncePerCustomer: boolean;
+  usageLimit: number | null;
+}
+
+export interface CopilotDraftValue {
+  kind: 'DISCOUNT' | 'SEGMENT' | 'REPORT';
+  discount: CopilotDiscountDraft | null;
+  segment: { name: string; query: string; customers: number } | null;
+  report: NonNullable<ReportQuestionAskData['reportQuestionAsk']['answer']> | null;
+}
+
+export interface CopilotDraftData {
+  copilotDraft: { draft: CopilotDraftValue | null; userErrors: UserError[] };
+}
+
 export type WorkflowTriggerType =
   | 'ORDER_CREATED'
   | 'ORDER_CONFIRMED'

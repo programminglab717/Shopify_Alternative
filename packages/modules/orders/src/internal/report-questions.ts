@@ -1,4 +1,9 @@
-import { AiGateway, REPORT_QUESTION_LIMITS, readReportQuestion } from '@hatti/ai';
+import {
+  AiGateway,
+  REPORT_QUESTION_LIMITS,
+  readReportQuestion,
+  type ReportChoices,
+} from '@hatti/ai';
 import {
   AiCredits,
   aiCreditsMessage,
@@ -41,6 +46,18 @@ const TRUE_PROFIT_COLUMNS = new Set(
     .filter(([, column]) => column.trueProfit)
     .map(([key]) => key),
 );
+
+/** The reports a reading may choose among: the lines of true profit only where the plan shows them. */
+export function reportChoicesOf(trueProfit: boolean): ReportChoices {
+  return {
+    breakdowns: REPORT_BREAKDOWNS,
+    periods: REPORT_PERIODS,
+    salesColumns: Object.keys(SALES_REPORT_COLUMNS).filter(
+      (key) => trueProfit || !TRUE_PROFIT_COLUMNS.has(key),
+    ),
+    productColumns: Object.keys(PRODUCT_REPORT_COLUMNS),
+  };
+}
 
 @Injectable()
 export class ReportQuestionService {
@@ -95,15 +112,7 @@ export class ReportQuestionService {
     if (balance && balance.left <= 0) {
       return failOne(['base'], 'TOO_MANY', aiCreditsMessage(balance));
     }
-    const salesColumns = Object.keys(SALES_REPORT_COLUMNS).filter(
-      (key) => trueProfit || !TRUE_PROFIT_COLUMNS.has(key),
-    );
-    const result = await readReportQuestion(ai, asked, {
-      breakdowns: REPORT_BREAKDOWNS,
-      periods: REPORT_PERIODS,
-      salesColumns,
-      productColumns: Object.keys(PRODUCT_REPORT_COLUMNS),
-    });
+    const result = await readReportQuestion(ai, asked, reportChoicesOf(trueProfit));
     const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
     const reading = result.ok && result.value.answerable ? result.value : null;
     await this.db.tenant(tenant.shopId, (tx) =>

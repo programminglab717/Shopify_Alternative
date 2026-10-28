@@ -9,7 +9,9 @@ export type AiCreditUse =
   /** A shopper's photo read into a search of the shop (ADR-870). */
   | 'visual_search'
   /** A customer's voice note read into an order (ADR-871). */
-  | 'voice_order';
+  | 'voice_order'
+  /** A request of staff's read into a draft by the merchant copilot (ADR-894). */
+  | 'copilot';
 
 /** A shop's AI credits this month. */
 export interface AiCreditBalance {

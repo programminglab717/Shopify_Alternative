@@ -38,6 +38,14 @@ export {
   type ArticleDraftRequest,
 } from './article.js';
 export {
+  COPILOT_LIMITS,
+  readCopilotRequest,
+  type CopilotChoices,
+  type CopilotReading,
+  type CopilotSegmentField,
+  type DiscountDraft,
+} from './copilot.js';
+export {
   REPORT_QUESTION_LIMITS,
   readReportQuestion,
   type ReportChoices,

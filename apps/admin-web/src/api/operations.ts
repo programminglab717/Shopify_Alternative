@@ -12682,6 +12682,69 @@ export const ReportQuestionAskMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Whether the merchant copilot drafts here (AI-01, ADR-894), and how often the shop asked today. */
+export const CopilotQuery = /* GraphQL */ `
+  query Copilot {
+    copilot {
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
+/** A request drafted by the copilot: a discount code or segment to confirm, or a report run. */
+export const CopilotDraftMutation = /* GraphQL */ `
+  mutation CopilotDraft($request: String!) {
+    copilotDraft(request: $request) {
+      draft {
+        kind
+        discount {
+          code
+          title
+          percentage
+          amount
+          freeShipping
+          minimumSubtotal
+          startsOn
+          endsOn
+          oncePerCustomer
+          usageLimit
+        }
+        segment {
+          name
+          query
+          customers
+        }
+        report {
+          breakdown
+          columns
+          period
+          report {
+            placedFrom
+            placedBefore
+            columns {
+              key
+              title
+              kind
+            }
+            rows {
+              key
+              label
+              values
+            }
+            totals
+          }
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 const FLOW_EXTENSION = /* GraphQL */ `
   fragment FlowExtensionFields on FlowExtension {
     id

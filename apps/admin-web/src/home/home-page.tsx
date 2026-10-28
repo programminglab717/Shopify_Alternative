@@ -25,6 +25,7 @@ import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { SeenAt } from '../offline/seen-at';
+import { Copilot } from './copilot';
 
 type HomeKey = Exclude<keyof HomeData['home'], 'today' | 'parcelsUnseen' | 'deliveriesToRescue'>;
 
@@ -362,6 +363,7 @@ export function HomePage() {
         {t('home.title')}
       </h1>
       <SetupChecklist />
+      <Copilot />
       <section aria-labelledby="home-next" className="flex flex-col gap-2">
         <h2 id="home-next" className="font-semibold">
           {t('home.next')}

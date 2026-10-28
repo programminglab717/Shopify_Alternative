@@ -249,27 +249,34 @@ export function fakeCore(
           ? orElse(() => answer(operation, variables), {
               translationDrafting: { available: false, usedToday: 0, limitPerDay: 100 },
             })
-          : operation === 'ProductCopyDrafting'
+          : operation === 'Copilot'
             ? orElse(() => answer(operation, variables), {
-                productCopyDrafting: { available: false, usedToday: 0, limitPerDay: 100 },
+                copilot: { available: false, usedToday: 0, limitPerDay: 50 },
               })
-            : operation === 'ProductCategories'
+            : operation === 'ProductCopyDrafting'
               ? orElse(() => answer(operation, variables), {
-                  productCategories: [
-                    'Apparel & Accessories > Clothing',
-                    'Apparel & Accessories > Shoes',
-                  ],
+                  productCopyDrafting: { available: false, usedToday: 0, limitPerDay: 100 },
                 })
-              : operation === 'StaffAccessRequests'
-                ? orElse(() => answer(operation, variables), { staffAccessRequests: [] })
-                : operation === 'CustomRoles'
-                  ? orElse(() => answer(operation, variables), { customRoles: [], rolePresets: [] })
-                  : operation === 'ProductMetafields'
+              : operation === 'ProductCategories'
+                ? orElse(() => answer(operation, variables), {
+                    productCategories: [
+                      'Apparel & Accessories > Clothing',
+                      'Apparel & Accessories > Shoes',
+                    ],
+                  })
+                : operation === 'StaffAccessRequests'
+                  ? orElse(() => answer(operation, variables), { staffAccessRequests: [] })
+                  : operation === 'CustomRoles'
                     ? orElse(() => answer(operation, variables), {
-                        metafieldDefinitions: [],
-                        product: { id: variables.id, metafields: [] },
+                        customRoles: [],
+                        rolePresets: [],
                       })
-                    : answer(operation, variables);
+                    : operation === 'ProductMetafields'
+                      ? orElse(() => answer(operation, variables), {
+                          metafieldDefinitions: [],
+                          product: { id: variables.id, metafields: [] },
+                        })
+                      : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });
