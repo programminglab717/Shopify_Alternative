@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-836 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-837 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -844,6 +844,7 @@
 | 834 | A shop sends push campaigns, a title, words and a page of its own, at most three a day, which the worker pushes to every subscribed browser in marketing hours a batch at a time | Accepted |
 | 835 | The admin's Push notifications page under Marketing shows who has them on, sends a push to all of them and lists those sent | Accepted |
 | 836 | Hatti Base's footer offers the shop's notifications once the browser can have them and they are off | Accepted |
+| 837 | Hatti keeps when a shop last said whether it is on FBR's Active Taxpayers List, asks it to check again after each 1 March's new list, and writes the SMS to 9966 that checks it | Accepted |
 
 ---
 
@@ -27316,3 +27317,32 @@
   where to allow them. English and Urdu.
 * **Consequences:** OS-14 is done in code. The only thing left is the storefront's
   `VAPID_PUBLIC_KEY` in production (OWN-32).
+
+## ADR-837 · Hatti keeps when a shop last said whether it is on FBR's Active Taxpayers List, asks it to check again after each 1 March's new list, and writes the SMS to 9966 that checks it
+
+* **Context:** TAX-08 asks for help checking filer status. ADR-500 keeps what the shop says of
+  the Active Taxpayers List but not when it said it, and FBR replaces the list each 1 March. FBR
+  has no API for the list: it answers an SMS to 9966, and its site. A shop that drops off the list
+  pays twice the income tax couriers and gateways withhold, without knowing it.
+* **Decision:**
+  * **`tax.settings.filer_checked_at`** (migration 0355): saying the filer status through
+    `taxSettingsUpdate`, even as it was, records a check; the event names `filerCheckedAt`.
+  * **`TaxSettings.filerCheck`**:
+    * `checkedAt`: when the shop last checked.
+    * `due`: NEVER while it hasn't said, or says unknown; NEW_LIST once FBR published a list
+      since it last said; null otherwise.
+    * `listOf`: the list in force, the latest 1 March in Pakistan's time.
+    * `smsBody`: "ATL" and the NTN's seven digits without the check digit, or a sole trader's
+      13-digit CNIC.
+  * **The admin's sales tax page has a section of its own.** It shows:
+    * why to check, or what the shop found and when;
+    * a link that opens the phone's messages app with the SMS written. Where the NTN is unknown,
+      it is written from a CNIC typed there, which goes nowhere else;
+    * buttons to say what FBR answered.
+    The form below is drawn afresh once the status is said, so saving it never sends the old one.
+* **Consequences:**
+  * Hatti still doesn't check the list itself; the shop says what FBR answered.
+  * The admin doesn't put a rupee figure on being off the list. The payouts' tax withheld
+    (ADR-493) mixes income tax with sales tax, so halving it would mislead; the percentages ADR-500
+    shows stand instead.
+  * A reminder by message each March waits for shops to ask; the page asks once they open it.

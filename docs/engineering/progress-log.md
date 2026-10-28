@@ -14,6 +14,16 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-28
+
+### Filer-status checks
+
+* **Tax:** Hatti keeps when the shop last said whether it is on FBR's Active Taxpayers List, asks
+  again once FBR publishes each 1 March's list, and the admin writes the SMS to 9966 that checks
+  it, from the NTN or a CNIC kept nowhere (TAX-08, [ADR-837](../architecture/13-decision-log.md#adr-837--hatti-keeps-when-a-shop-last-said-whether-it-is-on-fbrs-active-taxpayers-list-asks-it-to-check-again-after-each-1-marchs-new-list-and-writes-the-sms-to-9966-that-checks-it)). Done in code; FBR has no API, so the
+  shop says what it answered.
+* 4437 tests (4 new).
+
 ## 2026-10-27
 
 ### 77b5299 · Installable storefront and pushes to shoppers
