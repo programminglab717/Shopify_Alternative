@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Bulk mutations
+### 29dc48e · Bulk mutations
 
 * **`bulkOperationRunMutation`** runs a mutation once for each line of a JSONL file of variables
   staged with `stagedUploadsCreate`, as the caller, each answer a numbered line of the file it
