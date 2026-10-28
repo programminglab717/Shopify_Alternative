@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The theme store
+### 6a929c7 · The theme store
 
 * **Online store:** Online store › Themes has a theme store of designers' themes, free or for a
   price in rupees. A free one installs at once; the owner buys a paid one once, with an invoice
