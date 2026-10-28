@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Prices in shoppers' currencies
+
+* **Settings › Currencies:** a shop shows its prices in dirhams, riyals, pounds, dollars or euros
+  as well, at a rate it fixes or the day's, which Hatti reads from a free open feed, rounded as it
+  asks (OS-21, [ADR-865](../architecture/13-decision-log.md#adr-865--prices-in-shoppers-own-currencies-a-shop-shows-dirhams-riyals-pounds-dollars-or-euros-at-a-rate-it-fixes-or-the-days-from-an-open-feed-rounded-as-it-asks-and-charges-rupees)).
+* **Storefront:** shoppers pick their currency in the footer, or are asked when they shop from
+  abroad. The cart says what checkout charges in rupees. Which plans include it is OWN-55.
+* 4640 tests (8 new, the admin's check of each new GraphQL operation among them).
+
 ### 4fad27d · Single sign-on for staff
 
 * **Settings › Staff:** the owner sets the shop's identity provider (Microsoft Entra, Google

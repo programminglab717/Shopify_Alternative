@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-864 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-865 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -872,6 +872,7 @@
 | 862 | Subscriptions: selling plans by product tag, a subscribed line priced at its plan's discount, and the order placed again each interval by cash on delivery, confirmed as any other, the customer skipping, pausing or cancelling from its page | Accepted |
 | 863 | Seasons that follow the moon: Ramadan and the run-up to Eid ul Adha from Pakistan's Islamic dates, each variant's lift through last year's season, and reorders counting on it | Accepted |
 | 864 | Single sign-on for a shop's staff through its organisation's identity provider, over OpenID Connect: required if the shop says so, its sessions reaching that shop alone | Accepted |
+| 865 | Prices in shoppers' own currencies: a shop shows dirhams, riyals, pounds, dollars or euros at a rate it fixes or the day's from an open feed, rounded as it asks, and charges rupees | Accepted |
 
 ---
 
@@ -28514,3 +28515,60 @@
   * **A hosted identity broker (Auth0, WorkOS):** paid per connection.
   * **Sessions from the provider reaching every shop of the account:** any shop's owner could
     then reach their staff's other shops.
+
+## ADR-865 · Prices in shoppers' own currencies: a shop shows dirhams, riyals, pounds, dollars or euros at a rate it fixes or the day's from an open feed, rounded as it asks, and charges rupees
+
+* **Context:**
+  * OS-21 asks for diaspora storefronts: Pakistanis in the Gulf, Britain and North America buying
+    from home for family there or for themselves, seeing prices in AED, SAR, GBP, USD and CAD.
+  * Shopify shows prices in a shopper's currency through Markets, and charges in it. Hatti's
+    shops are paid in rupees: by cash on delivery, transfer or Pakistani gateways. International
+    cards are PAY-12, later.
+* **Decision:**
+  * **The shop's currencies** (Settings › Currencies): any of AED, SAR, GBP, USD, CAD and EUR.
+    * Each is shown at a rate the shop fixes, rupees for one unit as merchants say it
+      (1 AED = Rs 76.4521), or at the day's rate.
+    * Each is rounded to the cent, to a whole unit, or up to the next .99.
+    * Rates are kept as ten-thousandths of a rupee and prices converted from paisa exactly
+      (`@hatti/money`).
+  * **The day's rates:**
+    * The worker reads Fawaz Ahmed's exchange API every six hours, through jsDelivr's CDN. It is
+      free and open source, and its data is in the public domain. `CURRENCY_FEED_URL` can point
+      elsewhere.
+    * A rate that moved more than a quarter since the last is kept as it was and logged, as a
+      feed's mistake would be.
+    * The shops following a currency whose rate changed are published again.
+  * **The storefront:**
+    * The shop's document carries its currencies at their rates.
+    * Shopify's localization form (`/localization`) takes `currency_code`, or `country_code` as
+      Shopify's country pickers post it, and `language_code`. The currency is kept in a
+      `currency` cookie; rupees forget it.
+    * Every `money` filter shows prices in the shopper's currency. `money_pk` stays in rupees.
+    * `localization.currency` and `available_currencies` (Hatti's) give the currency with its
+      rate; `localization.country` and `available_countries` give its country, as Shopify's do.
+    * Hatti Base's footer has the picker and says the rate. A shopper who has picked none is
+      asked whether to see theirs, as `/localization.json` suggests by the country Cloudflare
+      says they are in.
+    * The cart says what checkout charges, in rupees. Checkout, the Ajax cart, feeds, structured
+      data and the Storefront API stay in rupees.
+  * **The edge:** a page in a shopper's currency is theirs alone (`private, no-store`). The rupee
+    pages stay cached for everyone. Once the edge exists, its cache rule bypasses requests with
+    the `currency` cookie, with the infrastructure.
+* **Consequences:**
+  * A shopper in Dubai sees "AED 163.99" and pays Rs 12,500 at the door in Lahore, or by
+    transfer, as anyone else.
+  * Pages in another currency are rendered for each shopper. They are a small share of a
+    Pakistani shop's traffic.
+  * Not yet:
+    * charging in the currency (PAY-12);
+    * prices a shop sets per currency;
+    * international domains and subfolders (`/en-ae`);
+    * the Ajax cart in the shopper's currency.
+  * Which plans include it is the owner's to decide (OWN-55).
+* **Alternatives:**
+  * **Converting in the browser:** the page's prices rewritten by a script. Prices then flash,
+    and the theme's text, sorting and structured data disagree with what is shown.
+  * **A currency in the address, as Markets' subfolders:** cache-friendly, but every link,
+    canonical address and sitemap would multiply. It may come with international domains.
+  * **A paid rates API (Open Exchange Rates, Fixer):** the open feed carries the rupee daily for
+    nothing.
