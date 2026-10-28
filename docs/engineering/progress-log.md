@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### A forecast by week
+### bfb01c8 · A forecast by week
 
 * **Each variant running low:** what it is expected to sell each of the next weeks, what is left,
   and the day it runs out ([ADR-893](../architecture/13-decision-log.md#adr-893--a-forecast-by-week-what-a-variant-running-low-is-expected-to-sell-each-week-what-is-left-the-day-it-runs-out-and-the-day-to-order-by-for-its-suppliers-lead-time)).
