@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Partners' work in the console
+### 703e794 · Partners' work in the console
 
 * **Reviews:** partners' public apps, theme-store themes and expert profiles are listed in the
   console once checked, or taken back ([ADR-880](../architecture/13-decision-log.md#adr-880--partners-work-in-the-console-public-apps-theme-store-themes-and-expert-profiles-listed-for-every-shop-once-checked-or-taken-back-and-partners-payouts-marked-paid-by-the-bank-transfers-reference)).
