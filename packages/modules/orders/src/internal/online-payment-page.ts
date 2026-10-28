@@ -17,7 +17,13 @@ export type OnlinePaymentProblem = 'unavailable' | 'pending' | 'test';
  * A shop with one gateway shows one button, Pay online, naming its gateway below it.
  */
 export function payOnlineForm(
-  online: { gateways: readonly OnlineGateway[]; amount: bigint; credit?: bigint | null },
+  online: {
+    gateways: readonly OnlineGateway[];
+    amount: bigint;
+    credit?: bigint | null;
+    /** What the shop's rider would collect at the door, paid online instead (ADR-846). */
+    door?: boolean;
+  },
   currency: CurrencyCode,
   transfer: boolean,
 ): Html {
@@ -35,21 +41,29 @@ export function payOnlineForm(
         </button>`,
     )}
     ${paragraphs(
-      credit
+      online.door
         ? {
             en:
-              `Pay ${due} now by card or wallet, through ${names.en}, and get ${credit} back ` +
-              'as store credit for your next order.',
-            ur: html`ابھی ${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا کریں اور اگلے آرڈر
-            کے لیے ${ltr(credit)} اسٹور کریڈٹ کے طور پر واپس پائیں۔`,
+              `Pay ${due} now by card or wallet, through ${names.en}, instead of cash to the ` +
+              'rider: once it is paid, the rider collects nothing.',
+            ur: html`رائیڈر کو نقد دینے کے بجائے ابھی ${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے
+            ذریعے ادا کریں: ادائیگی کے بعد رائیڈر کچھ وصول نہیں کرے گا۔`,
           }
-        : {
-            en:
-              `Pay ${due} by card or wallet, through ${names.en}.` +
-              (transfer ? ' Or transfer it to the account below.' : ''),
-            ur: html`${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا
-            کریں۔${transfer && ' یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔'}`,
-          },
+        : credit
+          ? {
+              en:
+                `Pay ${due} now by card or wallet, through ${names.en}, and get ${credit} back ` +
+                'as store credit for your next order.',
+              ur: html`ابھی ${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا کریں اور اگلے آرڈر
+              کے لیے ${ltr(credit)} اسٹور کریڈٹ کے طور پر واپس پائیں۔`,
+            }
+          : {
+              en:
+                `Pay ${due} by card or wallet, through ${names.en}.` +
+                (transfer ? ' Or transfer it to the account below.' : ''),
+              ur: html`${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا
+              کریں۔${transfer && ' یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔'}`,
+            },
       'center small muted',
     )}
   </form>`;

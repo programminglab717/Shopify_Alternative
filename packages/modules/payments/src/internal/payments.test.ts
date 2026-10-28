@@ -12,9 +12,12 @@ import type { AddressInfo } from 'node:net';
 import { InputChecker, PlanAllowance } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { toPublicId } from '@hatti/ids';
+import { StockService } from '@hatti/inventory/public';
 import {
+  FulfillmentService,
   checkAddress,
   offerPrepayIn,
+  openDoorPaymentIn,
   orderLinkPage,
   type PrepaidDiscountInput,
 } from '@hatti/orders/public';
@@ -1513,6 +1516,65 @@ describe.skipIf(!server)('Payments online', () => {
       { kind: 'credit', amount: '10000', remaining: '0' },
       { kind: 'debit', amount: '4000', remaining: null },
     ]);
+  });
+
+  it("takes online what the shop's own rider would collect at the door, who then collects nothing (PAY-09)", async () => {
+    const placed = unwrap(
+      await f.orders.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: '0300 1234567',
+          address1: 'House 12, Street 4',
+          city: 'Lahore',
+        },
+      }),
+    );
+    unwrap(await f.orders.confirm(f.a, placed.id));
+    const token = await f.linkOf(f.a, placed.id);
+    await f.connectTest(f.a);
+    const viewed = async () => {
+      const view = await f.links.viewLink(token);
+      if (view.kind !== 'order') throw new Error(view.kind);
+      return view;
+    };
+    // Shipped with a courier, it is paid at the door alone.
+    const parcel = unwrap(
+      await new FulfillmentService(f.db, new StockService()).fulfill(
+        { shopId: f.a.shopId, actor: 'system' },
+        placed.id,
+        { tracking: { company: "A's rider Asif", number: 'R-1' } },
+      ),
+    );
+    expect((await viewed()).onlinePayment).toBeNull();
+    // Out with the shop's own rider: its page offers what the rider would collect.
+    expect(
+      await f.db.tenant(f.a.shopId, (tx) =>
+        openDoorPaymentIn(tx, f.a.shopId, placed.id, parcel.fulfillmentId),
+      ),
+    ).toBe(true);
+    const view = await viewed();
+    expect(view.onlinePayment).toEqual({
+      gateways: [{ gateway: 'test', name: 'Test gateway', origin: null }],
+      amount: 2_000_00n,
+      door: true,
+    });
+    const page = orderLinkPage(view).html;
+    expect(page).toContain('is out for delivery today.');
+    expect(page).toContain(
+      'Pay Rs 2,000 now by card or wallet, through Test gateway, instead of cash to the rider',
+    );
+
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
+    expect(await f.orders.get(f.a, placed.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      codAmount: 0n,
+      financialStatus: 'paid',
+    });
+    expect((await f.timeline(f.a, placed.id))[0]).toMatch(/Rs 0 to collect at the door$/);
+    expect((await viewed()).onlinePayment).toBeNull();
   });
 
   it("pays nothing through a gateway's sandbox: a test, said on the page and the timeline", async () => {

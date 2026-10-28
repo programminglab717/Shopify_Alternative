@@ -335,6 +335,11 @@ export interface OrderRecord {
   prepayCredit: bigint | null;
   /** When that credit was given, the order paid in full online. */
   prepayCreditedAt: Date | null;
+  /**
+   * The parcel the shop's own rider has out at its door, while the order may be paid online
+   * instead of in cash there (PAY-09, ADR-846); null otherwise.
+   */
+  doorParcelId: string | null;
   /** When its customer took the offer its page made them (MKT-09, ADR-438); null until then. */
   upsoldAt: Date | null;
   /**

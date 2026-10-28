@@ -414,6 +414,11 @@ export const orders = ordersSchema.table(
     prepayCredit: money('prepay_credit'),
     /** When that credit was given, the order paid in full online. */
     prepayCreditedAt: timestamp('prepay_credited_at', { withTimezone: true }),
+    /**
+     * The parcel of a cash-on-delivery order the shop's own rider has out at its door, while it
+     * may be paid online instead of in cash (PAY-09, ADR-846); null otherwise.
+     */
+    doorParcelId: uuid('door_parcel_id'),
     /** When its customer took the offer its page made them (MKT-09, ADR-438): once an order. */
     upsoldAt: timestamp('upsold_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),

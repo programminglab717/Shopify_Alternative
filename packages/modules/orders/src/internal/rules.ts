@@ -269,17 +269,46 @@ export function prepayOwed(order: {
 }
 
 /**
- * What an order's page offers to take online (ADR-151, ADR-432): what it waits for before it
- * ships, or the rest of a cash-on-delivery order offered credit for paying it, whichever is more.
+ * What a cash-on-delivery order out at its door with the shop's own rider may pay online instead
+ * of in cash there (PAY-09, ADR-846): what the rider would collect, while the order is open and
+ * owes it; nothing otherwise, and nothing for a courier's parcel.
+ */
+export function doorOwed(order: {
+  paymentMethod: PaymentMethodValue;
+  status: OrderStatusValue;
+  doorParcelId: string | null;
+  codAmount: bigint;
+  amountPaid: bigint;
+  total: bigint;
+}): bigint {
+  if (
+    order.paymentMethod !== 'cash_on_delivery' ||
+    order.status !== 'open' ||
+    order.doorParcelId === null
+  ) {
+    return 0n;
+  }
+  const rest = order.total - order.amountPaid;
+  const due = order.codAmount < rest ? order.codAmount : rest;
+  return due > 0n ? due : 0n;
+}
+
+/**
+ * What an order's page offers to take online (ADR-151, ADR-432, ADR-846): what it waits for
+ * before it ships, the rest of a cash-on-delivery order offered credit for paying it, or what the
+ * shop's rider would collect at its door, whichever is most.
  */
 export function onlineOwed(
   order: Parameters<typeof prepayOwed>[0] &
-    Parameters<typeof transferOwed>[0] & { stage: OrderStageValue },
+    Parameters<typeof transferOwed>[0] &
+    Parameters<typeof doorOwed>[0] & { stage: OrderStageValue },
 ): bigint {
   const awaited =
     order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n;
-  const prepay = prepayOwed(order);
-  return prepay > awaited ? prepay : awaited;
+  return [prepayOwed(order), doorOwed(order)].reduce(
+    (most, owed) => (owed > most ? owed : most),
+    awaited,
+  );
 }
 
 /** Whether an order waits for money by transfer before it ships, as {@link transferOwed} says. */

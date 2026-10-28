@@ -252,11 +252,11 @@ export async function receiveOnlinePaymentIn(
     const paid = order.amountPaid + applied;
     const full = paid === order.total;
     // Before a cash-on-delivery order ships, the courier collects no more than it still owes
-    // (ADR-432).
+    // (ADR-432); nor does the shop's rider out at its door (ADR-846).
     const rest = order.total - paid;
     const codAmount =
       order.paymentMethod === 'cash_on_delivery' &&
-      order.fulfillmentStatus === 'unfulfilled' &&
+      (order.fulfillmentStatus === 'unfulfilled' || order.doorParcelId !== null) &&
       order.codAmount > rest
         ? rest
         : order.codAmount;

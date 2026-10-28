@@ -1,6 +1,8 @@
 import 'reflect-metadata';
+import { PublicSite } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { OnlinePayments, receiveOnlinePaymentIn, type OnlineGateway } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { RiderPageService, riderPage } from './rider-page.js';
 import { DeliveryCodeSender, RIDER_LIMITS, RiderService } from './riders.js';
@@ -15,6 +17,25 @@ class KeptCodes extends DeliveryCodeSender {
   async sendIn(_tx: Tx, _shopId: string, message: { code: string }) {
     this.codes.push(message.code);
     return true;
+  }
+}
+
+/** A shop taking payments online through one gateway, as far as the rider's page asks. */
+class OneGateway extends OnlinePayments {
+  gatewaysOf(): Promise<OnlineGateway[]> {
+    return Promise.resolve([{ gateway: 'safepay', name: 'Safepay' } as OnlineGateway]);
+  }
+  discountOf(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  start(): Promise<{ error: string }> {
+    return Promise.resolve({ error: 'not here' });
+  }
+  returned(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  refund(): Promise<{ ok: true; value: { refundId: null } }> {
+    return Promise.resolve({ ok: true, value: { refundId: null } });
   }
 }
 
@@ -69,6 +90,8 @@ describe.skipIf(!server)("A rider's page (APP-06, ADR-825)", () => {
     expect(view.stops).toEqual([
       {
         delivery: expect.objectContaining({ id: order.deliveryId, cashDue: 4_000_00n }),
+        due: 4_000_00n,
+        payable: false,
         order: `#${order.number}`,
         customer: 'Ayesha Khan',
         phone: '+923001234567',
@@ -169,5 +192,80 @@ describe.skipIf(!server)("A rider's page (APP-06, ADR-825)", () => {
     const other = unwrap(await riders.create(f.a, { name: 'Bilal', phone: '03211112223' }));
     const next = await handedOut();
     expect(await pages.fail(other.link, next.deliveryId, 'refused')).toEqual({ refused: 'none' });
+  });
+
+  it('lets the customer pay online at the door, the rider shown a QR code and then nothing to collect (PAY-09)', async () => {
+    const order = await handedOut();
+    const doorOf = async () =>
+      (
+        await f.admin.query<{ door_parcel_id: string | null; cod_amount: string }>(
+          'SELECT door_parcel_id, cod_amount::text FROM orders.orders WHERE id = $1',
+          [order.orderId],
+        )
+      ).rows[0]!;
+    // Handed out, its door is open to paying online.
+    expect((await doorOf()).door_parcel_id).not.toBeNull();
+    // Without the shop's gateways, the rider is offered nothing to show.
+    expect((await pages.view(link))!.stops[0]).toMatchObject({ payable: false });
+    expect(await pages.doorLink(link, order.deliveryId)).toBeNull();
+
+    const online = new RiderPageService(
+      f.db,
+      f.fulfillments,
+      new PublicSite('https://hatti.test'),
+      new OneGateway(),
+    );
+    const view = (await online.view(link))!;
+    expect(view.stops[0]).toMatchObject({ due: 4_000_00n, payable: true });
+    expect(riderPage(view, link)).toContain(
+      `<form method="post" action="/rider/${link}/${order.deliveryId}/pay">`,
+    );
+    const url = (await online.doorLink(link, order.deliveryId))!;
+    expect(url).toMatch(/^https:\/\/hatti\.test\/o\/[A-Za-z0-9_-]+$/);
+    // Shown again, the same page while it works.
+    expect(await online.doorLink(link, order.deliveryId)).toBe(url);
+    const shown = riderPage(view, link, undefined, { deliveryId: order.deliveryId, url });
+    expect(shown).toContain('<svg');
+    expect(shown).toContain('pay Rs 4,000 online');
+    const { rows: timeline } = await f.admin.query<{ message: string }>(
+      `SELECT message FROM orders.order_events WHERE order_id = $1 AND kind = 'link'`,
+      [order.orderId],
+    );
+    expect(timeline.map((entry) => entry.message)).toEqual([
+      'Sent the customer a link for the rider to show at the door',
+    ]);
+
+    // Paid online at the door: nothing more to collect, and the rider sees it.
+    await f.db.tenant(f.a.shopId, (tx) =>
+      receiveOnlinePaymentIn(tx, f.a.shopId, {
+        orderId: order.orderId,
+        amount: 4_000_00n,
+        gateway: 'safepay',
+        reference: 'T-1',
+      }),
+    );
+    expect((await doorOf()).cod_amount).toBe('0');
+    const paid = (await online.view(link))!;
+    expect(paid.stops[0]).toMatchObject({ due: 0n, payable: false });
+    expect(riderPage(paid, link)).toContain('Paid online: collect nothing');
+    expect(await online.doorLink(link, order.deliveryId)).toBeNull();
+    expect(await online.deliver(link, order.deliveryId, { code: '', cash: '4000' })).toEqual({
+      refused: 'cash',
+    });
+    expect(await online.deliver(link, order.deliveryId, { code: order.code, cash: '' })).toEqual({
+      ok: true,
+    });
+    // Delivered, its door is closed.
+    expect((await doorOf()).door_parcel_id).toBeNull();
+  });
+
+  it('closes the door to paying online once a delivery is not made', async () => {
+    const order = await handedOut();
+    expect(await pages.fail(link, order.deliveryId, 'not_home')).toEqual({ ok: true });
+    const { rows } = await f.admin.query<{ door_parcel_id: string | null }>(
+      'SELECT door_parcel_id FROM orders.orders WHERE id = $1',
+      [order.orderId],
+    );
+    expect(rows[0]!.door_parcel_id).toBeNull();
   });
 });

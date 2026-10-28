@@ -808,7 +808,12 @@ function statusPage(
     /** They came back from paying online, and it is in. */
     paid?: boolean;
     /** What the shop's gateways take online of what the order waits for (ADR-151, ADR-219). */
-    onlinePayment?: { gateways: OnlineGateway[]; amount: bigint; credit?: bigint | null } | null;
+    onlinePayment?: {
+      gateways: OnlineGateway[];
+      amount: bigint;
+      credit?: bigint | null;
+      door?: boolean;
+    } | null;
     /** Its parcels' steps on their way (ADR-160). */
     steps?: ParcelSteps;
     /** Once delivered, its products to rate (ADR-399). */
@@ -973,8 +978,10 @@ function statusPage(
       );
     case 'partially_fulfilled':
     case 'in_transit':
-      // With the rider now, as the courier last said of a parcel on its way.
+      // With the rider now, as the courier last said of a parcel on its way; or with the shop's
+      // own rider, who may be paid online instead of in cash (ADR-846).
       if (
+        order.doorParcelId !== null ||
         order.fulfillments.some(
           (parcel) =>
             parcel.status === 'in_transit' &&
@@ -989,6 +996,7 @@ function statusPage(
           },
           false,
           pay,
+          onlinePayment?.door && payOnlineForm(onlinePayment, shown.currency, false),
           parcels(order, steps, shop.timezone),
           summary(shown),
         );

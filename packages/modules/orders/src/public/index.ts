@@ -50,6 +50,7 @@ export {
   type CodHealthReport,
   type CodHealthRow,
 } from '../internal/cod-health.service.js';
+export { closeDoorPaymentIn, openDoorPaymentIn } from '../internal/door-payments.js';
 export {
   chargeParcelsIn,
   codOwedIn,

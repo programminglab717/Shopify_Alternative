@@ -67,6 +67,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   advance_due: string;
   prepay_credit: string | null;
   prepay_credited_at: string | null;
+  door_parcel_id: string | null;
   upsold_at: string | null;
   bank_account: BankAccountValue | null;
   customer_id: string;
@@ -253,6 +254,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     advanceDue: BigInt(row.advance_due),
     prepayCredit: row.prepay_credit === null ? null : BigInt(row.prepay_credit),
     prepayCreditedAt: toDateOrNull(row.prepay_credited_at),
+    doorParcelId: row.door_parcel_id,
     upsoldAt: toDateOrNull(row.upsold_at),
     // Orders placed before Raast IDs were kept have none.
     bankAccount: row.bank_account && {
@@ -462,7 +464,7 @@ export async function loadOrders(
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
            o.online_discount, o.total, o.discount_codes, o.automatic_discounts, o.amount_paid,
            o.amount_refunded, o.cod_amount, o.advance_due, o.prepay_credit,
-           o.prepay_credited_at, o.upsold_at, o.bank_account, o.customer_id,
+           o.prepay_credited_at, o.door_parcel_id, o.upsold_at, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.gift_message, o.tags,
            o.delivery_expected_on::text AS delivery_expected_on, o.delivery_slot_starts_at,
            o.delivery_slot_ends_at, o.cancel_reason,

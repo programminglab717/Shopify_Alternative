@@ -56,6 +56,7 @@ import {
   addressChangeable,
   awaitsCustomer,
   cancellableByCustomer,
+  doorOwed,
   orderLinkExpiry,
   onlineOwed,
   orderName,
@@ -142,7 +143,13 @@ export type OrderLinkView =
        * What the shop's gateways take online, and the store credit paying it all gives, offered
        * a cash-on-delivery order (ADR-432).
        */
-      onlinePayment: { gateways: OnlineGateway[]; amount: bigint; credit?: bigint } | null;
+      onlinePayment: {
+        gateways: OnlineGateway[];
+        amount: bigint;
+        credit?: bigint;
+        /** It is what the shop's rider would collect at the door, paid online instead (ADR-846). */
+        door?: boolean;
+      } | null;
       /** Its parcels' steps on their way (ADR-160), by parcel. */
       steps: ParcelSteps;
       /** Once it is delivered, its products to rate (ADR-399); empty before. */
@@ -564,7 +571,14 @@ export class OrderLinkService {
           ? await receiptCountIn(tx, shopId, order.id)
           : 0,
       onlinePayment:
-        gateways.length > 0 ? { gateways, amount: owed, ...(credit !== null && { credit }) } : null,
+        gateways.length > 0
+          ? {
+              gateways,
+              amount: owed,
+              ...(credit !== null && { credit }),
+              ...(owed === doorOwed(record) && { door: true }),
+            }
+          : null,
       steps: await fulfillmentEventsIn(
         tx,
         shopId,

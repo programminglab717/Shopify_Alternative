@@ -9,7 +9,7 @@ import {
 } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { FulfillmentService, orderShipmentFactsIn } from '@hatti/orders/public';
+import { FulfillmentService, openDoorPaymentIn, orderShipmentFactsIn } from '@hatti/orders/public';
 import { parsePkMobile } from '@hatti/pk';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -416,6 +416,8 @@ export class RiderService {
         VALUES (${shopId}, ${rider.id}, ${orderId}, ${shipped.value.fulfillmentId},
                 ${facts.codAmount.toString()}::bigint, ${sent ? digest(code) : null})
         RETURNING ${DELIVERY_COLUMNS}`);
+      // Its customer may pay online instead of in cash at the door (PAY-09, ADR-846).
+      await openDoorPaymentIn(tx, shopId, orderId, shipped.value.fulfillmentId);
       await appendEvent(tx, shopId, {
         type: RiderEvents.DeliveryUpdated,
         aggregateType: 'rider_delivery',
