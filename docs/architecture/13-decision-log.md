@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-868 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-869 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -876,6 +876,7 @@
 | 866 | Theme experiments: a draft theme shown a share of shoppers, each keeping their arm, counted as the shop's funnel is, and ended by Hatti when it sells clearly worse | Accepted |
 | 867 | Hatti Pass: a shopper saves their name and address for any Hatti shop's checkout, by a box they tick once their number is proved, and forgets it from any checkout | Accepted |
 | 868 | Functions: apps give checkout WebAssembly modules that hide ways to pay or refuse an order, run in a worker of their own with only their input and output, 50 ms and 10 MiB | Accepted |
+| 869 | Headless: a Next.js starter on the Storefront API, a project of its own to copy, its queries checked against the API in the storefront's tests | Accepted |
 
 ---
 
@@ -28722,3 +28723,40 @@
     stopped on time limits the same, in Node.
   * **JavaScript functions in a VM context:** escapes are found in `vm` regularly; WebAssembly's
     sandbox is the language's own.
+
+## ADR-869 · Headless: a Next.js starter on the Storefront API, a project of its own to copy, its queries checked against the API in the storefront's tests
+
+* **Context:**
+  * OS-19 asks for headless storefronts: the Storefront API (ADR-848) and a Next.js starter kit,
+    as Shopify's Hydrogen is.
+  * The API answers Shopify's dialect, so a shop or a partner can build a site of their own
+    design while Hatti keeps the catalog, carts, checkout and orders. They still need a
+    starting point that works.
+* **Decision:**
+  * **`starters/next-storefront`:** Next.js 15's App Router in TypeScript, a project of its own,
+    outside the workspace. It is copied, installed with npm and deployed anywhere Next.js runs.
+    * Home and search, collections, product pages with their variants, and a cart.
+    * The cart's ID is kept in an httpOnly cookie and its lines are changed by server actions.
+    * Checkout is the shop's own, at the cart's `checkoutUrl`: the address, delivery, cash on
+      delivery or paying online, and the order, as on the shop's Hatti storefront.
+  * **Settings:** `HATTI_STORE_DOMAIN` and a public Storefront API token, made in Settings ›
+    Apps. Catalog answers are kept a minute by Next's data cache; carts never.
+  * **Kept working:**
+    * Every query the starter asks is whole, in `lib/queries.ts`.
+    * The storefront's tests read them, validate each against the Storefront API's schema, and
+      run them: the shop, its products, a product, and a cart made, read, changed and emptied.
+    * A change to the API that breaks the starter fails CI.
+    * Its Next.js and React are pinned to releases older than two weeks.
+  * Its build output is kept out of the repository's formatting and lint.
+* **Consequences:**
+  * A partner starts a shop's own site from a working copy in minutes, and Shopify's headless
+    examples mostly carry over.
+  * CI doesn't install Next.js: the starter is built when it changes, by hand, as here.
+  * Not yet:
+    * accounts and sign-in through the API;
+    * Urdu and right-to-left pages, beyond `dir="auto"`;
+    * a Hydrogen-style package of components.
+* **Alternatives:**
+  * **The starter in the workspace:** Next.js installed and built on every CI run, for a template
+    few change.
+  * **Remix or Astro:** Next.js is what most partners in Pakistan build with.

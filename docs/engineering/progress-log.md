@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Headless starter
+
+* **`starters/next-storefront`:** a Next.js storefront for a Hatti shop on its Storefront API:
+  products, search, collections, a cart, and the shop's own checkout. It is copied, given the
+  shop's domain and a public token, and deployed anywhere (OS-19, [ADR-869](../architecture/13-decision-log.md#adr-869--headless-a-nextjs-starter-on-the-storefront-api-a-project-of-its-own-to-copy-its-queries-checked-against-the-api-in-the-storefronts-tests)).
+* **Kept working:** the storefront's tests check and run each of its queries against the API.
+* 4660 tests (2 new).
+
 ### 91a860f · Functions
 
 * **Apps:** an app gives the shop's checkout a WebAssembly function that hides ways to pay, such
