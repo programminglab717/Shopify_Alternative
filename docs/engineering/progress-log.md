@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Orders split among locations
+### c17f282 · Orders split among locations
 
 * **An order paid on delivery that no one location has all of** is split among those that do as
   it is placed, once the shop turns it on: each part an order of its own, shipped from its
