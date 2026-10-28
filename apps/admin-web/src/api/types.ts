@@ -3793,6 +3793,8 @@ export interface TikTokEvents {
 }
 
 export interface TikTokEventsData {
+  /** The catalog feed's address, which TikTok's catalogues read too (ADR-857). */
+  shop: { productFeedUrl: string };
   tiktokEvents: TikTokEvents | null;
 }
 

@@ -7643,6 +7643,9 @@ const TIKTOK_EVENTS = /* GraphQL */ `
 /** The shop's TikTok pixel, if it connected one (ADR-541). */
 export const TikTokEventsQuery = /* GraphQL */ `
   query TikTokEvents {
+    shop {
+      productFeedUrl
+    }
     tiktokEvents {
       ...TikTokEventsParts
     }

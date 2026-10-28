@@ -23,7 +23,7 @@ import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { EventsList, MOMENTS } from './meta';
+import { EventsList, FeedCard, MOMENTS } from './meta';
 
 const LABELS: Partial<Record<string, MessageKey>> = {
   pixelCode: 'tiktok.pixelCode',
@@ -244,6 +244,8 @@ export function TikTokTab() {
         {current && <Disconnect pixelCode={current.pixelCode} />}
       </FormSection>
       {current && <EventsList platform="TIKTOK" />}
+      {/* The same feed fills a TikTok catalogue, for its catalogue ads (CH-04, ADR-857). */}
+      <FeedCard url={query.data.shop.productFeedUrl} hint={t('tiktok.feedHint')} />
     </div>
   );
 }

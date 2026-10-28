@@ -46,12 +46,12 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   testEventCode: 'meta.testEventCode',
 };
 
-/** An address to give another service, to copy or open. */
-function FeedCard({ url }: { url: string }) {
+/** An address to give another service, to copy or open: the catalog feed's, unless said. */
+export function FeedCard({ url, hint }: { url: string; hint?: string }) {
   const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   return (
-    <FormSection title={t('meta.feed')} hint={t('meta.feedHint')}>
+    <FormSection title={t('meta.feed')} hint={hint ?? t('meta.feedHint')}>
       <code className="num break-all rounded-control bg-canvas px-2 py-1" dir="ltr">
         {url}
       </code>

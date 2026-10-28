@@ -56,7 +56,10 @@ function core(role: StaffRole, connected: typeof CONNECTED | null = null) {
     (operation, variables) => {
       switch (operation) {
         case 'TikTokEvents':
-          return { tiktokEvents: pixel };
+          return {
+            shop: { productFeedUrl: 'https://zari.hatti.pk/products.xml' },
+            tiktokEvents: pixel,
+          };
         case 'TikTokEventsUpdate': {
           if (!confirmed) return REAUTHENTICATE;
           const input = variables.input as Record<string, unknown>;
@@ -165,6 +168,18 @@ describe("TikTok's Events API", () => {
     ).toBeTruthy();
     expect(screen.getByText('Leave it blank to keep the one ending Tk42.')).toBeTruthy();
     expect(await screen.findByRole('heading', { name: 'Sent to TikTok' })).toBeTruthy();
+  });
+
+  it("gives the catalog feed's address for a TikTok catalogue, connected or not (CH-04)", async () => {
+    vi.stubGlobal('fetch', core('marketer').fetcher);
+    renderAdmin('/shop_1/online-store?tab=tiktok');
+    expect(await screen.findByText('https://zari.hatti.pk/products.xml')).toBeTruthy();
+    expect(
+      screen.getByText(
+        /^Every variant of your products with a photo\. In TikTok's Catalog Manager/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy the address' })).toBeTruthy();
   });
 
   it("lists TikTok's moments alone, with TikTok's request IDs", async () => {

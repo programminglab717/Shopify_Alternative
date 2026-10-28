@@ -2679,6 +2679,8 @@ const en = {
   'meta.latestOnly': 'Showing the latest 50.',
   'onlineStore.tiktok': 'TikTok',
   'tiktok.title': "TikTok's Events API",
+  'tiktok.feedHint':
+    "Every variant of your products with a photo. In TikTok's Catalog Manager, add a catalogue, choose a data feed, give it this address and have it fetched daily: your catalogue ads then show your products, priced and in stock as your store has them.",
   'tiktok.hint':
     "Orders placed through your checkout go to your TikTok pixel as they are placed, confirmed and delivered, from Hatti's servers, so TikTok's ads learn from the orders that turned out. Customers' details go hashed. On Growth and bigger plans.",
   'tiktok.connected': 'Connected to pixel {pixelCode}.',
@@ -9076,6 +9078,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'meta.latestOnly': 'تازہ ترین 50 دکھائے جا رہے ہیں۔',
   'onlineStore.tiktok': 'ٹک ٹاک',
   'tiktok.title': 'ٹک ٹاک کا ایونٹس API',
+  'tiktok.feedHint':
+    'آپ کی مصنوعات کا ہر ویرینٹ جس کی تصویر ہو۔ ٹک ٹاک کے کیٹلاگ مینیجر میں کیٹلاگ بنائیں، ڈیٹا فیڈ چنیں، یہ پتا دیں اور اسے روزانہ لانے کو کہیں: پھر آپ کے کیٹلاگ اشتہارات آپ کی مصنوعات دکھاتے ہیں، اسی قیمت اور اسٹاک کے ساتھ جو آپ کے اسٹور میں ہے۔',
   'tiktok.hint':
     'آپ کے چیک آؤٹ سے آنے والے آرڈر ہٹی کے سرورز سے آپ کے ٹک ٹاک پکسل کو جاتے ہیں جب وہ آئیں، کنفرم ہوں اور ڈیلیور ہوں، تاکہ ٹک ٹاک کے اشتہار ان آرڈرز سے سیکھیں جو پورے ہوئے۔ کسٹمرز کی تفصیلات ہیش ہو کر جاتی ہیں۔ گروتھ اور بڑے پلانز پر۔',
   'tiktok.connected': 'پکسل {pixelCode} سے منسلک۔',
