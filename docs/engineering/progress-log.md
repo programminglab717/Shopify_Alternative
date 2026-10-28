@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Shops and city names in the console
+### fb243e0 · Shops and city names in the console
 
 * **Shops:** Hatti's people find a shop by name, handle or ID, and see its standing: its owner,
   verification, what waits of it, whether support may look, and what was done to it. Each look
