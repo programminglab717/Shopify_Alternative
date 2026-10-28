@@ -1821,6 +1821,37 @@ describe('Storefront rendering', () => {
     expect(plain.html).not.toContain('combined-listing__name');
   });
 
+  it("names a one-card listing's values on its card in collections (ADR-901)", async () => {
+    const sample = sampleStore();
+    const [first, second, ...rest] = sample.products;
+    const values = ['Maroon', 'Teal <dark>', 'Mustard', 'Black', 'Rust', 'Sage'];
+    const listing = (oneCard: boolean) => ({
+      optionName: 'Colour',
+      products: values.map((value, index) => ({
+        id: index === 0 ? first!.id : `p${index}`,
+        value,
+      })),
+      ...(oneCard && { oneCard: true as const }),
+    });
+    const products = [
+      { ...first!, combinedListing: listing(true) },
+      {
+        ...second!,
+        combinedListing: { ...listing(false), products: listing(false).products.slice(0, 2) },
+      },
+      ...rest,
+    ];
+    const shop = new MemoryStore({ ...sample, products });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: '/collections/all' }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain(
+      '<p class="card__values" dir="auto">Maroon · Teal &lt;dark&gt; · Mustard · Black · +2 more</p>',
+    );
+    // A listing not shown as one card names none.
+    expect(flat.match(/class="card__values"/g)).toHaveLength(1);
+  });
+
   it("counts down a running sale's end, and says how many are left where few are (ADR-445)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

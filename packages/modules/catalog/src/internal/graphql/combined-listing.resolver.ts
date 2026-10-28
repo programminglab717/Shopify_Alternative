@@ -37,6 +37,7 @@ function toCombinedListing(record: CombinedListingRecord): CombinedListing {
         value: product.value,
       }),
     ),
+    oneCard: record.oneCard,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });
@@ -110,6 +111,7 @@ export class CombinedListingResolver {
           productId: tryFromPublicId(product.productId, 'product') ?? NO_PRODUCT,
           value: product.value,
         })),
+        oneCard: input.oneCard,
       }),
     );
   }

@@ -2821,6 +2821,11 @@ type CombinedListing {
   createdAt: DateTime!
   id: ID!
 
+  """
+  Whether collections show it as one card (ADR-901): the first of its products in each collection's order, its card naming the others' values; the others are left out there.
+  """
+  oneCard: Boolean!
+
   """What its products differ by, as its pages name the option: "Colour"."""
   optionName: String!
 
@@ -2835,6 +2840,11 @@ type CombinedListingDeletePayload {
 }
 
 input CombinedListingInput {
+  """
+  Whether collections show it as one card; left out, as it was, or false.
+  """
+  oneCard: Boolean
+
   """Up to 255 characters."""
   optionName: String!
 

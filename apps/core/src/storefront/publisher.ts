@@ -311,11 +311,16 @@ export function itemsFor(event: DomainEvent): string[] {
     case PersonalisationEvents.Updated:
     case StitchingEvents.Updated:
       return [Items.product(id)];
-    // The products in a combined listing before and after its change (ADR-799).
-    case CombinedListingEvents.Updated:
-      return (event.payload as unknown as CombinedListingUpdatedPayload).productIds.map(
-        Items.product,
-      );
+    // The products in a combined listing before and after its change (ADR-799), and the
+    // collections that hold them, which show a listing as one card where the shop says (ADR-901).
+    case CombinedListingEvents.Updated: {
+      const { productIds } = event.payload as unknown as CombinedListingUpdatedPayload;
+      return [
+        ...productIds.map(Items.product),
+        ...productIds.map(Items.collectionsWith),
+        Items.allProducts,
+      ];
+    }
     case DropEvents.Updated:
       // Its waiting room is the shop's document's (ADR-822); its products' pages count down to
       // it (ADR-823).
@@ -1445,9 +1450,16 @@ export class StorefrontPublisher {
       records.flatMap((record) => (record.image ? [record.image.fileId] : [])),
     );
     const images = this.options.images ?? LOCAL_IMAGES;
+    const held = new Map<string, string[]>();
+    for (const record of records) {
+      held.set(record.id, await this.services.collections.activeProductIdsOf(tx, shopId, record));
+    }
+    const listings = await this.services.related.combinedListingsOf(tx, shopId, [
+      ...new Set([...held.values()].flat()),
+    ]);
     const docs = [];
     for (const record of records) {
-      const productIds = await this.services.collections.activeProductIdsOf(tx, shopId, record);
+      const productIds = oneCardEach(held.get(record.id)!, listings);
       const file = record.image && ready.get(record.image.fileId);
       const image: ImageDoc | null =
         record.image && file
@@ -1632,11 +1644,30 @@ export class StorefrontPublisher {
       this.#changed(shopId, 'collection', stored, [], [ALL_PRODUCTS], changed);
     } else {
       const ids = await this.services.products.idsOf(tx, shopId, { status: 'active' });
-      const doc = allProductsDoc(ids);
+      const listings = await this.services.related.combinedListingsOf(tx, shopId, ids);
+      const doc = allProductsDoc(oneCardEach(ids, listings));
       await writer.putCollections([doc]);
       this.#changed(shopId, 'collection', stored, [doc], [], changed);
     }
   }
+}
+
+/**
+ * `ids`, in their order, with each combined listing the shop shows as one card (ADR-901) kept to
+ * the first of its products among them.
+ */
+export function oneCardEach(
+  ids: readonly string[],
+  listings: ReadonlyMap<string, CombinedListingRecord>,
+): string[] {
+  const shown = new Set<string>();
+  return ids.filter((id) => {
+    const listing = listings.get(id);
+    if (!listing?.oneCard) return true;
+    if (shown.has(listing.id)) return false;
+    shown.add(listing.id);
+    return true;
+  });
 }
 
 /** A publisher with the modules' services, for the worker and the seed. */

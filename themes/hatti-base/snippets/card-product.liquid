@@ -1,7 +1,8 @@
 {%- comment -%}
   A product in a grid: its image, title and price, with a badge for a sale or when it is sold
   out, and a heart for the shopper's wishlist. The first two cards load their images at once;
-  the rest when they come into view.
+  the rest when they come into view. A combined listing the shop shows as one card (ADR-901)
+  names its values under the title: four, and how many more.
 {%- endcomment -%}
 {%- liquid
   if position > 2
@@ -35,6 +36,19 @@
       {%- endif -%}
     </div>
     <h3 class="card__title" dir="auto">{{ product.title | escape }}</h3>
+    {%- if product.combined_listing.one_card -%}
+      {%- assign values = product.combined_listing.values -%}
+      <p class="card__values" dir="auto">
+        {%- for value in values limit: 4 -%}
+          {{- value.name | escape -}}
+          {%- unless forloop.last %} · {% endunless -%}
+        {%- endfor -%}
+        {%- if values.size > 4 -%}
+          {%- assign more = values.size | minus: 4 %}
+          · {{ 'products.product.more_values' | t: count: more -}}
+        {%- endif -%}
+      </p>
+    {%- endif -%}
   </a>
   {% render 'wishlist-button', product: product %}
   {% render 'rating', product: product %}

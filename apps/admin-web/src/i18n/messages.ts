@@ -6680,6 +6680,9 @@ const en = {
   'combined.none': 'Not in one: add the products this one comes in with.',
   'combined.option': 'What they differ by',
   'combined.optionHint': 'Such as Colour or Print.',
+  'combined.oneCard': 'Show as one card in collections',
+  'combined.oneCardHint':
+    'The first of these in each collection stands for the rest, its card naming their values.',
   'combined.value': 'Its value for {title}',
   'combined.this': '(this product)',
   'combined.add': 'Add a product to combine',
@@ -13786,6 +13789,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'combined.none': 'کسی میں نہیں: وہ پراڈکٹس شامل کریں جن کے ساتھ یہ آتی ہے۔',
   'combined.option': 'ان میں فرق کس چیز کا ہے',
   'combined.optionHint': 'جیسے رنگ یا پرنٹ۔',
+  'combined.oneCard': 'کلیکشنز میں ایک کارڈ کے طور پر دکھائیں',
+  'combined.oneCardHint':
+    'ہر کلیکشن میں ان میں سے پہلا باقی سب کی جگہ آتا ہے، اور اس کا کارڈ ان کی ویلیوز بتاتا ہے۔',
   'combined.value': '{title} کی ویلیو',
   'combined.this': '(یہ پراڈکٹ)',
   'combined.add': 'ملانے کے لیے پراڈکٹ شامل کریں',

@@ -5099,6 +5099,8 @@ export interface ProductSchedulePublishData {
 export interface CombinedListing {
   id: string;
   optionName: string;
+  /** Whether collections show it as one card (ADR-901). */
+  oneCard: boolean;
   products: { productId: string; value: string; product: { title: string } | null }[];
 }
 

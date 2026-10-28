@@ -88,6 +88,7 @@
         "caption_centimetres": "{{ name }}, in centimetres"
       },
       "on_sale": "Sale",
+      "more_values": "+{{ count }} more",
       "quantity": "Quantity",
       "choose": "Choose {{ option }}",
       "variant": "Size and colour",

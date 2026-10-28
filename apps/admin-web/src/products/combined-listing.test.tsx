@@ -59,6 +59,7 @@ function core(role: StaffRole, listing: CombinedListing | null) {
         const input = variables.input as {
           optionName: string;
           products: { productId: string; value: string }[];
+          oneCard: boolean;
         };
         if (input.products.some((each) => each.value === 'Teal' && each.productId === 'prod_3')) {
           return {
@@ -82,6 +83,7 @@ function core(role: StaffRole, listing: CombinedListing | null) {
         current = {
           id: 'cmbl_1',
           optionName: input.optionName,
+          oneCard: input.oneCard,
           products: input.products.map((each) => ({
             ...each,
             product: { title: titles[each.productId]! },
@@ -154,6 +156,8 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
     });
     // Teal before mustard.
     fireEvent.click(screen.getByRole('button', { name: 'Move Lawn suit, teal up the listing' }));
+    // One card in collections (ADR-901).
+    fireEvent.click(screen.getByRole('checkbox', { name: /Show as one card in collections/ }));
     fireEvent.click(save());
     expect(await screen.findByText('Saved: each page offers the others')).toBeTruthy();
     expect(sentOf(fake, 'CombinedListingSet').at(-1)).toEqual({
@@ -165,6 +169,7 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
           { productId: 'prod_2', value: 'Teal' },
           { productId: 'prod_3', value: 'Mustard' },
         ],
+        oneCard: true,
       },
     });
     // This product cannot be taken out of its own listing; another can.
@@ -184,6 +189,7 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
     const listing: CombinedListing = {
       id: 'cmbl_1',
       optionName: 'Colour',
+      oneCard: true,
       products: [
         { productId: 'prod_2', value: 'Teal', product: { title: 'Lawn suit, teal' } },
         { productId: 'prod_1', value: 'Maroon', product: { title: 'Lawn suit, maroon' } },
@@ -195,6 +201,9 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
     expect(
       ((await screen.findByLabelText('Its value for Lawn suit, teal')) as HTMLInputElement).value,
     ).toBe('Teal');
+    expect(
+      (screen.getByRole('checkbox', { name: /Show as one card/ }) as HTMLInputElement).checked,
+    ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Stop combining them' }));
     expect(await screen.findByText('They are shown on their own again')).toBeTruthy();
     expect(sentOf(fake, 'CombinedListingDelete')).toEqual([{ id: 'cmbl_1' }]);

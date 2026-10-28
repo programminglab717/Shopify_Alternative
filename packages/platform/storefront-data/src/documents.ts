@@ -314,6 +314,11 @@ export interface CombinedListingDoc {
   /** "Colour". */
   optionName: string;
   products: { id: string; value: string }[];
+  /**
+   * Whether collections show the listing as one card (ADR-901), this product standing for the
+   * others where it comes first; absent where not.
+   */
+  oneCard?: true;
 }
 
 /** A product's published reviews, as its page shows them (ADR-401). */

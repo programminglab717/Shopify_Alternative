@@ -275,7 +275,13 @@ function combinedListingDoc(
     .filter((product) => product.active || product.productId === productId)
     .map((product) => ({ id: product.productId, value: product.value }));
   if (products.length < 2) return {};
-  return { combinedListing: { optionName: listing.optionName, products } };
+  return {
+    combinedListing: {
+      optionName: listing.optionName,
+      products,
+      ...(listing.oneCard && { oneCard: true as const }),
+    },
+  };
 }
 
 /**

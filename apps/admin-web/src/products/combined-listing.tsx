@@ -12,6 +12,7 @@ import type {
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { ProductFinder } from '../online-store/link-page';
+import { CheckField } from '../settings/settings-form';
 import { useAdminMutation } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
@@ -46,7 +47,8 @@ function memberProblem(error: UserError, members: readonly Member[]): string {
 /**
  * The combined listing a product is in (CAT-23, ADR-799): the option its products differ by,
  * such as Colour, and each product with its value, this one among them, in the order its pages
- * offer them. Saved whole; stopped, each product is shown on its own again.
+ * offer them, and whether collections show it as one card (ADR-901). Saved whole; stopped, each
+ * product is shown on its own again.
  */
 export function ProductCombinedListingCard({ product }: { product: ProductDetail }) {
   const { t } = useLocale();
@@ -58,6 +60,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
   );
   const [listingId, setListingId] = useState(product.combinedListing?.id ?? null);
   const [optionName, setOptionName] = useState(product.combinedListing?.optionName ?? '');
+  const [oneCard, setOneCard] = useState(product.combinedListing?.oneCard ?? false);
   const own: Member = { productId: product.id, title: product.title, value: '' };
   const [members, setMembers] = useState<Member[]>(() => {
     const kept = membersOf(product.combinedListing);
@@ -106,6 +109,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
             productId: each.productId,
             value: each.value.trim(),
           })),
+          oneCard,
         },
       });
       const error = combinedListingSet.userErrors[0];
@@ -116,6 +120,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
       const saved = combinedListingSet.combinedListing;
       setListingId(saved.id);
       setOptionName(saved.optionName);
+      setOneCard(saved.oneCard);
       setMembers(membersOf(saved));
       setDone(t('combined.saved'));
     } catch (failure) {
@@ -136,6 +141,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
       }
       setListingId(null);
       setOptionName('');
+      setOneCard(false);
       setMembers([own]);
       setDone(t('combined.deleted'));
     } catch (failure) {
@@ -208,6 +214,12 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
             {t('combined.add')}
           </Button>
         )}
+        <CheckField
+          label={t('combined.oneCard')}
+          hint={t('combined.oneCardHint')}
+          checked={oneCard}
+          onChange={setOneCard}
+        />
         {problem && <Alert tone="danger">{problem}</Alert>}
         {done && <Alert tone="success">{done}</Alert>}
         <div className="flex flex-wrap gap-2">

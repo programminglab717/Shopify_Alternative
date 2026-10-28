@@ -156,9 +156,13 @@ describe('What storefront documents an event makes stale', () => {
       'combined-with:a1',
     ]);
     expect(itemsFor(event('product.deleted'))).toContain('every-collection');
+    // And the collections that hold them, which may show the listing as one card (ADR-901).
     expect(itemsFor(event('combined_listing.updated', { productIds: ['p1', 'p2'] }))).toEqual([
       'product:p1',
       'product:p2',
+      'collections-with:p1',
+      'collections-with:p2',
+      'all-products',
     ]);
     expect(itemsFor(event('collection.updated', { changed: ['title'] }))).toEqual([
       'collection:a1',
@@ -1689,6 +1693,54 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await listingOf(maroon.handle)).toBeUndefined();
     expect(await listingOf(mustard.handle)).toBeUndefined();
     for (const each of [maroon, teal, mustard]) unwrap(await products.delete(tenant, each.id));
+    await deliver();
+  });
+
+  it('shows a combined listing as one card in collections where the shop says (ADR-901)', async () => {
+    const listings = new CombinedListingService(database);
+    const made = async (title: string) =>
+      unwrap(await products.create(tenant, { title, status: 'active' }));
+    const maroon = await made('Card maroon');
+    const teal = await made('Card teal');
+    const plain = await made('Card plain');
+    const shelf = unwrap(
+      await collections.create(tenant, {
+        title: 'Card shelf',
+        productIds: [teal.id, plain.id, maroon.id],
+      }),
+    );
+    await deliver();
+    const held = async () => (await store().collectionByHandle(shelf.handle))!.productIds;
+    const members = [
+      { productId: maroon.id, value: 'Maroon' },
+      { productId: teal.id, value: 'Teal' },
+    ];
+    const listing = unwrap(
+      await listings.set(tenant, null, { optionName: 'Colour', products: members }),
+    );
+    await deliver();
+    // Each on its own card until the shop says.
+    expect(await held()).toEqual([teal.id, plain.id, maroon.id]);
+    unwrap(
+      await listings.set(tenant, listing.id, {
+        optionName: 'Colour',
+        products: members,
+        oneCard: true,
+      }),
+    );
+    await deliver();
+    // The first in the collection's order stands for the listing, whatever the listing's order.
+    expect(await held()).toEqual([teal.id, plain.id]);
+    const all = (await store().collectionByHandle('all'))!.productIds;
+    expect(all.filter((id) => id === maroon.id || id === teal.id)).toHaveLength(1);
+    expect((await store().productByHandle(teal.handle))?.combinedListing?.oneCard).toBe(true);
+    // Taken off sale, the next stands for it.
+    unwrap(await products.update(tenant, { id: teal.id, status: 'draft' }));
+    await deliver();
+    expect(await held()).toEqual([plain.id, maroon.id]);
+    unwrap(await listings.delete(tenant, listing.id));
+    unwrap(await collections.delete(tenant, shelf.id));
+    for (const each of [maroon, teal, plain]) unwrap(await products.delete(tenant, each.id));
     await deliver();
   });
 

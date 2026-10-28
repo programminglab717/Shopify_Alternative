@@ -29,6 +29,13 @@ export class CombinedListing {
   @Field(() => [CombinedListingProduct], { description: 'In the order its pages show them.' })
   products!: CombinedListingProduct[];
 
+  @Field({
+    description:
+      'Whether collections show it as one card (ADR-901): the first of its products in each ' +
+      "collection's order, its card naming the others' values; the others are left out there.",
+  })
+  oneCard!: boolean;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 
@@ -56,6 +63,12 @@ export class CombinedListingInput {
       'products, in the order its pages show them, each in no other listing.',
   })
   products!: CombinedListingProductInput[];
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Whether collections show it as one card; left out, as it was, or false.',
+  })
+  oneCard?: boolean | null;
 }
 
 @ObjectType()

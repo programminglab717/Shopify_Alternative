@@ -45,6 +45,11 @@ export interface CombinedListingRecord {
   optionName: string;
   /** In the order its pages show them. */
   products: CombinedListingMember[];
+  /**
+   * Whether collections show it as one card (ADR-901): the first of its products in each
+   * collection's order, the others left out there.
+   */
+  oneCard: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,11 +57,14 @@ export interface CombinedListingRecord {
 export interface CombinedListingInput {
   optionName: string;
   products: readonly CombinedListingProduct[];
+  /** Left out, as it was; false for a new listing. */
+  oneCard?: boolean | null;
 }
 
 type ListingRow = {
   id: string;
   option_name: string;
+  one_card: boolean;
   created_at: Date;
   updated_at: Date;
   products: CombinedListingMember[];
@@ -65,7 +73,7 @@ type ListingRow = {
 /** The listings `where` picks, each with its products in order, in the caller's transaction. */
 async function listingsWhere(tx: Tx, shopId: string, where: SQL): Promise<CombinedListingRecord[]> {
   const { rows } = await tx.execute<ListingRow>(sql`
-    SELECT l.id, l.option_name, l.created_at, l.updated_at,
+    SELECT l.id, l.option_name, l.one_card, l.created_at, l.updated_at,
            coalesce((SELECT json_agg(json_build_object('productId', m.product_id, 'value', m.value,
                                                        'active', p.status = 'active')
                                      ORDER BY m.position)
@@ -79,6 +87,7 @@ async function listingsWhere(tx: Tx, shopId: string, where: SQL): Promise<Combin
     id: row.id,
     optionName: row.option_name,
     products: row.products,
+    oneCard: row.one_card,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   }));
@@ -163,6 +172,7 @@ export class CombinedListingService {
   ): Promise<MutationResult<CombinedListingRecord>> {
     const errors: FieldError[] = [];
     const optionName = input.optionName.trim();
+    const oneCard = input.oneCard ?? null;
     if (optionName.length < 1 || optionName.length > COMBINED_LISTING_LIMITS.optionName) {
       errors.push({
         field: ['input', 'optionName'],
@@ -251,15 +261,17 @@ export class CombinedListingService {
       let listingId = id;
       if (listingId) {
         await tx.execute(sql`
-          UPDATE catalog.combined_listings SET option_name = ${optionName}, updated_at = now()
+          UPDATE catalog.combined_listings
+             SET option_name = ${optionName}, one_card = coalesce(${oneCard}, one_card),
+                 updated_at = now()
            WHERE shop_id = ${shopId} AND id = ${listingId}`);
         await tx.execute(sql`
           DELETE FROM catalog.combined_listing_products
            WHERE shop_id = ${shopId} AND listing_id = ${listingId}`);
       } else {
         const { rows } = await tx.execute<{ id: string }>(sql`
-          INSERT INTO catalog.combined_listings (shop_id, option_name)
-          VALUES (${shopId}, ${optionName}) RETURNING id`);
+          INSERT INTO catalog.combined_listings (shop_id, option_name, one_card)
+          VALUES (${shopId}, ${optionName}, ${oneCard ?? false}) RETURNING id`);
         listingId = rows[0]!.id;
       }
       await tx.execute(sql`

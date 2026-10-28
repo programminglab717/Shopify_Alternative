@@ -88,6 +88,30 @@ describe.skipIf(!server)('Combined listings (CAT-23, ADR-799)', () => {
     expect(errorsOf(await listings.delete(f.a, made.id))).toEqual([['id', 'NOT_FOUND']]);
   });
 
+  it('shows a listing as one card in collections where the shop says, kept unless changed (ADR-901)', async () => {
+    const maroon = await product('Maroon');
+    const teal = await product('Teal');
+    const products = [
+      { productId: maroon, value: 'Maroon' },
+      { productId: teal, value: 'Teal' },
+    ];
+    const made = unwrap(await listings.set(f.a, null, { optionName: 'Colour', products }));
+    expect(made.oneCard).toBe(false);
+    const carded = unwrap(
+      await listings.set(f.a, made.id, { optionName: 'Colour', products, oneCard: true }),
+    );
+    expect(carded.oneCard).toBe(true);
+    // Left out, as it was.
+    const kept = unwrap(
+      await listings.set(f.a, made.id, { optionName: 'Colour', products: [...products].reverse() }),
+    );
+    expect(kept.oneCard).toBe(true);
+    expect(
+      unwrap(await listings.set(f.a, made.id, { optionName: 'Colour', products, oneCard: false }))
+        .oneCard,
+    ).toBe(false);
+  });
+
   it("refuses too few products, one named twice, a value twice, another listing's, and another shop's", async () => {
     const maroon = await product('Maroon');
     const teal = await product('Teal');

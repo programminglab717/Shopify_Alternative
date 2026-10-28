@@ -531,9 +531,9 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
 }
 
 /**
- * A product's combined listing (ADR-799): `option_name`, and `values`, each its `name`, whether
- * it is the product shown (`selected`) and its `product`, whose `url`, `available` and
- * `featured_image` a swatch links and shows.
+ * A product's combined listing (ADR-799): `option_name`, `one_card` (ADR-901), and `values`, each
+ * its `name`, whether it is the product shown (`selected`) and its `product`, whose `url`,
+ * `available` and `featured_image` a swatch links and shows.
  */
 function combinedListingObject(
   doc: ProductDoc,
@@ -547,6 +547,8 @@ function combinedListingObject(
   );
   return {
     option_name: listing.optionName,
+    // Whether collections show the listing as one card, this product standing for it (ADR-901).
+    one_card: listing.oneCard === true,
     values: listing.products.map((product, index) => ({
       name: product.value,
       selected: product.id === doc.id,
