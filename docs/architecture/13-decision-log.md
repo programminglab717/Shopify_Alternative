@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-863 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-864 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -871,6 +871,7 @@
 | 861 | Workflows: a shop's own triggers, conditions and actions, as Shopify Flow's are, with triggers and actions apps offer them through the Admin API | Accepted |
 | 862 | Subscriptions: selling plans by product tag, a subscribed line priced at its plan's discount, and the order placed again each interval by cash on delivery, confirmed as any other, the customer skipping, pausing or cancelling from its page | Accepted |
 | 863 | Seasons that follow the moon: Ramadan and the run-up to Eid ul Adha from Pakistan's Islamic dates, each variant's lift through last year's season, and reorders counting on it | Accepted |
+| 864 | Single sign-on for a shop's staff through its organisation's identity provider, over OpenID Connect: required if the shop says so, its sessions reaching that shop alone | Accepted |
 
 ---
 
@@ -28461,3 +28462,55 @@
     can say, with a year of history at most for most shops.
   * **The same Gregorian dates last year:** Ramadan moves eleven days a year, so last year's
     February is not this year's season.
+
+## ADR-864 · Single sign-on for a shop's staff through its organisation's identity provider, over OpenID Connect: required if the shop says so, its sessions reaching that shop alone
+
+* **Context:**
+  * ADM-09 asks that larger merchants' staff sign in through their own organisation's accounts
+    (Microsoft Entra, Google Workspace, Okta), and that the shop can admit them only that way,
+    as Shopify Plus does.
+  * Staff signed in with a password, a phone code, Google or a passkey (ADR-103, ADR-164), each
+    their own account's.
+* **Decision:**
+  * **The shop's provider:**
+    * The owner alone sets it, having confirmed who they are lately (ADR-103). It is any provider
+      that speaks OpenID Connect: its issuer, the client ID and secret registered there, and the
+      email domains of the shop's staff. The secret is sealed as couriers' credentials are
+      (ADR-149), and only its last four characters are shown.
+    * Hatti reads the provider's configuration and keys from the issuer. Addresses that aren't
+      on the public internet are refused, so a provider can't be pointed inside Hatti.
+  * **Signing in:**
+    * On the sign-in page, "Sign in with your organisation" asks for the work email and sends
+      the browser to the provider of the shop whose domains it is of. The authorization code
+      flow is used, with PKCE, a state and a nonce.
+    * The provider sends the browser back to the core, which trades the code for the ID token
+      and checks its signature, issuer, audience, nonce and age. The email must be confirmed,
+      of the shop's domains, and a member of the shop's. The admin then trades a one-time code,
+      good for two minutes, for the session; it takes only an answer whose state its own tab
+      kept.
+    * The session is two-step verified when the shop says its provider asks for a second factor.
+  * **Required:** where the shop requires it, its members other than the owner reach the shop only
+    with sessions its provider began (`SSO_REQUIRED`). The owner keeps their own way in, so a
+    broken provider can't lock the shop out.
+  * **A session the provider began reaches that shop alone:**
+    * The shop's owner chose the provider and could have it vouch for any of the shop's staff.
+      So the session opens no other shop the person works in, and none of the account's own
+      settings: password, email, phone, passkeys, two-step, partner work or new shops
+      (`SSO_SESSION`).
+    * It can sign out, say who it is, and confirm who they are again.
+  * Each change to the settings is in the shop's audit log.
+* **Consequences:**
+  * A merchant's staff use the accounts their organisation already manages. When someone leaves
+    the organisation, the provider stops signing them in; the shop still removes them from its
+    staff.
+  * Not yet:
+    * SAML;
+    * SCIM, to add and remove staff from the provider;
+    * a domain proved to be the shop's, through DNS.
+  * Which plans include it is the owner's to decide (OWN-54).
+* **Alternatives:**
+  * **SAML 2.0:** older, XML signatures and their pitfalls. The providers merchants use speak
+    OpenID Connect as well.
+  * **A hosted identity broker (Auth0, WorkOS):** paid per connection.
+  * **Sessions from the provider reaching every shop of the account:** any shop's owner could
+    then reach their staff's other shops.

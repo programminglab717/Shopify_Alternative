@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Single sign-on for staff
+
+* **Settings › Staff:** the owner sets the shop's identity provider (Microsoft Entra, Google
+  Workspace, Okta, any speaking OpenID Connect) and its staff's email domains, and may require
+  it. Staff choose "Sign in with your organisation" on the sign-in page (ADM-09, [ADR-864](../architecture/13-decision-log.md#adr-864--single-sign-on-for-a-shops-staff-through-its-organisations-identity-provider-over-openid-connect-required-if-the-shop-says-so-its-sessions-reaching-that-shop-alone)).
+* **Kept to its shop:** a session the provider began opens that shop alone, never another shop
+  the person works in nor their account's settings. Which plans include it is OWN-54.
+* 4632 tests (7 new, the admin's check of each new GraphQL operation among them).
+
 ### d2b90a7 · Seasons in reorders
 
 * **Stock:** the stock page says when Ramadan or the run-up to Eid ul Adha begins, and how much
