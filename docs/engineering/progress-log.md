@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Theme experiments
+### d180656 · Theme experiments
 
 * **Online store › Themes › Experiments:** a shop tries a draft theme, a new home page or an Eid
   banner, on a share of its shoppers for up to 30 days. Each shopper keeps the theme first shown
