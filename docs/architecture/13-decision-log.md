@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-852 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-853 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -860,6 +860,7 @@
 | 850 | Developers get a TypeScript client for the Admin API, which waits out throttles and keeps one idempotency key across a mutation's tries, and `hatti`, a command line that pulls and pushes a shop's theme files | Accepted |
 | 851 | Partners' public apps are installed through OAuth: an owner or a manager approves one on the admin's consent page, and the app trades the code with its secret for a token of the shop's; until Hatti lists an app, it installs on its partner's development stores alone | Accepted |
 | 852 | Apps open inside the admin with a minute's session token signed with their client secret, and offer the storefront scripts that load once the shop turns them on | Accepted |
+| 853 | The theme store: partners offer themes from their development stores, free or for Rs 1,000 to Rs 100,000; Hatti lists each after a look; a shop installs a free one at once or buys a paid one with an invoice of Hatti's, and the designer earns 80% | Accepted |
 
 ---
 
@@ -27990,3 +27991,48 @@
     Merchants leave the admin, and each app asks them to sign in again.
   * **A token signed by Hatti's key, checked through an API call:** every app page would wait
     on Hatti. The client secret is already what the app and Hatti share.
+
+## ADR-853 · The theme store: partners offer themes from their development stores, free or for Rs 1,000 to Rs 100,000; Hatti lists each after a look; a shop installs a free one at once or buys a paid one with an invoice of Hatti's, and the designer earns 80%
+
+* **Context:**
+  * OS-20 asks for a theme marketplace: paid themes in PKR by local designers.
+  * Shops choose among Hatti's own themes (ADR-730) and change them in the editor (ADR-323).
+    Designers build on development stores as partners (ADR-504), but had no way to offer their
+    work to every shop, nor to be paid for it.
+* **Decision:**
+  * **What a theme is:** one of Hatti's themes with the designer's own JSON files over it
+    (ADR-039), as every shop's theme is. Offering one copies it as it is then.
+  * **Offering:** a partner offers a theme of a development store of theirs, not yet handed over,
+    through that store's Admin API (`themeStoreOffer`), from their partner page.
+    * It is free, or Rs 1,000 to Rs 100,000 in whole rupees, with a name and a description.
+    * A partner offers 20 themes at most.
+    * Offered anew, it is copied again and waits for Hatti again.
+  * **Review:** Hatti's people list a theme, or take it out, with `pnpm --filter @hatti/core
+    partner-themes list | list-theme <thls_…> | unlist <thls_…>`, after previewing it on its
+    development store. A shop that bought a theme keeps it when it is taken out.
+  * **Installing:** Online store › Themes shows the store's themes (`themeStore`).
+    * A free one installs at once as a theme of the shop's, not published (`themeStoreInstall`).
+    * A paid one is bought first, by the owner alone, having signed in lately (`themeStoreBuy`).
+      The purchase is an invoice of Hatti's, of a new kind, `THEME`, with sales tax as every
+      invoice (ADR-512), paid through Hatti's gateway or by transfer as plans are.
+    * Once paid, the shop installs it as often as it likes; it is never bought twice.
+    * A shop waits on one invoice for a theme at a time, beside one for its plan and one for credit.
+  * **The designer's share:** 80% of what the shop paid, less the sales tax, recorded when billing
+    says the invoice is paid, through identity's `record_theme_sale`. It is paid out with partners'
+    other earnings (ADR-505).
+* **Consequences:**
+  * Pakistan's designers sell themes to every Hatti shop, in rupees, and Hatti keeps 20%.
+  * What Hatti checks before listing a theme, the share, and the price range are the owner's to
+    confirm (OWN-47).
+  * Not yet:
+    * screenshots and a live preview of a theme from the store itself; merchants read its
+      description, and install a free theme to look at it;
+    * images in a theme's settings: they name the designer's own files, which do not go with it;
+    * updates of a theme a shop installed: a shop installs the new version as another theme;
+    * refunds of a theme bought, which Hatti's people make by hand.
+* **Alternatives:**
+  * **Designers uploading theme files directly:** rejected. A development store is where a
+    theme is built and checked against Hatti's themes, and where Hatti's people preview it.
+  * **Themes paid from message credit:** rejected. Credit is for messages, and a theme's price
+    is often more than a shop keeps there.
+  * **Shopify's 85% share:** a possible choice, for the owner (OWN-47).

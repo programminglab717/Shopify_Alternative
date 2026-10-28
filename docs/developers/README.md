@@ -140,6 +140,15 @@ const { accessToken, scopes } = await accessTokenFor({
   Changing its address turns it off again until the shop looks. Follow the shop's consent
   banner by reading its `hatti_consent` cookie before tracking anyone.
 
+## Selling themes
+
+A partner builds a theme on a development store, then offers it to the theme store from their
+partner page, free or for Rs 1,000 to Rs 100,000 (ADR-853). Hatti looks at it on that store
+before listing it, and again each time it is offered anew. Shops install free themes at once
+and buy paid ones once; the designer earns 80% of each sale, paid out with partners' other
+earnings. A theme's own files are JSON over one of Hatti's themes, so `hatti theme pull` and
+`push` work on it like any other.
+
 ## Trying things safely
 
 * A **development store**, opened by a partner (ADR-504), is closed to shoppers until it is

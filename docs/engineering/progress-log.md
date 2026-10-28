@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### The theme store
+
+* **Online store:** Online store › Themes has a theme store of designers' themes, free or for a
+  price in rupees. A free one installs at once; the owner buys a paid one once, with an invoice
+  of Hatti's, and installs it as often as they like. Partners offer themes from their
+  development stores, Hatti lists each after a look, and the designer earns 80% of each sale
+  (OS-20, [ADR-853](../architecture/13-decision-log.md#adr-853--the-theme-store-partners-offer-themes-from-their-development-stores-free-or-for-rs-1000-to-rs-100000-hatti-lists-each-after-a-look-a-shop-installs-a-free-one-at-once-or-buys-a-paid-one-with-an-invoice-of-hattis-and-the-designer-earns-80)). The share, prices and review are OWN-47.
+* 4550 tests (5 new; the admin's count, four short before, corrected).
+
 ### ea6c0be · Apps inside the admin and on the storefront
 
 * **Developers:** installed apps open inside the admin, their frames carrying a minute's session
