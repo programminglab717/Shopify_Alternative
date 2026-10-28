@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-870 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-871 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -878,6 +878,7 @@
 | 868 | Functions: apps give checkout WebAssembly modules that hide ways to pay or refuse an order, run in a worker of their own with only their input and output, 50 ms and 10 MiB | Accepted |
 | 869 | Headless: a Next.js starter on the Storefront API, a project of its own to copy, its queries checked against the API in the storefront's tests | Accepted |
 | 870 | Visual search: a shopper's photo read by the AI into the words a shop titles its products with, the shop's own search finding them; off until the shop turns it on, one AI credit a photo, 300 a day | Accepted |
+| 871 | Voice-note orders: a customer's WhatsApp voice note heard by Hatti's own whisper.cpp server, read by the AI into what it orders, and answered with the shop's checkout holding it; what was heard shown to staff, the audio never kept | Accepted |
 
 ---
 
@@ -28811,3 +28812,51 @@
   * **Showing the AI the shop's products:** too many tokens a photo, and a shop's catalog sent
     out for each shopper's photo.
   * **On by default:** shops would spend credits they didn't choose to spend.
+
+## ADR-871 · Voice-note orders: a customer's WhatsApp voice note heard by Hatti's own whisper.cpp server, read by the AI into what it orders, and answered with the shop's checkout holding it; what was heard shown to staff, the audio never kept
+
+* **Context:**
+  * MSG-11 asks for voice-note orders: Urdu speech to text, then a draft order.
+  * Many customers in Pakistan would rather speak than type: "do lawn suit medium, aik khussa",
+    in Urdu, Punjabi or English, mixed.
+  * The AI gateway (ADR-463) reads text and images, not audio. Paid speech APIs are ruled out;
+    whisper.cpp, Whisper's open-source server (MIT licensed), runs on Hatti's own machines and
+    hears Urdu.
+  * Carts from WhatsApp's catalogue are already answered with the shop's checkout (ADR-856).
+* **Decision:**
+  * **Heard:**
+    * The WhatsApp webhook keeps each message's media ID.
+    * The worker fetches a voice note's audio from WhatsApp with the token of the number it
+      came to, the shop's own or Hatti's (2 MiB at most), and sends it to
+      `SPEECH_TO_TEXT_URL`: whisper.cpp's server with `--convert`, or any server answering as
+      OpenAI's transcriptions do, in Urdu.
+    * What was heard is kept on the message, and the inbox shows it under the voice note as
+      "Heard as". The audio is never kept.
+  * **Read and matched:**
+    * The AI reads the words into up to ten things: each as a few English words a shop titles it
+      with, how many, and the size or colour said. It sees the words alone, never the shop's
+      products, and takes them as data, never instructions.
+    * The shop's own search finds each. Its variant is the only one, or the one whose every value
+      was said ("medium" is M).
+  * **Answered,** in English and Urdu, on the number the customer wrote to:
+    * the shop's checkout holding what was found, their number filled in;
+    * the pages of what needs a size or colour chosen;
+    * and what wasn't found, left to staff.
+    * Where nothing was found, or the note orders nothing, no answer: staff read what was heard.
+  * **What it costs the shop:**
+    * Off until the owner or a manager turns it on in Settings › Messages
+      (`voiceOrdersSet`, `write_settings`).
+    * Each voice note read is one AI credit (`voice_order`); 200 a day at most; none without
+      credits.
+    * The AI support agent (ADR-849) leaves voice notes to it where it is on.
+* **Consequences:**
+  * A customer orders by speaking, and checks what was heard in the cart before placing it:
+    no order is placed on a mishearing.
+  * Hatti runs a speech server (OWN-60). Without it, voice notes wait for staff, as before.
+  * whisper.cpp's Urdu is good but imperfect, and Punjabi less so: what was heard is shown so
+    staff can follow up.
+* **Alternatives:**
+  * **A draft order in the admin for staff to send:** staff work for every note. The checkout
+    link lets the customer finish, as carts from the catalogue do.
+  * **A paid speech API:** ruled out by cost.
+  * **Placing the order at once:** a mishearing would become an order to cancel.

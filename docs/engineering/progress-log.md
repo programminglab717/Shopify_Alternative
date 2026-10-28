@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Voice-note orders
+
+* **Customers:** a WhatsApp voice note, "do lawn suit medium, aik khussa", is heard and
+  answered with the shop's checkout holding what was found, and the pages of what needs a size
+  chosen (MSG-11, [ADR-871](../architecture/13-decision-log.md#adr-871--voice-note-orders-a-customers-whatsapp-voice-note-heard-by-hattis-own-whispercpp-server-read-by-the-ai-into-what-it-orders-and-answered-with-the-shops-checkout-holding-it-what-was-heard-shown-to-staff-the-audio-never-kept)).
+* **Shops:** off until the owner turns it on in Settings › Messages. Each note is one AI credit,
+  200 a day at most. Staff see what each note was heard as in the inbox; the audio is never kept.
+* **Needs you:** a machine for whisper.cpp, Hatti's own speech-to-text server, and the privacy
+  policy's mention of it (OWN-60).
+* 4685 tests (15 new).
+
 ### cbd74cb · Visual search
 
 * **Shoppers:** a "Search with a photo" button on the search page, where the theme's setting
