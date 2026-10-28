@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The console's operations
+### b4d71a8 · The console's operations
 
 * **Transfers:** shops' transfers into Hatti's bank account are confirmed in the console, for
   what came, or refused with why ([ADR-879](../architecture/13-decision-log.md#adr-879--the-consoles-operations-shops-transfers-into-hattis-account-confirmed-for-what-came-where-it-was-not-what-was-said-or-refused-with-why-and-the-status-pages-incidents-and-maintenance-posted-and-updated-until-they-end)).
