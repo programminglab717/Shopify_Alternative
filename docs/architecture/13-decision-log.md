@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-845 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-846 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -853,6 +853,7 @@
 | 843 | Bulk operations: bulkOperationRunQuery runs one of the shop's lists a page at a time in the background, as the caller, and writes each node to a JSONL file that a link gives for a week | Accepted |
 | 844 | A merchant asks of their numbers in English, Urdu or Roman Urdu: the AI reads the question alone into one of Hatti's reports, which Hatti runs and shows with what the question was taken to ask | Accepted |
 | 845 | Staff have a customer's receipt for their transfer read by the AI, the receipt alone sent, and see what it says beside what Hatti makes of it; they still mark the order paid themselves | Accepted |
+| 846 | A cash-on-delivery parcel out with the shop's own rider may be paid online at the door: its page offers what the rider would collect, the rider shows it as a QR code, and paid, the rider collects nothing; couriers' parcels wait on the couriers | Accepted |
 
 ---
 
@@ -27612,3 +27613,51 @@
     can't see, and the receipt's text could talk it round. The comparison is Hatti's own code.
   * **Marking the order paid when everything matches:** rejected. A screenshot is not money in
     the bank.
+
+## ADR-846 · A cash-on-delivery parcel out with the shop's own rider may be paid online at the door: its page offers what the rider would collect, the rider shows it as a QR code, and paid, the rider collects nothing; couriers' parcels wait on the couriers
+
+* **Context:**
+  * PAY-09 asks for a pay-now link or QR code when a parcel is out for delivery, so a customer
+    without cash, or who would rather not hand it over, can pay online at the door.
+  * An order's page took online only what it waited for before it shipped (ADR-151), or the
+    rest of a cash-on-delivery order offered credit for it before it was packed (ADR-432). Paid
+    online after it shipped, its cash to collect stayed as it was.
+  * No courier's API takes a change of a booked parcel's cash to collect. A customer who paid
+    online would be asked for the cash again (OWN-33).
+  * The shop's own riders (ADR-824, ADR-825) are Hatti's to tell: their page says what to
+    collect.
+* **Decision:**
+  * **Handing a cash-on-delivery order to the shop's rider opens its door** to paying online.
+    The order keeps the parcel that is out (migration 0361), while it is open and has cash to
+    collect.
+    * The door closes when the rider says the parcel was delivered or not.
+    * A courier's parcel never opens it.
+  * **While it is open, the order's page offers that cash online,** through the shop's
+    gateways, as "instead of cash to the rider", under "out for delivery today". What it offers
+    is the most of what it waits for, the credit offer's rest and the door's cash
+    (`doorOwed` in `onlineOwed`).
+  * **Paid online at the door, the cash to collect comes down,** as before a parcel ships
+    (ADR-432).
+  * **The rider's page:**
+    * It reads what to collect each time it is shown: what was due when the parcel went out, at
+      most the order's cash to collect now. "Paid online: collect nothing" once it is paid.
+    * Delivering takes no more cash than that.
+    * While there is cash to collect and the shop takes payments online, a "Customer pays
+      online" button shows the order's page as a QR code to scan, with the amount and a reload.
+      The same link is shown again while it works. Otherwise a new one is made, which the
+      order's timeline says went with the rider, and the link before stops working, as any new
+      link does (ADR-337).
+* **Consequences:**
+  * A customer who pays as the rider marks it delivered, with cash, has paid twice. The online
+    payment is then beyond what was owed and goes on the timeline for the shop to give back
+    (ADR-151).
+  * The rider's code message (ADR-825) doesn't mention paying online. The customer learns of it
+    at the door, or on the order's page.
+  * Not yet: couriers' parcels. They wait on the couriers saying how a booked parcel's cash is
+    changed, and how soon their rider is told (OWN-33).
+* **Alternatives:**
+  * **A pay page of the rider's own, on a token of the delivery:** it would repeat the order's
+    page and its gateways' return. The order's page already takes the payment and shows the
+    order.
+  * **Offering it for couriers' parcels and refunding the cash collected:** rejected. The
+    customer would be asked to pay twice at their door.

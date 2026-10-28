@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Paying online at the door
+
+* **Delivery:** a cash-on-delivery parcel out with the shop's own rider may be paid online at
+  the door. Its page offers what the rider would collect, and the rider shows that page as a QR
+  code. Once it is paid, the rider's page says to collect nothing (PAY-09, [ADR-846](../architecture/13-decision-log.md#adr-846--a-cash-on-delivery-parcel-out-with-the-shops-own-rider-may-be-paid-online-at-the-door-its-page-offers-what-the-rider-would-collect-the-rider-shows-it-as-a-qr-code-and-paid-the-rider-collects-nothing-couriers-parcels-wait-on-the-couriers)). Couriers'
+  parcels wait on the couriers changing a booked parcel's cash (OWN-33).
+* 4472 tests (3 new).
+
 ### 52af90c · Receipts for transfers, read by the AI
 
 * **Payments:** staff have a customer's receipt read by the AI, the receipt alone sent. They see
