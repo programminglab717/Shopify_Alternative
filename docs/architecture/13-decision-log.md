@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-865 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-866 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -873,6 +873,7 @@
 | 863 | Seasons that follow the moon: Ramadan and the run-up to Eid ul Adha from Pakistan's Islamic dates, each variant's lift through last year's season, and reorders counting on it | Accepted |
 | 864 | Single sign-on for a shop's staff through its organisation's identity provider, over OpenID Connect: required if the shop says so, its sessions reaching that shop alone | Accepted |
 | 865 | Prices in shoppers' own currencies: a shop shows dirhams, riyals, pounds, dollars or euros at a rate it fixes or the day's from an open feed, rounded as it asks, and charges rupees | Accepted |
+| 866 | Theme experiments: a draft theme shown a share of shoppers, each keeping their arm, counted as the shop's funnel is, and ended by Hatti when it sells clearly worse | Accepted |
 
 ---
 
@@ -28572,3 +28573,52 @@
     canonical address and sitemap would multiply. It may come with international domains.
   * **A paid rates API (Open Exchange Rates, Fixer):** the open feed carries the rupee daily for
     nothing.
+
+## ADR-866 · Theme experiments: a draft theme shown a share of shoppers, each keeping their arm, counted as the shop's funnel is, and ended by Hatti when it sells clearly worse
+
+* **Context:**
+  * OS-22 asks for A/B testing of sections, offers and prices, with guardrails.
+  * Shops prepare drafts of their themes already (ADR-320) and preview them (ADR-049), but can
+    only guess whether a new home page or an Eid banner sells better before publishing it.
+* **Decision:**
+  * **An experiment** (Online store › Themes › Experiments):
+    * The shop shows a draft theme to a share of its shoppers, 1 to 50%, for 1 to 30 days; the
+      rest see the live theme. One runs at a time. Sections, offers' banners and any setting a
+      theme holds are tried this way.
+    * It ends when staff end it, on its last day, when a theme is published (the live arm
+      changed) or its draft deleted, or by the guardrail.
+  * **The storefront:**
+    * The shop's document names the running experiment and its draft's version. The draft's
+      files are written beside the main theme's, before the document.
+    * A shopper is put in an arm on their first page, by the share, and keeps it in a
+      `hatti_ab` cookie. Robots always see the live theme, as search engines must.
+    * Pages of the draft, and the first page that sets the cookie, are the shopper's own
+      (`private, no-store`). The live theme's pages stay cached. Once the edge exists, its cache
+      rule bypasses requests whose `hatti_ab` cookie names the draft's arm.
+  * **Counting:**
+    * Each arm's sessions, and those that added to the cart, reached checkout and ordered, are
+      counted as the day's are (ADR-180): HyperLogLogs of session IDs.
+    * The worker keeps each arm's counts with the experiment every minute.
+  * **What it says:** once each arm has 200 sessions, a two-proportion z-test of their share of
+    sessions that ordered says whether the draft sells better or worse at 95%, or shows no
+    difference.
+  * **The guardrail:** with 500 sessions each, a draft worse at 99.5% is ended by the worker, so
+    a shop never loses much to a test.
+* **Consequences:**
+  * A shop tries its Eid look on a fifth of its shoppers before giving it to all of them, and
+    publishes it knowing it sells.
+  * Draft pages are rendered for each shopper. A shop runs one experiment at a time, at most
+    half its shoppers, for at most 30 days.
+  * Not yet:
+    * price tests: the same product at two prices to two shoppers. They need checkout to charge
+      each shopper their arm's price, and the owner's view on fairness and the law (OWN-56);
+    * tests of a section alone within one theme;
+    * revenue per session as the measure;
+    * more than two arms.
+* **Alternatives:**
+  * **Splitting in the browser:** a script swapping sections after the page loads. Pages flash,
+    and robots and slow phones see both.
+  * **A paid testing service (VWO, Optimizely):** paid, and blind to cash-on-delivery orders
+    confirmed later.
+  * **Bayesian probabilities:** friendlier words, but a test that peeks every minute needs
+    stricter thresholds either way. The z-test with a strict guardrail is simple to check.

@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Theme experiments
+
+* **Online store › Themes › Experiments:** a shop tries a draft theme, a new home page or an Eid
+  banner, on a share of its shoppers for up to 30 days. Each shopper keeps the theme first shown
+  them (OS-22, [ADR-866](../architecture/13-decision-log.md#adr-866--theme-experiments-a-draft-theme-shown-a-share-of-shoppers-each-keeping-their-arm-counted-as-the-shops-funnel-is-and-ended-by-hatti-when-it-sells-clearly-worse)).
+* **Results:** each theme's visits, carts and orders. Once each has 200 visits, whether the draft
+  sells better or worse. Hatti ends one whose draft sells clearly worse. Price tests wait on
+  OWN-56.
+* 4649 tests (9 new, the admin's check of each new GraphQL operation among them).
+
 ### fdcadbc · Prices in shoppers' currencies
 
 * **Settings › Currencies:** a shop shows its prices in dirhams, riyals, pounds, dollars or euros
