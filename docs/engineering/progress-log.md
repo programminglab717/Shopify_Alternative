@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Buy buttons
+### c69ae2c · Buy buttons
 
 * **Products:** an active product's page gives a snippet to paste into a blog, another website
   or a link page. It shows the product with its photo, price and variants, in English or Urdu,
