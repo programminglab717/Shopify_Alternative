@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Receipts for transfers, read by the AI
+### 2ac4fd6 · Receipts for transfers, read by the AI
 
 * **Payments:** staff have a customer's receipt read by the AI, the receipt alone sent. They see
   what it says beside Hatti's checks: the amount against what the order waited for, the account
