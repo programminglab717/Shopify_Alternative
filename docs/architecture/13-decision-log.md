@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-891 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-892 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -899,6 +899,7 @@
 | 889 | An age gate: a shop selling what is only for adults asks each visitor to confirm an age from 13 to 25 before its pages show, in the browser, the answer kept a month | Accepted |
 | 890 | The Storefront API serves the shop's menus, pages, blogs, articles and policies, as Shopify's names and shapes them, from its storefront documents | Accepted |
 | 891 | The forecast's seasons include those on the same days each year: the summer lawn launch, the run-up to Independence Day, the winter collection and the wedding season, the moon's season counted on where two meet | Accepted |
+| 892 | A supplier's lead time: the days it takes to deliver, which a reorder covers as well as the days chosen, and from which its goods are expected | Accepted |
 
 ---
 
@@ -29556,3 +29557,31 @@
     seasons: their days are too few to read a lift from.
   * Still not done: a forecast by week or a chart of it, and the days a supplier takes to
     deliver.
+
+## ADR-892 · A supplier's lead time: the days it takes to deliver, which a reorder covers as well as the days chosen, and from which its goods are expected
+
+* **Context:** a reorder from what runs low (ADR-354, ADR-368) was suggested to last the days
+  chosen from today. Goods from a mill in Faisalabad take two or three weeks to come. What sells
+  in those weeks comes out of what the shop has now, so the order came short by as much. ADR-891
+  left the days a supplier takes for later.
+* **Decision:**
+  * **A supplier's lead time:** `inventory.suppliers.lead_time_days`, 0 to 180 days, or none
+    where the shop has not said (migration 0391).
+    * Set as the supplier is added or changed. A null clears it.
+    * `Supplier.leadTimeDays` and `SupplierInput.leadTimeDays` in the API.
+    * Outside 0 to 180, or not whole, is `INVALID` on `input.leadTimeDays`.
+  * **The suppliers page:** a "Days to deliver" field, checked as typed, and "Delivers in N
+    days" under the supplier's name.
+  * **A new purchase order:**
+    * Lines from what runs low are suggested for the lead time plus the days chosen. The pace
+      and season are reckoned over the whole span, as before (ADR-863).
+    * They are suggested again when the supplier changes. Lines added by hand stay as typed.
+    * The form says the lead time is covered.
+    * "Expected on" starts at today plus the lead time, until typed, and says so.
+  * **A supplier without a lead time** is taken as 0 days: the suggestion is as it was.
+* **Consequences:**
+  * Orders from slow suppliers come in large enough, and their day expected is filled in, so
+    late goods show on the purchase orders page.
+  * The lead time is the shop's word, not learned from when past orders came; reckoning it from
+    orders' expected and received days is left for later.
+  * Still not done: a forecast by week, or a chart of it.
