@@ -49,6 +49,12 @@ const toAction = (action: WorkflowAction) => ({
     action.type === 'app_action'
       ? Object.entries(action.properties).map(([key, value]) => ({ key, value }))
       : [],
+  hours: action.type === 'wait' ? action.hours : null,
+  match: action.type === 'continue_if' ? enumOf(action.match) : null,
+  conditions:
+    action.type === 'continue_if'
+      ? action.conditions.map((each) => ({ ...each, operator: enumOf(each.operator) }))
+      : [],
 });
 
 const toWorkflow = (record: WorkflowRecord): Workflow =>
@@ -104,6 +110,13 @@ function inputOf(input: WorkflowInput): WorkflowServiceInput {
       message: action.message,
       extensionId: decoded(action.extensionId),
       properties: action.properties,
+      hours: action.hours,
+      match: action.match ? keptOf(action.match) : null,
+      conditions: action.conditions?.map((each) => ({
+        field: each.field,
+        operator: keptOf(each.operator),
+        value: each.value,
+      })),
     })),
     enabled: input.enabled,
   };

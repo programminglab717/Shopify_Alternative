@@ -22426,8 +22426,17 @@ type Workflow {
 
 """An action of a workflow, with what its type takes."""
 type WorkflowAction {
+  """A check's conditions; none for the rest."""
+  conditions: [WorkflowCondition!]!
+
   """An app's action."""
   extensionId: ID
+
+  """A wait's hours, 1 to 168."""
+  hours: Int
+
+  """A check's: whether all its conditions must hold, or any."""
+  match: WorkflowMatch
   message: String
   properties: [FlowProperty!]!
 
@@ -22440,7 +22449,13 @@ type WorkflowAction {
 }
 
 input WorkflowActionInput {
+  """A check's."""
+  conditions: [WorkflowConditionInput!]
   extensionId: ID
+
+  """A wait's hours, 1 to 168."""
+  hours: Int
+  match: WorkflowMatch
   message: String
   properties: [FlowPropertyInput!]
   tags: [String!]
@@ -22449,15 +22464,17 @@ input WorkflowActionInput {
 }
 
 """
-What a workflow does: tags added to or taken from the order or its customer; the owner's and managers' phones told; or APP_ACTION, an action an app offers, posted to it signed.
+What a workflow does: tags added to or taken from the order or its customer; the owner's and managers' phones told; APP_ACTION, an action an app offers, posted to it signed; WAIT, hours before the next action (ADR-886); or CONTINUE_IF, conditions checked of the order or customer as they are then, the rest left where they do not hold.
 """
 enum WorkflowActionType {
   ADD_CUSTOMER_TAGS
   ADD_ORDER_TAGS
   APP_ACTION
+  CONTINUE_IF
   NOTIFY_STAFF
   REMOVE_CUSTOMER_TAGS
   REMOVE_ORDER_TAGS
+  WAIT
 }
 
 type WorkflowCondition {

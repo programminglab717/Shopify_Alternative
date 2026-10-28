@@ -12654,6 +12654,13 @@ const WORKFLOW = /* GraphQL */ `
         key
         value
       }
+      hours
+      match
+      conditions {
+        field
+        operator
+        value
+      }
     }
     enabled
     lastRunStatus

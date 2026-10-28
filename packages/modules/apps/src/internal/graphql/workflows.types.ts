@@ -64,13 +64,17 @@ export enum WorkflowActionType {
   REMOVE_CUSTOMER_TAGS = 'REMOVE_CUSTOMER_TAGS',
   NOTIFY_STAFF = 'NOTIFY_STAFF',
   APP_ACTION = 'APP_ACTION',
+  WAIT = 'WAIT',
+  CONTINUE_IF = 'CONTINUE_IF',
 }
 
 registerEnumType(WorkflowActionType, {
   name: 'WorkflowActionType',
   description:
     "What a workflow does: tags added to or taken from the order or its customer; the owner's " +
-    "and managers' phones told; or APP_ACTION, an action an app offers, posted to it signed.",
+    "and managers' phones told; APP_ACTION, an action an app offers, posted to it signed; " +
+    'WAIT, hours before the next action (ADR-886); or CONTINUE_IF, conditions checked of the ' +
+    'order or customer as they are then, the rest left where they do not hold.',
 });
 
 export enum WorkflowRunStatus {
@@ -225,6 +229,18 @@ export class WorkflowAction {
 
   @Field(() => [FlowProperty])
   properties!: FlowProperty[];
+
+  @Field(() => Int, { nullable: true, description: "A wait's hours, 1 to 168." })
+  hours!: number | null;
+
+  @Field(() => WorkflowMatch, {
+    nullable: true,
+    description: "A check's: whether all its conditions must hold, or any.",
+  })
+  match!: WorkflowMatch | null;
+
+  @Field(() => [WorkflowCondition], { description: "A check's conditions; none for the rest." })
+  conditions!: WorkflowCondition[];
 }
 
 @ObjectType({
@@ -388,6 +404,15 @@ export class WorkflowActionInput {
 
   @Field(() => ID, { nullable: true })
   extensionId?: string | null;
+
+  @Field(() => Int, { nullable: true, description: "A wait's hours, 1 to 168." })
+  hours?: number | null;
+
+  @Field(() => WorkflowMatch, { nullable: true })
+  match?: WorkflowMatch | null;
+
+  @Field(() => [WorkflowConditionInput], { nullable: true, description: "A check's." })
+  conditions?: WorkflowConditionInput[] | null;
 
   @Field(() => [FlowPropertyInput], { nullable: true })
   properties?: FlowPropertyInput[] | null;

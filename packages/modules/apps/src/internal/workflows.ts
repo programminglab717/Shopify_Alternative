@@ -10,7 +10,10 @@ export const WORKFLOW_LIMITS = {
   perShop: 50,
   name: 100,
   conditions: 10,
-  actions: 5,
+  /** Actions done in turn, waits and checks among them (ADR-886). */
+  actions: 10,
+  /** The longest a wait waits, in hours: a week. */
+  waitHours: 168,
   /** A condition's value, and a template's. */
   value: 200,
   title: 80,
@@ -33,7 +36,7 @@ export const WORKFLOW_LIMITS = {
   keptDays: 30,
   /** Runs a sweep takes up. */
   batch: 25,
-  /** How long an app's action is tried for, from when the run was made. */
+  /** How long an app's action is tried for, from when the run was made or last waited till. */
   triesForMs: 24 * 3_600_000,
 } as const;
 
@@ -179,6 +182,33 @@ export const ORDER_FIELDS: readonly FactField[] = [
     ],
   },
   { key: 'order.delivery_method', type: 'choice', options: ['shipping', 'pickup'] },
+  // Where the order is now, as the admin shows it, and its confirmation (ADR-886): read again
+  // after a wait, "is it still waiting to be confirmed?".
+  {
+    key: 'order.stage',
+    type: 'choice',
+    options: [
+      'needs_confirmation',
+      'needs_review',
+      'awaiting_payment',
+      'to_pack',
+      'to_book',
+      'ready_for_pickup',
+      'partially_fulfilled',
+      'in_transit',
+      'returning',
+      'delivered',
+      'returned',
+      'lost',
+      'completed',
+      'cancelled',
+    ],
+  },
+  {
+    key: 'order.confirmation_status',
+    type: 'choice',
+    options: ['not_required', 'pending', 'confirmed', 'rejected', 'no_response', 'needs_review'],
+  },
   { key: 'order.risk_level', type: 'choice', options: ['low', 'medium', 'high', 'none'] },
   { key: 'order.city', type: 'text' },
   { key: 'order.tags', type: 'list' },
@@ -342,6 +372,10 @@ export const WORKFLOW_ACTIONS = {
   remove_customer_tags: { needs: 'customer' },
   notify_staff: { needs: null },
   app_action: { needs: null },
+  // The run waits, then goes on with the order or customer as they are then (ADR-886).
+  wait: { needs: null },
+  // The run goes on only where these hold then; else the rest is left (ADR-886).
+  continue_if: { needs: null },
 } as const satisfies Record<string, { needs: 'order' | 'customer' | null }>;
 
 export type WorkflowActionType = keyof typeof WORKFLOW_ACTIONS;
@@ -353,7 +387,9 @@ export type WorkflowAction =
       tags: string[];
     }
   | { type: 'notify_staff'; title: string; message: string }
-  | { type: 'app_action'; extensionId: string; properties: Record<string, string> };
+  | { type: 'app_action'; extensionId: string; properties: Record<string, string> }
+  | { type: 'wait'; hours: number }
+  | { type: 'continue_if'; match: 'all' | 'any'; conditions: WorkflowCondition[] };
 
 /** What a run of a workflow on `trigger` is about, as far as its actions can tell. */
 export function subjectsOf(

@@ -6152,7 +6152,9 @@ export type WorkflowActionType =
   | 'ADD_CUSTOMER_TAGS'
   | 'REMOVE_CUSTOMER_TAGS'
   | 'NOTIFY_STAFF'
-  | 'APP_ACTION';
+  | 'APP_ACTION'
+  | 'WAIT'
+  | 'CONTINUE_IF';
 
 export type WorkflowRunStatus = 'PENDING' | 'DONE' | 'SKIPPED' | 'FAILED';
 
@@ -6180,6 +6182,12 @@ export interface WorkflowAction {
   message: string | null;
   extensionId: string | null;
   properties: { key: string; value: string }[];
+  /** A wait's hours (ADR-886). */
+  hours: number | null;
+  /** A check's: whether all its conditions must hold, or any. */
+  match: 'ALL' | 'ANY' | null;
+  /** A check's conditions, of the order or customer as they are then. */
+  conditions: WorkflowCondition[];
 }
 
 export interface Workflow {

@@ -34,6 +34,7 @@ import { TextField } from '../ui/field';
 import { BackToSettings } from './settings-page';
 import { CheckField, SelectField } from './settings-form';
 import {
+  MOST_ACTIONS,
   OPERATORS,
   TEMPLATES,
   TRIGGERS,
@@ -184,6 +185,133 @@ export function WorkflowsPage() {
   );
 }
 
+/**
+ * Conditions on what a workflow is about, and whether all must hold or any: the workflow's own,
+ * or a check's among its actions (ADR-886), whose labels name its action.
+ */
+function Conditions({
+  fields,
+  match,
+  conditions,
+  action,
+  onChange,
+}: {
+  fields: FactField[];
+  match: 'ALL' | 'ANY';
+  conditions: WorkflowCondition[];
+  /** The check's action number; none for the workflow's own conditions. */
+  action?: number;
+  onChange: (patch: { match?: 'ALL' | 'ANY'; conditions?: WorkflowCondition[] }) => void;
+}) {
+  const { t } = useLocale();
+  const fieldName = (field: FactField) => field.label ?? t(fieldLabel(field.key));
+  const label = (key: MessageKey, number?: number) =>
+    action === undefined
+      ? t(key, { number: number ?? 0 })
+      : t('workflow.ofAction', { action, words: t(key, { number: number ?? 0 }) });
+  const setCondition = (index: number, patch: Partial<WorkflowCondition>) =>
+    onChange({
+      conditions: conditions.map((each, at) => (at === index ? { ...each, ...patch } : each)),
+    });
+  return (
+    <>
+      {conditions.length === 0 && action === undefined && (
+        <p className="text-secondary">{t('workflow.noConditions')}</p>
+      )}
+      {conditions.length > 1 && (
+        <SelectField
+          label={label('workflow.match')}
+          value={match}
+          options={[
+            { value: 'ALL', label: t('workflow.matchAll') },
+            { value: 'ANY', label: t('workflow.matchAny') },
+          ]}
+          onChange={(match) => onChange({ match })}
+        />
+      )}
+      {conditions.map((condition, index) => {
+        const field = fields.find((each) => each.key === condition.field) ?? fields[0];
+        if (!field) return null;
+        const number = index + 1;
+        return (
+          <fieldset key={index} className="flex flex-col gap-2 border-t border-line pt-3">
+            <legend className="sr-only">{t('workflow.condition', { number })}</legend>
+            <SelectField
+              label={label('workflow.conditionField', number)}
+              value={field.key}
+              options={fields.map((each) => ({ value: each.key, label: fieldName(each) }))}
+              onChange={(key) => {
+                const next = fields.find((each) => each.key === key)!;
+                setCondition(index, {
+                  field: key,
+                  operator: OPERATORS[next.type][0]!,
+                  value: next.options?.[0] ?? (next.type === 'boolean' ? 'true' : ''),
+                });
+              }}
+            />
+            <SelectField
+              label={label('workflow.conditionOperator', number)}
+              value={condition.operator}
+              options={OPERATORS[field.type].map((each) => ({
+                value: each,
+                label: t(`workflow.op.${each}` as MessageKey),
+              }))}
+              onChange={(operator) => setCondition(index, { operator })}
+            />
+            {field.type === 'choice' || field.type === 'boolean' ? (
+              <SelectField
+                label={label('workflow.conditionValue', number)}
+                value={condition.value}
+                options={(field.options ?? ['true', 'false']).map((each) => ({
+                  value: each,
+                  label: t(valueLabel(each)),
+                }))}
+                onChange={(value) => setCondition(index, { value })}
+              />
+            ) : (
+              <TextField
+                label={label('workflow.conditionValue', number)}
+                inputMode={field.type === 'number' ? 'decimal' : undefined}
+                value={condition.value}
+                onChange={(event) => setCondition(index, { value: event.target.value })}
+              />
+            )}
+            <Button
+              variant="secondary"
+              className="self-start"
+              icon={<Trash2 aria-hidden className="size-5" />}
+              onClick={() => onChange({ conditions: conditions.filter((_, at) => at !== index) })}
+            >
+              {label('workflow.removeCondition', number)}
+            </Button>
+          </fieldset>
+        );
+      })}
+      {fields.length > 0 && (
+        <Button
+          variant="secondary"
+          className="self-start"
+          icon={<Plus aria-hidden className="size-5" />}
+          onClick={() =>
+            onChange({
+              conditions: [
+                ...conditions,
+                {
+                  field: fields[0]!.key,
+                  operator: OPERATORS[fields[0]!.type][0]!,
+                  value: fields[0]!.options?.[0] ?? '',
+                },
+              ],
+            })
+          }
+        >
+          {label('workflow.addCondition')}
+        </Button>
+      )}
+    </>
+  );
+}
+
 function WorkflowEditor({
   initial,
   extensions,
@@ -213,16 +341,11 @@ function WorkflowEditor({
     ...(appActions.length > 0 ? (['APP_ACTION'] as const) : []),
   ];
   const change = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
-  const setCondition = (index: number, patch: Partial<WorkflowCondition>) =>
-    change({
-      conditions: draft.conditions.map((each, at) => (at === index ? { ...each, ...patch } : each)),
-    });
   const setAction = (index: number, patch: Partial<WorkflowAction>) =>
     change({
       actions: draft.actions.map((each, at) => (at === index ? { ...each, ...patch } : each)),
     });
 
-  const fieldName = (field: FactField) => field.label ?? t(fieldLabel(field.key));
   const show = (errors: UserError[]) => {
     if (errors[0]) setProblem(problemText(errors[0], t));
     return errors.length === 0;
@@ -290,101 +413,12 @@ function WorkflowEditor({
 
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="font-semibold">{t('workflow.conditions')}</h2>
-        {draft.conditions.length === 0 && (
-          <p className="text-secondary">{t('workflow.noConditions')}</p>
-        )}
-        {draft.conditions.length > 1 && (
-          <SelectField
-            label={t('workflow.match')}
-            value={draft.match}
-            options={[
-              { value: 'ALL', label: t('workflow.matchAll') },
-              { value: 'ANY', label: t('workflow.matchAny') },
-            ]}
-            onChange={(match) => change({ match })}
-          />
-        )}
-        {draft.conditions.map((condition, index) => {
-          const field = fields.find((each) => each.key === condition.field) ?? fields[0];
-          if (!field) return null;
-          const number = index + 1;
-          return (
-            <fieldset key={index} className="flex flex-col gap-2 border-t border-line pt-3">
-              <legend className="sr-only">{t('workflow.condition', { number })}</legend>
-              <SelectField
-                label={t('workflow.conditionField', { number })}
-                value={field.key}
-                options={fields.map((each) => ({ value: each.key, label: fieldName(each) }))}
-                onChange={(key) => {
-                  const next = fields.find((each) => each.key === key)!;
-                  setCondition(index, {
-                    field: key,
-                    operator: OPERATORS[next.type][0]!,
-                    value: next.options?.[0] ?? (next.type === 'boolean' ? 'true' : ''),
-                  });
-                }}
-              />
-              <SelectField
-                label={t('workflow.conditionOperator', { number })}
-                value={condition.operator}
-                options={OPERATORS[field.type].map((each) => ({
-                  value: each,
-                  label: t(`workflow.op.${each}` as MessageKey),
-                }))}
-                onChange={(operator) => setCondition(index, { operator })}
-              />
-              {field.type === 'choice' || field.type === 'boolean' ? (
-                <SelectField
-                  label={t('workflow.conditionValue', { number })}
-                  value={condition.value}
-                  options={(field.options ?? ['true', 'false']).map((each) => ({
-                    value: each,
-                    label: t(valueLabel(each)),
-                  }))}
-                  onChange={(value) => setCondition(index, { value })}
-                />
-              ) : (
-                <TextField
-                  label={t('workflow.conditionValue', { number })}
-                  inputMode={field.type === 'number' ? 'decimal' : undefined}
-                  value={condition.value}
-                  onChange={(event) => setCondition(index, { value: event.target.value })}
-                />
-              )}
-              <Button
-                variant="secondary"
-                className="self-start"
-                icon={<Trash2 aria-hidden className="size-5" />}
-                onClick={() =>
-                  change({ conditions: draft.conditions.filter((_, at) => at !== index) })
-                }
-              >
-                {t('workflow.removeCondition', { number })}
-              </Button>
-            </fieldset>
-          );
-        })}
-        {fields.length > 0 && (
-          <Button
-            variant="secondary"
-            className="self-start"
-            icon={<Plus aria-hidden className="size-5" />}
-            onClick={() =>
-              change({
-                conditions: [
-                  ...draft.conditions,
-                  {
-                    field: fields[0]!.key,
-                    operator: OPERATORS[fields[0]!.type][0]!,
-                    value: fields[0]!.options?.[0] ?? '',
-                  },
-                ],
-              })
-            }
-          >
-            {t('workflow.addCondition')}
-          </Button>
-        )}
+        <Conditions
+          fields={fields}
+          match={draft.match}
+          conditions={draft.conditions}
+          onChange={(patch) => change(patch)}
+        />
       </Card>
 
       <Card className="flex flex-col gap-3 p-4">
@@ -445,6 +479,36 @@ function WorkflowEditor({
                   />
                 </>
               )}
+              {action.type === 'WAIT' && (
+                <TextField
+                  label={t('workflow.hours', { number })}
+                  hint={t('workflow.hoursHint')}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={168}
+                  value={action.hours ?? ''}
+                  onChange={(event) =>
+                    setAction(index, {
+                      hours: event.target.value === '' ? null : Number(event.target.value),
+                    })
+                  }
+                />
+              )}
+              {action.type === 'CONTINUE_IF' && (
+                <>
+                  <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {t('workflow.checkHint')}
+                  </p>
+                  <Conditions
+                    fields={fields}
+                    match={action.match ?? 'ALL'}
+                    conditions={action.conditions}
+                    action={number}
+                    onChange={(patch) => setAction(index, patch)}
+                  />
+                </>
+              )}
               {appAction?.fields.map((field) => (
                 <TextField
                   key={field.key}
@@ -474,7 +538,7 @@ function WorkflowEditor({
             </fieldset>
           );
         })}
-        {draft.actions.length < 5 && (
+        {draft.actions.length < MOST_ACTIONS && (
           <Button
             variant="secondary"
             className="self-start"

@@ -135,6 +135,9 @@ describe('Workflows (DEV-11, ADR-861)', () => {
               message: null,
               extensionId: null,
               properties: [],
+              hours: null,
+              match: null,
+              conditions: [],
             },
             {
               type: 'APP_ACTION',
@@ -143,6 +146,9 @@ describe('Workflows (DEV-11, ADR-861)', () => {
               message: null,
               extensionId: 'fext_2',
               properties: [{ key: 'message', value: 'Thanks for {{order.name}}' }],
+              hours: null,
+              match: null,
+              conditions: [],
             },
           ],
           enabled: true,
@@ -158,6 +164,47 @@ describe('Workflows (DEV-11, ADR-861)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete workflow' }));
     expect(await screen.findByText('No workflows yet.')).toBeTruthy();
     expect(sentOf(fake, 'WorkflowDelete')).toEqual([{ id: 'wkfl_1' }]);
+  });
+
+  it('waits, then goes on only if the order is still unconfirmed (ADR-886)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/workflows');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Orders still unconfirmed after a day' }),
+    );
+    expect((screen.getByLabelText('Action 1') as HTMLSelectElement).value).toBe('WAIT');
+    expect((screen.getByLabelText('Hours action 1 waits') as HTMLInputElement).value).toBe('24');
+    expect((screen.getByLabelText('Action 2') as HTMLSelectElement).value).toBe('CONTINUE_IF');
+    const checked = screen.getByLabelText('Action 2: What condition 1 checks') as HTMLSelectElement;
+    expect(checked.value).toBe('order.confirmation_status');
+    expect(
+      (screen.getByLabelText('Action 2: Value for condition 1') as HTMLSelectElement).value,
+    ).toBe('confirmed');
+    // Two days, and also go on only while it is still to be confirmed.
+    type('Hours action 1 waits', '48');
+    fireEvent.click(screen.getByRole('button', { name: 'Action 2: Add a condition' }));
+    fireEvent.change(screen.getByLabelText('Action 2: What condition 2 checks'), {
+      target: { value: 'order.stage' },
+    });
+    fireEvent.change(screen.getByLabelText('Action 2: Value for condition 2'), {
+      target: { value: 'needs_confirmation' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save workflow' }));
+    await waitFor(() => expect(sentOf(fake, 'WorkflowCreate')).toHaveLength(1));
+    const { actions } = (sentOf(fake, 'WorkflowCreate')[0] as { input: { actions: unknown[] } })
+      .input;
+    expect(actions.slice(0, 2)).toEqual([
+      expect.objectContaining({ type: 'WAIT', hours: 48 }),
+      expect.objectContaining({
+        type: 'CONTINUE_IF',
+        match: 'ALL',
+        conditions: [
+          { field: 'order.confirmation_status', operator: 'NOT_EQUALS', value: 'confirmed' },
+          { field: 'order.stage', operator: 'EQUALS', value: 'needs_confirmation' },
+        ],
+      }),
+    ]);
   });
 
   it("offers an app's trigger, its fields to check, and its order's", async () => {

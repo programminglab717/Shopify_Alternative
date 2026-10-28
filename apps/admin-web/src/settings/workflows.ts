@@ -46,6 +46,32 @@ export const ORDER_FIELDS: readonly FactField[] = [
     ],
   },
   { key: 'order.delivery_method', type: 'choice', options: ['shipping', 'pickup'] },
+  // Where the order is now (ADR-886): read again after a wait.
+  {
+    key: 'order.stage',
+    type: 'choice',
+    options: [
+      'needs_confirmation',
+      'needs_review',
+      'awaiting_payment',
+      'to_pack',
+      'to_book',
+      'ready_for_pickup',
+      'partially_fulfilled',
+      'in_transit',
+      'returning',
+      'delivered',
+      'returned',
+      'lost',
+      'completed',
+      'cancelled',
+    ],
+  },
+  {
+    key: 'order.confirmation_status',
+    type: 'choice',
+    options: ['pending', 'confirmed', 'no_response', 'rejected', 'needs_review', 'not_required'],
+  },
   { key: 'order.risk_level', type: 'choice', options: ['low', 'medium', 'high', 'none'] },
   { key: 'order.city', type: 'text' },
   { key: 'order.tags', type: 'list' },
@@ -120,8 +146,13 @@ export function actionsOf(trigger: WorkflowTriggerType, extension: FlowExtension
     ...(has.order ? (['ADD_ORDER_TAGS', 'REMOVE_ORDER_TAGS'] as const) : []),
     ...(has.customer ? (['ADD_CUSTOMER_TAGS', 'REMOVE_CUSTOMER_TAGS'] as const) : []),
     'NOTIFY_STAFF',
+    'WAIT',
+    'CONTINUE_IF',
   ] as WorkflowActionType[];
 }
+
+/** Actions a workflow does at most, waits and checks among them. */
+export const MOST_ACTIONS = 10;
 
 export const fieldLabel = (key: string): MessageKey =>
   `workflow.field.${key.replace('.', '_')}` as MessageKey;
@@ -134,6 +165,9 @@ export const blankAction = (type: WorkflowActionType): WorkflowAction => ({
   message: type === 'NOTIFY_STAFF' ? '' : null,
   extensionId: null,
   properties: [],
+  hours: type === 'WAIT' ? 24 : null,
+  match: type === 'CONTINUE_IF' ? 'ALL' : null,
+  conditions: [],
 });
 
 const notify = (title: string, message: string): WorkflowAction => ({
@@ -194,6 +228,31 @@ export const TEMPLATES: readonly { id: string; label: MessageKey; workflow: Work
       match: 'ALL',
       conditions: [{ field: 'customer.returned_orders', operator: 'AT_LEAST', value: '2' }],
       actions: [tag('ADD_CUSTOMER_TAGS', ['returns-often'])],
+      enabled: true,
+    },
+  },
+  {
+    id: 'unconfirmed',
+    label: 'workflow.template.unconfirmed',
+    workflow: {
+      name: 'Orders still unconfirmed after a day',
+      trigger: 'ORDER_CREATED',
+      extensionId: null,
+      match: 'ALL',
+      conditions: [
+        { field: 'order.payment_method', operator: 'EQUALS', value: 'cash_on_delivery' },
+      ],
+      actions: [
+        { ...blankAction('WAIT'), hours: 24 },
+        {
+          ...blankAction('CONTINUE_IF'),
+          conditions: [
+            { field: 'order.confirmation_status', operator: 'NOT_EQUALS', value: 'confirmed' },
+          ],
+        },
+        tag('ADD_ORDER_TAGS', ['call-again']),
+        notify('{{order.name}} still unconfirmed', 'Call {{customer.name}} again today.'),
+      ],
       enabled: true,
     },
   },

@@ -56,6 +56,8 @@ export interface WorkflowSweep {
   failed: number;
   /** An app's action to try again. */
   retrying: number;
+  /** Runs waiting before their next action (ADR-886). */
+  waiting: number;
 }
 
 /** Rupees as a condition reads them: 2499.5 for Rs 2,499.50. */
@@ -73,6 +75,8 @@ export function orderFacts(order: OrderRecord): Record<string, FactValue> {
     'order.payment_method': order.paymentMethod,
     'order.source': order.source,
     'order.delivery_method': order.deliveryMethod,
+    'order.stage': order.stage,
+    'order.confirmation_status': order.confirmationStatus,
     'order.risk_level': order.risk?.level ?? 'none',
     'order.city': order.shippingAddress.city,
     'order.tags': order.tags,
@@ -107,6 +111,8 @@ interface Loaded {
  * one's conditions once, of the order or customer as they are then, and does its actions in
  * turn, each once. An app's action that did not answer is tried again, for a day, from it on;
  * one refused, or any other that could not be done, is recorded and the rest are done still.
+ * A wait leaves the run until it is up, and it goes on from the next action with the order or
+ * customer as they are then; a check leaves the rest where its conditions don't hold (ADR-886).
  */
 export class WorkflowRuns {
   constructor(
@@ -121,7 +127,7 @@ export class WorkflowRuns {
 
   /** One sweep at `at`. */
   async sweep(at: Date = new Date()): Promise<WorkflowSweep> {
-    const done: WorkflowSweep = { done: 0, skipped: 0, failed: 0, retrying: 0 };
+    const done: WorkflowSweep = { done: 0, skipped: 0, failed: 0, retrying: 0, waiting: 0 };
     for (const run of await this.workflows.claimDue(at)) {
       let outcome: WorkflowRunOutcome;
       try {
@@ -129,14 +135,15 @@ export class WorkflowRuns {
       } catch (error) {
         this.logger?.warn({ err: error, shopId: run.shopId, runId: run.id }, 'workflow run failed');
         // Tried again once its claim lapses, until its day is up.
-        if (at.getTime() - run.createdAt.getTime() < WORKFLOW_LIMITS.triesForMs) continue;
+        if (at.getTime() - run.since.getTime() < WORKFLOW_LIMITS.triesForMs) continue;
         outcome = { status: 'failed', conditionsMet: run.conditionsMet, steps: run.steps };
       }
       await this.workflows.finish(run, outcome, at);
-      if (outcome.status === 'pending') done.retrying += 1;
+      if (outcome.resumeAt) done.waiting += 1;
+      else if (outcome.status === 'pending') done.retrying += 1;
       else done[outcome.status] += 1;
     }
-    if (done.done + done.skipped + done.failed + done.retrying > 0) {
+    if (done.done + done.skipped + done.failed + done.retrying + done.waiting > 0) {
       this.logger?.info(done, 'workflows run');
     }
     return done;
@@ -152,10 +159,12 @@ export class WorkflowRuns {
   }
 
   async #run(run: DueWorkflowRun, at: Date): Promise<WorkflowRunOutcome> {
+    // Those done before a wait are kept; the next action is the one left out.
+    const next = run.actions[run.steps.length]?.type ?? run.actions[0]?.type ?? 'notify_staff';
     const skipped = (detail: string): WorkflowRunOutcome => ({
       status: 'skipped',
       conditionsMet: run.conditionsMet,
-      steps: [{ action: run.actions[0]?.type ?? 'notify_staff', outcome: 'skipped', detail }],
+      steps: [...run.steps, { action: next, outcome: 'skipped', detail }],
     });
     if (!run.enabled) return skipped('The workflow was turned off before it ran');
     const loaded = await this.#load(run);
@@ -163,10 +172,30 @@ export class WorkflowRuns {
     const met = run.conditionsMet ?? conditionsHold(run.match, run.conditions, loaded.facts);
     if (!met) return { status: 'skipped', conditionsMet: false, steps: [] };
 
-    // A run tried again goes on from the app's action that did not answer.
-    const steps: WorkflowStep[] = run.steps.slice(0, Math.max(0, run.steps.length - 1));
+    // A run tried again goes on from the app's action that did not answer; one that waited,
+    // from the action after its wait.
+    const last = run.steps.at(-1);
+    const again = last?.action === 'app_action' && last.outcome === 'failed';
+    const steps: WorkflowStep[] = again ? run.steps.slice(0, -1) : [...run.steps];
     for (let index = steps.length; index < run.actions.length; index += 1) {
       const action = run.actions[index]!;
+      if (action.type === 'wait') {
+        const resumeAt = new Date(at.getTime() + action.hours * 3_600_000);
+        steps.push({ action: 'wait', outcome: 'done', detail: `Until ${resumeAt.toISOString()}` });
+        return { status: 'pending', conditionsMet: true, steps, resumeAt };
+      }
+      if (action.type === 'continue_if') {
+        if (conditionsHold(action.match, action.conditions, loaded.facts)) {
+          steps.push({ action: 'continue_if', outcome: 'done', detail: null });
+          continue;
+        }
+        steps.push({
+          action: 'continue_if',
+          outcome: 'skipped',
+          detail: "Its conditions didn't hold: the rest was left",
+        });
+        break;
+      }
       const step = await this.#act(run, index, loaded, at);
       steps.push({ action: action.type, ...step });
       if (step.retry) return { status: 'pending', conditionsMet: true, steps: plain(steps) };
@@ -273,6 +302,10 @@ export class WorkflowRuns {
         );
         return { outcome: 'done', detail: `${told} ${told === 1 ? 'browser' : 'browsers'}` };
       }
+      case 'wait':
+      case 'continue_if':
+        // Done by the run itself, in turn.
+        return { outcome: 'done', detail: null };
       case 'app_action': {
         const properties = Object.fromEntries(
           Object.entries(action.properties).map(([key, value]) => [key, render(value, facts)]),
@@ -285,7 +318,7 @@ export class WorkflowRuns {
           at,
         );
         if (sent.error === null) return { outcome: 'done', detail: null };
-        const dayUp = at.getTime() - run.createdAt.getTime() >= WORKFLOW_LIMITS.triesForMs;
+        const dayUp = at.getTime() - run.since.getTime() >= WORKFLOW_LIMITS.triesForMs;
         return {
           outcome: 'failed',
           detail: sent.error.slice(0, 300),

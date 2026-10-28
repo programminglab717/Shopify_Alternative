@@ -95,6 +95,11 @@ export interface WorkflowActionInput {
   message?: string | null;
   extensionId?: string | null;
   properties?: { key: string; value: string }[] | null;
+  /** A wait's hours. */
+  hours?: number | null;
+  /** A check's conditions, and whether all must hold or any. */
+  match?: 'all' | 'any' | null;
+  conditions?: { field: string; operator: string; value: string }[] | null;
 }
 
 export interface WorkflowInput {
@@ -141,6 +146,8 @@ export interface DueWorkflowRun {
   steps: WorkflowStep[];
   attempts: number;
   createdAt: Date;
+  /** When it was made, or its last wait was up: an app's action is tried for a day from it. */
+  since: Date;
 }
 
 /** What became of a run's try. */
@@ -148,6 +155,8 @@ export interface WorkflowRunOutcome {
   status: WorkflowRunStatus;
   conditionsMet: boolean | null;
   steps: WorkflowStep[];
+  /** For a run waiting (ADR-886): when it goes on. */
+  resumeAt?: Date;
 }
 
 type ExtensionRow = {
@@ -541,7 +550,8 @@ export class WorkflowService {
     return this.db.system(async (tx) => {
       await tx.execute(sql`
         DELETE FROM apps.workflow_runs
-         WHERE created_at < ${new Date(at.getTime() - WORKFLOW_LIMITS.keptDays * 86_400_000)}`);
+         WHERE created_at < ${new Date(at.getTime() - WORKFLOW_LIMITS.keptDays * 86_400_000)}
+           AND status <> 'pending'`);
       const { rows } = await tx.execute<{
         shop_id: string;
         id: string;
@@ -559,6 +569,7 @@ export class WorkflowService {
         steps: WorkflowStep[];
         attempts: number;
         created_at: Date | string;
+        waited_until: Date | string | null;
       }>(sql`
         WITH due AS (
           SELECT shop_id, id FROM apps.workflow_runs
@@ -577,7 +588,7 @@ export class WorkflowService {
            AND w.shop_id = r.shop_id AND w.id = r.workflow_id
         RETURNING r.shop_id, r.id, r.workflow_id, w.name, w.trigger, e.resource, e.fields,
                   w.enabled, w.match, w.conditions, w.actions, r.subject, r.conditions_met,
-                  r.steps, r.attempts, r.created_at`);
+                  r.steps, r.attempts, r.created_at, r.waited_until`);
       return rows.map((row) => ({
         shopId: row.shop_id,
         id: row.id,
@@ -595,22 +606,27 @@ export class WorkflowService {
         steps: row.steps,
         attempts: row.attempts,
         createdAt: toDate(row.created_at),
+        since: toDate(row.waited_until ?? row.created_at),
       }));
     });
   }
 
   /**
-   * Records how a run's try went: finished, or pending, to be tried again after
-   * {@link retryDelayMs}, where an app's action did not answer and its day is not up.
+   * Records how a run's try went: finished; pending, to be tried again after
+   * {@link retryDelayMs}, where an app's action did not answer and its day is not up; or
+   * waiting until `resumeAt`, its tries counted afresh from then (ADR-886).
    */
   async finish(run: DueWorkflowRun, outcome: WorkflowRunOutcome, at: Date): Promise<void> {
     const finished = outcome.status !== 'pending';
+    const resumeAt = outcome.resumeAt ?? null;
     await this.db.tenant(run.shopId, (tx) =>
       tx.execute(sql`
         UPDATE apps.workflow_runs
            SET status = ${outcome.status}, conditions_met = ${outcome.conditionsMet},
                steps = ${JSON.stringify(outcome.steps)}::jsonb,
-               next_attempt_at = ${new Date(at.getTime() + retryDelayMs(run.attempts))},
+               next_attempt_at = ${resumeAt ?? new Date(at.getTime() + retryDelayMs(run.attempts))},
+               attempts = ${resumeAt ? 0 : run.attempts},
+               waited_until = coalesce(${resumeAt}::timestamptz, waited_until),
                finished_at = ${finished ? at : null}
          WHERE shop_id = ${run.shopId} AND id = ${run.id}`),
     );
@@ -857,17 +873,21 @@ async function checkWorkflow(
   if (conditions.length > WORKFLOW_LIMITS.conditions) {
     check.add(['input', 'conditions'], 'TOO_MANY', `can be ${WORKFLOW_LIMITS.conditions} at most`);
   }
-  const checkedConditions = conditions.map((condition, index): WorkflowCondition => {
-    const checked = {
-      field: condition.field,
-      operator: condition.operator as ConditionOperator,
-      value: condition.value.trim(),
-    };
-    const problem = conditionProblem(fields, checked);
-    if (problem)
-      check.add(['input', 'conditions', String(index), problem.on], 'INVALID', problem.message);
-    return checked;
-  });
+  const conditionsOf = (
+    path: string[],
+    given: readonly { field: string; operator: string; value: string }[],
+  ) =>
+    given.map((condition, index): WorkflowCondition => {
+      const checked = {
+        field: condition.field,
+        operator: condition.operator as ConditionOperator,
+        value: condition.value.trim(),
+      };
+      const problem = conditionProblem(fields, checked);
+      if (problem) check.add([...path, String(index), problem.on], 'INVALID', problem.message);
+      return checked;
+    });
+  const checkedConditions = conditionsOf(['input', 'conditions'], conditions);
 
   const template = (path: string[], value: string) => {
     const unknown = placeholdersOf(value).filter((key) => !keys.has(key));
@@ -945,6 +965,43 @@ async function checkWorkflow(
           template([...path, 'properties', String(index), 'value'], value);
         }
         return [{ type, extensionId: found.id, properties }];
+      }
+      case 'wait': {
+        const hours = action.hours ?? 0;
+        if (!Number.isInteger(hours) || hours < 1 || hours > WORKFLOW_LIMITS.waitHours) {
+          check.addMessage(
+            [...path, 'hours'],
+            'INVALID',
+            `A wait is a whole number of hours, 1 to ${WORKFLOW_LIMITS.waitHours}`,
+          );
+        }
+        if (index === input.actions.length - 1) {
+          check.addMessage([...path, 'type'], 'INVALID', 'A wait needs an action after it');
+        }
+        return [{ type, hours }];
+      }
+      case 'continue_if': {
+        const given = action.conditions ?? [];
+        if (given.length === 0) {
+          check.addMessage([...path, 'conditions'], 'BLANK', 'Give a condition to check');
+        }
+        if (given.length > WORKFLOW_LIMITS.conditions) {
+          check.add(
+            [...path, 'conditions'],
+            'TOO_MANY',
+            `can be ${WORKFLOW_LIMITS.conditions} at most`,
+          );
+        }
+        if (index === input.actions.length - 1) {
+          check.addMessage([...path, 'type'], 'INVALID', 'A check needs an action after it');
+        }
+        return [
+          {
+            type,
+            match: action.match === 'any' ? 'any' : 'all',
+            conditions: conditionsOf([...path, 'conditions'], given),
+          },
+        ];
       }
     }
   });

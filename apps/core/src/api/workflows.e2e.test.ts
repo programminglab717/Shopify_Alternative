@@ -34,7 +34,8 @@ const SET_EXTENSION = `mutation ($input: FlowExtensionInput!) {
 const WORKFLOW = `id name trigger enabled match lastRunStatus
   extension { handle }
   conditions { field operator value }
-  actions { type tags title message extensionId properties { key value } }`;
+  actions { type tags title message extensionId properties { key value }
+    hours match conditions { field operator value } }`;
 const CREATE = `mutation ($input: WorkflowInput!) {
   workflowCreate(input: $input) { workflow { ${WORKFLOW} } userErrors { field code message } } }`;
 const RUNS = `query ($id: ID!) {
@@ -316,7 +317,7 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
       );
     const placed = (await place(1)).order;
     expect(await hear('order.created')).toBe(1);
-    expect(await runs.sweep()).toEqual({ done: 1, skipped: 0, failed: 0, retrying: 0 });
+    expect(await runs.sweep()).toEqual({ done: 1, skipped: 0, failed: 0, retrying: 0, waiting: 0 });
 
     const order = await data(
       owner,
@@ -357,13 +358,13 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
     // Heard again, an event runs nothing again; a workflow's conditions not holding skip it.
     heard = new Set();
     expect(await hear('order.created')).toBe(1);
-    expect(await runs.sweep()).toEqual({ done: 0, skipped: 0, failed: 0, retrying: 0 });
+    expect(await runs.sweep()).toEqual({ done: 0, skipped: 0, failed: 0, retrying: 0, waiting: 0 });
     await admin.query(
       `UPDATE apps.workflows SET conditions = jsonb_set(conditions, '{0,value}', '"5000"')`,
     );
     const small = (await place(1)).order;
     await hear('order.created');
-    expect(await runs.sweep()).toEqual({ done: 0, skipped: 1, failed: 0, retrying: 0 });
+    expect(await runs.sweep()).toEqual({ done: 0, skipped: 1, failed: 0, retrying: 0, waiting: 0 });
     expect((await data(owner, RUNS, { id: big.workflow.id }))[0]).toMatchObject({
       status: 'SKIPPED',
       orderId: small.id,
@@ -374,13 +375,14 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
     sender.answer = { status: 503, error: 'The app answered 503' };
     const later = (await place(3)).order;
     await hear('order.created');
-    expect(await runs.sweep()).toEqual({ done: 0, skipped: 0, failed: 0, retrying: 1 });
+    expect(await runs.sweep()).toEqual({ done: 0, skipped: 0, failed: 0, retrying: 1, waiting: 0 });
     sender.answer = { status: 200, error: null };
     expect(await runs.sweep(new Date(Date.now() + 2 * 60_000))).toEqual({
       done: 1,
       skipped: 0,
       failed: 0,
       retrying: 0,
+      waiting: 0,
     });
     expect((await data(owner, RUNS, { id: big.workflow.id }))[0]).toMatchObject({
       status: 'DONE',
@@ -419,7 +421,7 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
       ).userErrors,
     ).toEqual([]);
     expect(await hear('flow.trigger_received')).toBe(1);
-    expect(await runs.sweep()).toEqual({ done: 1, skipped: 0, failed: 0, retrying: 0 });
+    expect(await runs.sweep()).toEqual({ done: 1, skipped: 0, failed: 0, retrying: 0, waiting: 0 });
     expect(await data(owner, RUNS, { id: low.workflow.id })).toEqual([
       {
         status: 'DONE',
@@ -456,5 +458,131 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
         )
       ).deletedWorkflowId,
     ).toBe(low.workflow.id);
+  });
+  it('waits, then goes on only where the order is still waiting to be confirmed (ADR-886)', async () => {
+    // The shop has its owner; managers make workflows too.
+    const owner = await account('manager');
+    await admin.query('UPDATE apps.workflows SET enabled = false WHERE shop_id = $1', [shop]);
+    const pending = { field: 'order.confirmation_status', operator: 'EQUALS', value: 'pending' };
+    const wrong = await data(owner, CREATE, {
+      input: {
+        name: 'Unconfirmed',
+        trigger: 'ORDER_CREATED',
+        actions: [
+          { type: 'WAIT', hours: 0 },
+          { type: 'CONTINUE_IF', conditions: [] },
+          { type: 'WAIT', hours: 24 },
+        ],
+      },
+    });
+    expect(wrong.userErrors).toEqual([
+      {
+        field: ['input', 'actions', '0', 'hours'],
+        code: 'INVALID',
+        message: 'A wait is a whole number of hours, 1 to 168',
+      },
+      {
+        field: ['input', 'actions', '1', 'conditions'],
+        code: 'BLANK',
+        message: 'Give a condition to check',
+      },
+      {
+        field: ['input', 'actions', '2', 'type'],
+        code: 'INVALID',
+        message: 'A wait needs an action after it',
+      },
+    ]);
+    const made = await data(owner, CREATE, {
+      input: {
+        name: 'Unconfirmed after a day',
+        trigger: 'ORDER_CREATED',
+        actions: [
+          { type: 'WAIT', hours: 24 },
+          { type: 'CONTINUE_IF', match: 'ALL', conditions: [pending] },
+          { type: 'ADD_ORDER_TAGS', tags: ['call-again'] },
+        ],
+      },
+    });
+    expect(made.userErrors).toEqual([]);
+    expect(made.workflow.actions).toEqual([
+      expect.objectContaining({ type: 'WAIT', hours: 24, match: null, conditions: [] }),
+      expect.objectContaining({
+        type: 'CONTINUE_IF',
+        hours: null,
+        match: 'ALL',
+        conditions: [{ ...pending, operator: 'EQUALS' }],
+      }),
+      expect.objectContaining({ type: 'ADD_ORDER_TAGS', tags: ['call-again'] }),
+    ]);
+
+    const product = await data(
+      owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "1,500" }] }) {
+          product { variants { id } } } }`,
+    );
+    const place = async () =>
+      (
+        await data(
+          owner,
+          `mutation ($variantId: ID!) {
+            orderCreate(input: {
+              lineItems: [{ variantId: $variantId, quantity: 1 }],
+              shippingAddress: { name: "Sana Malik", phone: "0301 2345678",
+                                 address1: "Flat 3, Block B", city: "Karachi" },
+              paymentMethod: CASH_ON_DELIVERY
+            }) { order { id } userErrors { message } } }`,
+          { variantId: product.product.variants[0].id },
+        )
+      ).order.id as string;
+    const [waiting, confirmed] = [await place(), await place()];
+    await hear('order.created');
+    expect(await runs.sweep()).toEqual({ done: 0, skipped: 0, failed: 0, retrying: 0, waiting: 2 });
+    // Nothing more until the day is up.
+    expect(await runs.sweep(new Date(Date.now() + 23 * 3_600_000))).toMatchObject({
+      done: 0,
+      waiting: 0,
+    });
+    // One is confirmed in the meantime; the other still waits for it.
+    const statusOf = (id: string, status: string) =>
+      admin.query('UPDATE orders.orders SET confirmation_status = $2 WHERE id = $1', [
+        fromPublicId(id, 'order'),
+        status,
+      ]);
+    await statusOf(waiting, 'pending');
+    await statusOf(confirmed, 'confirmed');
+    expect(await runs.sweep(new Date(Date.now() + 25 * 3_600_000))).toEqual({
+      done: 2,
+      skipped: 0,
+      failed: 0,
+      retrying: 0,
+      waiting: 0,
+    });
+    const ran = await data(owner, RUNS, { id: made.workflow.id });
+    const runOf = (id: string) => ran.find((run: Json) => run.orderId === id);
+    expect(runOf(waiting)).toMatchObject({
+      status: 'DONE',
+      steps: [
+        { action: 'WAIT', outcome: 'DONE' },
+        { action: 'CONTINUE_IF', outcome: 'DONE', detail: null },
+        { action: 'ADD_ORDER_TAGS', outcome: 'DONE', detail: 'call-again' },
+      ],
+    });
+    expect(runOf(waiting).steps[0].detail).toMatch(/^Until \d{4}-/);
+    expect(runOf(confirmed)).toMatchObject({
+      status: 'DONE',
+      steps: [
+        { action: 'WAIT', outcome: 'DONE' },
+        {
+          action: 'CONTINUE_IF',
+          outcome: 'SKIPPED',
+          detail: "Its conditions didn't hold: the rest was left",
+        },
+      ],
+    });
+    const tagsOf = async (id: string) =>
+      (await data(owner, `query ($id: ID!) { order(id: $id) { tags } }`, { id })).tags;
+    expect(await tagsOf(waiting)).toEqual(['call-again']);
+    expect(await tagsOf(confirmed)).toEqual([]);
   });
 });
