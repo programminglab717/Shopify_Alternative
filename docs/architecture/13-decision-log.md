@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-893 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-894 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -901,6 +901,7 @@
 | 891 | The forecast's seasons include those on the same days each year: the summer lawn launch, the run-up to Independence Day, the winter collection and the wedding season, the moon's season counted on where two meet | Accepted |
 | 892 | A supplier's lead time: the days it takes to deliver, which a reorder covers as well as the days chosen, and from which its goods are expected | Accepted |
 | 893 | A forecast by week: what a variant running low is expected to sell each week, what is left, the day it runs out, and the day to order by for its supplier's lead time | Accepted |
+| 894 | The merchant copilot: a request in English, Urdu or Roman Urdu drafted into a discount code or a segment, which staff confirm before it is made, or a report, run | Accepted |
 
 ---
 
@@ -29612,3 +29613,40 @@
   * What is on its way is not counted in the weeks: the day it comes is a purchase order's
     expected day, which is often not kept. The row says how many are on their way beside it.
   * Still not done: a chart of the weeks, and lead times learned from orders received.
+
+## ADR-894 · The merchant copilot: a request in English, Urdu or Roman Urdu drafted into a discount code or a segment, which staff confirm before it is made, or a report, run
+
+* **Context:** the catalog's AI-01 asks for a natural-language admin: discounts, segments,
+  broadcasts and reports drafted, then confirmed. Shop owners type "Eid ke liye 15% off code
+  bana do" more readily than they fill in a discount form. ANL-08 already reads a question into
+  a report (ADR-844), with the AI seeing the question alone.
+* **Decision:**
+  * **`@hatti/ai`'s `readCopilotRequest`** reads a request, through one tool, into one of four
+    things:
+    * a discount code: an upper-case code, exactly one of a percentage, whole rupees off or free
+      delivery, a least order, days from today to a year ahead, once per customer, a limit;
+    * a segment: a name and a query in the segment language, from the segment fields given;
+    * a report, of ANL-08's choices;
+    * none, with why, in the request's language.
+  * **What the model sees:** the request, today's date, the segment fields and the report
+    choices. It never sees the shop's data. A draft outside its rules is refused as `invalid`.
+  * **`copilotDraft(request)`** (`read_orders`):
+    * Checks the draft. A segment's query is compiled against the shop and its customers
+      counted. A report is run, its true-profit columns only on plans that show them.
+    * Makes nothing. A code or segment is made by staff confirming it, through
+      `discountCodeCreate` or `segmentCreate`, with their own access.
+    * Allows 50 requests a day. Each is kept in `orders.copilot_requests` with its outcome and
+      tokens (migration 0392). A draft spends an AI credit (`copilot`); a refusal or a segment
+      that does not check spends none.
+  * **Home:** a copilot box, shown where the AI is set up.
+    * A drafted code's terms are listed, with "Create the code" for those who manage discounts.
+    * A drafted segment shows its query and how many it matches. Its name can be changed
+      before "Save the segment".
+    * A report shows as ANL-08's answers do.
+* **Consequences:**
+  * A shop's commonest discount and its customer groups take one sentence and one tap. Nothing
+    reaches customers without staff confirming it.
+  * Broadcasts are not drafted yet. One needs an approved WhatsApp template or an SMS sender
+    chosen, which a sentence does not settle. The copilot says so, as kind none.
+  * A code's products and collections are not drafted: the model would have to see the
+    catalog. Codes are for the whole order until changed on the discounts page.
