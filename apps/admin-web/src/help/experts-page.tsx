@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
@@ -38,6 +38,8 @@ export interface Expert {
   languages: string[];
   startingPrice: number;
   listed: boolean;
+  /** Whether they hold Hatti's certificate (ADR-858). */
+  certified?: boolean;
 }
 
 const serviceKey = (service: string) => `experts.service.${service}` as MessageKey;
@@ -146,8 +148,16 @@ export function ExpertsPage() {
           <li key={expert.id}>
             <Card className="flex flex-col gap-2 p-4">
               <span className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-semibold" dir="auto">
-                  {expert.businessName}
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold" dir="auto">
+                    {expert.businessName}
+                  </span>
+                  {expert.certified && (
+                    <span className="inline-flex items-center gap-1 text-primary text-[length:var(--hatti-type-body-sm-size)] font-medium">
+                      <BadgeCheck aria-hidden className="size-4" />
+                      {t('experts.certified')}
+                    </span>
+                  )}
                 </span>
                 <span className="num">
                   {expert.startingPrice > 0

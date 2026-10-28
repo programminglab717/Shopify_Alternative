@@ -58,6 +58,8 @@ export interface ExpertRecord {
   languages: ('en' | 'ur')[];
   startingPrice: bigint;
   listed: boolean;
+  /** Whether they hold Hatti's certificate, still good (ADR-858). */
+  certified: boolean;
   updatedAt: Date;
 }
 
@@ -81,11 +83,15 @@ type ExpertRow = {
   languages: ('en' | 'ur')[];
   starting_price: string;
   listed_at: Date | string | null;
+  certified: boolean;
   updated_at: Date | string;
 };
 
 const COLUMNS = sql`e.partner_id, p.business_name, p.website, e.headline, e.about, e.services,
-                    e.cities, e.languages, e.starting_price::text, e.listed_at, e.updated_at`;
+                    e.cities, e.languages, e.starting_price::text, e.listed_at, e.updated_at,
+                    EXISTS (SELECT 1 FROM identity.partner_certificates c
+                             WHERE c.partner_id = e.partner_id AND c.expires_at > now())
+                      AS certified`;
 
 const toRecord = (row: ExpertRow): ExpertRecord => ({
   partnerId: row.partner_id,
@@ -98,6 +104,7 @@ const toRecord = (row: ExpertRow): ExpertRecord => ({
   languages: row.languages,
   startingPrice: BigInt(row.starting_price),
   listed: row.listed_at !== null,
+  certified: row.certified,
   updatedAt: new Date(row.updated_at),
 });
 

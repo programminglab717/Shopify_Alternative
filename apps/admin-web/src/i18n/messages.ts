@@ -5449,6 +5449,17 @@ const en = {
   'experts.service.migration': 'Moving from another platform',
   'experts.service.apps': 'Apps',
   'experts.service.content': 'Writing',
+  'certification.title': 'Hatti certification',
+  'certification.hint':
+    'Read the lessons, then answer the ten questions: {mark} right certify you for a year, and shops see it on your expert profile.',
+  'certification.certified': 'You are Hatti certified, until {date}.',
+  'certification.wrong': 'Not this one: read its lesson again.',
+  'certification.passed': '{score} of {total} right: you are Hatti certified.',
+  'certification.failed':
+    '{score} of {total} right: you need {mark}. Read the lessons again and try once more.',
+  'certification.tries': 'Tries left today: {count}',
+  'certification.submit': 'Send my answers',
+  'experts.certified': 'Hatti certified',
   'expertProfile.title': 'Your expert profile',
   'expertProfile.hint':
     'Offer shops your services. Hatti looks at your profile before shops see it; enquiries reach you here and by email.',
@@ -11840,6 +11851,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experts.service.migration': 'دوسرے پلیٹ فارم سے منتقلی',
   'experts.service.apps': 'ایپس',
   'experts.service.content': 'تحریر',
+  'certification.title': 'Hatti سرٹیفکیشن',
+  'certification.hint':
+    'اسباق پڑھیں، پھر دس سوالوں کے جواب دیں: {mark} درست ہوں تو آپ ایک سال کے لیے سرٹیفائیڈ ہیں، اور دکانیں یہ آپ کے ماہر پروفائل پر دیکھتی ہیں۔',
+  'certification.certified': 'آپ {date} تک Hatti سرٹیفائیڈ ہیں۔',
+  'certification.wrong': 'یہ درست نہیں: اس کا سبق دوبارہ پڑھیں۔',
+  'certification.passed': '{total} میں سے {score} درست: آپ Hatti سرٹیفائیڈ ہیں۔',
+  'certification.failed':
+    '{total} میں سے {score} درست: {mark} چاہییں۔ اسباق دوبارہ پڑھیں اور پھر کوشش کریں۔',
+  'certification.tries': 'آج کی باقی کوششیں: {count}',
+  'certification.submit': 'جوابات بھیجیں',
+  'experts.certified': 'Hatti سرٹیفائیڈ',
   'expertProfile.title': 'آپ کا ماہر پروفائل',
   'expertProfile.hint':
     'دکانوں کو اپنی خدمات پیش کریں۔ دکانوں کے دیکھنے سے پہلے Hatti آپ کا پروفائل دیکھتا ہے؛ پیغامات آپ کو یہاں اور ای میل پر ملتے ہیں۔',

@@ -15,6 +15,7 @@ import { roleLabel } from '../settings/settings-page';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { Certification } from './certification';
 import { ExpertProfile } from './expert-profile';
 import { PartnerApps } from './partner-apps';
 import { PartnerThemes } from './partner-themes';
@@ -90,6 +91,7 @@ export function PartnerPage() {
           <PartnerApps />
           <PartnerThemes stores={dashboard.data?.stores ?? []} />
           <ExpertProfile />
+          <Certification />
           {dashboard.data?.earnings && (
             <Earnings partner={partner} earnings={dashboard.data.earnings} />
           )}

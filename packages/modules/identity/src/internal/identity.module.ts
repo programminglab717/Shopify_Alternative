@@ -5,6 +5,7 @@ import { EmailFeedbackService } from './email-feedback.js';
 import { IdentityService, type IdentityServiceOptions } from './identity.service.js';
 import { PartnerAppsService } from './partner-apps.service.js';
 import { PartnerThemesService } from './partner-themes.service.js';
+import { CertificationService } from './certification.service.js';
 import { ExpertsService } from './experts.service.js';
 import { PartnersService } from './partners.service.js';
 import { StaffService } from './staff.service.js';
@@ -35,6 +36,7 @@ export class IdentityModule {
         { provide: PartnerAppsService, useValue: new PartnerAppsService(options) },
         { provide: PartnerThemesService, useValue: new PartnerThemesService(options) },
         { provide: ExpertsService, useValue: new ExpertsService(options) },
+        { provide: CertificationService, useValue: new CertificationService(options) },
         { provide: SupportAccessService, useValue: new SupportAccessService(options) },
       ],
       exports: [
@@ -45,6 +47,7 @@ export class IdentityModule {
         PartnerAppsService,
         PartnerThemesService,
         ExpertsService,
+        CertificationService,
       ],
     };
   }

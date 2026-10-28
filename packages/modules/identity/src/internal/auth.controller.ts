@@ -24,6 +24,7 @@ import { shopAgreementDocuments } from './agreements.js';
 import { AuthError } from './errors.js';
 import { PartnerAppsService, type PartnerAppRecord } from './partner-apps.service.js';
 import { PartnerThemesService } from './partner-themes.service.js';
+import { CertificationService, type CertificateRecord } from './certification.service.js';
 import { ExpertsService, type ExpertRecord } from './experts.service.js';
 import {
   IdentityService,
@@ -183,6 +184,9 @@ const enquiryBody = z.object({
   service: z.string().max(40),
   message: z.string().max(4_000),
 });
+const attemptBody = z.object({
+  answers: z.record(z.string().max(40), z.number().int().min(0).max(10)),
+});
 const expertsQuery = z.object({
   service: z.string().max(40).optional(),
   city: z.string().max(100).optional(),
@@ -274,8 +278,21 @@ function expertJson(expert: ExpertRecord) {
     languages: expert.languages,
     startingPrice: Number(expert.startingPrice / 100n),
     listed: expert.listed,
+    certified: expert.certified,
     updatedAt: expert.updatedAt.toISOString(),
   };
+}
+
+/** A partner's certificate (ADR-858), its dates as ISO strings. */
+function certificateJson(certificate: CertificateRecord | null) {
+  return (
+    certificate && {
+      courseVersion: certificate.courseVersion,
+      score: certificate.score,
+      passedAt: certificate.passedAt.toISOString(),
+      expiresAt: certificate.expiresAt.toISOString(),
+    }
+  );
 }
 
 /** A partner as they see themselves (ADR-504). */
@@ -335,6 +352,7 @@ export class AuthController {
     private readonly partnerApps: PartnerAppsService,
     private readonly partnerThemes: PartnerThemesService,
     private readonly experts: ExpertsService,
+    private readonly certification: CertificationService,
     @Optional() private readonly site?: PublicSite,
   ) {}
 
@@ -1052,6 +1070,41 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /**
+   * Hatti's course for partners (PRT-04, ADR-858): `{ course, certificate, triesLeft }`, the
+   * course's lessons and questions in English and Urdu, never their answers.
+   */
+  @Get('partner/certification')
+  async certificationCourse(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { userId } = await this.session(request);
+    return {
+      course: this.certification.course(),
+      certificate: certificateJson(await this.certification.certificateOf(userId)),
+      triesLeft: await this.certification.triesLeft(userId),
+    };
+  }
+
+  /**
+   * Answers the course's questions: `{ answers: { [questionId]: option } }`. What the partner
+   * scored, the questions they got wrong, and their certificate once they pass.
+   */
+  @Post('partner/certification')
+  @HttpCode(200)
+  async attemptCertification(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { answers } = parse(attemptBody, body);
+    const result = await this.certification.attempt((await this.session(request)).userId, answers);
+    return { ...result, certificate: certificateJson(result.certificate) };
   }
 
   /** The partner's expert profile (PRT-03, ADR-855): `{ expert }`, null while they have none. */

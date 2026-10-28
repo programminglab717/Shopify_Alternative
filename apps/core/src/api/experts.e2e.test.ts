@@ -107,6 +107,21 @@ describe.skipIf(!server)('Experts shops hire, over /auth (PRT-03)', () => {
     });
     expect([again.statusCode, (again.json() as Json).error.code]).toEqual([429, 'RATE_LIMITED']);
 
+    // The course, without its answers, scored by Hatti (PRT-04, ADR-858).
+    const course = (await send('GET', '/auth/partner/certification', expert.token)).json() as Json;
+    expect(course).toMatchObject({ certificate: null, triesLeft: 3 });
+    expect(course.course.questions).toHaveLength(10);
+    expect(JSON.stringify(course)).not.toContain('"answer"');
+    const tried = await send('POST', '/auth/partner/certification', expert.token, {
+      answers: Object.fromEntries(course.course.questions.map((each: Json) => [each.id, 9])),
+    });
+    expect(tried.json()).toEqual({
+      score: 0,
+      passed: false,
+      wrong: course.course.questions.map((each: Json) => each.id),
+      certificate: null,
+    });
+
     const received = (await send('GET', '/auth/partner/enquiries', expert.token)).json() as Json;
     expect(received.enquiries).toEqual([
       expect.objectContaining({

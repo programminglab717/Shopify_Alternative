@@ -105,6 +105,13 @@ export {
   type ExpertService,
 } from '../internal/experts.service.js';
 export {
+  CERTIFICATION_LIMITS,
+  CertificationService,
+  type AttemptResult,
+  type CertificateRecord,
+  type CourseView,
+} from '../internal/certification.service.js';
+export {
   PARTNER_LIMITS,
   PartnersService,
   recordAppSale,
