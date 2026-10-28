@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-895 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-896 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -903,6 +903,7 @@
 | 893 | A forecast by week: what a variant running low is expected to sell each week, what is left, the day it runs out, and the day to order by for its supplier's lead time | Accepted |
 | 894 | The merchant copilot: a request in English, Urdu or Roman Urdu drafted into a discount code or a segment, which staff confirm before it is made, or a report, run | Accepted |
 | 895 | An inventory item keeps FBR's unit of measure and the SRO it is sold under, beside its HS code, and digital invoicing is sent them with each item | Accepted |
+| 896 | The copilot drafts broadcasts: a name, who it goes to as a segment query, its SMS words and when, staff choosing its WhatsApp template and its audience saved as a segment as they confirm it | Accepted |
 
 ---
 
@@ -29684,3 +29685,37 @@
     (OWN-28).
   * IMS, the Tier-1 POS reporting, asks for none of these and is sent none.
   * Tax categories (ADR-097) are not tied to SROs. A shop gives an item its SRO here.
+
+## ADR-896 · The copilot drafts broadcasts: a name, who it goes to as a segment query, its SMS words and when, staff choosing its WhatsApp template and its audience saved as a segment as they confirm it
+
+* **Context:** ADR-894 left broadcasts out of the copilot. A broadcast needs an approved
+  WhatsApp template or an SMS's words, an audience and a time. "Lahore walon ko kal subah Eid
+  sale ka message bhejo" settles all but the template.
+* **Decision:**
+  * **`readCopilotRequest`'s broadcast:**
+    * a name, up to 100 characters;
+    * WhatsApp unless SMS is asked for;
+    * who it goes to, as a segment query, or none for everyone who agreed to hear;
+    * for SMS, the message's words, up to 320 characters;
+    * when, as a time in Pakistan within 30 days, or none for now.
+    * One past those limits is refused as `invalid`.
+  * **The draft is checked:** its query compiled and counted, as a segment's is (ADR-894). A
+    time already passed is refused, saying so; neither spends a credit. The draft comes back as
+    `CopilotDraft.broadcast` (migration 0394 allows its outcome).
+  * **Home's confirm card:**
+    * The name can be changed.
+    * Says who it goes to and when, and shows its query.
+    * For WhatsApp, a choice of the shop's approved templates, showing the chosen one's words;
+      for SMS, the words, which can be changed, in Urdu where written in its script.
+    * Confirming saves the audience as a segment of the broadcast's name, once even if the
+      broadcast is refused and tried again, then makes it with `broadcastCreate`.
+    * Open to those who send broadcasts and write templates (ADR-420), and who keep segments
+      where it has a query.
+* **Consequences:**
+  * A shop's commonest campaign is a sentence, a template chosen and a tap. It is a broadcast
+    like any other: only those who agreed hear it (ADR-421), in the hours marketing may go
+    (ADR-422).
+  * Each broadcast with an audience leaves a segment behind, named for it, which shops may
+    delete.
+  * The model does not see the shop's templates or segments. A draft cannot name an existing
+    segment; its query says who.
