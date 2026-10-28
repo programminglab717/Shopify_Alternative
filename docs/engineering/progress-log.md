@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Shops at a glance
+### 9b0e50d · Shops at a glance
 
 * **Admin:** an account of several shops sees each one's sales today and orders waiting to be
   confirmed and packed on the shop chooser, and their totals (ADM-06, [ADR-841](../architecture/13-decision-log.md#adr-841--an-account-of-several-shops-sees-each-ones-sales-today-and-the-orders-waiting-to-be-confirmed-and-packed-on-the-shop-chooser-and-what-they-come-to-together)). Done in code.
