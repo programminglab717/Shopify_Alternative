@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Paying online at the door
+### fa130d3 · Paying online at the door
 
 * **Delivery:** a cash-on-delivery parcel out with the shop's own rider may be paid online at
   the door. Its page offers what the rider would collect, and the rider shows that page as a QR
