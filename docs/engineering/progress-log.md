@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Carts from the WhatsApp catalogue
+
+* **Inbox:** a customer who sends a cart from the shop's WhatsApp catalogue, fed by its catalog
+  feed, is answered at once with a link to the shop's checkout holding those items, their number
+  filled in. The cart shows in the inbox; one of nothing sold online waits for staff (CH-02,
+  [ADR-856](../architecture/13-decision-log.md#adr-856--a-cart-a-customer-sends-from-the-shops-whatsapp-catalogue-is-kept-in-the-inbox-and-answered-once-with-a-link-to-the-shops-checkout-holding-what-it-sells-of-it-their-number-filled-in)). Help says how to connect the catalogue.
+* 4570 tests (7 new).
+
 ### aee7adf · Experts for hire
 
 * **Partners:** partners keep an expert profile of the services they offer shops, from store

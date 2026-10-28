@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-855 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-856 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -863,6 +863,7 @@
 | 853 | The theme store: partners offer themes from their development stores, free or for Rs 1,000 to Rs 100,000; Hatti lists each after a look; a shop installs a free one at once or buys a paid one with an invoice of Hatti's, and the designer earns 80% | Accepted |
 | 854 | Public apps charge shops once in rupees: the owner approves a charge in the admin and pays it as an invoice of Hatti's, a test on development stores, and the app's partner earns 80% | Accepted |
 | 855 | Experts: partners keep a profile of the services they offer shops, listed after Hatti looks, and a shop's owner or a manager sends one an enquiry from the admin, emailed to the expert | Accepted |
+| 856 | A cart a customer sends from the shop's WhatsApp catalogue is kept in the inbox and answered once with a link to the shop's checkout holding what it sells of it, their number filled in | Accepted |
 
 ---
 
@@ -28118,3 +28119,43 @@
     the count of leads and a record of who asked, and email answers keep both sides' numbers
     private until they choose.
   * **A chat between shop and expert in the inbox:** more than needs building first; email does.
+
+## ADR-856 · A cart a customer sends from the shop's WhatsApp catalogue is kept in the inbox and answered once with a link to the shop's checkout holding what it sells of it, their number filled in
+
+* **Context:**
+  * CH-02 asks for WhatsApp's catalogue and chat-to-order.
+  * A shop's catalog feed (ADR-142) already lists an item for each variant. Meta's Commerce
+    Manager reads it into a catalogue, which a WhatsApp Business number shows its customers.
+  * A customer can fill a cart there and send it. Hatti's webhook kept such a message as an
+    attachment, and staff had to type the order up by hand.
+* **Decision:**
+  * **Reading carts:** the webhook reads WhatsApp's `order` message: each item's
+    `product_retailer_id`, the variant's ID from the feed, and its quantity, 1 to 999, up to 50
+    items; and the customer's note beside it as the message's words. The inbox keeps the cart with
+    the message, and shows it as "A cart from your WhatsApp catalogue".
+  * **Answering:** the worker claims each cart once, as the message is received.
+    * It keeps the items the storefront sells, variants of active products.
+    * It replies on the number the customer wrote to with a link to the shop's checkout: a cart
+      permalink (ADR-709) holding those items, `checkout[phone]` filled in with the customer's
+      number. The reply is in English and Urdu, and says how many items it left out.
+    * The customer gives their address and places the order at checkout, cash on delivery or
+      paid, as any order.
+    * A cart of nothing the shop sells online gets no answer; it waits for staff in the inbox.
+  * **The AI agent** (ADR-849) leaves carts to this answer, a note beside one included.
+  * **Help** has an article on giving the feed to Meta's Commerce Manager and connecting the
+    catalogue to the shop's WhatsApp number.
+* **Consequences:**
+  * A customer orders from WhatsApp in two taps and a form, and the order is the shop's as any
+    other, confirmed, packed and shipped as checkout's are.
+  * Not yet:
+    * placing the order inside WhatsApp itself, with WhatsApp's own address and payment flows,
+      which Meta offers in few countries;
+    * a setting to answer carts by hand: every cart is answered, as a shop that connected its
+      catalogue wants;
+    * carts on Hatti's shared number, which has no shop's catalogue.
+* **Alternatives:**
+  * **Making the order at once from the cart, with no address:** rejected. A cash-on-delivery
+    order needs the customer's address and city, and the checkout already asks them, checks them
+    and confirms them.
+  * **A draft order for staff to finish:** slower for the customer; staff still see the cart in
+    the inbox, and the order once placed.
