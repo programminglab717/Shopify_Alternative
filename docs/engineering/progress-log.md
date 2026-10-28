@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Spin to win
+### 547d798 · Spin to win
 
 * **A wheel of offers** on Hatti Base's sign-up pop-up: a shopper's number signs them up and
   spins once, the platform chooses the slice by weight, and a slice that gives something is a
