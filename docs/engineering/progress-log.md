@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Functions
+
+* **Apps:** an app gives the shop's checkout a WebAssembly function that hides ways to pay, such
+  as cash on delivery above an amount, or refuses an order, saying why. It runs sandboxed, 50 ms
+  and 10 MiB at most (DEV-07, CHK-20, [ADR-868](../architecture/13-decision-log.md#adr-868--functions-apps-give-checkout-webassembly-modules-that-hide-ways-to-pay-or-refuse-an-order-run-in-a-worker-of-their-own-with-only-their-input-and-output-50-ms-and-10-mib)).
+* **Settings › Apps:** the owner turns each on with its settings, and sees when one last failed.
+  Checkout goes on without a function that fails. Which plans include them is OWN-58.
+* 4658 tests (8 new, the admin's check of each new GraphQL operation among them).
+
 ### a8d7655 · Hatti Pass
 
 * **Checkout:** a shopper ticks a box to save their name and address to Hatti Pass, and proves

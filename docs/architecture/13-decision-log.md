@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-867 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-868 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -875,6 +875,7 @@
 | 865 | Prices in shoppers' own currencies: a shop shows dirhams, riyals, pounds, dollars or euros at a rate it fixes or the day's from an open feed, rounded as it asks, and charges rupees | Accepted |
 | 866 | Theme experiments: a draft theme shown a share of shoppers, each keeping their arm, counted as the shop's funnel is, and ended by Hatti when it sells clearly worse | Accepted |
 | 867 | Hatti Pass: a shopper saves their name and address for any Hatti shop's checkout, by a box they tick once their number is proved, and forgets it from any checkout | Accepted |
+| 868 | Functions: apps give checkout WebAssembly modules that hide ways to pay or refuse an order, run in a worker of their own with only their input and output, 50 ms and 10 MiB | Accepted |
 
 ---
 
@@ -28662,3 +28663,62 @@
   * **A cookie on hatti.pk shared across shops:** shops' own domains can't read it, and
     browsers block third-party cookies.
   * **Filling in without a code:** anyone typing a neighbour's number would see where they live.
+
+## ADR-868 · Functions: apps give checkout WebAssembly modules that hide ways to pay or refuse an order, run in a worker of their own with only their input and output, 50 ms and 10 MiB
+
+* **Context:**
+  * DEV-07 and CHK-20 ask for Functions, as Shopify's: an app's code runs inside checkout to
+    customise what it offers. Payment customisations and cart validations come first.
+  * Here a shop might hide cash on delivery above Rs 10,000 or to some cities, beyond what its
+    own rules can say (ADR-099), or refuse an order its stock or couriers can't serve.
+  * An app's code inside checkout must not slow it, crash it, or reach anything but what it is
+    given.
+* **Decision:**
+  * **Giving one:**
+    * An app, custom or public, gives a function by `appFunctionSet` with `write_settings`: a
+      handle, a title, a target (`payment_customization` or `cart_validation`), and the module,
+      base64, 256 KiB at most.
+    * New versions replace it by its handle and run as the old one did.
+    * The owner or a manager turns each on in Settings › Apps, with its settings as JSON. It
+      goes with its app when the app is removed or uninstalled.
+  * **The module:**
+    * A WASI command, as Javy, TinyGo and Rust's wasm32-wasi build them. It reads its input as
+      JSON on standard input and writes its answer as JSON on standard output.
+    * It must compile, define and export its own memory, and import nothing but WASI's
+      functions.
+    * Hatti rewrites its memory section so the memory grows to 10 MiB at most.
+  * **Running it:**
+    * In a worker thread, one at a time, with a WASI of Hatti's own: standard input and output
+      alone, no files, network, environment or clock, and fixed randomness.
+    * Compiled once by its digest. 50 ms from its start, the worker's start and compiling
+      aside, and 64 KiB of answer.
+    * One past its time has its worker stopped and another started.
+  * **Its input:**
+    * The cart: subtotal, currency, and each line's variant, product, titles, SKU, quantity and
+      price.
+    * The delivery address's city and province as typed so far.
+    * The ways to pay checkout would offer, and the function's settings.
+  * **Its answer:**
+    * A payment customisation answers `{"operations":[{"hide":{"paymentMethod":"cash_on_delivery"}}]}`.
+      The page then offers no cash on delivery, transfer or online payment as hidden, saying so
+      as for the shop's own rules.
+    * A cart validation answers `{"errors":[{"message":"..."}]}`, three messages at most. They
+      refuse the order as it is placed, the form kept, in the app's words.
+  * **A function that fails**, runs past its time or answers in another shape is skipped, so
+    checkout goes on without it. Its last failure is kept for the shop and the app to see.
+* **Consequences:**
+  * Apps customise checkout's payments and checks without Hatti building each rule.
+  * Each enabled function adds its run to checkout's page and placing, a few milliseconds.
+  * Not yet:
+    * discount, delivery customisation and order routing functions;
+    * an input query, as Shopify's GraphQL input queries choose what a function reads;
+    * a pool of workers;
+    * the CLI building and deploying them.
+  * Which plans include functions is the owner's to decide (OWN-58).
+* **Alternatives:**
+  * **Node's own WASI:** experimental, and it reaches the file system unless sandboxed with
+    care.
+  * **Wasmtime or Wasmer, with fuel metering:** native bindings to build and ship. A worker
+    stopped on time limits the same, in Node.
+  * **JavaScript functions in a VM context:** escapes are found in `vm` regularly; WebAssembly's
+    sandbox is the language's own.
