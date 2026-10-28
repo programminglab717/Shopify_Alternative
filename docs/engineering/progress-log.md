@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The forecast's seasons on the same days each year
+### 85c97c7 · The forecast's seasons on the same days each year
 
 * **Seasons:** the summer lawn launch, the run-up to Independence Day, the winter collection and
   the wedding season, beside Ramadan and Eid ul Adha ([ADR-891](../architecture/13-decision-log.md#adr-891--the-forecasts-seasons-include-those-on-the-same-days-each-year-the-summer-lawn-launch-the-run-up-to-independence-day-the-winter-collection-and-the-wedding-season-the-moons-season-counted-on-where-two-meet)).
