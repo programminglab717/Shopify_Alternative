@@ -48,6 +48,7 @@ import { ProductBundleCard } from './bundle';
 import { ProductCombinedListingCard } from './combined-listing';
 import { ProductPairingsCard } from './pairings';
 import { ProductSchedule } from './schedule';
+import { BuyButtonCard } from './buy-button';
 import { ProductSearchListing } from './search-listing';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
@@ -634,6 +635,7 @@ function ProductView() {
       {edits && <DigitalProductCard key={`digital-${product.id}`} product={product} />}
       {edits && <CategoryCard product={product} />}
       {edits && <ProductSearchListing product={product} storefront={storefront?.url ?? ''} />}
+      {edits && <BuyButtonCard product={product} storefront={storefront?.url ?? ''} />}
       {edits && <EasternWearCard product={product} />}
       {edits && <ProductMetafieldsCard product={product} />}
       {edits && <GiftCardProduct key={String(product.isGiftCard)} product={product} />}

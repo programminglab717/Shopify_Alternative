@@ -2746,6 +2746,55 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it('serves buy buttons for other websites: the script, and each product as any site may read it (CH-08)', async () => {
+    const app = server();
+    const script = await app.inject({
+      method: 'GET',
+      url: '/buy-button.js',
+      headers: { host: 'localhost' },
+    });
+    expect([script.statusCode, script.headers['content-type']]).toEqual([
+      200,
+      'text/javascript; charset=utf-8',
+    ]);
+    expect(script.body).toContain('[data-hatti-buy-button]');
+    const product = sample.products.find((each) => each.images.length > 0)!;
+    const read = await app.inject({
+      method: 'GET',
+      url: `/buy-button/products/${product.handle}`,
+      headers: { host: 'localhost', origin: 'https://blog.example.pk' },
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.headers['access-control-allow-origin']).toBe('*');
+    const body = read.json() as {
+      handle: string;
+      url: string;
+      currency: string;
+      image: { src: string } | null;
+      variants: { id: string; price: string }[];
+    };
+    expect(body).toMatchObject({
+      handle: product.handle,
+      url: `http://localhost/products/${product.handle}`,
+      currency: 'PKR',
+    });
+    expect(body.image?.src).toMatch(/^http:\/\/localhost\//);
+    expect(body.variants[0]).toMatchObject({
+      id: product.variants[0]!.id,
+      price: (product.variants[0]!.price / 100).toFixed(2),
+    });
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/buy-button/products/no-such-thing',
+      headers: { host: 'localhost' },
+    });
+    expect([missing.statusCode, missing.headers['access-control-allow-origin']]).toEqual([
+      404,
+      '*',
+    ]);
+    await app.close();
+  });
+
   it('answers AI shopping agents: its UCP profile and its store MCP endpoint (OS-23, ADR-847)', async () => {
     const app = server();
     const profile = await app.inject({

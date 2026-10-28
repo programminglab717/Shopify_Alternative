@@ -98,6 +98,7 @@ import {
   type LoginProblem,
 } from './accounts.js';
 import { AGENT_LIMITS, AGENT_PATHS, mcpAnswer, ucpProfile } from './agents.js';
+import { BUY_BUTTON_PATHS, BUY_BUTTON_SCRIPT, buyButtonProduct } from './buy-button.js';
 import {
   STOREFRONT_TOKEN_HEADERS,
   storefrontApiAnswer,
@@ -2320,6 +2321,35 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         .header('access-control-allow-origin', '*')
         .type('application/json; charset=utf-8')
         .send(JSON.stringify(ucpProfile(await originOf(request, found))));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  });
+  /**
+   * Buy buttons (CH-08, ADR-860): the script other websites load, the same for every shop, and
+   * the product it shows, as JSON any site may read, as public as the product's page: nothing for
+   * a product the storefront doesn't show, nor while the shop is behind its password.
+   */
+  app.get(BUY_BUTTON_PATHS.script, async (_request, reply) =>
+    reply
+      .header('cache-control', 'public, max-age=3600, s-maxage=86400')
+      .type('text/javascript; charset=utf-8')
+      .send(BUY_BUTTON_SCRIPT),
+  );
+  app.get<{ Params: { handle: string } }>(BUY_BUTTON_PATHS.product, async (request, reply) => {
+    reply.header('access-control-allow-origin', '*');
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    try {
+      if (await lockOf(request, found)) return await notFound(reply, 'This shop is not open yet.');
+      const product = await found.store.productByHandle(request.params.handle.slice(0, 255));
+      if (!product) return await notFound(reply, 'The shop has no such product.');
+      return await reply
+        .header('cache-control', PAGE_CACHE)
+        .header('cache-tag', shopTag(found.shopId))
+        .type('application/json; charset=utf-8')
+        .send(JSON.stringify(buyButtonProduct(product, await originOf(request, found), 'PKR')));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       throw error;

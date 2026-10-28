@@ -5465,6 +5465,11 @@ const en = {
   'experts.service.migration': 'Moving from another platform',
   'experts.service.apps': 'Apps',
   'experts.service.content': 'Writing',
+  'buyButton.title': 'Buy button',
+  'buyButton.hint':
+    'Paste this into a blog, another website or a link page: it shows this product with its photo, price and sizes, and Buy now opens your checkout.',
+  'buyButton.language': 'Language of the button',
+  'buyButton.copy': 'Copy the code',
   'certification.title': 'Hatti certification',
   'certification.hint':
     'Read the lessons, then answer the ten questions: {mark} right certify you for a year, and shops see it on your expert profile.',
@@ -11884,6 +11889,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experts.service.migration': 'دوسرے پلیٹ فارم سے منتقلی',
   'experts.service.apps': 'ایپس',
   'experts.service.content': 'تحریر',
+  'buyButton.title': 'خریدنے کا بٹن',
+  'buyButton.hint':
+    'یہ کسی بلاگ، دوسری ویب سائٹ یا لنک پیج میں لگائیں: یہ اس پراڈکٹ کو تصویر، قیمت اور سائز کے ساتھ دکھاتا ہے، اور ابھی خریدیں آپ کا چیک آؤٹ کھولتا ہے۔',
+  'buyButton.language': 'بٹن کی زبان',
+  'buyButton.copy': 'کوڈ کاپی کریں',
   'certification.title': 'Hatti سرٹیفکیشن',
   'certification.hint':
     'اسباق پڑھیں، پھر دس سوالوں کے جواب دیں: {mark} درست ہوں تو آپ ایک سال کے لیے سرٹیفائیڈ ہیں، اور دکانیں یہ آپ کے ماہر پروفائل پر دیکھتی ہیں۔',
