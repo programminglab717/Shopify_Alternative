@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-900 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-901 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -908,6 +908,7 @@
 | 898 | An order paid on delivery that no one location has all of may be split among those that do as it is placed, as the shop allows: each part an order of its own, shipped from its location at the shop's cost | Accepted |
 | 899 | An affiliate sees their own figures at a secret link the shop sends them: their link, code and share, what their orders came to and earned, and their latest orders, nothing of their customers | Accepted |
 | 900 | Spin to win: a wheel of 2 to 8 offers on the theme's sign-up pop-up, a shopper's number signing them up and spinning once, the slice chosen by weight on the platform and given as a single-use code of their own | Accepted |
+| 901 | A combined listing the shop chooses is one card in collections: the first of its products in each collection's order stands for the rest, its card naming their values | Accepted |
 
 ---
 
@@ -29854,3 +29855,27 @@
   * Shops get spin-to-win without an app, and each shopper's code is their own and works once.
   * A shop whose 10,000 codes are full gives no spins until it deletes some.
   * A customer who is erased can spin again with the same number.
+
+## ADR-901 · A combined listing the shop chooses is one card in collections: the first of its products in each collection's order stands for the rest, its card naming their values
+
+* **Context:** ADR-799 left every product of a combined listing on its own card in collections,
+  so a print in six colours fills six places. Shopify's combined listings show one card, its
+  parent product. Hatti's listings have no parent product.
+* **Decision:**
+  * **A listing is one card where the shop says:** `CombinedListing.oneCard`, set with
+    `combinedListingSet` and the admin's "Show as one card in collections" (migration 0399). It
+    is off for listings made before, and left as it was when a change leaves it out.
+  * **The publisher keeps the first of its products in each collection's order** in that
+    collection's list, and in all products; the others are left out there. The card goes where
+    the first comes, and a product taken off sale gives its place to the next.
+  * **Collections are rebuilt when a listing changes,** with its products' pages, as they are
+    when a product's status changes.
+  * **`product.combined_listing.one_card`** says so to themes. Hatti Base's card names the
+    listing's values under its title: four, and "+N more".
+* **Consequences:**
+  * A print's colours take one place in a collection, and its page offers them all.
+  * Collection counts and filters count the card once: a filter matches the card's own product,
+    not the others'.
+  * Search still finds each product, as each has its own title and page.
+  * The listing's option and values in Urdu, and the store's export holding listings, are still
+    left for later.
