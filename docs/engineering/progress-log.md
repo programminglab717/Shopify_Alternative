@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Order routing
+
+* **Orders:** each location names the cities and provinces it ships to first, and an order goes
+  out from one that has all of it and serves its customer's city, else their province, before the
+  primary (SHP-09, INV-10, [ADR-839](../architecture/13-decision-log.md#adr-839--order-routing-a-location-names-the-cities-and-provinces-it-ships-to-first-and-an-order-goes-out-from-one-that-has-all-of-it-and-serves-its-customers-city-else-their-province-before-the-primary)). Done in code; splitting an order among locations by itself
+  stays debt 13.
+* 4440 tests (2 new).
+
 ### ecebbeb · Express checkout
 
 * **Checkout:** a signed-in shopper whose session proved their number places the order in a tap,

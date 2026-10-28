@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-838 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-839 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -846,6 +846,7 @@
 | 836 | Hatti Base's footer offers the shop's notifications once the browser can have them and they are off | Accepted |
 | 837 | Hatti keeps when a shop last said whether it is on FBR's Active Taxpayers List, asks it to check again after each 1 March's new list, and writes the SMS to 9966 that checks it | Accepted |
 | 838 | Express checkout: a signed-in shopper whose session proved their number places the order in a tap, to their book's default address, paid on delivery, where nothing else is asked of it | Accepted |
+| 839 | Order routing: a location names the cities and provinces it ships to first, and an order goes out from one that has all of it and serves its customer's city, else their province, before the primary | Accepted |
 
 ---
 
@@ -27379,3 +27380,33 @@
     they go through the form.
   * A browser proved by a code (ADR-199) but not signed in still uses "Ordered here before?"
     (ADR-447). Express needs the account, whose book the shopper keeps.
+
+## ADR-839 · Order routing: a location names the cities and provinces it ships to first, and an order goes out from one that has all of it and serves its customer's city, else their province, before the primary
+
+* **Context:** SHP-09 and INV-10 ask for multi-warehouse fulfilment with routing rules. ADR-355
+  ships an order from the first location fulfilling online orders that has all of it, the
+  primary first. It left out "rules by the customer's city": a shop with a Karachi branch and a
+  Lahore warehouse sent Karachi's orders from Lahore whenever Lahore had them.
+* **Decision:**
+  * **A location names where it ships to first** (migration 0356), through `locationEdit`'s
+    `serves`:
+    * cities, known ones spelled the standard way, each once, at most 100;
+    * provinces and territories, by code, name or alias.
+    Each list left out stays; an empty list names none. A location that names none ships
+    wherever, as before.
+  * **An order placed without a location goes out, of those that have all of it:**
+    1. from one that serves its customer's city;
+    2. else one that serves their province, the city's province where it is known;
+    3. then the primary;
+    4. then by name.
+    Where none has it all, it goes from the primary, as before.
+  * One named by staff, an app or a draft still ships from there, and an order collected ships
+    from where it is collected.
+  * Stock a checkout held is given back before the order is placed, so the order takes its stock
+    where it is routed.
+  * **The admin's location settings** say where each location ships to first and edit it, as
+    lists typed with commas.
+* **Consequences:**
+  * An order still ships from one location: one split among them by itself waits (debt 13).
+  * Routing doesn't weigh distance or courier rates. Shops here name their branches' cities,
+    which says more.
