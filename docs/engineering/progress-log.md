@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Expansion stores
+
+* **Settings:** an owner makes another shop they own an expansion store of this one, at a price
+  rate. Copying sends this shop's products there, priced at the rate, and copying again updates
+  them (CH-11, [ADR-859](../architecture/13-decision-log.md#adr-859--expansion-stores-an-owner-copies-a-shops-products-to-another-shop-they-own-its-prices-at-a-rate-through-the-product-export-and-import-and-copies-again-to-update-them)). Which plans include it is OWN-51.
+* 4583 tests (8 new, the admin's check of each new GraphQL operation among them).
+
 ### 20f1e59 · Partners certified
 
 * **Partners:** the partner page has Hatti's course, six lessons and ten questions in English and

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-858 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-859 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -866,6 +866,7 @@
 | 856 | A cart a customer sends from the shop's WhatsApp catalogue is kept in the inbox and answered once with a link to the shop's checkout holding what it sells of it, their number filled in | Accepted |
 | 857 | A TikTok catalogue reads the shop's catalog feed, whose address the online store's TikTok tab gives, as Meta's and Google's do | Accepted |
 | 858 | Partners are certified by Hatti's course: six lessons and ten questions in English and Urdu on the partner page, scored by Hatti, eight right for a year's certificate that shops see on experts | Accepted |
+| 859 | Expansion stores: an owner copies a shop's products to another shop they own, its prices at a rate, through the product export and import, and copies again to update them | Accepted |
 
 ---
 
@@ -28221,3 +28222,44 @@
     to read.
   * **Courses kept in the database, written in the admin:** more than six lessons need. Kept in
     code, they are reviewed and translated as the rest of the admin's words are.
+
+## ADR-859 · Expansion stores: an owner copies a shop's products to another shop they own, its prices at a rate, through the product export and import, and copies again to update them
+
+* **Context:**
+  * CH-11 asks for multi-store and expansion stores, as Shopify Plus has: a Pakistani store and
+    an international one, say, in dollars, selling the same products.
+  * An account already owns up to five shops, each in its own currency. Products already go out
+    as Shopify's CSV with their images' addresses (ADR-129, ADR-158), and come in from it,
+    updating those of the same handle when told to overwrite (ADR-130).
+* **Decision:**
+  * **Linking:** the owner makes another shop they own an expansion store of this one, with a
+    price rate: what a price here is multiplied by there, 0.0036 for rupees to dollars, 1 for the
+    same currency. Five a shop at most. The catalog keeps the link with the shop products come
+    from (`catalog.expansion_stores`). The core checks the same person owns both, as it does at
+    each copy.
+  * **Copying:** `expansionStoreCopy` does three things:
+    * exports this shop's products, all of them, as the product export writes them;
+    * multiplies prices, compare-at prices and costs by the rate, to two places;
+    * imports the file into the other shop as its owner, with overwrite. Products it has already
+      are updated by handle, new ones are added, and images are fetched from this shop's
+      addresses.
+    * The counts of the last copy are kept: products made, updated, and rows not taken.
+  * **In the admin:** Settings › Expansion stores, for the owner alone. It lists the expansion
+    stores, adds one of the owner's other shops at a rate, copies, and stops copying; the
+    expansion store keeps what it was given.
+* **Consequences:**
+  * An owner opens an international store with their catalogue in a few taps, and keeps its
+    prices in step as theirs change.
+  * Each store keeps its own stock, orders, theme and checkout.
+  * Not yet:
+    * copying as products change, rather than when asked;
+    * collections and metafields, which the product file doesn't carry;
+    * rates fetched from a currency feed;
+    * a single page across the stores' sales.
+  * Which plans include expansion stores is the owner's to decide (OWN-51).
+* **Alternatives:**
+  * **One shop with several currencies:** OS-21's diaspora storefronts, prices shown in a
+    shopper's currency. It is for a later phase; an expansion store has its own prices, checkout
+    and couriers abroad.
+  * **Copying product by product through the Admin API:** a second copy of what the import
+    already does and checks.
