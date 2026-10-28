@@ -3,7 +3,15 @@ import type { AddressInfo } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
 import sharp, { type Sharp } from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MAX_IMAGE_SIDE, MODEL_IMAGE_SIDE, cleanImage, cropImage, modelImage } from './clean.js';
+import {
+  MAX_IMAGE_SIDE,
+  MODEL_IMAGE_SIDE,
+  RECEIPT_IMAGE_SIDE,
+  cleanImage,
+  cropImage,
+  modelImage,
+  receiptImage,
+} from './clean.js';
 import { ImageFetcher } from './fetch.js';
 import { sniffImage } from './formats.js';
 import { frame, subjectCrop } from './subject.js';
@@ -210,6 +218,21 @@ describe('crops', () => {
 });
 
 describe('pictures for an AI model (APP-02, ADR-507)', () => {
+  it("are receipts' JPEGs as tall as their print needs, small ones kept small (PAY-08)", async () => {
+    const screenshot = await (await photo(1080, 2400, 'png')).png().toBuffer();
+    const read = await sharp(await receiptImage(screenshot)).metadata();
+    expect([read.format, read.height, read.width]).toEqual([
+      'jpeg',
+      RECEIPT_IMAGE_SIDE,
+      Math.round((1080 * RECEIPT_IMAGE_SIDE) / 2400),
+    ]);
+    const small = await sharp(
+      await receiptImage(await (await photo(400, 300)).jpeg().toBuffer()),
+    ).metadata();
+    expect([small.width, small.height]).toEqual([400, 300]);
+    await expect(receiptImage(Buffer.from('not a picture'))).rejects.toThrow();
+  });
+
   it('are JPEGs no longer than the model needs, see-through on white, small ones kept small', async () => {
     const large = await (await photo(3000, 1500)).jpeg().toBuffer();
     const small = await modelImage(large);

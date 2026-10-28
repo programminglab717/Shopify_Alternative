@@ -274,6 +274,42 @@ export interface RefundDetail {
   creditNote: { number: string } | null;
 }
 
+/** What a receipt says, as the AI read it, and what Hatti makes of it (PAY-08, ADR-845). */
+export interface TransferReceiptReadingValue {
+  outcome: 'READ' | 'NOT_A_RECEIPT' | 'FAILED';
+  readAt: string;
+  amount: MoneyValue | null;
+  paidOn: string | null;
+  reference: string | null;
+  senderName: string | null;
+  senderBank: string | null;
+  recipientName: string | null;
+  recipientAccount: string | null;
+  owed: MoneyValue | null;
+  amountCheck: 'MATCHES' | 'SHORT' | 'OVER' | 'UNKNOWN' | null;
+  accountCheck: 'MATCHES' | 'DIFFERS' | 'UNKNOWN' | null;
+  sameReferenceOrders: string[];
+  beforeOrder: boolean;
+}
+
+/** A receipt a customer sent for their transfer, and its reading, once read. */
+export interface TransferReceiptValue {
+  id: string;
+  createdAt: string;
+  mimeType: string;
+  url: string;
+  /** Whether it may be read with the AI here; absent where the query didn't ask. */
+  readable?: boolean;
+  reading?: TransferReceiptReadingValue | null;
+}
+
+export interface TransferReceiptReadData {
+  transferReceiptRead: {
+    reading: TransferReceiptReadingValue | null;
+    userErrors: UserError[];
+  } | null;
+}
+
 export interface OrderDetail {
   id: string;
   name: string;
@@ -337,7 +373,7 @@ export interface OrderDetail {
   /** What a cash-on-delivery order asks for in advance, by transfer, before it ships; zero for none. */
   advanceDue: MoneyValue;
   /** Receipts its customer sent through its page for its transfer or advance, oldest first. */
-  transferReceipts: { id: string; createdAt: string; mimeType: string; url: string }[];
+  transferReceipts: TransferReceiptValue[];
   /** The customer's link, while it has one: when it stops working, null while it lasts. */
   customerLink: { expiresAt: string | null } | null;
   amountPaid: MoneyValue;

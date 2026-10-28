@@ -45,12 +45,23 @@ export interface AiImage {
 /** The most pictures one request takes. */
 export const AI_IMAGE_LIMITS = { count: 5, bytes: 3_750_000 } as const;
 
+/** A PDF the model reads, such as a bank's receipt for a transfer (PAY-08). */
+export interface AiDocument {
+  mediaType: 'application/pdf';
+  data: Buffer;
+}
+
+/** The most PDFs one request takes, and how large each may be. */
+export const AI_DOCUMENT_LIMITS = { count: 1, bytes: 10 * 1024 * 1024 } as const;
+
 /** A request whose answer comes back through one tool, checked by `parse`. */
 export interface StructuredRequest<T> {
   system: string;
   prompt: string;
   /** Pictures given before the prompt, for the model to look at. */
   images?: readonly AiImage[];
+  /** PDFs given before the prompt, for the model to read. */
+  documents?: readonly AiDocument[];
   tool: { name: string; description: string; inputSchema: Record<string, unknown> };
   maxTokens: number;
   /** What the tool's input means, or null when it does not fit. */
@@ -91,16 +102,31 @@ export class AiGateway {
    */
   async structured<T>(request: StructuredRequest<T>): Promise<AiResult<T>> {
     const images = request.images ?? [];
+    const documents = request.documents ?? [];
     if (
       images.length > AI_IMAGE_LIMITS.count ||
       images.some((image) => image.data.length > AI_IMAGE_LIMITS.bytes)
     ) {
       return { ok: false, reason: 'invalid', detail: 'Too many pictures, or one too large' };
     }
+    if (
+      documents.length > AI_DOCUMENT_LIMITS.count ||
+      documents.some((document) => document.data.length > AI_DOCUMENT_LIMITS.bytes)
+    ) {
+      return { ok: false, reason: 'invalid', detail: 'Too many PDFs, or one too large' };
+    }
     const content =
-      images.length === 0
+      images.length === 0 && documents.length === 0
         ? request.prompt
         : [
+            ...documents.map((document) => ({
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: document.mediaType,
+                data: document.data.toString('base64'),
+              },
+            })),
             ...images.map((image) => ({
               type: 'image',
               source: {

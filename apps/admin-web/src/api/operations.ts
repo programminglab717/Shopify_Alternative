@@ -170,6 +170,30 @@ const MONEY = /* GraphQL */ `
   }
 `;
 
+/** What a receipt says, as the AI read it, and what Hatti makes of it (PAY-08, ADR-845). */
+const RECEIPT_READING = /* GraphQL */ `
+  fragment TransferReceiptReadingFields on TransferReceiptReading {
+    outcome
+    readAt
+    amount {
+      ...Money
+    }
+    paidOn
+    reference
+    senderName
+    senderBank
+    recipientName
+    recipientAccount
+    owed {
+      ...Money
+    }
+    amountCheck
+    accountCheck
+    sameReferenceOrders
+    beforeOrder
+  }
+`;
+
 /** One order, for its page. */
 export const OrderQuery = /* GraphQL */ `
   query Order($id: ID!) {
@@ -267,6 +291,10 @@ export const OrderQuery = /* GraphQL */ `
         createdAt
         mimeType
         url
+        readable
+        reading {
+          ...TransferReceiptReadingFields
+        }
       }
       customerLink {
         expiresAt
@@ -461,6 +489,7 @@ export const OrderQuery = /* GraphQL */ `
     }
   }
   ${MONEY}
+  ${RECEIPT_READING}
 `;
 
 const USER_ERRORS = /* GraphQL */ `
@@ -4902,6 +4931,23 @@ export const OrderMarkAsPaidMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+/** A customer's receipt for their transfer, read by the AI; one credit (PAY-08, ADR-845). */
+export const TransferReceiptReadMutation = /* GraphQL */ `
+  mutation TransferReceiptRead($id: ID!) {
+    transferReceiptRead(id: $id) {
+      reading {
+        ...TransferReceiptReadingFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MONEY}
+  ${RECEIPT_READING}
   ${USER_ERRORS}
 `;
 

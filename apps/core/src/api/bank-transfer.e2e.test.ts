@@ -351,7 +351,9 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
     const shown = await gql(
       tokens.clerk,
       `query ($id: ID!) {
-        order(id: $id) { transferReceipts { id mimeType fileSize url createdAt } }
+        order(id: $id) {
+          transferReceipts { id mimeType fileSize url createdAt readable reading { outcome } }
+        }
       }`,
       { id: order.id },
     );
@@ -373,6 +375,19 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       `inline; filename="Receipt ${order.name}-1.png"; filename*=UTF-8''Receipt%20%23${order.name.slice(1)}-1.png`,
     );
     expect(file.rawPayload.equals(photo)).toBe(true);
+    // Without the AI set up, it is not read (PAY-08, ADR-845).
+    expect(receipt).toMatchObject({ readable: false, reading: null });
+    const read = await gql(
+      tokens.clerk,
+      `mutation ($id: ID!) {
+        transferReceiptRead(id: $id) { reading { outcome } userErrors { field code } }
+      }`,
+      { id: receipt.id },
+    );
+    expect(read.data!.transferReceiptRead).toEqual({
+      reading: null,
+      userErrors: [{ field: ['base'], code: 'UNAVAILABLE' }],
+    });
 
     // The home counts it among the transfers to check, and the list finds it.
     const toCheck = await gql(

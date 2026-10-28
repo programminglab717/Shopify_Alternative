@@ -163,3 +163,21 @@ function problem(code: ImageProblemCode, message: string): CleanResult {
 function megabytes(bytes: number): string {
   return (bytes / 1024 / 1024).toFixed(1);
 }
+
+/** The longest side of a receipt an AI model reads (PAY-08): enough for its smallest print. */
+export const RECEIPT_IMAGE_SIDE = 1568;
+
+/**
+ * A customer's photo or screenshot of a transfer's receipt as an AI model reads it (PAY-08,
+ * ADR-845): turned the way it was taken, a JPEG no longer than {@link RECEIPT_IMAGE_SIDE} on its
+ * longest side, on white, without what cameras add. A tall phone screenshot keeps its text
+ * readable, where {@link modelImage} would make it too small to read.
+ */
+export async function receiptImage(upload: Buffer): Promise<Buffer> {
+  return sharp(upload, INPUT)
+    .rotate()
+    .resize(RECEIPT_IMAGE_SIDE, RECEIPT_IMAGE_SIDE, { fit: 'inside', withoutEnlargement: true })
+    .flatten({ background: '#ffffff' })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+}

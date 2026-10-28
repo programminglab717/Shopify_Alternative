@@ -97,6 +97,31 @@ function core(role: StaffRole, first: ReturnType<typeof order>) {
           },
         };
       }
+      case 'TransferReceiptRead': {
+        const reading = {
+          outcome: 'READ',
+          readAt: LATER,
+          amount: rupees('500'),
+          paidOn: '2026-10-20',
+          reference: 'TID 0012 3456',
+          senderName: 'Ayesha Khan',
+          senderBank: 'Meezan Bank',
+          recipientName: null,
+          recipientAccount: 'PK36****9911',
+          owed: rupees('500'),
+          amountCheck: 'MATCHES',
+          accountCheck: 'DIFFERS',
+          sameReferenceOrders: ['#1003'],
+          beforeOrder: false,
+        };
+        current = {
+          ...current,
+          transferReceipts: current.transferReceipts.map((receipt) =>
+            receipt.id === variables.id ? { ...receipt, reading } : receipt,
+          ),
+        };
+        return { transferReceiptRead: { reading, userErrors: [] } };
+      }
       case 'OrderLinkCreate':
         current = { ...current, customerLink: { expiresAt: null } };
         return {
@@ -155,6 +180,49 @@ describe("An order's payment received by hand, and its customer's link", () => {
     await within(money).findByText('Rs 500 recorded as received.');
     expect(sentOf(fake, 'OrderCreateManualPayment')).toEqual([{ id: 'ord_7', amount: '500' }]);
     expect(within(money).queryByText(/Waiting for its advance/)).toBeNull();
+  });
+
+  it("reads a receipt with the AI, saying what doesn't fit, for those who handle money (PAY-08)", async () => {
+    const readable = (id: string, mimeType: string, url: string) => ({
+      id,
+      createdAt: LATER,
+      mimeType,
+      url,
+      readable: true,
+      reading: null as Record<string, unknown> | null,
+    });
+    const receipts = [
+      readable('rcp_1', 'image/jpeg', 'https://files.test/r1.jpg'),
+      {
+        ...readable('rcp_2', 'image/png', 'https://files.test/r2.png'),
+        reading: { outcome: 'NOT_A_RECEIPT', readAt: LATER },
+      },
+    ];
+    const fake = core('manager', order({ transferReceipts: receipts }));
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const money = await screen.findByRole('region', { name: 'Payments and refunds' });
+    expect(within(money).getByText("The AI says this isn't a receipt for a payment")).toBeTruthy();
+    expect(within(money).getByText('Uses one AI credit')).toBeTruthy();
+    await press('Read with AI');
+    await within(money).findByText('What the AI read');
+    expect(sentOf(fake, 'TransferReceiptRead')).toEqual([{ id: 'rcp_1' }]);
+    expect(within(money).getByText(/what the order waited for/)).toBeTruthy();
+    expect(within(money).getByText('TID 0012 3456')).toBeTruthy();
+    expect(within(money).getByText(/also sent for #1003/)).toBeTruthy();
+    expect(within(money).getByText(/not the account the customer was told/)).toBeTruthy();
+    expect(
+      within(money).getByText('Check it in your bank before you mark the order paid.'),
+    ).toBeTruthy();
+    expect(within(money).queryByRole('button', { name: 'Read with AI' })).toBeNull();
+    cleanup();
+
+    // Those who don't handle its money never see the button.
+    vi.stubGlobal('fetch', core('packer', order({ transferReceipts: receipts })).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    await screen.findByRole('heading', { name: '#1007' });
+    expect(screen.queryByRole('button', { name: 'Read with AI' })).toBeNull();
   });
 
   it('lets an order go without its advance, after saying what the courier collects (ADR-653)', async () => {

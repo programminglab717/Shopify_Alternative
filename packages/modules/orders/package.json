@@ -30,6 +30,7 @@
     "@hatti/events": "workspace:*",
     "@hatti/files": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/images": "workspace:*",
     "@hatti/inventory": "workspace:*",
     "@hatti/marketing": "workspace:*",
     "@hatti/money": "workspace:*",

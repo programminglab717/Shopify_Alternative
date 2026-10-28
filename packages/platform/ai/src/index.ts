@@ -1,6 +1,8 @@
 export {
+  AI_DOCUMENT_LIMITS,
   AI_IMAGE_LIMITS,
   AiGateway,
+  type AiDocument,
   type AiFailure,
   type AiImage,
   type AiGatewayOptions,
@@ -41,3 +43,9 @@ export {
   type ReportChoices,
   type ReportQuestionReading,
 } from './report-question.js';
+export {
+  TRANSFER_RECEIPT_LIMITS,
+  readTransferReceipt,
+  type TransferReceiptFile,
+  type TransferReceiptReading,
+} from './transfer-receipt.js';

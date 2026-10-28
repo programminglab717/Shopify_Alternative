@@ -1,4 +1,4 @@
-import { FileUp } from 'lucide-react';
+import { FileUp, ScanText } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { browserFetch } from '../api/client';
@@ -10,6 +10,7 @@ import {
   OrderRefundMutation,
   OrderWaiveAdvanceMutation,
   StagedUploadsCreateMutation,
+  TransferReceiptReadMutation,
 } from '../api/operations';
 import type {
   CustomerStoreCreditData,
@@ -21,6 +22,8 @@ import type {
   ParcelUserErrorsData,
   RefundMethod,
   StagedUploadsCreateData,
+  TransferReceiptReadData,
+  TransferReceiptValue,
 } from '../api/types';
 import { can, gate, permits } from '../auth/permissions';
 import { formatDate, formatDateTime, formatMoney } from '../i18n/format';
@@ -426,6 +429,117 @@ function PayWithCredit({
   );
 }
 
+/**
+ * What a customer's receipt says, as the AI read it, beside what Hatti makes of it (PAY-08,
+ * ADR-845): its amount against what the order waited for, the account it went to, its reference
+ * on other orders' receipts, a day before the order. Unread, those who handle money read it for
+ * a credit. A reading is a help to check, never a payment: staff mark the order paid themselves.
+ */
+function ReceiptReading({ receipt, handles }: { receipt: TransferReceiptValue; handles: boolean }) {
+  const { t } = useLocale();
+  const read = useAdminMutation<TransferReceiptReadData, { id: string }>(
+    TransferReceiptReadMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const reading = receipt.reading ?? null;
+  const small = 'text-[length:var(--hatti-type-body-sm-size)]';
+  if (reading?.outcome === 'NOT_A_RECEIPT') {
+    return <span className={`text-warning ${small}`}>{t('money.reading.notReceipt')}</span>;
+  }
+  if (reading?.outcome === 'READ') {
+    const amountWarns = reading.amountCheck === 'SHORT' || reading.amountCheck === 'OVER';
+    return (
+      <dl className={`flex max-w-72 flex-col gap-0.5 ${small}`}>
+        <dt className="font-medium">{t('money.reading.title')}</dt>
+        {reading.amount && (
+          <dd>
+            <span className="num">{formatMoney(reading.amount.amount)}</span>
+            {reading.amountCheck === 'MATCHES' && (
+              <span className="text-success"> · {t('money.reading.amountMatches')}</span>
+            )}
+            {amountWarns && reading.owed && (
+              <span className="text-danger">
+                {' · '}
+                {t(
+                  reading.amountCheck === 'SHORT'
+                    ? 'money.reading.amountShort'
+                    : 'money.reading.amountOver',
+                  { amount: formatMoney(reading.owed.amount) },
+                )}
+              </span>
+            )}
+          </dd>
+        )}
+        {reading.paidOn && (
+          <dd>
+            <span dir="ltr">{reading.paidOn}</span>
+            {reading.beforeOrder && (
+              <span className="text-danger"> · {t('money.reading.beforeOrder')}</span>
+            )}
+          </dd>
+        )}
+        {reading.reference && (
+          <dd>
+            {t('money.reading.reference')} <span dir="ltr">{reading.reference}</span>
+            {reading.sameReferenceOrders.length > 0 && (
+              <span className="text-danger">
+                {' · '}
+                {t('money.reading.sameReference', {
+                  orders: reading.sameReferenceOrders.join(', '),
+                })}
+              </span>
+            )}
+          </dd>
+        )}
+        {(reading.senderName || reading.senderBank) && (
+          <dd>
+            {t('money.reading.from')}{' '}
+            <span dir="auto">
+              {[reading.senderName, reading.senderBank].filter(Boolean).join(' · ')}
+            </span>
+          </dd>
+        )}
+        {(reading.recipientName || reading.recipientAccount) && (
+          <dd>
+            {t('money.reading.to')}{' '}
+            <span dir="auto">
+              {[reading.recipientName, reading.recipientAccount].filter(Boolean).join(' · ')}
+            </span>
+            {reading.accountCheck === 'MATCHES' && (
+              <span className="text-success"> · {t('money.reading.accountMatches')}</span>
+            )}
+            {reading.accountCheck === 'DIFFERS' && (
+              <span className="text-danger"> · {t('money.reading.accountDiffers')}</span>
+            )}
+          </dd>
+        )}
+        <dd className="text-secondary">{t('money.reading.check')}</dd>
+      </dl>
+    );
+  }
+  if (!handles || !receipt.readable) return null;
+  return (
+    <div className="flex max-w-72 flex-col gap-1">
+      <Button
+        variant="tertiary"
+        icon={<ScanText aria-hidden className="size-4" />}
+        busy={read.isPending}
+        onClick={() =>
+          void attempt(
+            async () => (await read.mutateAsync({ id: receipt.id })).transferReceiptRead!,
+          )
+        }
+      >
+        {t('money.reading.read')}
+      </Button>
+      <span className={`text-secondary ${small}`}>
+        {reading?.outcome === 'FAILED' ? t('money.reading.failed') : t('money.reading.credit')}
+      </span>
+      {problem && <span className={`text-danger ${small}`}>{problem}</span>}
+    </div>
+  );
+}
+
 export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t, locale } = useLocale();
   const shop = useShop();
@@ -510,6 +624,7 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
                   <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                     {formatDateTime(receipt.createdAt, timezone, locale)}
                   </span>
+                  <ReceiptReading receipt={receipt} handles={handles} />
                 </li>
               );
             })}

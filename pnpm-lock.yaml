@@ -1415,6 +1415,9 @@ importers:
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
+      '@hatti/images':
+        specifier: workspace:*
+        version: link:../../platform/images
       '@hatti/inventory':
         specifier: workspace:*
         version: link:../inventory

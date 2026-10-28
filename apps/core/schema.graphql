@@ -11017,6 +11017,11 @@ type Mutation {
   tiktokEventsUpdate(input: TikTokEventsInput!): TikTokEventsUpdatePayload!
 
   """
+  Reads a customer's receipt for their transfer with the AI (PAY-08, ADR-845): what it says, how much was sent, when, its reference, from whom and to whom, checked against what its order waits for, the account its customer was told and the references of the shop's other receipts. The AI sees the receipt alone. It never marks the order paid: that is for staff to confirm. Spends an AI credit; a receipt read once is not read again.
+  """
+  transferReceiptRead(id: ID!): TransferReceiptReadPayload!
+
+  """
   AI drafts of a resource's fields in a language (CAT-07, ADR-463): those named, or all with words. Nothing is kept: the shop checks each and keeps it through translationsRegister with its digest. A hundred a day per shop.
   """
   translationsDraft(keys: [String!], locale: String!, resourceId: ID!): TranslationsDraftPayload!
@@ -19888,10 +19893,108 @@ type TransferReceipt {
   """image/jpeg, image/png, image/webp or application/pdf."""
   mimeType: String!
 
+  """Whether it may be read with the AI here: once the AI is set up."""
+  readable: Boolean!
+
+  """What it says, as the AI read it; null until it is read."""
+  reading: TransferReceiptReading
+
   """
   Where it is shown, for an hour from when it was asked for, named for its order: "Receipt #1023-1.jpg".
   """
   url: String!
+}
+
+"""
+Whether a receipt says the money went to the account its customer was told.
+"""
+enum TransferReceiptAccountCheck {
+  """Its account's last digits are another account's."""
+  DIFFERS
+
+  """
+  Its account's last digits end the account's IBAN or Raast ID, or, with no digits shown, its name is the account's title.
+  """
+  MATCHES
+
+  """It shows too little to tell, or the order was told no account."""
+  UNKNOWN
+}
+
+"""
+How the amount a receipt says compares with what its order waited for then.
+"""
+enum TransferReceiptAmountCheck {
+  """The same."""
+  MATCHES
+
+  """More than it waited for."""
+  OVER
+
+  """Less than it waited for."""
+  SHORT
+
+  """No amount was read, or the order waited for nothing then."""
+  UNKNOWN
+}
+
+"""What came of reading a receipt with the AI (PAY-08, ADR-845)."""
+enum TransferReceiptReadOutcome {
+  """The AI could not read it: it may be read again."""
+  FAILED
+
+  """It isn't a receipt for a sent payment."""
+  NOT_A_RECEIPT
+
+  """It was read: what it says is given."""
+  READ
+}
+
+type TransferReceiptReadPayload {
+  reading: TransferReceiptReading
+  userErrors: [UserError!]!
+}
+
+"""
+What a receipt says, as the AI read it, and what Hatti makes of it (PAY-08, ADR-845). The AI saw the receipt alone. A reading never marks an order paid: staff confirm the payment themselves.
+"""
+type TransferReceiptReading {
+  accountCheck: TransferReceiptAccountCheck
+
+  """The money it says was sent."""
+  amount: Money
+  amountCheck: TransferReceiptAmountCheck
+
+  """
+  Whether the day it says the money was sent is before its order was placed.
+  """
+  beforeOrder: Boolean!
+  outcome: TransferReceiptReadOutcome!
+
+  """What its order waited for by transfer when it was read."""
+  owed: Money
+
+  """The day it says the money was sent: "2026-10-20"."""
+  paidOn: String
+  readAt: DateTime!
+
+  """
+  The account it says the money went to, as it shows it, masked or whole.
+  """
+  recipientAccount: String
+  recipientName: String
+
+  """The transaction's own reference."""
+  reference: String
+
+  """
+  The shop's other orders with a receipt of the same reference, as "#1023": the same transfer sent for more than one order.
+  """
+  sameReferenceOrders: [String!]!
+
+  """The bank or wallet it was sent from: "Meezan Bank", "JazzCash"."""
+  senderBank: String
+  senderName: String
 }
 
 """

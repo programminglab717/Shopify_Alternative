@@ -34,6 +34,7 @@ import { OrderLinkResolver } from './graphql/order-link.resolver.js';
 import { DraftOrderResolver } from './graphql/draft-order.resolver.js';
 import { CustomReportResolver } from './graphql/custom-report.resolver.js';
 import { ReportQuestionResolver } from './graphql/report-question.resolver.js';
+import { ReceiptReadingService } from './receipt-readings.js';
 import { ReportQuestionService } from './report-questions.js';
 import { ExportScheduleResolver } from './graphql/export-schedule.resolver.js';
 import { OrderExportResolver } from './graphql/export.resolver.js';
@@ -49,6 +50,7 @@ import { AffiliatesService } from './affiliates.service.js';
 import { SavedSearchResolver } from './graphql/saved-search.resolver.js';
 import {
   RefundReceiptResolver,
+  TransferReceiptReadingResolver,
   TransferReceiptResolver,
 } from './graphql/transfer-receipt.resolver.js';
 import {
@@ -131,6 +133,8 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderExportResolver,
     CustomReportResolver,
     ReportQuestionService,
+    ReceiptReadingService,
+    TransferReceiptReadingResolver,
     ReportQuestionResolver,
     ExportScheduleResolver,
     RefundResolver,
