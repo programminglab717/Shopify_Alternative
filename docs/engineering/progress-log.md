@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The sales as a journal for the shop's books
+### 2329d37 · The sales as a journal for the shop's books
 
 * **Journal:** each day's sales, refunds and cost of goods as a balanced entry, for Tally,
   Xero or QuickBooks to import, or as a CSV ([ADR-885](../architecture/13-decision-log.md#adr-885--the-sales-as-a-journal-for-the-shops-books-an-entry-a-day-posting-what-the-sales-report-counts-to-accounts-the-shop-names-as-a-csv-xeros-or-quickbooks-journal-import-or-tallys-vouchers-what-the-shop-is-paid-is-left-to-the-accountant-to-clear)).
