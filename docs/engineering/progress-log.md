@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Hatti Pass
+
+* **Checkout:** a shopper ticks a box to save their name and address to Hatti Pass, and proves
+  their number with a code. At any other Hatti shop, "Ordered here before?" fills them in once
+  they prove the number there. They forget it from any checkout (CUS-08, [ADR-867](../architecture/13-decision-log.md#adr-867--hatti-pass-a-shopper-saves-their-name-and-address-for-any-hatti-shops-checkout-by-a-box-they-tick-once-their-number-is-proved-and-forgets-it-from-any-checkout)).
+* **Off until** Hatti's privacy policy says Hatti keeps these details (OWN-57); `HATTI_PASS`
+  turns it on.
+* 4650 tests (1 new).
+
 ### d180656 · Theme experiments
 
 * **Online store › Themes › Experiments:** a shop tries a draft theme, a new home page or an Eid

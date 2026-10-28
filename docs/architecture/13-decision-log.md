@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-866 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-867 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -874,6 +874,7 @@
 | 864 | Single sign-on for a shop's staff through its organisation's identity provider, over OpenID Connect: required if the shop says so, its sessions reaching that shop alone | Accepted |
 | 865 | Prices in shoppers' own currencies: a shop shows dirhams, riyals, pounds, dollars or euros at a rate it fixes or the day's from an open feed, rounded as it asks, and charges rupees | Accepted |
 | 866 | Theme experiments: a draft theme shown a share of shoppers, each keeping their arm, counted as the shop's funnel is, and ended by Hatti when it sells clearly worse | Accepted |
+| 867 | Hatti Pass: a shopper saves their name and address for any Hatti shop's checkout, by a box they tick once their number is proved, and forgets it from any checkout | Accepted |
 
 ---
 
@@ -28622,3 +28623,42 @@
     confirmed later.
   * **Bayesian probabilities:** friendlier words, but a test that peeks every minute needs
     stricter thresholds either way. The z-test with a strict guardrail is simple to check.
+
+## ADR-867 · Hatti Pass: a shopper saves their name and address for any Hatti shop's checkout, by a box they tick once their number is proved, and forgets it from any checkout
+
+* **Context:**
+  * CUS-08 asks for Hatti Pass: an opt-in identity across Hatti's shops, the verified number and
+    address filled in at any shop's checkout in a tap, as Shop Pay does across Shopify's.
+  * "Ordered here before?" fills checkout in from the shop's own last order once the number is
+    proved by a code (ADR-447). A shopper at a shop new to them still types the long address.
+* **Decision:**
+  * **Saving it:**
+    * Checkout's form has a box, unticked: save my name and address to Hatti Pass, for any
+      Hatti shop's checkout, kept until I forget it.
+    * Ticked, the order asks for a code to prove the number, as spending store credit does; the
+      shopper's signed-in session proves it too. No one keeps their details under another's
+      number.
+    * Placed, the order's name, email and address are kept by the number, replacing the last.
+      An order picked up or of digital products keeps none.
+  * **Using it:** at any shop's checkout, "Ordered here before?" fills the form in from the
+    shopper's Pass once they prove the number, where that shop has no order of theirs to fill it
+    from. The page says it came from their Hatti Pass.
+  * **Forgetting it:** the page filled from a Pass offers "Forget my Hatti Pass", from that
+    checkout or a browser that proved the number lately. Otherwise a code is asked for first.
+  * **Whose it is:**
+    * Hatti's, kept with the shopper's consent in `platform.hatti_passes`, not any shop's.
+    * A shop sees only the form its shopper filled in from it, and the order placed, as any.
+    * A shop's erasure of its customer leaves the Pass, which the shopper forgets themselves.
+* **Consequences:**
+  * A shopper who saved their Pass once fills in a new shop's checkout with a code, not a form,
+    on a phone.
+  * Hatti holds shoppers' addresses directly: its privacy policy must say so before it is
+    turned on (OWN-57). `HATTI_PASS` turns it on for every shop; it is off until then.
+  * Not yet:
+    * a page of Hatti's own for the shopper to see and forget their Pass without a checkout;
+    * several addresses;
+    * the Pass in the storefront's express checkout (ADR-838), which needs the shop's account.
+* **Alternatives:**
+  * **A cookie on hatti.pk shared across shops:** shops' own domains can't read it, and
+    browsers block third-party cookies.
+  * **Filling in without a code:** anyone typing a neighbour's number would see where they live.
