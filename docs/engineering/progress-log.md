@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Hatti's console
+### 44cde40 · Hatti's console
 
 * **Console:** Hatti's people now have a console of their own, at its own address. They sign in
   through Hatti's identity provider with their security keys ([ADR-876](../architecture/13-decision-log.md#adr-876--hattis-console-its-own-people-sign-in-through-hattis-identity-provider-with-their-security-keys-to-a-server-of-its-own-that-holds-the-system-login-the-api-never-does-sessions-last-a-working-day-and-each-thing-done-is-logged-before-it-is-done-shops-support-requests-are-its-first-queue)).
