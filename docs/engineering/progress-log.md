@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### An age gate for the online store
+### 1cd1851 · An age gate for the online store
 
 * **Gate:** a shop selling what is only for adults asks visitors to confirm an age, 13 to 25,
   before its pages show; the answer is kept a month ([ADR-889](../architecture/13-decision-log.md#adr-889--an-age-gate-a-shop-selling-what-is-only-for-adults-asks-each-visitor-to-confirm-an-age-from-13-to-25-before-its-pages-show-in-the-browser-the-answer-kept-a-month)).
