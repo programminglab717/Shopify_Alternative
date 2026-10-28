@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); B2B payment terms (CUS-06) next. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15) next. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,15 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### Payment terms for wholesale customers
+
+* **Terms:** an order paid by transfer within 1 to 120 days ships without waiting, owed until
+  paid and overdue past its date ([ADR-888](../architecture/13-decision-log.md#adr-888--payment-terms-for-wholesale-customers-an-order-paid-by-transfer-within-1-to-120-days-ships-without-waiting-for-the-money-owed-until-paid-and-overdue-past-its-date-its-terms-from-the-draft-or-the-customers-price-list)).
+* **From:** a draft's own terms, or its customer's price list's.
+* **Owed:** each order says what is due by when; searches find those owed or overdue, and the
+  price lists page lists who owes, the most overdue first.
+* 4822 tests (9 new).
 
 ### 23f3658 · Customers by how recently and often they buy
 

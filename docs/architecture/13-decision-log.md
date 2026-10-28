@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-887 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-888 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -895,6 +895,7 @@
 | 885 | The sales as a journal for the shop's books: an entry a day, posting what the sales report counts to accounts the shop names, as a CSV, Xero's or QuickBooks' journal import or Tally's vouchers; what the shop is paid is left to the accountant to clear | Accepted |
 | 886 | Workflows wait and check: a wait of an hour to a week before the next action, and a check that goes on only where its conditions hold of the order as it is then, with the order's stage and confirmation to check | Accepted |
 | 887 | Customers by how recently and often they buy: RFM on a grid of three by three, by the days since their last order against two lines the shop picks and by their delivered orders, each group a segment's query | Accepted |
+| 888 | Payment terms for wholesale customers: an order paid by transfer within 1 to 120 days ships without waiting for the money, owed until paid and overdue past its date, its terms from the draft or the customer's price list | Accepted |
 
 ---
 
@@ -29434,3 +29435,45 @@
     two clicks.
   * Monetary value is shown, not scored. Segments by spend can be added to a group's query by
     hand.
+
+## ADR-888 · Payment terms for wholesale customers: an order paid by transfer within 1 to 120 days ships without waiting for the money, owed until paid and overdue past its date, its terms from the draft or the customer's price list
+
+* **Context:** CUS-06 asks for customer groups, price lists, quantity breaks and payment terms;
+  Shopify keeps B2B to Plus. Price lists and breaks are built (ADR-778 to ADR-780). Pakistani
+  wholesalers sell to resellers on credit, "pay in 30 days", and keep who owes what in a
+  register. A bank-transfer order waited at awaiting payment until the transfer came (ADR-074),
+  so a credit sale could not ship.
+* **Decision:**
+  * **An order on payment terms** is paid by bank transfer within its days, 1 to 120, from when
+    it was placed (migration 0389: `payment_terms_days`, `payment_due_at`).
+    * It ships without waiting for the money: it never stops at awaiting payment, so unpaid
+      transfer reminders and cancelling (ADR-174) never touch it.
+    * It is owed until paid in full, and overdue once past its due date with something owed.
+    * The timeline says it was placed "on 30 days' terms".
+    * Terms are for bank transfer only; cash on delivery is paid at the door.
+  * **Where terms come from:**
+    * `orderCreate` and drafts take `paymentTermsDays`.
+    * A price list may give its customers terms. A bank-transfer draft for a customer with the
+      list's tag takes them, unless it says otherwise (0 for none). Where a customer has two
+      lists, the longest terms win, as the lowest price does.
+    * A draft paid another way loses its terms.
+  * **Seeing what is owed:**
+    * `Order.paymentTerms` gives its days, due date, what is owed and whether overdue.
+    * Order searches take `payment_terms:owed` and `payment_terms:overdue`.
+    * `paymentTermsOwed` lists the customers who owe, the most overdue first: their orders owed,
+      what they owe, what of it is overdue and the earliest due date.
+  * **The admin:**
+    * Bank-transfer drafts choose terms: their price list's, none, or 7 to 90 days.
+    * Price lists set their customers' terms.
+    * The order's payments say what is due by when, in red once overdue.
+    * The price lists page lists who owes, for owners, managers and accountants, linking to
+      each customer and to the orders owed.
+* **Consequences:**
+  * A wholesaler ships to a trusted reseller at once and sees who to chase, instead of keeping
+    a register.
+  * Paying is recorded as any transfer is: marked paid, or recorded in part (ADR-074).
+  * Not yet:
+    * reminders to the customer before and after the due date, which need WhatsApp templates
+      Meta approves;
+    * credit limits per customer;
+    * the storefront's order page saying the terms.
