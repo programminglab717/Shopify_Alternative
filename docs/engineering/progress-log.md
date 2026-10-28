@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Single sign-on for staff
+### 4fad27d · Single sign-on for staff
 
 * **Settings › Staff:** the owner sets the shop's identity provider (Microsoft Entra, Google
   Workspace, Okta, any speaking OpenID Connect) and its staff's email domains, and may require
