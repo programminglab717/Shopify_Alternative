@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Shops for AI shopping agents
+
+* **Online store:** each shop publishes a UCP profile at `/.well-known/ucp`, and a store MCP
+  endpoint at `/api/mcp`. Its tools search and read the shop's products, and make carts whose
+  `continue_url` is the shop's own checkout, so an agent's cash-on-delivery order is confirmed
+  as any order is (OS-23, CH-09, [ADR-847](../architecture/13-decision-log.md#adr-847--each-shop-answers-ai-shopping-agents-a-ucp-profile-at-well-knownucp-and-a-store-mcp-endpoint-whose-tools-search-and-read-its-products-and-make-carts-its-own-checkout-takes-so-an-agents-order-is-placed-and-confirmed-as-any-shoppers)). UCP's shapes come from its published packages, since
+  `ucp.dev` couldn't be read from here; check them against the spec once it can be.
+* 4478 tests (6 new).
+
 ### fa130d3 · Paying online at the door
 
 * **Delivery:** a cash-on-delivery parcel out with the shop's own rider may be paid online at

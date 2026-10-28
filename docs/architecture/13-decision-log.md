@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-846 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-847 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -854,6 +854,7 @@
 | 844 | A merchant asks of their numbers in English, Urdu or Roman Urdu: the AI reads the question alone into one of Hatti's reports, which Hatti runs and shows with what the question was taken to ask | Accepted |
 | 845 | Staff have a customer's receipt for their transfer read by the AI, the receipt alone sent, and see what it says beside what Hatti makes of it; they still mark the order paid themselves | Accepted |
 | 846 | A cash-on-delivery parcel out with the shop's own rider may be paid online at the door: its page offers what the rider would collect, the rider shows it as a QR code, and paid, the rider collects nothing; couriers' parcels wait on the couriers | Accepted |
+| 847 | Each shop answers AI shopping agents: a UCP profile at /.well-known/ucp and a store MCP endpoint whose tools search and read its products and make carts its own checkout takes, so an agent's order is placed and confirmed as any shopper's | Accepted |
 
 ---
 
@@ -27661,3 +27662,60 @@
     order.
   * **Offering it for couriers' parcels and refunding the cash collected:** rejected. The
     customer would be asked to pay twice at their door.
+
+## ADR-847 · Each shop answers AI shopping agents: a UCP profile at /.well-known/ucp and a store MCP endpoint whose tools search and read its products and make carts its own checkout takes, so an agent's order is placed and confirmed as any shopper's
+
+* **Context:**
+  * OS-23 and CH-09 ask for an agent-ready storefront: a store MCP endpoint and a Universal
+    Commerce Protocol (UCP) profile (09 §5). Agent orders must pass COD confirmation.
+  * The shops' structured data and feeds were already there (ADR-142, ADR-483).
+  * UCP's pages couldn't be read from where this was built. Its business profile's shape, and
+    its shopping service's tool names over MCP, come from two Apache-2.0 and MIT packages
+    published on npm: `@ucp-js/sdk` 0.5.1 and Shopify's reference client `@shopify/ucp-cli`
+    0.9.1, which speaks UCP 2026-04-08. Neither is a dependency.
+* **Decision:**
+  * **`/.well-known/ucp`** gives the shop's business profile, UCP 2026-04-08. Its shopping
+    service is reached over MCP at the shop's `/api/mcp`, with three capabilities:
+    `dev.ucp.shopping.catalog.search`, `dev.ucp.shopping.catalog.lookup` and
+    `dev.ucp.shopping.cart`. It names no checkout capability and no payment handler. It is kept
+    at the edge for an hour, as crawlers' pages are.
+  * **`/api/mcp`** answers MCP's JSON-RPC 2.0 over POST, one request at a time:
+    * `initialize` (in MCP's 2025-03-26, 2025-06-18 or 2025-11-25), `ping`, `tools/list` and
+      `tools/call`;
+    * a notification gets 202 with no body, and a GET gets 405, since nothing streams from it;
+    * each answer gives the tool's result as structured content and as its text.
+    Its tools are UCP's:
+    * `search_catalog`: the core's search (ADR-046), up to 20 a page, by cursor, with filters
+      for availability and price;
+    * `lookup_catalog`: up to 50 products, by ID, variant ID or product page;
+    * `get_product`: one product's options, with which values exist and are in stock, and its
+      variants, narrowed to the options chosen;
+    * `create_cart`, `get_cart`, `update_cart`.
+    Prices are minor units, paisa, as UCP's are. Product IDs, and variant IDs that name their
+    product, are opaque `gid://hatti/…` strings.
+  * **A cart is kept in its ID and nowhere else:** its lines, priced again each time it is read.
+    A sold-out line is left out with a message. Its `continue_url` is the shop's cart permalink
+    (ADR-042), which takes the shopper to the shop's checkout. There they give their address
+    and pay, cash on delivery among other ways. An agent's cash-on-delivery order is confirmed
+    as every order is (ADR-032).
+  * **What it never does:** place an order, read a customer or take a payment. The rules that
+    protect pages protect it too: a shop behind its password, suspended or paused answers
+    nothing. Each address makes at most 120 calls a minute.
+* **Consequences:**
+  * Agents that speak UCP or MCP can find a shop's products and hand a shopper a ready checkout,
+    with nothing to install. Shopify's stores answer the same way.
+  * UCP moves quickly. Version 2026-08-25 lists capabilities differently, and the spec's own
+    pages should be read against these shapes once they can be (`ucp.dev`). Answers carry
+    their version, so a newer one can be served beside it.
+  * Not yet:
+    * a shop's switch to keep agents out;
+    * tools for its policies, its FAQs, and delivery and cash on delivery by city (09 §5);
+    * UCP's checkout capability, which waits on agents taking Pakistan's ways to pay (09 §5,
+      Scale);
+    * request signatures from agents' profiles.
+* **Alternatives:**
+  * **The MCP SDK (`@modelcontextprotocol/sdk`, MIT):** rejected for what the endpoint needs.
+    It is a stateless JSON-RPC answer of four methods, and the SDK brings its sessions and
+    transports.
+  * **Carts kept in the core:** rejected. An agent's cart is its own until a shopper takes it,
+    and the shop's checkout makes the real one.
