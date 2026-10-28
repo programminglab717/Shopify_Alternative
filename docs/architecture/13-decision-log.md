@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-837 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-838 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -845,6 +845,7 @@
 | 835 | The admin's Push notifications page under Marketing shows who has them on, sends a push to all of them and lists those sent | Accepted |
 | 836 | Hatti Base's footer offers the shop's notifications once the browser can have them and they are off | Accepted |
 | 837 | Hatti keeps when a shop last said whether it is on FBR's Active Taxpayers List, asks it to check again after each 1 March's new list, and writes the SMS to 9966 that checks it | Accepted |
+| 838 | Express checkout: a signed-in shopper whose session proved their number places the order in a tap, to their book's default address, paid on delivery, where nothing else is asked of it | Accepted |
 
 ---
 
@@ -27346,3 +27347,35 @@
     (ADR-493) mixes income tax with sales tax, so halving it would mislead; the percentages ADR-500
     shows stand instead.
   * A reminder by message each March waits for shops to ask; the page asks once they open it.
+
+## ADR-838 · Express checkout: a signed-in shopper whose session proved their number places the order in a tap, to their book's default address, paid on delivery, where nothing else is asked of it
+
+* **Context:** CHK-21 asks for one tap for returning shoppers with a verified phone and a saved
+  address. Most of it existed:
+  * a shopper's account session fills in checkout from their book's default address (ADR-585,
+    ADR-587);
+  * the session proves their number for cash on delivery, as a code does (ADR-586).
+  Still, they had to read and submit the whole form.
+* **Decision:**
+  * **The checkout page shows an express checkout at its top.** It says the default address,
+    the number and the total paid on delivery, with the shop's agreement words and one button.
+    It is offered only where nothing else is asked of the order:
+    * no problem shown;
+    * cash on delivery takes the cart, with nothing asked in advance;
+    * something to deliver, not digital or picked up;
+    * no delivery time to choose;
+    * the form filled in from that address.
+  * **`action=express`, with the address's ID,** fills the form from that address of the
+    signed-in shopper's book and places the order through `place`, as any order is placed:
+    * risk scored;
+    * stock committed;
+    * policies agreed to;
+    * no code asked, as the session proves the number;
+    * the saved address not questioned again as vague (ADR-682), being one the shopper saved.
+  * **Anything that stops it shows the form, filled in from that address, saying why.** Without a
+    session, or with another number's, it shows the page as it was and places nothing.
+* **Consequences:**
+  * Express pays on delivery alone. Bank transfer and online payment take a step of their own, so
+    they go through the form.
+  * A browser proved by a code (ADR-199) but not signed in still uses "Ordered here before?"
+    (ADR-447). Express needs the account, whose book the shopper keeps.

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Express checkout
+
+* **Checkout:** a signed-in shopper whose session proved their number places the order in a tap,
+  to their book's default address, paid on delivery, where nothing else is asked of it; anything
+  that stops it shows the form filled in (CHK-21, [ADR-838](../architecture/13-decision-log.md#adr-838--express-checkout-a-signed-in-shopper-whose-session-proved-their-number-places-the-order-in-a-tap-to-their-books-default-address-paid-on-delivery-where-nothing-else-is-asked-of-it)). Done in code.
+* 4438 tests (1 new).
+
 ### 16cc959 · Filer-status checks
 
 * **Tax:** Hatti keeps when the shop last said whether it is on FBR's Active Taxpayers List, asks
