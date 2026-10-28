@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-897 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-898 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -905,6 +905,7 @@
 | 895 | An inventory item keeps FBR's unit of measure and the SRO it is sold under, beside its HS code, and digital invoicing is sent them with each item | Accepted |
 | 896 | The copilot drafts broadcasts: a name, who it goes to as a segment query, its SMS words and when, staff choosing its WhatsApp template and its audience saved as a segment as they confirm it | Accepted |
 | 897 | Bulk mutations: bulkOperationRunMutation runs a mutation once for each line of a JSONL file of variables the caller staged, as the caller, in order, each answer a line of the file it writes | Accepted |
+| 898 | An order paid on delivery that no one location has all of may be split among those that do as it is placed, as the shop allows: each part an order of its own, shipped from its location at the shop's cost | Accepted |
 
 ---
 
@@ -29750,3 +29751,41 @@
   * Mutations that ask for an Idempotency-Key header fail line by line in a bulk run, which
     has none. Each line's answer says so.
   * It runs in the API process that started it, as bulk queries do (ADR-843).
+
+## ADR-898 · An order paid on delivery that no one location has all of may be split among those that do as it is placed, as the shop allows: each part an order of its own, shipped from its location at the shop's cost
+
+* **Context:**
+  * An order ships from one location (ADR-355, ADR-839). One whose items no single location
+    has went to the primary, which refused it as out of stock, though the storefront counted
+    the items as for sale across locations.
+  * ADR-355 turned down splitting at once: two parcels cost two delivery charges the customer
+    did not agree to. ADR-135 splits by hand, an order paid on delivery alone, as cash is
+    collected parcel by parcel.
+* **Decision:**
+  * **The shop chooses:** `InventorySettings.splitOrdersAcrossLocations`, off until turned on
+    (migration 0396). It is set on the admin's locations page where the shop has two or more.
+  * **Which orders split:** those placed without a location, to be delivered, paid on delivery
+    with nothing paid or asked in advance (not even by its risk), past none of the plan's limit,
+    where no one location has all of them. The rest are placed as before.
+  * **How lines are shared** (`LocationService.splitFor`):
+    * Each line goes whole from one location, never units of it from two.
+    * The location that can send the most lines is chosen first. Where two can send as many,
+      it is the one routing ranks higher (ADR-839). The next takes what is left, and so on.
+    * At most three locations. Lines not counted, or on pre-order, go with the first.
+    * Where lines can't be shared so, the order is refused at the primary, as before.
+  * **As it is placed:** each line's stock is committed at its own location. The order ships
+    from the location with most of its lines, with the delivery charge and the fee for paying on
+    delivery. Each other location's lines are then split off in the same transaction, as ADR-135
+    splits (`OrderEditService.splitIn`), as an order of its own shipped from there.
+    * A part has no delivery charge or fee, and its share of the discount.
+    * A part is scored as the one order its customer placed.
+    * A part keeps its stock where it was committed.
+* **Consequences:**
+  * A shop with stock in Karachi and Lahore takes a cart of both. Its customer pays the total
+    they were shown, in cash, across two parcels. The shop pays for the second delivery.
+  * The thank-you page names the first order. Each part is an order created, which reaches its
+    customer as an order split by hand does (ADR-135).
+  * Checkout's stock holds still hold at one location or none (ADR-839). Placing checks the
+    stock again, as it always did.
+  * Orders paid ahead aren't split. They would ship in parts from one order, with a location for
+    each line, which waits.

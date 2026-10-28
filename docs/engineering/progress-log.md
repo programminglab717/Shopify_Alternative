@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10) are built; next, of the Growth rows that need no partner: an order's lines split across locations (INV-10, SHP-09), and a file as a personalisation answer (CAT-15), which waits until shops ask. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; next, the Growth rows' smaller gaps: affiliates' own figures (MKT-08) and combined listings as one card in collections (CAT-23). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### Orders split among locations
+
+* **An order paid on delivery that no one location has all of** is split among those that do as
+  it is placed, once the shop turns it on: each part an order of its own, shipped from its
+  location at the shop's cost ([ADR-898](../architecture/13-decision-log.md#adr-898--an-order-paid-on-delivery-that-no-one-location-has-all-of-may-be-split-among-those-that-do-as-it-is-placed-as-the-shop-allows-each-part-an-order-of-its-own-shipped-from-its-location-at-the-shops-cost)).
+* 4864 tests (4 new).
 
 ### 29dc48e · Bulk mutations
 
