@@ -19,7 +19,7 @@ import type {
   CustomerPhoneRevealData,
   CustomerUpdateData,
 } from '../api/types';
-import { gate, permits } from '../auth/permissions';
+import { can, gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -35,6 +35,7 @@ import { REVEALS_NUMBERS, shownPhone } from './customers-page';
 import { CustomerCare, MarketingConsent } from './care';
 import { READS_CREDIT, StoreCredit } from './store-credit';
 import { SeenAt } from '../offline/seen-at';
+import { TillSales } from '../pos/till-sales';
 
 /** The roles that change customers and the blocklist (docs/design/02 §6). */
 const EDITS_CUSTOMERS = gate(['owner', 'manager'], 'write_customers');
@@ -486,6 +487,9 @@ export function CustomerPage() {
           <Record customer={customer} />
           <Orders customer={customer} timezone={details.timezone} />
           <PastOrders customer={customer} timezone={details.timezone} />
+          {can(shop, 'read_orders') && (
+            <TillSales customerId={customer.id} timezone={details.timezone} />
+          )}
           {customer.addresses.length > 0 && (
             <FormSection title={t('customer.addresses')}>
               <ul className="flex flex-col gap-2">

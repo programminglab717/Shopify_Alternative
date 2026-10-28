@@ -16,6 +16,8 @@ export interface ReceiptSale {
   total: number;
   tenders: { method: string; amount: number }[];
   change: number;
+  /** Who rang it up, signed in at the till (ADR-874); none when no one was. */
+  cashier?: string | null;
 }
 
 export interface ReceiptWords {
@@ -26,6 +28,8 @@ export interface ReceiptWords {
   total: string;
   taxIncluded: string;
   change: string;
+  /** "Served by". */
+  servedBy: string;
   thanks: string;
   methods: Readonly<Record<string, string>>;
 }
@@ -78,5 +82,7 @@ td{padding:2px 0;vertical-align:top}.n{text-align:end;white-space:nowrap}.strong
 small{color:#333}.foot{margin-top:10px}</style></head><body>
 <h1>${escape(shopName)}</h1><p>${escape(registerName)}</p>
 <p>${escape(words.receipt)} ${escape(sale.name ?? words.pending)} · ${escape(when)}</p>
-<table>${lines}</table><table>${totals}</table><p class="foot">${escape(words.thanks)}</p></body></html>`;
+<table>${lines}</table><table>${totals}</table>${
+    sale.cashier ? `<p class="foot">${escape(words.servedBy)}: ${escape(sale.cashier)}</p>` : ''
+  }<p class="foot">${escape(words.thanks)}</p></body></html>`;
 }

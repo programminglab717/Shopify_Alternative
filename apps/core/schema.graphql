@@ -10876,6 +10876,11 @@ type Mutation {
   posCashMove(amount: String!, note: String!, out: Boolean!, sessionId: ID!): PosSessionPayload!
 
   """
+  A cashier signing in at a register's open session with their PIN: the token its sales carry. Five wrong PINs lock its sign-ins for five minutes.
+  """
+  posCashierSignIn(pin: String!, sessionId: ID!): PosCashierSignInPayload!
+
+  """
   An order the till places for the customer's home (POS-08, the endless aisle): shipped from wherever the shop ships from, confirmed by the customer in person, and paid at the till in full or its advance, or on delivery.
   """
   posOrderCreate(input: PosDeliveryOrderInput!): PosDeliveryOrderPayload!
@@ -10884,6 +10889,14 @@ type Mutation {
   A click-and-collect order handed over at the till: delivered there and then, and what it still owed paid into the session's drawer, or as asked.
   """
   posPickupHandOver(method: PosTenderMethod! = CASH, orderId: ID!, reference: String, sessionId: ID!): PosHandOverPayload!
+
+  """Takes the signed-in member of staff's till PIN away."""
+  posPinRemove: PosPinPayload!
+
+  """
+  Sets the signed-in member of staff's PIN for the shop's tills, 4 to 6 digits no other member has, and the name the till shows them by.
+  """
+  posPinSet(name: String!, pin: String!): PosPinPayload!
 
   """Takes a register away once its session is closed; its sales stay."""
   posRegisterArchive(id: ID!): PosRegisterArchivePayload!
@@ -14502,6 +14515,29 @@ type PlatformTheme {
   name: String!
 }
 
+"""A cashier signed in at a till (POS-07, ADR-874)."""
+type PosCashier {
+  """When the sign-in ends: a shift."""
+  expiresAt: DateTime!
+  name: String!
+
+  """Sealed: the till's sales carry it as cashierToken, offline ones too."""
+  token: String!
+}
+
+type PosCashierSignInPayload {
+  cashier: PosCashier
+  userErrors: [UserError!]!
+}
+
+"""Sales a cashier rang up in a session."""
+type PosCashierTotal {
+  """Null for sales with no cashier signed in."""
+  name: String
+  salesCount: Int!
+  total: Money!
+}
+
 """A variant as the till sells it, with what its shelf has."""
 type PosCatalogItem {
   """Available at the register's location; null for stock not tracked."""
@@ -14593,6 +14629,18 @@ type PosPickup {
   total: Money!
 }
 
+"""The signed-in member of staff's PIN for the shop's tills."""
+type PosPin {
+  """The name the till shows them by."""
+  name: String
+  set: Boolean!
+}
+
+type PosPinPayload {
+  pin: PosPin
+  userErrors: [UserError!]!
+}
+
 """
 A register at the shop's till (POS-01, ADR-872): it sells from one of the shop's locations, in cash sessions staff open and close.
 """
@@ -14644,6 +14692,9 @@ input PosReturnLineInput {
 
 """A sale at the till: its lines, and how it was paid."""
 type PosSale {
+  """Who rang it up, signed in at the till with their PIN; null for none."""
+  cashierName: String
+
   """Cash handed back."""
   changeGiven: Money!
 
@@ -14683,6 +14734,11 @@ type PosSaleConnection {
 }
 
 input PosSaleInput {
+  """
+  The token posCashierSignIn gave the cashier signed in at the till, naming who rang it up.
+  """
+  cashierToken: String
+
   """
   The till's own ID for the sale, a UUID it makes: a sale sent again with it, as an offline till does, is the sale kept the first time.
   """
@@ -14746,6 +14802,9 @@ A register's cash session, as its Z report gives it: what it sold, how it was pa
 type PosSession {
   cashIn: Money!
   cashOut: Money!
+
+  """Sales by who rang them up (ADR-874)."""
+  cashiers: [PosCashierTotal!]!
   closedAt: DateTime
   closingNote: String
 
@@ -17298,6 +17357,9 @@ type Query {
   The register location's click-and-collect orders not yet collected, the oldest first. Null for no such register.
   """
   posPickups(registerId: ID!): [PosPickup!]
+
+  """Whether the signed-in member of staff has a PIN for the shop's tills."""
+  posPin: PosPin!
 
   """The shop's registers, by name."""
   posRegisters: [PosRegister!]!

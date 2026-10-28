@@ -25,6 +25,7 @@ import { useAdminMutation, useAdminQuery, useShopTimezone } from '../shell/shop-
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { MyPin } from './cashier';
 import { METHOD_LABELS, METHODS } from './till';
 
 /** The Z report's figures: what was sold, how it was paid, and what the drawer should hold. */
@@ -53,7 +54,19 @@ function ZReport({ session }: { session: PosSessionValue }) {
   return (
     <div className="flex flex-col gap-2">
       <dl className="num flex flex-col gap-1">
-        {rows.map(([label, value]) => (
+        {[
+          ...rows,
+          ...session.cashiers.map(
+            (cashier) =>
+              [
+                t('pos.z.cashier', {
+                  name: cashier.name ?? t('pos.z.noCashier'),
+                  count: cashier.salesCount,
+                }),
+                formatMoney(cashier.total.amount),
+              ] as [string, string],
+          ),
+        ].map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4">
             <dt>{label}</dt>
             <dd>{value}</dd>
@@ -351,6 +364,7 @@ export function SessionPanel({ sessionId, onClosed }: { sessionId: string; onClo
         <Card className="p-4">
           <CashMove sessionId={sessionId} />
         </Card>
+        <MyPin />
         <Card className="flex flex-col gap-2 p-4">
           <h2 className="text-[length:var(--hatti-type-title-size)] font-semibold">
             {t('pos.sales')}

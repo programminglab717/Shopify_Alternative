@@ -16,6 +16,7 @@ import { OrderSegmentFacts } from './customer-facts.js';
 import { OrderDocumentService } from './document.service.js';
 import { DraftOrderService } from './draft-order.service.js';
 import { PosService } from './pos.service.js';
+import { PosCashierService } from './pos-cashiers.js';
 import { PosResolver } from './graphql/pos.resolver.js';
 import { OrderCustomerData } from './order-customer-data.js';
 import { PastOrderService } from './past-orders.js';
@@ -96,6 +97,7 @@ import { SubscriptionService } from './subscriptions.js';
   controllers: [DraftLinkController, OrderLinkController, StorefrontTrackingController],
   providers: [
     PosService,
+    PosCashierService,
     PosResolver,
     OrderService,
     DraftOrderService,

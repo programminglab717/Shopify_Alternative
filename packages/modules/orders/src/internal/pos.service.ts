@@ -19,6 +19,7 @@ import type { AddressInput } from './address.js';
 import { OrderEvents } from './events.js';
 import { FulfillmentService } from './fulfillment.service.js';
 import { OrderService } from './order.service.js';
+import { PosCashierService } from './pos-cashiers.js';
 
 // The shop's tills (POS-01, POS-02, POS-05, POS-07, ADR-872). A register sells from one of the
 // shop's locations, in cash sessions staff open with a float and close by counting the drawer;
@@ -101,6 +102,8 @@ export interface PosSessionReport {
   /** Orders paid at the till (ADR-873): collected there, or sent home and paid for there. */
   ordersPaid: number;
   ordersPaidAmount: bigint;
+  /** Sales by who rang them up, by name; null for those rung up with no cashier signed in. */
+  cashiers: { name: string | null; sales: number; total: bigint }[];
   /** What the drawer should hold now, or held as it closed. */
   expectedCash: bigint;
   /** Counted less expected: short below zero, over above; null while open. */
@@ -131,6 +134,8 @@ export interface PosSaleRecord {
   locationId: string;
   customerId: string | null;
   actorId: string;
+  /** Who rang it up, signed in at the till with their PIN (ADR-874); null for none. */
+  cashierName: string | null;
   subtotal: bigint;
   discount: bigint;
   tax: bigint;
@@ -157,6 +162,8 @@ export interface PosSaleInput {
   note?: string | null;
   /** When the till sold it, for a sale sent later; now unless given. */
   soldAt?: Date | null;
+  /** The token of the cashier signed in at the till (ADR-874), naming who rang it up. */
+  cashierToken?: string | null;
 }
 
 /** A click-and-collect order waiting at the register's location (POS-06, ADR-873). */
@@ -301,6 +308,7 @@ type SaleRow = {
   location_id: string;
   customer_id: string | null;
   actor_id: string;
+  cashier_name: string | null;
   subtotal: string;
   discount: string;
   tax: string;
@@ -358,6 +366,7 @@ async function salesIn(tx: Tx, shopId: string, rows: SaleRow[]): Promise<PosSale
     locationId: row.location_id,
     customerId: row.customer_id,
     actorId: row.actor_id,
+    cashierName: row.cashier_name,
     subtotal: BigInt(row.subtotal),
     discount: BigInt(row.discount),
     tax: BigInt(row.tax),
@@ -394,7 +403,7 @@ async function salesIn(tx: Tx, shopId: string, rows: SaleRow[]): Promise<PosSale
 
 const SALE_COLUMNS = sql`
   id, number, client_id, register_id, session_id, location_id, customer_id, actor_id,
-  subtotal::text, discount::text, tax::text, total::text, change_given::text, returned::text,
+  cashier_name, subtotal::text, discount::text, tax::text, total::text, change_given::text, returned::text,
   note, sold_at`;
 
 async function saleIn(tx: Tx, shopId: string, id: string): Promise<PosSaleRecord | null> {
@@ -426,6 +435,7 @@ export class PosService {
     private readonly inventory: InventoryService,
     private readonly orders: OrderService,
     private readonly fulfillment: FulfillmentService,
+    private readonly cashiers: PosCashierService,
   ) {}
 
   /**
@@ -700,6 +710,16 @@ export class PosService {
         SELECT count(*)::int AS count, coalesce(sum(amount), 0)::text AS amount
           FROM orders.pos_order_payments
          WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id}`);
+      const { rows: cashiers } = await tx.execute<{
+        name: string | null;
+        sales: number;
+        total: string;
+      }>(sql`
+        SELECT cashier_name AS name, count(*)::int AS sales, sum(total)::text AS total
+          FROM orders.pos_sales
+         WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id}
+         GROUP BY cashier_name
+         ORDER BY cashier_name NULLS LAST`);
       const expected = session.expectedCash ?? (await expectedCashIn(tx, tenant.shopId, session));
       return {
         session,
@@ -714,6 +734,11 @@ export class PosService {
         cashOut: BigInt(moves[0]!.cash_out),
         ordersPaid: orders[0]!.count,
         ordersPaidAmount: BigInt(orders[0]!.amount),
+        cashiers: cashiers.map((row) => ({
+          name: row.name,
+          sales: row.sales,
+          total: BigInt(row.total),
+        })),
         expectedCash: expected,
         difference: session.countedCash === null ? null : session.countedCash - expected,
       };
@@ -788,6 +813,16 @@ export class PosService {
       }
       const register = await registerIn(tx, tenant.shopId, session.registerId);
       if (!register) return failOne(['input', 'sessionId'], 'NOT_FOUND', 'No such register');
+      const cashier = input.cashierToken
+        ? this.cashiers.cashierOf(tenant.shopId, input.cashierToken, session.id, soldAt)
+        : null;
+      if (input.cashierToken && !cashier) {
+        return failOne(
+          ['input', 'cashierToken'],
+          'INVALID',
+          'The cashier’s sign-in has ended: sign in at the till again',
+        );
+      }
 
       const ids = lines.map((line) => line.variantId).filter((id) => UUID.test(id));
       const snapshots = await this.variants.snapshotsOf(tx, tenant.shopId, ids);
@@ -862,12 +897,13 @@ export class PosService {
       await tx.execute(sql`
         INSERT INTO orders.pos_sales
                (shop_id, id, number, client_id, register_id, session_id, location_id, customer_id,
-                actor_kind, actor_id, currency, subtotal, discount, tax, total, change_given, note,
-                sold_at)
+                actor_kind, actor_id, cashier_id, cashier_name, currency, subtotal, discount, tax,
+                total, change_given, note, sold_at)
         VALUES (${tenant.shopId}, ${id}, ${number}, ${input.clientId}, ${register.id},
                 ${session.id}, ${register.locationId}, ${customerId}, ${actor.actorKind},
-                ${actor.actorId}, ${CURRENCY}, ${subtotal}, ${discount}, ${tax.total}, ${total},
-                ${changeGiven}, ${note}, ${soldAt.toISOString()})`);
+                ${actor.actorId}, ${cashier?.userId ?? null}, ${cashier?.name ?? null},
+                ${CURRENCY}, ${subtotal}, ${discount}, ${tax.total}, ${total}, ${changeGiven},
+                ${note}, ${soldAt.toISOString()})`);
       for (const [index, line] of priced.entries()) {
         await tx.execute(sql`
           INSERT INTO orders.pos_sale_lines

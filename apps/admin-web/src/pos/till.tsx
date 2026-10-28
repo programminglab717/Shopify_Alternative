@@ -35,6 +35,7 @@ import {
   totalsOf,
   type CartLine,
 } from './cart';
+import { CashierBar, keptCashier } from './cashier';
 import { DeliverHome, placedText } from './deliver-home';
 import { receiptHtml, type ReceiptSale, type ReceiptWords } from './receipt';
 
@@ -60,6 +61,7 @@ export function useReceiptWords(): ReceiptWords {
     total: t('pos.total'),
     taxIncluded: t('pos.taxIncluded'),
     change: t('pos.change'),
+    servedBy: t('pos.servedBy'),
     thanks: t('pos.thanks'),
     methods: Object.fromEntries(METHODS.map((method) => [method, t(METHOD_LABELS[method])])),
   };
@@ -120,6 +122,7 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const [delivering, setDelivering] = useState(false);
+  const [cashier, setCashier] = useState(() => keptCashier(sessionId));
   const [placed, setPlaced] = useState<{ name: string; total: string; paid: string } | null>(null);
   const items = useMemo(() => catalog.data?.posCatalog ?? [], [catalog.data]);
   const found = useMemo(() => matching(items, query), [items, query]);
@@ -185,6 +188,7 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
       total: totals.total,
       tenders: [{ method, amount: paid }],
       change: Math.max(paid - totals.total, 0),
+      cashier: cashier?.name ?? null,
     };
     try {
       const { posSaleCreate } = await sell.mutateAsync({
@@ -196,6 +200,7 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
           ...(phone.trim() && { customerPhone: phone.trim() }),
           tenders: [tender],
           soldAt,
+          ...(cashier && { cashierToken: cashier.token }),
         },
       });
       const error = posSaleCreate.userErrors[0];
@@ -282,6 +287,7 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <section aria-label={t('pos.findItems')} className="flex flex-col gap-3">
+        <CashierBar sessionId={sessionId} cashier={cashier} onChange={setCashier} />
         <TextField
           ref={search}
           label={t('pos.search')}

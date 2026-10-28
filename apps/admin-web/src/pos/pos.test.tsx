@@ -66,6 +66,7 @@ describe("The till's sums and lookups (POS-01, ADR-872)", () => {
       total: 'Total',
       taxIncluded: 'Sales tax included',
       change: 'Change',
+      servedBy: 'Served by',
       thanks: 'Thank you!',
       methods: { CASH: 'Cash' },
     };
@@ -80,6 +81,7 @@ describe("The till's sums and lookups (POS-01, ADR-872)", () => {
         total: 550000,
         tenders: [{ method: 'CASH', amount: 600000 }],
         change: 50000,
+        cashier: 'Bilal',
       },
       { shopName: 'Zari', registerName: 'Counter 1', when: '28 Oct', words, rtl: false },
     );
@@ -87,6 +89,7 @@ describe("The till's sums and lookups (POS-01, ADR-872)", () => {
     expect(html).toContain('Receipt (to be numbered) · 28 Oct');
     expect(html).toContain('<td>Change</td><td class="n">Rs 500</td>');
     expect(html).toContain('<tr class="strong"><td>Total</td><td class="n">Rs 5,500</td>');
+    expect(html).toContain('<p class="foot">Served by: Bilal</p>');
   });
 });
 
@@ -114,6 +117,7 @@ function session(extra: Partial<PosSessionValue> = {}): PosSessionValue {
     cashOut: amount('0.00'),
     ordersPaidCount: 0,
     ordersPaid: amount('0.00'),
+    cashiers: [{ name: 'Bilal', salesCount: 1, total: amount('7000.00') }],
     expectedCash: amount('12000.00'),
     countedCash: null,
     difference: null,
@@ -210,6 +214,26 @@ function core(options: { registers?: { id: string; openSessionId: string | null 
             ],
           },
         };
+      case 'PosPin':
+        return { posPin: { set: false, name: null } };
+      case 'PosPinSet':
+        return { posPinSet: { pin: { set: true, name: variables.name }, userErrors: [] } };
+      case 'PosCashierSignIn':
+        return variables.pin === '58203'
+          ? {
+              posCashierSignIn: {
+                cashier: { name: 'Bilal', token: 'sealed', expiresAt: '2999-01-01T00:00:00Z' },
+                userErrors: [],
+              },
+            }
+          : {
+              posCashierSignIn: {
+                cashier: null,
+                userErrors: [
+                  { field: ['pin'], code: 'INVALID', message: 'No member of staff has this PIN' },
+                ],
+              },
+            };
       case 'PosPickups':
         return {
           posPickups: [
@@ -473,5 +497,41 @@ describe("The shop's till in the admin (POS-01, POS-02, POS-07, ADR-872)", () =>
         },
       },
     ]);
+  });
+
+  it('signs a cashier in with their PIN, each sale then naming them (POS-07, ADR-874)', async () => {
+    const fake = core({ registers: [{ id: 'preg_1', openSessionId: 'pses_1' }] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/pos');
+    expect(await screen.findByText('No cashier signed in')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with your PIN' }));
+    fireEvent.change(screen.getByLabelText('PIN'), { target: { value: '1111' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText('No member of staff has this PIN')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('PIN'), { target: { value: '5820a3' } });
+    expect((screen.getByLabelText('PIN') as HTMLInputElement).value).toBe('58203');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText('Cashier: Bilal')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Lawn Suit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Charge Rs 3,000' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Complete the sale' }));
+    await screen.findByRole('heading', { name: 'Sold: #P1' });
+    expect(sentOf(fake, 'PosSaleCreate')[0]).toMatchObject({
+      input: { cashierToken: 'sealed' },
+    });
+  });
+
+  it('sets a member’s own till PIN, and shows sales by cashier in the Z report', async () => {
+    const fake = core({ registers: [{ id: 'preg_1', openSessionId: 'pses_1' }] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/pos');
+    fireEvent.click(await screen.findByRole('tab', { name: 'Register' }));
+    expect(await screen.findByText('Bilal (1)')).toBeTruthy();
+    const name = (await screen.findByLabelText('Name on the till')) as HTMLInputElement;
+    expect(name.value).toBe('Sana');
+    fireEvent.change(screen.getByLabelText('PIN'), { target: { value: '4071' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save the PIN' }));
+    expect(await screen.findByText('Saved. Sign in at the till with it.')).toBeTruthy();
+    expect(sentOf(fake, 'PosPinSet')).toEqual([{ pin: '4071', name: 'Sana' }]);
   });
 });

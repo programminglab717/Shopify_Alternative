@@ -31,6 +31,7 @@ import {
   type PosTenderMethod,
 } from '../pos.service.js';
 import { uuidOf } from './mappers.js';
+import { PosCashierService } from '../pos-cashiers.js';
 import { MailingAddressInput } from './order.types.js';
 
 export enum PosTenderMethodValue {
@@ -113,6 +114,18 @@ export class PosTenderTotal {
   amount!: Money;
 }
 
+@ObjectType({ description: 'Sales a cashier rang up in a session.' })
+export class PosCashierTotal {
+  @Field(() => String, { nullable: true, description: 'Null for sales with no cashier signed in.' })
+  name!: string | null;
+
+  @Field(() => Int)
+  salesCount!: number;
+
+  @Field(() => Money)
+  total!: Money;
+}
+
 @ObjectType({
   description:
     "A register's cash session, as its Z report gives it: what it sold, how it was paid, and " +
@@ -168,6 +181,9 @@ export class PosSession {
 
   @Field(() => Money)
   ordersPaid!: Money;
+
+  @Field(() => [PosCashierTotal], { description: 'Sales by who rang them up (ADR-874).' })
+  cashiers!: PosCashierTotal[];
 
   @Field(() => Money, { description: 'What the drawer should hold now, or held as it closed.' })
   expectedCash!: Money;
@@ -255,6 +271,12 @@ export class PosSale {
 
   @Field(() => ID, { nullable: true, description: 'Its customer; null for a walk-in.' })
   customerId!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Who rang it up, signed in at the till with their PIN; null for none.',
+  })
+  cashierName!: string | null;
 
   @Field(() => Money)
   subtotal!: Money;
@@ -405,6 +427,47 @@ export class PosDeliveryOrderPayload {
   userErrors!: UserError[];
 }
 
+@ObjectType({ description: "The signed-in member of staff's PIN for the shop's tills." })
+export class PosPin {
+  @Field()
+  set!: boolean;
+
+  @Field(() => String, { nullable: true, description: 'The name the till shows them by.' })
+  name!: string | null;
+}
+
+@ObjectType()
+export class PosPinPayload {
+  @Field(() => PosPin, { nullable: true })
+  pin!: PosPin | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({ description: 'A cashier signed in at a till (POS-07, ADR-874).' })
+export class PosCashier {
+  @Field()
+  name!: string;
+
+  @Field({
+    description: "Sealed: the till's sales carry it as cashierToken, offline ones too.",
+  })
+  token!: string;
+
+  @Field(() => GraphQLISODateTime, { description: 'When the sign-in ends: a shift.' })
+  expiresAt!: Date;
+}
+
+@ObjectType()
+export class PosCashierSignInPayload {
+  @Field(() => PosCashier, { nullable: true })
+  cashier!: PosCashier | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class PosSaleConnection {
   @Field(() => [PosSale], { description: 'The latest first.' })
@@ -491,6 +554,13 @@ export class PosSaleInput {
     description: `When the till sold it, for a sale sent later: within ${POS_LIMITS.offlineDays} days.`,
   })
   soldAt?: Date | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The token posCashierSignIn gave the cashier signed in at the till, naming who rang it up.',
+  })
+  cashierToken?: string | null;
 }
 
 @InputType()
@@ -592,6 +662,13 @@ function toSession(report: PosSessionReport): PosSession {
     cashOut: pkr(report.cashOut),
     ordersPaidCount: report.ordersPaid,
     ordersPaid: pkr(report.ordersPaidAmount),
+    cashiers: report.cashiers.map((cashier) =>
+      Object.assign(new PosCashierTotal(), {
+        name: cashier.name,
+        salesCount: cashier.sales,
+        total: pkr(cashier.total),
+      }),
+    ),
     expectedCash: pkr(report.expectedCash),
     countedCash: session.countedCash === null ? null : pkr(session.countedCash),
     difference: report.difference === null ? null : pkr(report.difference),
@@ -608,6 +685,7 @@ function toSale(record: PosSaleRecord): PosSale {
     sessionId: toPublicId('posSession', record.sessionId),
     locationId: toPublicId('location', record.locationId),
     customerId: record.customerId && toPublicId('customer', record.customerId),
+    cashierName: record.cashierName,
     subtotal: pkr(record.subtotal),
     discount: pkr(record.discount),
     tax: pkr(record.tax),
@@ -649,7 +727,10 @@ const idOf = (kind: Parameters<typeof tryFromPublicId>[1], id: string) =>
 /** The shop's tills (POS-01, ADR-872): registers, cash sessions, sales and returns. */
 @Resolver()
 export class PosResolver {
-  constructor(private readonly pos: PosService) {}
+  constructor(
+    private readonly pos: PosService,
+    private readonly cashiers: PosCashierService,
+  ) {}
 
   @Query(() => [PosRegister], { description: "The shop's registers, by name." })
   @RequireScopes('read_orders')
@@ -710,6 +791,14 @@ export class PosResolver {
         }),
       ) ?? null
     );
+  }
+
+  @Query(() => PosPin, {
+    description: "Whether the signed-in member of staff has a PIN for the shop's tills.",
+  })
+  @RequireScopes('read_orders')
+  async posPin(@CurrentTenant() tenant: TenantContext): Promise<PosPin> {
+    return Object.assign(new PosPin(), await this.cashiers.mine(tenant));
   }
 
   @Query(() => PosSession, { nullable: true, description: 'A cash session, as its Z report.' })
@@ -890,6 +979,7 @@ export class PosResolver {
       })),
       note: input.note ?? null,
       soldAt: input.soldAt ?? null,
+      cashierToken: input.cashierToken ?? null,
     });
     return Object.assign(new PosSalePayload(), {
       sale: result.ok ? toSale(result.value) : null,
@@ -964,6 +1054,60 @@ export class PosResolver {
             name: `#${result.value.number}`,
             total: pkr(result.value.total),
             paid: pkr(result.value.paid),
+          })
+        : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => PosPinPayload, {
+    description:
+      "Sets the signed-in member of staff's PIN for the shop's tills, 4 to 6 digits no other " +
+      'member has, and the name the till shows them by.',
+  })
+  @RequireScopes('write_orders')
+  async posPinSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('pin') pin: string,
+    @Args('name') name: string,
+  ): Promise<PosPinPayload> {
+    const result = await this.cashiers.setPin(tenant, { pin, name });
+    return Object.assign(new PosPinPayload(), {
+      pin: result.ok ? Object.assign(new PosPin(), { set: true, name: result.value.name }) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => PosPinPayload, {
+    description: "Takes the signed-in member of staff's till PIN away.",
+  })
+  @RequireScopes('write_orders')
+  async posPinRemove(@CurrentTenant() tenant: TenantContext): Promise<PosPinPayload> {
+    await this.cashiers.removePin(tenant);
+    return Object.assign(new PosPinPayload(), {
+      pin: Object.assign(new PosPin(), { set: false, name: null }),
+      userErrors: [],
+    });
+  }
+
+  @Mutation(() => PosCashierSignInPayload, {
+    description:
+      "A cashier signing in at a register's open session with their PIN: the token its sales " +
+      'carry. Five wrong PINs lock its sign-ins for five minutes.',
+  })
+  @RequireScopes('write_orders')
+  async posCashierSignIn(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('sessionId', { type: () => ID }) sessionId: string,
+    @Args('pin') pin: string,
+  ): Promise<PosCashierSignInPayload> {
+    const result = await this.cashiers.signIn(tenant, idOf('posSession', sessionId), pin);
+    return Object.assign(new PosCashierSignInPayload(), {
+      cashier: result.ok
+        ? Object.assign(new PosCashier(), {
+            name: result.value.name,
+            token: result.value.token,
+            expiresAt: result.value.expiresAt,
           })
         : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),

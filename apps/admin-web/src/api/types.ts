@@ -6392,6 +6392,8 @@ export interface PosSessionValue {
   /** Orders paid at the till: collected there, or sent home and paid for there (ADR-873). */
   ordersPaidCount: number;
   ordersPaid: Amount;
+  /** Sales by who rang them up (ADR-874); null name for none signed in. */
+  cashiers: { name: string | null; salesCount: number; total: Amount }[];
   expectedCash: Amount;
   countedCash: Amount | null;
   difference: Amount | null;
@@ -6413,6 +6415,7 @@ export interface PosSaleValue {
   name: string;
   clientId: string;
   customerId: string | null;
+  cashierName: string | null;
   subtotal: Amount;
   discount: Amount;
   tax: Amount;
@@ -6471,4 +6474,30 @@ export interface PosOrderCreateData {
     order: { id: string; name: string; total: Amount; paid: Amount } | null;
     userErrors: UserError[];
   };
+}
+
+/** The signed-in member of staff's till PIN (ADR-874). */
+export interface PosPinValue {
+  set: boolean;
+  name: string | null;
+}
+
+export interface PosPinData {
+  posPin: PosPinValue;
+}
+
+export interface PosPinPayloadData {
+  posPinSet?: { pin: PosPinValue | null; userErrors: UserError[] };
+  posPinRemove?: { pin: PosPinValue | null; userErrors: UserError[] };
+}
+
+/** A cashier signed in at the till: the token its sales carry. */
+export interface PosCashierValue {
+  name: string;
+  token: string;
+  expiresAt: string;
+}
+
+export interface PosCashierSignInData {
+  posCashierSignIn: { cashier: PosCashierValue | null; userErrors: UserError[] };
 }

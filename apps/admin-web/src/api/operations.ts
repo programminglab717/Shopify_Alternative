@@ -12968,6 +12968,13 @@ const POS_SESSION = /* GraphQL */ `
     ordersPaid {
       amount
     }
+    cashiers {
+      name
+      salesCount
+      total {
+        amount
+      }
+    }
     expectedCash {
       amount
     }
@@ -12988,6 +12995,7 @@ const POS_SALE = /* GraphQL */ `
     name
     clientId
     customerId
+    cashierName
     subtotal {
       amount
     }
@@ -13235,4 +13243,75 @@ export const PosOrderCreateMutation = /* GraphQL */ `
     }
   }
   ${USER_ERRORS}
+`;
+
+/** Whether the signed-in member of staff has a till PIN (POS-07, ADR-874). */
+export const PosPinQuery = /* GraphQL */ `
+  query PosPin {
+    posPin {
+      set
+      name
+    }
+  }
+`;
+
+/** Sets the signed-in member of staff's till PIN and the name the till shows. */
+export const PosPinSetMutation = /* GraphQL */ `
+  mutation PosPinSet($pin: String!, $name: String!) {
+    posPinSet(pin: $pin, name: $name) {
+      pin {
+        set
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Takes the signed-in member of staff's till PIN away. */
+export const PosPinRemoveMutation = /* GraphQL */ `
+  mutation PosPinRemove {
+    posPinRemove {
+      pin {
+        set
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A cashier signing in at the till with their PIN. */
+export const PosCashierSignInMutation = /* GraphQL */ `
+  mutation PosCashierSignIn($sessionId: ID!, $pin: String!) {
+    posCashierSignIn(sessionId: $sessionId, pin: $pin) {
+      cashier {
+        name
+        token
+        expiresAt
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A customer's sales at the till (ADR-872). */
+export const PosCustomerSalesQuery = /* GraphQL */ `
+  query PosCustomerSales($customerId: ID!) {
+    posSales(customerId: $customerId, first: 20) {
+      nodes {
+        ...PosSaleParts
+      }
+    }
+  }
+  ${POS_SALE}
 `;

@@ -1,8 +1,9 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
-import { generateAccessToken } from '@hatti/api';
+import { generateAccessToken, type StaffRole } from '@hatti/api';
+import { base32Decode, totp } from '@hatti/crypto';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -410,5 +411,123 @@ describe.skipIf(!server)("The shop's till: registers, sessions, sales and return
       expectedCash: { amount: '4500.00' },
       tenders: [{ method: 'CASH', amount: { amount: '3500.00' } }],
     });
+  });
+
+  it('signs cashiers in with their own PINs, each sale naming who rang it up (POS-07, ADR-874)', async () => {
+    const post = (url: string, payload: object, bearer?: string) =>
+      app.inject({
+        method: 'POST',
+        url,
+        payload,
+        headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
+      });
+    async function staff(role: StaffRole): Promise<string> {
+      const body = (
+        await post('/auth/sign-up', {
+          email: `till-${randomUUID().slice(0, 8)}@example.pk`,
+          password: 'correct horse battery staple',
+          name: 'Hina Akhtar',
+        })
+      ).json() as { accessToken: string; user: { id: string } };
+      await admin.query(
+        'INSERT INTO identity.memberships (user_id, shop_id, role) VALUES ($1, $2, $3)',
+        [fromPublicId(body.user.id, 'user'), shop, role],
+      );
+      const { secret } = (await post('/auth/two-step/totp/setup', {}, body.accessToken)).json() as {
+        secret: string;
+      };
+      await post(
+        '/auth/two-step/totp/confirm',
+        { code: totp(base32Decode(secret), Date.now()) },
+        body.accessToken,
+      );
+      return body.accessToken;
+    }
+    const as = async (bearer: string, query: string, variables?: Record<string, unknown>) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: ADMIN_GRAPHQL_PATH,
+        headers: {
+          authorization: `Bearer ${bearer}`,
+          'x-hatti-shop-id': toPublicId('shop', shop),
+          'idempotency-key': randomUUID(),
+        },
+        payload: { query, variables },
+      });
+      const body = response.json<{ data?: Json; errors?: Json[] }>();
+      expect(body.errors).toBeUndefined();
+      return Object.values(body.data ?? {})[0] as Json;
+    };
+    const owner = await staff('owner');
+    const manager = await staff('manager');
+    const SET = `mutation ($pin: String!, $name: String!) {
+      posPinSet(pin: $pin, name: $name) { pin { set name } userErrors { field code message } } }`;
+    expect((await as(owner, SET, { pin: '1234', name: 'Hina' })).userErrors[0].message).toBe(
+      'Choose a PIN harder to guess than 1111 or 1234',
+    );
+    expect(await as(owner, SET, { pin: '4071', name: 'Hina' })).toEqual({
+      pin: { set: true, name: 'Hina' },
+      userErrors: [],
+    });
+    // No two members share one.
+    expect((await as(manager, SET, { pin: '4071', name: 'Bilal' })).userErrors[0].code).toBe(
+      'TAKEN',
+    );
+    await as(manager, SET, { pin: '58203', name: 'Bilal' });
+    expect(await as(manager, '{ posPin { set name } }')).toEqual({ set: true, name: 'Bilal' });
+    // An app has no PIN of its own.
+    expect((await data(SET, { pin: '9917', name: 'App' })).userErrors[0].field).toEqual(['pin']);
+
+    const register = (
+      await data(
+        `mutation ($input: PosRegisterInput!) {
+          posRegisterSave(input: $input) { register { id } } }`,
+        { input: { name: 'Counter 3', locationId: location } },
+      )
+    ).register.id as string;
+    const OPEN = `mutation ($id: ID!) {
+      posSessionOpen(registerId: $id, openingFloat: "0") { session { id } } }`;
+    const session = (await as(manager, OPEN, { id: register })).session.id as string;
+    const SIGN_IN = `mutation ($session: ID!, $pin: String!) {
+      posCashierSignIn(sessionId: $session, pin: $pin) {
+        cashier { name token expiresAt } userErrors { field code message } } }`;
+    const signed = await as(manager, SIGN_IN, { session, pin: '58203' });
+    expect(signed.cashier.name).toBe('Bilal');
+    const shawl = await stocked('Pashmina Shawl', '4,000', 3);
+    const sale = (token: string | null) => ({
+      clientId: randomUUID(),
+      sessionId: session,
+      lines: [{ variantId: shawl.variant, quantity: 1 }],
+      tenders: [{ method: 'CASH', amount: '4,000' }],
+      ...(token && { cashierToken: token }),
+    });
+    const SOLD = `mutation ($input: PosSaleInput!) {
+      posSaleCreate(input: $input) { sale { name cashierName } userErrors { field message } } }`;
+    expect((await as(manager, SOLD, { input: sale(signed.cashier.token) })).sale.cashierName).toBe(
+      'Bilal',
+    );
+    expect((await as(manager, SOLD, { input: sale(null) })).sale.cashierName).toBeNull();
+    // A token is its session's alone, and can't be made up.
+    const forged = await as(manager, SOLD, { input: sale('v1.x.y.z') });
+    expect(forged.userErrors[0].field).toEqual(['input', 'cashierToken']);
+    const report = await as(
+      manager,
+      `query ($id: ID!) { posSession(id: $id) { cashiers { name salesCount total { amount } } } }`,
+      { id: session },
+    );
+    expect(report.cashiers).toEqual([
+      { name: 'Bilal', salesCount: 1, total: { amount: '4000.00' } },
+      { name: null, salesCount: 1, total: { amount: '4000.00' } },
+    ]);
+
+    // Five wrong PINs lock the session's sign-ins, the right one too.
+    for (let wrong = 0; wrong < 5; wrong += 1) {
+      expect((await as(manager, SIGN_IN, { session, pin: '1111' })).userErrors[0].code).toBe(
+        'INVALID',
+      );
+    }
+    expect((await as(owner, SIGN_IN, { session, pin: '4071' })).userErrors[0].code).toBe(
+      'TOO_MANY',
+    );
   });
 });
