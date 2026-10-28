@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Seasons in reorders
+### d2b90a7 · Seasons in reorders
 
 * **Stock:** the stock page says when Ramadan or the run-up to Eid ul Adha begins, and how much
   faster the shop sold through it last year. Reorders started from what runs low count on that
