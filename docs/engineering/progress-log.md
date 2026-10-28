@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Affiliates' own pages
+### be1dfd6 · Affiliates' own pages
 
 * **A secret link** the shop sends an affiliate opens their own page: their link, code and
   share, their figures and latest orders, nothing of their customers ([ADR-899](../architecture/13-decision-log.md#adr-899--an-affiliate-sees-their-own-figures-at-a-secret-link-the-shop-sends-them-their-link-code-and-share-what-their-orders-came-to-and-earned-and-their-latest-orders-nothing-of-their-customers)).
