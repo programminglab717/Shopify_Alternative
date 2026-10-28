@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-840 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-841 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -848,6 +848,7 @@
 | 838 | Express checkout: a signed-in shopper whose session proved their number places the order in a tap, to their book's default address, paid on delivery, where nothing else is asked of it | Accepted |
 | 839 | Order routing: a location names the cities and provinces it ships to first, and an order goes out from one that has all of it and serves its customer's city, else their province, before the primary | Accepted |
 | 840 | The changes staff make most on a phone wait in the browser while it is offline, with the Idempotency-Key they were first sent with, and go in order once it is back online | Accepted |
+| 841 | An account of several shops sees each one's sales today and the orders waiting to be confirmed and packed on the shop chooser, and what they come to together | Accepted |
 
 ---
 
@@ -27445,3 +27446,22 @@
     reached the core. Confirming or packing twice changes nothing; a comment may be written twice.
   * What waits is in one browser alone. A change made offline on one phone and differently on
     another goes in whichever order they reach the core.
+
+## ADR-841 · An account of several shops sees each one's sales today and the orders waiting to be confirmed and packed on the shop chooser, and what they come to together
+
+* **Context:** ADM-06 asks for a view across an organisation's shops. An owner of two or three
+  shops chose one at a time and opened its home to see how its day went.
+* **Decision:**
+  * **The shop chooser of an account in more than one shop shows each shop's day:**
+    * its sales today;
+    * the orders waiting to be confirmed;
+    * the orders waiting to be packed.
+    Above the list it shows what they come to together.
+  * **Each shop is read by `ShopGlance`,** a small part of the home's own query (ADR-358), with
+    that shop's access. So the numbers are the home's, and a shop whose orders the member can't
+    read says nothing of them, and adds nothing to the totals.
+  * **It is the admin's alone:** no new API.
+* **Consequences:**
+  * One query per shop; an account of a few shops is the case it is for.
+  * An organisation of its own, with members across its shops and reports over all of them,
+    waits for shops to ask; the shop stays the unit of access.
