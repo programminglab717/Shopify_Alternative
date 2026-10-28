@@ -56,3 +56,8 @@ export {
   type SupportReplyRequest,
   type SupportTurn,
 } from './support-reply.js';
+export {
+  PHOTO_SEARCH_LIMITS,
+  readPhotoForSearch,
+  type PhotoSearchReading,
+} from './photo-search.js';

@@ -1741,6 +1741,22 @@ export interface SearchRuleValue {
   hiddenProducts: { id: string; title: string }[];
 }
 
+/** Whether the shop's search reads shoppers' photos (ADR-870). */
+export interface PhotoSearchValue {
+  enabled: boolean;
+  available: boolean;
+  usedToday: number;
+  limitPerDay: number;
+}
+
+export interface PhotoSearchData {
+  photoSearch: PhotoSearchValue;
+}
+
+export interface PhotoSearchSetData {
+  photoSearchSet: PhotoSearchValue;
+}
+
 export interface SearchRulesData {
   searchRules: SearchRuleValue[];
 }

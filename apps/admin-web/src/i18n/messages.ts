@@ -4545,6 +4545,18 @@ const en = {
   'error.SSO_SESSION':
     'Signed in through your organisation, you can work in its shop alone. Sign in with your password to change your account.',
   'settings.workflows': 'Workflows',
+  'photoSearch.title': 'Search with a photo',
+  'photoSearch.intro':
+    "Shoppers send a photo of what they want, and the shop's search shows its products like it. The AI reads the photo into words; the photo is never kept.",
+  'photoSearch.enabled': 'Let shoppers search with a photo',
+  'photoSearch.enabledHint':
+    "Each photo spends one of the shop's AI credits. Turn on the search section's photo setting in the theme editor too.",
+  'photoSearch.on': 'Shoppers can search with a photo.',
+  'photoSearch.off': 'Shoppers cannot search with a photo.',
+  'photoSearch.usage': '{used} of {limit} photos read in the last day.',
+  'photoSearch.theme':
+    "The button shows on the search page once the theme's search section has its photo setting on.",
+  'photoSearch.unavailable': 'Search with a photo is not available here yet.',
   'appFunctions.title': "Apps' checkout functions",
   'appFunctions.hint':
     'Functions your apps give your checkout: hiding a way to pay, such as cash on delivery above an amount, or refusing an order, saying why. Each is off until you turn it on. One that fails is skipped, and checkout goes on.',
@@ -11224,6 +11236,18 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'error.SSO_SESSION':
     'اپنے ادارے کے ذریعے سائن ان ہو کر آپ صرف اسی کی دکان میں کام کر سکتے ہیں۔ اپنا اکاؤنٹ بدلنے کے لیے پاس ورڈ سے سائن ان کریں۔',
   'settings.workflows': 'ورک فلو',
+  'photoSearch.title': 'تصویر سے تلاش',
+  'photoSearch.intro':
+    'خریدار جو چاہتے ہیں اس کی تصویر بھیجیں، اور دکان کی تلاش اس جیسی پروڈکٹس دکھائے۔ AI تصویر کو الفاظ میں پڑھتا ہے؛ تصویر کبھی رکھی نہیں جاتی۔',
+  'photoSearch.enabled': 'خریداروں کو تصویر سے تلاش کرنے دیں',
+  'photoSearch.enabledHint':
+    'ہر تصویر دکان کا ایک AI کریڈٹ خرچ کرتی ہے۔ تھیم ایڈیٹر میں تلاش کے سیکشن کی تصویر والی سیٹنگ بھی آن کریں۔',
+  'photoSearch.on': 'خریدار تصویر سے تلاش کر سکتے ہیں۔',
+  'photoSearch.off': 'خریدار تصویر سے تلاش نہیں کر سکتے۔',
+  'photoSearch.usage': 'پچھلے ایک دن میں {limit} میں سے {used} تصاویر پڑھی گئیں۔',
+  'photoSearch.theme':
+    'تھیم کے تلاش کے سیکشن کی تصویر والی سیٹنگ آن ہونے پر بٹن تلاش کے صفحے پر نظر آتا ہے۔',
+  'photoSearch.unavailable': 'تصویر سے تلاش یہاں ابھی دستیاب نہیں۔',
   'appFunctions.title': 'ایپس کے چیک آؤٹ فنکشنز',
   'appFunctions.hint':
     'وہ فنکشنز جو آپ کی ایپس آپ کے چیک آؤٹ کو دیتی ہیں: ادائیگی کا کوئی طریقہ چھپانا، جیسے ایک رقم سے زیادہ پر کیش آن ڈیلیوری، یا وجہ بتا کر آرڈر روکنا۔ ہر ایک تب تک بند رہتا ہے جب تک آپ اسے آن نہ کریں۔ جو ناکام ہو اسے چھوڑ دیا جاتا ہے، اور چیک آؤٹ چلتا رہتا ہے۔',

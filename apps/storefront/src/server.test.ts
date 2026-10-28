@@ -47,6 +47,9 @@ import {
   type TrackingRequest,
   type ContentSearchOptions,
   type ContentSearchResponse,
+  type PhotoSearchRefusal,
+  type PhotoSearchRequest,
+  type PhotoSearchResponse,
   type SearchOptions,
   type CommentRequest,
   type CommentResult,
@@ -472,6 +475,22 @@ class FakeCore {
     this.searches.push({ shopId, terms, options });
     if (this.found instanceof Error) throw this.found;
     return this.found.slice(0, options.limit);
+  }
+
+  /** The photos sent to be read into searches (ADR-870), and what they were read into. */
+  readonly photos: { shopId: string; request: PhotoSearchRequest }[] = [];
+  photoRead: PhotoSearchResponse | { refused: PhotoSearchRefusal } | Error = {
+    query: null,
+    productIds: [],
+  };
+
+  async photoSearch(
+    shopId: string,
+    request: PhotoSearchRequest,
+  ): Promise<PhotoSearchResponse | { refused: PhotoSearchRefusal }> {
+    this.photos.push({ shopId, request });
+    if (this.photoRead instanceof Error) throw this.photoRead;
+    return this.photoRead;
   }
 
   /** The searches of the shop's pages and articles asked for, and what they find (ADR-212). */
@@ -2094,6 +2113,53 @@ describe('Carts', () => {
       headers: { host: 'localhost' },
     });
     expect([down.statusCode, down.headers['cache-control']]).toEqual([503, 'no-store']);
+    await app.close();
+  });
+
+  it("reads a shopper's photo into a search, and sends them to its page (SRC-07, ADR-870)", async () => {
+    const app = server();
+    const PNG = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
+    const send = (payload: unknown, url = '/search/photo') =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { host: 'localhost', 'content-type': 'application/json' },
+        payload: JSON.stringify(payload),
+      });
+    core.photoRead = { query: 'lawn suit', productIds: ['p1'] };
+    const read = await send({ image: `data:image/png;base64,${PNG}` });
+    expect([read.statusCode, read.headers['cache-control'], read.json()]).toEqual([
+      200,
+      'private, no-store',
+      { location: '/search?q=lawn+suit&type=product' },
+    ]);
+    expect(core.photos).toEqual([
+      { shopId: 'sample', request: { image: PNG, mediaType: 'image/png' } },
+    ]);
+    // In Urdu at its Urdu address; a photo of no product is said to be one.
+    core.photoRead = { query: null, productIds: [] };
+    const none = await send({ image: `data:image/jpeg;base64,${PNG}` }, '/ur/search/photo');
+    expect(none.json()).toEqual({
+      message: 'اس تصویر میں کوئی چیز نظر نہیں آئی۔ براہ کرم کوئی اور تصویر آزمائیں۔',
+    });
+    // What is not a photo never reaches the core, nor a photo too large.
+    for (const image of ['data:image/svg+xml;base64,PHN2Zy8+', 'not a photo', 42]) {
+      expect((await send({ image })).statusCode).toBe(400);
+    }
+    const large = await send({ image: `data:image/png;base64,${'A'.repeat(2_100_000)}` });
+    expect(large.statusCode).toBe(413);
+    expect(core.photos).toHaveLength(2);
+    // The shop reads no photos, or no more today.
+    core.photoRead = { refused: 'unavailable' };
+    const off = await send({ image: `data:image/png;base64,${PNG}` });
+    expect([off.statusCode, off.json()]).toEqual([
+      503,
+      { message: 'Search by photo is not available just now.' },
+    ]);
+    core.photoRead = { refused: 'too_many' };
+    expect((await send({ image: `data:image/png;base64,${PNG}` })).statusCode).toBe(429);
+    core.photoRead = new StorefrontApiError(502, 'Bad gateway');
+    expect((await send({ image: `data:image/png;base64,${PNG}` })).statusCode).toBe(503);
     await app.close();
   });
 
@@ -6563,6 +6629,24 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       'Too many searches. Please wait a moment.\n',
     ]);
     expect(core.searches).toHaveLength(240);
+    await app.close();
+  });
+
+  it("limits how many photos an address sends to be read, as each spends the shop's AI credit", async () => {
+    const core = new FakeCore();
+    core.photoRead = { query: 'lawn', productIds: [] };
+    const app = server(core);
+    const PNG = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
+    const send = () =>
+      app.inject({
+        method: 'POST',
+        url: '/search/photo',
+        headers: { host: 'bazaar.localhost', 'content-type': 'application/json' },
+        payload: { image: `data:image/png;base64,${PNG}` },
+      });
+    for (let photo = 0; photo < 10; photo += 1) expect((await send()).statusCode).toBe(200);
+    expect((await send()).statusCode).toBe(429);
+    expect(core.photos).toHaveLength(10);
     await app.close();
   });
 

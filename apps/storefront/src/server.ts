@@ -153,6 +153,13 @@ import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { EXPERIMENT_COOKIE, experimentArm, experimentCookie } from './experiments.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
+import {
+  PHOTO_SEARCH_BODY_MAX,
+  PHOTO_SEARCH_PATH,
+  photoRequestOf,
+  photoSearchLocation,
+  photoSearchMessage,
+} from './photo-search.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import { chatCookie, chatCookieCleared, chatMessagesJson, chatTokenOf } from './web-chat.js';
 import {
@@ -269,6 +276,11 @@ const STOREFRONT_API_SERVER_CALLS = {
   limit: 6_000,
   windowMs: 60_000,
 };
+/**
+ * Photos an address may send to be read into a search a minute (ADR-870): each spends one of the
+ * shop's AI credits, so a few, with room for shoppers behind one mobile network's address.
+ */
+const PHOTO_SEARCHES = { name: 'photo-searches', limit: 10, windowMs: 60_000 };
 /** Calls of the store's MCP endpoint (ADR-847), an agent's address's, in a minute. */
 const AGENT_CALLS = { name: 'agent-calls', limit: 120, windowMs: 60_000 };
 
@@ -2649,6 +2661,56 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   for (const path of ['/search/suggest', '/search/suggest.json']) {
     app.get(path, suggest);
     app.get(`/ur${path}`, suggest);
+  }
+
+  /**
+   * Visual search (SRC-07, ADR-870): a shopper's photo, posted as JSON by the theme's search
+   * section where the shop allows it, read by the core into a search. Answered with where that
+   * search's page is, `{ "location": "/search?q=…" }`, or a message for the shopper; never kept.
+   */
+  const photoSearch = async (request: FastifyRequest, reply: FastifyReply) => {
+    reply.header('cache-control', 'private, no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return reply.code(404).send({ message: 'No shop answers at this address.' });
+    const urdu = request.url.startsWith('/ur/');
+    const locale = urdu ? 'ur' : 'en';
+    const allowed = limiter
+      ? await limiter.hit(PHOTO_SEARCHES, request.ip).then(
+          (hit) => hit.allowed,
+          () => true,
+        )
+      : true;
+    if (!allowed) {
+      return reply.code(429).send({ message: photoSearchMessage(locale, 'too_many') });
+    }
+    const photo = photoRequestOf(request.body);
+    if (!photo) return reply.code(400).send({ message: photoSearchMessage(locale, 'invalid') });
+    if (!core || found.preview) {
+      return reply.code(503).send({ message: photoSearchMessage(locale, 'unavailable') });
+    }
+    try {
+      const answer = await core.photoSearch(found.shopId, photo);
+      if ('refused' in answer) {
+        const status = answer.refused === 'too_many' ? 429 : 503;
+        return await reply
+          .code(status)
+          .send({ message: photoSearchMessage(locale, answer.refused) });
+      }
+      const location = photoSearchLocation(answer, urdu ? '/ur' : '');
+      return await reply.send(
+        location ? { location } : { message: photoSearchMessage(locale, 'none') },
+      );
+    } catch (error) {
+      if (error instanceof StoreMissingError) return reply.code(404).send();
+      if (error instanceof StorefrontApiError && error.status === 400) {
+        return reply.code(400).send({ message: photoSearchMessage(locale, 'invalid') });
+      }
+      if (!unreachable(request, error)) throw error;
+      return reply.code(503).send({ message: photoSearchMessage(locale, 'unavailable') });
+    }
+  };
+  for (const path of [PHOTO_SEARCH_PATH, `/ur${PHOTO_SEARCH_PATH}`]) {
+    app.post(path, { bodyLimit: PHOTO_SEARCH_BODY_MAX }, photoSearch);
   }
 
   /**

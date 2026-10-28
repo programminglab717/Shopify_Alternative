@@ -104,15 +104,20 @@ export {
 } from './comments.js';
 export {
   CONTENT_TYPES,
+  PHOTO_SEARCH_BYTES,
   SEARCH_RESULTS,
   SEARCH_TERMS_MAX,
   contentSearchPath,
   contentSearchQuery,
+  photoSearchPath,
   searchPath,
   searchQuery,
   type ContentSearchOptions,
   type ContentSearchResponse,
   type ContentType,
+  type PhotoSearchRefusal,
+  type PhotoSearchRequest,
+  type PhotoSearchResponse,
   type SearchOptions,
   type SearchResponse,
 } from './search.js';

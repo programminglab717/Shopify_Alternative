@@ -65,3 +65,33 @@ export interface ContentSearchResponse {
   articleIds: string[];
   pageIds: string[];
 }
+
+/** POST `…/search/photo`: a shopper's photo, read into a search of the shop (SRC-07, ADR-870). */
+export function photoSearchPath(shopId: string): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/search/photo`;
+}
+
+/** The most a photo may be, as the theme's script makes it small before it is sent. */
+export const PHOTO_SEARCH_BYTES = 1_500_000;
+
+export interface PhotoSearchRequest {
+  /** The photo, base64. */
+  image: string;
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+}
+
+/**
+ * What a photo was read into: the most particular search that finds the shop's products, and
+ * those it finds; the broadest, finding none, where none does; null where the photo shows no
+ * product.
+ */
+export interface PhotoSearchResponse {
+  query: string | null;
+  productIds: string[];
+}
+
+/**
+ * Why a photo was read into no search: the shop reads none (or has no AI), has no AI credit left
+ * this month, or has read as many as it reads in a day.
+ */
+export type PhotoSearchRefusal = 'unavailable' | 'no_credits' | 'too_many';

@@ -239,7 +239,10 @@
       "kinds": {
         "article": "Article",
         "page": "Page"
-      }
+      },
+      "photo": "Search with a photo",
+      "photo_reading": "Looking at your photo…",
+      "photo_failed": "That photo could not be searched. Please try again."
     },
     "predictive_search": {
       "label": "Suggestions",

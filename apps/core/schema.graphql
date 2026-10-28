@@ -10863,6 +10863,11 @@ type Mutation {
   ): PaymentSettlementImportPayload!
 
   """
+  Turns reading shoppers’ photos on or off. Each photo read spends one of the shop’s AI credits.
+  """
+  photoSearchSet(enabled: Boolean!): PhotoSearch!
+
+  """
   Sets the currencies the shop shows its prices in, in its picker’s order, replacing those it had; none to show rupees alone.
   """
   presentmentCurrenciesSet(input: [PresentmentCurrencyInput!]!): PresentmentCurrenciesSetPayload!
@@ -14329,6 +14334,23 @@ enum PersonalisationFieldKind {
   TEXT
 }
 
+"""
+Visual search (SRC-07, ADR-870): whether the shop's search reads a shopper's photo into a search of its products, each photo one of its AI credits. The theme shows its camera button where the search section's setting asks.
+"""
+type PhotoSearch {
+  """Whether Hatti has an AI to read them here."""
+  available: Boolean!
+
+  """Whether the shop reads shoppers’ photos."""
+  enabled: Boolean!
+
+  """Photos a shop reads a day at most."""
+  limitPerDay: Int!
+
+  """Photos read in the last day."""
+  usedToday: Int!
+}
+
 """Hatti's parts, as its status page lists them."""
 enum PlatformComponent {
   ADMIN
@@ -16881,6 +16903,9 @@ type Query {
     """Statements imported at or after this."""
     from: DateTime!
   ): PayoutsReport!
+
+  """Whether the shop’s search reads shoppers’ photos."""
+  photoSearch: PhotoSearch!
 
   """
   What is wrong at Hatti now, or planned soon (BIL-06, ADR-498): for every member of a shop's staff, whatever their role.

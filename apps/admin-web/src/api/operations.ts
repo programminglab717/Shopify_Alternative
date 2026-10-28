@@ -3846,6 +3846,30 @@ export const SearchRulesQuery = /* GraphQL */ `
   }
 `;
 
+/** Whether the shop's search reads shoppers' photos (SRC-07, ADR-870). */
+export const PhotoSearchQuery = /* GraphQL */ `
+  query PhotoSearch {
+    photoSearch {
+      enabled
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
+/** Turns reading shoppers' photos on or off (ADR-870). */
+export const PhotoSearchSetMutation = /* GraphQL */ `
+  mutation PhotoSearchSet($enabled: Boolean!) {
+    photoSearchSet(enabled: $enabled) {
+      enabled
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
 /** Pins and hides a term's products, in place of what its rule said (ADR-692). */
 export const SearchRuleSetMutation = /* GraphQL */ `
   mutation SearchRuleSet($query: String!, $pinnedProductIds: [ID!]!, $hiddenProductIds: [ID!]!) {

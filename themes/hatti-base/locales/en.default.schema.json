@@ -168,6 +168,10 @@
       "settings": {
         "products_per_page": {
           "label": "Products per page"
+        },
+        "photo_search": {
+          "label": "Search with a photo",
+          "info": "Shoppers send a photo and see the shop's products like it. Turn photo search on in Online Store › Search too: each photo spends one of the shop's AI credits."
         }
       }
     },

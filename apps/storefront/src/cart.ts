@@ -26,6 +26,7 @@ export type CoreBackend = Pick<
   | 'checkoutContact'
   | 'search'
   | 'searchContent'
+  | 'photoSearch'
   | 'themePreview'
   | 'themeImage'
   | 'signUp'

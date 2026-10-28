@@ -5,7 +5,9 @@ export type AiCreditUse =
   | 'article'
   | 'report_question'
   | 'transfer_receipt'
-  | 'support_reply';
+  | 'support_reply'
+  /** A shopper's photo read into a search of the shop (ADR-870). */
+  | 'visual_search';
 
 /** A shop's AI credits this month. */
 export interface AiCreditBalance {

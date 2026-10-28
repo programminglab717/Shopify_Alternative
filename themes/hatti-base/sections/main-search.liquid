@@ -17,6 +17,19 @@
       <input type="hidden" name="options[prefix]" value="last">
       <button type="submit" class="button">{{ 'sections.search.submit' | t }}</button>
     </form>
+    {%- if section.settings.photo_search -%}
+      {%- comment -%}
+        Search by photo (SRC-07, ADR-870): the photo made small in the browser, read by the AI into
+        a search, and the shopper sent to its page. Each photo spends one of the shop's AI credits.
+      {%- endcomment -%}
+      <hatti-photo-search class="search__photo" data-url="{{ routes.search_url }}/photo" data-reading="{{ 'sections.search.photo_reading' | t | escape }}" data-failed="{{ 'sections.search.photo_failed' | t | escape }}">
+        <label class="button button--secondary">
+          <input type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden" data-photo>
+          {{ 'sections.search.photo' | t }}
+        </label>
+        <p class="search__photo-status" role="status" aria-live="polite" data-status></p>
+      </hatti-photo-search>
+    {%- endif -%}
     {%- if search.performed -%}
       <p class="search__count" role="status">
         {%- if search.results_count == 0 -%}
@@ -61,7 +74,65 @@
   .search__text { padding: 1rem; border: 1px solid var(--color-muted); border-radius: 0.5rem; }
   .search__text h2 { margin-block: 0.25rem 0.5rem; font-size: 1.125rem; }
   .search__kind { margin: 0; font-size: 0.875rem; color: var(--color-muted); }
+  .search__photo { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; margin-block: -0.75rem 1.5rem; }
+  .search__photo label { cursor: pointer; }
+  .search__photo label:focus-within { outline: 2px solid currentColor; outline-offset: 2px; }
+  .search__photo-status { margin: 0; color: var(--color-muted); }
 {% endstylesheet %}
+
+{% javascript %}
+  // A shopper's photo, made at most 1024 pixels across as a JPEG before it is sent, for the
+  // shop's search to read into words (ADR-870).
+  class HattiPhotoSearch extends HTMLElement {
+    connectedCallback() {
+      this.input = this.querySelector('[data-photo]');
+      this.status = this.querySelector('[data-status]');
+      this.input.addEventListener('change', () => this.send());
+    }
+
+    async smaller(file) {
+      const url = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const scale = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.naturalWidth * scale);
+        canvas.height = Math.round(image.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.8);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    async send() {
+      const file = this.input.files && this.input.files[0];
+      if (!file) return;
+      this.status.textContent = this.dataset.reading;
+      try {
+        const response = await fetch(this.dataset.url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ image: await this.smaller(file) }),
+        });
+        const answer = await response.json();
+        if (answer.location) {
+          window.location.assign(answer.location);
+          return;
+        }
+        this.status.textContent = answer.message || this.dataset.failed;
+      } catch {
+        this.status.textContent = this.dataset.failed;
+      }
+      this.input.value = '';
+    }
+  }
+  if (!customElements.get('hatti-photo-search')) {
+    customElements.define('hatti-photo-search', HattiPhotoSearch);
+  }
+{% endjavascript %}
 
 {% schema %}
 {
@@ -75,6 +146,13 @@
       "max": 48,
       "step": 4,
       "default": 24
+    },
+    {
+      "type": "checkbox",
+      "id": "photo_search",
+      "label": "t:sections.main-search.settings.photo_search.label",
+      "info": "t:sections.main-search.settings.photo_search.info",
+      "default": false
     }
   ]
 }

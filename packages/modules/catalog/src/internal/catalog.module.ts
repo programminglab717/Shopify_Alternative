@@ -42,6 +42,8 @@ import { ProductImportService } from './product-import.service.js';
 import { ProductService } from './product.service.js';
 import { ProductReviewService } from './review.service.js';
 import { StorefrontSearchController } from './search.controller.js';
+import { PhotoSearchService, StorefrontPhotoSearchController } from './photo-search.js';
+import { PhotoSearchResolver } from './graphql/photo-search.resolver.js';
 import { SizeChartService } from './size-charts.js';
 import { SearchRuleService } from './search-rules.js';
 import { SearchSynonymService } from './search-synonyms.js';
@@ -108,14 +110,21 @@ import { MetafieldService } from './metafields.js';
     PriceSaleResolver,
     CopyDraftService,
     CopyDraftResolver,
+    PhotoSearchService,
+    PhotoSearchResolver,
     MetafieldService,
     MetafieldResolver,
     ProductMetafieldResolver,
     VariantMetafieldResolver,
     CollectionMetafieldResolver,
   ],
-  // The search the storefront asks for, and the links to digital products' files (ADR-814).
-  controllers: [StorefrontSearchController, DigitalDownloadController],
+  // The search the storefront asks for, by words or a photo (ADR-870), and the links to digital
+  // products' files (ADR-814).
+  controllers: [
+    StorefrontSearchController,
+    StorefrontPhotoSearchController,
+    DigitalDownloadController,
+  ],
   exports: [
     ExpansionStoreService,
     ProductService,

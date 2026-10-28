@@ -59,10 +59,14 @@ import {
 import {
   contentSearchPath,
   contentSearchQuery,
+  photoSearchPath,
   searchPath,
   searchQuery,
   type ContentSearchOptions,
   type ContentSearchResponse,
+  type PhotoSearchRefusal,
+  type PhotoSearchRequest,
+  type PhotoSearchResponse,
   type SearchOptions,
   type SearchResponse,
 } from './search.js';
@@ -174,6 +178,13 @@ export class StorefrontApiError extends Error {
     this.name = 'StorefrontApiError';
   }
 }
+
+/** Why the core read a shopper's photo into no search, by how it answered (ADR-870). */
+const PHOTO_SEARCH_REFUSALS: Readonly<Record<number, PhotoSearchRefusal>> = {
+  503: 'unavailable',
+  402: 'no_credits',
+  429: 'too_many',
+};
 
 /** Shops' carts as a storefront reaches them in the core (ADR-042). */
 export class StorefrontApiClient {
@@ -349,6 +360,23 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return ((await response.json()) as SearchResponse).productIds;
+  }
+
+  /**
+   * A shopper's photo read into a search of the shop (SRC-07, ADR-870): the search and what it
+   * finds, or why the shop reads no photos now.
+   */
+  async photoSearch(
+    shopId: string,
+    request: PhotoSearchRequest,
+  ): Promise<PhotoSearchResponse | { refused: PhotoSearchRefusal }> {
+    const response = await this.#request('POST', photoSearchPath(shopId), null, request);
+    const refused = PHOTO_SEARCH_REFUSALS[response.status];
+    if (refused) return { refused };
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as PhotoSearchResponse;
   }
 
   /** The shop's published articles and pages with every word of `terms`, best first (ADR-212). */

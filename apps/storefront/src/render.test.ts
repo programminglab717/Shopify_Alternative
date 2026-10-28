@@ -2477,6 +2477,33 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('“lawn” کے لیے 1 نتیجہ');
   });
 
+  it("offers search by photo where the search section's setting asks (SRC-07, ADR-870)", async () => {
+    // Off by default: no button, no script.
+    const plain = await render({ path: '/search' });
+    expect(plain.html).not.toContain('<hatti-photo-search');
+    const theme = loadTheme({
+      ...files,
+      'templates/search.json': JSON.stringify({
+        sections: { main: { type: 'main-search', settings: { photo_search: true } } },
+        order: ['main'],
+      }),
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const store = new MemoryStore(sampleStore());
+    const page = await renderer.render({ path: '/search' }, store.fresh());
+    expect(page.status).toBe(200);
+    expect(page.html).toContain(
+      '<hatti-photo-search class="search__photo" data-url="/search/photo"',
+    );
+    expect(page.html).toContain('accept="image/jpeg,image/png,image/webp"');
+    expect(page.html).toContain('Search with a photo');
+    expect(page.html).toContain("customElements.define('hatti-photo-search'");
+    // In Urdu, to the Urdu address, which answers in Urdu.
+    const urdu = await renderer.render({ path: '/search', locale: 'ur' }, store.fresh());
+    expect(urdu.html).toContain('data-url="/ur/search/photo"');
+    expect(urdu.html).toContain('تصویر سے تلاش کریں');
+  });
+
   it('sorts a collection and filters a search, as Shopify does (ADR-479)', async () => {
     const lawn = sampleStore().products.filter((each) => each.id.startsWith('p-eid-lawn-'));
     const cheapest = [...lawn].sort(

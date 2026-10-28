@@ -23,6 +23,7 @@ import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { ProductFinder } from './link-page';
+import { PhotoSearchSection } from './photo-search';
 
 /** What the core takes for a term (ADR-692). */
 export const MOST_PINNED = 10;
@@ -380,6 +381,7 @@ export function SearchRulesTab() {
           }}
         />
       )}
+      <PhotoSearchSection />
     </div>
   );
 }

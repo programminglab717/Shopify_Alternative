@@ -17,8 +17,14 @@ function core(
 ) {
   let kept = rules;
   let refusal = refuse;
+  const photos = { enabled: false, available: true, usedToday: 4, limitPerDay: 300 };
   return fakeCore(role, (operation, variables) => {
     if (operation === 'SearchRules') return { searchRules: kept };
+    if (operation === 'PhotoSearch') return { photoSearch: photos };
+    if (operation === 'PhotoSearchSet') {
+      photos.enabled = variables.enabled as boolean;
+      return { photoSearchSet: photos };
+    }
     if (operation === 'CollectionProductSearch') {
       return {
         products: { nodes: [LAWN, KURTA, OLD].map((each) => ({ ...each, status: 'ACTIVE' })) },
@@ -108,6 +114,25 @@ describe("The online store's search results (SRC-04, ADR-693)", () => {
     // Taken away from the list.
     fireEvent.click(screen.getByRole('button', { name: 'Remove the search for Eid' }));
     await screen.findByText('No searches of your own yet. Every search shows what it finds.');
+  });
+
+  it("turns search with a photo on, for those who set the shop's settings (SRC-07, ADR-870)", async () => {
+    const fake = core('owner', []);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=searchRules');
+    const box = (await screen.findByRole('checkbox', {
+      name: /Let shoppers search with a photo/,
+    })) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(screen.getByText('4 of 300 photos read in the last day.')).toBeTruthy();
+    fireEvent.click(box);
+    await waitFor(() => expect(box.checked).toBe(true));
+    expect(
+      fake.sent.filter((each) => each.operation === 'PhotoSearchSet').map((each) => each.variables),
+    ).toEqual([{ enabled: true }]);
+    await screen.findByText(
+      "The button shows on the search page once the theme's search section has its photo setting on.",
+    );
   });
 
   it('says what the core refused under the words, and of each product by its name', async () => {
