@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Offline-tolerant actions
+### 8d9734b · Offline-tolerant actions
 
 * **Admin:** confirming, packing, collected, a call's outcome and a comment wait on the phone
   while it is offline, with the key they were first sent with, and go in order once it is back;
