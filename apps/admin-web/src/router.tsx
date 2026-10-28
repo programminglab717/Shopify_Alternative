@@ -89,6 +89,7 @@ import { HelpPage } from './help/help-page';
 import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { AppFramePage } from './settings/app-frame-page';
+import { AppChargePage } from './settings/app-charge-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AdSpendPage } from './marketing/ad-spend-page';
 import { AffiliatesPage } from './marketing/affiliates-page';
@@ -812,6 +813,13 @@ const settingsApps = createRoute({
   component: AppsPage,
 });
 
+// An app's one-time charge for the owner to answer (ADR-854).
+const settingsAppCharge = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/apps/charges/$chargeId',
+  component: AppChargePage,
+});
+
 // A public app opened inside the admin (ADR-852).
 const settingsAppFrame = createRoute({
   getParentRoute: () => shop,
@@ -1122,6 +1130,7 @@ export const routeTree = root.addChildren([
     settingsCustomData,
     settingsApps,
     settingsAppFrame,
+    settingsAppCharge,
     settingsWhatsApp,
     marketing,
     marketingTemplates,

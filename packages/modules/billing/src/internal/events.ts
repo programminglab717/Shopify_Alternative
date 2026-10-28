@@ -55,6 +55,9 @@ export interface InvoicePayload {
   interval: string | null;
   /** The theme store's theme it buys (ADR-853); absent for others. */
   themeId?: string;
+  /** The app's charge it pays, and the app (ADR-854); absent for others. */
+  appChargeId?: string;
+  publicAppId?: string;
   /** Paisa, as strings: what the shop pays, and the sales tax in it (ADR-512). */
   amount: string;
   tax?: string;

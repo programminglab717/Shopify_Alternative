@@ -137,7 +137,7 @@ const DAY_MS = 24 * 3_600_000;
 
 export const INVOICE_STATUSES = ['open', 'paid', 'void'] as const;
 export type InvoiceStatusValue = (typeof INVOICE_STATUSES)[number];
-export type InvoiceReasonValue = 'change' | 'renewal' | 'credits' | 'theme';
+export type InvoiceReasonValue = 'change' | 'renewal' | 'credits' | 'theme' | 'app';
 
 /** An invoice of Hatti's to the shop, as the Admin API shows it. */
 export interface InvoiceRecord {
@@ -151,6 +151,8 @@ export interface InvoiceRecord {
   plan: Plan | null;
   /** The theme it buys from the theme store (ADR-853), as it was named then; none for others. */
   theme: { id: string; name: string } | null;
+  /** The app's charge it pays (ADR-854): the charge, its app, and what it is for; none for others. */
+  appCharge: { id: string; publicAppId: string; name: string } | null;
   interval: BillingIntervalValue | null;
   /**
    * Paisa: the plan's price for the period, less what was left of the period it cut short; or the
@@ -239,6 +241,9 @@ type InvoiceRow = {
   billing_interval: BillingIntervalValue | null;
   theme_id: string | null;
   theme_name: string | null;
+  app_charge_id: string | null;
+  public_app_id: string | null;
+  charge_name: string | null;
   price: string;
   credit: string;
   tax: string;
@@ -273,7 +278,8 @@ const TRANSFER_COLUMNS = sql.raw(
 );
 
 const INVOICE_COLUMNS = sql.raw(
-  `id, number::text, reason, plan, billing_interval, theme_id, theme_name, price::text,
+  `id, number::text, reason, plan, billing_interval, theme_id, theme_name, app_charge_id,
+   public_app_id, charge_name, price::text,
    credit::text, tax::text,
    tax_rate, tax_authority, tax_registration, amount::text, status, reference, paid_at,
    created_at`,
@@ -718,6 +724,48 @@ export class BillingService extends PlanAllowance {
         details: { theme: theme.name, invoice: invoice.name },
       });
       return { ok: true, value: { invoice } };
+    });
+  }
+
+  /**
+   * Invoices an app's one-time charge the owner approved (DEV-05, ADR-854), at its price in
+   * rupees, paid as plans' are, with {@link pay}. Another app charge's invoice waiting to be paid
+   * gives way to it.
+   */
+  async invoiceAppCharge(
+    tenant: TenantContext,
+    charge: { id: string; publicAppId: string; name: string; price: bigint },
+  ): Promise<InvoiceRecord> {
+    const { shopId } = tenant;
+    return this.db.tenant(shopId, async (tx) => {
+      await tx.execute(sql`
+        UPDATE billing.invoices SET status = 'void', updated_at = now()
+         WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'app'`);
+      const invoice = await insertInvoice(
+        tx,
+        shopId,
+        {
+          reason: 'app',
+          plan: null,
+          interval: null,
+          price: charge.price,
+          credit: 0n,
+          appCharge: {
+            id: charge.id,
+            publicAppId: charge.publicAppId,
+            name: charge.name.slice(0, 100),
+          },
+        },
+        this.hattiTax,
+      );
+      await recordAudit(tx, shopId, {
+        action: 'billing.app_charge_approved',
+        subjectType: 'shop',
+        subjectId: shopId,
+        ...actorColumnsOf(tenant.actor),
+        details: { charge: charge.name, invoice: invoice.name },
+      });
+      return invoice;
     });
   }
 
@@ -1180,7 +1228,7 @@ export class BillingService extends PlanAllowance {
         aggregateId: invoice.id,
         payload: invoicePayloadOf(invoice),
       });
-    if (invoice.reason === 'theme') {
+    if (invoice.reason === 'theme' || invoice.reason === 'app') {
       // The shop installs the theme as often as it likes from now on (ADR-853).
       await paid();
       return;
@@ -1456,16 +1504,20 @@ async function insertInvoice(
     price: bigint;
     credit: bigint;
     theme?: { id: string; name: string } | null;
+    appCharge?: { id: string; publicAppId: string; name: string } | null;
   },
   hattiTax: HattiTax | null,
 ): Promise<InvoiceRecord> {
   const tax = hattiTax ? taxOn(invoice.price - invoice.credit, hattiTax.rate) : 0n;
   const { rows } = await tx.execute<InvoiceRow>(sql`
     INSERT INTO billing.invoices
-           (shop_id, reason, plan, billing_interval, theme_id, theme_name, price, credit, tax,
-            tax_rate, tax_authority, tax_registration)
+           (shop_id, reason, plan, billing_interval, theme_id, theme_name, app_charge_id,
+            public_app_id, charge_name, price, credit, tax, tax_rate, tax_authority,
+            tax_registration)
     VALUES (${shopId}, ${invoice.reason}, ${invoice.plan}, ${invoice.interval},
-            ${invoice.theme?.id ?? null}, ${invoice.theme?.name ?? null}, ${invoice.price},
+            ${invoice.theme?.id ?? null}, ${invoice.theme?.name ?? null},
+            ${invoice.appCharge?.id ?? null}, ${invoice.appCharge?.publicAppId ?? null},
+            ${invoice.appCharge?.name ?? null}, ${invoice.price},
             ${invoice.credit}, ${tax}, ${hattiTax?.rate ?? 0}, ${hattiTax?.authority ?? null},
             ${hattiTax?.registration ?? null})
     RETURNING ${INVOICE_COLUMNS}`);
@@ -1486,6 +1538,10 @@ function invoicePayloadOf(invoice: InvoiceRecord): InvoicePayload {
     plan: invoice.plan?.code ?? null,
     interval: invoice.interval,
     ...(invoice.theme && { themeId: invoice.theme.id }),
+    ...(invoice.appCharge && {
+      appChargeId: invoice.appCharge.id,
+      publicAppId: invoice.appCharge.publicAppId,
+    }),
     amount: invoice.amount.toString(),
     tax: invoice.tax.toString(),
   };
@@ -1500,6 +1556,14 @@ function toInvoiceRecord(row: InvoiceRow): InvoiceRecord {
     reason: row.reason,
     plan: row.plan === null ? null : PLANS[row.plan],
     theme: row.theme_id === null ? null : { id: row.theme_id, name: row.theme_name ?? '' },
+    appCharge:
+      row.app_charge_id === null
+        ? null
+        : {
+            id: row.app_charge_id,
+            publicAppId: row.public_app_id ?? '',
+            name: row.charge_name ?? '',
+          },
     interval: row.billing_interval,
     price: BigInt(row.price),
     credit: BigInt(row.credit),

@@ -359,6 +359,58 @@ type AppEmbedPayload {
 }
 
 """
+An installed app's one-time charge of the shop, in rupees (DEV-05, ADR-854), as Shopify's AppPurchaseOneTime: approved by its owner, then paid as an invoice of Hatti's.
+"""
+type AppPurchaseOneTime {
+  appName: String!
+  createdAt: DateTime!
+  id: ID!
+
+  """What the app charges for."""
+  name: String!
+  price: Money!
+
+  """Where the owner goes back to the app once they answered."""
+  returnUrl: String!
+  status: AppPurchaseStatus!
+
+  """A charge on a development store: paid once approved, no money moving."""
+  test: Boolean!
+}
+
+type AppPurchaseOneTimeAnswerPayload {
+  appPurchaseOneTime: AppPurchaseOneTime
+
+  """
+  The invoice to pay with billingInvoicePay; null for a test or a refusal.
+  """
+  invoiceId: ID
+  userErrors: [UserError!]!
+}
+
+type AppPurchaseOneTimeCreatePayload {
+  appPurchaseOneTime: AppPurchaseOneTime
+
+  """Where to send the shop's owner to approve it, in the admin."""
+  confirmationUrl: String
+  userErrors: [UserError!]!
+}
+
+enum AppPurchaseStatus {
+  """Approved: its invoice waits to be paid."""
+  ACCEPTED
+
+  """Declined by the owner."""
+  DECLINED
+
+  """Paid: the app gives what it charged for."""
+  PAID
+
+  """Waiting for the owner to answer."""
+  PENDING
+}
+
+"""
 An installed app opened inside the admin (DEV-06, ADR-852): the address its frame loads, carrying a session token the app checks with its client secret.
 """
 type AppSession {
@@ -954,6 +1006,11 @@ An invoice of Hatti's to the shop, for a plan's period or for message credit.
 type BillingInvoice {
   """What is owed: price less credit, and the tax."""
   amount: Money!
+
+  """
+  What an app's charge it pays is for, as the app named it (ADR-854); null for others.
+  """
+  chargeName: String
   createdAt: DateTime!
 
   """What was left unused of the period the plan cut short, taken off."""
@@ -1016,6 +1073,9 @@ type BillingInvoicePayPayload {
 }
 
 enum BillingInvoiceReason {
+  """An installed app's one-time charge the owner approved (ADR-854)."""
+  APP
+
   """A plan chosen now: it begins once paid."""
   CHANGE
 
@@ -9241,6 +9301,19 @@ type Mutation {
   """
   appEmbedSet(input: AppEmbedInput!): AppEmbedPayload!
 
+  """
+  Approves an app's charge: an invoice, paid with billingInvoicePay; a test is paid at once. The owner alone, having signed in lately.
+  """
+  appPurchaseOneTimeApprove(id: ID!): AppPurchaseOneTimeAnswerPayload!
+
+  """
+  Asks the shop to pay the calling public app once, in rupees: its owner approves it at `confirmationUrl`. On a development store, a test.
+  """
+  appPurchaseOneTimeCreate(name: String!, price: MoneyInput!, returnUrl: String!): AppPurchaseOneTimeCreatePayload!
+
+  """Declines an app's charge. The owner alone."""
+  appPurchaseOneTimeDecline(id: ID!): AppPurchaseOneTimeAnswerPayload!
+
   """Uninstalls a public app: its token stops working at once."""
   appUninstall(id: ID!): AppUninstallPayload!
 
@@ -15393,6 +15466,12 @@ type Query {
   The calling app's storefront scripts; for staff, every app's the shop has.
   """
   appEmbeds: [AppEmbed!]!
+  appPurchaseOneTime(id: ID!): AppPurchaseOneTime
+
+  """
+  The calling app's one-time charges, the latest first; for staff, every app's.
+  """
+  appPurchasesOneTime: [AppPurchaseOneTime!]!
 
   """
   Opens the installed app `id` inside the admin; null for no such app installed.

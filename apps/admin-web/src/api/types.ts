@@ -1435,7 +1435,7 @@ export interface BillingPlanValue {
 export interface BillingInvoiceValue {
   id: string;
   name: string;
-  reason: 'CHANGE' | 'CREDITS' | 'RENEWAL' | 'THEME';
+  reason: 'APP' | 'CHANGE' | 'CREDITS' | 'RENEWAL' | 'THEME';
   status: 'OPEN' | 'PAID' | 'VOID';
   interval: BillingInterval | null;
   createdAt: string;
@@ -4646,6 +4646,33 @@ export interface InstalledAppsData {
 
 export interface AppUninstallData {
   appUninstall: { uninstalledAppId: string | null; userErrors: UserError[] };
+}
+
+/** An app's one-time charge of the shop (DEV-05, ADR-854). */
+export interface AppPurchase {
+  id: string;
+  name: string;
+  appName: string;
+  price: { amount: string };
+  status: 'PENDING' | 'ACCEPTED' | 'PAID' | 'DECLINED';
+  test: boolean;
+  returnUrl: string;
+}
+
+export interface AppPurchaseData {
+  appPurchaseOneTime: AppPurchase | null;
+}
+
+export interface AppPurchaseAnswerData {
+  appPurchaseOneTimeApprove?: {
+    appPurchaseOneTime: { id: string; status: AppPurchase['status'] } | null;
+    invoiceId: string | null;
+    userErrors: UserError[];
+  };
+  appPurchaseOneTimeDecline?: {
+    appPurchaseOneTime: { id: string; status: AppPurchase['status'] } | null;
+    userErrors: UserError[];
+  };
 }
 
 export interface AppSessionData {

@@ -9678,6 +9678,54 @@ export const AppEmbedEnableMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** An app's one-time charge, for its owner to answer (ADR-854). */
+export const AppPurchaseQuery = /* GraphQL */ `
+  query AppPurchase($id: ID!) {
+    appPurchaseOneTime(id: $id) {
+      id
+      name
+      appName
+      price {
+        amount
+      }
+      status
+      test
+      returnUrl
+    }
+  }
+`;
+
+export const AppPurchaseApproveMutation = /* GraphQL */ `
+  mutation AppPurchaseApprove($id: ID!) {
+    appPurchaseOneTimeApprove(id: $id) {
+      appPurchaseOneTime {
+        id
+        status
+      }
+      invoiceId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const AppPurchaseDeclineMutation = /* GraphQL */ `
+  mutation AppPurchaseDecline($id: ID!) {
+    appPurchaseOneTimeDecline(id: $id) {
+      appPurchaseOneTime {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const CustomAppsQuery = /* GraphQL */ `
   query CustomApps {
     customApps {

@@ -60,6 +60,7 @@ export enum BillingInvoiceReason {
   RENEWAL = 'RENEWAL',
   CREDITS = 'CREDITS',
   THEME = 'THEME',
+  APP = 'APP',
 }
 
 registerEnumType(BillingInvoiceReason, {
@@ -72,6 +73,9 @@ registerEnumType(BillingInvoiceReason, {
     },
     THEME: {
       description: "A theme of the theme store (ADR-853): the shop's to install once paid.",
+    },
+    APP: {
+      description: "An installed app's one-time charge the owner approved (ADR-854).",
     },
   },
 });
@@ -247,6 +251,13 @@ export class BillingInvoice {
       "The theme store's theme it buys, as it was named then (ADR-853); null for others.",
   })
   themeName!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "What an app's charge it pays is for, as the app named it (ADR-854); null for others.",
+  })
+  chargeName!: string | null;
 
   @Field(() => BillingInterval, { nullable: true })
   interval!: BillingInterval | null;

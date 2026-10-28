@@ -13,3 +13,5 @@ export const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
 /** DI tokens for resources created by the process entry point. */
 export const REDIS = Symbol('REDIS');
 export const LOGGER = Symbol('LOGGER');
+/** Where staff use the admin: "https://admin.hatti.pk", for links that open it. */
+export const ADMIN_ORIGIN = Symbol('ADMIN_ORIGIN');

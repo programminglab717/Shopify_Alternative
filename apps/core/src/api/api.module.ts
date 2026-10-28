@@ -59,13 +59,14 @@ import type { FastifyRequest } from 'fastify';
 import { GraphQLError } from 'graphql';
 import type { Redis } from 'ioredis';
 import mercurius from 'mercurius';
-import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
+import { ADMIN_GRAPHQL_PATH, ADMIN_ORIGIN, LOGGER, REDIS } from './constants.js';
 import { queryCostHooks, type QueryCostOptions } from './query-cost.js';
 import { HealthController } from './health.controller.js';
 import { StockWatchController } from './stock-watches.controller.js';
 import { OAuthController } from './oauth.controller.js';
 import { AppSessionResolver } from './app-sessions.resolver.js';
 import { ThemeStoreResolver } from './theme-store.resolver.js';
+import { AppChargeResolver } from './app-charges.resolver.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
@@ -230,6 +231,14 @@ class InfrastructureModule {
         { provide: LOGGER, useValue: options.logger },
         { provide: REDIS, useValue: options.redis ?? null },
         {
+          provide: ADMIN_ORIGIN,
+          useValue: new URL(
+            options.identity.emails?.adminUrl ??
+              options.identity.passkeys?.origins[0] ??
+              'http://localhost:5173',
+          ).origin,
+        },
+        {
           provide: PublicSite,
           useValue: new PublicSite(options.publicUrl ?? 'http://localhost:4000'),
         },
@@ -262,6 +271,7 @@ class InfrastructureModule {
         Database,
         LOGGER,
         REDIS,
+        ADMIN_ORIGIN,
         PublicSite,
         StorefrontSite,
         DnsLookup,
@@ -392,6 +402,7 @@ export class ApiModule {
         OrderAgreementResolver,
         AppSessionResolver,
         ThemeStoreResolver,
+        AppChargeResolver,
         FileUsesResolver,
         PaymentLinkOrdersResolver,
         OrderAssignmentResolver,

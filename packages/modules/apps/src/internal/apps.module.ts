@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AppChargeService } from './app-charges.service.js';
 import { AppEmbedService } from './app-embeds.service.js';
 import { AppInstallsService } from './app-installs.service.js';
 import { CustomAppService } from './custom-apps.service.js';
@@ -19,7 +20,14 @@ import { WebhookService } from './webhooks.service.js';
     AppInstallsResolver,
     AppEmbedService,
     AppEmbedResolver,
+    AppChargeService,
   ],
-  exports: [CustomAppService, WebhookService, AppInstallsService, AppEmbedService],
+  exports: [
+    CustomAppService,
+    WebhookService,
+    AppInstallsService,
+    AppEmbedService,
+    AppChargeService,
+  ],
 })
 export class AppsModule {}

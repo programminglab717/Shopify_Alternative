@@ -98,6 +98,7 @@ export {
 export {
   PARTNER_LIMITS,
   PartnersService,
+  recordAppSale,
   recordPartnerEarning,
   recordThemeSale,
   type PartnerEarnings,

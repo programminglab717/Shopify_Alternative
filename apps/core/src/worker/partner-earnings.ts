@@ -1,12 +1,14 @@
+import { AppChargeService } from '@hatti/apps/public';
 import { BillingEvents, type InvoicePayload } from '@hatti/billing/public';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
-import { recordPartnerEarning, recordThemeSale } from '@hatti/identity/public';
+import { recordAppSale, recordPartnerEarning, recordThemeSale } from '@hatti/identity/public';
 
 /**
  * Earns a partner their share of each plan invoice a store they brought pays Hatti (PRT-02,
- * ADR-505), and a designer theirs of each theme of theirs a shop buys (ADR-853), as billing says
- * it is paid: through identity's functions, in the shop's own transaction, once an invoice;
+ * ADR-505), a designer theirs of each theme of theirs a shop buys (ADR-853), and an app's
+ * partner theirs of each charge of the app's a shop pays, marking the charge paid (ADR-854), as
+ * billing says it is paid: through identity's functions, in the shop's own transaction, once an invoice;
  * nothing of message credit, nor of a shop no partner brought.
  */
 export class PartnerEarnings {
@@ -27,6 +29,19 @@ export class PartnerEarnings {
           id: event.aggregateId,
           number,
           themeId: invoice.themeId!,
+          amount: BigInt(invoice.amount) - BigInt(invoice.tax ?? '0'),
+        }),
+      );
+      return;
+    }
+    // An app's one-time charge (ADR-854): paid, for the app to honour, and its partner's share.
+    if (invoice.reason === 'app' && invoice.appChargeId && invoice.publicAppId) {
+      await new AppChargeService(this.database).paid(event.shopId, invoice.appChargeId);
+      await this.database.tenant(event.shopId, (tx) =>
+        recordAppSale(tx, event.shopId, {
+          id: event.aggregateId,
+          number,
+          appId: invoice.publicAppId!,
           amount: BigInt(invoice.amount) - BigInt(invoice.tax ?? '0'),
         }),
       );

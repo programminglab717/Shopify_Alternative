@@ -57,21 +57,25 @@ export function invoicePage(view: InvoicePageView | null): {
     ? `${plan.name}, ${invoice.interval === 'yearly' ? 'yearly' : 'monthly'}`
     : theme
       ? `the theme ${theme.name}`
-      : 'message credit';
+      : invoice.appCharge
+        ? invoice.appCharge.name
+        : 'message credit';
   let body: Html;
   if (invoice.status === 'paid') {
     const after = theme
       ? ` Install ${theme.name} from Online store › Theme store.`
-      : !plan
-        ? ` ${amount} of message credit is added to ${view.shopName}'s.`
-        : view.periodEnd
-          ? ` ${view.shopName} is on ${plan.name} until ${dateOf(view.periodEnd)}.`
-          : '';
+      : invoice.appCharge
+        ? ' Go back to the app from Settings › Apps.'
+        : !plan
+          ? ` ${amount} of message credit is added to ${view.shopName}'s.`
+          : view.periodEnd
+            ? ` ${view.shopName} is on ${plan.name} until ${dateOf(view.periodEnd)}.`
+            : '';
     body = html`<div class="banner done" role="status">
       ${paragraphs({
         en: `Thank you: invoice ${name} is paid.${after}`,
         ur:
-          plan || theme
+          plan || theme || invoice.appCharge
             ? html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے۔`
             : html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے، اور ${ltr(amount)} کا میسج کریڈٹ شامل
               ہو گیا ہے۔`,

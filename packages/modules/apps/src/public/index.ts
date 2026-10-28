@@ -44,3 +44,9 @@ export {
   type AppEmbedInput,
   type AppEmbedRecord,
 } from '../internal/app-embeds.service.js';
+export {
+  APP_CHARGE_LIMITS,
+  AppChargeService,
+  type AppChargeRecord,
+  type AppChargeStatus,
+} from '../internal/app-charges.service.js';
