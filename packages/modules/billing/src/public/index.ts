@@ -91,3 +91,14 @@ export {
   type HattiTax,
   type TaxAuthority,
 } from '../internal/tax.js';
+export {
+  STATEMENT_LIMITS,
+  StatementError,
+  matchStatement,
+  referenceKey,
+  statementCredits,
+  type StatementCredit,
+  type StatementMatch,
+  type StatementResult,
+  type TransferToMatch,
+} from '../internal/statement.js';

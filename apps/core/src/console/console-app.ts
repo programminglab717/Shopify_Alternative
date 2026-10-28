@@ -125,7 +125,8 @@ export async function createConsoleApi(
   const adapter = new FastifyAdapter({
     loggerInstance: options.logger,
     trustProxy: options.trustProxy ?? false,
-    bodyLimit: 256 * 1024,
+    // A bank's statement, as CSV, is the largest thing sent (ADR-883).
+    bodyLimit: 4 * 1024 * 1024,
     genReqId: (request: IncomingMessage) => requestId(request.headers['x-request-id']),
   });
   adapter.getInstance().addHook('onSend', async (request, reply) => {

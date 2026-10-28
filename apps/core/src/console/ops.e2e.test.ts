@@ -129,6 +129,47 @@ describe.skipIf(!server)(
       expect((await call('GET', '/billing-transfers')).body.transfers).toEqual([]);
     });
 
+    it("matches transfers waiting from Hatti's bank statement, confirming none itself (ADR-883)", async () => {
+      const id = await transferSaid('FT24100777');
+      expect((await call('POST', '/billing-transfers/statement', { csv: ' ' })).status).toBe(422);
+      expect(
+        (await call('POST', '/billing-transfers/statement', { csv: 'Date,Amount\n1,2' })).body.error
+          .message,
+      ).toMatch(/No column of credits/);
+      const csv = [
+        'Txn Date,Narration,Debit,Credit',
+        '05-11-2026,IBFT FROM SANA REF FT-2410-0777,,"2,999.00"',
+        '05-11-2026,CASH DEPOSIT,,"10,000.00"',
+      ].join('\n');
+      const matched = (await call('POST', '/billing-transfers/statement', { csv })).body;
+      expect(matched).toEqual({
+        credits: 2,
+        matches: [
+          {
+            transfer: expect.objectContaining({ id, reference: 'FT24100777' }),
+            credit: {
+              row: 2,
+              date: '05-11-2026',
+              description: 'IBFT FROM SANA REF FT-2410-0777',
+              amount: 'Rs 2,999',
+              received: '2999.00',
+            },
+            outcome: 'exact',
+          },
+        ],
+        ambiguous: [],
+        unmatched: [expect.objectContaining({ description: 'CASH DEPOSIT', amount: 'Rs 10,000' })],
+        moreUnmatched: 0,
+      });
+      // Nothing was confirmed: it waits until Hatti's people confirm it.
+      expect((await call('GET', '/billing-transfers')).body.transfers).toHaveLength(1);
+      expect(
+        (await call('POST', `/billing-transfers/${id}/confirm`, { received: '2999.00' })).body
+          .transfer.outcome,
+        // With the Rs 2,000 found before, the invoice is paid.
+      ).toBe('paid');
+    });
+
     it('posts an incident to the status page, updates it, and ends it', async () => {
       expect(
         (await call('POST', '/incidents', { kind: 'outage', impact: 'degraded' })).body.error

@@ -287,3 +287,26 @@ export interface SupportAccess {
   /** Where to look at it in the admin; null where the admin's address isn't set. */
   adminUrl: string | null;
 }
+
+/** A credit of Hatti's bank statement (ADR-883). */
+export interface StatementCredit {
+  row: number;
+  date: string | null;
+  description: string;
+  amount: string;
+  /** What came, as confirming takes it: "2999.00". */
+  received: string;
+}
+
+/** Hatti's bank statement, matched against the transfers waiting. */
+export interface StatementMatched {
+  credits: number;
+  matches: {
+    transfer: BillingTransfer;
+    credit: StatementCredit;
+    outcome: 'exact' | 'short' | 'over';
+  }[];
+  ambiguous: BillingTransfer[];
+  unmatched: StatementCredit[];
+  moreUnmatched: number;
+}

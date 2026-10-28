@@ -66,6 +66,35 @@ function fakeServer() {
         transfer: { outcome: 'short', invoiceName: 'HB-000123', left: 'Rs 999' },
       });
     }
+    if (path === '/billing-transfers/statement') {
+      return json(200, {
+        credits: 2,
+        matches: [
+          {
+            transfer: TRANSFER,
+            credit: {
+              row: 2,
+              date: '05-11-2026',
+              description: 'IBFT FROM SANA REF FT24100012',
+              amount: 'Rs 2,999',
+              received: '2999.00',
+            },
+            outcome: 'exact',
+          },
+        ],
+        ambiguous: [],
+        unmatched: [
+          {
+            row: 3,
+            date: '05-11-2026',
+            description: 'CASH DEPOSIT',
+            amount: 'Rs 10,000',
+            received: '10000.00',
+          },
+        ],
+        moreUnmatched: 0,
+      });
+    }
     if (path === '/billing-transfers') return json(200, { transfers: state.transfers });
     if (path === '/incidents' && init?.method === 'POST') {
       if (!body!.title) {
@@ -122,6 +151,23 @@ describe("Hatti's console: transfers and the status page (ADR-879)", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Found it: confirm' }));
     expect(await screen.findByText('No transfer waits.')).toBeTruthy();
     expect(posted(server, '/billing-transfers/btr_1/confirm')).toEqual([{ received: '2,000' }]);
+  });
+
+  it("matches transfers from Hatti's bank statement, confirmed one by one (ADR-883)", async () => {
+    const server = fakeServer();
+    vi.stubGlobal('fetch', server.fetcher);
+    renderConsole('/transfers');
+    const csv = 'Txn Date,Narration,Credit\n05-11-2026,IBFT FROM SANA REF FT24100012,2999.00';
+    fireEvent.change(await screen.findByLabelText('The statement'), {
+      target: { files: [new File([csv], 'statement.csv', { type: 'text/csv' })] },
+    });
+    expect(await screen.findByText('2 credits read; 1 matched.')).toBeTruthy();
+    expect(posted(server, '/billing-transfers/statement').at(-1)).toEqual({ csv });
+    expect(screen.getByText('1 credit matched nothing')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm for Rs 2,999' }));
+    await waitFor(() =>
+      expect(posted(server, '/billing-transfers/btr_1/confirm')).toEqual([{ received: '2999.00' }]),
+    );
   });
 
   it('posts an incident to the status page, and updates it to its next status', async () => {

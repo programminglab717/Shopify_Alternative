@@ -2,7 +2,10 @@ import { PublicSite } from '@hatti/api';
 import {
   BILLING_CURRENCY,
   BillingService,
+  StatementError,
   TRANSFER_REFUSAL_LENGTH,
+  matchStatement,
+  type StatementCredit,
   type TransferChecked,
   type WaitingTransferRecord,
 } from '@hatti/billing/public';
@@ -51,6 +54,20 @@ function transferJson(transfer: WaitingTransferRecord) {
     reportedAt: transfer.reportedAt.toISOString(),
   };
 }
+
+function creditJson(credit: StatementCredit) {
+  return {
+    row: credit.row,
+    date: credit.date,
+    description: credit.description,
+    amount: rupees(credit.amount),
+    /** What came, as the confirm call takes it: "2999.00". */
+    received: `${credit.amount / 100n}.${String(credit.amount % 100n).padStart(2, '0')}`,
+  };
+}
+
+/** The most credits nothing matched that the console is shown. */
+const UNMATCHED_SHOWN = 50;
 
 function checkedJson(checked: TransferChecked) {
   return { outcome: checked.outcome, invoiceName: checked.invoiceName, left: rupees(checked.left) };
@@ -165,6 +182,48 @@ export class ConsoleOpsController {
     return this.#checked(
       await this.#billing.confirmTransfer(transfer, { by: agent.name, received }),
     );
+  }
+
+  /**
+   * Hatti's bank statement, `{ csv }` as the bank exports it, matched against the transfers
+   * waiting (ADR-883): each credit carrying a transfer's reference paired with it, for Hatti's
+   * people to confirm; nothing is confirmed here.
+   */
+  @Post('billing-transfers/statement')
+  @HttpCode(200)
+  async statement(@Body() body: unknown, @Req() request: FastifyRequest) {
+    const agent = consoleAgentOf(request);
+    const csv = (body as { csv?: unknown } | null)?.csv;
+    if (typeof csv !== 'string' || !csv.trim()) {
+      throw consoleError(422, 'BLANK', 'Choose the statement, as CSV', { csv: 'BLANK' });
+    }
+    const waiting = await this.#billing.waitingTransfers(500);
+    let result;
+    try {
+      result = matchStatement(
+        csv,
+        waiting.map((each) => ({ id: each.id, reference: each.reference, amount: each.amount })),
+      );
+    } catch (error) {
+      if (error instanceof StatementError) throw consoleError(422, 'INVALID', error.message);
+      throw error;
+    }
+    await this.console.record(agent, 'billing_transfer.statement', null, {
+      credits: result.credits,
+      matched: result.matches.length,
+    });
+    const byId = new Map(waiting.map((each) => [each.id, each]));
+    return {
+      credits: result.credits,
+      matches: result.matches.map((match) => ({
+        transfer: transferJson(byId.get(match.transferId)!),
+        credit: creditJson(match.credit),
+        outcome: match.outcome,
+      })),
+      ambiguous: result.ambiguous.map((id) => transferJson(byId.get(id)!)),
+      unmatched: result.unmatched.slice(0, UNMATCHED_SHOWN).map(creditJson),
+      moreUnmatched: Math.max(0, result.unmatched.length - UNMATCHED_SHOWN),
+    };
   }
 
   /** Refuses a transfer not found, `{ reason }`, which the shop's owner is told. */
