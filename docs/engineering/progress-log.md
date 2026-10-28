@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Partners certified
+
+* **Partners:** the partner page has Hatti's course, six lessons and ten questions in English and
+  Urdu. Eight right certify a partner for a year, and shops see certified experts marked so
+  (PRT-04, [ADR-858](../architecture/13-decision-log.md#adr-858--partners-are-certified-by-hattis-course-six-lessons-and-ten-questions-in-english-and-urdu-on-the-partner-page-scored-by-hatti-eight-right-for-a-years-certificate-that-shops-see-on-experts)). Reviewing the course's words is OWN-50.
+* 4575 tests (4 new).
+
 ### e3fae5a · TikTok catalogues
 
 * **Online store:** the TikTok tab gives the catalog feed's address and how to add it to a

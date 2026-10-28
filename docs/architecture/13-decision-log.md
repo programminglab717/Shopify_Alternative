@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-857 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-858 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -865,6 +865,7 @@
 | 855 | Experts: partners keep a profile of the services they offer shops, listed after Hatti looks, and a shop's owner or a manager sends one an enquiry from the admin, emailed to the expert | Accepted |
 | 856 | A cart a customer sends from the shop's WhatsApp catalogue is kept in the inbox and answered once with a link to the shop's checkout holding what it sells of it, their number filled in | Accepted |
 | 857 | A TikTok catalogue reads the shop's catalog feed, whose address the online store's TikTok tab gives, as Meta's and Google's do | Accepted |
+| 858 | Partners are certified by Hatti's course: six lessons and ten questions in English and Urdu on the partner page, scored by Hatti, eight right for a year's certificate that shops see on experts | Accepted |
 
 ---
 
@@ -28184,3 +28185,39 @@
 * **Alternatives:**
   * **Pushing products to TikTok's Catalog API:** a token per shop to keep and refresh, and every
     product change sent, for what TikTok fetches by itself.
+
+## ADR-858 · Partners are certified by Hatti's course: six lessons and ten questions in English and Urdu on the partner page, scored by Hatti, eight right for a year's certificate that shops see on experts
+
+* **Context:**
+  * PRT-04 asks for certification and Urdu training for partners.
+  * Partners build stores for others (ADR-504) and offer shops their services (ADR-855). Shops
+    had no way to tell those who know Hatti well from those who don't, and partners had nothing
+    to learn it from in Urdu.
+* **Decision:**
+  * **The course:** six lessons, in English and Urdu, kept in the code with a version
+    (`2026-10`):
+    * cash on delivery and the Confirmation Desk;
+    * couriers, their rules and the cash they owe;
+    * the online store, its themes and its Urdu;
+    * paying online, transfers, gateways and advances;
+    * staff, their roles, two-step verification, and handing a development store over;
+    * growing a shop with ads, catalogues and messages to those who agreed.
+  * **The questions:** ten, on the same, each with one right option, shown in the admin's
+    language. Their answers stay on the server; the partner sends their choices and Hatti scores
+    them, naming the questions answered wrongly.
+  * **Certified:** eight right certify the partner for a year, of the version passed; passing
+    again renews it. Three tries a day.
+  * **Shown:** the partner page shows the course and the certificate's end. Certified experts
+    are marked "Hatti certified" in Help › Hire an expert.
+* **Consequences:**
+  * Shops choose experts who know how Hatti works, and partners learn it in their language.
+  * The course's words, and whether certification asks more (a store built, a fee), are the
+    owner's to confirm (OWN-50). A new version of the course is a change to the code, its
+    certificates running to their end.
+  * Not yet: video lessons, more courses (themes, apps), and a public page to check a
+    certificate.
+* **Alternatives:**
+  * **Questions scored in the browser:** rejected. The answers would be in the page for anyone
+    to read.
+  * **Courses kept in the database, written in the admin:** more than six lessons need. Kept in
+    code, they are reviewed and translated as the rest of the admin's words are.
