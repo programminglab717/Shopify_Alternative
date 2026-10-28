@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Cashiers at the till
+### cfedec9 · Cashiers at the till
 
 * **PINs:** each member of staff sets their own till PIN. At a shared tablet, a cashier signs in
   with it, and each sale they ring up names them, offline too (POS-07, [ADR-874](../architecture/13-decision-log.md#adr-874--cashiers-at-a-shared-till-each-member-of-staffs-own-pin-kept-as-a-scrypt-verifier-signs-them-in-for-a-shift-the-tills-sales-carry-a-sealed-token-naming-who-rang-them-up-offline-too-five-wrong-pins-lock-the-tills-sign-ins)).
