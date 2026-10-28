@@ -96,18 +96,18 @@ describe.skipIf(!server)("Carts from shops' WhatsApp catalogues, answered (CH-02
   let kurta = '';
   let draft = '';
 
+  /** Each cart's customer, a number of their own: the inbox keeps one conversation a number. */
+  let customers = 0;
+
   /** A cart the customer sent on WhatsApp, kept in the inbox: the event saying so. */
   async function cartSent(items: unknown, note: string | null = null): Promise<DomainEvent> {
     const conversationId = newId();
     const messageId = newId();
+    customers += 1;
     await admin.query(
       `INSERT INTO messaging.conversations (shop_id, id, customer_phone, last_message_at)
        VALUES ($1, $2, $3, now())`,
-      [
-        shopId,
-        conversationId,
-        `+9230012${String(sent.length).padStart(5, '0')}${Math.floor(Math.random() * 9)}`,
-      ],
+      [shopId, conversationId, `+9230012${String(customers).padStart(5, '0')}`],
     );
     await admin.query(
       `INSERT INTO messaging.conversation_messages
