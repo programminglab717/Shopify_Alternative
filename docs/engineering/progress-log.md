@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments and reports (AI-01) are built; next, of the Growth rows that need no partner: the copilot's broadcasts (AI-01); FBR's unit of measure and SRO on variants (CAT-19); an order's lines split across locations (INV-10, SHP-09); a file as a personalisation answer (CAT-15); and bulk imports (DEV-10). Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19) are built; next, of the Growth rows that need no partner: the copilot's broadcasts (AI-01); an order's lines split across locations (INV-10, SHP-09); a file as a personalisation answer (CAT-15); and bulk imports (DEV-10). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### FBR's unit of measure and SRO on items
+
+* **An item keeps** FBR's unit of measure and the SRO it is sold under, beside its HS code, set
+  in the product's stock rules ([ADR-895](../architecture/13-decision-log.md#adr-895--an-inventory-item-keeps-fbrs-unit-of-measure-and-the-sro-it-is-sold-under-beside-its-hs-code-and-digital-invoicing-is-sent-them-with-each-item)).
+* **Digital invoicing** is sent them with each item.
+* **Owner:** check the units and the reduced-rate sale type in FBR's sandbox (OWN-28).
+* 4854 tests (4 new).
 
 ### ab502d7 · The merchant copilot
 

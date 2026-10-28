@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-894 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-895 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -902,6 +902,7 @@
 | 892 | A supplier's lead time: the days it takes to deliver, which a reorder covers as well as the days chosen, and from which its goods are expected | Accepted |
 | 893 | A forecast by week: what a variant running low is expected to sell each week, what is left, the day it runs out, and the day to order by for its supplier's lead time | Accepted |
 | 894 | The merchant copilot: a request in English, Urdu or Roman Urdu drafted into a discount code or a segment, which staff confirm before it is made, or a report, run | Accepted |
+| 895 | An inventory item keeps FBR's unit of measure and the SRO it is sold under, beside its HS code, and digital invoicing is sent them with each item | Accepted |
 
 ---
 
@@ -29650,3 +29651,36 @@
     chosen, which a sentence does not settle. The copilot says so, as kind none.
   * A code's products and collections are not drafted: the model would have to see the
     catalog. Codes are for the whole order until changed on the discounts page.
+
+## ADR-895 · An inventory item keeps FBR's unit of measure and the SRO it is sold under, beside its HS code, and digital invoicing is sent them with each item
+
+* **Context:** CAT-19 asks for FBR's invoice fields on products: the HS code, the unit of
+  measure and the tax category or SRO. ADR-557 kept the HS code. Every item still went to
+  digital invoicing (ADR-562) as "Numbers, pieces, units", with no SRO. That is wrong for cloth
+  sold by the metre, shoes by the pair, and goods sold at a reduced rate or exempt under an SRO.
+* **Decision:**
+  * **`@hatti/pk`'s `FBR_UNITS`:** the units of digital invoicing's reference list, as written
+    there, "Numbers, pieces, units" the default.
+  * **On the inventory item, beside its HS code** (migration 0393):
+    * `fbr_unit`, one of the list;
+    * `sro_schedule_no`, up to 50 characters;
+    * `sro_item_serial_no`, up to 20 characters, never without a schedule.
+    * Set and cleared as the HS code is, blank clearing each, and recorded in the item's change
+      event. In the API: `InventoryItem.fbrUnitOfMeasure` (the default where unset),
+      `sroScheduleNumber` and `sroItemSerialNumber`, and the same in `InventoryItemInput`.
+  * **Invoices:** an order's invoice reads each line's fields through the inventory facade,
+    `fbrItemFieldsIn`, as it reads HS codes, and keeps them in its fiscal document. Digital
+    invoicing is sent:
+    * the item's unit as `uoM`;
+    * its SRO as `sroScheduleNo` and `sroItemSerialNo`;
+    * a taxed item under an SRO as "Goods at Reduced Rate".
+  * **The admin:** "FBR's unit and SRO" under each variant's HS code in the product's stock
+    rules, folded away. The unit is chosen from the list; the SRO fields are saved when left.
+* **Consequences:**
+  * A cloth shop's metres and a shoe shop's pairs reach FBR as they are sold. An item under an
+    SRO names it, as FBR asks of reduced rates.
+  * The list and the reduced-rate sale type follow FBR's published reference. They are to be
+    checked against its sandbox's reference lists along with the rest of digital invoicing
+    (OWN-28).
+  * IMS, the Tier-1 POS reporting, asks for none of these and is sent none.
+  * Tax categories (ADR-097) are not tied to SROs. A shop gives an item its SRO here.
