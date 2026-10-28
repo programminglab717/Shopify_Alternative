@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Cashiers at the till
+
+* **PINs:** each member of staff sets their own till PIN. At a shared tablet, a cashier signs in
+  with it, and each sale they ring up names them, offline too (POS-07, [ADR-874](../architecture/13-decision-log.md#adr-874--cashiers-at-a-shared-till-each-member-of-staffs-own-pin-kept-as-a-scrypt-verifier-signs-them-in-for-a-shift-the-tills-sales-carry-a-sealed-token-naming-who-rang-them-up-offline-too-five-wrong-pins-lock-the-tills-sign-ins)).
+* **Reports:** receipts say who served; the Z report gives sales by cashier.
+* **Customers:** a customer's page lists their sales at the till.
+* **Needs you:** FBR's invoice number on till receipts for Tier-1 shops (OWN-62).
+* 4719 tests (8 new).
+
 ### 822b48c · Orders at the till
 
 * **Pickups:** the till lists click-and-collect orders waiting at its location; staff hand one

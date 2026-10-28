@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-873 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-874 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -881,6 +881,7 @@
 | 871 | Voice-note orders: a customer's WhatsApp voice note heard by Hatti's own whisper.cpp server, read by the AI into what it orders, and answered with the shop's checkout holding it; what was heard shown to staff, the audio never kept | Accepted |
 | 872 | Point of sale: registers that sell from a location's shelf in cash sessions closed with a Z report; till sales kept apart from orders, paid in cash, card, transfer or wallet, linked to a customer by number; rung up in the admin, offline too | Accepted |
 | 873 | Orders at the till: click-and-collect orders handed over there with what they owe, and orders sent home from there, confirmed in person; the money taken counted in the register's session | Accepted |
+| 874 | Cashiers at a shared till: each member of staff's own PIN, kept as a scrypt verifier, signs them in for a shift; the till's sales carry a sealed token naming who rang them up, offline too; five wrong PINs lock the till's sign-ins | Accepted |
 
 ---
 
@@ -28957,3 +28958,37 @@
   * **A draft order and its link (ADR-223):** the customer is at the counter. Asking them to
     confirm on their phone is a step for nothing.
   * **Collecting the money in the orders page:** it would not reach the drawer's count.
+
+## ADR-874 · Cashiers at a shared till: each member of staff's own PIN, kept as a scrypt verifier, signs them in for a shift; the till's sales carry a sealed token naming who rang them up, offline too; five wrong PINs lock the till's sign-ins
+
+* **Context:**
+  * POS-07 asks for staff PINs at the till.
+  * A shop's counter tablet is signed in once, often as the owner or a manager, and several
+    people ring up sales on it in a day. The Z report should say who sold what.
+* **Decision:**
+  * **A PIN of one's own:** each member of staff sets a PIN for the shop's tills, 4 to 6 digits,
+    with the name the till shows them by, in Point of sale › Register.
+    * It is kept as a scrypt verifier, never the PIN.
+    * PINs that are one digit throughout or a run (1111, 1234) are refused, and so is one
+      another member has.
+    * Apps have none.
+  * **Signing in:** at a register's open session, a cashier enters their PIN. The till is given
+    a token sealed with the shop's keys, bound to the shop and the session, for a 12-hour shift.
+    * The till keeps the token in the tab. Each sale it sends, offline ones later too, carries
+      it; the core opens it and names the cashier on the sale.
+    * A token of another session, one past its shift when the sale was made, or a forged one
+      refuses the sale.
+    * Five wrong PINs lock the session's sign-ins for five minutes.
+  * **What shows:** receipts say "Served by" the cashier, and the Z report gives sales by
+    cashier.
+  * **The customer's page** lists their till sales (ADR-872), for those who read orders.
+* **Consequences:**
+  * A shared tablet stays signed in, and each sale still names who made it.
+  * A PIN is weaker than a password. It is good for naming who served, not for guarding money
+    or settings, which stay with the signed-in account's role.
+  * Signing in needs a connection; selling after it doesn't.
+* **Alternatives:**
+  * **Signing each cashier in to the admin:** two-step sign-in for every change of hands at a
+    busy counter.
+  * **Checking the PIN on the device:** the device would hold every member's verifier, and an
+    offline sale's cashier could not be trusted.
