@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-879 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-880 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -887,6 +887,7 @@
 | 877 | The console's trust queues: shoppers' reports decided, stores taken down and restored, owners' appeals refused, and shops' verifications decided or taken back, as the agent signed in; a verification's documents linked only when an agent asks, which is logged | Accepted |
 | 878 | The console's other trust queues: rights complaints upheld or dismissed and store owners' answers refused or their listings let go, listings screening held by mistake cleared, signs of scam stores cleared, and shops' SMS sender names approved, refused or taken back | Accepted |
 | 879 | The console's operations: shops' transfers into Hatti's account confirmed, for what came where it was not what was said, or refused with why; and the status page's incidents and maintenance posted and updated until they end | Accepted |
+| 880 | Partners' work in the console: public apps, theme-store themes and expert profiles listed for every shop once checked, or taken back; and partners' payouts marked paid by the bank transfer's reference | Accepted |
 
 ---
 
@@ -29166,3 +29167,27 @@
     * The status page and every shop's admin show it at once, as they did.
 * **Consequences:** the console covers every queue of Hatti's people but partners' reviews and
   payouts, couriers' city names and closed shops' purges, which stay commands for now.
+
+## ADR-880 · Partners' work in the console: public apps, theme-store themes and expert profiles listed for every shop once checked, or taken back; and partners' payouts marked paid by the bank transfer's reference
+
+* **Context:** `partner-apps` (ADR-851), `partner-themes` (ADR-853), `partner-experts` (ADR-855)
+  and `partner-payouts` (ADR-505) were commands run with the identity login.
+* **Decision:** the console's server reads and reviews them with the identity login it already
+  has. Each action is the signed-in agent's, logged before it is done.
+  * **Partners' work:** apps, themes and expert profiles, those waiting first, each with what the
+    review list in docs/developers/README.md asks to check:
+    * an app's address, its scopes and where it sends merchants back;
+    * a theme's price, base and the development store to preview it on;
+    * a profile's services, cities and languages.
+    Each is listed for every shop once checked, or taken back. Shops that installed or bought
+    one keep it.
+  * **Payouts:** partners owed their share, how much, of how many invoices, and into which bank
+    account. Once Hatti's transfer is made, everything a partner was owed is marked paid with its
+    reference.
+* **Consequences:**
+  * Every daily queue of Hatti's people is in the console.
+  * Still commands, for whoever runs Hatti:
+    * adding and removing agents (`support-agent`), which only the provider's own administrators
+      should do;
+    * couriers' city names;
+    * closed shops' purges, which can't be undone.

@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Partners' work in the console
+
+* **Reviews:** partners' public apps, theme-store themes and expert profiles are listed in the
+  console once checked, or taken back ([ADR-880](../architecture/13-decision-log.md#adr-880--partners-work-in-the-console-public-apps-theme-store-themes-and-expert-profiles-listed-for-every-shop-once-checked-or-taken-back-and-partners-payouts-marked-paid-by-the-bank-transfers-reference)).
+* **Payouts:** partners' payouts are marked paid there by the bank transfer's reference.
+* Every daily queue of Hatti's people is now in the console. Agents, couriers' city names and
+  closed shops' purges stay commands.
+* 4771 tests (4 new).
+
 ### b4d71a8 · The console's operations
 
 * **Transfers:** shops' transfers into Hatti's bank account are confirmed in the console, for
