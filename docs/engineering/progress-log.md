@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Orders at the till
+### 822b48c · Orders at the till
 
 * **Pickups:** the till lists click-and-collect orders waiting at its location; staff hand one
   over and take what it owes there (POS-06, [ADR-873](../architecture/13-decision-log.md#adr-873--orders-at-the-till-click-and-collect-orders-handed-over-there-with-what-they-owe-and-orders-sent-home-from-there-confirmed-in-person-the-money-taken-counted-in-the-registers-session)).
