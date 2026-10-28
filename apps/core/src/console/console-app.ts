@@ -25,7 +25,11 @@ import { ConsoleController } from './console.controller.js';
 import { ConsoleOpsController } from './ops.controller.js';
 import { ConsolePartnersController } from './partners.controller.js';
 import { ConsoleRightsController } from './rights.controller.js';
-import { CONSOLE_IDENTITY_DB, ConsoleShopsController } from './shops.controller.js';
+import {
+  CONSOLE_ADMIN_URL,
+  CONSOLE_IDENTITY_DB,
+  ConsoleShopsController,
+} from './shops.controller.js';
 import { ConsoleSignalsController } from './signals.controller.js';
 import { CONSOLE_DATABASE, ConsoleTrustController } from './trust.controller.js';
 
@@ -41,6 +45,8 @@ export interface CreateConsoleOptions {
   storage: ObjectStorage;
   /** The core's public address, where a takedown's link to appeal by goes (ADR-462). */
   publicUrl: string;
+  /** The merchant admin's address, for agents to look at shops open to them (ADR-882). */
+  adminUrl?: string | null;
   logger: Logger;
   trustProxy?: boolean;
 }
@@ -82,6 +88,7 @@ class ConsoleModule {
         },
         { provide: CONSOLE_DATABASE, useValue: options.database },
         { provide: CONSOLE_IDENTITY_DB, useValue: options.identityDb },
+        { provide: CONSOLE_ADMIN_URL, useValue: options.adminUrl ?? null },
         {
           provide: VerificationsService,
           useValue: new VerificationsService(options.database, options.storage),

@@ -37,6 +37,7 @@ const app = await createConsoleApi({
   supportSender: supportSenderOf(config),
   storage: createStorage(config, publicUrl),
   publicUrl,
+  adminUrl: config.ADMIN_URL ?? null,
   logger,
   trustProxy: config.TRUST_PROXY,
 });

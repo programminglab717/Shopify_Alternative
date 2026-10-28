@@ -276,3 +276,14 @@ export interface CourierCities {
   }[];
   hatti: { city: string; courierCity: string }[];
 }
+
+/** A shop whose owner lets support look now (ADR-156, ADR-882). */
+export interface SupportAccess {
+  shop: { id: string; name: string; handle: string };
+  note: string | null;
+  grantedBy: string;
+  since: string;
+  until: string;
+  /** Where to look at it in the admin; null where the admin's address isn't set. */
+  adminUrl: string | null;
+}

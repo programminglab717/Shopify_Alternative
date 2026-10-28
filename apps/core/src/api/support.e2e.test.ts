@@ -89,6 +89,11 @@ describe.skipIf(!server)("Admin GraphQL API: Hatti's support, with the owner's c
     await admin.query(`INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari')`, [
       shop,
     ]);
+    // The shop's alerts number, where Hatti tells it support is looking (ADR-882).
+    await admin.query(
+      `INSERT INTO messaging.settings (shop_id, alerts_phone) VALUES ($1, '+923335550009')`,
+      [shop],
+    );
     api = await startTestApi(testDb);
   });
 
@@ -195,6 +200,14 @@ describe.skipIf(!server)("Admin GraphQL API: Hatti's support, with the owner's c
     ]);
     const ended = await gql(agent.token, 'mutation { supportAccessEnd { grant { id } } }');
     expect(ended.errors?.[0].extensions.code).toBe('SUPPORT_READ_ONLY');
+
+    // The shop is told that support is looking, once a grant, however often it looks (ADR-882).
+    const { rows: told } = await admin.query<{ channel: string; variables: Json }>(
+      `SELECT channel, variables FROM messaging.messages
+        WHERE shop_id = $1 AND kind = 'support_looking'`,
+      [shop],
+    );
+    expect(told).toEqual([{ channel: 'whatsapp', variables: { shop: 'Zari' } }]);
 
     // Each look is on the shop's audit log, as support.
     const looked = await data(

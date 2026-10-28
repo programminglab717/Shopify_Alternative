@@ -89,7 +89,10 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
     reply.header('x-request-id', request.id);
   });
   // Hatti's support only looks, and each look is logged before it runs (ADR-156).
-  fastify.addHook('preHandler', supportAccessHook(options.database));
+  fastify.addHook(
+    'preHandler',
+    supportAccessHook(options.database, new MessagesService(options.database)),
+  );
   // Before an Idempotency-Key is claimed, so a refused request keeps its key for the retry.
   fastify.addHook('preHandler', recentAuthenticationHook());
   const idempotency = idempotencyHooks(new IdempotencyStore(options.database));

@@ -1101,6 +1101,8 @@ const consoleSchema = z
      * storage's links to verifications' documents (ADR-877); the API's in development.
      */
     PUBLIC_URL: env.httpUrl().optional(),
+    /** The merchant admin's address, where agents look at shops open to them (ADR-882). */
+    ADMIN_URL: env.httpUrl().optional(),
     // Where verifications' documents are kept, as the API keeps them (ADR-465).
     ...storage,
   })

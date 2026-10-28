@@ -11,6 +11,7 @@ import {
   type RouterHistory,
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
+import { AccessPage } from './access';
 import { ActionsLogPage } from './actions-log';
 import { CitiesPage } from './cities';
 import { ShopPage, ShopsPage } from './lookup';
@@ -53,6 +54,9 @@ function Shell() {
           </Link>
           <Link to="/support" className={link}>
             Support requests
+          </Link>
+          <Link to="/access" className={link}>
+            Open to support
           </Link>
           <Link to="/reports" className={link}>
             Reports
@@ -243,6 +247,12 @@ const citiesRoute = createRoute({
   component: CitiesPage,
 });
 
+const accessRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/access',
+  component: AccessPage,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => signedInLayout,
   path: '/log',
@@ -268,6 +278,7 @@ const routeTree = rootRoute.addChildren([
     shopsRoute,
     shopRoute,
     citiesRoute,
+    accessRoute,
     logRoute,
   ]),
 ]);

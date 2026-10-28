@@ -622,6 +622,7 @@ describe("Messages' words", () => {
       'listings_taken_down',
       'rights_counter_refused',
       'listings_released',
+      'support_looking',
       'status_update',
       'legal_changed',
     ]);
@@ -709,6 +710,7 @@ describe("Messages' words", () => {
       'listings_taken_down',
       'rights_counter_refused',
       'listings_released',
+      'support_looking',
       // Hatti's outages (ADR-544).
       'status_update',
       // And its terms and policies changed (ADR-742).
@@ -928,6 +930,7 @@ describe("Messages' words", () => {
       'listings_taken_down',
       'rights_counter_refused',
       'listings_released',
+      'support_looking',
       'legal_changed',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;

@@ -76,6 +76,7 @@ export const MESSAGE_KINDS = [
   'listings_taken_down',
   'rights_counter_refused',
   'listings_released',
+  'support_looking',
   'status_update',
   'legal_changed',
   'broadcast',
@@ -163,6 +164,7 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'listings_taken_down',
   'rights_counter_refused',
   'listings_released',
+  'support_looking',
   // Hatti's outages, when they begin and end (ADR-544).
   'status_update',
   // Hatti's terms and policies changed (ADR-742).
@@ -215,6 +217,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'listings_taken_down',
   'rights_counter_refused',
   'listings_released',
+  'support_looking',
   'status_update',
   'legal_changed',
 ];
@@ -1394,6 +1397,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s listings are let go",
       ur: '{shop} کی اشیاء بحال کر دی گئی ہیں',
+    },
+  },
+  support_looking: {
+    whatsapp: 'hatti_support_looking',
+    category: 'utility',
+    parameters: ['shop'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: our support is looking at {shop} now, as you allowed. They change nothing, and each look is on your activity log. End it any time from Settings › Hatti's support.",
+      ur: 'ہٹی: آپ کی اجازت سے ہماری سپورٹ ابھی {shop} دیکھ رہی ہے۔ وہ کچھ تبدیل نہیں کرتے، اور ہر بار دیکھنا آپ کے ایکٹیویٹی لاگ میں درج ہے۔ سیٹنگز › ہٹی کی سپورٹ سے کسی بھی وقت ختم کریں۔',
+    },
+    subject: {
+      en: "Hatti's support is looking at {shop}",
+      ur: 'ہٹی کی سپورٹ {shop} دیکھ رہی ہے',
     },
   },
   status_update: {

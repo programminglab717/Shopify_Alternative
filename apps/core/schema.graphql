@@ -9149,6 +9149,11 @@ enum MessageKind {
   STORE_SUSPENDED
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and to its owner: Hatti's support looking at it, as its owner allowed, the first time under each grant (ADR-882).
+  """
+  SUPPORT_LOOKING
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: Hatti found the transfer it said it made into Hatti's account, which paid its invoice (ADR-254).
   """
   TRANSFER_CONFIRMED

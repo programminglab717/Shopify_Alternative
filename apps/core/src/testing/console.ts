@@ -44,6 +44,7 @@ export async function startTestConsole(
     console: { ...console, allowPrivateAddresses: true },
     storage,
     publicUrl: 'https://hatti.example',
+    adminUrl: 'https://admin.hatti.example',
     logger: createLogger({ name: 'console-test', level: 'silent' }),
   });
   return {

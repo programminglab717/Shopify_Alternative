@@ -138,6 +138,19 @@ describe.skipIf(!server)(
       ).toEqual(['shop.view', 'shop.view']);
     });
 
+    it('lists the shops whose owners let support look now, with where to look (ADR-882)', async () => {
+      expect((await call('GET', '/support-access')).body.shops).toEqual([
+        {
+          shop: { id: toPublicId('shop', zari), name: 'Zari', handle: 'zari' },
+          note: "Order #1043 won't ship",
+          grantedBy: 'Sana Ahmed',
+          since: expect.any(String),
+          until: expect.any(String),
+          adminUrl: `https://admin.hatti.example/${toPublicId('shop', zari)}`,
+        },
+      ]);
+    });
+
     it("shows the names shops give a city with a courier, and keeps and forgets Hatti's own", async () => {
       expect((await call('GET', '/courier-cities')).body.couriers).toEqual(['postex']);
       const review = (await call('GET', '/courier-cities/postex')).body;

@@ -155,3 +155,49 @@ describe("Hatti's console: shops and couriers' city names (ADR-881)", () => {
     ).toBeTruthy();
   });
 });
+
+describe('Shops open to support (ADR-882)', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    keepSession({
+      token: 'hcs_1',
+      agent: { email: 'ayesha@hatti.pk', name: 'Ayesha', expiresAt: LATER },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('lists them with what for, until when, and where to look in the admin', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.endsWith('/support-access')
+          ? new Response(
+              JSON.stringify({
+                shops: [
+                  {
+                    shop: { id: 'shop_1', name: 'Zari', handle: 'zari' },
+                    note: "Order #1043 won't ship",
+                    grantedBy: 'Sana Ahmed',
+                    since: '2026-10-28T05:00:00Z',
+                    until: '2026-10-28T06:00:00Z',
+                    adminUrl: 'https://admin.hatti.pk/shop_1',
+                  },
+                ],
+              }),
+              { status: 200, headers: { 'content-type': 'application/json' } },
+            )
+          : new Response(JSON.stringify({ actions: [] }), { status: 200 }),
+      ),
+    );
+    renderConsole('/access');
+    expect(await screen.findByText("Order #1043 won't ship")).toBeTruthy();
+    expect(screen.getByText(/^Sana Ahmed allowed it/)).toBeTruthy();
+    const look = screen.getByRole('link', { name: 'Look in the admin' });
+    expect(look.getAttribute('href')).toBe('https://admin.hatti.pk/shop_1');
+    expect(look.getAttribute('rel')).toBe('noreferrer noopener');
+  });
+});

@@ -28,6 +28,9 @@ import { CONSOLE_DATABASE, consoleWords, notFound } from './trust.controller.js'
 /** The identity login, as the console's server has it. */
 export const CONSOLE_IDENTITY_DB = Symbol('CONSOLE_IDENTITY_DB');
 
+/** The merchant admin's address, where an agent looks at a shop open to them; null unless set. */
+export const CONSOLE_ADMIN_URL = Symbol('CONSOLE_ADMIN_URL');
+
 type ShopRow = {
   id: string;
   name: string;
@@ -68,6 +71,7 @@ export class ConsoleShopsController {
     private readonly console: ConsoleAuthService,
     @Inject(CONSOLE_DATABASE) private readonly database: Database,
     @Inject(CONSOLE_IDENTITY_DB) private readonly identity: Db,
+    @Inject(CONSOLE_ADMIN_URL) private readonly adminUrl: string | null,
   ) {
     this.#cities = new CourierCityReview(database);
   }
@@ -163,6 +167,52 @@ export class ConsoleShopsController {
         subject: action.subject,
         at: action.at.toISOString(),
       })),
+    };
+  }
+
+  /**
+   * Shops whose owners let support look now (ADR-156), the soonest to end first: what for, until
+   * when, and where to look at each in the admin, signed in to it as an agent (ADR-882).
+   */
+  @Get('support-access')
+  async supportAccess() {
+    const { rows: grants } = await this.identity.execute<{
+      shop_id: string;
+      note: string | null;
+      created_at: Date | string;
+      expires_at: Date | string;
+      granted_by: string;
+    }>(sql`
+      SELECT g.shop_id, g.note, g.created_at, g.expires_at, u.name AS granted_by
+        FROM identity.support_grants g JOIN identity.users u ON u.id = g.granted_by
+       WHERE g.ended_at IS NULL AND g.expires_at > now()
+       ORDER BY g.expires_at`);
+    if (grants.length === 0) return { shops: [] };
+    const { rows: shops } = await this.database.system((tx) =>
+      tx.execute<{ id: string; name: string; handle: string }>(sql`
+        SELECT id, name, handle FROM control.shops
+         WHERE id IN (${sql.join(
+           grants.map((grant) => sql`${grant.shop_id}`),
+           sql`, `,
+         )}) AND status = 'active'`),
+    );
+    const byId = new Map(shops.map((shop) => [shop.id, shop]));
+    return {
+      shops: grants.flatMap((grant) => {
+        const shop = byId.get(grant.shop_id);
+        if (!shop) return [];
+        const id = toPublicId('shop', shop.id);
+        return [
+          {
+            shop: { id, name: shop.name, handle: shop.handle },
+            note: grant.note,
+            grantedBy: grant.granted_by,
+            since: new Date(grant.created_at).toISOString(),
+            until: new Date(grant.expires_at).toISOString(),
+            adminUrl: this.adminUrl ? `${this.adminUrl.replace(/\/+$/, '')}/${id}` : null,
+          },
+        ];
+      }),
     };
   }
 

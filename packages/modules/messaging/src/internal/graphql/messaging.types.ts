@@ -74,6 +74,7 @@ export enum MessageKind {
   LISTINGS_TAKEN_DOWN = 'LISTINGS_TAKEN_DOWN',
   RIGHTS_COUNTER_REFUSED = 'RIGHTS_COUNTER_REFUSED',
   LISTINGS_RELEASED = 'LISTINGS_RELEASED',
+  SUPPORT_LOOKING = 'SUPPORT_LOOKING',
   STATUS_UPDATE = 'STATUS_UPDATE',
   LEGAL_CHANGED = 'LEGAL_CHANGED',
   BROADCAST = 'BROADCAST',
@@ -391,6 +392,12 @@ registerEnumType(MessageKind, {
       description:
         'For the shop, from Hatti and paid by Hatti, at its alerts number: listings held for a ' +
         'rights complaint let go, and why (ADR-476).',
+    },
+    SUPPORT_LOOKING: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number and to its owner: ' +
+        "Hatti's support looking at it, as its owner allowed, the first time under each grant " +
+        '(ADR-882).',
     },
     STATUS_UPDATE: {
       description:
