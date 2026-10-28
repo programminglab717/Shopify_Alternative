@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-869 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-870 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -877,6 +877,7 @@
 | 867 | Hatti Pass: a shopper saves their name and address for any Hatti shop's checkout, by a box they tick once their number is proved, and forgets it from any checkout | Accepted |
 | 868 | Functions: apps give checkout WebAssembly modules that hide ways to pay or refuse an order, run in a worker of their own with only their input and output, 50 ms and 10 MiB | Accepted |
 | 869 | Headless: a Next.js starter on the Storefront API, a project of its own to copy, its queries checked against the API in the storefront's tests | Accepted |
+| 870 | Visual search: a shopper's photo read by the AI into the words a shop titles its products with, the shop's own search finding them; off until the shop turns it on, one AI credit a photo, 300 a day | Accepted |
 
 ---
 
@@ -28760,3 +28761,53 @@
   * **The starter in the workspace:** Next.js installed and built on every CI run, for a template
     few change.
   * **Remix or Astro:** Next.js is what most partners in Pakistan build with.
+
+## ADR-870 · Visual search: a shopper's photo read by the AI into the words a shop titles its products with, the shop's own search finding them; off until the shop turns it on, one AI credit a photo, 300 a day
+
+* **Context:**
+  * SRC-07 asks for visual search: a shopper's photo, and the shop's products like it.
+  * Shoppers in Pakistan screenshot a suit from Instagram or photograph a neighbour's khussa, and
+    can't name its fabric or cut in the words a shop titles it with.
+  * Finding by the picture itself would need an embedding model and a vector index of every
+    shop's photos. Hatti has neither, and a paid embedding API is ruled out.
+  * Hatti already has an AI gateway that reads images (ADR-463) and AI credits per plan (ADR-533).
+* **Decision:**
+  * **Read into words:**
+    * The AI reads the photo into up to three searches, from the most particular to the broadest:
+      "maroon embroidered lawn suit", "lawn suit", "suit". It uses Pakistani shops' words
+      (kurta, khussa, lawn, karahi), never brands, sizes or prices.
+    * It sees the photo alone, never the shop's products. Text in the photo is data, never
+      instructions. A photo of no product is said to be one.
+    * The shop's own search (ADR-046), with its synonyms and rules, tries each search in turn.
+      The first that finds products is the one shown; where none does, the broadest.
+  * **The shopper:**
+    * The theme's search section has a "Search with a photo" button where its `photo_search`
+      setting is on (off by default).
+    * The browser makes the photo at most 1024 pixels across, as a JPEG, and posts it to
+      `/search/photo` (`/ur/search/photo` in Urdu).
+    * The shopper is sent to that search's page, as if they had typed it, and can change the
+      words.
+  * **What it costs the shop:**
+    * Off until the owner or a manager turns it on in Online Store › Search
+      (`photoSearchSet`, `write_settings`).
+    * Each photo read spends one of the shop's AI credits (`visual_search`). Without credits,
+      or past 300 photos a day, no photo is read.
+    * An address sends 10 photos a minute at most.
+  * **Checked and forgotten:**
+    * The storefront takes JPEG, PNG or WebP data URLs of 1.5 MB at most; the core checks the
+      bytes are what their type says.
+    * The photo goes to the core and the AI provider, and is kept by neither. What is kept, in
+      `catalog.photo_searches`, is what came of it, the search shown and the AI's tokens.
+* **Consequences:**
+  * A shopper finds a suit they can't name, in the shop's own words. The search page, its
+    filters and its rules all work as for a typed search.
+  * A shop pays for it from its AI credits, and turns it on knowing that.
+  * It finds by what the photo shows, not by how it looks: two maroon lawn suits are alike to it,
+    whatever their prints. A shop whose titles don't say what a product is finds less.
+  * Shoppers' photos reach the AI provider. The privacy policy should say so (OWN-59).
+* **Alternatives:**
+  * **Image embeddings and a vector index:** truer likeness, but a model to host or pay for,
+    every shop's photos embedded, and pgvector. Worth it once photo search is used enough.
+  * **Showing the AI the shop's products:** too many tokens a photo, and a shop's catalog sent
+    out for each shopper's photo.
+  * **On by default:** shops would spend credits they didn't choose to spend.

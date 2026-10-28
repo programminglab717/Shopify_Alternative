@@ -16,6 +16,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Visual search
+
+* **Shoppers:** a "Search with a photo" button on the search page, where the theme's setting
+  asks. The AI reads the photo into the words shops title their products with, and the shopper
+  sees that search's results (SRC-07, [ADR-870](../architecture/13-decision-log.md#adr-870--visual-search-a-shoppers-photo-read-by-the-ai-into-the-words-a-shop-titles-its-products-with-the-shops-own-search-finding-them-off-until-the-shop-turns-it-on-one-ai-credit-a-photo-300-a-day)).
+* **Shops:** off until the owner turns it on in Online Store › Search. Each photo is one AI
+  credit, 300 a day at most. The photo is never kept.
+* **Needs you:** the privacy policy's mention of photos sent to the AI (OWN-59).
+* 4670 tests (10 new).
+
 ### 96e5213 · Headless starter
 
 * **`starters/next-storefront`:** a Next.js storefront for a Hatti shop on its Storefront API:
