@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Transfers matched from Hatti's bank statement
+
+* **Statement:** Hatti's people upload the bank's statement as CSV in the console ([ADR-883](../architecture/13-decision-log.md#adr-883--transfers-to-hatti-matched-from-its-bank-statement-the-csv-the-bank-exports-read-in-the-console-each-credit-carrying-a-waiting-transfers-reference-paired-with-it-and-each-match-confirmed-by-hattis-people-for-what-came)).
+* **Matching:** each credit carrying a waiting transfer's reference is paired with it, and each
+  match is confirmed with one click for what came. Nothing is confirmed on its own.
+* 4782 tests (5 new).
+
 ### bd3a9cf · Support access, followed through
 
 * **Open to support:** the console lists the shops whose owners let support look now, each

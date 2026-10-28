@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-882 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-883 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -890,6 +890,7 @@
 | 880 | Partners' work in the console: public apps, theme-store themes and expert profiles listed for every shop once checked, or taken back; and partners' payouts marked paid by the bank transfer's reference | Accepted |
 | 881 | Shops looked up in the console by name, handle or ID, each with its standing at a glance and every look logged; and couriers' names for cities reviewed, kept and forgotten there | Accepted |
 | 882 | Support access, followed through: the console lists the shops whose owners let support look now, with where to look in the admin; a shop is told on WhatsApp and by email the first time support looks under each grant; and whether support may ever change things is left to Hatti's owner | Accepted |
+| 883 | Transfers to Hatti matched from its bank statement: the CSV the bank exports read in the console, each credit carrying a waiting transfer's reference paired with it, and each match confirmed by Hatti's people for what came | Accepted |
 
 ---
 
@@ -29249,3 +29250,31 @@
     they have been let in.
   * The notice's WhatsApp template, `hatti_support_looking`, is submitted with Hatti's others
     (OWN-23).
+
+## ADR-883 · Transfers to Hatti matched from its bank statement: the CSV the bank exports read in the console, each credit carrying a waiting transfer's reference paired with it, and each match confirmed by Hatti's people for what came
+
+* **Context:** shops pay Hatti's invoices by transfer or Raast into Hatti's account and give the
+  reference (ADR-254). Hatti's people found each in the bank's statement by eye; the roadmap
+  asks that transfers be matched from Hatti's bank's statements.
+* **Decision:**
+  * **The statement:** Hatti's people upload it in the console, as the CSV the bank exports. An
+    Excel statement is saved as CSV first.
+    * Banks' own lines before the heading are passed over.
+    * The heading is the first row naming a credit column, with a description or a reference
+      beside it, by the names Pakistani banks use: Narration, Particulars, Details, Ref No,
+      Credit, Deposit and the like.
+    * Its credits are read; debits and anything not an amount are passed over.
+  * **Matching:** a credit is paired with the waiting transfer whose reference, in letters and
+    digits alone, it carries, each credit and each transfer once.
+    * A reference two credits carry is left for Hatti's people to find by hand.
+    * A reference shorter than four characters is too likely to turn up by chance, and matches
+      nothing.
+    * Each match says whether what came is as said, less or more.
+  * **Nothing is confirmed by the matcher.** Each match is confirmed by Hatti's people with one
+    click, for what came, as ADR-879 confirms, so the invoice is paid, waits for the rest, or
+    was paid otherwise already. Credits nothing matched are listed.
+  * Reading a statement is logged, with how many credits it had and how many matched.
+* **Consequences:**
+  * A day's transfers are found in one upload instead of one by one.
+  * A bank whose export names its columns otherwise needs its names added to the list.
+  * The banks' own APIs, where they have them, come later with Hatti's bank account (OWN-30).
