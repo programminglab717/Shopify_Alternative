@@ -63,6 +63,22 @@ export function liftOf(seasonUnits: number, seasonDays: number, baseUnits: numbe
   return Math.round(Math.min(max, Math.max(min, lift)) * 100) / 100;
 }
 
+/** Units expected to sell in the `days` from `today`, as {@link forecastUnits} says, unrounded. */
+function expectedUnits(
+  soldLast30Days: number,
+  days: number,
+  today: string,
+  outlook: SeasonOutlook | null,
+): number {
+  if (days <= 0) return 0;
+  const pace = soldLast30Days / SALES_PACE_DAYS;
+  const inSeason =
+    outlook && outlook.lift !== null
+      ? daysInSeason(outlook.season, today, addDays(today, days - 1))
+      : 0;
+  return pace * (days - inSeason + inSeason * (outlook?.lift ?? 1));
+}
+
 /**
  * Units a variant is expected to sell in the `days` from `today`: its pace over the last 30, and
  * on the days in `outlook`'s season, that pace times its lift; rounded up.
@@ -73,12 +89,63 @@ export function forecastUnits(
   today: string,
   outlook: SeasonOutlook | null,
 ): number {
-  const pace = soldLast30Days / SALES_PACE_DAYS;
-  const inSeason =
-    outlook && outlook.lift !== null
-      ? daysInSeason(outlook.season, today, addDays(today, days - 1))
-      : 0;
-  return Math.ceil(pace * (days - inSeason + inSeason * (outlook?.lift ?? 1)));
+  return Math.ceil(expectedUnits(soldLast30Days, days, today, outlook));
+}
+
+/** How many weeks a forecast by week gives (ADR-893): eight unless asked, a quarter at most. */
+export const FORECAST_WEEKS = { default: 8, max: 13 } as const;
+
+/** A week of a variant's forecast (ADR-893). */
+export interface StockWeekRecord {
+  /** Its first day, YYYY-MM-DD: today, then every seventh day after. */
+  startsOn: string;
+  /** Units expected to sell in it. */
+  units: number;
+  /** What is left of what is available at its end, never below none. */
+  left: number;
+}
+
+/**
+ * A variant's forecast week by week from `today` (ADR-893), as {@link forecastUnits} reckons the
+ * weeks so far less those before, so the weeks add up to the whole.
+ */
+export function weeklyForecast(
+  soldLast30Days: number,
+  available: number,
+  today: string,
+  outlook: SeasonOutlook | null,
+  weeks: number = FORECAST_WEEKS.default,
+): StockWeekRecord[] {
+  return Array.from({ length: weeks }, (_, week) => {
+    const before = forecastUnits(soldLast30Days, week * 7, today, outlook);
+    const through = forecastUnits(soldLast30Days, (week + 1) * 7, today, outlook);
+    return {
+      startsOn: addDays(today, week * 7),
+      units: through - before,
+      left: Math.max(0, available - through),
+    };
+  });
+}
+
+/**
+ * The day a variant sells the last of what is available (ADR-893), at its pace and a season's
+ * lift: today when none is; null when it sold none, or lasts past `within` days.
+ */
+export function runsOutOn(
+  soldLast30Days: number,
+  available: number,
+  today: string,
+  outlook: SeasonOutlook | null,
+  within: number = SEASON_LIMITS.aheadDays,
+): string | null {
+  if (available <= 0) return today;
+  if (soldLast30Days <= 0) return null;
+  for (let days = 1; days <= within; days++) {
+    if (expectedUnits(soldLast30Days, days, today, outlook) >= available) {
+      return addDays(today, days - 1);
+    }
+  }
+  return null;
 }
 
 /**

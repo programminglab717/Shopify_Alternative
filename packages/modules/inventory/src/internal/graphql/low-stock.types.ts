@@ -105,6 +105,23 @@ export class StockSeason {
   fromShop!: boolean;
 }
 
+@ObjectType({ description: "A week of a variant's forecast (INV-08, ADR-893)." })
+export class StockWeek {
+  @Field({ description: 'Its first day, YYYY-MM-DD: today, then every seventh day after.' })
+  startsOn!: string;
+
+  @Field(() => Int, {
+    description:
+      "Units expected to sell in it, at the pace of the last 30 days and a season's lift.",
+  })
+  units!: number;
+
+  @Field(() => Int, {
+    description: 'What is left of what is available at its end, never below none.',
+  })
+  left!: number;
+}
+
 @ObjectType()
 export class LowStockItemEdge {
   @Field()

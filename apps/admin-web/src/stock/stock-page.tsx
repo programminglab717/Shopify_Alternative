@@ -30,15 +30,17 @@ import type {
   StockLevel,
   StockSearchData,
   StockSeasonData,
+  StockWeek,
   UserError,
 } from '../api/types';
 import { can, gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney } from '../i18n/format';
-import { useLocale } from '../i18n/locale';
+import { useLocale, type Locale } from '../i18n/locale';
 import { messages } from '../i18n/messages';
 import type { MessageKey } from '../i18n/messages';
 import { parseStock } from '../products/product-form';
+import { addDays } from '../purchase-orders/new-purchase-order-page';
 import { LocationFilter, useOrdersLocation } from '../orders/location-filter';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
@@ -543,6 +545,9 @@ function Row({
   sold = 0,
   daysLeft = null,
   lastFrom = null,
+  leadDays = null,
+  runsOutOn = null,
+  weeks = [],
   chosen,
   onChoose,
 }: {
@@ -563,13 +568,21 @@ function Row({
   daysLeft?: number | null;
   /** The supplier it was ordered from last. */
   lastFrom?: string | null;
+  /** The days that supplier takes to deliver, where the shop said (ADR-892). */
+  leadDays?: number | null;
+  /** The day it is expected to sell its last (ADR-893). */
+  runsOutOn?: string | null;
+  /** The weeks of its forecast (ADR-893). */
+  weeks?: StockWeek[];
   /** Chosen to order, where it can be. */
   chosen?: boolean;
   onChoose?: (chosen: boolean) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { id: shopId } = useShop();
   const [open, setOpen] = useState(opened);
+  // The day to order by for the goods to come before it runs out (ADR-893).
+  const orderBy = runsOutOn && leadDays !== null ? addDays(runsOutOn, -leadDays) : null;
   return (
     <li className="flex flex-col gap-2 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -603,6 +616,12 @@ function Row({
               daysLeft > 0 &&
               ` · ${t('stock.lasts', { count: formatCount(daysLeft) })}`}
             {lastFrom && ` · ${t('stock.lastFrom', { name: lastFrom })}`}
+            {orderBy &&
+              ` · ${
+                orderBy <= pkToday()
+                  ? t('stock.orderNow')
+                  : t('stock.orderBy', { date: dayText(orderBy, locale) })
+              }`}
             {[sku, barcode].map(
               (code) =>
                 code && (
@@ -628,8 +647,58 @@ function Row({
           onClick={() => setOpen(!open)}
         />
       </div>
+      {open && weeks.some((week) => week.units > 0) && (
+        <Weeks weeks={weeks} runsOutOn={runsOutOn} />
+      )}
       {open && <StockItem itemId={itemId} />}
     </li>
+  );
+}
+
+/** A day, YYYY-MM-DD, as Pakistan's calendar has it: "12 Nov 2026". */
+const dayText = (day: string, locale: Locale) =>
+  formatDate(`${day}T12:00:00+05:00`, 'Asia/Karachi', locale);
+
+/** The next weeks of a variant's forecast (ADR-893): what it is expected to sell, and what is left. */
+function Weeks({ weeks, runsOutOn }: { weeks: StockWeek[]; runsOutOn: string | null }) {
+  const { t, locale } = useLocale();
+  return (
+    <div className="flex flex-col gap-1 rounded-control bg-canvas p-3">
+      <p>
+        {runsOutOn
+          ? t('stock.runsOut', { date: dayText(runsOutOn, locale) })
+          : t('stock.lastsPast')}
+      </p>
+      <table className="text-[length:var(--hatti-type-body-sm-size)]">
+        <caption className="text-start font-medium">
+          {t('stock.weeks', { count: formatCount(weeks.length) })}
+        </caption>
+        <thead>
+          <tr className="text-secondary">
+            <th scope="col" className="py-1 text-start font-normal">
+              {t('stock.weekFrom')}
+            </th>
+            <th scope="col" className="py-1 text-end font-normal">
+              {t('stock.weekSells')}
+            </th>
+            <th scope="col" className="py-1 text-end font-normal">
+              {t('stock.weekLeft')}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((week) => (
+            <tr key={week.startsOn}>
+              <th scope="row" className="py-1 text-start font-normal">
+                {dayText(week.startsOn, locale)}
+              </th>
+              <td className="num py-1 text-end">{formatCount(week.units)}</td>
+              <td className="num py-1 text-end">{formatCount(week.left)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -909,6 +978,9 @@ export function StockPage() {
                     sold={each.soldLast30Days}
                     daysLeft={each.daysOfStockLeft}
                     lastFrom={each.lastSupplier?.name ?? null}
+                    leadDays={each.lastSupplier?.leadTimeDays ?? null}
+                    runsOutOn={each.runsOutOn}
+                    weeks={each.weeks}
                     chosen={chosen.has(each.variantId)}
                     onChoose={edits ? (on) => choose(each.variantId, on) : undefined}
                   />

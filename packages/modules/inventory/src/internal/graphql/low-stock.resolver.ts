@@ -19,9 +19,12 @@ import {
   LowStockService,
   SALES_PACE_DAYS,
   SEASON_LIMITS,
+  FORECAST_WEEKS,
   daysLeft,
   forecastUnits,
+  runsOutOn,
   seasonAhead,
+  weeklyForecast,
   type SeasonOutlook,
   type InventorySettingsRecord,
   type LowStockCursor,
@@ -38,6 +41,7 @@ import {
   LowStockItemEdge,
   StockSeason,
   StockSeasonKey,
+  StockWeek,
 } from './low-stock.types.js';
 import { toInventoryItem, uuidOf } from './mappers.js';
 
@@ -262,6 +266,52 @@ export class LowStockItemResolver {
       loadSeason(loaders, this.lowStock, tenant, item.record.variantId, item.record.locationId),
     ]);
     return forecastUnits(sold, span, pkDayOf(new Date()), outlook);
+  }
+
+  #paced(tenant: TenantContext, loaders: RequestLoaders, item: LowStockItem) {
+    return Promise.all([
+      this.#sold(tenant, loaders, item),
+      loadSeason(loaders, this.lowStock, tenant, item.record.variantId, item.record.locationId),
+    ]);
+  }
+
+  @ResolveField(() => [StockWeek], {
+    description:
+      'Its forecast week by week from today (INV-08, ADR-893): units expected to sell in each, ' +
+      "as `forecast` reckons them, and what is left of what is available at each week's end.",
+  })
+  async weeks(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+    @Args('count', {
+      type: () => Int,
+      nullable: true,
+      description: `1 to ${FORECAST_WEEKS.max}; ${FORECAST_WEEKS.default} unless given.`,
+    })
+    count?: number | null,
+  ): Promise<StockWeek[]> {
+    const weeks = Math.min(Math.max(count ?? FORECAST_WEEKS.default, 1), FORECAST_WEEKS.max);
+    const [sold, outlook] = await this.#paced(tenant, loaders, item);
+    return weeklyForecast(sold, item.available, pkDayOf(new Date()), outlook, weeks).map((week) =>
+      Object.assign(new StockWeek(), week),
+    );
+  }
+
+  @ResolveField(() => String, {
+    nullable: true,
+    description:
+      'The day, YYYY-MM-DD, it is expected to sell the last of what is available (ADR-893), at ' +
+      "its pace and a season's lift: today when none is; null when it sold none in the last 30 " +
+      'days, or lasts past 90 more.',
+  })
+  async runsOutOn(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<string | null> {
+    const [sold, outlook] = await this.#paced(tenant, loaders, item);
+    return runsOutOn(sold, item.available, pkDayOf(new Date()), outlook);
   }
 
   @ResolveField(() => InventoryItem, { description: 'How its stock is counted, and where it is.' })

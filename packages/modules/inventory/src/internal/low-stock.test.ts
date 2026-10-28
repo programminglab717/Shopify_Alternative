@@ -7,6 +7,8 @@ import {
   LowStockService,
   daysLeft,
   forecastUnits,
+  runsOutOn,
+  weeklyForecast,
   liftOf,
   seasonAhead,
   type SeasonOutlook,
@@ -276,6 +278,29 @@ describe.skipIf(!server)('Low stock', () => {
     expect(forecastUnits(30, 30, '2027-01-30', outlook)).toBe(72);
     expect(forecastUnits(30, 30, '2027-01-30', { ...outlook, lift: null })).toBe(30);
     expect(forecastUnits(0, 30, '2027-01-30', outlook)).toBe(0);
+  });
+
+  it('forecasts week by week, adding up to the whole, and the day what is for sale runs out (ADR-893)', () => {
+    const season = { key: 'ramadan' as const, start: '2027-02-08', end: '2027-03-12', moon: true };
+    const outlook: SeasonOutlook = { season, lift: 3, fromShop: false };
+    // 30 a month is one a day; from 1 February Ramadan begins on the eighth day, at three a day.
+    expect(weeklyForecast(30, 40, '2027-02-01', outlook, 3)).toEqual([
+      { startsOn: '2027-02-01', units: 7, left: 33 },
+      { startsOn: '2027-02-08', units: 21, left: 12 },
+      { startsOn: '2027-02-15', units: 21, left: 0 },
+    ]);
+    const weeks = weeklyForecast(10, 100, '2027-01-01', null, 13);
+    expect(weeks.reduce((sum, week) => sum + week.units, 0)).toBe(
+      forecastUnits(10, 91, '2027-01-01', null),
+    );
+    expect(weeks.map((week) => week.units).slice(0, 4)).toEqual([3, 2, 2, 3]);
+    expect(weeklyForecast(0, 5, '2027-01-01', null, 2).map((week) => week.left)).toEqual([5, 5]);
+    // Seven of 40 sell in the first week, then three a day: the last on 18 February.
+    expect(runsOutOn(30, 40, '2027-02-01', outlook)).toBe('2027-02-18');
+    expect(runsOutOn(30, 40, '2027-02-01', null)).toBe('2027-03-12');
+    expect(runsOutOn(30, 0, '2027-02-01', null)).toBe('2027-02-01');
+    expect(runsOutOn(0, 4, '2027-02-01', null)).toBeNull();
+    expect(runsOutOn(1, 40, '2027-02-01', null)).toBeNull();
   });
 
   it('alerts once a spell when a variant falls to the threshold, and once more when it runs out (ADR-157)', async () => {

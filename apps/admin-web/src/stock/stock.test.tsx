@@ -63,7 +63,12 @@ function item(id: string) {
 
 const SHOP = { id: 'loc_2', name: 'Gulberg shop' };
 
-function core(role: StaffRole, places = [MAIN, SHOP], season: object | null = null) {
+function core(
+  role: StaffRole,
+  places = [MAIN, SHOP],
+  season: object | null = null,
+  dupatta: object = {},
+) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'StockSeason':
@@ -110,6 +115,7 @@ function core(role: StaffRole, places = [MAIN, SHOP], season: object | null = nu
                 sku: null,
                 available: 2,
                 inventoryItem: { id: 'inv_2' },
+                ...dupatta,
               },
             ],
           },
@@ -285,6 +291,53 @@ describe('Stock', () => {
         /^The wedding season is on, until .+\. Last year your shop sold 1\.6 times its usual/,
       ),
     ).toBeTruthy();
+  });
+
+  it('says when what runs low runs out, the day to order by for its supplier, and its weeks ahead (ADR-893)', async () => {
+    const inDays = (days: number) =>
+      new Date(Date.now() + 5 * 3_600_000 + days * 86_400_000).toISOString().slice(0, 10);
+    const forecast = (leadTimeDays: number | null) => ({
+      soldLast30Days: 9,
+      daysOfStockLeft: 6,
+      lastSupplier: { id: 'sup_1', name: 'Gul Ahmed', leadTimeDays },
+      runsOutOn: inDays(6),
+      weeks: [
+        { startsOn: inDays(0), units: 2, left: 0 },
+        { startsOn: inDays(7), units: 3, left: 0 },
+      ],
+    });
+    vi.stubGlobal('fetch', core('owner', [MAIN, SHOP], null, forecast(4)).fetcher);
+    renderAdmin('/shop_1/stock');
+    // Six days left, four for the goods to come: ordered by the second day from today.
+    expect(
+      await screen.findByText(
+        /^2 for sale · 9 sold in 30 days · lasts about 6 days · last from Gul Ahmed · order by \d+ \w+ \d{4}$/,
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show the stock of Dupatta' }));
+    expect(screen.getByText(/^Expected to run out about \d+ \w+ \d{4}\.$/)).toBeTruthy();
+    const weeks = screen.getByRole('table', { name: 'The next 2 weeks' });
+    expect(
+      within(weeks)
+        .getAllByRole('row')
+        .map((row) => row.textContent),
+    ).toEqual([
+      'Week fromTo sellLeft',
+      expect.stringMatching(/^\d+ \w+ \d{4}20$/),
+      expect.stringMatching(/^\d+ \w+ \d{4}30$/),
+    ]);
+    cleanup();
+
+    // A supplier slower than the stock lasts: order now. One without a lead time: no day at all.
+    vi.stubGlobal('fetch', core('owner', [MAIN, SHOP], null, forecast(10)).fetcher);
+    renderAdmin('/shop_1/stock');
+    expect(
+      await screen.findByText(/last from Gul Ahmed · order now to have it in time$/),
+    ).toBeTruthy();
+    cleanup();
+    vi.stubGlobal('fetch', core('owner', [MAIN, SHOP], null, forecast(null)).fetcher);
+    renderAdmin('/shop_1/stock');
+    expect(await screen.findByText(/lasts about 6 days · last from Gul Ahmed$/)).toBeTruthy();
   });
 
   it('moves stock to another location, no more than is available, or says to add one', async () => {

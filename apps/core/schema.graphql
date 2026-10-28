@@ -8324,6 +8324,11 @@ type LowStockItem {
   productTitle: String!
 
   """
+  The day, YYYY-MM-DD, it is expected to sell the last of what is available (ADR-893), at its pace and a season's lift: today when none is; null when it sold none in the last 30 days, or lasts past 90 more.
+  """
+  runsOutOn: String
+
+  """
   The season on or within 90 days (ADR-863), with how much faster than usual it sold in it last year, or the shop's stock did where it has no such history; null for none ahead.
   """
   season: StockSeason
@@ -8337,6 +8342,14 @@ type LowStockItem {
   """The variant."""
   variantId: ID!
   variantTitle: String!
+
+  """
+  Its forecast week by week from today (INV-08, ADR-893): units expected to sell in each, as `forecast` reckons them, and what is left of what is available at each week's end.
+  """
+  weeks(
+    """1 to 13; 8 unless given."""
+    count: Int
+  ): [StockWeek!]!
 }
 
 type LowStockItemConnection {
@@ -20367,6 +20380,20 @@ enum StockSeasonKey {
   SUMMER_LAWN
   WEDDING_SEASON
   WINTER_COLLECTION
+}
+
+"""A week of a variant's forecast (INV-08, ADR-893)."""
+type StockWeek {
+  """What is left of what is available at its end, never below none."""
+  left: Int!
+
+  """Its first day, YYYY-MM-DD: today, then every seventh day after."""
+  startsOn: String!
+
+  """
+  Units expected to sell in it, at the pace of the last 30 days and a season's lift.
+  """
+  units: Int!
 }
 
 """

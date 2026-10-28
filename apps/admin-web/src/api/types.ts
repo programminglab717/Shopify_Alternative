@@ -2235,17 +2235,31 @@ export interface LowStockData {
       available: number;
       /** Units on open purchase orders, not yet received. */
       incoming: number;
-      lastSupplier: { id: string; name: string } | null;
+      lastSupplier: { id: string; name: string; leadTimeDays: number | null } | null;
       lastUnitCost: { amount: string } | null;
       /** Units sold in the last 30 days: committed to orders, less those cancelled. */
       soldLast30Days: number;
       /** Whole days what is available lasts at that pace; null when none sold. */
       daysOfStockLeft: number | null;
+      /** The day it is expected to sell its last (ADR-893); null when none sold, or past 90 days. */
+      runsOutOn: string | null;
+      /** The next eight weeks of its forecast (ADR-893). */
+      weeks: StockWeek[];
       /** The season on or ahead, and how much faster it sold in it last year (ADR-863). */
       season: StockSeason | null;
       inventoryItem: { id: string };
     }[];
   };
+}
+
+/** A week of a variant's forecast (ADR-893). */
+export interface StockWeek {
+  /** Its first day, YYYY-MM-DD. */
+  startsOn: string;
+  /** Units expected to sell in it. */
+  units: number;
+  /** What is left of what is available at its end. */
+  left: number;
 }
 
 export interface StockSearchData {

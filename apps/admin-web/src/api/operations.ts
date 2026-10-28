@@ -5217,9 +5217,16 @@ export const LowStockQuery = /* GraphQL */ `
         lastSupplier {
           id
           name
+          leadTimeDays
         }
         soldLast30Days
         daysOfStockLeft
+        runsOutOn
+        weeks(count: 8) {
+          startsOn
+          units
+          left
+        }
         season {
           key
           startsOn
