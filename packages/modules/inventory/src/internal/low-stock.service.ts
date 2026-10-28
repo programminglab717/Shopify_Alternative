@@ -2,6 +2,14 @@ import { InputChecker, type MutationResult, type TenantContext } from '@hatti/ap
 import { VariantService } from '@hatti/catalog/public';
 import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import {
+  addDays,
+  daysInSeason,
+  pkDayOf,
+  pkSeasonsBetween,
+  previousPkSeason,
+  type PkSeason,
+} from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { InventoryEvents, type InventorySettingsUpdatedPayload } from './events.js';
@@ -16,6 +24,56 @@ export const LOW_STOCK_THRESHOLD = {
 
 /** How far back what a variant sold is counted, to say how fast it sells (ADR-368). */
 export const SALES_PACE_DAYS = 30;
+
+/**
+ * How a season's pace may differ from the usual (INV-08, ADR-863): no less than a quarter, no
+ * more than eight times, and how far ahead a season is looked for.
+ */
+export const SEASON_LIMITS = { lift: { min: 0.25, max: 8 }, aheadDays: 90 } as const;
+
+/** A season on or ahead, and how much faster than usual what sells sold in it last year. */
+export interface SeasonOutlook {
+  season: PkSeason;
+  /** Units a day in last year's season over units a day in the 30 days before it; null for none. */
+  lift: number | null;
+  /** The lift is the shop's, all its variants together, as the variant has no such history. */
+  fromShop: boolean;
+}
+
+/** The season on at `at`, or the next to begin within {@link SEASON_LIMITS.aheadDays}; null for none. */
+export function seasonAhead(at: Date = new Date()): PkSeason | null {
+  const today = pkDayOf(at);
+  return pkSeasonsBetween(today, addDays(today, SEASON_LIMITS.aheadDays - 1))[0] ?? null;
+}
+
+/**
+ * How much faster `seasonUnits` sold over `seasonDays` than `baseUnits` over the 30 days before:
+ * within {@link SEASON_LIMITS.lift}, to two places; null where either sold none.
+ */
+export function liftOf(seasonUnits: number, seasonDays: number, baseUnits: number): number | null {
+  if (seasonUnits <= 0 || baseUnits <= 0 || seasonDays <= 0) return null;
+  const lift = seasonUnits / seasonDays / (baseUnits / SALES_PACE_DAYS);
+  const { min, max } = SEASON_LIMITS.lift;
+  return Math.round(Math.min(max, Math.max(min, lift)) * 100) / 100;
+}
+
+/**
+ * Units a variant is expected to sell in the `days` from `today`: its pace over the last 30, and
+ * on the days in `outlook`'s season, that pace times its lift; rounded up.
+ */
+export function forecastUnits(
+  soldLast30Days: number,
+  days: number,
+  today: string,
+  outlook: SeasonOutlook | null,
+): number {
+  const pace = soldLast30Days / SALES_PACE_DAYS;
+  const inSeason =
+    outlook && outlook.lift !== null
+      ? daysInSeason(outlook.season, today, addDays(today, days - 1))
+      : 0;
+  return Math.ceil(pace * (days - inSeason + inSeason * (outlook?.lift ?? 1)));
+}
 
 /**
  * Whole days `available` units last when `sold` sold in the last SALES_PACE_DAYS: none when
@@ -225,6 +283,55 @@ export class LowStockService {
            ${locationId ? sql`AND m.location_id = ${locationId}` : sql``}
          GROUP BY m.variant_id`);
       return new Map(rows.filter((row) => row.sold > 0).map((row) => [row.variant_id, row.sold]));
+    });
+  }
+
+  /**
+   * How `season`'s lift was last year (ADR-863), of each of `variantIds` and of the shop: units
+   * sold in last year's season and in the 30 days before it, from the ledger as {@link soldOf}
+   * counts them, in Pakistan's days. Variants without both are left out; the shop's is null
+   * without them, or with no season the year before.
+   */
+  async seasonLifts(
+    tenant: TenantContext,
+    variantIds: readonly string[],
+    locationId: string | null,
+    season: PkSeason,
+  ): Promise<{ shop: number | null; variants: Map<string, number> }> {
+    const last = previousPkSeason(season);
+    if (!last) return { shop: null, variants: new Map() };
+    const baseFrom = addDays(last.start, -SALES_PACE_DAYS);
+    const seasonDays = daysInSeason(last, last.start, last.end);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        variant_id: string | null;
+        in_season: number;
+        before: number;
+      }>(sql`
+        WITH sold AS (
+          SELECT m.variant_id, (m.created_at AT TIME ZONE 'Asia/Karachi')::date AS day, m.delta
+            FROM inventory.movements m
+            JOIN inventory.adjustments a ON a.shop_id = m.shop_id AND a.id = m.adjustment_id
+           WHERE m.shop_id = ${tenant.shopId}
+             AND m.quantity_name = 'committed'
+             AND a.reason IN ('committed', 'commitment_released')
+             AND m.created_at >= (${baseFrom}::date)::timestamp AT TIME ZONE 'Asia/Karachi'
+             AND m.created_at < ((${last.end}::date) + 1)::timestamp AT TIME ZONE 'Asia/Karachi'
+             ${locationId ? sql`AND m.location_id = ${locationId}` : sql``})
+        SELECT CASE WHEN GROUPING(variant_id) = 1 THEN NULL ELSE variant_id END AS variant_id,
+               GREATEST(SUM(delta) FILTER (WHERE day >= ${last.start}::date), 0)::int AS in_season,
+               GREATEST(SUM(delta) FILTER (WHERE day < ${last.start}::date), 0)::int AS before
+          FROM sold
+         GROUP BY ROLLUP (variant_id)`);
+      const wanted = new Set(variantIds);
+      const variants = new Map<string, number>();
+      let shop: number | null = null;
+      for (const row of rows) {
+        const lift = liftOf(row.in_season, seasonDays, row.before);
+        if (row.variant_id === null) shop = lift;
+        else if (lift !== null && wanted.has(row.variant_id)) variants.set(row.variant_id, lift);
+      }
+      return { shop, variants };
     });
   }
 

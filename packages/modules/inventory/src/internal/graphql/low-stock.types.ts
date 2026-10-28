@@ -1,5 +1,5 @@
 import { PageInfo, UserError } from '@hatti/api';
-import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ID, InputType, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import type { LowStockRecord } from '../low-stock.service.js';
 
 @ObjectType({ description: "The shop's inventory settings." })
@@ -57,6 +57,45 @@ export class LowStockItem {
 
   /** For its inventoryItem's loader. */
   record!: LowStockRecord;
+}
+
+export enum StockSeasonKey {
+  RAMADAN = 'RAMADAN',
+  EID_UL_ADHA = 'EID_UL_ADHA',
+}
+
+registerEnumType(StockSeasonKey, {
+  name: 'StockSeasonKey',
+  description:
+    'A shopping season that follows the moon (INV-08, ADR-863): RAMADAN, from its first day ' +
+    "through Eid ul Fitr's third; EID_UL_ADHA, from Dhu al-Qadah's 25th through Eid's third.",
+});
+
+@ObjectType({
+  description:
+    'A season on or ahead (ADR-863), and how much faster than usual stock sold in it last year: ' +
+    "its units a day then over its units a day in the 30 days before, as Pakistan's days fall.",
+})
+export class StockSeason {
+  @Field(() => StockSeasonKey)
+  key!: StockSeasonKey;
+
+  @Field({ description: 'Its first day this time, YYYY-MM-DD.' })
+  startsOn!: string;
+
+  @Field({ description: 'Its last day, YYYY-MM-DD.' })
+  endsOn!: string;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: '0.25 to 8; null where nothing sold in it, or the month before it, last year.',
+  })
+  lift!: number | null;
+
+  @Field({
+    description: "The lift is the shop's, all its stock together, as this has no such history.",
+  })
+  fromShop!: boolean;
 }
 
 @ObjectType()

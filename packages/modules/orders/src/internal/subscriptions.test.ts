@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, dayText, intervalText, nextOrderDay } from './subscriptions.js';
+import { dayText, intervalText, nextOrderDay } from './subscriptions.js';
 
 describe('Subscriptions (CAT-16, ADR-862)', () => {
   it('places the next order an interval later, a month from the 31st on its last day', () => {
@@ -10,7 +10,6 @@ describe('Subscriptions (CAT-16, ADR-862)', () => {
     expect(nextOrderDay('2026-12-15', 'month', 1)).toBe('2027-01-15');
     expect(nextOrderDay('2026-12-28', 'week', 1)).toBe('2027-01-04');
     expect(nextOrderDay('2026-10-28', 'week', 2)).toBe('2026-11-11');
-    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
   });
 
   it('says its interval and days as its pages do', () => {

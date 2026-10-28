@@ -20,6 +20,7 @@ import {
   LocationsQuery,
   LowStockQuery,
   StockSearchQuery,
+  StockSeasonQuery,
 } from '../api/operations';
 import type {
   InventoryItemData,
@@ -28,11 +29,12 @@ import type {
   LowStockData,
   StockLevel,
   StockSearchData,
+  StockSeasonData,
   UserError,
 } from '../api/types';
 import { can, gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
-import { formatCount, formatMoney } from '../i18n/format';
+import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { messages } from '../i18n/messages';
 import type { MessageKey } from '../i18n/messages';
@@ -868,6 +870,7 @@ export function StockPage() {
           )}
         </div>
       </div>
+      <SeasonBanner />
       {permits(shop, SEES_STOCK_WORTH) && <StockWorth />}
       {!where.ready || query.isPending ? (
         <Loading label={t('state.loading')} />
@@ -977,5 +980,35 @@ export function StockPage() {
         </Section>
       )}
     </div>
+  );
+}
+
+/** Today in Pakistan, YYYY-MM-DD: UTC+5 all year. */
+function pkToday(): string {
+  return new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * The season on or ahead (INV-08, ADR-863), Ramadan or the days before Eid ul Adha, and how much
+ * faster the shop sold through it last year, which reorders started here count on.
+ */
+function SeasonBanner() {
+  const { t, locale } = useLocale();
+  const query = useAdminQuery<StockSeasonData>(['stockSeason'], StockSeasonQuery);
+  const season = query.data?.stockSeason;
+  if (!season) return null;
+  const today = pkToday();
+  const name = t(`stock.season.${season.key}` as MessageKey);
+  const date = (day: string) => formatDate(`${day}T12:00:00+05:00`, 'Asia/Karachi', locale);
+  const days = Math.round((Date.parse(season.startsOn) - Date.parse(today)) / 86_400_000);
+  return (
+    <Alert tone="info">
+      {season.startsOn <= today
+        ? t('stock.season.on', { season: name, end: date(season.endsOn) })
+        : t('stock.season.ahead', { season: name, start: date(season.startsOn), days })}{' '}
+      {season.lift !== null
+        ? t('stock.season.lift', { lift: season.lift.toFixed(1) })
+        : t('stock.season.noHistory')}
+    </Alert>
   );
 }

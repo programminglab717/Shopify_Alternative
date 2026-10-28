@@ -5069,6 +5069,12 @@ export const LowStockQuery = /* GraphQL */ `
         }
         soldLast30Days
         daysOfStockLeft
+        season {
+          key
+          startsOn
+          endsOn
+          lift
+        }
         lastUnitCost {
           amount
         }
@@ -5076,6 +5082,18 @@ export const LowStockQuery = /* GraphQL */ `
           id
         }
       }
+    }
+  }
+`;
+
+/** The season on or ahead, and how fast the shop sold in it last year (INV-08, ADR-863). */
+export const StockSeasonQuery = /* GraphQL */ `
+  query StockSeason {
+    stockSeason {
+      key
+      startsOn
+      endsOn
+      lift
     }
   }
 `;

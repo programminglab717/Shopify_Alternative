@@ -63,9 +63,11 @@ function item(id: string) {
 
 const SHOP = { id: 'loc_2', name: 'Gulberg shop' };
 
-function core(role: StaffRole, places = [MAIN, SHOP]) {
+function core(role: StaffRole, places = [MAIN, SHOP], season: object | null = null) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'StockSeason':
+        return { stockSeason: season };
       case 'Locations':
         return {
           locations: {
@@ -243,6 +245,28 @@ describe('Stock', () => {
         },
       }),
     );
+  });
+
+  it('says Ramadan is ahead, and how much faster the shop sold through it last year (ADR-863)', async () => {
+    const inDays = (days: number) =>
+      new Date(Date.now() + 5 * 3_600_000 + days * 86_400_000).toISOString().slice(0, 10);
+    const ramadan = { key: 'RAMADAN', startsOn: inDays(30), endsOn: inDays(62), lift: 2.4 };
+    vi.stubGlobal('fetch', core('owner', [MAIN, SHOP], ramadan).fetcher);
+    renderAdmin('/shop_1/stock');
+    expect(
+      await screen.findByText(
+        /^Ramadan begins on .+, in 30 days\. Last year your shop sold 2\.4 times its usual/,
+      ),
+    ).toBeTruthy();
+    cleanup();
+    vi.stubGlobal(
+      'fetch',
+      core('owner', [MAIN, SHOP], { ...ramadan, startsOn: inDays(-3), lift: null }).fetcher,
+    );
+    renderAdmin('/shop_1/stock');
+    expect(
+      await screen.findByText(/^Ramadan is on, until .+\. Stock up on what sells for Eid/),
+    ).toBeTruthy();
   });
 
   it('moves stock to another location, no more than is available, or says to add one', async () => {

@@ -4492,6 +4492,14 @@ const en = {
   'subscriptions.pause': 'Pause',
   'subscriptions.resume': 'Resume',
   'subscriptions.cancel': 'Cancel',
+  'stock.season.RAMADAN': 'Ramadan',
+  'stock.season.EID_UL_ADHA': 'The run-up to Eid ul Adha',
+  'stock.season.ahead': '{season} begins on {start}, in {days} days.',
+  'stock.season.on': '{season} is on, until {end}.',
+  'stock.season.lift':
+    'Last year your shop sold {lift} times its usual through it: reorders started here count on that.',
+  'stock.season.noHistory':
+    'Stock up on what sells for Eid: reorders count on it once a year of sales shows how much.',
   'settings.workflows': 'Workflows',
   'settings.workflowsHint': 'Tag orders and customers, and get told, as things happen',
   'workflow.hint':
@@ -11065,6 +11073,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'subscriptions.pause': 'روکیں',
   'subscriptions.resume': 'دوبارہ شروع کریں',
   'subscriptions.cancel': 'منسوخ کریں',
+  'stock.season.RAMADAN': 'رمضان',
+  'stock.season.EID_UL_ADHA': 'عید الاضحیٰ سے پہلے کے دن',
+  'stock.season.ahead': '{season} {start} کو شروع ہو رہا ہے، {days} دن میں۔',
+  'stock.season.on': '{season} جاری ہے، {end} تک۔',
+  'stock.season.lift':
+    'پچھلے سال آپ کی دکان نے اس دوران معمول سے {lift} گنا بیچا: یہاں سے شروع کیے گئے آرڈرز اسی حساب سے ہیں۔',
+  'stock.season.noHistory':
+    'عید پر بکنے والی چیزوں کا اسٹاک بڑھائیں: ایک سال کی فروخت کے بعد آرڈرز اس کا حساب رکھیں گے۔',
   'settings.workflows': 'ورک فلو',
   'settings.workflowsHint': 'کچھ ہوتے ہی آرڈرز اور گاہکوں پر ٹیگ لگائیں، اور اطلاع پائیں',
   'workflow.hint':

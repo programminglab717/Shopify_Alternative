@@ -9,7 +9,13 @@ import {
   StockSearchQuery,
   SupplierCreateMutation,
 } from '../api/operations';
-import type { LowStockData, PurchaseOrderFormData, StockSearchData, UserError } from '../api/types';
+import type {
+  LowStockData,
+  PurchaseOrderFormData,
+  StockSearchData,
+  StockSeason,
+  UserError,
+} from '../api/types';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { parseStock } from '../products/product-form';
@@ -35,6 +41,21 @@ interface Basis {
   incoming: number;
   /** Units sold in the last 30 days. */
   sold: number;
+  /** A season ahead, and how much faster it sold in it last year (ADR-863). */
+  season?: StockSeason | null;
+}
+
+/** Today in Pakistan, YYYY-MM-DD: UTC+5 all year. */
+function pkToday(): string {
+  return new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** How many of `days` from `today` fall in `season`. */
+export function seasonDays(season: StockSeason, today: string, days: number): number {
+  const day = (value: string) => Date.parse(`${value}T00:00:00Z`) / 86_400_000;
+  const first = Math.max(day(today), day(season.startsOn));
+  const last = Math.min(day(today) + days - 1, day(season.endsOn));
+  return Math.max(0, last - first + 1);
 }
 
 /** The days a reorder can be made to last, at the pace a variant sold (ADR-368). */
@@ -42,11 +63,22 @@ export const COVER_DAYS = [15, 30, 45, 60, 90] as const;
 
 /**
  * How many to order of a variant running low (ADR-354, ADR-368): enough to last `days` at the
- * pace it sold in the last 30, or, where none sold, for twice the shop's low mark to be for
- * sale; less what is for sale and on its way already; at least one.
+ * pace it sold in the last 30, the days of a season ahead at that pace times the season's lift
+ * (ADR-863), or, where none sold, for twice the shop's low mark to be for sale; less what is for
+ * sale and on its way already; at least one.
  */
-export function suggestedQuantity(basis: Basis, threshold: number, days: number): number {
-  const wanted = basis.sold > 0 ? Math.ceil((basis.sold * days) / 30) : threshold * 2;
+export function suggestedQuantity(
+  basis: Basis,
+  threshold: number,
+  days: number,
+  today: string = pkToday(),
+): number {
+  const lift = basis.season?.lift ?? null;
+  const inSeason = basis.season && lift !== null ? seasonDays(basis.season, today, days) : 0;
+  const wanted =
+    basis.sold > 0
+      ? Math.ceil((basis.sold * (days - inSeason + inSeason * (lift ?? 1))) / 30)
+      : threshold * 2;
   return Math.max(1, wanted - basis.available - basis.incoming);
 }
 
@@ -247,6 +279,7 @@ export function startFromLow(
         available: each.available,
         incoming: each.incoming,
         sold: each.soldLast30Days,
+        season: each.season,
       };
       return {
         itemId: each.inventoryItem.id,

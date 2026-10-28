@@ -8050,6 +8050,14 @@ type LowStockItem {
   daysOfStockLeft: Int
 
   """
+  Units it is expected to sell in the coming `days` (INV-08, ADR-863): at its pace of the last 30, and on the days of a season ahead at that pace times the season's lift.
+  """
+  forecast(
+    """1 to 90; 30 unless given."""
+    days: Int
+  ): Int!
+
+  """
   Units on open purchase orders, not yet received: already on their way; listed for one location, those on their way to it, sent from its other locations too.
   """
   incoming: Int!
@@ -8066,6 +8074,11 @@ type LowStockItem {
   lastUnitCost: Money
   productId: ID!
   productTitle: String!
+
+  """
+  The season on or within 90 days (ADR-863), with how much faster than usual it sold in it last year, or the shop's stock did where it has no such history; null for none ahead.
+  """
+  season: StockSeason
   sku: String
 
   """
@@ -17048,6 +17061,11 @@ type Query {
   starterKits: [StarterKitPreview!]!
 
   """
+  The season on now, or the next to begin within 90 days (INV-08, ADR-863), with how much faster than usual the shop sold in it last year; null for none.
+  """
+  stockSeason: StockSeason
+
+  """
   What storeBuild would make of the shop's description (ONB-03): its kit, theme, accent, About us page and home page SEO. Changes nothing.
   """
   storeBuildPlan(description: String!): StoreBuildPlan!
@@ -19251,6 +19269,36 @@ type StitchingMeasurement {
 
   """The cart line property its answer goes in: "Chest (inches)"."""
   property: String!
+}
+
+"""
+A season on or ahead (ADR-863), and how much faster than usual stock sold in it last year: its units a day then over its units a day in the 30 days before, as Pakistan's days fall.
+"""
+type StockSeason {
+  """Its last day, YYYY-MM-DD."""
+  endsOn: String!
+
+  """
+  The lift is the shop's, all its stock together, as this has no such history.
+  """
+  fromShop: Boolean!
+  key: StockSeasonKey!
+
+  """
+  0.25 to 8; null where nothing sold in it, or the month before it, last year.
+  """
+  lift: Float
+
+  """Its first day this time, YYYY-MM-DD."""
+  startsOn: String!
+}
+
+"""
+A shopping season that follows the moon (INV-08, ADR-863): RAMADAN, from its first day through Eid ul Fitr's third; EID_UL_ADHA, from Dhu al-Qadah's 25th through Eid's third.
+"""
+enum StockSeasonKey {
+  EID_UL_ADHA
+  RAMADAN
 }
 
 """

@@ -12,12 +12,17 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId } from '@hatti/ids';
+import { pkDayOf } from '@hatti/pk';
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { InventoryService } from '../inventory.service.js';
 import {
   LowStockService,
   SALES_PACE_DAYS,
+  SEASON_LIMITS,
   daysLeft,
+  forecastUnits,
+  seasonAhead,
+  type SeasonOutlook,
   type InventorySettingsRecord,
   type LowStockCursor,
   type LowStockRecord,
@@ -31,6 +36,8 @@ import {
   LowStockItem,
   LowStockItemConnection,
   LowStockItemEdge,
+  StockSeason,
+  StockSeasonKey,
 } from './low-stock.types.js';
 import { toInventoryItem, uuidOf } from './mappers.js';
 
@@ -101,6 +108,61 @@ export class LowStockResolver {
       }),
     });
   }
+
+  @Query(() => StockSeason, {
+    nullable: true,
+    description:
+      'The season on now, or the next to begin within 90 days (INV-08, ADR-863), with how much ' +
+      'faster than usual the shop sold in it last year; null for none.',
+  })
+  @RequireScopes('read_inventory')
+  async stockSeason(@CurrentTenant() tenant: TenantContext): Promise<StockSeason | null> {
+    const season = seasonAhead();
+    if (!season) return null;
+    const { shop } = await this.lowStock.seasonLifts(tenant, [], null, season);
+    return toStockSeason({ season, lift: shop, fromShop: true });
+  }
+}
+
+/** A season ahead as the API says it. */
+function toStockSeason(outlook: SeasonOutlook): StockSeason {
+  return Object.assign(new StockSeason(), {
+    key: outlook.season.key.toUpperCase() as StockSeasonKey,
+    startsOn: outlook.season.start,
+    endsOn: outlook.season.end,
+    lift: outlook.lift,
+    fromShop: outlook.fromShop,
+  });
+}
+
+/**
+ * The season ahead of a variant (ADR-863), with its own lift last year or else the shop's,
+ * through the request's batch loader: a page of variants reads them with one query.
+ */
+export function loadSeason(
+  loaders: RequestLoaders,
+  lowStock: LowStockService,
+  tenant: TenantContext,
+  variantId: string,
+  locationId: string | null = null,
+): Promise<SeasonOutlook | null> {
+  const season = seasonAhead();
+  if (!season) return Promise.resolve(null);
+  return loaders
+    .get<string, SeasonOutlook>(`inventory.season:${locationId ?? 'online'}`, async (ids) => {
+      const { shop, variants } = await lowStock.seasonLifts(tenant, ids, locationId, season);
+      return new Map(
+        ids.map((id) => {
+          const own = variants.get(id);
+          return [
+            id,
+            { season, lift: own ?? shop, fromShop: own === undefined && shop !== null },
+          ] as const;
+        }),
+      );
+    })
+    .load(variantId)
+    .then((outlook) => outlook ?? { season, lift: null, fromShop: false });
 }
 
 /**
@@ -159,6 +221,47 @@ export class LowStockItemResolver {
     @Parent() item: LowStockItem,
   ): Promise<number | null> {
     return daysLeft(item.available, await this.#sold(tenant, loaders, item));
+  }
+
+  @ResolveField(() => StockSeason, {
+    nullable: true,
+    description:
+      'The season on or within 90 days (ADR-863), with how much faster than usual it sold in it ' +
+      "last year, or the shop's stock did where it has no such history; null for none ahead.",
+  })
+  async season(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<StockSeason | null> {
+    const outlook = await loadSeason(
+      loaders,
+      this.lowStock,
+      tenant,
+      item.record.variantId,
+      item.record.locationId,
+    );
+    return outlook && toStockSeason(outlook);
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      'Units it is expected to sell in the coming `days` (INV-08, ADR-863): at its pace of the ' +
+      "last 30, and on the days of a season ahead at that pace times the season's lift.",
+  })
+  async forecast(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+    @Args('days', { type: () => Int, nullable: true, description: '1 to 90; 30 unless given.' })
+    days?: number | null,
+  ): Promise<number> {
+    const span = Math.min(Math.max(days ?? SALES_PACE_DAYS, 1), SEASON_LIMITS.aheadDays);
+    const [sold, outlook] = await Promise.all([
+      this.#sold(tenant, loaders, item),
+      loadSeason(loaders, this.lowStock, tenant, item.record.variantId, item.record.locationId),
+    ]);
+    return forecastUnits(sold, span, pkDayOf(new Date()), outlook);
   }
 
   @ResolveField(() => InventoryItem, { description: 'How its stock is counted, and where it is.' })

@@ -2193,6 +2193,8 @@ export interface LowStockData {
       soldLast30Days: number;
       /** Whole days what is available lasts at that pace; null when none sold. */
       daysOfStockLeft: number | null;
+      /** The season on or ahead, and how much faster it sold in it last year (ADR-863). */
+      season: StockSeason | null;
       inventoryItem: { id: string };
     }[];
   };
@@ -6182,4 +6184,17 @@ export interface SellingPlanPayloadData {
 
 export interface OrderSubscriptionChangeData {
   orderSubscriptionChange: { subscription: OrderSubscription | null; userErrors: UserError[] };
+}
+
+/** A season that follows the moon, on or ahead (INV-08, ADR-863). */
+export interface StockSeason {
+  key: 'RAMADAN' | 'EID_UL_ADHA';
+  startsOn: string;
+  endsOn: string;
+  /** How much faster than usual stock sold in it last year; null for no history. */
+  lift: number | null;
+}
+
+export interface StockSeasonData {
+  stockSeason: StockSeason | null;
 }

@@ -497,7 +497,6 @@ export {
   SUBSCRIPTION_LIMITS,
   SUBSCRIPTION_PROPERTY,
   SubscriptionService,
-  addDays,
   changeSubscriptionIn,
   nextOrderDay,
   subscriptionOfOrderIn,

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { LATER, fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
+import { seasonDays, suggestedQuantity } from './new-purchase-order-page';
 
 const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const GODOWN = { id: 'loc_1', name: 'Faisalabad godown' };
@@ -651,5 +652,23 @@ describe('Purchase orders (INV-05)', () => {
     expect(screen.queryByRole('heading', { name: 'Goods that came' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Close the order' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Change the order' })).toBeNull();
+  });
+
+  it('orders more for the days of Ramadan, at how much faster it sold through the last (ADR-863)', () => {
+    const season = {
+      key: 'RAMADAN' as const,
+      startsOn: '2027-02-08',
+      endsOn: '2027-03-12',
+      lift: 3,
+    };
+    const basis = { available: 4, incoming: 0, sold: 30, season };
+    // 30 days from 30 January: 9 before Ramadan, 21 in it, at three times the pace.
+    expect(seasonDays(season, '2027-01-30', 30)).toBe(21);
+    expect(suggestedQuantity(basis, 5, 30, '2027-01-30')).toBe(9 + 63 - 4);
+    expect(suggestedQuantity({ ...basis, season: null }, 5, 30, '2027-01-30')).toBe(30 - 4);
+    expect(
+      suggestedQuantity({ ...basis, season: { ...season, lift: null } }, 5, 30, '2027-01-30'),
+    ).toBe(26);
+    expect(seasonDays(season, '2027-03-20', 30)).toBe(0);
   });
 });

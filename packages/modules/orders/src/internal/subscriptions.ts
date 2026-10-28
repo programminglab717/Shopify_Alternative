@@ -18,7 +18,7 @@ import { Database, toDate, type Tx } from '@hatti/db';
 import { recordAudit } from '@hatti/events';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
-import { pkDayOf } from '@hatti/pk';
+import { addDays, pkDayOf } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderService } from './order.service.js';
@@ -243,12 +243,6 @@ export async function changeSubscriptionIn(
     by.why ? `${message}, ${by.why}` : message,
   );
   return null;
-}
-
-/** The day `days` after `day` (YYYY-MM-DD). */
-export function addDays(day: string, days: number): string {
-  const [year, month, date] = day.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(year, month - 1, date + days)).toISOString().slice(0, 10);
 }
 
 /**

@@ -9,7 +9,22 @@ export {
   type PkProvince,
   type PkProvinceCode,
 } from './cities.js';
-export { addPkWorkingDays, isPkWorkingDay, pkDayOf, pkHolidaysOf, pkHourOf } from './holidays.js';
+export {
+  addDays,
+  addPkWorkingDays,
+  isPkWorkingDay,
+  pkDayOf,
+  pkHolidaysOf,
+  pkHourOf,
+} from './holidays.js';
+export {
+  daysInSeason,
+  pkSeasonsBetween,
+  pkSeasonsOf,
+  previousPkSeason,
+  type PkSeason,
+  type PkSeasonKey,
+} from './seasons.js';
 export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
 export {

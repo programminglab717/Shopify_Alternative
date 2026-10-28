@@ -2,7 +2,14 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Tx } from '@hatti/db';
-import { LowStockService, daysLeft } from './low-stock.service.js';
+import { addDays, pkSeasonsOf, previousPkSeason } from '@hatti/pk';
+import {
+  LowStockService,
+  daysLeft,
+  forecastUnits,
+  liftOf,
+  type SeasonOutlook,
+} from './low-stock.service.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -198,6 +205,61 @@ describe.skipIf(!server)('Low stock', () => {
       0,
       null,
     ]);
+  });
+
+  it("tells how much faster each variant sold in last year's Ramadan, or the shop's stock did (ADR-863)", async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const [small, medium, large] = await sold('Eid Kurta', ['S', 'M', 'L']);
+    for (const variant of [small!, medium!, large!]) {
+      unwrap(
+        await f.inventory.setQuantities(f.a, {
+          name: 'available',
+          reason: 'cycle_count_available',
+          quantities: [{ inventoryItemId: variant, locationId: warehouse.id, quantity: 500 }],
+        }),
+      );
+    }
+    const ramadan = pkSeasonsOf(2027).find((each) => each.key === 'ramadan')!;
+    const last = previousPkSeason(ramadan)!;
+    const commitOn = async (variantId: string, quantity: number, day: string) => {
+      await f.db.tenant(f.a.shopId, (tx) =>
+        f.stock.commit(tx, f.a, [{ variantId, locationId: warehouse.id, quantity }]),
+      );
+      await f.admin.query(
+        `UPDATE inventory.movements SET created_at = ($1::date + time '12:00') AT TIME ZONE 'Asia/Karachi'
+          WHERE created_at > now() - interval '1 minute'`,
+        [day],
+      );
+    };
+    // The small sold 6 in the 30 days before last Ramadan, and 33 through it: some 5 times faster.
+    await commitOn(small!, 6, addDays(last.start, -10));
+    await commitOn(small!, 33, addDays(last.start, 5));
+    // The medium sold through it alone; the large not at all.
+    await commitOn(medium!, 4, addDays(last.start, 2));
+    const days = Math.round((Date.parse(last.end) - Date.parse(last.start)) / 86_400_000) + 1;
+
+    const lifts = await lowStock.seasonLifts(f.a, [small!, medium!, large!], null, ramadan);
+    expect(lifts.variants).toEqual(new Map([[small!, liftOf(33, days, 6)]]));
+    expect(lifts.variants.get(small!)! > 4).toBe(true);
+    expect(lifts.shop).toBe(liftOf(37, days, 6));
+    expect(await lowStock.seasonLifts(f.b, [small!], null, ramadan)).toEqual({
+      shop: null,
+      variants: new Map(),
+    });
+  });
+
+  it('forecasts the coming days at the pace sold, and faster on the days of a season ahead', () => {
+    expect([liftOf(30, 30, 10), liftOf(0, 30, 10), liftOf(10, 30, 0), liftOf(1000, 30, 1)]).toEqual(
+      [3, null, null, 8],
+    );
+    expect(liftOf(1, 30, 30)).toBe(0.25);
+    const season = { key: 'ramadan' as const, start: '2027-02-08', end: '2027-03-12' };
+    const outlook: SeasonOutlook = { season, lift: 3, fromShop: false };
+    // 30 sold in 30 days: 30 more without a season; in 30 days of which 21 are in it, 9 + 63.
+    expect(forecastUnits(30, 30, '2027-01-01', null)).toBe(30);
+    expect(forecastUnits(30, 30, '2027-01-30', outlook)).toBe(72);
+    expect(forecastUnits(30, 30, '2027-01-30', { ...outlook, lift: null })).toBe(30);
+    expect(forecastUnits(0, 30, '2027-01-30', outlook)).toBe(0);
   });
 
   it('alerts once a spell when a variant falls to the threshold, and once more when it runs out (ADR-157)', async () => {
