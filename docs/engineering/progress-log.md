@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Payment terms for wholesale customers
+### c0b16b7 · Payment terms for wholesale customers
 
 * **Terms:** an order paid by transfer within 1 to 120 days ships without waiting, owed until
   paid and overdue past its date ([ADR-888](../architecture/13-decision-log.md#adr-888--payment-terms-for-wholesale-customers-an-order-paid-by-transfer-within-1-to-120-days-ships-without-waiting-for-the-money-owed-until-paid-and-overdue-past-its-date-its-terms-from-the-draft-or-the-customers-price-list)).
