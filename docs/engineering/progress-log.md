@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Developers' tools
+
+* **Developers:** `@hatti/admin-client` is a TypeScript client for the Admin API. It waits out
+  throttles, keeps a mutation's idempotency key across tries, reads connections a page at a time
+  and checks webhooks' signatures. `hatti` is a command line that pulls and pushes a shop's theme
+  files. `docs/developers/README.md` says how to build on Hatti (DEV-08, DEV-09, [ADR-850](../architecture/13-decision-log.md#adr-850--developers-get-a-typescript-client-for-the-admin-api-which-waits-out-throttles-and-keeps-one-idempotency-key-across-a-mutations-tries-and-hatti-a-command-line-that-pulls-and-pushes-a-shops-theme-files)).
+  Publishing both on npm is OWN-45.
+* 4515 tests (13 new).
+
 ### 16c078e · Customers answered by the AI
 
 * **Inbox:** on Growth and Pro, a shop may let the AI answer customers on WhatsApp and in its

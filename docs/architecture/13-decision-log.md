@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-849 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-850 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -857,6 +857,7 @@
 | 847 | Each shop answers AI shopping agents: a UCP profile at /.well-known/ucp and a store MCP endpoint whose tools search and read its products and make carts its own checkout takes, so an agent's order is placed and confirmed as any shopper's | Accepted |
 | 848 | The Storefront API: GraphQL at each shop's own address, as Shopify's at /api/<version>/graphql.json, answered with the shop's public or private tokens, its catalog read from the storefront's documents and its carts changed through the core | Accepted |
 | 849 | On Growth and Pro, a shop may let the AI answer its customers on WhatsApp and in its web chat, from its policies and the customer's own orders, handing the conversation to staff when it should; staff answering or taking it leave it theirs | Accepted |
+| 850 | Developers get a TypeScript client for the Admin API, which waits out throttles and keeps one idempotency key across a mutation's tries, and `hatti`, a command line that pulls and pushes a shop's theme files | Accepted |
 
 ---
 
@@ -27836,3 +27837,50 @@
     orders up front means no answer can be talked into another's.
   * **Drafts for staff to send:** slower for the questions that matter most. The inbox's saved
     replies already help staff (ADR-758).
+
+## ADR-850 · Developers get a TypeScript client for the Admin API, which waits out throttles and keeps one idempotency key across a mutation's tries, and `hatti`, a command line that pulls and pushes a shop's theme files
+
+* **Context:**
+  * DEV-09 asks for SDKs and docs, and DEV-08 for a CLI, dev stores and sandboxes.
+  * Developers already had what they ask through:
+    * custom apps' tokens and webhooks (ADR-395, ADR-397);
+    * the Admin API's costs (ADR-576);
+    * development stores (ADR-504);
+    * the test courier (ADR-232), and gateways' sandboxes (ADR-151).
+  * They had no client to ask the API with, nothing to work with a theme from their own
+    machine, and no page saying how.
+* **Decision:**
+  * **`@hatti/admin-client`:** a TypeScript client with no dependencies but Node's `fetch`.
+    * `request` asks the dated Admin API with the app's token.
+    * Throttled, it waits for what `extensions.cost` says the bucket lacks, then asks again.
+    * A 429 or a server error is asked again after a growing wait, three times at most.
+    * A mutation carries one `Idempotency-Key` across its tries.
+    * Errors throw `HattiAdminApiError`, with the status and the API's errors.
+    * `paginate` reads a connection a page at a time.
+    * `verifyWebhook` checks a delivery's `X-Hatti-Hmac-Sha256` against its raw body, in constant
+      time.
+    An end-to-end test asks the real API through it, small buckets throttling it.
+  * **`@hatti/cli`, `hatti`:** `hatti theme list`, `pull`, `push` and `dev`.
+    * It works on a theme's own JSON files: its templates, section groups and settings
+      (ADR-323).
+    * `pull` writes only paths a theme has, never one leaving the directory.
+    * `push` refuses a file that isn't JSON before sending anything. It changes the theme
+      shoppers see only with `--allow-live`.
+    * `dev` pushes each file a moment after it is saved, and shows the theme's preview.
+    * The token comes from `HATTI_ACCESS_TOKEN`, as Shopify's CLI takes a theme token, and is
+      never written to disk.
+  * **`docs/developers/README.md`** says what to use and how: the Admin API, the Storefront API
+    (ADR-848), the store MCP endpoint (ADR-847), webhooks, the client, the command line, and
+    trying things on a development store.
+* **Consequences:**
+  * An integration, or a theme kept in git, needs a custom app's token and these two packages.
+  * Both are private in the workspace until Hatti publishes them on npm (OWN-45).
+  * Not yet:
+    * PHP and Python clients;
+    * a WhatsApp simulator for development stores, whose messages go out as any shop's;
+    * Urdu video tutorials.
+* **Alternatives:**
+  * **A client generated from the schema:** typed calls, but generated code to keep in step with
+    every version. GraphQL clients bring their own types from the schema (`apps/core/schema.graphql`).
+  * **Storing the token in a config file, as a login:** rejected. It would sit on disk; CI and
+    shells already keep secrets in the environment.
