@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Hatti Pass
+### a8d7655 · Hatti Pass
 
 * **Checkout:** a shopper ticks a box to save their name and address to Hatti Pass, and proves
   their number with a code. At any other Hatti shop, "Ordered here before?" fills them in once
