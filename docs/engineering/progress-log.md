@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Experts for hire
+### aee7adf · Experts for hire
 
 * **Partners:** partners keep an expert profile of the services they offer shops, from store
   setup to product photography and ads. Hatti lists each. A shop's owner or a manager finds
