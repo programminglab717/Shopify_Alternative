@@ -162,6 +162,8 @@ export const ID_PREFIXES = {
   partnerApp: 'papp',
   // A script an app offers the shop's storefront, which the shop turns on (ADR-852).
   appEmbed: 'aemb',
+  // A theme of the theme store, offered by a designer (ADR-853).
+  themeListing: 'thls',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

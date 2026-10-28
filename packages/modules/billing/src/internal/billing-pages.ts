@@ -52,23 +52,29 @@ export function invoicePage(view: InvoicePageView | null): {
   const name = invoice.name;
   const amount = rupees(invoice.amount);
   const plan = invoice.plan;
+  const theme = invoice.theme;
   const what = plan
     ? `${plan.name}, ${invoice.interval === 'yearly' ? 'yearly' : 'monthly'}`
-    : 'message credit';
+    : theme
+      ? `the theme ${theme.name}`
+      : 'message credit';
   let body: Html;
   if (invoice.status === 'paid') {
-    const after = !plan
-      ? ` ${amount} of message credit is added to ${view.shopName}'s.`
-      : view.periodEnd
-        ? ` ${view.shopName} is on ${plan.name} until ${dateOf(view.periodEnd)}.`
-        : '';
+    const after = theme
+      ? ` Install ${theme.name} from Online store › Theme store.`
+      : !plan
+        ? ` ${amount} of message credit is added to ${view.shopName}'s.`
+        : view.periodEnd
+          ? ` ${view.shopName} is on ${plan.name} until ${dateOf(view.periodEnd)}.`
+          : '';
     body = html`<div class="banner done" role="status">
       ${paragraphs({
         en: `Thank you: invoice ${name} is paid.${after}`,
-        ur: plan
-          ? html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے۔`
-          : html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے، اور ${ltr(amount)} کا میسج کریڈٹ شامل ہو
-            گیا ہے۔`,
+        ur:
+          plan || theme
+            ? html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے۔`
+            : html`شکریہ! انوائس ${ltr(name)} ادا ہو گئی ہے، اور ${ltr(amount)} کا میسج کریڈٹ شامل
+              ہو گیا ہے۔`,
       })}
     </div>`;
   } else if (invoice.status === 'open') {

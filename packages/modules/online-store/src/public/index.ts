@@ -153,7 +153,8 @@ export {
 /** One of Hatti's themes, as the library lists it (ADR-730). */
 export type { PlatformThemeInfo } from '@hatti/themes';
 export { REDIRECT_LIMIT, redirectPath, redirectTarget } from '../internal/redirect-paths.js';
-export { toShopPolicy, toShopPolicyVersion } from '../internal/graphql/mappers.js';
+export { toShopPolicy, toShopPolicyVersion, toTheme } from '../internal/graphql/mappers.js';
+export { OnlineStoreTheme } from '../internal/graphql/theme.types.js';
 export {
   ShopPolicy,
   ShopPolicyDraft,

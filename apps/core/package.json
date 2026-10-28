@@ -22,7 +22,8 @@
     "courier-cities": "node --env-file-if-exists=../../.env --enable-source-maps dist/courier-cities.js",
     "status-incidents": "node --env-file-if-exists=../../.env --enable-source-maps dist/status-incidents.js",
     "trust-reports": "node --env-file-if-exists=../../.env --enable-source-maps dist/trust-reports.js",
-    "partner-apps": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-apps.js"
+    "partner-apps": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-apps.js",
+    "partner-themes": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-themes.js"
   },
   "dependencies": {
     "@hatti/ai": "workspace:*",

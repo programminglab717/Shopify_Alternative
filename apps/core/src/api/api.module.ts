@@ -65,6 +65,7 @@ import { HealthController } from './health.controller.js';
 import { StockWatchController } from './stock-watches.controller.js';
 import { OAuthController } from './oauth.controller.js';
 import { AppSessionResolver } from './app-sessions.resolver.js';
+import { ThemeStoreResolver } from './theme-store.resolver.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
@@ -390,6 +391,7 @@ export class ApiModule {
         SupportAccessResolver,
         OrderAgreementResolver,
         AppSessionResolver,
+        ThemeStoreResolver,
         FileUsesResolver,
         PaymentLinkOrdersResolver,
         OrderAssignmentResolver,

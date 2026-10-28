@@ -62,6 +62,7 @@ export type AuthErrorCode =
   // Public apps (ADR-851): too many registered, a member who may not install one, an app not
   // yet listed, and a code, client ID or secret that is not good.
   | 'TOO_MANY_APPS'
+  | 'TOO_MANY_THEMES'
   | 'FORBIDDEN'
   | 'NOT_LISTED'
   | 'INVALID_GRANT';

@@ -8808,6 +8808,70 @@ export const ThemeFilesDeleteMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The theme store's themes (OS-20, ADR-853). */
+export const ThemeStoreQuery = /* GraphQL */ `
+  query ThemeStore {
+    themeStore {
+      id
+      name
+      description
+      designer
+      base
+      price {
+        amount
+      }
+      free
+      bought
+    }
+  }
+`;
+
+export const ThemeStoreInstallMutation = /* GraphQL */ `
+  mutation ThemeStoreInstall($id: ID!) {
+    themeStoreInstall(id: $id) {
+      theme {
+        ...Theme
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME}
+  ${USER_ERRORS}
+`;
+
+export const ThemeStoreBuyMutation = /* GraphQL */ `
+  mutation ThemeStoreBuy($id: ID!) {
+    themeStoreBuy(id: $id) {
+      invoiceId
+      amount {
+        amount
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A partner's theme offered to the store from their development store (ADR-853). */
+export const ThemeStoreOfferMutation = /* GraphQL */ `
+  mutation ThemeStoreOffer($themeId: ID!, $input: ThemeStoreOfferInput!) {
+    themeStoreOffer(themeId: $themeId, input: $input) {
+      listing {
+        id
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A theme added, a copy of one the shop has or on the platform theme afresh. */
 export const ThemeCreateMutation = /* GraphQL */ `
   mutation ThemeCreate($name: String!, $copyFrom: ID, $base: String) {

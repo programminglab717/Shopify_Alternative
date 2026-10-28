@@ -23,13 +23,14 @@ describe.skipIf(!server)(
       amount: string,
       id = newId(),
       tax?: string,
+      themeId?: string,
     ) => ({
       id: newId(),
       type: BillingEvents.InvoicePaid,
       shopId,
       aggregateType: 'billing_invoice',
       aggregateId: id,
-      payload: { number: 'HB-001234', reason, plan, interval: 'monthly', amount, tax },
+      payload: { number: 'HB-001234', reason, plan, interval: 'monthly', amount, tax, themeId },
       occurredAt: new Date().toISOString(),
     });
 
@@ -96,6 +97,50 @@ describe.skipIf(!server)(
           invoice_amount: '299900',
           share_percent: 20,
           amount: '59980',
+        },
+      ]);
+    });
+
+    it("records a designer's share of each theme of theirs a shop buys, once (ADR-853)", async () => {
+      const designer = newId();
+      await admin.query(
+        `INSERT INTO identity.users (id, name, email) VALUES ($1, 'Hira', 'hira@rang.pk')`,
+        [designer],
+      );
+      await admin.query(
+        `INSERT INTO identity.partners (user_id, business_name, referral_code)
+         VALUES ($1, 'Rang Studio', 'r4ngst2d')`,
+        [designer],
+      );
+      const studio = newId();
+      await admin.query(
+        `INSERT INTO control.shops (id, name, handle, development) VALUES ($1, 'Rang lab', 'rang-lab', true)`,
+        [studio],
+      );
+      const { rows: themes } = await admin.query<{ id: string }>(
+        `INSERT INTO identity.partner_themes
+                (partner_id, source_shop, source_theme, name, base, files, price)
+         VALUES ($1, $2, $3, 'Basant', 'hatti-base', '{}', 500000) RETURNING id`,
+        [designer, studio, newId()],
+      );
+      const earnings = new PartnerEarnings(database);
+      const invoice = newId();
+      // Rs 5,000 and its sales tax: the share is of what Hatti earns.
+      const sold = paid('theme', null, '580000', invoice, '80000', themes[0]!.id);
+      await earnings.handle(sold);
+      await earnings.handle(sold);
+      const { rows } = await admin.query(
+        `SELECT partner_id, plan, invoice_amount::text, share_percent, amount::text
+           FROM identity.partner_earnings WHERE invoice_id = $1`,
+        [invoice],
+      );
+      expect(rows).toEqual([
+        {
+          partner_id: designer,
+          plan: 'theme',
+          invoice_amount: '500000',
+          share_percent: 80,
+          amount: '400000',
         },
       ]);
     });

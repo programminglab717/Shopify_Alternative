@@ -30,6 +30,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { ThemeStore } from './theme-store';
 import { ScheduledNote, ThemeSchedule, ThemeVersions, VersionsButton } from './theme-versions';
 
 /** Those who change the shop's themes: its owner and managers, as the core allows. */
@@ -335,6 +336,7 @@ export function ThemesTab() {
         </ul>
       </Card>
       <AddTheme themes={themes} library={query.data.platformThemes} />
+      <ThemeStore />
     </div>
   );
 }

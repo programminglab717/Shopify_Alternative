@@ -331,6 +331,7 @@ function toInvoice(record: InvoiceRecord): BillingInvoice {
     name: record.name,
     reason: record.reason.toUpperCase() as BillingInvoiceReason,
     plan: record.plan && toPlan(record.plan),
+    themeName: record.theme?.name ?? null,
     interval: record.interval && (record.interval.toUpperCase() as BillingInterval),
     price: rupees(record.price),
     credit: rupees(record.credit),

@@ -965,7 +965,7 @@ type BillingInvoice {
   name: String!
   paidAt: DateTime
 
-  """The plan it pays for; null for credit."""
+  """The plan it pays for; null for credit, or a theme."""
   plan: BillingPlan
 
   """The plan's price for the period, or the credit bought."""
@@ -997,6 +997,11 @@ type BillingInvoice {
   taxRegistration: String
 
   """
+  The theme store's theme it buys, as it was named then (ADR-853); null for others.
+  """
+  themeName: String
+
+  """
   The transfers the owner said they made for it, into Hatti's account, the latest first.
   """
   transfers: [BillingInvoiceTransfer!]!
@@ -1019,6 +1024,9 @@ enum BillingInvoiceReason {
 
   """The plan's next period, invoiced a week before the period ends."""
   RENEWAL
+
+  """A theme of the theme store (ADR-853): the shop's to install once paid."""
+  THEME
 }
 
 enum BillingInvoiceStatus {
@@ -11093,6 +11101,21 @@ type Mutation {
   themeSchedulePublish(id: ID!, publishAt: DateTime): ThemeSchedulePublishPayload!
 
   """
+  Chooses a paid theme of the store to buy: an invoice, paid with billingInvoicePay, after which the shop installs it. The owner alone, having signed in lately.
+  """
+  themeStoreBuy(id: ID!): ThemeStoreBuyPayload!
+
+  """
+  Installs a theme of the store as one of the shop's, not published: a free one, or one the shop bought, as often as it likes.
+  """
+  themeStoreInstall(id: ID!): ThemeStoreInstallPayload!
+
+  """
+  Offers a theme of this development store to the theme store, copied as it is now, or offers it anew: the partner's who built the store alone. It waits for Hatti to look at it.
+  """
+  themeStoreOffer(input: ThemeStoreOfferInput!, themeId: ID!): ThemeStoreOfferPayload!
+
+  """
   Connects the shop's TikTok advertiser account, in place of any it had, or gives it another token (ADR-566), once TikTok says the token reads it and that it bills in the shop's currency: from then on, the worker pulls its spend by day and campaign every few hours, the last week's again each time, and the last 30 days' at once, as a Meta ad account's. What the shop typed by hand stays its own. On plans with true profit. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   tiktokAdAccountConnect(input: TikTokAdAccountConnectInput!): TikTokAdAccountConnectPayload!
@@ -16762,6 +16785,9 @@ type Query {
   taxSettings: TaxSettings!
   theme(id: ID!): OnlineStoreTheme
 
+  """The theme store's themes, the latest first."""
+  themeStore: [ThemeListing!]!
+
   """
   The shop's themes: the main one, which the storefront shows, first, then the newest.
   """
@@ -19855,6 +19881,28 @@ type ThemeFilesUpsertPayload {
   userErrors: [UserError!]!
 }
 
+"""
+A theme of the theme store (OS-20, ADR-853): one of Hatti's themes with a designer's own files over it, free or for a price in rupees.
+"""
+type ThemeListing {
+  """Hatti's theme it is built on."""
+  base: String!
+
+  """Whether the shop bought it, to install as often as it likes."""
+  bought: Boolean!
+  description: String!
+
+  """The designer's business."""
+  designer: String!
+  free: Boolean!
+  id: ID!
+  name: String!
+
+  """What it costs; nothing for a free theme."""
+  price: Money!
+  updatedAt: DateTime!
+}
+
 type ThemePreviewLinksRevokePayload {
   theme: OnlineStoreTheme
   userErrors: [UserError!]!
@@ -19881,6 +19929,34 @@ type ThemeRollbackPayload {
 
 type ThemeSchedulePublishPayload {
   theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+type ThemeStoreBuyPayload {
+  """What the invoice asks, its tax included."""
+  amount: Money
+
+  """The invoice to pay with billingInvoicePay."""
+  invoiceId: ID
+  userErrors: [UserError!]!
+}
+
+type ThemeStoreInstallPayload {
+  """The theme made, not published."""
+  theme: OnlineStoreTheme
+  userErrors: [UserError!]!
+}
+
+input ThemeStoreOfferInput {
+  description: String
+  name: String!
+
+  """Whole rupees: "0" for a free theme, else 1,000 to 100,000."""
+  price: String!
+}
+
+type ThemeStoreOfferPayload {
+  listing: ThemeListing
   userErrors: [UserError!]!
 }
 

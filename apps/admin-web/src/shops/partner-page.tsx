@@ -16,6 +16,7 @@ import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { PartnerApps } from './partner-apps';
+import { PartnerThemes } from './partner-themes';
 import { TermsAgreement, useTermsAgreement } from './terms-agreement';
 
 /** A partner as they see themselves (ADR-504). */
@@ -86,6 +87,7 @@ export function PartnerPage() {
         <>
           <Dashboard partner={partner} stores={dashboard.data?.stores ?? []} />
           <PartnerApps />
+          <PartnerThemes stores={dashboard.data?.stores ?? []} />
           {dashboard.data?.earnings && (
             <Earnings partner={partner} earnings={dashboard.data.earnings} />
           )}

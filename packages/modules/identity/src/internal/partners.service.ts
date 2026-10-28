@@ -410,6 +410,23 @@ export async function recordPartnerEarning(
 }
 
 /**
+ * Records the share a paid theme invoice of the shop of `tx` earns the theme's designer (ADR-853),
+ * through identity's function: once an invoice. The share in paisa, or null for none.
+ */
+export async function recordThemeSale(
+  tx: Pick<Tx, 'execute'>,
+  shopId: string,
+  invoice: { id: string; number: string; themeId: string; amount: bigint },
+): Promise<bigint | null> {
+  const { rows } = await tx.execute<{ amount: string | null }>(sql`
+    SELECT identity.record_theme_sale(${shopId}, ${invoice.id}, ${invoice.number}::bigint,
+                                      ${invoice.themeId}, ${invoice.amount.toString()}::bigint)::text
+           AS amount`);
+  const amount = rows[0]?.amount;
+  return amount === null || amount === undefined ? null : BigInt(amount);
+}
+
+/**
  * Marks a development store handed to its client, as its partner hands it over (ADR-104): it opens
  * to shoppers, its storefront published again. Nothing for any other shop.
  */

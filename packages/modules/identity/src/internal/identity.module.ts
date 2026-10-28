@@ -4,6 +4,7 @@ import { EmailFeedbackController } from './email-feedback.controller.js';
 import { EmailFeedbackService } from './email-feedback.js';
 import { IdentityService, type IdentityServiceOptions } from './identity.service.js';
 import { PartnerAppsService } from './partner-apps.service.js';
+import { PartnerThemesService } from './partner-themes.service.js';
 import { PartnersService } from './partners.service.js';
 import { StaffService } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
@@ -31,6 +32,7 @@ export class IdentityModule {
         { provide: StaffService, useValue: new StaffService(options) },
         { provide: PartnersService, useValue: new PartnersService(options) },
         { provide: PartnerAppsService, useValue: new PartnerAppsService(options) },
+        { provide: PartnerThemesService, useValue: new PartnerThemesService(options) },
         { provide: SupportAccessService, useValue: new SupportAccessService(options) },
       ],
       exports: [
@@ -39,6 +41,7 @@ export class IdentityModule {
         SupportAccessService,
         PartnersService,
         PartnerAppsService,
+        PartnerThemesService,
       ],
     };
   }

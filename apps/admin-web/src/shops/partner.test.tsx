@@ -1,4 +1,4 @@
-import { cleanup, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
 import { forgetReferral, referralCode, rememberReferral } from './referral';
@@ -106,6 +106,104 @@ describe("Hatti's partners (PRT-01, ADR-504)", () => {
     );
     expect(await screen.findByText('Building')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Noor Jewels' })).toBeTruthy();
+  });
+
+  it('offers a theme of its development store to the theme store, and lists its own (ADR-853)', async () => {
+    let themes = [
+      {
+        id: 'thls_1',
+        name: 'Saada',
+        description: '',
+        price: '0',
+        listed: true,
+        shopId: 'shop_10',
+        themeId: 'thm_1',
+        updatedAt: '2026-10-20T10:00:00Z',
+      },
+    ];
+    const core = fakeCore(
+      'owner',
+      (operation, variables) => {
+        if (operation === 'Themes') {
+          return {
+            themes: {
+              nodes: [
+                {
+                  id: 'thm_2',
+                  name: 'Basant draft',
+                  role: 'UNPUBLISHED',
+                  base: 'hatti-base',
+                  previewUrl: 'https://noor.hatti.pk/?preview_theme_id=thm_2',
+                  publishAt: null,
+                  createdAt: '2026-10-20T10:00:00Z',
+                  updatedAt: '2026-10-20T10:00:00Z',
+                },
+              ],
+            },
+            platformThemes: [],
+          };
+        }
+        if (operation === 'ThemeStoreOffer') {
+          const input = variables.input as { name: string; price: string };
+          themes = [
+            ...themes,
+            { ...themes[0]!, id: 'thls_2', name: input.name, price: '500000', listed: false },
+          ];
+          return {
+            themeStoreOffer: { listing: { id: 'thls_2', name: input.name }, userErrors: [] },
+          };
+        }
+        throw new Error(`unexpected ${operation}`);
+      },
+      (path) => {
+        if (path === '/auth/partner') {
+          return {
+            partner: {
+              businessName: 'Rang Studio',
+              website: null,
+              referralCode: 'rang0001',
+              joinedAt: '2026-10-17T10:00:00Z',
+            },
+            stores: [
+              {
+                id: 'shop_10',
+                name: 'Rang lab',
+                handle: 'rang-lab',
+                status: 'active',
+                kind: 'development',
+                role: 'owner',
+                accessEndsAt: null,
+                since: '2026-10-17T10:00:00Z',
+                transferredAt: null,
+              },
+            ],
+            earnings: null,
+          };
+        }
+        if (path === '/auth/partner/apps') return { apps: [] };
+        if (path === '/auth/partner/themes') return { themes };
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/partners');
+
+    expect(await screen.findByText('Saada')).toBeTruthy();
+    expect(screen.getByText('In the store')).toBeTruthy();
+    await waitFor(() =>
+      expect((screen.getByLabelText('Theme') as HTMLSelectElement).value).toBe('thm_2'),
+    );
+    type('Name in the store', 'Basant');
+    fireEvent.change(screen.getByLabelText('Price in rupees, 0 for free'), {
+      target: { value: '5000' },
+    });
+    await press('Offer to the theme store');
+    expect(await screen.findByText('Basant waits for Hatti to look at it.')).toBeTruthy();
+    expect(core.sent.find((each) => each.operation === 'ThemeStoreOffer')?.variables).toEqual({
+      themeId: 'thm_2',
+      input: { name: 'Basant', description: '', price: '5000' },
+    });
+    expect(await screen.findByText('Waiting for review')).toBeTruthy();
   });
 
   it('shows what it earned, its link, and keeps the bank account it is paid into (ADR-505)', async () => {

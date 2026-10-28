@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { shopAgreementDocuments } from './agreements.js';
 import { AuthError } from './errors.js';
 import { PartnerAppsService, type PartnerAppRecord } from './partner-apps.service.js';
+import { PartnerThemesService } from './partner-themes.service.js';
 import {
   IdentityService,
   type AuthenticatedSession,
@@ -295,6 +296,7 @@ export class AuthController {
     private readonly support: SupportAccessService,
     private readonly partners: PartnersService,
     private readonly partnerApps: PartnerAppsService,
+    private readonly partnerThemes: PartnerThemesService,
     @Optional() private readonly site?: PublicSite,
   ) {}
 
@@ -1012,6 +1014,33 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /**
+   * The partner's themes in the theme store (OS-20, ADR-853): `{ themes }`, oldest first, each
+   * with its price in paisa as a string and whether Hatti listed it. They are offered from a
+   * development store's themes, through its Admin API.
+   */
+  @Get('partner/themes')
+  async listPartnerThemes(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { userId } = await this.session(request);
+    const themes = await this.partnerThemes.themes(userId);
+    return {
+      themes: themes.map((theme) => ({
+        id: toPublicId('themeListing', theme.id),
+        name: theme.name,
+        description: theme.description,
+        price: theme.price.toString(),
+        listed: theme.listed,
+        shopId: toPublicId('shop', theme.sourceShopId),
+        themeId: toPublicId('theme', theme.sourceThemeId),
+        updatedAt: theme.updatedAt.toISOString(),
+      })),
+    };
   }
 
   /** The partner's apps, which shops install (DEV-05, ADR-851): `{ apps }`, oldest first. */

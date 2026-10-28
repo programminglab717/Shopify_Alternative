@@ -90,9 +90,16 @@ export {
   type RedeemedAuthorization,
 } from '../internal/partner-apps.service.js';
 export {
+  PartnerThemesService,
+  THEME_STORE_LIMITS,
+  type ThemeListingRecord,
+  type ThemeOffer,
+} from '../internal/partner-themes.service.js';
+export {
   PARTNER_LIMITS,
   PartnersService,
   recordPartnerEarning,
+  recordThemeSale,
   type PartnerEarnings,
   type PartnerOwed,
   type PartnerProfile,

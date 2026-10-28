@@ -137,7 +137,7 @@ const DAY_MS = 24 * 3_600_000;
 
 export const INVOICE_STATUSES = ['open', 'paid', 'void'] as const;
 export type InvoiceStatusValue = (typeof INVOICE_STATUSES)[number];
-export type InvoiceReasonValue = 'change' | 'renewal' | 'credits';
+export type InvoiceReasonValue = 'change' | 'renewal' | 'credits' | 'theme';
 
 /** An invoice of Hatti's to the shop, as the Admin API shows it. */
 export interface InvoiceRecord {
@@ -147,8 +147,10 @@ export interface InvoiceRecord {
   name: string;
   /** A plan chosen now, the plan's next period, or message credit (ADR-155). */
   reason: InvoiceReasonValue;
-  /** The plan and the period it pays for; none for credit. */
+  /** The plan and the period it pays for; none for credit, nor a theme. */
   plan: Plan | null;
+  /** The theme it buys from the theme store (ADR-853), as it was named then; none for others. */
+  theme: { id: string; name: string } | null;
   interval: BillingIntervalValue | null;
   /**
    * Paisa: the plan's price for the period, less what was left of the period it cut short; or the
@@ -235,6 +237,8 @@ type InvoiceRow = {
   reason: InvoiceReasonValue;
   plan: Exclude<PlanCode, 'free'> | null;
   billing_interval: BillingIntervalValue | null;
+  theme_id: string | null;
+  theme_name: string | null;
   price: string;
   credit: string;
   tax: string;
@@ -269,7 +273,8 @@ const TRANSFER_COLUMNS = sql.raw(
 );
 
 const INVOICE_COLUMNS = sql.raw(
-  `id, number::text, reason, plan, billing_interval, price::text, credit::text, tax::text,
+  `id, number::text, reason, plan, billing_interval, theme_id, theme_name, price::text,
+   credit::text, tax::text,
    tax_rate, tax_authority, tax_registration, amount::text, status, reference, paid_at,
    created_at`,
 );
@@ -669,6 +674,69 @@ export class BillingService extends PlanAllowance {
   }
 
   /**
+   * Chooses a theme of the theme store to buy (OS-20, ADR-853), at its price in rupees: an invoice
+   * of its own, paid as plans' are, with {@link pay}. A theme chosen before and not paid for gives
+   * way to it; a theme bought already is not bought twice.
+   */
+  async buyTheme(
+    tenant: TenantContext,
+    theme: { id: string; name: string; price: bigint },
+  ): Promise<MutationResult<{ invoice: InvoiceRecord }>> {
+    if (theme.price <= 0n) {
+      return failOne(['id'], 'INVALID', 'A free theme is installed, never bought');
+    }
+    const { shopId } = tenant;
+    return this.db.tenant(shopId, async (tx) => {
+      if ((await themesBoughtIn(tx, shopId)).has(theme.id)) {
+        return failOne<{ invoice: InvoiceRecord }>(
+          ['id'],
+          'TAKEN',
+          'The shop bought this theme already',
+        );
+      }
+      await tx.execute(sql`
+        UPDATE billing.invoices SET status = 'void', updated_at = now()
+         WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'theme'`);
+      const invoice = await insertInvoice(
+        tx,
+        shopId,
+        {
+          reason: 'theme',
+          plan: null,
+          interval: null,
+          price: theme.price,
+          credit: 0n,
+          theme: { id: theme.id, name: theme.name.slice(0, 60) },
+        },
+        this.hattiTax,
+      );
+      await recordAudit(tx, shopId, {
+        action: 'billing.theme_chosen',
+        subjectType: 'shop',
+        subjectId: shopId,
+        ...actorColumnsOf(tenant.actor),
+        details: { theme: theme.name, invoice: invoice.name },
+      });
+      return { ok: true, value: { invoice } };
+    });
+  }
+
+  /** The theme store's themes the shop paid for, by their listings' IDs (ADR-853). */
+  async themesBoughtOf(shopId: string): Promise<Set<string>> {
+    return this.db.tenant(shopId, (tx) => themesBoughtIn(tx, shopId));
+  }
+
+  /** The invoice for a theme waiting to be paid, if one is (ADR-853). */
+  async openThemeInvoiceOf(shopId: string): Promise<InvoiceRecord | null> {
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<InvoiceRow>(sql`
+        SELECT ${INVOICE_COLUMNS} FROM billing.invoices
+         WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'theme'`),
+    );
+    return rows[0] ? toInvoiceRecord(rows[0]) : null;
+  }
+
+  /**
    * Gives the shop `amount` of message credit from Hatti, saying why: to try messages with, or
    * to make good what went wrong. What the shop's credit holds after.
    */
@@ -1007,7 +1075,7 @@ export class BillingService extends PlanAllowance {
     if (row.next_plan !== null && end > at.getTime()) return false;
     const { rows: open } = await tx.execute<{ id: string }>(sql`
       SELECT id FROM billing.invoices
-       WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
+       WHERE shop_id = ${shopId} AND status = 'open' AND reason IN ('change', 'renewal')`);
     if (open.length > 0 || row.next_plan === 'free') return false;
     const plan = (row.next_plan ?? row.plan) as Exclude<PlanCode, 'free'>;
     const interval = row.next_interval ?? row.billing_interval!;
@@ -1112,6 +1180,11 @@ export class BillingService extends PlanAllowance {
         aggregateId: invoice.id,
         payload: invoicePayloadOf(invoice),
       });
+    if (invoice.reason === 'theme') {
+      // The shop installs the theme as often as it likes from now on (ADR-853).
+      await paid();
+      return;
+    }
     if (invoice.reason === 'credits') {
       // What messages took below nothing is paid from it first.
       await walletEntryIn(tx, shopId, {
@@ -1207,7 +1280,7 @@ export class BillingService extends PlanAllowance {
     const row = await subscriptionIn(tx, shopId, false);
     const { rows: open } = await tx.execute<InvoiceRow>(sql`
       SELECT ${INVOICE_COLUMNS} FROM billing.invoices
-       WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
+       WHERE shop_id = ${shopId} AND status = 'open' AND reason IN ('change', 'renewal')`);
     const periodEnd = row?.period_end ? toDate(row.period_end) : null;
     return {
       plan: PLANS[row?.plan ?? 'free'],
@@ -1356,10 +1429,17 @@ async function subscriptionIn(
 }
 
 /** Sets aside the invoice for a plan waiting to be paid: credit chosen to buy stays. */
+async function themesBoughtIn(tx: Tx, shopId: string): Promise<Set<string>> {
+  const { rows } = await tx.execute<{ theme_id: string }>(sql`
+    SELECT DISTINCT theme_id FROM billing.invoices
+     WHERE shop_id = ${shopId} AND reason = 'theme' AND status = 'paid'`);
+  return new Set(rows.map((row) => row.theme_id));
+}
+
 async function voidOpenInvoices(tx: Tx, shopId: string): Promise<void> {
   await tx.execute(sql`
     UPDATE billing.invoices SET status = 'void', updated_at = now()
-     WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
+     WHERE shop_id = ${shopId} AND status = 'open' AND reason IN ('change', 'renewal')`);
 }
 
 /**
@@ -1375,15 +1455,17 @@ async function insertInvoice(
     interval: BillingIntervalValue | null;
     price: bigint;
     credit: bigint;
+    theme?: { id: string; name: string } | null;
   },
   hattiTax: HattiTax | null,
 ): Promise<InvoiceRecord> {
   const tax = hattiTax ? taxOn(invoice.price - invoice.credit, hattiTax.rate) : 0n;
   const { rows } = await tx.execute<InvoiceRow>(sql`
     INSERT INTO billing.invoices
-           (shop_id, reason, plan, billing_interval, price, credit, tax, tax_rate, tax_authority,
-            tax_registration)
-    VALUES (${shopId}, ${invoice.reason}, ${invoice.plan}, ${invoice.interval}, ${invoice.price},
+           (shop_id, reason, plan, billing_interval, theme_id, theme_name, price, credit, tax,
+            tax_rate, tax_authority, tax_registration)
+    VALUES (${shopId}, ${invoice.reason}, ${invoice.plan}, ${invoice.interval},
+            ${invoice.theme?.id ?? null}, ${invoice.theme?.name ?? null}, ${invoice.price},
             ${invoice.credit}, ${tax}, ${hattiTax?.rate ?? 0}, ${hattiTax?.authority ?? null},
             ${hattiTax?.registration ?? null})
     RETURNING ${INVOICE_COLUMNS}`);
@@ -1403,6 +1485,7 @@ function invoicePayloadOf(invoice: InvoiceRecord): InvoicePayload {
     reason: invoice.reason,
     plan: invoice.plan?.code ?? null,
     interval: invoice.interval,
+    ...(invoice.theme && { themeId: invoice.theme.id }),
     amount: invoice.amount.toString(),
     tax: invoice.tax.toString(),
   };
@@ -1416,6 +1499,7 @@ function toInvoiceRecord(row: InvoiceRow): InvoiceRecord {
     name: invoiceName(number),
     reason: row.reason,
     plan: row.plan === null ? null : PLANS[row.plan],
+    theme: row.theme_id === null ? null : { id: row.theme_id, name: row.theme_name ?? '' },
     interval: row.billing_interval,
     price: BigInt(row.price),
     credit: BigInt(row.credit),

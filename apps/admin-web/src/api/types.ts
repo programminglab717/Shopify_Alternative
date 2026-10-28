@@ -1435,7 +1435,7 @@ export interface BillingPlanValue {
 export interface BillingInvoiceValue {
   id: string;
   name: string;
-  reason: 'CHANGE' | 'CREDITS' | 'RENEWAL';
+  reason: 'CHANGE' | 'CREDITS' | 'RENEWAL' | 'THEME';
   status: 'OPEN' | 'PAID' | 'VOID';
   interval: BillingInterval | null;
   createdAt: string;
@@ -4242,6 +4242,38 @@ export interface OnlineStoreTheme {
   publishAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A theme of the theme store (OS-20, ADR-853). */
+export interface ThemeListing {
+  id: string;
+  name: string;
+  description: string;
+  designer: string;
+  base: string;
+  price: { amount: string };
+  free: boolean;
+  bought: boolean;
+}
+
+export interface ThemeStoreData {
+  themeStore: ThemeListing[];
+}
+
+export interface ThemeStoreInstallData {
+  themeStoreInstall: { theme: OnlineStoreTheme | null; userErrors: UserError[] };
+}
+
+export interface ThemeStoreBuyData {
+  themeStoreBuy: {
+    invoiceId: string | null;
+    amount: { amount: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface ThemeStoreOfferData {
+  themeStoreOffer: { listing: { id: string; name: string } | null; userErrors: UserError[] };
 }
 
 /** One of Hatti's own themes, which a shop's theme is built on (ADR-730). */
