@@ -370,7 +370,9 @@ function contactOf(body: unknown): { name: string; phone: string } {
  * shop's gateway to pay the order placed online (`action=pay`, ADR-152), fills in a returning
  * shopper's saved address once their number is proved, sending the code (`action=recall`, with
  * `channel=sms` for one by SMS) or checking it (`action=recall_code`, ADR-447), fills in
- * another address of a signed-in shopper's book (`action=use_address`, ADR-587), shows the page
+ * another address of a signed-in shopper's book (`action=use_address`, ADR-587), places a
+ * signed-in shopper's order to an address of their book in a tap (`action=express`, ADR-838),
+ * shows the page
  * with the form as typed for its total, placing nothing (`action=totals`, ADR-713), or places the
  * order.
  */
@@ -410,6 +412,8 @@ async function posted(
       );
     case 'use_address':
       return checkouts.useAddress(token, field(body, 'address'), options);
+    case 'express':
+      return checkouts.express(token, field(body, 'shown'), field(body, 'address'), options);
     default:
       return checkouts.place(token, field(body, 'shown'), formOf(body), options);
   }

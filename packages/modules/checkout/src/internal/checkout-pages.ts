@@ -133,6 +133,9 @@ const LABELS = {
   savedAddresses: { en: 'Your saved addresses', ur: 'آپ کے محفوظ پتے' },
   deliverHere: { en: 'Deliver here', ur: 'یہاں پہنچائیں' },
   defaultAddress: { en: 'Default', ur: 'بنیادی' },
+  express: { en: 'Express checkout', ur: 'فوری چیک آؤٹ' },
+  expressPlace: { en: 'Place order, pay on delivery', ur: 'آرڈر دیں، ادائیگی ڈیلیوری پر' },
+  expressOr: { en: 'Or change anything below.', ur: 'یا نیچے کچھ بھی بدلیں۔' },
   fillAddress: { en: 'Fill in my address', ur: 'میرا پتہ بھر دیں' },
   storeCredit: { en: 'Store credit', ur: 'اسٹور کریڈٹ' },
   backToCart: { en: 'Back to cart', ur: 'واپس کارٹ پر' },
@@ -372,6 +375,12 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         banner(problemWords(problem, ways)),
       // Its stock held for the shopper meanwhile (ADR-715).
       view.heldUntil && heldNotice(view.heldUntil),
+      // A signed-in shopper's order in a tap, to their default address (CHK-21, ADR-838).
+      expressSection(view, {
+        codOffered,
+        total: totals.total === null ? null : totals.total + codRules.fee,
+        agreement,
+      }),
       cartSummary(
         cart,
         charges,
@@ -1743,6 +1752,53 @@ const RECALL_STATUS: Record<RecallState, number> = {
 
 /** Where the number is proved and the form filled in, or found to have nothing to fill it from. */
 const RECALL_DONE: readonly RecallState[] = ['filled', 'nothing'];
+
+/**
+ * Express checkout (CHK-21, ADR-838): a signed-in shopper, whose number their session proved
+ * (ADR-586), places the order in a tap, to their book's default address, paying on delivery, the
+ * total said. Offered alone where nothing else is asked of the order: no problem shown, cash on
+ * delivery taking the cart with nothing in advance, something to deliver, no time to choose, and
+ * the form filled in from that address. Anything that stops it shows the form below, filled in,
+ * saying why.
+ */
+function expressSection(
+  view: Extract<CheckoutView, { kind: 'open' }>,
+  options: { codOffered: boolean; total: bigint | null; agreement: Sentence | null },
+): Html | false {
+  const address = view.book?.find((each) => each.isDefault);
+  const { payments, form } = view;
+  if (
+    !address ||
+    view.problem !== null ||
+    !options.codOffered ||
+    options.total === null ||
+    payments.advance !== null ||
+    payments.capAdvance ||
+    view.digital ||
+    view.deliverySlots.length > 0 ||
+    form.pickup ||
+    !form.address1
+  ) {
+    return false;
+  }
+  return html`<section class="section express">
+    <h2 class="label">${say('bilingual', LABELS.express)}</h2>
+    <form method="post">
+      <input type="hidden" name="action" value="express" />
+      <input type="hidden" name="shown" value="${view.shown}" />
+      <input type="hidden" name="address" value="${address.id}" />
+      <p class="small" dir="auto">${address.summary}</p>
+      <p class="small"><bdi dir="ltr">${form.phone}</bdi></p>
+      <p class="small">
+        ${say('bilingual', LABELS.payOnDelivery)} ·
+        <strong><bdi>Rs ${amount(options.total)}</bdi></strong>
+      </p>
+      ${options.agreement && paragraphs(options.agreement, 'small muted')}
+      <button class="button stack" type="submit">${say('bilingual', LABELS.expressPlace)}</button>
+    </form>
+    <p class="small muted">${say('bilingual', LABELS.expressOr)}</p>
+  </section>`;
+}
 
 /**
  * A signed-in shopper's address book (ADR-587): each address, the default first, with a form of

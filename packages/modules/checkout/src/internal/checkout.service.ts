@@ -826,6 +826,37 @@ export class CheckoutService {
   }
 
   /**
+   * Express checkout (CHK-21, ADR-838): places the order as the page showed it (`shown`) to the
+   * address `addressId` of the signed-in shopper's book, as the client's account session names
+   * it, paid on delivery, as {@link place} places any: their session proved the number (ADR-586),
+   * and the address is their own, as they saved it, so it isn't asked about again (ADR-682).
+   * Anything that stops it shows the page filled in from that address, saying why; without a
+   * session, or an address of the book, the page as it was.
+   */
+  async express(
+    token: string,
+    shown: string,
+    addressId: string,
+    options: { shopId?: string; client?: CheckoutClient } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    const account = options.client?.account ?? null;
+    const id = tryFromPublicId(addressId.slice(0, 64), 'accountAddress');
+    const form =
+      account && id
+        ? await this.db.tenant(found.shopId, (tx) => accountFormIn(tx, found.shopId, account, id))
+        : EMPTY_FORM;
+    if (!form.address1) return this.view(token, options.shopId, { account });
+    return this.place(
+      token,
+      shown,
+      { ...form, payment: 'cash_on_delivery', addressChecked: form.address1 },
+      options,
+    );
+  }
+
+  /**
    * Places the order as the page showed it (`shown`), to the address and number the shopper typed,
    * paid as they chose of the ways the page offered: on delivery, its risk scored as for any such
    * order, with the shop's fee for it, and none placed at the shop's limit for risk (ADR-099); or

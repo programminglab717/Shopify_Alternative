@@ -1556,6 +1556,59 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await f.checkouts.book(f.a.shopId, 'y'.repeat(500))).toBeNull();
   });
 
+  it("places a signed-in shopper's order in a tap, to an address of their book, paid on delivery (CHK-21, ADR-838)", async () => {
+    const token = await signIn(JAZZ);
+    const by = (account?: string) => ({
+      shopId: f.a.shopId,
+      client: { ip: null, userAgent: null, ...(account && { account }) },
+    });
+    await order(JAZZ);
+    await saved(token, typed('Home'));
+    const office = (await saved(token, typed('Office', { city: 'Karachi' }))).find(
+      (address) => address.name === 'Office',
+    )!;
+    const book = (await f.checkouts.book(f.a.shopId, token))!;
+    const home = book.find((each) => each.isDefault)!;
+    // Every order on delivery asks for a code from now: the session proves the number instead.
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }));
+
+    // The page offers it, to the default address, with the total on delivery.
+    const { secret } = await checkout();
+    const view = await f.checkouts.view(secret, f.a.shopId, { account: token });
+    if (view.kind !== 'open') throw new Error('Expected an open checkout');
+    const page = checkoutPage({ ...view, book }).html;
+    expect(page).toContain('Express checkout');
+    expect(page).toContain('<input type="hidden" name="action" value="express" />');
+    expect(page).toContain(`<input type="hidden" name="address" value="${home.id}" />`);
+    expect(page).toContain(home.summary.replace("'", '&#39;'));
+    // Not without a book, nor while the page says something is wrong.
+    expect(checkoutPage(view).html).not.toContain('Express checkout');
+    expect(checkoutPage({ ...view, book, problem: { kind: 'changed' } }).html).not.toContain(
+      'Express checkout',
+    );
+
+    // Without a session, or with another number's: the page, nothing placed.
+    expect(await f.checkouts.express(secret, view.shown, home.id, by())).toMatchObject({
+      kind: 'open',
+      form: { address1: '' },
+    });
+    const zong = await signIn(ZONG);
+    expect((await f.checkouts.express(secret, view.shown, home.id, by(zong))).kind).toBe('open');
+
+    // Placed in a tap, to the address chosen, its number proved by the session: no code sent.
+    const placed = await f.checkouts.express(secret, view.shown, office.id, by(token));
+    if (placed.kind !== 'placed') throw new Error(`Expected it placed: ${JSON.stringify(placed)}`);
+    expect(placed.order).toMatchObject({
+      paymentMethod: 'cash_on_delivery',
+      shippingAddress: { name: 'Office', city: 'Karachi' },
+    });
+    const { rows } = await f.admin.query<{ phone_verified_at: Date | null }>(
+      'SELECT phone_verified_at FROM orders.orders ORDER BY created_at DESC LIMIT 1',
+    );
+    expect(rows[0]!.phone_verified_at).toBeInstanceOf(Date);
+    expect(await sent('one_time_code')).toEqual([]);
+  });
+
   it('sweeps codes to sign in with once their day is up', async () => {
     await f.accounts.startSignIn(f.a.shopId, { phone: JAZZ });
     await f.accounts.startSignIn(f.a.shopId, { phone: ZONG });
