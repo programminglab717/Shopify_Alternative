@@ -1,13 +1,16 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { ChevronRight, Handshake, Store } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api/client';
+import { ShopGlanceQuery } from '../api/operations';
+import type { ShopGlanceData } from '../api/types';
 import { AuthLayout } from '../auth/auth-layout';
 import { ME_KEY, useMe, useSessionStore } from '../auth/context';
 import type { ShopAccess } from '../auth/session';
 import { errorText } from '../i18n/errors';
+import { formatMoney } from '../i18n/format';
 import { takePendingInvitation } from '../invitation/invitation-page';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -106,6 +109,58 @@ function PartnersLink() {
 }
 
 /**
+ * The account's shops at a glance (ADM-06, ADR-841), for one who works in more than one: each
+ * shop's sales today and the orders waiting to be confirmed and packed, read as each shop's home
+ * reads them, and what they come to together. A shop the member can't read orders of says
+ * nothing of them, and counts for nothing in the totals.
+ */
+function useGlances(shops: readonly ShopAccess[]) {
+  const store = useSessionStore();
+  return useQueries({
+    queries: shops.map((shop) => ({
+      queryKey: ['glance', shop.id],
+      queryFn: () => store.graphql<ShopGlanceData>(shop.id, ShopGlanceQuery),
+      retry: false,
+      staleTime: 60_000,
+    })),
+  });
+}
+
+function GlanceTotals({ glances }: { glances: (ShopGlanceData | undefined)[] }) {
+  const { t } = useLocale();
+  const read = glances.filter((each): each is ShopGlanceData => each !== undefined);
+  if (read.length === 0) return null;
+  const sum = (of: (glance: ShopGlanceData) => number) =>
+    read.reduce((total, glance) => total + of(glance), 0);
+  const sales = sum((glance) => Number(glance.home.today.sales.total.amount));
+  return (
+    <section
+      aria-label={t('shops.glance')}
+      className="grid grid-cols-3 gap-2 rounded-control border border-line p-3 text-center"
+    >
+      <p className="flex flex-col">
+        <span className="num font-semibold">{formatMoney(sales.toFixed(2))}</span>
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('shops.glanceSales', { count: sum((glance) => glance.home.today.sales.count) })}
+        </span>
+      </p>
+      <p className="flex flex-col">
+        <span className="num font-semibold">{sum((glance) => glance.home.toConfirm.count)}</span>
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('shops.glanceToConfirm')}
+        </span>
+      </p>
+      <p className="flex flex-col">
+        <span className="num font-semibold">{sum((glance) => glance.home.toPack.count)}</span>
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          {t('shops.glanceToPack')}
+        </span>
+      </p>
+    </section>
+  );
+}
+
+/**
  * The shops the account works in, each with its role there: one alone opens at once; none asks
  * for the merchant's first.
  */
@@ -121,6 +176,8 @@ export function ShopsPage() {
   // As does a partner's referral link to this page (ADR-505).
   useState(() => rememberReferral());
   const only = !invited && shops.length === 1 && closed.length === 0 ? shops[0] : undefined;
+  // Read only for an account of more than one shop.
+  const glances = useGlances(shops.length > 1 ? shops : []);
 
   useEffect(() => {
     if (invited) {
@@ -163,8 +220,9 @@ export function ShopsPage() {
         <OpenShopForm first={false} />
       ) : (
         <div className="flex flex-col gap-4">
+          {shops.length > 1 && <GlanceTotals glances={glances.map((each) => each.data)} />}
           <ul className="flex flex-col divide-y divide-line rounded-control border border-line">
-            {shops.map((shop) => (
+            {shops.map((shop, index) => (
               <li key={shop.id}>
                 <Link
                   to="/$shopId"
@@ -177,6 +235,15 @@ export function ShopsPage() {
                     <span className="text-secondary" dir="auto">
                       {shop.customRole?.name ?? t(`shops.role.${shop.role}` as MessageKey)}
                     </span>
+                    {glances[index]?.data && (
+                      <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                        {t('shops.glanceShop', {
+                          sales: formatMoney(glances[index].data.home.today.sales.total.amount),
+                          toConfirm: glances[index].data.home.toConfirm.count,
+                          toPack: glances[index].data.home.toPack.count,
+                        })}
+                      </span>
+                    )}
                   </span>
                   <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
                 </Link>

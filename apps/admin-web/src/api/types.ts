@@ -5800,3 +5800,12 @@ export interface ShopperPushesData {
 export interface PushCampaignSendData {
   pushCampaignSend: { campaign: PushCampaignValue | null; userErrors: UserError[] };
 }
+
+/** A shop at a glance (ADR-841). */
+export interface ShopGlanceData {
+  home: {
+    toConfirm: { count: number };
+    toPack: { count: number };
+    today: { sales: { count: number; total: { amount: string; currencyCode: string } } };
+  };
+}

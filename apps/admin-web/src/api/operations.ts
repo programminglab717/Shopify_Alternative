@@ -12036,3 +12036,29 @@ export const PushCampaignSendMutation = /* GraphQL */ `
   ${PUSH_CAMPAIGN}
   ${USER_ERRORS}
 `;
+
+/**
+ * A shop at a glance, for the account's view of all its shops (ADM-06, ADR-841): today's sales,
+ * and the orders waiting to be confirmed and packed.
+ */
+export const ShopGlanceQuery = /* GraphQL */ `
+  query ShopGlance {
+    home {
+      toConfirm {
+        count
+      }
+      toPack {
+        count
+      }
+      today {
+        sales {
+          count
+          total {
+            amount
+            currencyCode
+          }
+        }
+      }
+    }
+  }
+`;
