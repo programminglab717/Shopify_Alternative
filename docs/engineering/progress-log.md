@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Workflows
+### 8366c0e · Workflows
 
 * **Settings › Workflows:** the owner and managers make workflows: a trigger (an order placed,
   confirmed, paid, cancelled, delivered or returned; a customer added; an app's), conditions on
