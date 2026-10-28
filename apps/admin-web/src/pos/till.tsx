@@ -35,6 +35,7 @@ import {
   totalsOf,
   type CartLine,
 } from './cart';
+import { DeliverHome, placedText } from './deliver-home';
 import { receiptHtml, type ReceiptSale, type ReceiptWords } from './receipt';
 
 export const METHODS: readonly PosTenderMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER', 'WALLET'];
@@ -118,6 +119,8 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
   const [reference, setReference] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<Done | null>(null);
+  const [delivering, setDelivering] = useState(false);
+  const [placed, setPlaced] = useState<{ name: string; total: string; paid: string } | null>(null);
   const items = useMemo(() => catalog.data?.posCatalog ?? [], [catalog.data]);
   const found = useMemo(() => matching(items, query), [items, query]);
   const totals = totalsOf(lines, paisaOf(discount));
@@ -153,6 +156,8 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
     setReference('');
     setProblem(null);
     setDone(null);
+    setDelivering(false);
+    setPlaced(null);
     search.current?.focus();
   };
 
@@ -225,6 +230,20 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
         message={errorText(catalog.error, t)}
         action={<Button onClick={() => void catalog.refetch()}>{t('action.retry')}</Button>}
       />
+    );
+  }
+
+  if (placed) {
+    return (
+      <Card className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+        <h2 className="text-[length:var(--hatti-type-title-size)] font-semibold">
+          {t('pos.deliverPlacedTitle', { name: placed.name })}
+        </h2>
+        <p>{placedText(t, placed)}</p>
+        <Button className="self-start" onClick={fresh}>
+          {t('pos.newSale')}
+        </Button>
+      </Card>
     );
   }
 
@@ -392,10 +411,27 @@ export function Till({ register, sessionId }: { register: PosRegisterValue; sess
             <dd>{money(totals.total)}</dd>
           </div>
         </dl>
-        {!paying ? (
-          <Button disabled={lines.length === 0} onClick={() => setPaying(true)}>
-            {t('pos.charge', { amount: money(totals.total) })}
-          </Button>
+        {delivering ? (
+          <DeliverHome
+            sessionId={sessionId}
+            lines={lines}
+            discount={totals.discount}
+            onPlaced={setPlaced}
+            onBack={() => setDelivering(false)}
+          />
+        ) : !paying ? (
+          <div className="flex flex-col gap-2">
+            <Button disabled={lines.length === 0} onClick={() => setPaying(true)}>
+              {t('pos.charge', { amount: money(totals.total) })}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={lines.length === 0}
+              onClick={() => setDelivering(true)}
+            >
+              {t('pos.deliverHome')}
+            </Button>
+          </div>
         ) : (
           <form onSubmit={(event) => void complete(event)} className="flex flex-col gap-3">
             <fieldset className="flex flex-wrap gap-2">

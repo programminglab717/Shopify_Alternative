@@ -438,6 +438,11 @@ export class OrderService {
   async create(
     tenant: TenantContext,
     input: OrderCreateInput,
+    /**
+     * Placed at the shop's till (ADR-873): its source, how the timeline says it was placed, the
+     * customer confirmed it in person, and placed in the till's transaction.
+     */
+    till?: { tx: Tx; how: string },
   ): Promise<MutationResult<OrderRecord>> {
     const check = new InputChecker();
     const lineInputs = input.lineItems;
@@ -506,9 +511,11 @@ export class OrderService {
       shopId: tenant.shopId,
       currency: tenant.currency,
       actor: tenant.actor,
-      source: sourceOf(tenant),
-      how: tenant.actor.kind === 'staff' ? 'by staff' : 'through the API',
+      source: till ? 'pos' : sourceOf(tenant),
+      how: till?.how ?? (tenant.actor.kind === 'staff' ? 'by staff' : 'through the API'),
+      ...(till && { confirmedByCustomer: true }),
     };
+    if (till) return this.placeIn(till.tx, placement, order);
     return this.db.tenant(tenant.shopId, (tx) => this.placeIn(tx, placement, order));
   }
 

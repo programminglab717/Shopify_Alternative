@@ -24,12 +24,14 @@ import {
 import {
   POS_LIMITS,
   PosService,
+  type PosPickupRecord,
   type PosRegisterRecord,
   type PosSaleRecord,
   type PosSessionReport,
   type PosTenderMethod,
 } from '../pos.service.js';
 import { uuidOf } from './mappers.js';
+import { MailingAddressInput } from './order.types.js';
 
 export enum PosTenderMethodValue {
   CASH = 'CASH',
@@ -159,6 +161,14 @@ export class PosSession {
   @Field(() => Money)
   cashOut!: Money;
 
+  @Field(() => Int, {
+    description: 'Orders paid at the till: collected there, or sent home and paid for there.',
+  })
+  ordersPaidCount!: number;
+
+  @Field(() => Money)
+  ordersPaid!: Money;
+
   @Field(() => Money, { description: 'What the drawer should hold now, or held as it closed.' })
   expectedCash!: Money;
 
@@ -275,6 +285,124 @@ export class PosSale {
 
   @Field(() => [PosTender])
   tenders!: PosTender[];
+}
+
+@ObjectType({
+  description:
+    "A click-and-collect order waiting at the register's location (POS-06, ADR-873), to hand over " +
+    'at the till.',
+})
+export class PosPickup {
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field({ description: '"#1043".' })
+  name!: string;
+
+  @Field(() => String, { nullable: true })
+  customerName!: string | null;
+
+  @Field(() => Money)
+  total!: Money;
+
+  @Field(() => Money, { description: 'What it still owes, paid as it is collected.' })
+  owed!: Money;
+
+  @Field({
+    description: 'Whether it can be handed over now: confirmed, and not waiting to be paid.',
+  })
+  ready!: boolean;
+}
+
+@ObjectType()
+export class PosHandOverPayload {
+  @Field(() => ID, { nullable: true })
+  orderId!: string | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description: 'What was paid at the till as it was collected.',
+  })
+  paid!: Money | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+export enum PosDeliveryPayment {
+  PAID = 'PAID',
+  ADVANCE = 'ADVANCE',
+  ON_DELIVERY = 'ON_DELIVERY',
+}
+
+registerEnumType(PosDeliveryPayment, {
+  name: 'PosDeliveryPayment',
+  description: 'How an order the till sends home is paid.',
+  valuesMap: {
+    PAID: { description: 'In full at the till.' },
+    ADVANCE: { description: 'Its advance at the till, the rest on delivery.' },
+    ON_DELIVERY: { description: 'All of it on delivery.' },
+  },
+});
+
+@InputType()
+export class PosDeliveryOrderInput {
+  @Field(() => ID)
+  sessionId!: string;
+
+  @Field(() => [PosSaleLineInput])
+  lines!: PosSaleLineInput[];
+
+  @Field(() => String, { nullable: true })
+  discount?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'The delivery charge, in major units.' })
+  shippingPrice?: string | null;
+
+  @Field(() => MailingAddressInput)
+  address!: MailingAddressInput;
+
+  @Field(() => String, { nullable: true })
+  email?: string | null;
+
+  @Field(() => String, { nullable: true })
+  note?: string | null;
+
+  @Field(() => PosDeliveryPayment)
+  payment!: PosDeliveryPayment;
+
+  @Field(() => String, { nullable: true, description: 'With ADVANCE: what was paid now.' })
+  advance?: string | null;
+
+  @Field(() => PosTenderMethodValue, { nullable: true, description: 'Cash unless given.' })
+  method?: PosTenderMethodValue | null;
+
+  @Field(() => String, { nullable: true })
+  reference?: string | null;
+}
+
+@ObjectType()
+export class PosDeliveryOrder {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: '"#1043".' })
+  name!: string;
+
+  @Field(() => Money)
+  total!: Money;
+
+  @Field(() => Money, { description: 'Paid at the till.' })
+  paid!: Money;
+}
+
+@ObjectType()
+export class PosDeliveryOrderPayload {
+  @Field(() => PosDeliveryOrder, { nullable: true })
+  order!: PosDeliveryOrder | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType()
@@ -462,6 +590,8 @@ function toSession(report: PosSessionReport): PosSession {
     ),
     cashIn: pkr(report.cashIn),
     cashOut: pkr(report.cashOut),
+    ordersPaidCount: report.ordersPaid,
+    ordersPaid: pkr(report.ordersPaidAmount),
     expectedCash: pkr(report.expectedCash),
     countedCash: session.countedCash === null ? null : pkr(session.countedCash),
     difference: report.difference === null ? null : pkr(report.difference),
@@ -551,6 +681,32 @@ export class PosResolver {
           barcode: item.barcode,
           price: pkr(item.price),
           available: item.available,
+        }),
+      ) ?? null
+    );
+  }
+
+  @Query(() => [PosPickup], {
+    nullable: true,
+    description:
+      "The register location's click-and-collect orders not yet collected, the oldest first. " +
+      'Null for no such register.',
+  })
+  @RequireScopes('read_orders')
+  async posPickups(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('registerId', { type: () => ID }) registerId: string,
+  ): Promise<PosPickup[] | null> {
+    const pickups = await this.pos.pickups(tenant, idOf('posRegister', registerId));
+    return (
+      pickups?.map((pickup: PosPickupRecord) =>
+        Object.assign(new PosPickup(), {
+          orderId: toPublicId('order', pickup.orderId),
+          name: `#${pickup.number}`,
+          customerName: pickup.customerName,
+          total: pkr(pickup.total),
+          owed: pkr(pickup.owed),
+          ready: pickup.ready,
         }),
       ) ?? null
     );
@@ -737,6 +893,79 @@ export class PosResolver {
     });
     return Object.assign(new PosSalePayload(), {
       sale: result.ok ? toSale(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => PosHandOverPayload, {
+    description:
+      'A click-and-collect order handed over at the till: delivered there and then, and what it ' +
+      "still owed paid into the session's drawer, or as asked.",
+  })
+  @RequireScopes('write_orders')
+  async posPickupHandOver(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('sessionId', { type: () => ID }) sessionId: string,
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @Args('method', { type: () => PosTenderMethodValue, defaultValue: PosTenderMethodValue.CASH })
+    method: PosTenderMethodValue,
+    @Args('reference', { type: () => String, nullable: true }) reference?: string | null,
+  ): Promise<PosHandOverPayload> {
+    const result = await this.pos.handOver(tenant, {
+      sessionId: idOf('posSession', sessionId),
+      orderId: idOf('order', orderId),
+      method: methodOf(method),
+      reference: reference ?? null,
+    });
+    return Object.assign(new PosHandOverPayload(), {
+      orderId: result.ok ? orderId : null,
+      paid: result.ok ? pkr(result.value.paid) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => PosDeliveryOrderPayload, {
+    description:
+      "An order the till places for the customer's home (POS-08, the endless aisle): shipped " +
+      'from wherever the shop ships from, confirmed by the customer in person, and paid at the ' +
+      'till in full or its advance, or on delivery.',
+  })
+  @RequireScopes('write_orders')
+  async posOrderCreate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: PosDeliveryOrderInput,
+  ): Promise<PosDeliveryOrderPayload> {
+    const result = await this.pos.orderForDelivery(tenant, {
+      sessionId: idOf('posSession', input.sessionId),
+      lines: input.lines.map((line) => ({
+        variantId: idOf('variant', line.variantId),
+        quantity: line.quantity,
+        price: line.price ?? null,
+      })),
+      discount: input.discount ?? null,
+      shippingPrice: input.shippingPrice ?? null,
+      address: input.address,
+      email: input.email ?? null,
+      note: input.note ?? null,
+      payment:
+        input.payment === PosDeliveryPayment.PAID
+          ? 'paid'
+          : input.payment === PosDeliveryPayment.ADVANCE
+            ? 'advance'
+            : 'on_delivery',
+      advance: input.advance ?? null,
+      method: input.method ? methodOf(input.method) : null,
+      reference: input.reference ?? null,
+    });
+    return Object.assign(new PosDeliveryOrderPayload(), {
+      order: result.ok
+        ? Object.assign(new PosDeliveryOrder(), {
+            id: toPublicId('order', result.value.orderId),
+            name: `#${result.value.number}`,
+            total: pkr(result.value.total),
+            paid: pkr(result.value.paid),
+          })
+        : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

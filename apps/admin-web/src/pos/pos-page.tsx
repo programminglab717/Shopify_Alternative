@@ -24,6 +24,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { Pickups } from './pickups';
 import { SessionPanel } from './session-panel';
 import { Till } from './till';
 
@@ -170,7 +171,7 @@ export function PosPage() {
   const registers = useAdminQuery<PosRegistersData>(['posRegisters'], PosRegistersQuery);
   const [chosen, setChosen] = useState<string | null>(() => keptRegister(shop.id));
   const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<'sell' | 'session'>('sell');
+  const [view, setView] = useState<'sell' | 'pickups' | 'session'>('sell');
   const sets = permits(shop, SETS_SETTINGS);
 
   const title = (
@@ -244,7 +245,7 @@ export function PosPage() {
       ) : (
         <>
           <div role="tablist" aria-label={register.name} className="flex gap-2">
-            {(['sell', 'session'] as const).map((tab) => (
+            {(['sell', 'pickups', 'session'] as const).map((tab) => (
               <Button
                 key={tab}
                 role="tab"
@@ -252,12 +253,20 @@ export function PosPage() {
                 variant={view === tab ? 'primary' : 'secondary'}
                 onClick={() => setView(tab)}
               >
-                {t(tab === 'sell' ? 'pos.tabSell' : 'pos.tabSession')}
+                {t(
+                  tab === 'sell'
+                    ? 'pos.tabSell'
+                    : tab === 'pickups'
+                      ? 'pos.tabPickups'
+                      : 'pos.tabSession',
+                )}
               </Button>
             ))}
           </div>
           {view === 'sell' ? (
             <Till register={register} sessionId={register.openSessionId} />
+          ) : view === 'pickups' ? (
+            <Pickups register={register} sessionId={register.openSessionId} />
           ) : (
             <SessionPanel sessionId={register.openSessionId} onClosed={() => setView('sell')} />
           )}

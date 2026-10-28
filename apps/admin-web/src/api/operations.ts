@@ -12964,6 +12964,10 @@ const POS_SESSION = /* GraphQL */ `
     cashOut {
       amount
     }
+    ordersPaidCount
+    ordersPaid {
+      amount
+    }
     expectedCash {
       amount
     }
@@ -13174,5 +13178,61 @@ export const PosSaleReturnMutation = /* GraphQL */ `
     }
   }
   ${POS_SALE}
+  ${USER_ERRORS}
+`;
+
+/** Click-and-collect orders waiting at the register's location (POS-06, ADR-873). */
+export const PosPickupsQuery = /* GraphQL */ `
+  query PosPickups($registerId: ID!) {
+    posPickups(registerId: $registerId) {
+      orderId
+      name
+      customerName
+      total {
+        amount
+      }
+      owed {
+        amount
+      }
+      ready
+    }
+  }
+`;
+
+/** A click-and-collect order handed over at the till, what it owed paid into the drawer. */
+export const PosPickupHandOverMutation = /* GraphQL */ `
+  mutation PosPickupHandOver($sessionId: ID!, $orderId: ID!, $method: PosTenderMethod!) {
+    posPickupHandOver(sessionId: $sessionId, orderId: $orderId, method: $method) {
+      orderId
+      paid {
+        amount
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An order the till sends to the customer's home (POS-08, ADR-873). */
+export const PosOrderCreateMutation = /* GraphQL */ `
+  mutation PosOrderCreate($input: PosDeliveryOrderInput!) {
+    posOrderCreate(input: $input) {
+      order {
+        id
+        name
+        total {
+          amount
+        }
+        paid {
+          amount
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
   ${USER_ERRORS}
 `;

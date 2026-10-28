@@ -6389,6 +6389,9 @@ export interface PosSessionValue {
   tenders: { method: PosTenderMethod; amount: Amount }[];
   cashIn: Amount;
   cashOut: Amount;
+  /** Orders paid at the till: collected there, or sent home and paid for there (ADR-873). */
+  ordersPaidCount: number;
+  ordersPaid: Amount;
   expectedCash: Amount;
   countedCash: Amount | null;
   difference: Amount | null;
@@ -6441,4 +6444,31 @@ export interface PosSalesData {
 
 export interface PosSaleReturnData {
   posSaleReturn: { sale: PosSaleValue | null; userErrors: UserError[] };
+}
+
+/** A click-and-collect order waiting at the till (ADR-873). */
+export interface PosPickupValue {
+  orderId: string;
+  name: string;
+  customerName: string | null;
+  total: Amount;
+  owed: Amount;
+  ready: boolean;
+}
+
+export interface PosPickupsData {
+  posPickups: PosPickupValue[] | null;
+}
+
+export interface PosPickupHandOverData {
+  posPickupHandOver: { orderId: string | null; paid: Amount | null; userErrors: UserError[] };
+}
+
+export type PosDeliveryPayment = 'PAID' | 'ADVANCE' | 'ON_DELIVERY';
+
+export interface PosOrderCreateData {
+  posOrderCreate: {
+    order: { id: string; name: string; total: Amount; paid: Amount } | null;
+    userErrors: UserError[];
+  };
 }

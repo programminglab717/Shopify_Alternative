@@ -291,4 +291,124 @@ describe.skipIf(!server)("The shop's till: registers, sessions, sales and return
     });
     expect(theirs.nodes).toEqual([{ name: '#P1' }]);
   });
+
+  it('hands over click-and-collect orders, and sends orders home, the money in the drawer (ADR-873)', async () => {
+    const register = (
+      await data(
+        `mutation ($input: PosRegisterInput!) {
+          posRegisterSave(input: $input) { register { id } userErrors { code } } }`,
+        { input: { name: 'Counter 2', locationId: location } },
+      )
+    ).register.id as string;
+    const session = (
+      await data(
+        `mutation ($id: ID!) {
+          posSessionOpen(registerId: $id, openingFloat: "1,000") { session { id } } }`,
+        { id: register },
+      )
+    ).session.id as string;
+    await data(
+      `mutation ($id: ID!) {
+        locationEdit(id: $id, input: { address: { address1: "Shop 4, Liberty Market", city: "lhr" } }) {
+          userErrors { code } } }`,
+      { id: location },
+    );
+    await data(
+      `mutation ($settings: LocalPickupSettingsInput!) {
+        locationLocalPickupEnable(localPickupSettings: $settings) { userErrors { code } } }`,
+      { settings: { locationId: location, instructions: 'Ask at the counter' } },
+    );
+    const kurta = await stocked('Khaddar Kurta', '2,500', 5);
+    const address = {
+      name: 'Ayesha Khan',
+      phone: '0300 7654321',
+      address1: 'House 12, Street 4',
+      city: 'lhr',
+    };
+    const placed = await data(
+      `mutation ($input: OrderCreateInput!) {
+        orderCreate(input: $input) { order { id name } userErrors { field code message } } }`,
+      {
+        input: {
+          lineItems: [{ variantId: kurta.variant, quantity: 1 }],
+          shippingAddress: address,
+          deliveryMethod: 'PICKUP',
+        },
+      },
+    );
+    const order = placed.order.id as string;
+    const pickups = `query ($id: ID!) {
+      posPickups(registerId: $id) { orderId name customerName owed { amount } ready } }`;
+    // Waiting for the customer to confirm: not to hand over yet.
+    expect(await data(pickups, { id: register })).toEqual([
+      {
+        orderId: order,
+        name: placed.order.name,
+        customerName: 'Ayesha Khan',
+        owed: { amount: '2500.00' },
+        ready: false,
+      },
+    ]);
+    await data(`mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`, {
+      id: order,
+    });
+    const hand = `mutation ($session: ID!, $order: ID!) {
+      posPickupHandOver(sessionId: $session, orderId: $order) {
+        orderId paid { amount } userErrors { field code message } } }`;
+    const handed = await data(hand, { session, order });
+    expect(handed).toMatchObject({ orderId: order, paid: { amount: '2500.00' }, userErrors: [] });
+    const done = await data(
+      `query ($id: ID!) { order(id: $id) { stage financialStatus amountPaid { amount } } }`,
+      { id: order },
+    );
+    expect(done).toEqual({
+      stage: 'COMPLETED',
+      financialStatus: 'PAID',
+      amountPaid: { amount: '2500.00' },
+    });
+    expect(await data(pickups, { id: register })).toEqual([]);
+    expect((await data(hand, { session, order })).userErrors).not.toEqual([]);
+
+    // Sent home from the till: confirmed by the customer there, its advance in the drawer.
+    const sent = await data(
+      `mutation ($input: PosDeliveryOrderInput!) {
+        posOrderCreate(input: $input) {
+          order { id name total { amount } paid { amount } } userErrors { field code message } } }`,
+      {
+        input: {
+          sessionId: session,
+          lines: [{ variantId: kurta.variant, quantity: 2 }],
+          address: { ...address, city: 'khi' },
+          payment: 'ADVANCE',
+          advance: '1,000',
+        },
+      },
+    );
+    expect(sent.userErrors).toEqual([]);
+    expect(sent.order).toMatchObject({ total: { amount: '5000.00' }, paid: { amount: '1000.00' } });
+    const home = await data(
+      `query ($id: ID!) { order(id: $id) {
+        source confirmationStatus amountPaid { amount } tags } }`,
+      { id: sent.order.id },
+    );
+    expect(home).toEqual({
+      source: 'POS',
+      confirmationStatus: 'CONFIRMED',
+      amountPaid: { amount: '1000.00' },
+      tags: ['pos'],
+    });
+    const report = await data(
+      `query ($id: ID!) { posSession(id: $id) {
+        ordersPaidCount ordersPaid { amount } expectedCash { amount }
+        tenders { method amount { amount } } } }`,
+      { id: session },
+    );
+    expect(report).toEqual({
+      ordersPaidCount: 2,
+      ordersPaid: { amount: '3500.00' },
+      // 1,000 float + 2,500 collected + 1,000 advance.
+      expectedCash: { amount: '4500.00' },
+      tenders: [{ method: 'CASH', amount: { amount: '3500.00' } }],
+    });
+  });
 });

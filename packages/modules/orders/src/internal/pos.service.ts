@@ -15,7 +15,10 @@ import { InventoryService, LocationService, StockService } from '@hatti/inventor
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import type { AddressInput } from './address.js';
 import { OrderEvents } from './events.js';
+import { FulfillmentService } from './fulfillment.service.js';
+import { OrderService } from './order.service.js';
 
 // The shop's tills (POS-01, POS-02, POS-05, POS-07, ADR-872). A register sells from one of the
 // shop's locations, in cash sessions staff open with a float and close by counting the drawer;
@@ -95,6 +98,9 @@ export interface PosSessionReport {
   tenders: { method: PosTenderMethod; amount: bigint }[];
   cashIn: bigint;
   cashOut: bigint;
+  /** Orders paid at the till (ADR-873): collected there, or sent home and paid for there. */
+  ordersPaid: number;
+  ordersPaidAmount: bigint;
   /** What the drawer should hold now, or held as it closed. */
   expectedCash: bigint;
   /** Counted less expected: short below zero, over above; null while open. */
@@ -151,6 +157,35 @@ export interface PosSaleInput {
   note?: string | null;
   /** When the till sold it, for a sale sent later; now unless given. */
   soldAt?: Date | null;
+}
+
+/** A click-and-collect order waiting at the register's location (POS-06, ADR-873). */
+export interface PosPickupRecord {
+  orderId: string;
+  number: number;
+  customerName: string | null;
+  total: bigint;
+  /** What it still owes, to be paid as it is collected. */
+  owed: bigint;
+  /** Whether it can be handed over now: confirmed, and not waiting for a transfer. */
+  ready: boolean;
+  createdAt: Date;
+}
+
+/** An order the till places for the customer's home (POS-08, ADR-873). */
+export interface PosDeliveryInput {
+  sessionId: string;
+  lines: { variantId: string; quantity: number; price?: string | null }[];
+  discount?: string | null;
+  shippingPrice?: string | null;
+  address: AddressInput;
+  email?: string | null;
+  note?: string | null;
+  /** Paid in full at the till, an advance paid there, or all of it on delivery. */
+  payment: 'paid' | 'advance' | 'on_delivery';
+  advance?: string | null;
+  method?: PosTenderMethod | null;
+  reference?: string | null;
 }
 
 export interface PosReturnInput {
@@ -235,6 +270,9 @@ async function expectedCashIn(tx: Tx, shopId: string, session: PosSessionRecord)
       - coalesce((SELECT sum(change_given) FROM orders.pos_sales
                    WHERE shop_id = ${shopId} AND session_id = ${session.id}), 0)
       - coalesce((SELECT sum(amount) FROM orders.pos_returns
+                   WHERE shop_id = ${shopId} AND session_id = ${session.id}
+                     AND method = 'cash'), 0)
+      + coalesce((SELECT sum(amount) FROM orders.pos_order_payments
                    WHERE shop_id = ${shopId} AND session_id = ${session.id}
                      AND method = 'cash'), 0)
       + coalesce((SELECT sum(CASE kind WHEN 'in' THEN amount ELSE -amount END)
@@ -386,6 +424,8 @@ export class PosService {
     private readonly stock: StockService,
     private readonly customers: CustomerService,
     private readonly inventory: InventoryService,
+    private readonly orders: OrderService,
+    private readonly fulfillment: FulfillmentService,
   ) {}
 
   /**
@@ -646,12 +686,19 @@ export class PosService {
            WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id} AND change_given > 0
           UNION ALL
           SELECT method, -amount FROM orders.pos_returns
+           WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id}
+          UNION ALL
+          SELECT method, amount FROM orders.pos_order_payments
            WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id}) paid
          GROUP BY method ORDER BY method`);
       const { rows: moves } = await tx.execute<{ cash_in: string; cash_out: string }>(sql`
         SELECT coalesce(sum(amount) FILTER (WHERE kind = 'in'), 0)::text AS cash_in,
                coalesce(sum(amount) FILTER (WHERE kind = 'out'), 0)::text AS cash_out
           FROM orders.pos_cash_movements
+         WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id}`);
+      const { rows: orders } = await tx.execute<{ count: number; amount: string }>(sql`
+        SELECT count(*)::int AS count, coalesce(sum(amount), 0)::text AS amount
+          FROM orders.pos_order_payments
          WHERE shop_id = ${tenant.shopId} AND session_id = ${session.id}`);
       const expected = session.expectedCash ?? (await expectedCashIn(tx, tenant.shopId, session));
       return {
@@ -665,6 +712,8 @@ export class PosService {
         tenders: tenders.map((row) => ({ method: row.method, amount: BigInt(row.amount) })),
         cashIn: BigInt(moves[0]!.cash_in),
         cashOut: BigInt(moves[0]!.cash_out),
+        ordersPaid: orders[0]!.count,
+        ordersPaidAmount: BigInt(orders[0]!.amount),
         expectedCash: expected,
         difference: session.countedCash === null ? null : session.countedCash - expected,
       };
@@ -844,6 +893,185 @@ export class PosService {
       });
       return { ok: true, value: (await saleIn(tx, tenant.shopId, id))! };
     });
+  }
+
+  /** The register location's click-and-collect orders not yet collected, the oldest first. */
+  async pickups(tenant: TenantContext, registerId: string): Promise<PosPickupRecord[] | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const register = await registerIn(tx, tenant.shopId, registerId);
+      if (!register) return null;
+      const { rows } = await tx.execute<{
+        id: string;
+        number: number;
+        name: string | null;
+        total: string;
+        owed: string;
+        ready: boolean;
+        created_at: string | Date;
+      }>(sql`
+        SELECT id, number, shipping_address->>'name' AS name, total::text,
+               (total - amount_paid)::text AS owed,
+               confirmation_status IN ('confirmed', 'not_required')
+                 AND stage <> 'awaiting_payment' AS ready,
+               created_at
+          FROM orders.orders
+         WHERE shop_id = ${tenant.shopId} AND location_id = ${register.locationId}
+           AND delivery_method = 'pickup' AND status = 'open'
+           AND fulfillment_status IN ('unfulfilled', 'partially_fulfilled')
+         ORDER BY created_at, id
+         LIMIT 100`);
+      return rows.map((row) => ({
+        orderId: row.id,
+        number: row.number,
+        customerName: row.name,
+        total: BigInt(row.total),
+        owed: BigInt(row.owed),
+        ready: row.ready,
+        createdAt: toDate(row.created_at),
+      }));
+    });
+  }
+
+  /**
+   * A click-and-collect order handed over at the till (POS-06): what is left of it delivered
+   * there and then, and what it still owed paid into the session as `method`.
+   */
+  async handOver(
+    tenant: TenantContext,
+    input: {
+      sessionId: string;
+      orderId: string;
+      method: PosTenderMethod;
+      reference?: string | null;
+    },
+  ): Promise<MutationResult<{ orderId: string; paid: bigint }>> {
+    const check = new InputChecker();
+    if (!(POS_TENDER_METHODS as readonly string[]).includes(input.method)) {
+      check.add(['input', 'method'], 'INVALID', 'is not a way to pay');
+    }
+    const reference = check.text(['input', 'reference'], input.reference, {
+      max: POS_LIMITS.reference,
+    });
+    if (!check.ok) return fail(check.errors);
+    const actor = actorColumnsOf(tenant.actor);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const open = await this.#openSessionIn(tx, tenant.shopId, input.sessionId);
+      if (!open.ok) return open;
+      const { session, register } = open.value;
+      if (!UUID.test(input.orderId)) {
+        return failOne(['input', 'orderId'], 'NOT_FOUND', 'Order not found');
+      }
+      const { rows } = await tx.execute<{ location_id: string; owed: string }>(sql`
+        SELECT location_id, (total - amount_paid)::text AS owed FROM orders.orders
+         WHERE shop_id = ${tenant.shopId} AND id = ${input.orderId} FOR UPDATE`);
+      const found = rows[0];
+      if (!found) return failOne(['input', 'orderId'], 'NOT_FOUND', 'Order not found');
+      if (found.location_id !== register.locationId) {
+        return failOne(
+          ['input', 'orderId'],
+          'INVALID',
+          'The order is collected at another location',
+        );
+      }
+      const owed = BigInt(found.owed);
+      const handed = await this.fulfillment.pickUpIn(tx, tenant, input.orderId);
+      if (!handed.ok) {
+        return fail(handed.errors.map((error) => ({ ...error, field: ['input', 'orderId'] })));
+      }
+      if (owed > 0n) {
+        await tx.execute(sql`
+          INSERT INTO orders.pos_order_payments
+                 (shop_id, id, session_id, order_id, kind, method, amount, reference, actor_kind,
+                  actor_id)
+          VALUES (${tenant.shopId}, ${newId()}, ${session.id}, ${input.orderId}, 'pickup',
+                  ${input.method}, ${owed}, ${reference}, ${actor.actorKind}, ${actor.actorId})`);
+      }
+      return { ok: true, value: { orderId: input.orderId, paid: owed } };
+    });
+  }
+
+  /**
+   * An order the till places for the customer's home (POS-08, the endless aisle): what the shop
+   * sells, from wherever it ships from, to their address, confirmed by them in person; paid at the
+   * till in full or its advance, into the session as `method`, or all of it on delivery.
+   */
+  async orderForDelivery(
+    tenant: TenantContext,
+    input: PosDeliveryInput,
+  ): Promise<MutationResult<{ orderId: string; number: number; total: bigint; paid: bigint }>> {
+    const check = new InputChecker();
+    const method = input.method ?? 'cash';
+    if (input.payment !== 'on_delivery') {
+      if (!(POS_TENDER_METHODS as readonly string[]).includes(method)) {
+        check.add(['input', 'method'], 'INVALID', 'is not a way to pay');
+      }
+    }
+    const advance =
+      input.payment === 'advance'
+        ? check.price(['input', 'advance'], input.advance, CURRENCY, { required: true })
+        : null;
+    if (advance === 0n) check.add(['input', 'advance'], 'INVALID', 'must be more than zero');
+    const reference = check.text(['input', 'reference'], input.reference, {
+      max: POS_LIMITS.reference,
+    });
+    if (!check.ok) return fail(check.errors);
+    const actor = actorColumnsOf(tenant.actor);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const open = await this.#openSessionIn(tx, tenant.shopId, input.sessionId);
+      if (!open.ok) return open;
+      const { session, register } = open.value;
+      const placed = await this.orders.create(
+        tenant,
+        {
+          lineItems: input.lines,
+          shippingAddress: input.address,
+          email: input.email ?? null,
+          paymentMethod: input.payment === 'paid' ? 'prepaid' : 'cash_on_delivery',
+          ...(advance !== null && { advancePaid: input.advance! }),
+          shippingPrice: input.shippingPrice ?? null,
+          discount: input.discount ?? null,
+          note: input.note ?? null,
+          tags: ['pos'],
+        },
+        { tx, how: `at the till, ${register.name}` },
+      );
+      if (!placed.ok) return placed;
+      const order = placed.value;
+      const paid = input.payment === 'paid' ? order.total : (advance ?? 0n);
+      if (paid > 0n) {
+        await tx.execute(sql`
+          INSERT INTO orders.pos_order_payments
+                 (shop_id, id, session_id, order_id, kind, method, amount, reference, actor_kind,
+                  actor_id)
+          VALUES (${tenant.shopId}, ${newId()}, ${session.id}, ${order.id}, 'delivery',
+                  ${method}, ${paid}, ${reference}, ${actor.actorKind}, ${actor.actorId})`);
+      }
+      return {
+        ok: true,
+        value: { orderId: order.id, number: order.number, total: order.total, paid },
+      };
+    });
+  }
+
+  /** The session `id`, open, locked, with its register; or why money can't be taken in it. */
+  async #openSessionIn(
+    tx: Tx,
+    shopId: string,
+    id: string,
+  ): Promise<
+    MutationResult<{
+      session: PosSessionRecord;
+      register: { id: string; locationId: string; name: string };
+    }>
+  > {
+    const session = await sessionIn(tx, shopId, id, { lock: true });
+    if (!session) return failOne(['input', 'sessionId'], 'NOT_FOUND', 'No such session');
+    if (session.closedAt) {
+      return failOne(['input', 'sessionId'], 'INVALID', 'The register’s session is closed');
+    }
+    const register = await registerIn(tx, shopId, session.registerId);
+    if (!register) return failOne(['input', 'sessionId'], 'NOT_FOUND', 'No such register');
+    return { ok: true, value: { session, register } };
   }
 
   /** The sale `id`; null for none. */

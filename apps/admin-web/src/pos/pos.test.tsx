@@ -112,6 +112,8 @@ function session(extra: Partial<PosSessionValue> = {}): PosSessionValue {
     tenders: [{ method: 'CASH', amount: amount('7000.00') }],
     cashIn: amount('0.00'),
     cashOut: amount('0.00'),
+    ordersPaidCount: 0,
+    ordersPaid: amount('0.00'),
     expectedCash: amount('12000.00'),
     countedCash: null,
     difference: null,
@@ -206,6 +208,47 @@ function core(options: { registers?: { id: string; openSessionId: string | null 
                 tenders: [{ method: 'CASH', amount: amount('6000.00'), reference: null }],
               },
             ],
+          },
+        };
+      case 'PosPickups':
+        return {
+          posPickups: [
+            {
+              orderId: 'gid://hatti/Order/7',
+              name: '#1043',
+              customerName: 'Ayesha Khan',
+              total: amount('2500.00'),
+              owed: amount('2500.00'),
+              ready: true,
+            },
+            {
+              orderId: 'gid://hatti/Order/8',
+              name: '#1044',
+              customerName: null,
+              total: amount('900.00'),
+              owed: amount('0.00'),
+              ready: false,
+            },
+          ],
+        };
+      case 'PosPickupHandOver':
+        return {
+          posPickupHandOver: {
+            orderId: variables.orderId,
+            paid: amount('2500.00'),
+            userErrors: [],
+          },
+        };
+      case 'PosOrderCreate':
+        return {
+          posOrderCreate: {
+            order: {
+              id: 'gid://hatti/Order/9',
+              name: '#1045',
+              total: amount('3000.00'),
+              paid: amount('1000.00'),
+            },
+            userErrors: [],
           },
         };
       case 'PosSaleReturn':
@@ -371,5 +414,64 @@ describe("The shop's till in the admin (POS-01, POS-02, POS-07, ADR-872)", () =>
     fireEvent.click(screen.getByRole('button', { name: 'Close and print the Z report' }));
     expect(await screen.findByRole('heading', { name: 'Register closed' })).toBeTruthy();
     expect(screen.getByText('The drawer is Rs 200 short.')).toBeTruthy();
+  });
+
+  it('hands over a click-and-collect order, collecting what it owes (POS-06, ADR-873)', async () => {
+    const fake = core({ registers: [{ id: 'preg_1', openSessionId: 'pses_1' }] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/pos');
+    fireEvent.click(await screen.findByRole('tab', { name: 'Pickups' }));
+    // One not confirmed waits; the other is handed over, its money collected.
+    const waiting = await screen.findByRole('button', { name: 'Hand over #1044' });
+    expect((waiting as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Waits for the customer to confirm, or for its payment.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('What they owe, paid by'), {
+      target: { value: 'WALLET' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Hand over #1043' }));
+    expect(await screen.findByText('#1043 handed over, Rs 2,500 paid.')).toBeTruthy();
+    expect(sentOf(fake, 'PosPickupHandOver')).toEqual([
+      { sessionId: 'pses_1', orderId: 'gid://hatti/Order/7', method: 'WALLET' },
+    ]);
+  });
+
+  it('sends the cart to the customer’s home, its advance paid at the till (POS-08)', async () => {
+    const fake = core({ registers: [{ id: 'preg_1', openSessionId: 'pses_1' }] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/pos');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Lawn Suit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send to their home' }));
+    fireEvent.change(screen.getByLabelText('Customer’s name'), { target: { value: 'Ayesha' } });
+    fireEvent.change(screen.getByLabelText('Mobile number'), {
+      target: { value: '0300 7654321' },
+    });
+    fireEvent.change(screen.getByLabelText('House and street'), {
+      target: { value: 'House 12, Street 4' },
+    });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Karachi' } });
+    fireEvent.change(screen.getByLabelText('Paid'), { target: { value: 'ADVANCE' } });
+    fireEvent.change(screen.getByLabelText('Advance paid now (Rs)'), {
+      target: { value: '1,000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Place the order' }));
+    expect(await screen.findByRole('heading', { name: 'Order #1045 placed' })).toBeTruthy();
+    expect(screen.getByText('#1045 ships from the shop’s stock; Rs 1,000 paid now.')).toBeTruthy();
+    expect(sentOf(fake, 'PosOrderCreate')).toEqual([
+      {
+        input: {
+          sessionId: 'pses_1',
+          lines: [{ variantId: SUIT.variantId, quantity: 1 }],
+          address: {
+            name: 'Ayesha',
+            phone: '0300 7654321',
+            address1: 'House 12, Street 4',
+            city: 'Karachi',
+          },
+          payment: 'ADVANCE',
+          advance: '1,000',
+          method: 'CASH',
+        },
+      },
+    ]);
   });
 });

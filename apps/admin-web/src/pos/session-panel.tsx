@@ -43,6 +43,7 @@ function ZReport({ session }: { session: PosSessionValue }) {
       (tender) =>
         [t(METHOD_LABELS[tender.method]), formatMoney(tender.amount.amount)] as [string, string],
     ),
+    [t('pos.z.orders', { count: session.ordersPaidCount }), formatMoney(session.ordersPaid.amount)],
     [t('pos.z.cashIn'), formatMoney(session.cashIn.amount)],
     [t('pos.z.cashOut'), `-${formatMoney(session.cashOut.amount)}`],
     [t('pos.z.expected'), formatMoney(session.expectedCash.amount)],
