@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### The console's trust queues
+
+* **Reports:** Hatti's people decide shoppers' reports of stores in the console, as the agent
+  signed in ([ADR-877](../architecture/13-decision-log.md#adr-877--the-consoles-trust-queues-shoppers-reports-decided-stores-taken-down-and-restored-owners-appeals-refused-and-shops-verifications-decided-or-taken-back-as-the-agent-signed-in-a-verifications-documents-linked-only-when-an-agent-asks-which-is-logged)).
+* **Stores down:** they take stores down, refuse their owners' appeals and restore them.
+* **Verifications:** they decide shops' verifications. A verification's CNIC photos are linked
+  only when an agent asks, and each ask is logged.
+* Still on the command: SMS sender names, rights complaints, flagged listings and signs of scam
+  stores, next.
+* 4755 tests (7 new).
+
 ### 44cde40 · Hatti's console
 
 * **Console:** Hatti's people now have a console of their own, at its own address. They sign in

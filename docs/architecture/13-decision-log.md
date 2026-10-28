@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-876 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-877 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -884,6 +884,7 @@
 | 874 | Cashiers at a shared till: each member of staff's own PIN, kept as a scrypt verifier, signs them in for a shift; the till's sales carry a sealed token naming who rang them up, offline too; five wrong PINs lock the till's sign-ins | Accepted |
 | 875 | Daraz sync: a shop connects its Daraz seller account through Daraz's own page; every ten minutes Hatti brings Daraz's new orders in as prepaid marketplace orders, follows their cancellations, and gives Daraz each matching SKU's stock, and prices where asked, from one location | Accepted |
 | 876 | Hatti's console: its own people sign in through Hatti's identity provider with their security keys, to a server of its own that holds the system login the API never does; sessions last a working day, and each thing done is logged before it is done; shops' support requests are its first queue | Accepted |
+| 877 | The console's trust queues: shoppers' reports decided, stores taken down and restored, owners' appeals refused, and shops' verifications decided or taken back, as the agent signed in; a verification's documents linked only when an agent asks, which is logged | Accepted |
 
 ---
 
@@ -29087,3 +29088,35 @@
     keys required, and an employee who leaves keeps their account until someone notices.
   * **A hosted internal-tools builder (Retool and the like):** paid per seat, and the system
     login with a third party.
+
+## ADR-877 · The console's trust queues: shoppers' reports decided, stores taken down and restored, owners' appeals refused, and shops' verifications decided or taken back, as the agent signed in; a verification's documents linked only when an agent asks, which is logged
+
+* **Context:**
+  * The console has Hatti's people sign in with their keys and logs what they do (ADR-876).
+    Its first queue was shops' support requests.
+  * Reports of stores (ADR-460), takedowns (ADR-461), appeals (ADR-462) and verifications
+    (ADR-465) were decided through `trust-reports`, a command run with the system login, each
+    naming who decided by `--by`.
+* **Decision:**
+  * **Reports:** those open, the soonest due first, overdue ones marked, with how many of the
+    store's are open. Each is upheld with what was done, or dismissed with why. A report links
+    on to taking its store down.
+  * **Stores down:** a store taken down by its handle, with why: its owner is told first, with
+    the link to appeal by, as the command does. Those down are listed with their owners' appeals,
+    each refused with why, or the store restored, which upholds the appeal.
+  * **Verifications:** those waiting, the owner's CNIC in full while it waits.
+    * The documents' links, good for an hour, are given only when an agent asks for them, and
+      each ask is logged.
+    * Each is verified, with a note, or refused with why, its documents then deleted.
+    * A shop's verification is taken back by its handle: a business's goes with its owner's.
+  * Each decision is the signed-in agent's, by name, logged before it is made; the shop is told
+    as the command tells it. Lists show what waits, or everything.
+  * The console's server reads the core's public address, for appeal links, and storage, for the
+    documents, as the API does.
+* **Consequences:**
+  * Trust and safety work happens in a browser, accounted for by name. The command remains.
+  * SMS sender names, rights complaints and their answers, flagged listings and signs of scam
+    stores are still the command's, and come to the console next.
+* **Alternatives:**
+  * **Every verification's document links in the list:** each agent who opened the page would
+    reach every CNIC, with nothing logged.
