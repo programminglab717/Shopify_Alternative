@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Customers by how recently and often they buy
+### 23f3658 · Customers by how recently and often they buy
 
 * **Grid:** each customer who has ordered, by the days since their last order and their
   delivered orders, in nine groups from champions to lost ([ADR-887](../architecture/13-decision-log.md#adr-887--customers-by-how-recently-and-often-they-buy-rfm-on-a-grid-of-three-by-three-by-the-days-since-their-last-order-against-two-lines-the-shop-picks-and-by-their-delivered-orders-each-group-a-segments-query)).
