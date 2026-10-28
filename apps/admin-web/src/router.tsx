@@ -130,6 +130,7 @@ import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { AccessRequestPage } from './shops/access-request-page';
+import { OAuthPage } from './shops/oauth-page';
 import { PartnerPage } from './shops/partner-page';
 import { ShopsPage } from './shops/shops-page';
 import { NewTransferPage, validateNewTransferSearch } from './transfers/new-transfer-page';
@@ -155,6 +156,7 @@ const PUBLIC_PATHS = [
   '/sign-in',
   '/sign-up',
   '/invitation',
+  '/oauth/authorize',
   '/forgot-password',
   '/reset-password',
   '/verify-email',
@@ -992,6 +994,13 @@ const invitation = createRoute({
   component: InvitationPage,
 });
 
+// A public app's install link (DEV-05, ADR-851); a merchant not signed in is asked to, first.
+const oauthAuthorize = createRoute({
+  getParentRoute: () => root,
+  path: '/oauth/authorize',
+  component: OAuthPage,
+});
+
 export const routeTree = root.addChildren([
   index,
   signIn,
@@ -1001,6 +1010,7 @@ export const routeTree = root.addChildren([
   askAccess,
   partners,
   invitation,
+  oauthAuthorize,
   forgotPassword,
   resetPassword,
   verifyEmail,

@@ -58,7 +58,13 @@ export type AuthErrorCode =
   | 'SHOP_NOT_FOUND'
   | 'TOO_MANY_REQUESTS'
   | 'REQUEST_WAITING'
-  | 'NOT_PARTNER';
+  | 'NOT_PARTNER'
+  // Public apps (ADR-851): too many registered, a member who may not install one, an app not
+  // yet listed, and a code, client ID or secret that is not good.
+  | 'TOO_MANY_APPS'
+  | 'FORBIDDEN'
+  | 'NOT_LISTED'
+  | 'INVALID_GRANT';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

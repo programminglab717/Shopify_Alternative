@@ -19,6 +19,7 @@ import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { forgetReferral, referralCode, rememberReferral } from './referral';
 import { TextField } from '../ui/field';
 import { ClosedShops } from './closed-shops';
+import { takePendingInstall } from './oauth-page';
 import { TermsAgreement, useTermsAgreement } from './terms-agreement';
 
 /** Opening a shop (ONB-01, ONB-10): its name; Pakistan's currency and time, and Free, to start. */
@@ -175,19 +176,24 @@ export function ShopsPage() {
   const [invited] = useState(takePendingInvitation);
   // As does a partner's referral link to this page (ADR-505).
   useState(() => rememberReferral());
-  const only = !invited && shops.length === 1 && closed.length === 0 ? shops[0] : undefined;
+  // And an app's install link (ADR-851).
+  const [installing] = useState(takePendingInstall);
+  const only =
+    !invited && !installing && shops.length === 1 && closed.length === 0 ? shops[0] : undefined;
   // Read only for an account of more than one shop.
   const glances = useGlances(shops.length > 1 ? shops : []);
 
   useEffect(() => {
     if (invited) {
       void navigate({ to: '/invitation', hash: `token=${invited}`, replace: true });
+    } else if (installing) {
+      void navigate({ href: installing, replace: true });
     } else if (only) {
       void navigate({ to: '/$shopId', params: { shopId: only.id }, replace: true });
     }
-  }, [invited, only, navigate]);
+  }, [invited, installing, only, navigate]);
 
-  if (me.isPending || only || invited) {
+  if (me.isPending || only || invited || installing) {
     return (
       <AuthLayout title={t('shops.title')}>
         <Loading label={t('state.loading')} />

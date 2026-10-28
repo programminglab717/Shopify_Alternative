@@ -35,6 +35,7 @@ import { TextField } from '../ui/field';
 import { FormSection } from '../products/product-form';
 import { SelectField } from './settings-form';
 import { AppWebhooks } from './app-webhooks';
+import { InstalledApps } from './installed-apps';
 import { StorefrontTokens } from './storefront-tokens';
 import { BackToSettings } from './settings-page';
 
@@ -453,6 +454,7 @@ export function AppsPage() {
       </h1>
       <p className="text-secondary">{t('apps.hint')}</p>
       {body()}
+      <InstalledApps />
       <StorefrontTokens />
     </div>
   );

@@ -8,6 +8,7 @@ import {
   Optional,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseFilters,
@@ -15,12 +16,13 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import { PublicSite } from '@hatti/api';
-import { toPublicId } from '@hatti/ids';
+import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { shopAgreementDocuments } from './agreements.js';
 import { AuthError } from './errors.js';
+import { PartnerAppsService, type PartnerAppRecord } from './partner-apps.service.js';
 import {
   IdentityService,
   type AuthenticatedSession,
@@ -147,6 +149,24 @@ const shopBody = z.object({
 const agreementBody = shopBody.pick({ agreed: true });
 const closeBody = z.object({ name: z.string().max(1_024) });
 const codeBody = z.object({ code: z.string().max(32) });
+const partnerAppBody = z.object({
+  name: z.string().max(1_024),
+  appUrl: z.string().max(1_024),
+  redirectUrls: z.array(z.string().max(1_024)).max(10),
+  scopes: z.array(z.string().max(100)).max(100),
+});
+const oauthQuery = z.object({
+  client_id: z.string().max(100),
+  redirect_uri: z.string().max(1_024),
+  scope: z.string().max(4_000),
+});
+const authorizeBody = z.object({
+  clientId: z.string().max(100),
+  redirectUri: z.string().max(1_024),
+  scope: z.string().max(4_000),
+  state: z.string().max(1_024).nullish(),
+  shopId: z.string().max(100),
+});
 const partnerBody = z.object({
   businessName: z.string().max(1_024),
   website: z.string().max(1_024).nullish(),
@@ -221,6 +241,10 @@ function accessRequestJson(request: AccessRequestRecord) {
 }
 
 /** A partner as they see themselves (ADR-504). */
+function partnerAppJson(app: PartnerAppRecord) {
+  return { ...app, createdAt: app.createdAt.toISOString() };
+}
+
 function partnerJson(partner: PartnerProfile) {
   return {
     businessName: partner.businessName,
@@ -270,6 +294,7 @@ export class AuthController {
     private readonly staff: StaffService,
     private readonly support: SupportAccessService,
     private readonly partners: PartnersService,
+    private readonly partnerApps: PartnerAppsService,
     @Optional() private readonly site?: PublicSite,
   ) {}
 
@@ -987,6 +1012,112 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /** The partner's apps, which shops install (DEV-05, ADR-851): `{ apps }`, oldest first. */
+  @Get('partner/apps')
+  async listPartnerApps(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const apps = await this.partnerApps.apps(await this.session(request));
+    return { apps: apps.map(partnerAppJson) };
+  }
+
+  /**
+   * Registers an app of the partner's: `{ name, appUrl, redirectUrls, scopes }`. The app, with
+   * its client secret, given this once.
+   */
+  @Post('partner/apps')
+  @HttpCode(201)
+  async registerPartnerApp(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const made = await this.partnerApps.create(
+      await this.session(request),
+      parse(partnerAppBody, body),
+    );
+    return { app: partnerAppJson(made.app), clientSecret: made.clientSecret };
+  }
+
+  /** Changes an app of the partner's, by the ID it was given: the same body. */
+  @Post('partner/apps/:id')
+  @HttpCode(200)
+  async changePartnerApp(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const uuid = tryFromPublicId(id, 'partnerApp');
+    if (!uuid) throw new AuthError('NOT_FOUND', 404, 'No such app');
+    const app = await this.partnerApps.update(
+      await this.session(request),
+      uuid,
+      parse(partnerAppBody, body),
+    );
+    return { app: partnerAppJson(app) };
+  }
+
+  /**
+   * What the admin's consent page shows of a public app asking to be installed (DEV-05,
+   * ADR-851), as its link said: `?client_id&redirect_uri&scope`. Refused where the app has no
+   * such redirect URL or asks beyond the scopes it registered.
+   */
+  @Get('oauth/app')
+  async oauthApp(
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    await this.session(request);
+    const asked = parse(oauthQuery, query);
+    const consent = await this.partnerApps.consent(
+      asked.client_id,
+      asked.redirect_uri,
+      asked.scope,
+    );
+    return {
+      app: {
+        name: consent.name,
+        appUrl: consent.appUrl,
+        partner: consent.partner,
+        scopes: consent.scopes,
+        listed: consent.listed,
+      },
+    };
+  }
+
+  /**
+   * An owner's or manager's approval of the app for their shop: `{ clientId, redirectUri, scope,
+   * state?, shopId }`. Where the admin sends them back, to the app with its code.
+   */
+  @Post('oauth/authorize')
+  @HttpCode(200)
+  async oauthAuthorize(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const session = await this.session(request);
+    const asked = parse(authorizeBody, body);
+    const shopId = tryFromPublicId(asked.shopId, 'shop');
+    if (!shopId) throw new AuthError('NOT_FOUND', 404, 'No such shop');
+    const redirectUrl = await this.partnerApps.authorize(session, {
+      clientId: asked.clientId,
+      redirectUri: asked.redirectUri,
+      scope: asked.scope,
+      state: asked.state ?? '',
+      shopId,
+    });
+    return { redirectUrl };
   }
 
   /**

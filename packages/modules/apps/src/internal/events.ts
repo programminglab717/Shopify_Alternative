@@ -7,6 +7,9 @@ export const AppEvents = {
   TokenRotated: 'app.token_rotated',
   SecretRotated: 'app.secret_rotated',
   Deleted: 'app.deleted',
+  /** A public app installed on the shop, or uninstalled from it (ADR-851). */
+  Installed: 'app.installed',
+  Uninstalled: 'app.uninstalled',
 } as const;
 
 /** A custom app made, changed, given a new token or secret, or removed. */

@@ -63,6 +63,7 @@ import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
 import { queryCostHooks, type QueryCostOptions } from './query-cost.js';
 import { HealthController } from './health.controller.js';
 import { StockWatchController } from './stock-watches.controller.js';
+import { OAuthController } from './oauth.controller.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
@@ -376,7 +377,7 @@ export class ApiModule {
           support: options.support ?? null,
         }),
       ],
-      controllers: [HealthController, StockWatchController],
+      controllers: [HealthController, StockWatchController, OAuthController],
       providers: [
         ShopResolver,
         AuditResolver,

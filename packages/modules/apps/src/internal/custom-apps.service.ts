@@ -76,6 +76,7 @@ async function appIn(tx: Tx, shopId: string, id: string): Promise<AppRow | null>
   const { rows } = await tx.execute<AppRow>(sql`
     SELECT ${COLUMNS} FROM apps.access_tokens
      WHERE shop_id = ${shopId} AND id = ${id} AND revoked_at IS NULL
+       AND public_app_id IS NULL
        AND (expires_at IS NULL OR expires_at > now())
        FOR UPDATE`);
   return rows[0] ?? null;
@@ -104,7 +105,7 @@ export class CustomAppService {
     const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
       tx.execute<AppRow>(sql`
         SELECT ${COLUMNS} FROM apps.access_tokens
-         WHERE shop_id = ${tenant.shopId} AND revoked_at IS NULL
+         WHERE shop_id = ${tenant.shopId} AND revoked_at IS NULL AND public_app_id IS NULL
            AND (expires_at IS NULL OR expires_at > now())
          ORDER BY created_at DESC, id DESC`),
     );
@@ -131,7 +132,7 @@ export class CustomAppService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{ count: number }>(sql`
         SELECT count(*)::int AS count FROM apps.access_tokens
-         WHERE shop_id = ${tenant.shopId} AND revoked_at IS NULL
+         WHERE shop_id = ${tenant.shopId} AND revoked_at IS NULL AND public_app_id IS NULL
            AND (expires_at IS NULL OR expires_at > now())`);
       if (rows[0]!.count >= APP_LIMITS.apps) {
         return failOne(

@@ -9553,6 +9553,30 @@ export const StorefrontAccessTokenDeleteMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+export const InstalledAppsQuery = /* GraphQL */ `
+  query InstalledApps {
+    installedApps {
+      id
+      appId
+      name
+      scopes
+      installedAt
+    }
+  }
+`;
+
+export const AppUninstallMutation = /* GraphQL */ `
+  mutation AppUninstall($id: ID!) {
+    appUninstall(id: $id) {
+      uninstalledAppId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const CustomAppsQuery = /* GraphQL */ `
   query CustomApps {
     customApps {

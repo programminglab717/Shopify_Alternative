@@ -4599,6 +4599,23 @@ export interface StorefrontAccessTokenCreateData {
   };
 }
 
+/** A public app installed on the shop through OAuth (DEV-05, ADR-851). */
+export interface InstalledApp {
+  id: string;
+  appId: string;
+  name: string;
+  scopes: string[];
+  installedAt: string;
+}
+
+export interface InstalledAppsData {
+  installedApps: InstalledApp[];
+}
+
+export interface AppUninstallData {
+  appUninstall: { uninstalledAppId: string | null; userErrors: UserError[] };
+}
+
 export interface StorefrontAccessTokenDeleteData {
   storefrontAccessTokenDelete: {
     deletedStorefrontAccessTokenId: string | null;

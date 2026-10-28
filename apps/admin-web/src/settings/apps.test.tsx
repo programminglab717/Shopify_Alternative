@@ -85,6 +85,15 @@ function core() {
       createdAt: LATER,
     },
   ];
+  let installed: Record<string, unknown>[] = [
+    {
+      id: 'tok_9',
+      appId: 'papp_1',
+      name: 'Reviews Pro',
+      scopes: ['read_products', 'write_orders'],
+      installedAt: EARLIER,
+    },
+  ];
   let subscriptions: Record<string, unknown>[] = [
     {
       id: 'whs_1',
@@ -221,6 +230,11 @@ function core() {
               userErrors: [],
             },
           };
+        case 'InstalledApps':
+          return { installedApps: installed };
+        case 'AppUninstall':
+          installed = installed.filter((app) => app.id !== variables.id);
+          return { appUninstall: { uninstalledAppId: variables.id, userErrors: [] } };
         case 'CustomAppDelete':
           apps = apps.filter((app) => app.id !== variables.id);
           return { customAppDelete: { deletedCustomAppId: variables.id, userErrors: [] } };
@@ -437,5 +451,26 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
     await waitFor(() =>
       expect(sentOf(fake, 'StorefrontAccessTokenDelete')).toEqual([{ id: 'sfat_1' }]),
     );
+  });
+
+  it('lists the public apps installed, with what each reaches, and uninstalls one (DEV-05)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings');
+
+    fireEvent.click(await screen.findByRole('link', { name: /Apps/ }));
+    const section = await screen.findByRole('region', { name: 'Installed apps' });
+    expect(await within(section).findByText('Reviews Pro')).toBeTruthy();
+    expect(
+      within(section).getByText(/^Reaches See products, See and change orders · Installed /),
+    ).toBeTruthy();
+
+    fireEvent.click(within(section).getByRole('button', { name: 'Uninstall Reviews Pro' }));
+    expect(
+      within(section).getByText('Uninstall Reviews Pro? It stops reaching the shop at once.'),
+    ).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Uninstall' }));
+    await waitFor(() => expect(sentOf(fake, 'AppUninstall')).toEqual([{ id: 'tok_9' }]));
+    expect(await within(section).findByText('No app is installed.')).toBeTruthy();
   });
 });

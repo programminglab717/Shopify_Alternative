@@ -15,6 +15,7 @@ import { roleLabel } from '../settings/settings-page';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { PartnerApps } from './partner-apps';
 import { TermsAgreement, useTermsAgreement } from './terms-agreement';
 
 /** A partner as they see themselves (ADR-504). */
@@ -84,6 +85,7 @@ export function PartnerPage() {
       {dashboard.isPending ? null : partner ? (
         <>
           <Dashboard partner={partner} stores={dashboard.data?.stores ?? []} />
+          <PartnerApps />
           {dashboard.data?.earnings && (
             <Earnings partner={partner} earnings={dashboard.data.earnings} />
           )}

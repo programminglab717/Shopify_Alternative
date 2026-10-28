@@ -82,6 +82,14 @@ export {
   type ShopOpenedPayload,
 } from '../internal/shops.js';
 export {
+  PARTNER_APP_LIMITS,
+  PartnerAppsService,
+  type AppConsent,
+  type PartnerAppInput,
+  type PartnerAppRecord,
+  type RedeemedAuthorization,
+} from '../internal/partner-apps.service.js';
+export {
   PARTNER_LIMITS,
   PartnersService,
   recordPartnerEarning,

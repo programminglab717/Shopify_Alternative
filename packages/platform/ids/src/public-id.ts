@@ -158,6 +158,8 @@ export const ID_PREFIXES = {
   bulkOperation: 'bulk',
   // A token the Storefront API answers headless storefronts by (ADR-848).
   storefrontAccessToken: 'sfat',
+  // An app a partner registered for shops to install (ADR-851).
+  partnerApp: 'papp',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

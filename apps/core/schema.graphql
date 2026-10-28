@@ -321,6 +321,11 @@ type AffiliateUpdatePayload {
   userErrors: [UserError!]!
 }
 
+type AppUninstallPayload {
+  uninstalledAppId: ID
+  userErrors: [UserError!]!
+}
+
 """
 An article of one of the shop's blogs, which its storefront shows at /blogs/{blog}/{handle} once published.
 """
@@ -6819,6 +6824,18 @@ type InboxReplyTimes {
   withinTarget: Int
 }
 
+"""
+A public app installed on the shop through OAuth (DEV-05, ADR-851): its owner or a manager approved what it reaches, and it holds a token of the shop's.
+"""
+type InstalledApp {
+  """The app as its partner registered it."""
+  appId: ID!
+  id: ID!
+  installedAt: DateTime!
+  name: String!
+  scopes: [String!]!
+}
+
 input InventoryAdjustQuantitiesInput {
   """Up to 250; each item and location once."""
   changes: [InventoryChangeInput!]!
@@ -9151,6 +9168,9 @@ type Mutation {
   Changes an affiliate, or ends their part: orders placed after it earn them nothing. Their figures are left to `affiliates`.
   """
   affiliateUpdate(input: AffiliateUpdateInput!): AffiliateUpdatePayload!
+
+  """Uninstalls a public app: its token stops working at once."""
+  appUninstall(id: ID!): AppUninstallPayload!
 
   """
   An AI draft of a blog article's title, body, summary and search engine title and description, from what the shop wants it to say, in the language asked for (MKT-15, ADR-801). It says nothing of the shop the shop did not; nothing is kept: the shop checks it in its form and saves it. Each draft spends one of the AI credits of the shop’s plan; 30 a day per shop.
@@ -15919,6 +15939,9 @@ type Query {
     """Answers from this time."""
     from: DateTime!
   ): InboxReplyTimes!
+
+  """The public apps installed on the shop."""
+  installedApps: [InstalledApp!]!
 
   """
   The shop's stock as Shopify's inventory CSV, of the products a search matches as the products list does, at one location or all active ones: a row for each tracked variant at each, with what is on hand, committed to orders, available and not, for a stock count in a spreadsheet that inventoryImport then takes back. As much as one import takes, 5,000 rows and 1,500,000 characters, a larger shop's in parts.

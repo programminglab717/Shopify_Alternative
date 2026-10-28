@@ -9,3 +9,4 @@ export {
   type QueryCost,
 } from './client.js';
 export { WEBHOOK_HEADERS, verifyWebhook } from './webhooks.js';
+export { accessTokenFor, approvalOf, authorizeUrl, type AuthorizeUrlOptions } from './oauth.js';

@@ -55,6 +55,7 @@ export default defineConfig(
       '**/src/seed.ts',
       '**/src/support-agent.ts',
       '**/src/partner-payouts.ts',
+      '**/src/partner-apps.ts',
       '**/src/vapid-keys.ts',
       '**/src/email-suppression.ts',
       '**/src/billing-transfers.ts',

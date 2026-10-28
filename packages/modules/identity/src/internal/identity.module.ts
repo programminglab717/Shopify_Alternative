@@ -3,6 +3,7 @@ import { AuthController } from './auth.controller.js';
 import { EmailFeedbackController } from './email-feedback.controller.js';
 import { EmailFeedbackService } from './email-feedback.js';
 import { IdentityService, type IdentityServiceOptions } from './identity.service.js';
+import { PartnerAppsService } from './partner-apps.service.js';
 import { PartnersService } from './partners.service.js';
 import { StaffService } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
@@ -29,9 +30,16 @@ export class IdentityModule {
         },
         { provide: StaffService, useValue: new StaffService(options) },
         { provide: PartnersService, useValue: new PartnersService(options) },
+        { provide: PartnerAppsService, useValue: new PartnerAppsService(options) },
         { provide: SupportAccessService, useValue: new SupportAccessService(options) },
       ],
-      exports: [IdentityService, StaffService, SupportAccessService, PartnersService],
+      exports: [
+        IdentityService,
+        StaffService,
+        SupportAccessService,
+        PartnersService,
+        PartnerAppsService,
+      ],
     };
   }
 }
