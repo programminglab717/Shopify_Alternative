@@ -6326,9 +6326,15 @@ export interface OrderSubscriptionChangeData {
   orderSubscriptionChange: { subscription: OrderSubscription | null; userErrors: UserError[] };
 }
 
-/** A season that follows the moon, on or ahead (INV-08, ADR-863). */
+/** A shopping season on or ahead (INV-08, ADR-863, ADR-891). */
 export interface StockSeason {
-  key: 'RAMADAN' | 'EID_UL_ADHA';
+  key:
+    | 'RAMADAN'
+    | 'EID_UL_ADHA'
+    | 'SUMMER_LAWN'
+    | 'INDEPENDENCE_DAY'
+    | 'WINTER_COLLECTION'
+    | 'WEDDING_SEASON';
   startsOn: string;
   endsOn: string;
   /** How much faster than usual stock sold in it last year; null for no history. */

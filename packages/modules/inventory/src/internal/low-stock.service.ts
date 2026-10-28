@@ -40,10 +40,16 @@ export interface SeasonOutlook {
   fromShop: boolean;
 }
 
-/** The season on at `at`, or the next to begin within {@link SEASON_LIMITS.aheadDays}; null for none. */
+/**
+ * The season on at `at`, or the next to begin within {@link SEASON_LIMITS.aheadDays}; null for
+ * none. Where one that follows the moon meets another, the moon's is the one shoppers buy for
+ * (ADR-891): Ramadan in the lawn launch is Ramadan.
+ */
 export function seasonAhead(at: Date = new Date()): PkSeason | null {
   const today = pkDayOf(at);
-  return pkSeasonsBetween(today, addDays(today, SEASON_LIMITS.aheadDays - 1))[0] ?? null;
+  const ahead = pkSeasonsBetween(today, addDays(today, SEASON_LIMITS.aheadDays - 1));
+  const on = ahead.filter((season) => season.start <= today);
+  return on.find((season) => season.moon) ?? on[0] ?? ahead[0] ?? null;
 }
 
 /**

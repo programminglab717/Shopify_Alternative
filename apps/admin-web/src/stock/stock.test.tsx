@@ -265,7 +265,25 @@ describe('Stock', () => {
     );
     renderAdmin('/shop_1/stock');
     expect(
-      await screen.findByText(/^Ramadan is on, until .+\. Stock up on what sells for Eid/),
+      await screen.findByText(/^Ramadan is on, until .+\. Stock up on what sells then/),
+    ).toBeTruthy();
+  });
+
+  it('names the seasons on the same days each year too (ADR-891)', async () => {
+    const inDays = (days: number) =>
+      new Date(Date.now() + 5 * 3_600_000 + days * 86_400_000).toISOString().slice(0, 10);
+    const weddings = {
+      key: 'WEDDING_SEASON',
+      startsOn: inDays(-20),
+      endsOn: inDays(70),
+      lift: 1.6,
+    };
+    vi.stubGlobal('fetch', core('owner', [MAIN, SHOP], weddings).fetcher);
+    renderAdmin('/shop_1/stock');
+    expect(
+      await screen.findByText(
+        /^The wedding season is on, until .+\. Last year your shop sold 1\.6 times its usual/,
+      ),
     ).toBeTruthy();
   });
 

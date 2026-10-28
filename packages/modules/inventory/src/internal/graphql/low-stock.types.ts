@@ -62,13 +62,20 @@ export class LowStockItem {
 export enum StockSeasonKey {
   RAMADAN = 'RAMADAN',
   EID_UL_ADHA = 'EID_UL_ADHA',
+  SUMMER_LAWN = 'SUMMER_LAWN',
+  INDEPENDENCE_DAY = 'INDEPENDENCE_DAY',
+  WINTER_COLLECTION = 'WINTER_COLLECTION',
+  WEDDING_SEASON = 'WEDDING_SEASON',
 }
 
 registerEnumType(StockSeasonKey, {
   name: 'StockSeasonKey',
   description:
-    'A shopping season that follows the moon (INV-08, ADR-863): RAMADAN, from its first day ' +
-    "through Eid ul Fitr's third; EID_UL_ADHA, from Dhu al-Qadah's 25th through Eid's third.",
+    'A shopping season of Pakistan (INV-08, ADR-863, ADR-891). Those that follow the moon: ' +
+    "RAMADAN, from its first day through Eid ul Fitr's third; EID_UL_ADHA, from Dhu al-Qadah's " +
+    "25th through Eid's third. Those on the same days each year: SUMMER_LAWN, 15 February to " +
+    '30 April; INDEPENDENCE_DAY, 1 to 14 August; WINTER_COLLECTION, October; WEDDING_SEASON, ' +
+    "1 November to 14 February. Where the moon's meets another, the moon's is the one given.",
 });
 
 @ObjectType({

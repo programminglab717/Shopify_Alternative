@@ -8,9 +8,25 @@ import {
   daysLeft,
   forecastUnits,
   liftOf,
+  seasonAhead,
   type SeasonOutlook,
 } from './low-stock.service.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
+
+describe('The season a forecast counts on (ADR-891)', () => {
+  const at = (day: string) => seasonAhead(new Date(`${day}T07:00:00Z`));
+
+  it("is the one on, the moon's where two meet, else the next within 90 days", () => {
+    // Ramadan 1447 fell in the 2026 lawn launch: Ramadan is what shoppers bought for.
+    expect(at('2026-03-01')).toMatchObject({ key: 'ramadan', moon: true });
+    // Before Ramadan, the lawn launch on.
+    expect(at('2026-02-16')).toMatchObject({ key: 'summer_lawn' });
+    // Winter weddings, from last November.
+    expect(at('2027-01-10')).toMatchObject({ key: 'wedding_season', start: '2026-11-01' });
+    // In July, the run-up to Independence Day is next.
+    expect(at('2026-07-10')).toMatchObject({ key: 'independence_day', start: '2026-08-01' });
+  });
+});
 
 const server = testDatabaseServer();
 
@@ -253,7 +269,7 @@ describe.skipIf(!server)('Low stock', () => {
       [3, null, null, 8],
     );
     expect(liftOf(1, 30, 30)).toBe(0.25);
-    const season = { key: 'ramadan' as const, start: '2027-02-08', end: '2027-03-12' };
+    const season = { key: 'ramadan' as const, start: '2027-02-08', end: '2027-03-12', moon: true };
     const outlook: SeasonOutlook = { season, lift: 3, fromShop: false };
     // 30 sold in 30 days: 30 more without a season; in 30 days of which 21 are in it, 9 + 63.
     expect(forecastUnits(30, 30, '2027-01-01', null)).toBe(30);

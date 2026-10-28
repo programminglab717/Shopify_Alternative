@@ -989,7 +989,7 @@ function pkToday(): string {
 }
 
 /**
- * The season on or ahead (INV-08, ADR-863), Ramadan or the days before Eid ul Adha, and how much
+ * The season on or ahead (INV-08, ADR-863, ADR-891), Ramadan or the lawn launch say, and how much
  * faster the shop sold through it last year, which reorders started here count on.
  */
 function SeasonBanner() {
