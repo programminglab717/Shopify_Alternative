@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Signs of scam stores
+
+* **Trust:** the worker looks across stores four times a day for young stores keeping paid orders
+  unshipped, catalogues copied from older stores, and names that read as verified stores'; Hatti's
+  people list and clear them with `trust-reports` (TNS-02, [ADR-842](../architecture/13-decision-log.md#adr-842--signs-of-scam-stores-the-worker-looks-across-stores-four-times-a-day-for-young-stores-keeping-paid-orders-unshipped-catalogues-copied-from-older-stores-and-names-that-read-as-verified-stores-for-hattis-people-to-look-into-or-clear)). Done in code.
+* 4448 tests (3 new).
+
 ### 9b0e50d · Shops at a glance
 
 * **Admin:** an account of several shops sees each one's sales today and orders waiting to be

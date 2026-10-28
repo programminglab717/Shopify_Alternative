@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-841 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-842 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -849,6 +849,7 @@
 | 839 | Order routing: a location names the cities and provinces it ships to first, and an order goes out from one that has all of it and serves its customer's city, else their province, before the primary | Accepted |
 | 840 | The changes staff make most on a phone wait in the browser while it is offline, with the Idempotency-Key they were first sent with, and go in order once it is back online | Accepted |
 | 841 | An account of several shops sees each one's sales today and the orders waiting to be confirmed and packed on the shop chooser, and what they come to together | Accepted |
+| 842 | Signs of scam stores: the worker looks across stores four times a day for young stores keeping paid orders unshipped, catalogues copied from older stores and names that read as verified stores', for Hatti's people to look into or clear | Accepted |
 
 ---
 
@@ -27465,3 +27466,34 @@
   * One query per shop; an account of a few shops is the case it is for.
   * An organisation of its own, with members across its shops and reports over all of them,
     waits for shops to ask; the shop stays the unit of access.
+
+## ADR-842 · Signs of scam stores: the worker looks across stores four times a day for young stores keeping paid orders unshipped, catalogues copied from older stores and names that read as verified stores', for Hatti's people to look into or clear
+
+* **Context:** TNS-02 asks for scam-store detection: prepaid anomalies, cloned catalogues and brand
+  impersonation. Shoppers' reports (ADR-460) come once the harm is done. Scam stores here open,
+  copy a known brand's catalogue and name, take payment in advance by transfer, and never ship.
+* **Decision:**
+  * **`trust.store_signals`** (migration 0357): one sign a store and kind, with what was found and
+    when it was first and last seen. The worker's scan finds each kind:
+    * **`prepaid_unshipped`:** a store younger than 90 days with at least five orders paid in
+      advance, by transfer or online, placed more than five days ago and neither shipped nor
+      cancelled. It notes their count, total and the oldest.
+    * **`cloned_catalogue`:** a store younger than 90 days of which at least five photos, or five
+      titles, and half its own, are an older store's. Photos match on the same byte size, width
+      and height, as a copy's do; titles match word for word. It notes the other store and how
+      many matched.
+    * **`impersonation`:** a young store, not verified itself, whose name reads as a verified
+      store's: letters and digits alone, words like "official" or "store" left out, at most one
+      letter apart, names of four letters or more.
+  * **The worker scans four times a day.** Indexes on the photos' sizes and the titles keep the
+    matching across stores cheap.
+  * **Hatti's people see them with `trust-reports signals`.** A sign found to be nothing is
+    cleared with who and why (`clear-signal`), and isn't raised again for that store. A sign
+    alone does nothing to a store: taking it down stays theirs (ADR-461).
+* **Consequences:**
+  * Photos re-saved or cropped don't match by size. A content fingerprint of images waits for
+    signs that copies get past.
+  * There is no list of known brands; names are compared with stores Hatti verified (ADR-465).
+* **Alternatives:**
+  * **Holding a store's payouts on a sign:** Hatti doesn't hold shops' money; gateways and
+    couriers pay shops directly.
