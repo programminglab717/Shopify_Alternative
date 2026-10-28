@@ -43,8 +43,8 @@ import { consoleError } from './console.controller.js';
 /** The database, with the system login, as the console's server has it. */
 export const CONSOLE_DATABASE = Symbol('CONSOLE_DATABASE');
 
-const iso = (at: Date | null) => at?.toISOString() ?? null;
-const shopOf = (record: { shopId: string; shopName: string; shopHandle: string }) => ({
+export const iso = (at: Date | null) => at?.toISOString() ?? null;
+export const shopOf = (record: { shopId: string; shopName: string; shopHandle: string }) => ({
   id: toPublicId('shop', record.shopId),
   name: record.shopName,
   handle: record.shopHandle,
@@ -119,7 +119,7 @@ function verificationJson(review: VerificationReview) {
 }
 
 /** A field of the body: its words, trimmed, required unless said, at most `max` characters. */
-function wordsOf(
+export function consoleWords(
   body: unknown,
   name: string,
   max: number,
@@ -136,7 +136,7 @@ function wordsOf(
   return words;
 }
 
-const notFound = (what: string) => consoleError(404, 'NOT_FOUND', `No such ${what}`);
+export const notFound = (what: string) => consoleError(404, 'NOT_FOUND', `No such ${what}`);
 const already = (message: string) => consoleError(409, 'DECIDED', message);
 
 /**
@@ -186,7 +186,7 @@ export class ConsoleTrustController {
     if (status !== 'dismissed' && status !== 'upheld') {
       throw consoleError(422, 'INVALID', 'Dismiss it or uphold it', { status: 'INVALID' });
     }
-    const note = wordsOf(body, 'note', 1000, {
+    const note = consoleWords(body, 'note', 1000, {
       message: status === 'upheld' ? 'Say what was done' : 'Say why',
     });
     const report = tryFromPublicId(id, 'storeReport');
@@ -220,7 +220,7 @@ export class ConsoleTrustController {
     if (typeof reason !== 'string' || !(REPORT_REASONS as readonly string[]).includes(reason)) {
       throw consoleError(422, 'INVALID', 'Say why it is taken down', { reason: 'INVALID' });
     }
-    const note = wordsOf(body, 'note', TAKEDOWN_LIMITS.note, {
+    const note = consoleWords(body, 'note', TAKEDOWN_LIMITS.note, {
       message: 'Say why, as its owner is told',
     });
     await this.console.record(agent, 'store.suspend', handle.slice(0, 100), { reason });
@@ -243,7 +243,7 @@ export class ConsoleTrustController {
     @Req() request: FastifyRequest,
   ) {
     const agent = consoleAgentOf(request);
-    const note = wordsOf(body, 'note', TAKEDOWN_LIMITS.note, {
+    const note = consoleWords(body, 'note', TAKEDOWN_LIMITS.note, {
       message: 'Say why, as its owner is told',
     });
     await this.console.record(agent, 'store.restore', handle.slice(0, 100));
@@ -267,7 +267,7 @@ export class ConsoleTrustController {
   @HttpCode(200)
   async refuse(@Param('id') id: string, @Body() body: unknown, @Req() request: FastifyRequest) {
     const agent = consoleAgentOf(request);
-    const answer = wordsOf(body, 'answer', APPEAL_LIMITS.answer, {
+    const answer = consoleWords(body, 'answer', APPEAL_LIMITS.answer, {
       message: 'Say why, as its owner is told',
     });
     const appeal = tryFromPublicId(id, 'storeAppeal');
@@ -311,7 +311,7 @@ export class ConsoleTrustController {
   @HttpCode(200)
   async approve(@Param('id') id: string, @Body() body: unknown, @Req() request: FastifyRequest) {
     const agent = consoleAgentOf(request);
-    const note = wordsOf(body, 'answer', VERIFICATION_LIMITS.answer, { required: false });
+    const note = consoleWords(body, 'answer', VERIFICATION_LIMITS.answer, { required: false });
     return this.#decideVerification(agent, id, 'approve', () =>
       approveVerification(
         this.database,
@@ -328,7 +328,7 @@ export class ConsoleTrustController {
   @HttpCode(200)
   async refuseOne(@Param('id') id: string, @Body() body: unknown, @Req() request: FastifyRequest) {
     const agent = consoleAgentOf(request);
-    const answer = wordsOf(body, 'answer', VERIFICATION_LIMITS.answer, {
+    const answer = consoleWords(body, 'answer', VERIFICATION_LIMITS.answer, {
       message: 'Say why, as the shop is told',
     });
     return this.#decideVerification(agent, id, 'refuse', () =>
@@ -357,7 +357,7 @@ export class ConsoleTrustController {
         level: 'INVALID',
       });
     }
-    const answer = wordsOf(body, 'answer', VERIFICATION_LIMITS.answer, {
+    const answer = consoleWords(body, 'answer', VERIFICATION_LIMITS.answer, {
       message: 'Say why, as the shop is told',
     });
     await this.console.record(agent, 'verification.revoke', handle.slice(0, 100), { level });

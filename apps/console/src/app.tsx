@@ -13,6 +13,8 @@ import {
 import { useEffect } from 'react';
 import { ActionsLogPage } from './actions-log';
 import { ReportsPage } from './reports';
+import { RightsPage } from './rights';
+import { SendersPage, SignalsPage } from './shops';
 import { StoresPage } from './stores';
 import { VerificationsPage } from './verifications';
 import { consoleCall, whenSignedOut } from './api';
@@ -52,6 +54,15 @@ function Shell() {
           </Link>
           <Link to="/verifications" className={link}>
             Verifications
+          </Link>
+          <Link to="/rights" className={link}>
+            Rights
+          </Link>
+          <Link to="/signals" className={link}>
+            Scam signs
+          </Link>
+          <Link to="/senders" className={link}>
+            Sender names
           </Link>
           <Link to="/log" className={link}>
             Log
@@ -146,6 +157,24 @@ const verificationsRoute = createRoute({
   component: VerificationsPage,
 });
 
+const rightsRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/rights',
+  component: RightsPage,
+});
+
+const signalsRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/signals',
+  component: SignalsPage,
+});
+
+const sendersRoute = createRoute({
+  getParentRoute: () => signedInLayout,
+  path: '/senders',
+  component: SendersPage,
+});
+
 const logRoute = createRoute({
   getParentRoute: () => signedInLayout,
   path: '/log',
@@ -161,6 +190,9 @@ const routeTree = rootRoute.addChildren([
     reportsRoute,
     storesRoute,
     verificationsRoute,
+    rightsRoute,
+    signalsRoute,
+    sendersRoute,
     logRoute,
   ]),
 ]);

@@ -98,3 +98,61 @@ export interface Verification {
   decidedBy: string | null;
   answer: string | null;
 }
+
+/** A rights owner's complaint of a store's listings (ADR-474), and the owner's answer (ADR-476). */
+export interface RightsComplaint {
+  id: string;
+  shop: ShopRef;
+  kind: string;
+  rightsOwner: string;
+  registration: string | null;
+  complainant: string;
+  actingAs: string;
+  email: string;
+  phone: string | null;
+  listings: { id: string; title: string; url: string }[];
+  details: string;
+  signature: string;
+  language: 'en' | 'ur';
+  status: 'open' | 'dismissed' | 'upheld';
+  overdue: boolean;
+  dueAt: string;
+  createdAt: string;
+  decidedBy: string | null;
+  decision: string | null;
+  counter: {
+    words: string | null;
+    signature: string | null;
+    at: string;
+    status: 'open' | 'refused' | 'upheld' | null;
+    answer: string | null;
+    answeredBy: string | null;
+  } | null;
+  releasedAt: string | null;
+  releasedBy: string | null;
+  releaseNote: string | null;
+}
+
+/** A sign of a scam store, found by the worker (ADR-842). */
+export interface StoreSignal {
+  shop: ShopRef;
+  kind: 'prepaid_unshipped' | 'cloned_catalogue' | 'impersonation';
+  detail: Record<string, unknown>;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  clearedAt: string | null;
+  clearedBy: string | null;
+  note: string | null;
+}
+
+/** A shop's own SMS sender name (ADR-469). */
+export interface SmsSender {
+  id: string;
+  shop: ShopRef;
+  name: string;
+  status: 'waiting' | 'approved' | 'refused' | 'revoked';
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  answer: string | null;
+}
