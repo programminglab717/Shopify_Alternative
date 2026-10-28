@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Customers answered by the AI
+
+* **Inbox:** on Growth and Pro, a shop may let the AI answer customers on WhatsApp and in its
+  web chat. It answers from the shop's policies and the customer's own orders, and hands the
+  conversation to staff when it should; staff answering or taking a conversation leave it
+  theirs (MSG-07, [ADR-849](../architecture/13-decision-log.md#adr-849--on-growth-and-pro-a-shop-may-let-the-ai-answer-its-customers-on-whatsapp-and-in-its-web-chat-from-its-policies-and-the-customers-own-orders-handing-the-conversation-to-staff-when-it-should-staff-answering-or-taking-it-leave-it-theirs)). Done in code; it answers once the AI is set up (OWN-11). Whether
+  replies spend credits is OWN-44.
+* 4502 tests (11 new: 9, and 2 checks of the admin's new operations).
+
 ### 9454f9b · The Storefront API
 
 * **Developers:** each shop answers Shopify's Storefront API at `/api/<version>/graphql.json`,

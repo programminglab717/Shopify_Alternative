@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-848 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-849 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -856,6 +856,7 @@
 | 846 | A cash-on-delivery parcel out with the shop's own rider may be paid online at the door: its page offers what the rider would collect, the rider shows it as a QR code, and paid, the rider collects nothing; couriers' parcels wait on the couriers | Accepted |
 | 847 | Each shop answers AI shopping agents: a UCP profile at /.well-known/ucp and a store MCP endpoint whose tools search and read its products and make carts its own checkout takes, so an agent's order is placed and confirmed as any shopper's | Accepted |
 | 848 | The Storefront API: GraphQL at each shop's own address, as Shopify's at /api/<version>/graphql.json, answered with the shop's public or private tokens, its catalog read from the storefront's documents and its carts changed through the core | Accepted |
+| 849 | On Growth and Pro, a shop may let the AI answer its customers on WhatsApp and in its web chat, from its policies and the customer's own orders, handing the conversation to staff when it should; staff answering or taking it leave it theirs | Accepted |
 
 ---
 
@@ -27779,3 +27780,59 @@
     from its documents.
   * **Tokens checked by the core on each call:** rejected, as a round trip a call, where
     digests in the document cost none.
+
+## ADR-849 · On Growth and Pro, a shop may let the AI answer its customers on WhatsApp and in its web chat, from its policies and the customer's own orders, handing the conversation to staff when it should; staff answering or taking it leave it theirs
+
+* **Context:**
+  * MSG-07 asks for an AI support agent: order status, FAQs, policy answers and hand-off to a
+    person.
+  * Most of what customers ask a Pakistani shop on WhatsApp is "where is my order", "is it COD"
+    or "can I return it". A shop's staff answer those again and again, often late.
+  * Pricing has the AI support agent from Growth upward, with fair use (03, 09 §7).
+* **Decision:**
+  * **The shop turns it on** in Customer messages' settings ("AI answers"), on Growth and Pro
+    (`aiSupportAgent`, a feature of the plan). The API has `supportAgent` and
+    `supportAgentUpdate`. A shop moved to a plan without it is answered by its staff alone.
+  * **When a customer writes,** on WhatsApp or in the web chat (ADR-810), the worker asks the AI
+    to answer while the message is the AI's to answer:
+    * the shop has it on, and has answered fewer than 200 messages in the last day;
+    * the message is the conversation's latest and the customer's, and hasn't been answered;
+    * the conversation is given to no member of staff;
+    * no member of staff answered it, and the AI didn't hand it over, in the last day.
+  * **What the AI is given:** the shop's shipping, refund, terms and contact policies as text,
+    and the customer's own orders. Each order is a line: where it stands, its total and how it
+    is paid, what is left to pay, and its parcels with their courier and tracking. It gets
+    nothing of an address, nor of anyone else.
+    * On WhatsApp the customer is the number WhatsApp verified, so their latest five orders are
+      given.
+    * In the web chat the number was typed, so only orders the shopper names by number ("#1023")
+      that were placed from that number.
+  * **What the AI does:** it answers through one tool, in the customer's language, from those
+    facts alone, never inventing a price, a date, stock or a policy. It hands the conversation
+    to staff for anything else: a change, a cancellation, a refund or return, a complaint, a
+    person asked for. The customer's words are data, never instructions.
+  * **The reply** goes back as the shop's, on the number the customer wrote to, or in the web
+    chat. It is kept marked as the AI's: `byAi` on the message, which the inbox shows as "AI".
+    * It is not counted in staff's reply times (ADR-763).
+    * It leaves the conversation unread for staff to see.
+    * Handed over, the conversation waits for staff.
+  * **What it costs:** each reply spends an AI credit (ADR-533), a use of its own,
+    `support_reply`. Without a credit, nothing is sent. What came of each message is kept, with
+    its tokens (migration 0363). The worker now reads `AI_API_KEY` and `AI_MODEL` as the API
+    does.
+* **Consequences:**
+  * Customers get an answer at once, at any hour, to what the shop has written down and to
+    their order's state. The rest still comes to staff, flagged as waiting.
+  * The AI can be wrong in its words, though never about facts it was not given. Staff see each
+    reply in the inbox, marked.
+  * Whether replies should spend the plan's credits, or be included under fair use alone as the
+    pricing page says, is the owner's decision (OWN-44). Replies spend credits until they decide.
+  * Not yet:
+    * the shop's FAQ and product facts (sizes, stock) as answers;
+    * a per-shop tone or name for the assistant;
+    * WhatsApp's voice notes and pictures, which reach the AI as nothing to read.
+* **Alternatives:**
+  * **Tools the model calls to look orders up:** rejected for now. Giving it only this customer's
+    orders up front means no answer can be talked into another's.
+  * **Drafts for staff to send:** slower for the questions that matter most. The inbox's saved
+    replies already help staff (ADR-758).
