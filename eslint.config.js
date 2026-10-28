@@ -57,6 +57,7 @@ export default defineConfig(
       '**/src/partner-payouts.ts',
       '**/src/partner-apps.ts',
       '**/src/partner-themes.ts',
+      '**/src/partner-experts.ts',
       '**/src/vapid-keys.ts',
       '**/src/email-suppression.ts',
       '**/src/billing-transfers.ts',

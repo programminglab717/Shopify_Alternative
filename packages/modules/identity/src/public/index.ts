@@ -96,6 +96,15 @@ export {
   type ThemeOffer,
 } from '../internal/partner-themes.service.js';
 export {
+  EXPERT_LIMITS,
+  EXPERT_SERVICES,
+  ExpertsService,
+  type EnquiryRecord,
+  type ExpertProfileInput,
+  type ExpertRecord,
+  type ExpertService,
+} from '../internal/experts.service.js';
+export {
   PARTNER_LIMITS,
   PartnersService,
   recordAppSale,

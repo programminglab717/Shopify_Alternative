@@ -164,6 +164,8 @@ export const ID_PREFIXES = {
   appEmbed: 'aemb',
   // An installed app's one-time charge of the shop (ADR-854).
   appCharge: 'achg',
+  // A partner offering shops their services, by their account (ADR-855).
+  expert: 'expt',
   // A theme of the theme store, offered by a designer (ADR-853).
   themeListing: 'thls',
 } as const;

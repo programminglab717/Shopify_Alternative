@@ -86,6 +86,7 @@ import { SupportAccessPage } from './settings/support-page';
 import { StoreExportPage } from './settings/export-page';
 import { VerificationPage } from './settings/verification-page';
 import { HelpPage } from './help/help-page';
+import { ExpertsPage } from './help/experts-page';
 import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { AppFramePage } from './settings/app-frame-page';
@@ -654,6 +655,13 @@ const help = createRoute({
   component: HelpPage,
 });
 
+// Experts a shop hires (ADR-855).
+const helpExperts = createRoute({
+  getParentRoute: () => shop,
+  path: 'help/experts',
+  component: ExpertsPage,
+});
+
 const stock = createRoute({
   getParentRoute: () => shop,
   path: 'stock',
@@ -1085,6 +1093,7 @@ export const routeTree = root.addChildren([
     transfer,
     account,
     help,
+    helpExperts,
     onlineStore,
     newPage,
     pageEditor,

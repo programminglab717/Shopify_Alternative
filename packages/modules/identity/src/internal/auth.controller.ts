@@ -24,6 +24,7 @@ import { shopAgreementDocuments } from './agreements.js';
 import { AuthError } from './errors.js';
 import { PartnerAppsService, type PartnerAppRecord } from './partner-apps.service.js';
 import { PartnerThemesService } from './partner-themes.service.js';
+import { ExpertsService, type ExpertRecord } from './experts.service.js';
 import {
   IdentityService,
   type AuthenticatedSession,
@@ -168,6 +169,25 @@ const authorizeBody = z.object({
   state: z.string().max(1_024).nullish(),
   shopId: z.string().max(100),
 });
+const expertBody = z.object({
+  headline: z.string().max(1_024),
+  about: z.string().max(4_000).nullish(),
+  services: z.array(z.string().max(40)).max(20),
+  cities: z.array(z.string().max(100)).max(20).nullish(),
+  languages: z.array(z.string().max(10)).max(5),
+  // Whole rupees.
+  startingPrice: z.number().int().min(0).max(1_000_000).nullish(),
+});
+const enquiryBody = z.object({
+  shopId: z.string().max(100),
+  service: z.string().max(40),
+  message: z.string().max(4_000),
+});
+const expertsQuery = z.object({
+  service: z.string().max(40).optional(),
+  city: z.string().max(100).optional(),
+  language: z.string().max(10).optional(),
+});
 const partnerBody = z.object({
   businessName: z.string().max(1_024),
   website: z.string().max(1_024).nullish(),
@@ -241,6 +261,23 @@ function accessRequestJson(request: AccessRequestRecord) {
   };
 }
 
+/** An expert as shops see them (ADR-855), their starting price in whole rupees. */
+function expertJson(expert: ExpertRecord) {
+  return {
+    id: toPublicId('expert', expert.partnerId),
+    businessName: expert.businessName,
+    website: expert.website,
+    headline: expert.headline,
+    about: expert.about,
+    services: expert.services,
+    cities: expert.cities,
+    languages: expert.languages,
+    startingPrice: Number(expert.startingPrice / 100n),
+    listed: expert.listed,
+    updatedAt: expert.updatedAt.toISOString(),
+  };
+}
+
 /** A partner as they see themselves (ADR-504). */
 function partnerAppJson(app: PartnerAppRecord) {
   return { ...app, createdAt: app.createdAt.toISOString() };
@@ -297,6 +334,7 @@ export class AuthController {
     private readonly partners: PartnersService,
     private readonly partnerApps: PartnerAppsService,
     private readonly partnerThemes: PartnerThemesService,
+    private readonly experts: ExpertsService,
     @Optional() private readonly site?: PublicSite,
   ) {}
 
@@ -1014,6 +1052,100 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /** The partner's expert profile (PRT-03, ADR-855): `{ expert }`, null while they have none. */
+  @Get('partner/expert')
+  async expertProfile(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const expert = await this.experts.profile((await this.session(request)).userId);
+    return { expert: expert && expertJson(expert) };
+  }
+
+  /**
+   * Saves the partner's expert profile: `{ headline, about?, services, cities?, languages,
+   * startingPrice? }`, the price in whole rupees. Shops see it once Hatti has looked at it.
+   */
+  @Post('partner/expert')
+  @HttpCode(200)
+  async saveExpertProfile(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const input = parse(expertBody, body);
+    const expert = await this.experts.save((await this.session(request)).userId, {
+      ...input,
+      startingPrice: BigInt(input.startingPrice ?? 0) * 100n,
+    });
+    return { expert: expertJson(expert) };
+  }
+
+  /**
+   * The enquiries shops sent the partner, the latest first, of the last 90 days: `{ enquiries }`,
+   * each with the shop's handle to ask for access by (ADR-488), and who sent it.
+   */
+  @Get('partner/enquiries')
+  async expertEnquiries(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const enquiries = await this.experts.enquiries((await this.session(request)).userId);
+    return {
+      enquiries: enquiries.map((enquiry) => ({
+        id: enquiry.id,
+        shop: { name: enquiry.shop.name, handle: enquiry.shop.handle },
+        sender: enquiry.sender,
+        service: enquiry.service,
+        message: enquiry.message,
+        createdAt: enquiry.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  /** Experts Hatti listed, for shops to hire (ADR-855): `?service&city&language`, `{ experts }`. */
+  @Get('experts')
+  async listExperts(
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    await this.session(request);
+    const experts = await this.experts.directory(parse(expertsQuery, query));
+    return { experts: experts.map(expertJson) };
+  }
+
+  /**
+   * Sends an expert an enquiry for a shop of the signed-in owner's or manager's: `{ shopId,
+   * service, message }`. The expert reads it on their partner page, and answers by email.
+   */
+  @Post('experts/:id/enquiries')
+  @HttpCode(201)
+  async enquireExpert(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const partnerId = tryFromPublicId(id, 'expert');
+    if (!partnerId) throw new AuthError('NOT_FOUND', 404, 'No such expert');
+    const input = parse(enquiryBody, body);
+    const shopId = tryFromPublicId(input.shopId, 'shop');
+    if (!shopId) throw new AuthError('NOT_FOUND', 404, 'No such shop');
+    const sent = await this.experts.enquire((await this.session(request)).userId, {
+      partnerId,
+      shopId,
+      service: input.service,
+      message: input.message,
+    });
+    return { enquiry: { id: sent.id } };
   }
 
   /**

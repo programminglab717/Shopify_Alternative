@@ -10,6 +10,7 @@ import {
   Paperclip,
   Phone,
 } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -36,7 +37,7 @@ import type { MessageKey } from '../i18n/messages';
 import { mediaLabel } from '../inbox/inbox-page';
 import { FormSection, TextArea, problemText } from '../products/product-form';
 import { SelectField } from '../settings/settings-form';
-import { useAdminMutation, useAdminQuery, useShopTimezone } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
@@ -464,6 +465,7 @@ function Request({ request }: { request: SupportRequestValue }) {
 
 export function HelpPage() {
   const { t } = useLocale();
+  const shop = useShop();
   const query = useAdminQuery<HattiSupportData>(['hattiSupport'], HattiSupportQuery);
 
   let support;
@@ -505,6 +507,13 @@ export function HelpPage() {
         {t('nav.help')}
       </h1>
       <HelpCentre />
+      <Link
+        to="/$shopId/help/experts"
+        params={{ shopId: shop.id }}
+        className="inline-flex min-h-10 items-center self-start font-medium underline"
+      >
+        {t('experts.link')}
+      </Link>
       {support}
     </div>
   );

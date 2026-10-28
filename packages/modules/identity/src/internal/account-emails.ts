@@ -280,6 +280,51 @@ export function accessRequestEmail(input: {
   return compose(words, input.to, input.link, input.language);
 }
 
+/** What an expert offers shops, in each language, for the emails about their enquiries. */
+const SERVICE_NAMES: Record<string, Record<AccountEmailLanguage, string>> = {
+  setup: { en: 'setting a store up', ur: 'اسٹور سیٹ اپ' },
+  design: { en: 'design', ur: 'ڈیزائن' },
+  photography: { en: 'product photography', ur: 'پراڈکٹ فوٹوگرافی' },
+  ads: { en: 'ads', ur: 'اشتہارات' },
+  migration: { en: 'moving from another platform', ur: 'دوسرے پلیٹ فارم سے منتقلی' },
+  apps: { en: 'apps', ur: 'ایپس' },
+  content: { en: 'writing', ur: 'تحریر' },
+};
+
+/**
+ * The email telling an expert at `to` that `sender` of `shop` sent them an enquiry about `service`
+ * (ADR-855), with their partner page's `link` to read it and the sender's address to answer.
+ */
+export function expertEnquiryEmail(input: {
+  to: string;
+  sender: string;
+  shop: string;
+  service: string;
+  link: string;
+  language: AccountEmailLanguage;
+}): AccountEmail {
+  const sender = oneLine(input.sender);
+  const shop = oneLine(input.shop);
+  const service = SERVICE_NAMES[input.service]?.[input.language] ?? input.service;
+  const words: Omit<Words, 'greeting'> & { greeting: string } =
+    input.language === 'ur'
+      ? {
+          subject: `${shop} کی طرف سے ${service} کے بارے میں پوچھا گیا`,
+          greeting: 'السلام علیکم،',
+          lead: `${shop} کے ${sender} نے ہٹی پر آپ سے ${service} کے بارے میں رابطہ کیا ہے۔`,
+          button: 'پیغام پڑھیں',
+          after: 'ان کا پتا اور پیغام آپ کے پارٹنر صفحے پر ہے۔ انہیں جلد جواب دیں۔',
+        }
+      : {
+          subject: `${shop} asks you about ${service}`,
+          greeting: 'Assalam o alaikum,',
+          lead: `${sender} of ${shop} sent you an enquiry about ${service} on Hatti.`,
+          button: 'Read it',
+          after: 'Their address and message are on your partner page. Answer them soon.',
+        };
+  return compose(words, input.to, input.link, input.language);
+}
+
 /** An email of `words` around `link`, as text and as HTML, its words right to left in Urdu. */
 function compose(
   words: Omit<Words, 'greeting'> & { greeting: string },

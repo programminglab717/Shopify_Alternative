@@ -23,7 +23,8 @@
     "status-incidents": "node --env-file-if-exists=../../.env --enable-source-maps dist/status-incidents.js",
     "trust-reports": "node --env-file-if-exists=../../.env --enable-source-maps dist/trust-reports.js",
     "partner-apps": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-apps.js",
-    "partner-themes": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-themes.js"
+    "partner-themes": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-themes.js",
+    "partner-experts": "node --env-file-if-exists=../../.env --enable-source-maps dist/partner-experts.js"
   },
   "dependencies": {
     "@hatti/ai": "workspace:*",
