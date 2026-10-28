@@ -8,6 +8,7 @@ import {
   CircleCheck,
   CircleSlash,
   Clock,
+  Disc3,
   FileText,
   Gift,
   Handshake,
@@ -537,6 +538,20 @@ export function BroadcastsPage() {
             <span className="font-medium">{t('referrals.title')}</span>
             <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
               {t('referrals.linkHint')}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+        </Link>
+        <Link
+          to="/$shopId/marketing/spin-wheel"
+          params={{ shopId }}
+          className="flex min-h-16 items-center gap-3 border-t border-line px-4 py-3"
+        >
+          <Disc3 aria-hidden className="size-6 shrink-0 text-secondary" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="font-medium">{t('spinWheel.title')}</span>
+            <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t('spinWheel.linkHint')}
             </span>
           </span>
           <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />

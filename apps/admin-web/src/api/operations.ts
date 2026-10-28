@@ -12362,6 +12362,53 @@ export const ReferralProgramUpdateMutation = /* GraphQL */ `
   ${REFERRAL_PROGRAM}
 `;
 
+const SPIN_WHEEL = /* GraphQL */ `
+  fragment SpinWheelFields on SpinWheel {
+    enabled
+    slices {
+      label
+      kind
+      percentage
+      amount {
+        amount
+      }
+      weight
+    }
+    codeDays
+    minimumSubtotal {
+      amount
+    }
+    spins
+    codesUsed
+    updatedAt
+  }
+`;
+
+export const SpinWheelQuery = /* GraphQL */ `
+  query SpinWheel {
+    spinWheel {
+      ...SpinWheelFields
+    }
+  }
+  ${SPIN_WHEEL}
+`;
+
+export const SpinWheelUpdateMutation = /* GraphQL */ `
+  mutation SpinWheelUpdate($spinWheel: SpinWheelInput!) {
+    spinWheelUpdate(spinWheel: $spinWheel) {
+      spinWheel {
+        ...SpinWheelFields
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+  ${SPIN_WHEEL}
+`;
+
 export const AffiliatesQuery = /* GraphQL */ `
   query Affiliates {
     shop {

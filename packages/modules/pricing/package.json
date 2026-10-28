@@ -26,6 +26,7 @@
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

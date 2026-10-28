@@ -106,6 +106,13 @@ import {
   type SignUpResponse,
 } from './sign-ups.js';
 import {
+  spinsPath,
+  type SpinErrorResponse,
+  type SpinRequest,
+  type SpinResponse,
+  type SpinWheelResponse,
+} from './spins.js';
+import {
   stockWatchesPath,
   type StockWatchErrorResponse,
   type StockWatchRequest,
@@ -133,6 +140,7 @@ export type CartActionResult =
   ({ ok: true } & CartChangeResponse) | { ok: false; error: CartError };
 
 export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
+export type SpinResult = ({ ok: true } & SpinResponse) | ({ ok: false } & SpinErrorResponse);
 export type ReportResult = ({ ok: true } & ReportResponse) | ({ ok: false } & ReportErrorResponse);
 /**
  * What a web chat said back (ADR-810): its messages, and its token when it starts; what was
@@ -421,6 +429,32 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return { ok: true, ...((await response.json()) as SignUpResponse) };
+  }
+
+  /** The shop's wheel of offers (ADR-900), to draw; null while it has none turned on. */
+  async spinWheel(shopId: string): Promise<SpinWheelResponse | null> {
+    const response = await this.#request('GET', spinsPath(shopId), null);
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as SpinWheelResponse;
+  }
+
+  /**
+   * A shopper's spin (ADR-900): their slice and code, or what was wrong with it; null while the
+   * shop has no wheel turned on.
+   */
+  async spin(shopId: string, request: SpinRequest): Promise<SpinResult | null> {
+    const response = await this.#request('POST', spinsPath(shopId), null, request);
+    if (response.status === 404) return null;
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as SpinErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as SpinResponse) };
   }
 
   /**

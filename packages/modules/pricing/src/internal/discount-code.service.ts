@@ -53,7 +53,7 @@ export interface DiscountCodeInput {
 const USAGE_LIMIT_MAX = 1_000_000;
 
 /** The columns an input sets. */
-type CheckedCode = Partial<
+export type CheckedCode = Partial<
   Pick<
     DiscountCodeRow,
     | 'code'
@@ -148,29 +148,7 @@ export class DiscountCodeService {
         }
         const missing = await missingItemsIn(tx, tenant.shopId, values);
         if (missing.length > 0) return fail(missing);
-        const [row] = await tx
-          .insert(discountCodes)
-          .values({
-            shopId: tenant.shopId,
-            id: newId(),
-            code: values.code!,
-            title: values.title ?? values.code!,
-            kind: values.kind!,
-            percentageBps: values.percentageBps ?? null,
-            amount: values.amount ?? null,
-            buyQuantity: values.buyQuantity ?? null,
-            getQuantity: values.getQuantity ?? null,
-            minimumSubtotal: values.minimumSubtotal ?? null,
-            ...(values.startsAt ? { startsAt: values.startsAt } : {}),
-            endsAt: values.endsAt ?? null,
-            usageLimit: values.usageLimit ?? null,
-            oncePerCustomer: values.oncePerCustomer ?? false,
-            productIds: values.productIds ?? [],
-            collectionIds: values.collectionIds ?? [],
-          })
-          .returning();
-        await recordEvent(tx, PricingEvents.DiscountCodeCreated, row!);
-        return { ok: true, value: toRecord(row!) };
+        return { ok: true, value: await insertCodeIn(tx, tenant.shopId, values) };
       });
     } catch (error) {
       if (isUniqueViolation(error, 'discount_codes_code_key')) return taken(values.code!);
@@ -260,6 +238,40 @@ export async function discountCodeByIdIn(
   return row ? toRecord(row) : null;
 }
 
+/**
+ * A new code of the checked `values`, in the caller's transaction `tx`, whose items are there.
+ * Records `discount_code.created`.
+ */
+export async function insertCodeIn(
+  tx: Tx,
+  shopId: string,
+  values: CheckedCode,
+): Promise<DiscountCodeRecord> {
+  const [row] = await tx
+    .insert(discountCodes)
+    .values({
+      shopId,
+      id: newId(),
+      code: values.code!,
+      title: values.title ?? values.code!,
+      kind: values.kind!,
+      percentageBps: values.percentageBps ?? null,
+      amount: values.amount ?? null,
+      buyQuantity: values.buyQuantity ?? null,
+      getQuantity: values.getQuantity ?? null,
+      minimumSubtotal: values.minimumSubtotal ?? null,
+      ...(values.startsAt ? { startsAt: values.startsAt } : {}),
+      endsAt: values.endsAt ?? null,
+      usageLimit: values.usageLimit ?? null,
+      oncePerCustomer: values.oncePerCustomer ?? false,
+      productIds: values.productIds ?? [],
+      collectionIds: values.collectionIds ?? [],
+    })
+    .returning();
+  await recordEvent(tx, PricingEvents.DiscountCodeCreated, row!);
+  return toRecord(row!);
+}
+
 function taken(code: string): MutationResult<DiscountCodeRecord> {
   return failOne(
     ['code'],
@@ -272,8 +284,8 @@ function taken(code: string): MutationResult<DiscountCodeRecord> {
  * The columns `input` sets, checked: for a new code (`current` null), or over `current`, whose
  * dates the new ones must still fit.
  */
-function checkCode(
-  tenant: TenantContext,
+export function checkCode(
+  tenant: Pick<TenantContext, 'currency'>,
   input: DiscountCodeInput,
   current: DiscountCodeRow | null,
 ): MutationResult<CheckedCode> {
@@ -365,7 +377,7 @@ interface CurrentOffer {
  */
 export function checkOffer(
   check: InputChecker,
-  tenant: TenantContext,
+  tenant: Pick<TenantContext, 'currency'>,
   input: OfferInput,
   current: CurrentOffer | null,
   value: CheckedOffer,
@@ -476,7 +488,7 @@ function checkBuyXGetY(
 /** Its minimum, dates, and the products and collections it is for. */
 function checkRest(
   check: InputChecker,
-  tenant: TenantContext,
+  tenant: Pick<TenantContext, 'currency'>,
   input: OfferInput,
   current: CurrentOffer | null,
   value: CheckedOffer,

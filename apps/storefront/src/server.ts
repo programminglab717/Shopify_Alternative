@@ -292,6 +292,11 @@ const AGENT_CALLS = { name: 'agent-calls', limit: 120, windowMs: 60_000 };
  */
 const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
 /**
+ * Spins an address may make a minute of shops' wheels (ADR-900): a shopper spins once, so few,
+ * but room for many behind one mobile network's address.
+ */
+const SPINS = { name: 'spins', limit: 10, windowMs: 60_000 };
+/**
  * Messages an address may write a minute in shops' chats (ADR-811): a shopper writes a few, and
  * a script many.
  */
@@ -3877,6 +3882,60 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     };
 
   /**
+   * Spin to win (OS-08, ADR-900), for the theme's sign-up pop-up: `GET /spin.json` answers the
+   * shop's wheel, `{ "slices": [{ "label" }] }`, to draw; `POST /spin` with `{ "phone",
+   * "consent" }` signs the shopper up and answers where the wheel stops, `{ "slice", "label",
+   * "code", "endsAt", "again" }`, or 422 with `{ "errors": [{ "field", "message" }] }`. 404 while
+   * the shop has no wheel turned on. JSON alone, from the shop's own pages alone, at most
+   * {@link SPINS} spins a minute from an address, never kept.
+   */
+  const spin =
+    (action: 'wheel' | 'spin') => async (request: FastifyRequest, reply: FastifyReply) => {
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      accountAnswer(reply);
+      const refuse = (status: number, message: string) => reply.code(status).send({ message });
+      if (!fromShopItself(request))
+        return refuse(403, "Wheels are spun from the shop's own pages.");
+      if (action === 'spin' && !isJson(request)) return refuse(415, 'Send JSON.');
+      if (
+        action === 'spin' &&
+        limiter !== null &&
+        !(await limiter.hit(SPINS, request.ip)).allowed
+      ) {
+        return refuse(429, 'Too many spins. Please wait a minute.');
+      }
+      const body = paramsOf(request);
+      const text = (name: string) => (typeof body[name] === 'string' ? body[name] : null);
+      try {
+        if (!core) throw new StorefrontApiError(503, 'This storefront keeps no wheels');
+        if (action === 'wheel') {
+          const wheel = await core.spinWheel(found.shopId);
+          return wheel ? await reply.send(wheel) : await refuse(404, 'No wheel here.');
+        }
+        const consent = text('consent');
+        const result = await core.spin(found.shopId, {
+          phone: text('phone') ?? '',
+          ...(consent !== null && { consent }),
+        });
+        if (!result) return await refuse(404, 'No wheel here.');
+        if (!result.ok) return await reply.code(422).send({ errors: result.errors });
+        return await reply.send({
+          slice: result.slice,
+          label: result.label,
+          code: result.code,
+          endsAt: result.endsAt,
+          again: result.again,
+        });
+      } catch (error) {
+        if (error instanceof StoreMissingError)
+          return notFound(reply, 'This shop is not open yet.');
+        if (!unreachable(request, error)) throw error;
+        return refuse(503, 'The shop cannot be reached just now. Please try again in a minute.');
+      }
+    };
+
+  /**
    * The chat on the shop's pages (MSG-10, ADR-811), for the theme's script: `POST /chat` with
    * `{ "name", "phone", "body" }` starts one, keeping its session in a cookie of its own;
    * `POST /chat/messages` with `{ "body" }` writes in it; `GET /chat/messages.json` reads it. Each
@@ -4193,6 +4252,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   app.post(PUSH_PATHS.unsubscribe, pushChange('unsubscribe'));
 
   // The chat on the shop's pages, the same whatever the page's language (ADR-811).
+  app.get('/spin.json', spin('wheel'));
+  app.post('/spin', spin('spin'));
   app.post('/chat', chat('start'));
   app.post('/chat/messages', chat('write'));
   app.get('/chat/messages.json', chat('read'));

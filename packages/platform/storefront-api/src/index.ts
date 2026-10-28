@@ -90,6 +90,7 @@ export {
   type CommentResult,
   type ReportResult,
   type SignUpResult,
+  type SpinResult,
   type ContactMessageResult,
   type PushSubscribeResult,
   type WebChatResult,
@@ -146,6 +147,13 @@ export {
   type SignUpRequest,
   type SignUpResponse,
 } from './sign-ups.js';
+export {
+  spinsPath,
+  type SpinErrorResponse,
+  type SpinRequest,
+  type SpinResponse,
+  type SpinWheelResponse,
+} from './spins.js';
 export {
   stockWatchesPath,
   type StockWatchErrorResponse,

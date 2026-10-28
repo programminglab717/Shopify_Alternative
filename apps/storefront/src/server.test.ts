@@ -60,6 +60,8 @@ import {
   type WebChatResult,
   type SignUpRequest,
   type SignUpResult,
+  type SpinResult,
+  type SpinWheelResponse,
   type ReportRequest,
   type ReportResult,
   type RightsComplaintRequest,
@@ -560,6 +562,27 @@ class FakeCore {
     this.signUps.push({ shopId, request });
     if (this.signedUp instanceof Error) throw this.signedUp;
     return this.signedUp;
+  }
+
+  /** The spins sent on, and the shop's wheel (ADR-900). */
+  readonly spins: { shopId: string; request: object }[] = [];
+  wheel: SpinWheelResponse | null = { slices: [{ label: '10% off' }, { label: 'Next time' }] };
+  spun: SpinResult | null = {
+    ok: true,
+    slice: 0,
+    label: '10% off',
+    code: 'SPIN-ABCD2345',
+    endsAt: '2026-11-03T09:00:00.000Z',
+    again: false,
+  };
+
+  async spinWheel(): Promise<SpinWheelResponse | null> {
+    return this.wheel;
+  }
+
+  async spin(shopId: string, request: object): Promise<SpinResult | null> {
+    this.spins.push({ shopId, request });
+    return this.spun;
   }
 
   /** The contact form's messages sent on, and how the core answers them (ADR-589). */
@@ -3936,6 +3959,84 @@ describe('Carts', () => {
       payload: form({ name: 'A', phone: '0300 1234567', body: 'Hi' }),
     });
     expect(formed.statusCode).toBe(415);
+  });
+
+  it("answers the shop's wheel and sends shoppers' spins on (ADR-900)", async () => {
+    const app = server();
+    const JSON_POST = { host: 'localhost', 'content-type': 'application/json' };
+    const wheel = await app.inject({
+      method: 'GET',
+      url: '/spin.json',
+      headers: { host: 'localhost' },
+    });
+    expect([wheel.statusCode, wheel.headers['cache-control'], wheel.json()]).toEqual([
+      200,
+      'private, no-store',
+      { slices: [{ label: '10% off' }, { label: 'Next time' }] },
+    ]);
+    const spun = await app.inject({
+      method: 'POST',
+      url: '/spin',
+      headers: JSON_POST,
+      payload: { phone: '0300 1234567', consent: 'Yes, send me offers' },
+    });
+    expect([spun.statusCode, spun.json()]).toEqual([
+      200,
+      {
+        slice: 0,
+        label: '10% off',
+        code: 'SPIN-ABCD2345',
+        endsAt: '2026-11-03T09:00:00.000Z',
+        again: false,
+      },
+    ]);
+    expect(core.spins.at(-1)?.request).toEqual({
+      phone: '0300 1234567',
+      consent: 'Yes, send me offers',
+    });
+    // What the core refuses, said by field.
+    core.spun = { ok: false, errors: [{ field: 'phone', message: 'Give a mobile number' }] };
+    const wrong = await app.inject({
+      method: 'POST',
+      url: '/spin',
+      headers: JSON_POST,
+      payload: { phone: '12' },
+    });
+    expect([wrong.statusCode, wrong.json()]).toEqual([
+      422,
+      { errors: [{ field: 'phone', message: 'Give a mobile number' }] },
+    ]);
+    // From another site, or not JSON: refused, and nothing asked of the core.
+    const asked = core.spins.length;
+    const across = await app.inject({
+      method: 'POST',
+      url: '/spin',
+      headers: { ...JSON_POST, 'sec-fetch-site': 'cross-site' },
+      payload: { phone: '0300 1234567' },
+    });
+    const formed = await app.inject({
+      method: 'POST',
+      url: '/spin',
+      headers: FORM,
+      payload: form({ phone: '0300 1234567' }),
+    });
+    expect([across.statusCode, formed.statusCode]).toEqual([403, 415]);
+    expect(core.spins).toHaveLength(asked);
+    // A shop with no wheel turned on.
+    core.wheel = null;
+    core.spun = null;
+    const none = await app.inject({
+      method: 'GET',
+      url: '/spin.json',
+      headers: { host: 'localhost' },
+    });
+    const noSpin = await app.inject({
+      method: 'POST',
+      url: '/spin',
+      headers: JSON_POST,
+      payload: { phone: '0300 1234567' },
+    });
+    expect([none.statusCode, noSpin.statusCode]).toEqual([404, 404]);
   });
 
   it("offers the shop's notifications where Hatti pushes, and passes subscriptions on (ADR-833)", async () => {

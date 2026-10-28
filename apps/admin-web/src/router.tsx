@@ -109,6 +109,7 @@ import {
 } from './marketing/google-ads-account';
 import { AutomationsPage } from './marketing/automations-page';
 import { ReferralsPage } from './marketing/referrals-page';
+import { SpinWheelPage } from './marketing/spin-wheel-page';
 import { PushPage } from './marketing/push-page';
 import { BroadcastsPage } from './marketing/broadcasts-page';
 import { CalendarPage } from './marketing/calendar-page';
@@ -934,6 +935,12 @@ const marketingReferrals = createRoute({
   component: ReferralsPage,
 });
 
+const marketingSpinWheel = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing/spin-wheel',
+  component: SpinWheelPage,
+});
+
 const marketingPushes = createRoute({
   getParentRoute: () => shop,
   path: 'marketing/pushes',
@@ -1226,6 +1233,7 @@ export const routeTree = root.addChildren([
     marketingAdSpend,
     marketingAffiliates,
     marketingReferrals,
+    marketingSpinWheel,
     marketingPushes,
     settingsTax,
     settingsMessages,

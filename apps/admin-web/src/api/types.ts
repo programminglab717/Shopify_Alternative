@@ -6066,6 +6066,35 @@ export interface ReferralProgramUpdateData {
   referralProgramUpdate: { referralProgram: ReferralProgramValue | null; userErrors: UserError[] };
 }
 
+export type SpinSliceKind = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING' | 'NONE';
+
+export interface SpinSliceValue {
+  label: string;
+  kind: SpinSliceKind;
+  percentage: number | null;
+  amount: { amount: string } | null;
+  weight: number;
+}
+
+/** The shop's spin-to-win wheel (OS-08, ADR-900). */
+export interface SpinWheelValue {
+  enabled: boolean;
+  slices: SpinSliceValue[];
+  codeDays: number;
+  minimumSubtotal: { amount: string } | null;
+  spins: number;
+  codesUsed: number;
+  updatedAt: string | null;
+}
+
+export interface SpinWheelData {
+  spinWheel: SpinWheelValue;
+}
+
+export interface SpinWheelUpdateData {
+  spinWheelUpdate: { spinWheel: SpinWheelValue | null; userErrors: UserError[] };
+}
+
 export interface AffiliatesData {
   shop: { url: string };
   affiliates: AffiliateValue[];

@@ -326,8 +326,9 @@ describe.skipIf(!server)('DiscountCodeService', () => {
     });
     expect(await exported(a.shopId, ayesha)).toEqual({
       discountCodeUses: [use('TWICE'), use('TWICE'), use('ONCE')],
+      wheelSpins: [],
     });
-    expect(await exported(b.shopId, ayesha)).toEqual({ discountCodeUses: [] });
+    expect(await exported(b.shopId, ayesha)).toEqual({ discountCodeUses: [], wheelSpins: [] });
     const events = await admin.query<{ event_type: string; payload: Record<string, unknown> }>(
       `SELECT event_type, payload FROM platform.outbox_events
         WHERE event_type = 'discount_code.redeemed' ORDER BY occurred_at, id`,

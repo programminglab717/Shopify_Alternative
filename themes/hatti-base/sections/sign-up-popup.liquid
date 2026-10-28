@@ -6,6 +6,11 @@
   it stays away for good. Signed up here, it opens again saying so, with the shop's code for them
   where it gives one. Hidden in the footer group until the shop shows it; in the theme editor it
   opens at once, to be seen.
+
+  With the spin-to-win wheel on (OS-08, ADR-900), and the shop's wheel turned on in its admin,
+  the pop-up draws the wheel from /spin.json; the number posts to /spin, which signs the shopper
+  up and says where the wheel stops, chosen by the platform, never the page, and the shopper's
+  own code. Without scripts, or with the shop's wheel off, it is the plain sign-up.
 {%- endcomment -%}
 {%- liquid
   assign show = true
@@ -24,6 +29,16 @@
     data-days="{{ section.settings.days_hidden }}"
     {% if section.settings.exit_intent %}data-exit{% endif %}
     {% if request.design_mode %}data-design{% endif %}
+    {% if section.settings.spin_wheel %}
+      data-spin
+      data-spin-label="{{ 'sections.sign_up_popup.spin' | t | escape }}"
+      data-spin-spinning="{{ 'sections.sign_up_popup.spinning' | t | escape }}"
+      data-spin-won="{{ 'sections.sign_up_popup.spin_won' | t: label: '{label}' | escape }}"
+      data-spin-again="{{ 'sections.sign_up_popup.spin_again' | t: label: '{label}' | escape }}"
+      data-spin-ends="{{ 'sections.sign_up_popup.spin_ends' | t: date: '{date}' | escape }}"
+      data-spin-invalid="{{ 'sections.newsletter.error' | t | escape }}"
+      data-spin-failed="{{ 'sections.sign_up_popup.spin_failed' | t | escape }}"
+    {% endif %}
   >
     <dialog class="sign-up-popup" id="sign-up-popup" aria-labelledby="sign-up-popup-heading">
       <button
@@ -37,6 +52,20 @@
       <h2 id="sign-up-popup-heading" dir="auto">{{ section.settings.heading | escape }}</h2>
       {%- if section.settings.text != blank -%}
         <p dir="auto">{{ section.settings.text | escape }}</p>
+      {%- endif -%}
+      {%- if section.settings.spin_wheel -%}
+        <div class="spin-wheel" data-spin-wheel hidden>
+          <span class="spin-wheel__pointer" aria-hidden="true"></span>
+          <div class="spin-wheel__disc" data-spin-disc aria-hidden="true"></div>
+        </div>
+        <div class="spin-wheel__result" data-spin-result hidden>
+          <p role="status" dir="auto" data-spin-message></p>
+          <p class="sign-up-popup__offer" data-spin-offer hidden>
+            {{ 'sections.sign_up_popup.code' | t }}
+            <strong class="sign-up-popup__code" dir="ltr" data-spin-code></strong>
+          </p>
+          <p data-spin-until hidden></p>
+        </div>
       {%- endif -%}
       {%- form 'customer', id: 'sign-up-popup-form', class: 'sign-up-popup__form' -%}
         {%- if form.posted_successfully? -%}
@@ -68,6 +97,9 @@
               {{- 'sections.newsletter.error' | t -}}
             </p>
           {%- endif -%}
+          {%- if section.settings.spin_wheel -%}
+            <p class="sign-up-popup__error" role="alert" data-spin-error hidden></p>
+          {%- endif -%}
           <button type="submit" class="button">{{ 'sections.newsletter.submit' | t }}</button>
         {%- endif -%}
       {%- endform -%}
@@ -87,6 +119,12 @@
   .sign-up-popup__form input[type='tel'] { padding: 0.6rem 0.75rem; font: inherit; }
   .sign-up-popup__error { color: #b91c1c; margin: 0; }
   .sign-up-popup__code { font-size: 1.25rem; letter-spacing: 0.05em; }
+  .spin-wheel { position: relative; inline-size: min(100%, 16rem); aspect-ratio: 1; margin: 1rem auto 0; }
+  .spin-wheel__disc { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 4px var(--color-text); transition: transform 4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .spin-wheel__label { position: absolute; top: 50%; left: 50%; inline-size: 40%; font-size: 0.8rem; font-weight: 600; text-align: center; line-height: 1.1; transform-origin: 0 0; }
+  .spin-wheel__pointer { position: absolute; z-index: 1; top: -0.5rem; left: calc(50% - 0.6rem); border-inline: 0.6rem solid transparent; border-block-start: 1.2rem solid var(--color-text); }
+  .spin-wheel__result { margin-block-start: 1rem; }
+  @media (prefers-reduced-motion: reduce) { .spin-wheel__disc { transition: none; } }
   .sign-up-popup__later { margin-block-start: 0.75rem; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 {% endstylesheet %}
 
@@ -102,6 +140,7 @@
         if (event.target === this.dialog) this.dialog.close();
       });
       this.dialog.addEventListener('close', () => this.remember('closed'));
+      if ('spin' in this.dataset) this.wheel();
       if ('design' in this.dataset) return this.open();
 
       const query = new URLSearchParams(location.search);
@@ -138,6 +177,106 @@
       // Not over another dialog, such as the cart drawer.
       if (this.dialog.open || document.querySelector('dialog[open]')) return;
       this.dialog.showModal();
+    }
+
+    /** The shop's wheel, drawn, its spins posted; nothing while the shop has none on. */
+    async wheel() {
+      const form = this.querySelector('form');
+      const phone = form?.querySelector('[name="contact[phone]"]');
+      if (!phone) return;
+      let slices;
+      try {
+        const response = await fetch('/spin.json', { headers: { accept: 'application/json' } });
+        if (!response.ok) return;
+        slices = (await response.json()).slices;
+      } catch {
+        return;
+      }
+      if (!Array.isArray(slices) || slices.length < 2) return;
+      const box = this.querySelector('[data-spin-wheel]');
+      const disc = box.querySelector('[data-spin-disc]');
+      const step = 360 / slices.length;
+      // Turns of two colours, a third for the last of an odd number, so no two side by side match.
+      const colour = (index) =>
+        index === slices.length - 1 && slices.length % 2 === 1
+          ? '#fde68a'
+          : index % 2 === 0
+            ? '#0f766e'
+            : '#f1f5f9';
+      disc.style.background = `conic-gradient(${slices
+        .map((_, index) => `${colour(index)} ${index * step}deg ${(index + 1) * step}deg`)
+        .join(', ')})`;
+      slices.forEach((slice, index) => {
+        const label = document.createElement('span');
+        label.className = 'spin-wheel__label';
+        label.textContent = slice.label;
+        label.style.color = colour(index) === '#0f766e' ? '#fff' : '#0f172a';
+        label.style.transform = `rotate(${index * step + step / 2 - 90}deg) translate(15%, -50%)`;
+        disc.append(label);
+      });
+      box.hidden = false;
+      const button = form.querySelector('[type="submit"]');
+      button.textContent = this.dataset.spinLabel;
+      const error = form.querySelector('[data-spin-error]');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        error.hidden = true;
+        button.disabled = true;
+        button.textContent = this.dataset.spinSpinning;
+        let response = null;
+        try {
+          response = await fetch('/spin', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({
+              phone: phone.value,
+              consent: form.querySelector('[name="contact[consent]"]')?.value,
+            }),
+          });
+        } catch {
+          // Said below.
+        }
+        // The shop's wheel went off meanwhile: the plain sign-up.
+        if (response?.status === 404) return form.submit();
+        if (!response?.ok) {
+          error.textContent =
+            response?.status === 422 ? this.dataset.spinInvalid : this.dataset.spinFailed;
+          error.hidden = false;
+          phone.setAttribute('aria-invalid', String(response?.status === 422));
+          button.disabled = false;
+          button.textContent = this.dataset.spinLabel;
+          return;
+        }
+        const result = await response.json();
+        this.remember('signed_up');
+        // Five turns and on to the slice's middle, under the pointer.
+        disc.style.transform = `rotate(${5 * 360 + 360 - (result.slice * step + step / 2)}deg)`;
+        const done = () => this.spun(result, form);
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) done();
+        else disc.addEventListener('transitionend', done, { once: true });
+      });
+    }
+
+    /** Where the wheel stopped, and the shopper's code. */
+    spun(result, form) {
+      form.hidden = true;
+      const shown = this.querySelector('[data-spin-result]');
+      const words = result.again ? this.dataset.spinAgain : this.dataset.spinWon;
+      shown.querySelector('[data-spin-message]').textContent = words.replace('{label}', result.label);
+      if (result.code) {
+        shown.querySelector('[data-spin-code]').textContent = result.code;
+        shown.querySelector('[data-spin-offer]').hidden = false;
+      }
+      if (result.code && result.endsAt) {
+        const date = new Date(result.endsAt).toLocaleDateString(
+          document.documentElement.lang || undefined,
+          { day: 'numeric', month: 'long' },
+        );
+        const until = shown.querySelector('[data-spin-until]');
+        until.textContent = this.dataset.spinEnds.replace('{date}', date);
+        until.hidden = false;
+      }
+      shown.hidden = false;
     }
 
     kept() {
@@ -215,6 +354,13 @@
       "type": "checkbox",
       "id": "home_only",
       "label": "t:sections.sign-up-popup.settings.home_only.label",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "spin_wheel",
+      "label": "t:sections.sign-up-popup.settings.spin_wheel.label",
+      "info": "t:sections.sign-up-popup.settings.spin_wheel.info",
       "default": false
     }
   ]

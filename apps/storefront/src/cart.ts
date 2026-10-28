@@ -30,6 +30,8 @@ export type CoreBackend = Pick<
   | 'themePreview'
   | 'themeImage'
   | 'signUp'
+  | 'spinWheel'
+  | 'spin'
   | 'contactMessage'
   | 'postComment'
   | 'watchStock'

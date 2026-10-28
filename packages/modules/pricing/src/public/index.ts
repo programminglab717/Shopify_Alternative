@@ -66,3 +66,10 @@ export {
   type DiscountedOrder,
 } from '../internal/redemptions.js';
 export { DISCOUNT_KINDS, type DiscountKindValue } from '../internal/schema.js';
+export {
+  SPIN_LABEL_MAX,
+  SPIN_SLICES,
+  SpinWheelService,
+  type SpinOutcome,
+  type SpinWheelRecord,
+} from '../internal/spin-wheel.js';

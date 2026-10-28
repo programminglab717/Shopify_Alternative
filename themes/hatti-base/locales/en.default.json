@@ -312,7 +312,13 @@
     "sign_up_popup": {
       "close": "Close",
       "code": "Your code for the offer:",
-      "later": "Not now"
+      "later": "Not now",
+      "spin": "Spin the wheel",
+      "spinning": "Spinning…",
+      "spin_won": "The wheel stopped at {{ label }}!",
+      "spin_again": "You spun before: the wheel stopped at {{ label }}.",
+      "spin_ends": "Use it by {{ date }}, for one order.",
+      "spin_failed": "The wheel cannot spin just now. Please try again in a minute."
     },
     "store_locator": {
       "empty": "Our stores will be listed here soon.",

@@ -3860,6 +3860,35 @@ describe('Storefront rendering', () => {
       await render({ path: '/', editor: { origins: ['https://admin.hatti.pk'] } }, { extra })
     ).html;
     expect(editing).toMatch(/<hatti-sign-up-popup[^>]*data-design/);
+    // No wheel unless the shop shows one.
+    expect(home).not.toMatch(/<hatti-sign-up-popup[^>]*data-spin/);
+    expect(home).not.toContain('<div class="spin-wheel"');
+  });
+
+  it("draws the shop's spin-to-win wheel in the pop-up where it shows one (OS-08, ADR-900)", async () => {
+    const footer = JSON.parse(files['sections/footer-group.json']!) as SectionList;
+    const extra = {
+      'sections/footer-group.json': JSON.stringify({
+        ...footer,
+        sections: {
+          ...footer.sections,
+          popup: { type: 'sign-up-popup', settings: { spin_wheel: true } },
+        },
+      }),
+    };
+    const home = (await render({ path: '/' }, { extra })).html;
+    expect(home).toMatch(/<hatti-sign-up-popup[^>]*\sdata-spin\s/);
+    expect(home).toContain('data-spin-label="Spin the wheel"');
+    expect(home).toContain('data-spin-won="The wheel stopped at {label}!"');
+    expect(home).toContain('data-spin-ends="Use it by {date}, for one order."');
+    expect(home).toContain('<div class="spin-wheel" data-spin-wheel hidden>');
+    expect(home).toContain(
+      '<p class="sign-up-popup__error" role="alert" data-spin-error hidden></p>',
+    );
+    // Without scripts, the plain sign-up form.
+    expect(home).toContain('<input type="hidden" name="contact[tags]" value="popup">');
+    const urdu = (await render({ path: '/', locale: 'ur' }, { extra })).html;
+    expect(urdu).toContain('data-spin-label="پہیہ گھمائیں"');
   });
 
   it('puts a WhatsApp button on every page, its message saying what the shopper was looking at (OS-10, ADR-593)', async () => {

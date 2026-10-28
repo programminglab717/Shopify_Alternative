@@ -312,6 +312,10 @@
         },
         "home_only": {
           "label": "On the home page alone"
+        },
+        "spin_wheel": {
+          "label": "Show the spin-to-win wheel",
+          "info": "Set its slices under Marketing › Spin to win. Each shopper spins once and gets a code of their own."
         }
       }
     },

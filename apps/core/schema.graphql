@@ -11709,6 +11709,11 @@ type Mutation {
   smsSenderWithdraw: SmsSenderWithdrawPayload!
 
   """
+  Changes the wheel; the rest stays. Codes it gave keep what they give. Turned on, it needs 2 to 8 slices.
+  """
+  spinWheelUpdate(spinWheel: SpinWheelInput!): SpinWheelPayload!
+
+  """
   Approves a request for access waiting on the shop (ADR-488): its account works in the shop from now until its days are up, in `role` and for `accessDays` where given in place of what it asked. Within the plan's staff (ADR-154). The owner approves any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffAccessRequestApprove(accessDays: Int, id: ID!, role: StaffMemberRole): StaffAccessRequestApprovePayload!
@@ -18162,6 +18167,9 @@ type Query {
   """The name the shop's SMS go from, and its requests for one of its own."""
   smsSender: SmsSender!
 
+  """The shop's spin-to-win wheel, off until set."""
+  spinWheel: SpinWheel!
+
   """
   Requests for access waiting on the shop, the oldest first (ADR-488). Staff need to be the owner or a manager.
   """
@@ -20190,6 +20198,93 @@ type SpeedPage {
   kind: StorefrontPageKind!
   metrics: [SpeedMetric!]!
   pageViews: Int!
+}
+
+type SpinSlice {
+  """Off the items, for a FIXED_AMOUNT slice."""
+  amount: Money
+  kind: SpinSliceKind!
+
+  """The words on the wheel: "10% off"."""
+  label: String!
+
+  """Percent off, for a PERCENTAGE slice."""
+  percentage: Float
+
+  """
+  How often the wheel stops at it, against the others' weights: 1 to 100.
+  """
+  weight: Int!
+}
+
+input SpinSliceInput {
+  """Off the items, in major units, for a FIXED_AMOUNT slice: "500"."""
+  amount: String
+  kind: SpinSliceKind!
+
+  """The words on the wheel, up to 24 characters."""
+  label: String!
+
+  """Percent off, 0.01 to 100, for a PERCENTAGE slice."""
+  percentage: Float
+
+  """1 to 100."""
+  weight: Int!
+}
+
+"""What a slice of the shop's wheel gives the shopper it stops for."""
+enum SpinSliceKind {
+  """A code for an amount off the order's items."""
+  FIXED_AMOUNT
+
+  """A code for free delivery."""
+  FREE_SHIPPING
+
+  """Nothing: "Better luck next time"."""
+  NONE
+
+  """A code for a percentage off the order's items."""
+  PERCENTAGE
+}
+
+"""
+Spin to win (OS-08): a wheel of offers on the shop's sign-up pop-up. A shopper gives their number, is signed up for the shop's news and offers on WhatsApp, tagged "spin", and the wheel stops at a slice chosen by its weight; one that gives something is a code of their own, for one order. Once a number.
+"""
+type SpinWheel {
+  """How many days a shopper's code works: 1 to 90."""
+  codeDays: Int!
+
+  """Orders placed with codes the wheel gave."""
+  codesUsed: Int!
+
+  """Whether the theme's sign-up pop-up shows it."""
+  enabled: Boolean!
+
+  """What an order's items must come to for a code to work."""
+  minimumSubtotal: Money
+
+  """2 to 8, in the wheel's order."""
+  slices: [SpinSlice!]!
+
+  """Numbers that have spun."""
+  spins: Int!
+  updatedAt: DateTime
+}
+
+input SpinWheelInput {
+  codeDays: Int
+  enabled: Boolean
+
+  """In major units; null or blank for no minimum."""
+  minimumSubtotal: String
+
+  """Every slice, 2 to 8, in place of those it has."""
+  slices: [SpinSliceInput!]
+}
+
+type SpinWheelPayload {
+  spinWheel: SpinWheel
+  userErrors: [UserError!]!
 }
 
 """
