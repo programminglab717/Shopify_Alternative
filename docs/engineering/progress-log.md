@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Shops for AI shopping agents
+### d716755 · Shops for AI shopping agents
 
 * **Online store:** each shop publishes a UCP profile at `/.well-known/ucp`, and a store MCP
   endpoint at `/api/mcp`. Its tools search and read the shop's products, and make carts whose
