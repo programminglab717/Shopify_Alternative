@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-872 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-873 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -880,6 +880,7 @@
 | 870 | Visual search: a shopper's photo read by the AI into the words a shop titles its products with, the shop's own search finding them; off until the shop turns it on, one AI credit a photo, 300 a day | Accepted |
 | 871 | Voice-note orders: a customer's WhatsApp voice note heard by Hatti's own whisper.cpp server, read by the AI into what it orders, and answered with the shop's checkout holding it; what was heard shown to staff, the audio never kept | Accepted |
 | 872 | Point of sale: registers that sell from a location's shelf in cash sessions closed with a Z report; till sales kept apart from orders, paid in cash, card, transfer or wallet, linked to a customer by number; rung up in the admin, offline too | Accepted |
+| 873 | Orders at the till: click-and-collect orders handed over there with what they owe, and orders sent home from there, confirmed in person; the money taken counted in the register's session | Accepted |
 
 ---
 
@@ -28925,3 +28926,34 @@
     installable (ADR-514) and works offline already.
   * **Printing over Web Bluetooth or WebUSB in ESC/POS:** Chrome alone, and printer by printer.
     The system's print dialog reaches any printer the tablet has a driver for.
+
+## ADR-873 · Orders at the till: click-and-collect orders handed over there with what they owe, and orders sent home from there, confirmed in person; the money taken counted in the register's session
+
+* **Context:**
+  * POS-06 asks for click and collect at the shop, and POS-08 for the endless aisle: a shopper
+    at the counter orders what the shop has elsewhere, or not on the shelf, for home delivery.
+  * Pickup orders (ADR-389) and their hand-over exist, and so does the till (ADR-872). Neither
+    counted the money taken at the counter in the till's drawer.
+* **Decision:**
+  * **Pickups at the till:** the register's Pickups list shows the open click-and-collect orders
+    for its location, oldest first, with what each still owes.
+    * One not confirmed, or waiting for its transfer, waits.
+    * Handing one over is the pickup hand-over, in the same transaction. What it owed is paid
+      into the session, in cash or as chosen, and refused for another location's order.
+  * **Sent home from the till:** the cart becomes an order, with source `pos` and tag `pos`,
+    placed as orders are, to the customer's address.
+    * It is confirmed by them in person, and ships from wherever the shop ships from.
+    * It is paid at the till in full (prepaid), an advance with the rest on delivery, or all on
+      delivery.
+  * **In the session:** money taken at the till for orders is kept as `orders.pos_order_payments`.
+    The Z report counts it: what each way of paying took, orders paid here, and the cash the
+    drawer should hold.
+* **Consequences:**
+  * A shopper collects at the counter and pays there. Another orders what is not on the shelf
+    and has it delivered, paying now or at the door.
+  * The drawer balances against everything taken at it.
+  * Sending home needs a connection: it is not kept offline as till sales are.
+* **Alternatives:**
+  * **A draft order and its link (ADR-223):** the customer is at the counter. Asking them to
+    confirm on their phone is a step for nothing.
+  * **Collecting the money in the orders page:** it would not reach the drawer's count.

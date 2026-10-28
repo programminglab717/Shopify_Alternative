@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Orders at the till
+
+* **Pickups:** the till lists click-and-collect orders waiting at its location; staff hand one
+  over and take what it owes there (POS-06, [ADR-873](../architecture/13-decision-log.md#adr-873--orders-at-the-till-click-and-collect-orders-handed-over-there-with-what-they-owe-and-orders-sent-home-from-there-confirmed-in-person-the-money-taken-counted-in-the-registers-session)).
+* **Sent home:** a cart becomes an order to the customer's address, confirmed at the counter,
+  paid now in full, an advance, or on delivery (POS-08).
+* **The drawer:** money taken for orders at the till is in the session's Z report.
+* 4711 tests (6 new).
+
 ### f18650e · Point of sale
 
 * **Registers:** a shop adds a register for each counter, selling from a location's shelf, and
