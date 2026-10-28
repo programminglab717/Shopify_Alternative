@@ -1,6 +1,7 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
 import { parseDsn } from '@hatti/logger';
+import type { ConsoleSignInSettings } from '@hatti/identity/public';
 import type { GoogleAdsOptions } from '@hatti/marketing/public';
 import { DarazClient } from '@hatti/orders/public';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
@@ -1063,6 +1064,53 @@ const supportRequestsSchema = z
   .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED);
 
 /**
+ * Hatti's console's server (ADR-876): a process of its own, reached at the console's address
+ * alone, never the API's. It has the system login, which reads every shop's, for the queues of
+ * Hatti's people, and the identity login for its agents and sessions. Hatti's own identity
+ * provider signs them in: its issuer, the client the console is registered as there, and the
+ * console's address. The provider asks for security keys; where it says how its people signed in
+ * (`amr`), one of CONSOLE_OIDC_REQUIRED_AMR must be among them.
+ */
+const consoleSchema = z
+  .object({
+    NODE_ENV: common.NODE_ENV,
+    LOG_LEVEL: common.LOG_LEVEL,
+    ERROR_TRACKING_DSN: common.ERROR_TRACKING_DSN,
+    ERROR_TRACKING_ENVIRONMENT: common.ERROR_TRACKING_ENVIRONMENT,
+    ERROR_TRACKING_RELEASE: common.ERROR_TRACKING_RELEASE,
+    HOST: z.string().default('0.0.0.0'),
+    CONSOLE_PORT: env.port().default(4100),
+    TRUST_PROXY: env.flag().default(false),
+    DATABASE_URL: env.postgresUrl(),
+    DATABASE_SYSTEM_URL: env.postgresUrl(),
+    DATABASE_IDENTITY_URL: env.postgresUrl(),
+    CONSOLE_URL: env.httpUrl(),
+    CONSOLE_OIDC_ISSUER: env.httpUrl(),
+    CONSOLE_OIDC_CLIENT_ID: z.string().trim().min(1).max(255),
+    CONSOLE_OIDC_CLIENT_SECRET: env.secret(16),
+    CONSOLE_OIDC_REQUIRED_AMR: env
+      .list()
+      .pipe(z.array(z.string().regex(/^[a-z_]{2,20}$/)).min(1))
+      .optional(),
+    // Answers to requests written on WhatsApp go back there (ADR-560).
+    META_GRAPH_URL: messageSending.META_GRAPH_URL,
+    META_GRAPH_VERSION: messageSending.META_GRAPH_VERSION,
+    ...supportWhatsApp,
+  })
+  .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED);
+
+/** Hatti's provider, as the console signs in through it. */
+export function consoleSignInOf(config: ConsoleConfig): ConsoleSignInSettings {
+  return {
+    consoleUrl: config.CONSOLE_URL.replace(/\/+$/, ''),
+    issuer: config.CONSOLE_OIDC_ISSUER.replace(/\/+$/, ''),
+    clientId: config.CONSOLE_OIDC_CLIENT_ID,
+    clientSecret: config.CONSOLE_OIDC_CLIENT_SECRET,
+    requiredAmr: config.CONSOLE_OIDC_REQUIRED_AMR ?? [],
+  };
+}
+
+/**
  * Hatti's people decide on shoppers' reports of stores (ADR-460) and shops' verifications (ADR-465),
  * with the system login, which reads every shop's.
  */
@@ -1134,6 +1182,7 @@ export type PartnerPayoutsConfig = z.output<typeof partnerPayoutsSchema>;
 export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
 export type SupportRequestsConfig = z.output<typeof supportRequestsSchema>;
+export type ConsoleConfig = z.output<typeof consoleSchema>;
 export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
 export type TrustReportsConfig = z.output<typeof trustReportsSchema>;
 export type StatusIncidentsConfig = z.output<typeof statusIncidentsSchema>;
@@ -1153,6 +1202,7 @@ export const loadBillingTransfersConfig = (source?: Env): BillingTransfersConfig
   parseEnv(billingTransfersSchema, source);
 export const loadSupportRequestsConfig = (source?: Env): SupportRequestsConfig =>
   parseEnv(supportRequestsSchema, source);
+export const loadConsoleConfig = (source?: Env): ConsoleConfig => parseEnv(consoleSchema, source);
 export const loadCourierCitiesConfig = (source?: Env): CourierCitiesConfig =>
   parseEnv(courierCitiesSchema, source);
 export const loadTrustReportsConfig = (source?: Env): TrustReportsConfig =>

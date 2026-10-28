@@ -8,6 +8,14 @@ export type AuthErrorCode =
   | 'SSO_EXPIRED'
   /** A session the shop's provider began reaches that shop alone, not the account's settings. */
   | 'SSO_SESSION'
+  /** Hatti's provider isn't set up for the console (ADR-876). */
+  | 'CONSOLE_NOT_SET_UP'
+  /** Hatti's provider can't be reached now. */
+  | 'CONSOLE_UNREACHABLE'
+  /** The provider's answer was traded already, or too late. */
+  | 'CONSOLE_EXPIRED'
+  /** No console session, or one that ended. */
+  | 'CONSOLE_SIGNED_OUT'
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_TAKEN'
   | 'WEAK_PASSWORD'

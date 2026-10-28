@@ -20,6 +20,10 @@ pnpm dev:api           # http://localhost:4000, GraphiQL at /graphiql
 pnpm dev:worker        # outbox relay, event consumers that keep storefronts up to date, and sweeps (in a second terminal)
 ```
 
+Hatti's own console (ADR-876) runs apart from both: `pnpm dev:console-server` on :4100 and
+`pnpm dev:console` on http://localhost:5174, once `CONSOLE_*` in `.env` name an identity provider
+and `pnpm --filter @hatti/core support-agent add <email>` has made an account one of its agents.
+
 `pnpm dev:api` and `pnpm dev:worker` build what they need first (Turborepo caches unchanged
 packages), then start the process. Stop with Ctrl+C; both shut down gracefully.
 

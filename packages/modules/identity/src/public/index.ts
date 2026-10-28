@@ -155,3 +155,18 @@ export {
   type ShopSsoSettings,
   type SsoOptions,
 } from '../internal/sso.js';
+export {
+  CONSOLE_LIMITS,
+  ConsoleAuthService,
+  type ConsoleActionRecord,
+  type ConsoleAgent,
+  type ConsoleSignInProblem,
+  type ConsoleSignInSettings,
+} from '../internal/console.js';
+export {
+  ConsoleAuthController,
+  ConsoleGuard,
+  consoleAgentJson,
+  consoleAgentOf,
+} from '../internal/console.controller.js';
+export { AuthErrorFilter } from '../internal/auth.controller.js';

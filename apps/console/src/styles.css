@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+/* Hatti UI's tokens (packages/ui/tokens) as Tailwind's theme, as the admin has them. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --color-primary: var(--hatti-color-primary);
+  --color-primary-strong: var(--hatti-color-primary-strong);
+  --color-on-primary: var(--hatti-color-on-primary);
+  --color-canvas: var(--hatti-color-canvas);
+  --color-surface: var(--hatti-color-surface);
+  --color-text: var(--hatti-color-text);
+  --color-secondary: var(--hatti-color-text-secondary);
+  --color-line: var(--hatti-color-border);
+  --color-focus: var(--hatti-color-focus);
+  --color-success: var(--hatti-color-success);
+  --color-warning: var(--hatti-color-warning);
+  --color-danger: var(--hatti-color-danger);
+  --radius-control: var(--hatti-radius-control);
+  --radius-card: var(--hatti-radius-card);
+  --font-sans: var(--hatti-font-latin);
+}
+
+html {
+  background: var(--hatti-color-canvas);
+  color: var(--hatti-color-text);
+  font-family: var(--hatti-font-latin);
+  font-size: var(--hatti-type-body-size);
+  line-height: var(--hatti-type-body-line);
+}
+
+/* What shops wrote in Urdu, in Nastaliq where the device has it. */
+[lang='ur'] {
+  font-family: 'Noto Nastaliq Urdu', var(--hatti-font-urdu), serif;
+  line-height: 2;
+}
+
+:focus-visible {
+  outline: 2px solid var(--hatti-color-focus);
+  outline-offset: 2px;
+}

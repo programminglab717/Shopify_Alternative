@@ -10,8 +10,10 @@ import {
   supportSenderOf,
 } from './billing.js';
 import {
+  consoleSignInOf,
   googleAdsOptions,
   loadApiConfig,
+  loadConsoleConfig,
   loadBillingTransfersConfig,
   loadClosedShopsConfig,
   loadStorageCorsConfig,
@@ -773,5 +775,42 @@ describe('Worker configuration', () => {
     expect(() => loadApiConfig({ ...env, GOOGLE_ADS_API_VERSION: '21' })).toThrow(
       'GOOGLE_ADS_API_VERSION',
     );
+  });
+});
+
+describe("Hatti's console's server (ADR-876)", () => {
+  const settings = {
+    DATABASE_URL: env.DATABASE_URL,
+    DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+    DATABASE_IDENTITY_URL: env.DATABASE_IDENTITY_URL,
+    CONSOLE_URL: 'https://console.hatti.pk/',
+    CONSOLE_OIDC_ISSUER: 'https://accounts.google.com',
+    CONSOLE_OIDC_CLIENT_ID: '123-console.apps.googleusercontent.com',
+    CONSOLE_OIDC_CLIENT_SECRET: 'GOCSPX-console-secret',
+  };
+
+  it("needs the three logins and Hatti's provider, and listens on a port of its own", () => {
+    const config = loadConsoleConfig(settings);
+    expect(config.CONSOLE_PORT).toBe(4100);
+    expect(consoleSignInOf(config)).toEqual({
+      consoleUrl: 'https://console.hatti.pk',
+      issuer: 'https://accounts.google.com',
+      clientId: '123-console.apps.googleusercontent.com',
+      clientSecret: 'GOCSPX-console-secret',
+      requiredAmr: [],
+    });
+    expect(
+      consoleSignInOf(loadConsoleConfig({ ...settings, CONSOLE_OIDC_REQUIRED_AMR: 'hwk,swk' }))
+        .requiredAmr,
+    ).toEqual(['hwk', 'swk']);
+    const { CONSOLE_OIDC_CLIENT_SECRET: _secret, ...withoutSecret } = settings;
+    expect(() => loadConsoleConfig(withoutSecret)).toThrow('CONSOLE_OIDC_CLIENT_SECRET');
+    const { DATABASE_SYSTEM_URL: _system, ...withoutSystem } = settings;
+    expect(() => loadConsoleConfig(withoutSystem)).toThrow('DATABASE_SYSTEM_URL');
+  });
+
+  it("is no part of the API's configuration, which never holds the system login", () => {
+    expect(loadApiConfig({ ...env, ...settings })).not.toHaveProperty('CONSOLE_URL');
+    expect(loadApiConfig({ ...env, ...settings })).not.toHaveProperty('DATABASE_SYSTEM_URL');
   });
 });

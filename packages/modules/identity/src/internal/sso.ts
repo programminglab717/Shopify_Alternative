@@ -1,11 +1,8 @@
-import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
-import { InputChecker, failOne, isPublicAddress, type MutationResult } from '@hatti/api';
+import { InputChecker, failOne, type MutationResult } from '@hatti/api';
 import { SecretBox, secretToken, sha256 } from '@hatti/crypto';
 import type { Db } from '@hatti/db';
-import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
-import { createHash, randomBytes } from 'node:crypto';
 import { sql } from 'drizzle-orm';
+import { OIDC_LIMITS, OidcRelyingParty, confirmedEmailOf, pkcePair } from './oidc.js';
 
 // Single sign-on for a shop's staff (ADM-09, ADR-864): the organisation's identity provider, any
 // that speaks OpenID Connect, signs its people in to the shop. The owner names its issuer, the
@@ -23,10 +20,10 @@ export const SSO_LIMITS = {
   /** How long the admin has to trade the provider's answer for a session. */
   handoffMs: 2 * 60_000,
   /** How long the provider has to answer Hatti. */
-  timeoutMs: 10_000,
+  timeoutMs: OIDC_LIMITS.timeoutMs,
   /** How long a provider's configuration is kept. */
-  discoveryMs: 60 * 60_000,
-  clockToleranceSeconds: 60,
+  discoveryMs: OIDC_LIMITS.discoveryMs,
+  clockToleranceSeconds: OIDC_LIMITS.clockToleranceSeconds,
 } as const;
 
 export interface SsoOptions {
@@ -55,15 +52,6 @@ export interface ShopSsoInput {
   providerMfa: boolean;
 }
 
-/** A provider's OpenID configuration, as far as Hatti uses it. */
-interface Discovery {
-  issuer: string;
-  authorization_endpoint: string;
-  token_endpoint: string;
-  jwks_uri: string;
-  token_endpoint_auth_methods_supported?: string[];
-}
-
 /** Why a sign-in through the provider did not happen. */
 export type SsoProblem =
   'no_sso' | 'unreachable' | 'expired' | 'refused' | 'invalid' | 'not_member';
@@ -87,7 +75,6 @@ type SettingsRow = {
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const sealedFor = (shopId: string) => `shop_sso:${shopId}`;
-const base64url = (bytes: Buffer) => bytes.toString('base64url');
 
 /** The email's domain, lowercased; null for no email. */
 function domainOf(email: string): string | null {
@@ -105,9 +92,7 @@ export class ShopSsoService {
   readonly #db: Db;
   readonly #box: SecretBox;
   readonly #now: () => Date;
-  readonly #allowPrivate: boolean;
-  readonly #discovered = new Map<string, { at: number; discovery: Discovery }>();
-  readonly #keys = new Map<string, JWTVerifyGetKey>();
+  readonly #oidc: OidcRelyingParty;
 
   constructor(options: {
     db: Db;
@@ -118,7 +103,9 @@ export class ShopSsoService {
     this.#db = options.db;
     this.#box = options.secretBox;
     this.#now = options.now ?? (() => new Date());
-    this.#allowPrivate = options.sso?.allowPrivateAddresses ?? false;
+    this.#oidc = new OidcRelyingParty({
+      allowPrivateAddresses: options.sso?.allowPrivateAddresses ?? false,
+    });
   }
 
   /** The shop's settings, its secret's last characters alone; null while it has none. */
@@ -131,7 +118,7 @@ export class ShopSsoService {
   async save(shopId: string, input: ShopSsoInput): Promise<MutationResult<ShopSsoSettings>> {
     const check = new InputChecker();
     const issuer = check.text(['input', 'issuer'], input.issuer, { required: true, max: 500 });
-    if (issuer && !this.#addressOk(issuer)) {
+    if (issuer && !this.#oidc.addressOk(issuer)) {
       check.addMessage(['input', 'issuer'], 'INVALID', 'Give the provider’s https address');
     }
     const clientId = check.text(['input', 'clientId'], input.clientId, {
@@ -200,12 +187,11 @@ export class ShopSsoService {
        ORDER BY updated_at DESC LIMIT 1`);
     const found = rows[0];
     if (!found) return { problem: 'no_sso' };
-    const discovery = await this.#discover(found.issuer);
+    const discovery = await this.#oidc.discover(found.issuer);
     if (!discovery) return { problem: 'unreachable' };
     const state = secretToken('', 32);
     const nonce = secretToken('', 32);
-    const verifier = base64url(randomBytes(32));
-    const challenge = base64url(createHash('sha256').update(verifier).digest());
+    const { verifier, challenge } = pkcePair();
     const now = this.#now();
     await this.#db.execute(sql`
       DELETE FROM identity.sso_logins WHERE expires_at < ${new Date(now.getTime() - 3_600_000)}`);
@@ -252,68 +238,20 @@ export class ShopSsoService {
     const shopId = login.shop_id;
     if (answer.error || !answer.code) return { problem: 'refused', shopId };
     const settings = await this.#row(shopId);
-    const discovery = settings && (await this.#discover(settings.issuer));
+    const discovery = settings && (await this.#oidc.discover(settings.issuer));
     if (!settings || !discovery) return { problem: 'unreachable', shopId };
-    const secret = this.#box.decrypt(settings.client_secret, sealedFor(shopId)).toString('utf8');
-    const basic = (
-      discovery.token_endpoint_auth_methods_supported ?? ['client_secret_basic']
-    ).includes('client_secret_basic');
-    const form = new URLSearchParams({
-      grant_type: 'authorization_code',
+    const checked = await this.#oidc.idTokenFor({
+      discovery,
+      clientId: settings.client_id,
+      clientSecret: this.#box.decrypt(settings.client_secret, sealedFor(shopId)).toString('utf8'),
       code: answer.code,
-      redirect_uri: callbackUrl,
-      code_verifier: login.code_verifier,
-      ...(basic ? {} : { client_id: settings.client_id, client_secret: secret }),
+      redirectUri: callbackUrl,
+      verifier: login.code_verifier,
+      nonce: login.nonce,
+      now,
     });
-    let idToken: unknown;
-    try {
-      if (!(await this.#reachable(discovery.token_endpoint)))
-        return { problem: 'unreachable', shopId };
-      const response = await fetch(discovery.token_endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-          accept: 'application/json',
-          ...(basic && {
-            authorization: `Basic ${Buffer.from(
-              `${encodeURIComponent(settings.client_id)}:${encodeURIComponent(secret)}`,
-            ).toString('base64')}`,
-          }),
-        },
-        body: form.toString(),
-        redirect: 'manual',
-        signal: AbortSignal.timeout(SSO_LIMITS.timeoutMs),
-      });
-      if (!response.ok) return { problem: 'refused', shopId };
-      idToken = ((await response.json()) as { id_token?: unknown }).id_token;
-    } catch {
-      return { problem: 'unreachable', shopId };
-    }
-    if (typeof idToken !== 'string') return { problem: 'invalid', shopId };
-    const keys = await this.#keysOf(discovery.jwks_uri);
-    if (!keys) return { problem: 'unreachable', shopId };
-    let email: string | null;
-    try {
-      const { payload } = await jwtVerify(idToken, keys, {
-        issuer: discovery.issuer,
-        audience: settings.client_id,
-        requiredClaims: ['sub', 'iat', 'exp', 'nonce'],
-        currentDate: now,
-        clockTolerance: SSO_LIMITS.clockToleranceSeconds,
-      });
-      if (payload.nonce !== login.nonce) return { problem: 'invalid', shopId };
-      const claimed =
-        typeof payload.email === 'string'
-          ? payload.email
-          : typeof payload.preferred_username === 'string'
-            ? payload.preferred_username
-            : null;
-      // A provider that says the email isn't confirmed is believed.
-      const unconfirmed = payload.email_verified === false || payload.email_verified === 'false';
-      email = claimed && !unconfirmed ? claimed.trim().toLowerCase() : null;
-    } catch {
-      return { problem: 'invalid', shopId };
-    }
+    if ('problem' in checked) return { problem: checked.problem, shopId };
+    const email = confirmedEmailOf(checked.payload);
     // Only an email of the organisation's own domains names a member: the owner vouched for them.
     const domain = email && domainOf(email);
     if (!email || !domain || !settings.email_domains.includes(domain)) {
@@ -371,69 +309,5 @@ export class ShopSsoService {
       providerMfa: row.provider_mfa,
       updatedAt: new Date(row.updated_at),
     };
-  }
-
-  /** Whether an address may be fetched from: https on a name, unless tests allow their own. */
-  #addressOk(value: string): boolean {
-    try {
-      const url = new URL(value);
-      if (url.username || url.password) return false;
-      return url.protocol === 'https:' || (this.#allowPrivate && url.protocol === 'http:');
-    } catch {
-      return false;
-    }
-  }
-
-  /** Whether `value` is an address fetched from: every address its host has on the public internet. */
-  async #reachable(value: string): Promise<boolean> {
-    if (!this.#addressOk(value)) return false;
-    if (this.#allowPrivate) return true;
-    const host = new URL(value).hostname.replace(/^\[|\]$/g, '');
-    try {
-      const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
-      return addresses.length > 0 && addresses.every((each) => isPublicAddress(each.address));
-    } catch {
-      return false;
-    }
-  }
-
-  /** The provider's configuration, fetched once an hour; null where it can't be had. */
-  async #discover(issuer: string): Promise<Discovery | null> {
-    const kept = this.#discovered.get(issuer);
-    if (kept && Date.now() - kept.at < SSO_LIMITS.discoveryMs) return kept.discovery;
-    const at = `${issuer}/.well-known/openid-configuration`;
-    try {
-      if (!(await this.#reachable(at))) return null;
-      const response = await fetch(at, {
-        headers: { accept: 'application/json' },
-        redirect: 'manual',
-        signal: AbortSignal.timeout(SSO_LIMITS.timeoutMs),
-      });
-      if (!response.ok) return null;
-      const discovery = (await response.json()) as Partial<Discovery>;
-      if (
-        discovery.issuer?.replace(/\/+$/, '') !== issuer ||
-        typeof discovery.authorization_endpoint !== 'string' ||
-        typeof discovery.token_endpoint !== 'string' ||
-        typeof discovery.jwks_uri !== 'string' ||
-        !this.#addressOk(discovery.authorization_endpoint)
-      ) {
-        return null;
-      }
-      this.#discovered.set(issuer, { at: Date.now(), discovery: discovery as Discovery });
-      return discovery as Discovery;
-    } catch {
-      return null;
-    }
-  }
-
-  async #keysOf(jwksUri: string): Promise<JWTVerifyGetKey | null> {
-    if (!(await this.#reachable(jwksUri))) return null;
-    let keys = this.#keys.get(jwksUri);
-    if (!keys) {
-      keys = createRemoteJWKSet(new URL(jwksUri), { timeoutDuration: SSO_LIMITS.timeoutMs });
-      this.#keys.set(jwksUri, keys);
-    }
-    return keys;
   }
 }
