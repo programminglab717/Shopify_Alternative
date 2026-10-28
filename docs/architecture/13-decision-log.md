@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-856 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-857 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -864,6 +864,7 @@
 | 854 | Public apps charge shops once in rupees: the owner approves a charge in the admin and pays it as an invoice of Hatti's, a test on development stores, and the app's partner earns 80% | Accepted |
 | 855 | Experts: partners keep a profile of the services they offer shops, listed after Hatti looks, and a shop's owner or a manager sends one an enquiry from the admin, emailed to the expert | Accepted |
 | 856 | A cart a customer sends from the shop's WhatsApp catalogue is kept in the inbox and answered once with a link to the shop's checkout holding what it sells of it, their number filled in | Accepted |
+| 857 | A TikTok catalogue reads the shop's catalog feed, whose address the online store's TikTok tab gives, as Meta's and Google's do | Accepted |
 
 ---
 
@@ -28159,3 +28160,27 @@
     and confirms them.
   * **A draft order for staff to finish:** slower for the customer; staff still see the cart in
     the inbox, and the order once placed.
+
+## ADR-857 · A TikTok catalogue reads the shop's catalog feed, whose address the online store's TikTok tab gives, as Meta's and Google's do
+
+* **Context:**
+  * CH-04 asks for a TikTok catalogue, for TikTok's catalogue ads.
+  * A shop already connects its TikTok pixel and Events API (ADR-541, ADR-543) and its ad spend
+    (ADR-566). TikTok's Catalog Manager takes a product data feed by its address, fetched on a
+    schedule, in the fields Google's specification names.
+  * The shop's catalog feed (ADR-142) already has each of them: ID, title, description, link,
+    image, availability, price and sale price, brand and condition.
+* **Decision:**
+  * The online store's TikTok tab gives the feed's address, connected or not, to copy or open,
+    with how to use it: in TikTok's Catalog Manager, add a catalogue, choose a data feed, give
+    the address, and have it fetched daily.
+  * Nothing of the feed changes; Meta's, Google's and TikTok's catalogues read the same one.
+* **Consequences:**
+  * A shop's TikTok catalogue ads show its products as its store has them, priced and in stock,
+    with no product upload to TikTok.
+  * The pixel's events name each variant by the same ID as the feed, so TikTok matches what
+    shoppers viewed and bought to the catalogue.
+  * Not yet: TikTok Shop, which sells inside TikTok; it is not open to Pakistan's sellers.
+* **Alternatives:**
+  * **Pushing products to TikTok's Catalog API:** a token per shop to keep and refresh, and every
+    product change sent, for what TikTok fetches by itself.

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### TikTok catalogues
+
+* **Online store:** the TikTok tab gives the catalog feed's address and how to add it to a
+  catalogue in TikTok's Catalog Manager, for catalogue ads showing the store's products (CH-04,
+  [ADR-857](../architecture/13-decision-log.md#adr-857--a-tiktok-catalogue-reads-the-shops-catalog-feed-whose-address-the-online-stores-tiktok-tab-gives-as-metas-and-googles-do)).
+* 4571 tests (1 new).
+
 ### 9c2e6ee · Carts from the WhatsApp catalogue
 
 * **Inbox:** a customer who sends a cart from the shop's WhatsApp catalogue, fed by its catalog
