@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-892 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-893 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -900,6 +900,7 @@
 | 890 | The Storefront API serves the shop's menus, pages, blogs, articles and policies, as Shopify's names and shapes them, from its storefront documents | Accepted |
 | 891 | The forecast's seasons include those on the same days each year: the summer lawn launch, the run-up to Independence Day, the winter collection and the wedding season, the moon's season counted on where two meet | Accepted |
 | 892 | A supplier's lead time: the days it takes to deliver, which a reorder covers as well as the days chosen, and from which its goods are expected | Accepted |
+| 893 | A forecast by week: what a variant running low is expected to sell each week, what is left, the day it runs out, and the day to order by for its supplier's lead time | Accepted |
 
 ---
 
@@ -29585,3 +29586,29 @@
   * The lead time is the shop's word, not learned from when past orders came; reckoning it from
     orders' expected and received days is left for later.
   * Still not done: a forecast by week, or a chart of it.
+
+## ADR-893 · A forecast by week: what a variant running low is expected to sell each week, what is left, the day it runs out, and the day to order by for its supplier's lead time
+
+* **Context:** the stock page said how many days what is for sale lasts at the last 30 days'
+  pace (ADR-368), and a reorder counted on a season ahead (ADR-863, ADR-891). It did not say
+  when a season's faster weeks bring the last unit forward, nor when to order so the goods come
+  in time (ADR-892).
+* **Decision:**
+  * **Weeks:** `LowStockItem.weeks(count)`, 8 unless asked, 13 at most. Each week, from today,
+    gives the units expected to sell in it and what is left of what is available at its end.
+    * The weeks are `forecast`'s whole span less its span before, each rounded up, so they add
+      up to the forecast for the whole.
+  * **The day it runs out:** `LowStockItem.runsOutOn`, the day the units expected to sell,
+    unrounded, reach what is available.
+    * Today where none is available.
+    * Null where none sold in the last 30 days, or it lasts past 90 days.
+  * **The stock page:**
+    * Where the last supplier has a lead time, a row says the day to order by: the day it runs
+      out less the lead time. Where that day has come, it says to order now.
+    * An open row says when it runs out and shows a table of the next eight weeks.
+* **Consequences:**
+  * Before Ramadan or the wedding season, the day to order by comes as much sooner as last year's
+    lift says.
+  * What is on its way is not counted in the weeks: the day it comes is a purchase order's
+    expected day, which is often not kept. The row says how many are on their way beside it.
+  * Still not done: a chart of the weeks, and lead times learned from orders received.

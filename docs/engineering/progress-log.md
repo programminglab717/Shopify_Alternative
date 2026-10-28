@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) next. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; next, of the Growth rows that need no partner: the merchant copilot, drafting discounts, segments, broadcasts and reports for staff to confirm (AI-01); FBR's unit of measure and SRO on variants (CAT-19); an order's lines split across locations (INV-10, SHP-09); a file as a personalisation answer (CAT-15); and bulk imports (DEV-10). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### A forecast by week
+
+* **Each variant running low:** what it is expected to sell each of the next weeks, what is left,
+  and the day it runs out ([ADR-893](../architecture/13-decision-log.md#adr-893--a-forecast-by-week-what-a-variant-running-low-is-expected-to-sell-each-week-what-is-left-the-day-it-runs-out-and-the-day-to-order-by-for-its-suppliers-lead-time)).
+* **The stock page** says the day to order by for the last supplier's lead time, and shows the
+  weeks in an open row.
+* 4840 tests (2 new).
 
 ### 8b23141 · Suppliers' lead times
 
