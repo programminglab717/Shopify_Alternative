@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Workflows that wait and check
+### a13dc9e · Workflows that wait and check
 
 * **Wait:** a workflow's run waits an hour to a week, then goes on with the order as it is then
   ([ADR-886](../architecture/13-decision-log.md#adr-886--workflows-wait-and-check-a-wait-of-an-hour-to-a-week-before-the-next-action-and-a-check-that-goes-on-only-where-its-conditions-hold-of-the-order-as-it-is-then-with-the-orders-stage-and-confirmation-to-check)).
