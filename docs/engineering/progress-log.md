@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Support access, followed through
+
+* **Open to support:** the console lists the shops whose owners let support look now, each
+  linked to the admin ([ADR-882](../architecture/13-decision-log.md#adr-882--support-access-followed-through-the-console-lists-the-shops-whose-owners-let-support-look-now-with-where-to-look-in-the-admin-a-shop-is-told-on-whatsapp-and-by-email-the-first-time-support-looks-under-each-grant-and-whether-support-may-ever-change-things-is-left-to-hattis-owner)).
+* **Owner told:** a shop is told on WhatsApp and by email the first time support looks under
+  each grant.
+* **Needs you:** whether Hatti's support may ever change things in a shop, and how (OWN-65).
+* 4777 tests (2 new).
+
 ### fb243e0 · Shops and city names in the console
 
 * **Shops:** Hatti's people find a shop by name, handle or ID, and see its standing: its owner,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-881 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-882 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -889,6 +889,7 @@
 | 879 | The console's operations: shops' transfers into Hatti's account confirmed, for what came where it was not what was said, or refused with why; and the status page's incidents and maintenance posted and updated until they end | Accepted |
 | 880 | Partners' work in the console: public apps, theme-store themes and expert profiles listed for every shop once checked, or taken back; and partners' payouts marked paid by the bank transfer's reference | Accepted |
 | 881 | Shops looked up in the console by name, handle or ID, each with its standing at a glance and every look logged; and couriers' names for cities reviewed, kept and forgotten there | Accepted |
+| 882 | Support access, followed through: the console lists the shops whose owners let support look now, with where to look in the admin; a shop is told on WhatsApp and by email the first time support looks under each grant; and whether support may ever change things is left to Hatti's owner | Accepted |
 
 ---
 
@@ -29219,3 +29220,32 @@
   * Support starts from the shop. Every queue of `courier-cities` and the trust, billing and
     partner commands is in the console.
   * Still commands: adding and removing agents, and purging closed shops.
+
+## ADR-882 · Support access, followed through: the console lists the shops whose owners let support look now, with where to look in the admin; a shop is told on WhatsApp and by email the first time support looks under each grant; and whether support may ever change things is left to Hatti's owner
+
+* **Context:** ADR-156 left three things for later, now that the console exists (ADR-876):
+  * alerts to Hatti's people of each grant;
+  * telling the owner while support looks;
+  * writes an owner allows.
+* **Decision:**
+  * **Open to support** in the console: the shops whose owners let support look now, the soonest
+    to end first, with what for, who allowed it and until when, and a link to each in the admin
+    where `ADMIN_URL` is set. The page reads itself again each minute.
+  * **The shop is told** the first time support looks under each grant (`support_looking`):
+    * at its alerts number on WhatsApp, and by email to its owner, at Hatti's cost;
+    * saying support changes nothing, each look is on its activity log, and how to end it.
+    The API's hook knows it is the first look by the audit log, in the same transaction that
+    records the look.
+  * **Support's writes are not built.** Support is not an actor of its own in what shops record:
+    42 tables take an app or a member of staff, and about 20 places take any caller that isn't
+    staff for an app.
+    * Letting support change things means either a new kind of actor through all of them, or
+      support standing in as a member of staff, a manager without capabilities and with fewer
+      scopes, which would also show it what managers see.
+    * Which, if either, is a decision about Hatti's support and merchants' trust, left to
+      Hatti's owner (OWN-65).
+* **Consequences:**
+  * An owner always knows when Hatti's people start looking. Hatti's people see at once where
+    they have been let in.
+  * The notice's WhatsApp template, `hatti_support_looking`, is submitted with Hatti's others
+    (OWN-23).
