@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Sessions by source, landing page and device
+
+* **Counted:** each session once as it began, by where it came from, the page it landed on and
+  its device, in Valkey, and kept each day in Postgres by the worker ([ADR-884](../architecture/13-decision-log.md#adr-884--sessions-by-where-they-came-from-their-landing-page-and-device-each-counted-once-as-it-began-from-its-first-pages-script-and-its-user-agent-counted-in-valkey-and-kept-each-day-in-postgres-by-the-worker-not-in-clickhouse)).
+* **Shown:** the admin's analytics show the ten with the most of each, with their share.
+* 4790 tests (8 new).
+
 ### 009a574 · Transfers matched from Hatti's bank statement
 
 * **Statement:** Hatti's people upload the bank's statement as CSV in the console ([ADR-883](../architecture/13-decision-log.md#adr-883--transfers-to-hatti-matched-from-its-bank-statement-the-csv-the-bank-exports-read-in-the-console-each-credit-carrying-a-waiting-transfers-reference-paired-with-it-and-each-match-confirmed-by-hattis-people-for-what-came)).

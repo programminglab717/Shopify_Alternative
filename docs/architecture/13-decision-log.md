@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-883 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-884 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -891,6 +891,7 @@
 | 881 | Shops looked up in the console by name, handle or ID, each with its standing at a glance and every look logged; and couriers' names for cities reviewed, kept and forgotten there | Accepted |
 | 882 | Support access, followed through: the console lists the shops whose owners let support look now, with where to look in the admin; a shop is told on WhatsApp and by email the first time support looks under each grant; and whether support may ever change things is left to Hatti's owner | Accepted |
 | 883 | Transfers to Hatti matched from its bank statement: the CSV the bank exports read in the console, each credit carrying a waiting transfer's reference paired with it, and each match confirmed by Hatti's people for what came | Accepted |
+| 884 | Sessions by where they came from, their landing page and device: each counted once as it began, from its first page's script and its user agent, counted in Valkey and kept each day in Postgres by the worker, not in ClickHouse | Accepted |
 
 ---
 
@@ -29278,3 +29279,32 @@
   * A day's transfers are found in one upload instead of one by one.
   * A bank whose export names its columns otherwise needs its names added to the list.
   * The banks' own APIs, where they have them, come later with Hatti's bank account (OWN-30).
+
+## ADR-884 · Sessions by where they came from, their landing page and device: each counted once as it began, from its first page's script and its user agent, counted in Valkey and kept each day in Postgres by the worker, not in ClickHouse
+
+* **Context:** ADR-180 counts the online store's sessions and how far they went. Merchants also
+  ask where their visitors came from: Instagram, WhatsApp, Google or a campaign's link. Shopify
+  reports sessions by referrer, landing page and device. ADR-180 left this for ClickHouse,
+  which Hatti does not run yet.
+* **Decision:**
+  * **What is counted:** each session once, as it began, by three things.
+    * **Source:** the campaign's `utm_source` where the link gave one. Else the site the
+      referrer was, by the name merchants know it (google, facebook, instagram, whatsapp,
+      tiktok, youtube, x, daraz and others), or its host. Else `direct`, as for a referrer on
+      the shop's own host.
+    * **Landing page:** its path, lower case, without its query or a trailing slash.
+    * **Device:** mobile or desktop, from the user agent, as the web vitals read it (ADR-485).
+  * **How:** the page's script sends `{b, l, r, s}` with its beacon when its session began. The
+    storefront marks the session in Valkey for half an hour (set once), so a page that says so
+    again is not counted twice, and adds one to each of the day's three counts.
+  * **Kept:** the worker's minute sweep keeps each changed day's counts in
+    `online_store.session_origins`, in place of those before.
+    * Each day keeps its 100 values with the most sessions by name. The rest are kept together
+      as "(other)", so a day's rows are bounded however many hosts and paths there were.
+  * **Read:** `storefrontSessionsBy(from, before, by, first)` gives a period's values, the most
+    first, with those past `first` together as "(other)". The admin's analytics show the ten
+    with the most under Source, Landing page and Device tabs, each with its share.
+* **Consequences:**
+  * No ClickHouse, and nothing about a shopper kept: only counts by day.
+  * Sessions are counted by where they came from from this release on; earlier days show none.
+  * Sessions by place (city) wait for an IP-to-place database that is free to use.
