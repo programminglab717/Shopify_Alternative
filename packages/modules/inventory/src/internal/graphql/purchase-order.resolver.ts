@@ -56,6 +56,7 @@ function toSupplier(record: SupplierRecord): Supplier {
     name: record.name,
     phone: record.phone,
     note: record.note,
+    leadTimeDays: record.leadTimeDays,
     createdAt: record.createdAt,
   });
 }
@@ -209,7 +210,9 @@ export class PurchaseOrderResolver {
     });
   }
 
-  @Mutation(() => SupplierPayload, { description: "Changes a supplier's name, number or note." })
+  @Mutation(() => SupplierPayload, {
+    description: "Changes a supplier's name, number, note or lead time.",
+  })
   @RequireScopes('write_inventory')
   async supplierUpdate(
     @CurrentTenant() tenant: TenantContext,

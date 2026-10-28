@@ -4516,7 +4516,7 @@ export interface PurchaseOrderData {
 }
 
 export interface PurchaseOrderFormData {
-  suppliers: { id: string; name: string; phone: string | null }[];
+  suppliers: { id: string; name: string; phone: string | null; leadTimeDays: number | null }[];
   locations: { nodes: { id: string; name: string; isPrimary: boolean }[] };
 }
 
@@ -4525,6 +4525,8 @@ export interface Supplier {
   name: string;
   phone: string | null;
   note: string | null;
+  /** Days from ordering to the goods coming in, when the shop has said (ADR-892). */
+  leadTimeDays: number | null;
 }
 
 /** What the shop has bought from a supplier, and still waits for (ADR-371). */

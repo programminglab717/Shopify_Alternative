@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { LATER, fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
-import { seasonDays, suggestedQuantity } from './new-purchase-order-page';
+import { addDays, seasonDays, suggestedQuantity } from './new-purchase-order-page';
 
 const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const GODOWN = { id: 'loc_1', name: 'Faisalabad godown' };
@@ -82,6 +82,7 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
               name: 'Nishat Mills',
               phone: '+923007654321',
               note: null,
+              leadTimeDays: 10,
               // Seventeen came, three still to come (ADR-371).
               purchasing: {
                 purchaseOrders: 2,
@@ -97,6 +98,7 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
               name: 'Ajrak House',
               phone: null,
               note: 'Hala',
+              leadTimeDays: null,
               // Ordered from with no costs given: in units alone.
               purchasing: {
                 purchaseOrders: 1,
@@ -112,6 +114,7 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
               name: 'Never ordered from',
               phone: null,
               note: null,
+              leadTimeDays: null,
               purchasing: {
                 purchaseOrders: 0,
                 receivedQuantity: 0,
@@ -137,7 +140,11 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
         return { purchaseOrderUpdate: { purchaseOrder: { id: 'po_1' }, userErrors: [] } };
       case 'PurchaseOrderForm':
         return {
-          suppliers: [{ id: 'sup_1', name: 'Nishat Mills', phone: null }],
+          suppliers: [
+            { id: 'sup_1', name: 'Nishat Mills', phone: null, leadTimeDays: null },
+            // Delivers in a fortnight and a day (ADR-892).
+            { id: 'sup_7', name: 'Karachi Dyes', phone: null, leadTimeDays: 15 },
+          ],
           locations: {
             nodes: places.map((place) => ({ ...place, isPrimary: place.id === GODOWN.id })),
           },
@@ -392,11 +399,20 @@ describe('Purchase orders (INV-05)', () => {
     ).toBeTruthy();
     expect(screen.getByText(/^1 purchase order · 22 still to come · last ordered /)).toBeTruthy();
     expect(screen.getAllByText(/purchase orders? ·/)).toHaveLength(2);
+    expect(screen.getByText('Delivers in 10 days')).toBeTruthy();
     await press('Change Nishat Mills');
     expect((screen.getByLabelText("Supplier's name") as HTMLInputElement).value).toBe(
       'Nishat Mills',
     );
     type('Note', 'Pays on delivery');
+    expect(screen.getByLabelText('Days to deliver')).toHaveProperty('value', '10');
+    type('Days to deliver', '200');
+    expect(screen.getByText('From 0 to 180 days')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save the supplier' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    type('Days to deliver', '14');
     await press('Save the supplier');
     await waitFor(() =>
       expect(sentOf(fake, 'SupplierUpdate')).toEqual([
@@ -406,6 +422,7 @@ describe('Purchase orders (INV-05)', () => {
             name: 'Nishat Mills',
             phone: expect.stringMatching(/300/),
             note: 'Pays on delivery',
+            leadTimeDays: 14,
           },
         },
       ]),
@@ -415,7 +432,7 @@ describe('Purchase orders (INV-05)', () => {
     await press('Add the supplier');
     await waitFor(() =>
       expect(sentOf(fake, 'SupplierCreate')).toEqual([
-        { input: { name: 'Gul Ahmed', phone: null, note: null } },
+        { input: { name: 'Gul Ahmed', phone: null, note: null, leadTimeDays: null } },
       ]),
     );
 
@@ -617,6 +634,39 @@ describe('Purchase orders (INV-05)', () => {
         ],
       }),
     );
+  });
+
+  it("orders enough for the supplier's lead time too, and expects the goods when it says (ADR-892)", async () => {
+    const fake = poCore('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/stock');
+
+    await screen.findByText('2 for sale · 20 sold in 30 days · lasts about 3 days');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · L to order' }));
+    await press('Order the chosen (1)');
+    const large = await screen.findByLabelText('How many of Khaddar suit · L');
+    expect(large).toHaveProperty('value', '18');
+    expect(screen.getByLabelText('Expected on')).toHaveProperty('value', '');
+    // Fifteen days on the way and thirty after, at 20 a month, less the two for sale.
+    fireEvent.change(screen.getByLabelText('Supplier'), { target: { value: 'sup_7' } });
+    expect(large).toHaveProperty('value', '28');
+    expect(
+      screen.getByText('Also covers the 15 days this supplier takes to deliver.'),
+    ).toBeTruthy();
+    const today = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+    expect(screen.getByLabelText('Expected on')).toHaveProperty('value', addDays(today, 15));
+    expect(screen.getByText('In 15 days, as this supplier takes.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Enough for'), { target: { value: '15' } });
+    expect(large).toHaveProperty('value', '18');
+    await press('Save the purchase order');
+    await waitFor(() =>
+      expect(sentOf(fake, 'PurchaseOrderCreate')[0]?.input).toMatchObject({
+        supplierId: 'sup_7',
+        expectedOn: addDays(today, 15),
+        lines: [{ inventoryItemId: 'invi_3', quantity: 18, unitCost: null }],
+      }),
+    );
+    expect(addDays('2026-12-25', 10)).toBe('2027-01-04');
   });
 
   it('chooses all that runs low at once, and none for a packer', async () => {

@@ -6,6 +6,7 @@ import {
   boolean,
   date,
   integer,
+  smallint,
   pgSchema,
   primaryKey,
   text,
@@ -143,6 +144,8 @@ export const suppliers = inventorySchema.table(
     name: text('name').notNull(),
     phone: text('phone'),
     note: text('note'),
+    /** Days from ordering to the goods arriving, 0 to 180 (ADR-892); null where not said. */
+    leadTimeDays: smallint('lead_time_days'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

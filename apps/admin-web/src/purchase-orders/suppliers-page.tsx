@@ -8,6 +8,7 @@ import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import { parseStock } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { EDITS_STOCK } from '../stock/stock-page';
@@ -16,6 +17,9 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
 type Mutated = Record<string, { userErrors: UserError[] }>;
+
+/** The most days a supplier may take to deliver, as the server allows (ADR-892). */
+export const LEAD_TIME_MOST_DAYS = 180;
 
 /** A supplier's name, number and note, to add one or change it. */
 function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone: () => void }) {
@@ -30,10 +34,19 @@ function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone:
   const [name, setName] = useState(supplier?.name ?? '');
   const [phone, setPhone] = useState(supplier?.phone ? formatPhone(supplier.phone) : '');
   const [note, setNote] = useState(supplier?.note ?? '');
+  const [lead, setLead] = useState(supplier?.leadTimeDays?.toString() ?? '');
+  const leadDays = lead.trim() ? parseStock(lead) : null;
+  const leadBad = lead.trim() !== '' && (leadDays === null || leadDays > LEAD_TIME_MOST_DAYS);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const input = { name, phone: phone.trim() || null, note: note.trim() || null };
+    if (leadBad) return;
+    const input = {
+      name,
+      phone: phone.trim() || null,
+      note: note.trim() || null,
+      leadTimeDays: leadDays,
+    };
     const ok = await attempt(
       async () =>
         Object.values(
@@ -64,9 +77,23 @@ function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone:
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
+      <TextField
+        label={t('po.supplierLeadTime')}
+        hint={t('po.supplierLeadTimeHint')}
+        inputMode="numeric"
+        ltr
+        className="w-40"
+        value={lead}
+        error={leadBad ? t('po.supplierLeadTimeBad', { most: String(LEAD_TIME_MOST_DAYS) }) : null}
+        onChange={(event) => setLead(event.target.value)}
+      />
       {problem && <Alert tone="danger">{problem}</Alert>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" busy={create.isPending || update.isPending} disabled={!name.trim()}>
+        <Button
+          type="submit"
+          busy={create.isPending || update.isPending}
+          disabled={!name.trim() || leadBad}
+        >
           {t(supplier ? 'po.supplierSave' : 'po.supplierAdd')}
         </Button>
         <Button variant="tertiary" onClick={onDone}>
@@ -169,6 +196,13 @@ export function SuppliersPage() {
                         {supplier.note && (
                           <span className="text-secondary" dir="auto">
                             {supplier.note}
+                          </span>
+                        )}
+                        {supplier.leadTimeDays !== null && (
+                          <span className="text-secondary">
+                            {t('po.supplierLeadTimeIs', {
+                              count: formatCount(supplier.leadTimeDays),
+                            })}
                           </span>
                         )}
                         <Bought purchasing={supplier.purchasing} />

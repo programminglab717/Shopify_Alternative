@@ -41,6 +41,12 @@ export class Supplier {
   @Field(() => String, { nullable: true })
   note!: string | null;
 
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Days from ordering to the goods coming in, when known (INV-08).',
+  })
+  leadTimeDays!: number | null;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 }
@@ -216,6 +222,12 @@ export class SupplierInput {
 
   @Field(() => String, { nullable: true, description: 'Null clears it.' })
   note?: string | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Days from ordering to the goods coming in, 0 to 180; null clears it.',
+  })
+  leadTimeDays?: number | null;
 }
 
 @InputType()

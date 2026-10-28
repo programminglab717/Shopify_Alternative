@@ -9238,6 +9238,7 @@ export const PurchaseOrderFormQuery = /* GraphQL */ `
       id
       name
       phone
+      leadTimeDays
     }
     locations(first: 50) {
       nodes {
@@ -9316,6 +9317,7 @@ export const SuppliersQuery = /* GraphQL */ `
       name
       phone
       note
+      leadTimeDays
       purchasing {
         purchaseOrders
         receivedQuantity

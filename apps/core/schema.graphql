@@ -11650,7 +11650,7 @@ type Mutation {
   """Adds a supplier, named uniquely in the shop."""
   supplierCreate(input: SupplierInput!): SupplierPayload!
 
-  """Changes a supplier's name, number or note."""
+  """Changes a supplier's name, number, note or lead time."""
   supplierUpdate(id: ID!, input: SupplierInput!): SupplierPayload!
 
   """Ends Hatti's support's access to the shop now. The owner or a manager."""
@@ -20955,6 +20955,9 @@ type StorefrontSessionsValue {
 type Supplier {
   createdAt: DateTime!
   id: ID!
+
+  """Days from ordering to the goods coming in, when known (INV-08)."""
+  leadTimeDays: Int
   name: String!
   note: String
 
@@ -20964,6 +20967,9 @@ type Supplier {
 }
 
 input SupplierInput {
+  """Days from ordering to the goods coming in, 0 to 180; null clears it."""
+  leadTimeDays: Int
+
   """Required to add one; up to 255 characters."""
   name: String
 

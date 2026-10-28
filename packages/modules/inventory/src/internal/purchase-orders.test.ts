@@ -68,6 +68,35 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
     ]);
   });
 
+  it("keeps a supplier's lead time, 0 to 180 days, and clears it", async () => {
+    const made = unwrap(
+      await f.purchaseOrders.createSupplier(f.a, { name: 'Karachi Dyes', leadTimeDays: 21 }),
+    );
+    expect(made.leadTimeDays).toBe(21);
+    const order = unwrap(
+      await f.purchaseOrders.create(f.a, {
+        supplierId: made.id,
+        locationId: warehouse.id,
+        lines: [{ inventoryItemId: variants[0]!, quantity: 1 }],
+      }),
+    );
+    expect(order.supplier.leadTimeDays).toBe(21);
+    expect((await supplier()).leadTimeDays).toBeNull();
+    for (const leadTimeDays of [-1, 181, 2.5]) {
+      expect(
+        errorsOf(await f.purchaseOrders.updateSupplier(f.a, made.id, { leadTimeDays })),
+      ).toEqual([['input.leadTimeDays', 'INVALID']]);
+    }
+    expect(
+      unwrap(await f.purchaseOrders.updateSupplier(f.a, made.id, { note: 'Ships by rail' }))
+        .leadTimeDays,
+    ).toBe(21);
+    expect(
+      unwrap(await f.purchaseOrders.updateSupplier(f.a, made.id, { leadTimeDays: null }))
+        .leadTimeDays,
+    ).toBeNull();
+  });
+
   it('orders goods for a location, numbered for the shop, each line named as the variant was', async () => {
     const from = await supplier();
     const order = unwrap(

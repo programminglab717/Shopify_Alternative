@@ -50,6 +50,11 @@ function pkToday(): string {
   return new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
 }
 
+/** The day `days` after `day`, both YYYY-MM-DD. */
+export function addDays(day: string, days: number): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 /** How many of `days` from `today` fall in `season`. */
 export function seasonDays(season: StockSeason, today: string, days: number): number {
   const day = (value: string) => Date.parse(`${value}T00:00:00Z`) / 86_400_000;
@@ -80,6 +85,19 @@ export function suggestedQuantity(
       ? Math.ceil((basis.sold * (days - inSeason + inSeason * (lift ?? 1))) / 30)
       : threshold * 2;
   return Math.max(1, wanted - basis.available - basis.incoming);
+}
+
+/**
+ * Lines from what runs low suggested again (ADR-368, ADR-892): enough for the supplier's lead
+ * time, sold while the goods are on their way, and the days chosen after they come; the rest as
+ * typed.
+ */
+export function resuggest(lines: Line[], threshold: number, days: number, leadDays: number) {
+  return lines.map((line) =>
+    line.basis
+      ? { ...line, quantity: String(suggestedQuantity(line.basis, threshold, days + leadDays)) }
+      : line,
+  );
 }
 
 type Created<K extends string, T> = Record<K, { userErrors: UserError[] } & T>;
@@ -337,33 +355,34 @@ function OrderForm({
     { input: Record<string, unknown> }
   >(PurchaseOrderCreateMutation);
   const { problem, attempt } = useAttempt();
+  const suppliers = form.suppliers;
+  const leadOf = (id: string) => suppliers.find((each) => each.id === id)?.leadTimeDays ?? 0;
   const [supplier, setSupplier] = useState(start?.supplierId ?? '');
+  const supplierId = supplier || suppliers[0]?.id || NEW_SUPPLIER;
+  const leadDays = leadOf(supplierId);
   const [location, setLocation] = useState(
     goesTo && form.locations.nodes.some((each) => each.id === goesTo) ? goesTo : '',
   );
   const [reference, setReference] = useState('');
-  const [expectedOn, setExpectedOn] = useState('');
-  const [lines, setLines] = useState<Line[]>(start?.lines ?? []);
+  // Null until typed: then the day the supplier's lead time says the goods come (ADR-892).
+  const [expectedOn, setExpectedOn] = useState<string | null>(null);
+  const expected = expectedOn ?? (leadDays > 0 ? addDays(pkToday(), leadDays) : '');
   const [days, setDays] = useState(30);
+  const threshold = start?.threshold ?? 0;
+  const [lines, setLines] = useState<Line[]>(() =>
+    resuggest(start?.lines ?? [], threshold, 30, leadDays),
+  );
   const paced = lines.some((line) => (line.basis?.sold ?? 0) > 0);
-  // Lines from what runs low suggested again for the days chosen; the rest as typed (ADR-368).
   const cover = (chosen: number) => {
     setDays(chosen);
-    setLines((now) =>
-      now.map((line) =>
-        line.basis
-          ? {
-              ...line,
-              quantity: String(suggestedQuantity(line.basis, start?.threshold ?? 0, chosen)),
-            }
-          : line,
-      ),
-    );
+    setLines((now) => resuggest(now, threshold, chosen, leadDays));
+  };
+  const choose = (id: string) => {
+    setSupplier(id);
+    setLines((now) => resuggest(now, threshold, days, leadOf(id)));
   };
 
-  const suppliers = form.suppliers;
   const places = form.locations.nodes;
-  const supplierId = supplier || suppliers[0]?.id || NEW_SUPPLIER;
   const locationId = location || places.find((each) => each.isPrimary)?.id || places[0]?.id || '';
   const valid =
     supplierId !== NEW_SUPPLIER &&
@@ -387,7 +406,7 @@ function OrderForm({
           supplierId,
           locationId,
           reference: reference.trim() || null,
-          expectedOn: expectedOn || null,
+          expectedOn: expected || null,
           lines: lines.map((line) => ({
             inventoryItemId: line.itemId,
             quantity: parseStock(line.quantity),
@@ -428,12 +447,12 @@ function OrderForm({
             ...suppliers.map((each) => ({ value: each.id, label: each.name })),
             { value: NEW_SUPPLIER, label: t('po.supplierNew') },
           ]}
-          onChange={setSupplier}
+          onChange={choose}
         />
         {supplierId === NEW_SUPPLIER && (
           <NewSupplier
             onAdded={(id) => setSupplier(id)}
-            onCancel={() => setSupplier(suppliers[0]?.id ?? NEW_SUPPLIER)}
+            onCancel={() => choose(suppliers[0]?.id ?? NEW_SUPPLIER)}
           />
         )}
         <SelectField
@@ -451,9 +470,14 @@ function OrderForm({
           />
           <TextField
             label={t('po.expectedOn')}
+            hint={
+              expectedOn === null && leadDays > 0
+                ? t('po.expectedFromLead', { count: String(leadDays) })
+                : undefined
+            }
             type="date"
             ltr
-            value={expectedOn}
+            value={expected}
             onChange={(event) => setExpectedOn(event.target.value)}
           />
         </div>
@@ -471,6 +495,9 @@ function OrderForm({
             }))}
             onChange={(value) => cover(Number(value))}
           />
+        )}
+        {paced && leadDays > 0 && (
+          <p className="text-secondary">{t('po.coversLead', { count: String(leadDays) })}</p>
         )}
         <FindVariants
           chosen={new Set(lines.map((line) => line.itemId))}

@@ -36,9 +36,14 @@ export interface SupplierRecord {
   /** A Pakistani mobile number in E.164 form. */
   phone: string | null;
   note: string | null;
+  /** Days from ordering to the goods arriving (ADR-892); null where the shop has not said. */
+  leadTimeDays: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** The most days a supplier may take to deliver, as the shop says (ADR-892). */
+export const LEAD_TIME_MOST_DAYS = 180;
 
 /** What the shop has bought from a supplier, and still waits for (INV-05, ADR-371). */
 export interface SupplierPurchasingRecord {
@@ -62,6 +67,8 @@ export interface SupplierInput {
   name?: string | null;
   phone?: string | null;
   note?: string | null;
+  /** 0 to 180; null clears it. */
+  leadTimeDays?: number | null;
 }
 
 export interface PurchaseOrderLineRecord {
@@ -167,9 +174,24 @@ function toSupplier(row: typeof suppliers.$inferSelect): SupplierRecord {
     name: row.name,
     phone: row.phone,
     note: row.note,
+    leadTimeDays: row.leadTimeDays,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/** A supplier's days to deliver, 0 to 180, or none (ADR-892). */
+function checkLeadTime(check: InputChecker, days: number | null): number | null {
+  if (days === null) return null;
+  if (!Number.isInteger(days) || days < 0 || days > LEAD_TIME_MOST_DAYS) {
+    check.addMessage(
+      ['input', 'leadTimeDays'],
+      'INVALID',
+      `A supplier takes 0 to ${LEAD_TIME_MOST_DAYS} days to deliver`,
+    );
+    return null;
+  }
+  return days;
 }
 
 /** A real day, as YYYY-MM-DD; null when blank, after an error where it is not one. */
@@ -296,6 +318,7 @@ export class PurchaseOrderService {
           name: string;
           phone: string | null;
           note: string | null;
+          lead_time_days: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -332,6 +355,7 @@ export class PurchaseOrderService {
               name: row.supplier.name,
               phone: row.supplier.phone,
               note: row.supplier.note,
+              leadTimeDays: row.supplier.lead_time_days,
               createdAt: new Date(row.supplier.created_at),
               updatedAt: new Date(row.supplier.updated_at),
             },
@@ -350,6 +374,7 @@ export class PurchaseOrderService {
     const name = check.text(['input', 'name'], input.name, { required: true, max: 255 });
     const phone = check.mobile(['input', 'phone'], input.phone);
     const note = check.text(['input', 'note'], input.note, { max: 5000 });
+    const leadTimeDays = checkLeadTime(check, input.leadTimeDays ?? null);
     if (!check.ok || !name) return { ok: false, errors: check.errors };
     try {
       return await this.db.tenant(tenant.shopId, async (tx) => {
@@ -366,7 +391,7 @@ export class PurchaseOrderService {
         }
         const [row] = await tx
           .insert(suppliers)
-          .values({ shopId: tenant.shopId, id: newId(), name, phone, note })
+          .values({ shopId: tenant.shopId, id: newId(), name, phone, note, leadTimeDays })
           .returning();
         await appendEvent<SupplierPayload>(tx, tenant.shopId, {
           type: InventoryEvents.SupplierCreated,
@@ -401,6 +426,8 @@ export class PurchaseOrderService {
       input.note === undefined
         ? undefined
         : check.text(['input', 'note'], input.note, { max: 5000 });
+    const leadTimeDays =
+      input.leadTimeDays === undefined ? undefined : checkLeadTime(check, input.leadTimeDays);
     if (!check.ok || name === null) return { ok: false, errors: check.errors };
     try {
       return await this.db.tenant(tenant.shopId, async (tx) => {
@@ -410,6 +437,7 @@ export class PurchaseOrderService {
             ...(name !== undefined && { name }),
             ...(phone !== undefined && { phone }),
             ...(note !== undefined && { note }),
+            ...(leadTimeDays !== undefined && { leadTimeDays }),
             version: sql`${suppliers.version} + 1`,
             updatedAt: sql`now()`,
           })
@@ -1061,6 +1089,7 @@ export class PurchaseOrderService {
         name: string;
         phone: string | null;
         note: string | null;
+        lead_time_days: number | null;
         created_at: string;
         updated_at: string;
       };
@@ -1099,6 +1128,7 @@ export class PurchaseOrderService {
         name: row.supplier.name,
         phone: row.supplier.phone,
         note: row.supplier.note,
+        leadTimeDays: row.supplier.lead_time_days,
         createdAt: new Date(row.supplier.created_at),
         updatedAt: new Date(row.supplier.updated_at),
       },
