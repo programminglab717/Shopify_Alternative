@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The copilot drafts broadcasts
+### b9776f8 · The copilot drafts broadcasts
 
 * **A broadcast drafted** from a request: its name, who it goes to, its SMS words and when
   ([ADR-896](../architecture/13-decision-log.md#adr-896--the-copilot-drafts-broadcasts-a-name-who-it-goes-to-as-a-segment-query-its-sms-words-and-when-staff-choosing-its-whatsapp-template-and-its-audience-saved-as-a-segment-as-they-confirm-it)).
