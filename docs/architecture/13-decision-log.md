@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-885 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-886 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -893,6 +893,7 @@
 | 883 | Transfers to Hatti matched from its bank statement: the CSV the bank exports read in the console, each credit carrying a waiting transfer's reference paired with it, and each match confirmed by Hatti's people for what came | Accepted |
 | 884 | Sessions by where they came from, their landing page and device: each counted once as it began, from its first page's script and its user agent, counted in Valkey and kept each day in Postgres by the worker, not in ClickHouse | Accepted |
 | 885 | The sales as a journal for the shop's books: an entry a day, posting what the sales report counts to accounts the shop names, as a CSV, Xero's or QuickBooks' journal import or Tally's vouchers; what the shop is paid is left to the accountant to clear | Accepted |
+| 886 | Workflows wait and check: a wait of an hour to a week before the next action, and a check that goes on only where its conditions hold of the order as it is then, with the order's stage and confirmation to check | Accepted |
 
 ---
 
@@ -29363,3 +29364,37 @@
     been tried in each by an accountant (OWN-66).
   * Linking to Xero's and QuickBooks' APIs comes later, if shops ask for it, once Hatti is
     registered as an app with each.
+
+## ADR-886 · Workflows wait and check: a wait of an hour to a week before the next action, and a check that goes on only where its conditions hold of the order as it is then, with the order's stage and confirmation to check
+
+* **Context:** ADR-861's workflows check their conditions once, when they run, and do their
+  actions at once. It left waits ("a day later") and branches for later (MKT-04). What
+  Pakistani shops ask of a wait is mostly about confirmation: "a day after a COD order, if it
+  still isn't confirmed, tag it and tell me".
+* **Decision:**
+  * **Two actions of their own**, among a workflow's actions, which may now number ten:
+    * **Wait:** a whole number of hours, 1 to 168. The run is left pending until then, and goes
+      on from the next action.
+    * **Go on only if:** conditions, all or any, checked of the order or customer as they are
+      then. Where they hold, the run goes on. Where they don't, the actions after it are left,
+      and the run is done, the check's step skipped with why.
+    * Neither may be a workflow's last action.
+  * **After a wait**, the order and its customer are read again, so a check, a template or a tag
+    sees them as they are then. The run goes on with the workflow as it is then. A workflow
+    turned off during a wait leaves the rest, keeping the steps done before it.
+  * **An app's action** after a wait is tried for a day from when the wait was up, not from when
+    the run was made (migration 0388, `waited_until`).
+  * **Runs** are kept 30 days once finished; a run mid-wait is never cleared.
+  * **Conditions** may read where the order is (`order.stage`, as the admin shows it: to
+    confirm, to pack, with the courier, delivered and so on) and its confirmation
+    (`order.confirmation_status`).
+  * **The admin's editor** offers both actions, the check's conditions edited as the workflow's
+    are. A workflow to start from waits a day and, where a COD order still isn't confirmed,
+    tags it `call-again` and tells the owner and managers.
+* **Consequences:**
+  * **Waits and a check cover "a day later, if still …".** Full branches, with other actions
+    where conditions don't hold, would need a tree in the editor; they wait for shops to ask.
+  * Still not done (ADR-861):
+    * actions that change more than tags: holding or cancelling an order, or a WhatsApp message
+      to the customer, which needs approved templates;
+    * scheduled triggers, and triggers on stock.

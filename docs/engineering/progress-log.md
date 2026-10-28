@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows' waits and branches (MKT-04) next. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); RFM segments (ANL-04) next. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,15 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-28
+
+### Workflows that wait and check
+
+* **Wait:** a workflow's run waits an hour to a week, then goes on with the order as it is then
+  ([ADR-886](../architecture/13-decision-log.md#adr-886--workflows-wait-and-check-a-wait-of-an-hour-to-a-week-before-the-next-action-and-a-check-that-goes-on-only-where-its-conditions-hold-of-the-order-as-it-is-then-with-the-orders-stage-and-confirmation-to-check)).
+* **Go on only if:** conditions checked then; where they don't hold, the rest is left.
+* **Facts:** where the order is, and its confirmation, for "a day later, still unconfirmed?".
+* **Admin:** both in the editor, and a workflow to start from that does exactly that.
+* 4806 tests (2 new).
 
 ### 2329d37 · The sales as a journal for the shop's books
 
