@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-898 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-899 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -906,6 +906,7 @@
 | 896 | The copilot drafts broadcasts: a name, who it goes to as a segment query, its SMS words and when, staff choosing its WhatsApp template and its audience saved as a segment as they confirm it | Accepted |
 | 897 | Bulk mutations: bulkOperationRunMutation runs a mutation once for each line of a JSONL file of variables the caller staged, as the caller, in order, each answer a line of the file it writes | Accepted |
 | 898 | An order paid on delivery that no one location has all of may be split among those that do as it is placed, as the shop allows: each part an order of its own, shipped from its location at the shop's cost | Accepted |
+| 899 | An affiliate sees their own figures at a secret link the shop sends them: their link, code and share, what their orders came to and earned, and their latest orders, nothing of their customers | Accepted |
 
 ---
 
@@ -29789,3 +29790,32 @@
     stock again, as it always did.
   * Orders paid ahead aren't split. They would ship in parts from one order, with a location for
     each line, which waits.
+
+## ADR-899 · An affiliate sees their own figures at a secret link the shop sends them: their link, code and share, what their orders came to and earned, and their latest orders, nothing of their customers
+
+* **Context:** ADR-776 and ADR-777 left creators' own page of their figures for later. Creators
+  ask the shop for screenshots of what they brought and are owed; shops send them by hand.
+* **Decision:**
+  * **`affiliatePageLinkCreate(id)`** (`write_marketing_events`) makes a secret link,
+    `/a/<secret>`, on Hatti's public site, as order links are (ADR-032).
+    * It is shown once. Hatti keeps the secret's digest alone (migration 0397).
+    * A new link stops the one before.
+    * `orders.resolve_affiliate_page` finds the affiliate of an active shop before the shop is
+      known, as `resolve_order_link` does.
+  * **The page,** in English and Urdu, with the shop's logo and colour:
+    * their link to the storefront, their code and their share, and a note where the shop ended
+      their part;
+    * their orders, those delivered, sales delivered, earned, earned once delivered, paid and
+      owed, as the admin's card counts them (ADR-776);
+    * their latest 50 orders, by number, day and stage (delivered, on its way, or come back),
+      with what each earns them.
+    * Nothing of their customers: no name, number or address.
+    * Not cached, indexed or framed, as link pages aren't.
+  * **The admin's affiliate card** makes the link, shows it once, and copies it or opens WhatsApp
+    to the affiliate's number with it.
+* **Consequences:**
+  * A creator checks what they brought and are owed without asking, and shops stop sending
+    screenshots.
+  * Anyone with the link sees the figures, as anyone with an order's link sees the order. A shop
+    that suspects it has been passed on makes a new one.
+  * Paying affiliates through Hatti still needs a payments partner (PAY-10).
