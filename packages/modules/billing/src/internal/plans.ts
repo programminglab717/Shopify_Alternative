@@ -49,6 +49,8 @@ export interface Plan {
   fiscalReporting: boolean;
   /** Whether it may schedule drops: a waiting room and stock that cannot oversell (ADR-820). */
   drops: boolean;
+  /** Whether the AI may answer its customers' messages, each answer a credit (ADR-849). */
+  aiSupportAgent: boolean;
   /** AI credits it includes a month, each a draft the AI gives (ADR-533). */
   aiCredits: number;
 }
@@ -72,6 +74,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     pixels: false,
     fiscalReporting: false,
     drops: false,
+    aiSupportAgent: false,
     aiCredits: 10,
   },
   starter: {
@@ -92,6 +95,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     pixels: true,
     fiscalReporting: false,
     drops: false,
+    aiSupportAgent: false,
     aiCredits: 50,
   },
   growth: {
@@ -112,6 +116,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     pixels: true,
     fiscalReporting: false,
     drops: false,
+    aiSupportAgent: true,
     aiCredits: 150,
   },
   pro: {
@@ -132,6 +137,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     pixels: true,
     fiscalReporting: true,
     drops: true,
+    aiSupportAgent: true,
     aiCredits: 600,
   },
 };

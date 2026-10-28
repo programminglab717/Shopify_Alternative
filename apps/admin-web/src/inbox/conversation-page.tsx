@@ -117,6 +117,7 @@ function Message({ message, timezone }: { message: ConversationMessageValue; tim
       )}
       <span className="flex flex-wrap items-center gap-x-2 text-secondary text-[length:var(--hatti-type-caption-size)]">
         <time dateTime={message.at}>{formatDateTime(message.at, timezone, locale)}</time>
+        {message.byAi && <span className="font-medium">{t('inbox.byAi')}</span>}
         {status && (
           <span className={`inline-flex items-center gap-1 ${status.className}`}>
             <status.icon aria-hidden className="size-4" />

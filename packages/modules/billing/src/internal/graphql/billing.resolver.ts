@@ -320,6 +320,7 @@ function toPlan(plan: Plan): BillingPlan {
     pixels: plan.pixels,
     fiscalReporting: plan.fiscalReporting,
     drops: plan.drops,
+    aiSupportAgent: plan.aiSupportAgent,
     aiCredits: plan.aiCredits,
   });
 }

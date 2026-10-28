@@ -338,6 +338,22 @@ const storefrontDnsTarget = z
   .regex(/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, 'Expected a host name')
   .optional();
 
+/**
+ * The AI gateway (ADR-463): the model provider's API key and the model's ID, both or neither, and
+ * the provider's address where it is not Anthropic's own, as for a proxy. No model is named in
+ * code: changing it is a change here. Without them, nothing is drafted with AI, and the worker
+ * answers no customer with it (ADR-849).
+ */
+const aiGateway = {
+  AI_API_KEY: env.secret(16).optional(),
+  AI_MODEL: z.string().trim().min(1).max(200).optional(),
+  AI_BASE_URL: env.httpUrl().optional(),
+};
+
+const aiPaired = (config: { AI_API_KEY?: string; AI_MODEL?: string }) =>
+  (config.AI_API_KEY === undefined) === (config.AI_MODEL === undefined);
+const AI_PAIRED = { path: ['AI_MODEL'], message: 'Set both AI_API_KEY and AI_MODEL, or neither' };
+
 const common = {
   NODE_ENV: env.nodeEnv(),
   LOG_LEVEL: env.logLevel(),
@@ -519,14 +535,7 @@ const apiSchema = z
     SUPPORT_HOURS: z.string().trim().min(1).max(100).optional(),
     SUPPORT_HOURS_UR: z.string().trim().min(1).max(100).optional(),
     ...supportWhatsApp,
-    /**
-     * The AI gateway (ADR-463): the model provider's API key and the model's ID, both or neither,
-     * and the provider's address where it is not Anthropic's own, as for a proxy. No model is
-     * named in code: changing it is a change here. Without them, nothing is drafted with AI.
-     */
-    AI_API_KEY: env.secret(16).optional(),
-    AI_MODEL: z.string().trim().min(1).max(200).optional(),
-    AI_BASE_URL: env.httpUrl().optional(),
+    ...aiGateway,
     /**
      * The map tiles checkout's map to move the address's pin on is drawn from (ADR-719): a
      * provider's raster tiles by a template with {z}, {x} and {y} after its host, such as
@@ -548,10 +557,7 @@ const apiSchema = z
     ...webPush,
   })
   .refine(webPushComplete, WEB_PUSH_COMPLETE)
-  .refine((config) => (config.AI_API_KEY === undefined) === (config.AI_MODEL === undefined), {
-    path: ['AI_MODEL'],
-    message: 'Set both AI_API_KEY and AI_MODEL, or neither',
-  })
+  .refine(aiPaired, AI_PAIRED)
   .refine(
     (config) =>
       (config.MAP_TILES_URL === undefined) === (config.MAP_TILES_ATTRIBUTION === undefined),
@@ -885,9 +891,11 @@ const workerSchema = z
         return probes;
       }),
     ...messageSending,
+    ...aiGateway,
     ...storage,
     ...webPush,
   })
+  .refine(aiPaired, AI_PAIRED)
   .refine(webPushComplete, WEB_PUSH_COMPLETE)
   .refine(whatsAppPaired, WHATSAPP_PAIRED)
   .refine(smsPaired, SMS_PAIRED)

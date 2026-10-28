@@ -1,6 +1,11 @@
 /** What an AI draft spends one of a shop's monthly AI credits on (BIL-01, ADR-533). */
 export type AiCreditUse =
-  'product_copy' | 'translation' | 'article' | 'report_question' | 'transfer_receipt';
+  | 'product_copy'
+  | 'translation'
+  | 'article'
+  | 'report_question'
+  | 'transfer_receipt'
+  | 'support_reply';
 
 /** A shop's AI credits this month. */
 export interface AiCreditBalance {

@@ -1,6 +1,12 @@
 import { PublicSite, StorefrontSite, SystemDnsLookup } from '@hatti/api';
 import { HttpWebhookSender, WebhookService } from '@hatti/apps/public';
-import { BillingService, MessageWallet, SupportService } from '@hatti/billing/public';
+import { AiGateway } from '@hatti/ai';
+import {
+  AiCreditsService,
+  BillingService,
+  MessageWallet,
+  SupportService,
+} from '@hatti/billing/public';
 import {
   CollectionService,
   MediaProcessing,
@@ -51,12 +57,14 @@ import {
 import {
   AutomationsService,
   BroadcastsService,
+  ConversationsService,
   MessageRetention,
   MessagesService,
   PushService,
   ShopperPushService,
   SmsSendersService,
   StockWatchService,
+  SupportAgentService,
   WebPushSender,
   WhatsAppAccountsService,
   WhatsAppBusinessClient,
@@ -150,6 +158,7 @@ import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import { BackInStockAlerts } from './back-in-stock.js';
 import { StoreOpenNotices } from './store-open.js';
+import { AiCustomerReplies } from './ai-customer-replies.js';
 import { CodPrepaidOffers } from './cod-prepaid-offers.js';
 import { ParcelSteps } from './parcel-steps.js';
 import { PaymentInquiries } from './payment-inquiries.js';
@@ -195,6 +204,7 @@ export interface EventConsumers {
   backInStock?: BackInStockAlerts;
   storeOpen?: StoreOpenNotices;
   codPrepaid?: CodPrepaidOffers;
+  aiReplies?: AiCustomerReplies;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   partnerEarnings?: PartnerEarnings;
@@ -226,6 +236,7 @@ export function eventHandlers(
     backInStock,
     storeOpen,
     codPrepaid,
+    aiReplies,
     parcelSteps,
     billing,
     partnerEarnings,
@@ -298,6 +309,13 @@ export function eventHandlers(
     for (const type of CodPrepaidOffers.EVENTS) {
       registry.on(type, async (event) => {
         await codPrepaid.handle(event);
+      });
+    }
+  }
+  if (aiReplies) {
+    for (const type of AiCustomerReplies.EVENTS) {
+      registry.on(type, async (event) => {
+        await aiReplies.handle(event);
       });
     }
   }
@@ -454,6 +472,44 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
         ),
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
+        // Customers answered by the AI, where the shop turned it on (ADR-849): replies go back
+        // on the number they wrote to, Hatti's or the shop's own, whose token is sealed.
+        ...(config.AI_API_KEY &&
+          config.AI_MODEL && {
+            aiReplies: new AiCustomerReplies(
+              database,
+              new SupportAgentService(
+                database,
+                new BillingService(
+                  database,
+                  new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+                ),
+              ),
+              new ConversationsService(
+                database,
+                {
+                  baseUrl: config.META_GRAPH_URL,
+                  version: config.META_GRAPH_VERSION,
+                  shared:
+                    config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_ACCESS_TOKEN
+                      ? {
+                          phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
+                          accessToken: config.WHATSAPP_ACCESS_TOKEN,
+                        }
+                      : null,
+                },
+                config.ENCRYPTION_KEYS
+                  ? new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null)
+                  : null,
+              ),
+              new AiGateway({
+                apiKey: config.AI_API_KEY,
+                model: config.AI_MODEL,
+                ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
+              }),
+              new AiCreditsService(database),
+            ),
+          }),
         billing: new BillingNotices(database, new MessagesService(database)),
         partnerEarnings: new PartnerEarnings(database),
         push: new PushNotices(database, pushes),

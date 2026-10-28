@@ -11,6 +11,8 @@ import { ReferralResolver } from './graphql/referral.resolver.js';
 import { ReferralProgramService } from './referrals.service.js';
 import { StorefrontWebChatController, WebChatService } from './web-chat.service.js';
 import { WebChatResolver } from './graphql/web-chat.resolver.js';
+import { SupportAgentResolver } from './graphql/support-agent.resolver.js';
+import { SupportAgentService } from './support-agent.service.js';
 import {
   ContactMessagesService,
   StorefrontContactMessagesController,
@@ -119,6 +121,8 @@ export class MessagingModule {
         ReferralResolver,
         WebChatService,
         WebChatResolver,
+        SupportAgentService,
+        SupportAgentResolver,
         SmsSendersService,
         SmsSenderResolver,
         PushService,
@@ -138,6 +142,7 @@ export class MessagingModule {
         StockWatchService,
         ReferralProgramService,
         WebChatService,
+        SupportAgentService,
         PushService,
         ShopperPushService,
       ],

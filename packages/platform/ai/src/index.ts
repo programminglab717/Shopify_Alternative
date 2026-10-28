@@ -49,3 +49,10 @@ export {
   type TransferReceiptFile,
   type TransferReceiptReading,
 } from './transfer-receipt.js';
+export {
+  SUPPORT_REPLY_LIMITS,
+  draftSupportReply,
+  type SupportReply,
+  type SupportReplyRequest,
+  type SupportTurn,
+} from './support-reply.js';

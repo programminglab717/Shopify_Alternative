@@ -51,7 +51,7 @@ const THREAD = [
     status: 'FAILED',
     error: 'Message undeliverable',
   }),
-  message('m3', 'OUTBOUND', 'We have it in green and blue', { status: 'READ' }),
+  message('m3', 'OUTBOUND', 'We have it in green and blue', { status: 'READ', byAi: true }),
   message('m4', 'INBOUND', null, { mediaKind: 'image' }),
   message('m5', 'INBOUND', null, { mediaKind: 'contacts' }),
   message('m6', 'INBOUND', 'Green please'),
@@ -306,6 +306,10 @@ describe('The inbox: customers’ WhatsApp conversations (MSG-05, ADR-545)', () 
       null,
       'Green please',
     ]);
+    // The AI's answer says it is the AI's (ADR-849); staff's don't.
+    const items = within(thread).getAllByRole('listitem');
+    expect(within(items[2]!).getByText('AI')).toBeTruthy();
+    expect(within(items[1]!).queryByText('AI')).toBeNull();
     expect(sentOf(core, 'ConversationMarkRead')).toHaveLength(1);
   });
 

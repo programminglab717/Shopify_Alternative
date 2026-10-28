@@ -207,6 +207,11 @@ export class BillingPlan {
   })
   drops!: boolean;
 
+  @Field({
+    description: "Whether the AI may answer the shop's customers' messages (ADR-849).",
+  })
+  aiSupportAgent!: boolean;
+
   @Field(() => Int, {
     description: 'AI credits it includes a month, each a draft the AI gives (ADR-533).',
   })

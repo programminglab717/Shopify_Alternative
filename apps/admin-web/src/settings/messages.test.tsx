@@ -77,8 +77,14 @@ function core(role: StaffRole, requests: Request[] = []) {
     greeting: null as string | null,
     updatedAt: null as string | null,
   };
+  let agent = { enabled: false, available: true, answeredToday: 0, limitPerDay: 200 };
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'SupportAgent':
+        return { supportAgent: agent };
+      case 'SupportAgentUpdate':
+        agent = { ...agent, enabled: Boolean(variables.enabled), answeredToday: 3 };
+        return { supportAgentUpdate: { supportAgent: agent, userErrors: [] } };
       case 'WebChatSettings':
         return { webChatSettings: webChat };
       case 'WebChatSettingsUpdate': {
@@ -346,6 +352,22 @@ describe('Customer messages', () => {
     expect(sentOf(fake, 'WebChatSettingsUpdate')).toEqual([
       { input: { enabled: true, greeting: 'Ask us about sizes!' } },
     ]);
+  });
+
+  it('lets the AI answer customers, saying what it costs and how many it answered (ADR-849)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const card = await screen.findByRole('region', { name: 'AI answers' });
+    const on = (await within(card).findByLabelText(
+      'Let the AI answer customers',
+    )) as HTMLInputElement;
+    expect(on.checked).toBe(false);
+    expect(within(card).getByText(/Each answer uses one AI credit/)).toBeTruthy();
+    fireEvent.click(on);
+    expect(await within(card).findByText('Answered today: 3 of 200')).toBeTruthy();
+    expect(sentOf(fake, 'SupportAgentUpdate')).toEqual([{ enabled: true }]);
   });
 
   it('lists the messages sent, by status, with their orders and why one failed', async () => {

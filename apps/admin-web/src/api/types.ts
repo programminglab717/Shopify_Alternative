@@ -5378,6 +5378,24 @@ export interface ConversationMessageValue {
   at: string;
   status: ConversationReplyStatus | null;
   error: string | null;
+  /** A reply the AI wrote for the shop (ADR-849); absent where the query didn't ask. */
+  byAi?: boolean;
+}
+
+/** The AI answering the shop's customers (MSG-07, ADR-849). */
+export interface SupportAgentValue {
+  enabled: boolean;
+  available: boolean;
+  answeredToday: number;
+  limitPerDay: number;
+}
+
+export interface SupportAgentData {
+  supportAgent: SupportAgentValue;
+}
+
+export interface SupportAgentUpdateData {
+  supportAgentUpdate: { supportAgent: SupportAgentValue | null; userErrors: UserError[] };
 }
 
 /** The chat on the shop's online store (ADR-810). */

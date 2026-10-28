@@ -78,6 +78,7 @@ describe.skipIf(!server)('Billing', () => {
       'pixels',
       'fiscalReporting',
       'drops',
+      'aiSupportAgent',
     ] as const) {
       expect(await f.billing.excludes(f.a.shopId, feature)).toBe('Free');
     }

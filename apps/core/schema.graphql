@@ -1026,6 +1026,9 @@ type BillingPlan {
   """AI credits it includes a month, each a draft the AI gives (ADR-533)."""
   aiCredits: Int!
 
+  """Whether the AI may answer the shop's customers' messages (ADR-849)."""
+  aiSupportAgent: Boolean!
+
   """
   Whether the shop may turn automations and the abandoned checkout reminder on (ADR-523).
   """
@@ -3138,6 +3141,9 @@ type ConversationMessage {
 
   """What was written, or the button pressed; null for anything else."""
   body: String
+
+  """A reply the AI wrote for the shop (MSG-07, ADR-849)."""
+  byAi: Boolean!
   direction: ConversationMessageDirection!
 
   """Why WhatsApp could not deliver the reply."""
@@ -10945,6 +10951,11 @@ type Mutation {
   ): SupportAccessGrantPayload!
 
   """
+  Turns the AI's answers to customers on or off. Each answer spends an AI credit; staff answering a conversation, or taking it, leave it theirs.
+  """
+  supportAgentUpdate(enabled: Boolean!): SupportAgentUpdatePayload!
+
+  """
   Closes one of the shop’s requests: answered enough, or no longer needed.
   """
   supportRequestClose(id: ID!): SupportRequestPayload!
@@ -16647,6 +16658,9 @@ type Query {
   """
   supportAccessGrants(first: Int! = 20): [SupportAccessGrant!]!
 
+  """Whether the AI answers the shop's customers."""
+  supportAgent: SupportAgent!
+
   """The sales tax the shop charges, included in its prices."""
   taxSettings: TaxSettings!
   theme(id: ID!): OnlineStoreTheme
@@ -19373,6 +19387,26 @@ type SupportAccessGrantPayload {
 enum SupportAccessLevel {
   """It looks, numbers masked as most staff see them, and changes nothing."""
   READ
+}
+
+"""
+The AI answering the shop's customers on WhatsApp and in its web chat (MSG-07, ADR-849), from its policies and the customer's own orders, handing over to staff when it should.
+"""
+type SupportAgent {
+  """Messages it answered in the last day."""
+  answeredToday: Int!
+
+  """Whether Hatti answers at all: false until its AI is set up."""
+  available: Boolean!
+
+  """Whether the shop turned it on."""
+  enabled: Boolean!
+  limitPerDay: Int!
+}
+
+type SupportAgentUpdatePayload {
+  supportAgent: SupportAgent
+  userErrors: [UserError!]!
 }
 
 """

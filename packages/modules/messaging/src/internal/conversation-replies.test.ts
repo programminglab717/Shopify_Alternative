@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import type { MutationResult, TenantContext } from '@hatti/api';
+import type { MutationResult, PlanAllowance, TenantContext } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CONVERSATION_WINDOW_MS, ConversationsService } from './conversations.service.js';
 import { MessagingEvents } from './events.js';
 import { ReplyTimesService } from './reply-times.service.js';
+import { SUPPORT_AGENT_DAILY, SupportAgentService } from './support-agent.service.js';
 import { WHATSAPP_CLOUD } from './providers.js';
 import { FakeGraph, NUMBER, SHARED_NUMBER, SHARED_TOKEN, TOKEN, WABA } from './test-support.js';
 import type { WhatsAppAccountsService, WhatsAppSender } from './whatsapp-accounts.service.js';
@@ -421,5 +422,60 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
       error: 'WhatsApp 131047: Re-engagement message',
     });
     expect((await inbox.get(a, other))!.lastMessage).toMatchObject({ status: 'failed' });
+  });
+
+  it("sends the AI's reply as the AI's, leaving staff's reply times and unread as they were (ADR-849)", async () => {
+    const id = await sharedConversation();
+    const sent = unwrap(await inbox.reply(a, id, 'Ji, medium mein hai.', SOON, { ai: true }));
+    expect(sent.message).toMatchObject({ body: 'Ji, medium mein hai.', byAi: true });
+    expect(graph.sent.at(-1)?.body).toMatchObject({ text: { body: 'Ji, medium mein hai.' } });
+    expect(sent.conversation).toMatchObject({ unread: 1, waitingSince: null });
+    expect(sent.conversation.lastMessage).toMatchObject({ byAi: true });
+    const { rows } = await admin.query<{ actor_kind: string; actor_id: string | null }>(
+      `SELECT actor_kind, actor_id FROM messaging.conversation_messages
+        WHERE conversation_id = $1 AND direction = 'outbound'`,
+      [id],
+    );
+    expect(rows).toEqual([{ actor_kind: 'ai', actor_id: null }]);
+    expect(
+      (
+        await admin.query(
+          'SELECT 1 FROM messaging.conversation_answers WHERE conversation_id = $1',
+          [id],
+        )
+      ).rows,
+    ).toEqual([]);
+    const { items } = await inbox.messages(a, id, { first: 5, before: null });
+    expect(items.map((message) => message.byAi)).toEqual([true, false]);
+
+    // The shop's setting, off until it turns it on.
+    const agent = new SupportAgentService(db);
+    expect(await agent.settings(a)).toEqual({
+      enabled: false,
+      answeredToday: 0,
+      limitPerDay: SUPPORT_AGENT_DAILY,
+    });
+    expect(unwrap(await agent.update(a, { enabled: true })).enabled).toBe(true);
+    expect((await agent.settings(b)).enabled).toBe(false);
+    // On a plan without it, it is not turned on, and answers no one though it was on.
+    const starter = new SupportAgentService(db, {
+      excludes: async (_shopId: string, feature: string) =>
+        feature === 'aiSupportAgent' ? 'Starter' : null,
+    } as unknown as PlanAllowance);
+    const refused = await starter.update(b, { enabled: true });
+    expect(!refused.ok && refused.errors[0]).toMatchObject({
+      code: 'PROHIBITED',
+      message: "The Starter plan doesn't include AI answers: choose the Growth plan for them",
+    });
+    expect(unwrap(await starter.update(a, { enabled: false })).enabled).toBe(false);
+    unwrap(await agent.update(a, { enabled: true }));
+    await inbox.recordInbound(inbound({ text: 'aur kuch?', at: SOON, id: `wamid.${newId()}` }));
+    const { rows: written } = await admin.query<{ id: string }>(
+      `SELECT id FROM messaging.conversation_messages
+        WHERE conversation_id = $1 ORDER BY at DESC, id DESC LIMIT 1`,
+      [id],
+    );
+    expect(await agent.taskOf(a.shopId, id, written[0]!.id, SOON)).not.toBeNull();
+    expect(await starter.taskOf(a.shopId, id, written[0]!.id, SOON)).toBeNull();
   });
 });

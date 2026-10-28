@@ -1224,6 +1224,9 @@ importers:
 
   packages/modules/messaging:
     dependencies:
+      '@hatti/ai':
+        specifier: workspace:*
+        version: link:../../platform/ai
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api

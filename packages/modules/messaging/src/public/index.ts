@@ -294,3 +294,10 @@ export {
   type PushSubscriptionKeys,
   type VapidKeys,
 } from '../internal/web-push.js';
+export {
+  SUPPORT_AGENT_DAILY,
+  SUPPORT_AGENT_QUIET_MS,
+  SupportAgentService,
+  type SupportAgentOutcome,
+  type SupportAgentTask,
+} from '../internal/support-agent.service.js';

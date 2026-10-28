@@ -11093,7 +11093,37 @@ const CONVERSATION_MESSAGE = /* GraphQL */ `
     at
     status
     error
+    byAi
   }
+`;
+
+/** The AI answering the shop's customers (MSG-07, ADR-849). */
+export const SupportAgentQuery = /* GraphQL */ `
+  query SupportAgent {
+    supportAgent {
+      enabled
+      available
+      answeredToday
+      limitPerDay
+    }
+  }
+`;
+
+export const SupportAgentUpdateMutation = /* GraphQL */ `
+  mutation SupportAgentUpdate($enabled: Boolean!) {
+    supportAgentUpdate(enabled: $enabled) {
+      supportAgent {
+        enabled
+        available
+        answeredToday
+        limitPerDay
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 const CONVERSATION = /* GraphQL */ `

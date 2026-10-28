@@ -51,6 +51,7 @@ export {
   type CodHealthRow,
 } from '../internal/cod-health.service.js';
 export { closeDoorPaymentIn, openDoorPaymentIn } from '../internal/door-payments.js';
+export { SUPPORT_FACTS_ORDERS, supportFactsIn } from '../internal/support-facts.js';
 export {
   chargeParcelsIn,
   codOwedIn,

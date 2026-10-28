@@ -104,6 +104,9 @@ export class ConversationMessage {
     description: 'Why WhatsApp could not deliver the reply.',
   })
   error!: string | null;
+
+  @Field({ description: 'A reply the AI wrote for the shop (MSG-07, ADR-849).' })
+  byAi!: boolean;
 }
 
 @ObjectType()

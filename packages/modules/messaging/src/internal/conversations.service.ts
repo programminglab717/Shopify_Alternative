@@ -53,6 +53,8 @@ export interface ConversationMessageRecord {
   status: ReplyStatusValue | null;
   /** Why WhatsApp could not deliver a reply. */
   error: string | null;
+  /** A reply the AI wrote for the shop (MSG-07, ADR-849). */
+  byAi: boolean;
 }
 
 /**
@@ -145,6 +147,7 @@ type ConversationRow = {
   at: string | Date | null;
   message_status: ReplyStatusValue | null;
   message_error: string | null;
+  message_by_ai: boolean | null;
 };
 
 type MessageRow = {
@@ -155,6 +158,7 @@ type MessageRow = {
   at: string | Date;
   status: ReplyStatusValue | null;
   error: string | null;
+  by_ai: boolean;
 };
 
 /** What WhatsApp's statuses may move a reply on from: never back, and failed only undelivered. */
@@ -301,7 +305,8 @@ export class ConversationsService {
   ): Promise<Page<ConversationMessageRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<MessageRow>(sql`
-        SELECT m.id, m.direction, m.body, m.media_kind, m.at, m.status, m.error
+        SELECT m.id, m.direction, m.body, m.media_kind, m.at, m.status, m.error,
+               m.actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai
           FROM messaging.conversation_messages m
          WHERE m.shop_id = ${tenant.shopId} AND m.conversation_id = ${conversationId}
            ${
@@ -477,6 +482,8 @@ export class ConversationsService {
     id: string,
     body: string,
     now: Date = new Date(),
+    /** Written by the AI for the shop (ADR-849): no member of staff's answer, nor read by one. */
+    options: { ai?: boolean } = {},
   ): Promise<
     MutationResult<{ conversation: ConversationRecord; message: ConversationMessageRecord }>
   > {
@@ -524,7 +531,9 @@ export class ConversationsService {
       }
       providerMessageId = sent.providerMessageId;
     }
-    const actor = actorColumnsOf(tenant.actor);
+    const actor = options.ai
+      ? { actorKind: 'ai' as const, actorId: null }
+      : actorColumnsOf(tenant.actor);
     return {
       ok: true,
       value: await this.db.tenant(tenant.shopId, async (tx) => {
@@ -535,19 +544,23 @@ export class ConversationsService {
                   actor_kind, actor_id)
           VALUES (${tenant.shopId}, ${id}, 'outbound', ${text}, ${providerMessageId}, ${at},
                   'sent', ${actor.actorKind}, ${actor.actorId})
-          RETURNING id, direction, body, media_kind, at, status, error`);
+          RETURNING id, direction, body, media_kind, at, status, error,
+                    actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai`);
         const message = rows[0]!;
-        // The customer waited for this answer: how long, and who gave it (ADR-763).
-        await tx.execute(sql`
-          INSERT INTO messaging.conversation_answers
-                 (shop_id, conversation_id, waited_from, answered_at, actor_kind, actor_id)
-          SELECT shop_id, id, waiting_since, greatest(waiting_since, ${at}::timestamptz),
-                 ${actor.actorKind}, ${actor.actorId}
-            FROM messaging.conversations
-           WHERE shop_id = ${tenant.shopId} AND id = ${id} AND waiting_since IS NOT NULL`);
+        // The customer waited for this answer: how long, and who gave it (ADR-763). The AI's
+        // answers are not staff's, and leave what staff have to read as it was.
+        if (!options.ai) {
+          await tx.execute(sql`
+            INSERT INTO messaging.conversation_answers
+                   (shop_id, conversation_id, waited_from, answered_at, actor_kind, actor_id)
+            SELECT shop_id, id, waiting_since, greatest(waiting_since, ${at}::timestamptz),
+                   ${actor.actorKind}, ${actor.actorId}
+              FROM messaging.conversations
+             WHERE shop_id = ${tenant.shopId} AND id = ${id} AND waiting_since IS NOT NULL`);
+        }
         await tx.execute(sql`
           UPDATE messaging.conversations
-             SET unread = 0, waiting_since = NULL,
+             SET unread = ${options.ai ? sql`unread` : sql`0`}, waiting_since = NULL,
                  last_message_at = greatest(last_message_at, ${at}::timestamptz)
            WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
         await appendEvent<ConversationRepliedPayload>(tx, tenant.shopId, {
@@ -708,10 +721,11 @@ function conversationSelect(shopId: string) {
            ${ANSWER_BY} AS answer_by,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
            m.id AS message_id, m.direction, m.body, m.media_kind, m.at,
-           m.status AS message_status, m.error AS message_error
+           m.status AS message_status, m.error AS message_error, m.by_ai AS message_by_ai
       FROM messaging.conversations c
       LEFT JOIN LATERAL (
-        SELECT l.id, l.direction, l.body, l.media_kind, l.at, l.status, l.error
+        SELECT l.id, l.direction, l.body, l.media_kind, l.at, l.status, l.error,
+               l.actor_kind IS NOT DISTINCT FROM 'ai' AS by_ai
           FROM messaging.conversation_messages l
          WHERE l.shop_id = c.shop_id AND l.conversation_id = c.id
          ORDER BY l.at DESC, l.id DESC LIMIT 1) m ON true
@@ -754,6 +768,7 @@ function toConversation(row: ConversationRow): ConversationRecord {
             at: row.at,
             status: row.message_status,
             error: row.message_error,
+            by_ai: row.message_by_ai ?? false,
           })
         : null,
     lastMessageAtExactly: row.last_message_at_exactly,
@@ -769,5 +784,6 @@ function toMessage(row: MessageRow): ConversationMessageRecord {
     at: toDate(row.at),
     status: row.status,
     error: row.error,
+    byAi: row.by_ai,
   };
 }

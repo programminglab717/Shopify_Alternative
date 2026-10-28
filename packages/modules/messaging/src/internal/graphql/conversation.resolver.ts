@@ -280,5 +280,6 @@ function toMessage(record: ConversationMessageRecord): ConversationMessage {
     at: record.at,
     status: record.status && (record.status.toUpperCase() as ConversationReplyStatus),
     error: record.error,
+    byAi: record.byAi,
   });
 }

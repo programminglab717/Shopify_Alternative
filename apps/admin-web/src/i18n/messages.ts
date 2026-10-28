@@ -2740,6 +2740,15 @@ const en = {
   'settings.messagesHint': 'WhatsApp or SMS, which messages go, and alerts to you',
   'settings.whatsapp': 'Your WhatsApp number',
   'settings.whatsappHint': "Your shop's own number, which your broadcasts go from",
+  'supportAgent.title': 'AI answers',
+  'supportAgent.hint':
+    'The AI answers customers on WhatsApp and in your online store’s chat, from your policies and their own orders, and hands the chat to your team when it should.',
+  'supportAgent.on': 'Let the AI answer customers',
+  'supportAgent.how':
+    'Each answer uses one AI credit. Once someone in your team answers a chat, or takes it, the AI leaves it to them for a day.',
+  'supportAgent.today': 'Answered today: {count} of {limit}',
+  'supportAgent.unavailable': 'AI answers are not set up on Hatti yet.',
+  'inbox.byAi': 'AI',
   'webChat.title': 'Chat on your online store',
   'webChat.hint':
     'Shoppers write to you from a button on every page, giving their name and mobile number. Their chats come to your inbox beside WhatsApp, and you answer them there.',
@@ -8994,6 +9003,15 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'settings.messagesHint': 'واٹس ایپ یا SMS، کون سے میسج جائیں، اور آپ کو الرٹس',
   'settings.whatsapp': 'آپ کا واٹس ایپ نمبر',
   'settings.whatsappHint': 'آپ کی دکان کا اپنا نمبر، جس سے آپ کے براڈکاسٹ جاتے ہیں',
+  'supportAgent.title': 'AI جوابات',
+  'supportAgent.hint':
+    'AI واٹس ایپ اور آپ کے آن لائن اسٹور کی چیٹ میں گاہکوں کو آپ کی پالیسیوں اور ان کے اپنے آرڈرز سے جواب دیتی ہے، اور ضرورت ہو تو چیٹ آپ کی ٹیم کو سونپ دیتی ہے۔',
+  'supportAgent.on': 'AI کو گاہکوں کو جواب دینے دیں',
+  'supportAgent.how':
+    'ہر جواب میں ایک AI کریڈٹ لگتا ہے۔ جب آپ کی ٹیم کا کوئی فرد چیٹ کا جواب دے یا اسے لے لے، تو AI ایک دن کے لیے اسے ان پر چھوڑ دیتی ہے۔',
+  'supportAgent.today': 'آج جواب دیے: {limit} میں سے {count}',
+  'supportAgent.unavailable': 'AI جوابات ابھی ہٹی پر سیٹ اپ نہیں ہوئے۔',
+  'inbox.byAi': 'AI',
   'webChat.title': 'آپ کے آن لائن اسٹور پر چیٹ',
   'webChat.hint':
     'خریدار ہر صفحے پر ایک بٹن سے، اپنا نام اور موبائل نمبر دے کر آپ کو لکھتے ہیں۔ ان کی چیٹس واٹس ایپ کے ساتھ آپ کے ان باکس میں آتی ہیں، اور آپ وہیں جواب دیتے ہیں۔',

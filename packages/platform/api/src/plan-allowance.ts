@@ -24,7 +24,8 @@ export type PlanFeature =
   | 'trueProfit'
   | 'pixels'
   | 'fiscalReporting'
-  | 'drops';
+  | 'drops'
+  | 'aiSupportAgent';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {
