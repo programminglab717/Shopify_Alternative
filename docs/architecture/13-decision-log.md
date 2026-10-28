@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-850 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-851 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -858,6 +858,7 @@
 | 848 | The Storefront API: GraphQL at each shop's own address, as Shopify's at /api/<version>/graphql.json, answered with the shop's public or private tokens, its catalog read from the storefront's documents and its carts changed through the core | Accepted |
 | 849 | On Growth and Pro, a shop may let the AI answer its customers on WhatsApp and in its web chat, from its policies and the customer's own orders, handing the conversation to staff when it should; staff answering or taking it leave it theirs | Accepted |
 | 850 | Developers get a TypeScript client for the Admin API, which waits out throttles and keeps one idempotency key across a mutation's tries, and `hatti`, a command line that pulls and pushes a shop's theme files | Accepted |
+| 851 | Partners' public apps are installed through OAuth: an owner or a manager approves one on the admin's consent page, and the app trades the code with its secret for a token of the shop's; until Hatti lists an app, it installs on its partner's development stores alone | Accepted |
 
 ---
 
@@ -27884,3 +27885,60 @@
     every version. GraphQL clients bring their own types from the schema (`apps/core/schema.graphql`).
   * **Storing the token in a config file, as a login:** rejected. It would sit on disk; CI and
     shells already keep secrets in the environment.
+
+## ADR-851 · Partners' public apps are installed through OAuth: an owner or a manager approves one on the admin's consent page, and the app trades the code with its secret for a token of the shop's; until Hatti lists an app, it installs on its partner's development stores alone
+
+* **Context:**
+  * DEV-05 asks for public apps that shops install, as Shopify's do: OAuth, a review, and a
+    billing API in PKR.
+  * A shop could make custom apps (ADR-395), with tokens and webhooks of its own, and partners
+    could open development stores (ADR-504). An app built once for many shops had no way in.
+* **Decision:**
+  * **Registering:** a partner registers an app from their partner page (`POST
+    /auth/partner/apps`): its name, its https address, one to five https redirect URLs and the
+    scopes it asks for, ten apps at most. Hatti gives it a client ID (`hca_…`) and a client
+    secret (`hcs_…`), shown once and kept as its SHA-256 digest.
+  * **Consent:** the app sends the merchant to the admin's `/oauth/authorize?client_id&scope&
+    redirect_uri&state&shop`, as Shopify's apps link to theirs.
+    * The page says which app, by which partner, asks to reach what, in words.
+    * A redirect URL the app did not register, or a scope beyond those it registered, is
+      refused before anything is shown.
+    * A merchant not signed in signs in first; the link waits in the tab.
+  * **Approval** (`POST /auth/oauth/authorize`), by the shop's owner or a manager alone:
+    * with the second factor their role needs, and a sign-in within the last 15 minutes
+      (ADR-103), as for making a custom app;
+    * within what their role reaches, a custom role's included (ADR-578); a role that writes a
+      resource reads it too.
+    * Hatti gives a code of 24 random bytes, kept as its digest for ten minutes, and sends the
+      merchant back to the redirect URL with `code`, `shop` and the app's `state`.
+  * **The token:** the app trades the code at `POST /admin/oauth/access_token` with
+    `{ client_id, client_secret, code }`, once, the secret compared in constant time.
+    * It gets `{ access_token, scope }`: a token of the shop's, as a custom app's, with the
+      scopes approved, sent in `X-Hatti-Access-Token`.
+    * Its webhooks are signed with its client secret, kept sealed for the shop and the install.
+    * Installed again, the app's earlier token stops working.
+  * **Unlisted apps** install on their partner's own development stores alone, not yet handed
+    over. Hatti's review lists an app for every shop, or takes it back, with `pnpm --filter
+    @hatti/core partner-apps list | list-app <client id> | unlist <client id>`, never through the
+    Admin API. Shops that installed an app keep it when it is unlisted.
+  * **The shop:** Settings › Apps lists the installed apps, with what each reaches, and
+    uninstalls one, its token stopping at once (`installedApps`, `appUninstall`). They are not
+    counted as custom apps.
+  * **The client:** `@hatti/admin-client` gains `authorizeUrl`, `approvalOf`, which checks the
+    state the merchant comes back with, and `accessTokenFor`.
+* **Consequences:**
+  * A partner builds once and any shop installs, after Hatti's review, with no token passed by
+    hand.
+  * What Hatti checks before listing an app, and the terms partners agree to for their apps,
+    are the owner's to decide (OWN-46).
+  * Not yet:
+    * the billing API, by which an app charges shops in PKR;
+    * an app store page listing apps for merchants to find;
+    * embedded admin apps and theme app extensions (DEV-06);
+    * a token's form-encoded exchange: JSON alone is taken.
+* **Alternatives:**
+  * **Partners' apps as custom apps a merchant pastes a token into:** no consent page and no
+    review; merchants would hand tokens around by hand. Rejected.
+  * **PKCE without a client secret:** for apps with no server. Hatti's apps are server-side, as
+    Shopify's are, and webhooks need a secret the app holds.
+  * **Listing every app at once:** rejected. Merchants would install apps nobody had looked at.

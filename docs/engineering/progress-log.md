@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Public apps through OAuth
+
+* **Developers:** partners register apps that shops install. An owner or a manager approves one
+  on the admin's consent page, within what their role reaches; the app trades the code with its
+  secret for the shop's token. Settings › Apps lists installed apps and uninstalls them. Until
+  Hatti lists an app, it installs on its partner's development stores alone (DEV-05, [ADR-851](../architecture/13-decision-log.md#adr-851--partners-public-apps-are-installed-through-oauth-an-owner-or-a-manager-approves-one-on-the-admins-consent-page-and-the-app-trades-the-code-with-its-secret-for-a-token-of-the-shops-until-hatti-lists-an-app-it-installs-on-its-partners-development-stores-alone)).
+  What Hatti's review checks, and partners' terms for apps, is OWN-46.
+* 4528 tests (13 new).
+
 ### 46e2014 · Developers' tools
 
 * **Developers:** `@hatti/admin-client` is a TypeScript client for the Admin API. It waits out

@@ -75,6 +75,42 @@ hatti theme dev  --theme thm_… --dir my-theme   # push each file as it is save
 The theme shoppers see is changed only with `--allow-live`. The token is read from the
 environment and never written to disk.
 
+## Public apps
+
+A partner (ADR-504) registers an app on their partner page: its address, its redirect URLs and
+the scopes it asks for. Its client ID and secret are shown then, the secret once. Shops install
+it as Shopify's apps are installed (ADR-851):
+
+```ts
+import { accessTokenFor, approvalOf, authorizeUrl } from '@hatti/admin-client';
+
+// 1. Send the merchant to the consent page, with a state of your own.
+const url = authorizeUrl({
+  adminUrl: 'https://admin.hatti.pk',
+  clientId,
+  scopes: ['read_products', 'write_orders'],
+  redirectUri: 'https://your-app.example/callback',
+  state,
+});
+
+// 2. Approved, they come back to the redirect URL with code, shop and state.
+const approval = approvalOf(request.url, state);
+
+// 3. Trade the code, within ten minutes and once, for the shop's token.
+const { accessToken, scopes } = await accessTokenFor({
+  apiUrl: 'https://api.hatti.pk',
+  clientId,
+  clientSecret,
+  code: approval!.code,
+});
+```
+
+* The token is sent in `X-Hatti-Access-Token`, as a custom app's. Webhooks are signed with the
+  app's client secret.
+* Only the shop's owner or a manager installs an app, and gives no more than their role reaches.
+* Until Hatti reviews and lists an app, it installs on its partner's own development stores
+  alone.
+
 ## Trying things safely
 
 * A **development store**, opened by a partner (ADR-504), is closed to shoppers until it is
@@ -87,5 +123,5 @@ environment and never written to disk.
 
 * PHP and Python clients.
 * Publishing the client and the command line to npm (OWN-45).
-* Public apps that shops install through OAuth (DEV-05).
+* The billing API, by which a public app charges shops in PKR, and an app store page.
 * Urdu video tutorials.
