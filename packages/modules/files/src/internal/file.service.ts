@@ -51,7 +51,19 @@ export interface StagedUploadInput {
   mimeType: string;
   /** Bytes, as a decimal string, as Shopify takes it: "123456". */
   fileSize: string;
+  /** What it is for, as Shopify's: a file of the shop's, unless a bulk mutation's variables. */
+  resource?: 'file' | 'bulk_mutation_variables';
 }
+
+/** A bulk mutation's variables (DEV-10, ADR-897): a JSONL file, a line for each run. */
+export const BULK_VARIABLES = {
+  types: ['text/jsonl', 'application/jsonl', 'application/x-ndjson'],
+  /** Bytes, as Shopify's limit. */
+  maxBytes: 20 * 1024 * 1024,
+} as const;
+
+/** Where a shop's bulk mutation variables are staged: a run takes them from there alone. */
+export const bulkVariablesPrefixOf = (shopId: string) => `shops/${shopId}/bulk-variables/`;
 
 /**
  * A file's name or words for what it shows, changed (ADR-638), or what it holds replaced by a
@@ -89,10 +101,28 @@ export class FileService {
     tenant: TenantContext,
     inputs: StagedUploadInput[],
   ): Promise<MutationResult<StagedUpload[]>> {
+    if (
+      inputs.length > 0 &&
+      inputs.every((input) => input.resource === 'bulk_mutation_variables')
+    ) {
+      return this.#stageBulkVariables(tenant, inputs);
+    }
     const check = new InputChecker();
     countOf(check, ['input'], inputs.length);
+    inputs.forEach((input, index) => {
+      if (input.resource === 'bulk_mutation_variables') {
+        check.addMessage(
+          ['input', String(index), 'resource'],
+          'INVALID',
+          "Stage a bulk mutation's variables apart from files",
+        );
+      }
+    });
+    // A bulk mutation's variables among files are said to be, and checked no further.
     const staged = inputs.map((input, index) =>
-      checkStaged(check, ['input', String(index)], input),
+      input.resource === 'bulk_mutation_variables'
+        ? null
+        : checkStaged(check, ['input', String(index)], input),
     );
     if (!check.ok) return fail(check.errors);
     const { swept, uploads } = await this.db.tenant(tenant.shopId, async (tx) => {
@@ -120,6 +150,46 @@ export class FileService {
     });
     await this.#remove(swept);
     return { ok: true, value: uploads };
+  }
+
+  /**
+   * Where to upload bulk mutations' variables (ADR-897): a JSONL file each, under the shop's own
+   * prefix, kept by no file record; `resourceUrl` is the staged upload path a run takes.
+   */
+  #stageBulkVariables(
+    tenant: TenantContext,
+    inputs: StagedUploadInput[],
+  ): MutationResult<StagedUpload[]> {
+    const check = new InputChecker();
+    countOf(check, ['input'], inputs.length);
+    const sizes = inputs.map((input, index) => {
+      const field = ['input', String(index)];
+      if (!(BULK_VARIABLES.types as readonly string[]).includes(input.mimeType.trim())) {
+        check.addMessage([...field, 'mimeType'], 'INVALID', 'Give a JSONL file: text/jsonl');
+      }
+      const size = /^\d{1,12}$/.test(input.fileSize.trim()) ? Number(input.fileSize) : NaN;
+      if (!(size >= 1 && size <= BULK_VARIABLES.maxBytes)) {
+        check.addMessage(
+          [...field, 'fileSize'],
+          'INVALID',
+          `A bulk mutation's variables are 1 byte to ${BULK_VARIABLES.maxBytes / 1024 / 1024} MiB`,
+        );
+      }
+      return size;
+    });
+    if (!check.ok) return fail(check.errors);
+    return {
+      ok: true,
+      value: sizes.map((size) => {
+        const key = `${bulkVariablesPrefixOf(tenant.shopId)}${newId()}.jsonl`;
+        const upload = this.storage.signUpload(
+          key,
+          { contentType: 'text/jsonl', contentLength: size },
+          UPLOAD_SECONDS,
+        );
+        return { ...upload, resourceUrl: key };
+      }),
+    };
   }
 
   /**

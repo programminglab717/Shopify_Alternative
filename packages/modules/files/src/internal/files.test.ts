@@ -10,7 +10,7 @@ import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BrandService, shopLogoOf } from './brand.service.js';
-import { FileService, type StagedUploadInput } from './file.service.js';
+import { FileService, bulkVariablesPrefixOf, type StagedUploadInput } from './file.service.js';
 import { fileVersionOf, keyName, looksLike } from './file-types.js';
 import type { FileRecord } from './records.js';
 import { brands as brandsTable, files as filesTable } from './schema.js';
@@ -122,6 +122,45 @@ describe.skipIf(!server)('FileService', () => {
       await tx.select().from(filesTable).limit(1);
       await tx.select().from(brandsTable).limit(1);
     });
+  });
+
+  it("stages a bulk mutation's variables under the shop's own prefix, kept by no file (ADR-897)", async () => {
+    const [upload] = unwrap(
+      await stage([
+        {
+          filename: 'products.jsonl',
+          mimeType: 'text/jsonl',
+          fileSize: '2048',
+          resource: 'bulk_mutation_variables',
+        },
+      ]),
+    );
+    expect(upload!.resourceUrl).toMatch(
+      new RegExp(`^${bulkVariablesPrefixOf(a.shopId)}[0-9a-f-]{36}\\.jsonl$`),
+    );
+    expect(upload!.method).toBe('PUT');
+    const { rows } = await admin.query('SELECT count(*)::int AS files FROM files.files');
+    expect(rows[0]).toEqual({ files: 0 });
+    const bulk = (mimeType: string, fileSize: string) =>
+      stage([{ filename: 'x.jsonl', mimeType, fileSize, resource: 'bulk_mutation_variables' }]);
+    expect(errorsOf(await bulk('text/csv', '10'))).toEqual([['input.0.mimeType', 'INVALID']]);
+    expect(errorsOf(await bulk('text/jsonl', String(21 * 1024 * 1024)))).toEqual([
+      ['input.0.fileSize', 'INVALID'],
+    ]);
+    // Not among a shop's files.
+    expect(
+      errorsOf(
+        await stage([
+          { filename: 'a.png', mimeType: 'image/png', fileSize: '10' },
+          {
+            filename: 'b.jsonl',
+            mimeType: 'text/jsonl',
+            fileSize: '10',
+            resource: 'bulk_mutation_variables',
+          },
+        ]),
+      ),
+    ).toEqual([['input.1.resource', 'INVALID']]);
   });
 
   /** A file of `owner`'s, uploaded and made: `size` bytes of `type`. */

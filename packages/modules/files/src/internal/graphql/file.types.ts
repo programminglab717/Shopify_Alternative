@@ -7,6 +7,7 @@ import {
   InputType,
   Int,
   ObjectType,
+  registerEnumType,
 } from '@nestjs/graphql';
 
 @ObjectType({
@@ -85,6 +86,25 @@ export class FilesArgs {
   query?: string | null;
 }
 
+export enum StagedUploadTargetGenerateUploadResource {
+  FILE = 'FILE',
+  IMAGE = 'IMAGE',
+  VIDEO = 'VIDEO',
+  BULK_MUTATION_VARIABLES = 'BULK_MUTATION_VARIABLES',
+}
+
+registerEnumType(StagedUploadTargetGenerateUploadResource, {
+  name: 'StagedUploadTargetGenerateUploadResource',
+  description: "What an upload is for, as Shopify's: a file of the shop's, or a bulk mutation's.",
+  valuesMap: {
+    BULK_MUTATION_VARIABLES: {
+      description:
+        "A bulk mutation's variables, a JSONL file to 20 MiB (ADR-897): its resourceUrl is " +
+        "bulkOperationRunMutation's stagedUploadPath.",
+    },
+  },
+});
+
 @InputType({ description: "A file to upload, as Shopify's stagedUploadsCreate takes it." })
 export class StagedUploadInput {
   @Field({ description: 'Its name, up to 255 characters: "Lawn collection.jpg".' })
@@ -99,6 +119,12 @@ export class StagedUploadInput {
 
   @Field({ description: 'Bytes, as a string: "123456". 1 to 20 MiB; a video, to 100 MiB.' })
   fileSize!: string;
+
+  @Field(() => StagedUploadTargetGenerateUploadResource, {
+    nullable: true,
+    description: 'A file of the shop’s unless BULK_MUTATION_VARIABLES.',
+  })
+  resource?: StagedUploadTargetGenerateUploadResource | null;
 }
 
 @ObjectType({ description: 'A header to send with the upload, as given.' })

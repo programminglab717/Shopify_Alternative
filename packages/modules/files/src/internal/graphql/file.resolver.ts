@@ -3,7 +3,9 @@ import {
   PageInfo,
   RequireScopes,
   UserError,
+  accessDenied,
   badUserInput,
+  hasScope,
   decodeCursor,
   encodeCursor,
   pageSize,
@@ -26,6 +28,7 @@ import {
   StagedMediaUploadTarget,
   StagedUploadInput,
   StagedUploadParameter,
+  StagedUploadTargetGenerateUploadResource,
   StagedUploadsCreatePayload,
 } from './file.types.js';
 
@@ -76,12 +79,26 @@ export class FileResolver {
       'Where to upload files, up to 10 at a time, for an hour: PUT each one there, then make ' +
       'files of them with fileCreate.',
   })
-  @RequireScopes('write_files')
+  // Files need write_files; a bulk mutation's variables, the scopes of the mutation they run.
+  @RequireScopes()
   async stagedUploadsCreate(
     @CurrentTenant() tenant: TenantContext,
     @Args('input', { type: () => [StagedUploadInput] }) input: StagedUploadInput[],
   ): Promise<StagedUploadsCreatePayload> {
-    const result = await this.service.stage(tenant, input);
+    const bulk = (each: StagedUploadInput) =>
+      each.resource === StagedUploadTargetGenerateUploadResource.BULK_MUTATION_VARIABLES;
+    if (!input.every(bulk) && !hasScope(tenant, 'write_files')) {
+      throw accessDenied(['write_files']);
+    }
+    const result = await this.service.stage(
+      tenant,
+      input.map((each) => ({
+        filename: each.filename,
+        mimeType: each.mimeType,
+        fileSize: each.fileSize,
+        resource: bulk(each) ? 'bulk_mutation_variables' : 'file',
+      })),
+    );
     return Object.assign(new StagedUploadsCreatePayload(), {
       stagedTargets: result.ok
         ? result.value.map((upload) =>

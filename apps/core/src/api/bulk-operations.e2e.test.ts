@@ -6,7 +6,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestApi, type TestApi } from '../testing/api.js';
-import { pagedQuery } from './bulk-operations.js';
+import { bulkMutation, pagedQuery } from './bulk-operations.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
 const server = testDatabaseServer();
@@ -37,6 +37,31 @@ describe('Bulk queries as each page runs them (DEV-10, ADR-843)', () => {
     ] as const) {
       const refused = pagedQuery(query);
       expect(!refused.ok && refused.message, query).toContain(wrong);
+    }
+  });
+});
+
+describe('Bulk mutations as given (DEV-10, ADR-897)', () => {
+  it('takes one mutation of one field, with variables, and nothing else', () => {
+    expect(
+      bulkMutation(
+        'mutation ($input: ProductCreateInput!) { productCreate(input: $input) { product { id } } }',
+      ),
+    ).toEqual({ ok: true });
+    for (const [mutation, wrong] of [
+      ['{ products { nodes { id } } }', 'Give a mutation'],
+      [
+        'mutation { a: productDelete(id: "1") { deletedProductId } b: productDelete(id: "2") { deletedProductId } }',
+        'one mutation field',
+      ],
+      [
+        'fragment F on Product { id } mutation { productCreate(input: {}) { product { ...F } } }',
+        'without fragments',
+      ],
+      ['mutation {', "doesn't parse"],
+    ] as const) {
+      const refused = bulkMutation(mutation);
+      expect(!refused.ok && refused.message, mutation).toContain(wrong);
     }
   });
 });
@@ -157,6 +182,118 @@ describe.skipIf(!server)('Bulk operations through the Admin API (DEV-10, ADR-843
       },
     ]);
     // Each caller sees their own.
+    expect((await gql(tokens.products, CURRENT)).data?.currentBulkOperation).toBeNull();
+  });
+
+  it('runs a mutation once a line of staged variables, each answer a line with its number (ADR-897)', async () => {
+    const lines = [
+      { input: { title: 'Chunri dupatta' } },
+      'not json',
+      { input: { title: '' } },
+      { input: { title: 'Ajrak shawl' } },
+    ];
+    const body = Buffer.from(
+      lines.map((line) => (typeof line === 'string' ? line : JSON.stringify(line))).join('\n'),
+    );
+    const staged = (
+      await gql(
+        tokens.reader,
+        `mutation ($input: [StagedUploadInput!]!) {
+           stagedUploadsCreate(input: $input) {
+             stagedTargets { url httpMethod parameters { name value } resourceUrl }
+             userErrors { field code message }
+           }
+         }`,
+        {
+          input: [
+            {
+              filename: 'products.jsonl',
+              mimeType: 'text/jsonl',
+              fileSize: String(body.length),
+              resource: 'BULK_MUTATION_VARIABLES',
+            },
+          ],
+        },
+      )
+    ).data?.stagedUploadsCreate;
+    expect(staged.userErrors).toEqual([]);
+    const [target] = staged.stagedTargets;
+    // A reader stages a shop's files no more than before.
+    expect(
+      (
+        await gql(
+          tokens.reader,
+          `mutation { stagedUploadsCreate(input: [{ filename: "a.png", mimeType: "image/png", fileSize: "10" }]) { userErrors { code } } }`,
+        )
+      ).errors?.[0].extensions.code,
+    ).toBe('ACCESS_DENIED');
+
+    const MUTATION =
+      'mutation ($input: ProductCreateInput!) { productCreate(input: $input) { product { title } userErrors { field message } } }';
+    const RUN_MUTATION = `mutation ($mutation: String!, $path: String!) {
+      bulkOperationRunMutation(mutation: $mutation, stagedUploadPath: $path) {
+        bulkOperation { id type status } userErrors { field code message }
+      }
+    }`;
+    // Before the upload, and for another shop's path, it is refused.
+    const notThere = (
+      await gql(tokens.products, RUN_MUTATION, { mutation: MUTATION, path: target.resourceUrl })
+    ).data?.bulkOperationRunMutation;
+    expect(notThere.userErrors[0].message).toBe('Upload the variables to the staged target first');
+    const elsewhere = (
+      await gql(tokens.products, RUN_MUTATION, {
+        mutation: MUTATION,
+        path: `shops/${newId()}/bulk-variables/${newId()}.jsonl`,
+      })
+    ).data?.bulkOperationRunMutation;
+    expect(elsewhere.userErrors[0].message).toMatch(/^Give the resourceUrl/);
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: target.url.replace('http://localhost:4000', ''),
+      payload: body,
+      headers: Object.fromEntries(
+        target.parameters.map((each: { name: string; value: string }) => [each.name, each.value]),
+      ),
+    });
+    expect(put.statusCode).toBeLessThan(300);
+    const started = (
+      await gql(tokens.products, RUN_MUTATION, { mutation: MUTATION, path: target.resourceUrl })
+    ).data?.bulkOperationRunMutation;
+    expect(started).toEqual({
+      bulkOperation: { id: expect.stringMatching(/^bulk_/), type: 'MUTATION', status: 'RUNNING' },
+      userErrors: [],
+    });
+    let done: Json = null;
+    for (let tries = 0; tries < 200 && !done; tries++) {
+      const current = (
+        await gql(
+          tokens.products,
+          '{ currentBulkOperation(type: MUTATION) { type status objectCount url errorCode } }',
+        )
+      ).data?.currentBulkOperation;
+      if (current?.status !== 'RUNNING') done = current;
+      else await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(done).toMatchObject({ type: 'MUTATION', status: 'COMPLETED', objectCount: 4 });
+    const file = await app.inject({
+      method: 'GET',
+      url: new URL(done.url).pathname + new URL(done.url).search,
+    });
+    const answers = file.body
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Json);
+    expect(answers.map((answer) => answer.__lineNumber)).toEqual([0, 1, 2, 3]);
+    expect(answers[0].data.productCreate.product).toEqual({ title: 'Chunri dupatta' });
+    expect(answers[1].errors[0].message).toBe('Line 2 is not a JSON object');
+    expect(answers[2].data.productCreate.userErrors).not.toEqual([]);
+    expect(answers[3].data.productCreate.product).toEqual({ title: 'Ajrak shawl' });
+    // The variables are gone once run; the query's own operation is apart from it.
+    const again = (
+      await gql(tokens.products, RUN_MUTATION, { mutation: MUTATION, path: target.resourceUrl })
+    ).data?.bulkOperationRunMutation;
+    expect(again.userErrors[0].message).toBe('Upload the variables to the staged target first');
     expect((await gql(tokens.products, CURRENT)).data?.currentBulkOperation).toBeNull();
   });
 });

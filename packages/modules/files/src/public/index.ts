@@ -22,9 +22,11 @@ export {
   type StoreExportPayload,
 } from '../internal/events.js';
 export {
+  BULK_VARIABLES,
   FILE_LIMITS,
   FILE_URL_SECONDS,
   FileService,
+  bulkVariablesPrefixOf,
   UPLOAD_SECONDS,
   takeStagedUploadIn,
   type FileCreateInput,

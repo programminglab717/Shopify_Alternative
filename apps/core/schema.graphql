@@ -1756,7 +1756,7 @@ enum BroadcastStatus {
 }
 
 """
-All of one of the shop's lists at once (DEV-10, ADR-843), as Shopify's bulk operations: its nodes in a JSONL file, a line each.
+All of one of the shop's lists at once (DEV-10, ADR-843), as Shopify's bulk operations: its nodes in a JSONL file, a line each; or a mutation run once a line of variables (ADR-897), its answers in a JSONL file, a line each with its __lineNumber.
 """
 type BulkOperation {
   completedAt: DateTime
@@ -1771,10 +1771,13 @@ type BulkOperation {
   fileSize: Int
   id: ID!
 
-  """The nodes written so far."""
+  """The nodes written so far; a mutation's, the lines of variables run."""
   objectCount: Int!
+
+  """The query, or the mutation each line of variables ran."""
   query: String!
   status: BulkOperationStatus!
+  type: BulkOperationType!
 
   """Where the file is, for a week: a line of JSON for each node."""
   url: String
@@ -1790,6 +1793,11 @@ enum BulkOperationStatus {
   COMPLETED
   FAILED
   RUNNING
+}
+
+enum BulkOperationType {
+  MUTATION
+  QUERY
 }
 
 """
@@ -9993,6 +10001,11 @@ type Mutation {
   bulkOperationCancel(id: ID!): BulkOperationPayload!
 
   """
+  Runs a mutation once for each line of a JSONL file of variables, as Shopify's: stage the file with stagedUploadsCreate and resource BULK_MUTATION_VARIABLES, upload it, then give its resourceUrl as stagedUploadPath. It runs in the background, as the caller, in order, each answer a line of the file it writes. One mutation of one field; up to 100,000 lines.
+  """
+  bulkOperationRunMutation(mutation: String!, stagedUploadPath: String!): BulkOperationPayload!
+
+  """
   Runs a query for all of one list in the background, as the caller, a page at a time, writing each node to a JSONL file: one list at its top, with its nodes or edges, and without first, last, after or before. The scopes it needs are the list’s own. Its pages cost nothing of the query budget; one runs at a time for a caller.
   """
   bulkOperationRunQuery(query: String!): BulkOperationPayload!
@@ -17159,8 +17172,13 @@ type Query {
   """
   currencyRates: [CurrencyRate!]!
 
-  """The caller's latest bulk operation: running, or how it ended."""
-  currentBulkOperation: BulkOperation
+  """
+  The caller's latest bulk operation of a type: running, or how it ended.
+  """
+  currentBulkOperation(
+    """QUERY unless given."""
+    type: BulkOperationType
+  ): BulkOperation
 
   """The shop's custom apps, the latest first (DEV-04, ADR-395)."""
   customApps: [CustomApp!]!
@@ -20396,12 +20414,28 @@ input StagedUploadInput {
   image/jpeg, image/png, image/webp, image/gif, application/pdf, or a product's video: video/mp4 or video/quicktime (ADR-258).
   """
   mimeType: String!
+
+  """A file of the shop’s unless BULK_MUTATION_VARIABLES."""
+  resource: StagedUploadTargetGenerateUploadResource
 }
 
 """A header to send with the upload, as given."""
 type StagedUploadParameter {
   name: String!
   value: String!
+}
+
+"""
+What an upload is for, as Shopify's: a file of the shop's, or a bulk mutation's.
+"""
+enum StagedUploadTargetGenerateUploadResource {
+  """
+  A bulk mutation's variables, a JSONL file to 20 MiB (ADR-897): its resourceUrl is bulkOperationRunMutation's stagedUploadPath.
+  """
+  BULK_MUTATION_VARIABLES
+  FILE
+  IMAGE
+  VIDEO
 }
 
 type StagedUploadsCreatePayload {
