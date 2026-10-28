@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### The console's operations
+
+* **Transfers:** shops' transfers into Hatti's bank account are confirmed in the console, for
+  what came, or refused with why ([ADR-879](../architecture/13-decision-log.md#adr-879--the-consoles-operations-shops-transfers-into-hattis-account-confirmed-for-what-came-where-it-was-not-what-was-said-or-refused-with-why-and-the-status-pages-incidents-and-maintenance-posted-and-updated-until-they-end)).
+* **Status page:** incidents and maintenance are posted there and updated until they end.
+* Still commands: partners' reviews and payouts, couriers' city names, and closed shops' purges.
+* 4767 tests (5 new).
+
 ### 9e797e7 · The console's other trust queues
 
 * **Rights:** rights complaints are upheld or dismissed in the console; store owners' answers are

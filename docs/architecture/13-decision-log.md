@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-878 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-879 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -886,6 +886,7 @@
 | 876 | Hatti's console: its own people sign in through Hatti's identity provider with their security keys, to a server of its own that holds the system login the API never does; sessions last a working day, and each thing done is logged before it is done; shops' support requests are its first queue | Accepted |
 | 877 | The console's trust queues: shoppers' reports decided, stores taken down and restored, owners' appeals refused, and shops' verifications decided or taken back, as the agent signed in; a verification's documents linked only when an agent asks, which is logged | Accepted |
 | 878 | The console's other trust queues: rights complaints upheld or dismissed and store owners' answers refused or their listings let go, listings screening held by mistake cleared, signs of scam stores cleared, and shops' SMS sender names approved, refused or taken back | Accepted |
+| 879 | The console's operations: shops' transfers into Hatti's account confirmed, for what came where it was not what was said, or refused with why; and the status page's incidents and maintenance posted and updated until they end | Accepted |
 
 ---
 
@@ -29146,3 +29147,22 @@
     Hatti.
   * Shops' billing transfers, partners' reviews, the status page and couriers' city names are
     still commands, and come to the console next.
+
+## ADR-879 · The console's operations: shops' transfers into Hatti's account confirmed, for what came where it was not what was said, or refused with why; and the status page's incidents and maintenance posted and updated until they end
+
+* **Context:** `billing-transfers` (ADR-254) and `status-incidents` (ADR-498) were commands,
+  each naming who acted by `--by`.
+* **Decision:** the console takes them over, each action the signed-in agent's and logged before
+  it is done.
+  * **Transfers to Hatti:** those waiting, the oldest first, each with its shop, invoice, amount
+    and the reference the owner gave, to find in Hatti's bank account.
+    * Confirmed, with what came where it was not what was said: the invoice is paid, waits for
+      the rest, or was paid otherwise already.
+    * Refused with why, which the shop's owner is told.
+  * **Status page:** incidents as they begin, and maintenance ahead with its times, which Hatti's
+    people type in Pakistan's time. Each says what it touches and how badly, with a title and
+    words in English and, optionally, Urdu.
+    * Updates move it through its statuses, and the last one ends it.
+    * The status page and every shop's admin show it at once, as they did.
+* **Consequences:** the console covers every queue of Hatti's people but partners' reviews and
+  payouts, couriers' city names and closed shops' purges, which stay commands for now.
