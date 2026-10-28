@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### The Storefront API
+### 9454f9b · The Storefront API
 
 * **Developers:** each shop answers Shopify's Storefront API at `/api/<version>/graphql.json`,
   with tokens it makes on Settings › Apps, public or private. It covers the shop, its products,
