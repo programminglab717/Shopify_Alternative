@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Signs of scam stores
+### 8b34552 · Signs of scam stores
 
 * **Trust:** the worker looks across stores four times a day for young stores keeping paid orders
   unshipped, catalogues copied from older stores, and names that read as verified stores'; Hatti's
