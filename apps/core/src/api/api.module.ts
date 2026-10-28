@@ -88,6 +88,7 @@ import { OrderEventResolver } from './order-event.resolver.js';
 import { InventoryFileResolver } from './inventory-file.resolver.js';
 import { BroadcastEstimateResolver } from './broadcast-estimate.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
+import { BulkOperationsResolver, BulkOperationsService } from './bulk-operations.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { BlogsFromShopifyResolver } from './blogs-from-shopify.resolver.js';
 import { MetafieldsFromShopifyResolver } from './metafields-from-shopify.resolver.js';
@@ -294,8 +295,9 @@ function formatErrors(maskInternalErrors: boolean): MercuriusDriverConfig['error
           extensions: { code: 'BAD_REQUEST' },
         });
       }
-      const requestId = context.reply.request.id;
-      context.reply.log.error({ err: original, path: error.path, requestId }, 'resolver failed');
+      // A bulk operation's page, which the API runs itself, has no request (ADR-843).
+      const requestId = context.reply?.request.id;
+      context.reply?.log.error({ err: original, path: error.path, requestId }, 'resolver failed');
       return new GraphQLError(maskInternalErrors ? 'Internal error' : error.message, {
         nodes: error.nodes,
         path: error.path,
@@ -304,7 +306,7 @@ function formatErrors(maskInternalErrors: boolean): MercuriusDriverConfig['error
     });
     const formatted = mercurius.defaultErrorFormatter({ ...execution, errors }, context);
     // A query refused for its cost tells what it would have cost and what is left (ADR-576).
-    const cost = context.reply.request.queryCost;
+    const cost = context.reply?.request.queryCost;
     return cost
       ? { ...formatted, response: { ...formatted.response, extensions: { cost } } }
       : formatted;
@@ -404,6 +406,9 @@ export class ApiModule {
         DiscountsFromShopifyResolver,
         { provide: ShopifyStores, useValue: options.shopifyStores ?? new ShopifyStores() },
         ProductsExportResolver,
+        // All of a list at once, to a file (ADR-843).
+        BulkOperationsService,
+        BulkOperationsResolver,
         BroadcastEstimateResolver,
         InventoryFileResolver,
         HomeResolver,

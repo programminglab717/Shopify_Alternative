@@ -154,6 +154,8 @@ export const ID_PREFIXES = {
   riderHandover: 'rhnd',
   // A push campaign a shop sends to shoppers' browsers (ADR-834).
   pushCampaign: 'pcmp',
+  // A bulk operation's run of a list to a file (ADR-843).
+  bulkOperation: 'bulk',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

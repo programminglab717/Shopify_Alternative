@@ -124,7 +124,9 @@ export function queryCostHooks(
   return {
     async preExecution(schema, document, context, variables) {
       const tenant = (context as CostContext).tenant;
-      if (!tenant) return;
+      // A bulk operation's pages, run by the API itself without a request, aren't metered
+      // (ADR-843).
+      if (!tenant || !context.reply) return;
       const request = context.reply.request;
       const operation = { schema, document, variables, operationName: operationNameOf(request) };
       let requested: number;
@@ -176,7 +178,7 @@ export function queryCostHooks(
 
     async onResolution(execution, context) {
       const run = runs.get(context);
-      const cost = context.reply.request.queryCost;
+      const cost = context.reply?.request.queryCost;
       if (!run || !cost) return;
       const requested = cost.requestedQueryCost;
       let actual = requested;
