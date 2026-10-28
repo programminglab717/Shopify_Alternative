@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-889 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-890 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -897,6 +897,7 @@
 | 887 | Customers by how recently and often they buy: RFM on a grid of three by three, by the days since their last order against two lines the shop picks and by their delivered orders, each group a segment's query | Accepted |
 | 888 | Payment terms for wholesale customers: an order paid by transfer within 1 to 120 days ships without waiting for the money, owed until paid and overdue past its date, its terms from the draft or the customer's price list | Accepted |
 | 889 | An age gate: a shop selling what is only for adults asks each visitor to confirm an age from 13 to 25 before its pages show, in the browser, the answer kept a month | Accepted |
+| 890 | The Storefront API serves the shop's menus, pages, blogs, articles and policies, as Shopify's names and shapes them, from its storefront documents | Accepted |
 
 ---
 
@@ -29503,3 +29504,26 @@
     is for a partner, should a shop's goods ever need it.
   * Search engines' crawlers that run scripts see the gate as visitors do; a shop selling
     adult-only goods expects that.
+
+## ADR-890 · The Storefront API serves the shop's menus, pages, blogs, articles and policies, as Shopify's names and shapes them, from its storefront documents
+
+* **Context:** ADR-848's Storefront API served the shop, its products, collections and carts.
+  It left menus, pages and articles for later. A headless storefront (ADR-869) or a shopping
+  app needs them too: the header's menu, the returns page, the blog, the privacy policy.
+* **Decision:**
+  * **Queries,** as Shopify's Storefront API names them:
+    * `menu(handle)`: its items' titles, types and URLs, with the items under them. A link to
+      the storefront is made absolute, for an app that is not on it.
+    * `page(id | handle)` and `pages`: body as HTML, a plain summary, SEO and its address.
+    * `blog(id | handle)` with `articles` (the latest first) and `articleByHandle`; and `blogs`.
+    * `articles`: every blog's, by blog handle and article handle. Each gives its content,
+      excerpt, author, tags, image, SEO and blog.
+    * `shop.privacyPolicy`, `refundPolicy`, `shippingPolicy` and `termsOfService`, null where
+      the shop has none.
+  * **Read from the shop's storefront documents,** as its pages are. Nothing new is published,
+    and the tokens and limits are the API's own (ADR-848).
+  * **Lists** go a page at a time, by handle, as collections do.
+* **Consequences:**
+  * The headless starter can build a whole store, not only its catalog.
+  * Still not done (ADR-848): customer accounts, `@inContext` for Urdu, metafields, and
+    cost-based limits with persisted queries.
