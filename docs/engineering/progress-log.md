@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
+### Receipts for transfers, read by the AI
+
+* **Payments:** staff have a customer's receipt read by the AI, the receipt alone sent. They see
+  what it says beside Hatti's checks: the amount against what the order waited for, the account
+  it went to, a reference on another order, and a day before the order. They still mark the
+  order paid themselves (PAY-08, [ADR-845](../architecture/13-decision-log.md#adr-845--staff-have-a-customers-receipt-for-their-transfer-read-by-the-ai-the-receipt-alone-sent-and-see-what-it-says-beside-what-hatti-makes-of-it-they-still-mark-the-order-paid-themselves)). Done in code; it reads once the AI is set up (OWN-11).
+* 4469 tests (11 new: 10, and 1 check of the admin's new operation).
+
 ### e260b86 · Questions of the shop's numbers
 
 * **Analytics:** a merchant asks in English, Urdu or Roman Urdu; the AI reads the question alone

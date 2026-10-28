@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-844 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-845 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -852,6 +852,7 @@
 | 842 | Signs of scam stores: the worker looks across stores four times a day for young stores keeping paid orders unshipped, catalogues copied from older stores and names that read as verified stores', for Hatti's people to look into or clear | Accepted |
 | 843 | Bulk operations: bulkOperationRunQuery runs one of the shop's lists a page at a time in the background, as the caller, and writes each node to a JSONL file that a link gives for a week | Accepted |
 | 844 | A merchant asks of their numbers in English, Urdu or Roman Urdu: the AI reads the question alone into one of Hatti's reports, which Hatti runs and shows with what the question was taken to ask | Accepted |
+| 845 | Staff have a customer's receipt for their transfer read by the AI, the receipt alone sent, and see what it says beside what Hatti makes of it; they still mark the order paid themselves | Accepted |
 
 ---
 
@@ -3520,7 +3521,8 @@
   * A receipt's bytes pass through the core, up to 10 MiB each, held in memory while storage
     takes them.
   * Not yet: a list of orders with receipts to check, telling staff when one comes, removing
-    erased receipts' files from storage, and reading receipts with AI (Growth).
+    erased receipts' files from storage, and reading receipts with AI (Growth,
+    since done: ADR-845).
 * **Alternatives:**
   * **A script on the page uploading straight to storage:** the page runs none, and works on
     any phone without.
@@ -27558,3 +27560,55 @@
   * A question no report answers ("which customer spends most?") is said so. Reports of customers
     wait for custom reports to have them.
   * The model is the configured one (OWN-11): Anthropic's API, or one that speaks it.
+
+## ADR-845 · Staff have a customer's receipt for their transfer read by the AI, the receipt alone sent, and see what it says beside what Hatti makes of it; they still mark the order paid themselves
+
+* **Context:** PAY-08 asks for the AI to read transfer screenshots, with the merchant
+  confirming. Customers send a receipt for their transfer through their order's page (ADR-080).
+  Staff then read it by eye and look for the money in their bank's app. That is slow when many
+  come in, and a doctored or reused screenshot is easy to miss.
+* **Decision:**
+  * **Staff ask for a receipt to be read:** a "Read with AI" button under each receipt, for
+    those who handle the order's money (`write_orders`). It is not read when it arrives, so no
+    credit is spent unasked.
+  * **The AI sees the receipt alone,** never the order:
+    * a photo or screenshot goes as a JPEG of at most 1,568 pixels a side, turned the way it was
+      taken (`receiptImage`). That keeps a tall phone screenshot's small print readable;
+    * a bank's PDF goes as a document; the gateway now takes PDFs.
+    Through one tool it gives:
+    * the amount, kept in paisa, and only when it is in rupees;
+    * the day the money was sent;
+    * the transaction's reference;
+    * who sent it, and from which bank or wallet;
+    * who it went to, and the account as the receipt shows it.
+    What the receipt doesn't show is left out. A picture that isn't a receipt is said to be one.
+  * **Hatti checks the reading itself** (migration 0360 keeps it on the receipt):
+    * **Amount:** against what the order waited for by transfer when it was read. It matches,
+      is short or is over.
+    * **Account:** the receipt's last four or more digits against the order's account, its
+      IBAN or its Raast ID. With no digits shown, the receipt's name is compared with the
+      account's title. A name alone never says the account differs.
+    * **Reference:** compared by its letters and digits alone, it names the shop's other orders
+      whose receipts carry the same reference: one transfer sent for two orders.
+    * **Date:** a day before the order was placed, in Pakistan's time, is flagged.
+  * **A reading never marks an order paid.** The order's page shows it with "check it in your
+    bank before you mark the order paid", and staff mark it paid as before.
+  * **Credits:** each reading spends one AI credit (ADR-533), a new `transfer_receipt` use.
+    * A receipt read once isn't read again, and asking again costs nothing.
+    * A failed reading spends nothing and may be tried again.
+    * Without credits, or without the AI set up (OWN-11), nothing is read and the button isn't
+      shown.
+  * **API:** `transferReceiptRead`, and `readable` and `reading` on `TransferReceipt`.
+* **Consequences:**
+  * Staff still confirm the money in their bank. Hatti has no feed of the shop's account to
+    check the reading against.
+  * The receipt's own words reach the model as data, never as instructions. Whatever the model
+    reads, Hatti does the checks and staff decide.
+  * Erasing the customer takes the reading with the receipt's record (ADR-080).
+  * Not yet: reading each receipt as it arrives, as a shop's setting; telling staff of a
+    mismatch on WhatsApp (ADR-247).
+* **Alternatives:**
+  * **Giving the model the order to compare:** rejected. The model would judge a payment it
+    can't see, and the receipt's text could talk it round. The comparison is Hatti's own code.
+  * **Marking the order paid when everything matches:** rejected. A screenshot is not money in
+    the bank.
