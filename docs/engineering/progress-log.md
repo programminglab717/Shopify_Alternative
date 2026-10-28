@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-28
 
-### Suppliers' lead times
+### 8b23141 · Suppliers' lead times
 
 * **A supplier's days to deliver** are kept, 0 to 180 ([ADR-892](../architecture/13-decision-log.md#adr-892--a-suppliers-lead-time-the-days-it-takes-to-deliver-which-a-reorder-covers-as-well-as-the-days-chosen-and-from-which-its-goods-are-expected)).
 * **A reorder** is suggested for them as well as the days chosen, and its goods are expected
