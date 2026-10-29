@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Theme experiments of several drafts
+### 0daa026 · Theme experiments of several drafts
 
 * **A theme experiment may show up to three drafts**, each its own share of shoppers, each
   compared with the live theme at a confidence split among them; any selling clearly worse ends
