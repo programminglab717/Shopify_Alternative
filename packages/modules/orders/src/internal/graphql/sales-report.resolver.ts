@@ -92,7 +92,8 @@ export class SalesReportResolver {
     description:
       "Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or " +
       "month by month in the shop's time zone, the products that sold most, and by channel, " +
-      'or by where their last visits came from or their campaigns. Worked out from the orders ' +
+      'by where their last visits came from or their campaigns, or by customer or city ' +
+      '(ADR-909). Worked out from the orders ' +
       'when asked. Its true profit lines are on Growth and bigger plans (ADR-529).',
   })
   @RequireScopes('read_orders')

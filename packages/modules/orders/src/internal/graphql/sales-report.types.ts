@@ -35,6 +35,8 @@ export enum SalesDimension {
   SOURCE = 'SOURCE',
   VISIT_SOURCE = 'VISIT_SOURCE',
   CAMPAIGN = 'CAMPAIGN',
+  CUSTOMER = 'CUSTOMER',
+  CITY = 'CITY',
 }
 
 registerEnumType(SalesDimension, {
@@ -51,6 +53,16 @@ registerEnumType(SalesDimension, {
       description:
         "The campaign of each order's last visit from elsewhere, its utm_campaign, in any " +
         'letter case; orders without one together.',
+    },
+    CUSTOMER: {
+      description:
+        'The customer who placed each order, keyed by their ID and named as their orders were ' +
+        'addressed most, else by their phone; "Customer erased" once erased (ADR-909).',
+    },
+    CITY: {
+      description:
+        'The city each order went to, in any letter case, in the spelling most used; orders ' +
+        'without one together (ADR-909).',
     },
   },
 });
@@ -314,13 +326,16 @@ export class ProductSales {
   costOfGoods!: Money;
 }
 
-@ObjectType({ description: 'What the orders of one channel, source or campaign came to.' })
+@ObjectType({
+  description: 'What the orders of one channel, source, campaign, customer or city came to.',
+})
 export class SalesRow {
   @Field(() => String, {
     nullable: true,
     description:
-      'The OrderSource value, where the visits came from as CustomerVisit.source has it, or the ' +
-      'campaign in the spelling most used; null for orders without a visit, or a campaign.',
+      'The OrderSource value, where the visits came from as CustomerVisit.source has it, the ' +
+      "campaign or city in the spelling most used, or the customer's ID; null for orders without " +
+      'a visit, a campaign or a city.',
   })
   key!: string | null;
 

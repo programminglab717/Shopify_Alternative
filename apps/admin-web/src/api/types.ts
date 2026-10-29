@@ -3563,7 +3563,15 @@ export interface ExportSchedule {
 }
 
 export type CustomReportBreakdown =
-  'DAY' | 'WEEK' | 'MONTH' | 'PRODUCT' | 'SOURCE' | 'VISIT_SOURCE' | 'CAMPAIGN';
+  | 'DAY'
+  | 'WEEK'
+  | 'MONTH'
+  | 'PRODUCT'
+  | 'SOURCE'
+  | 'VISIT_SOURCE'
+  | 'CAMPAIGN'
+  | 'CUSTOMER'
+  | 'CITY';
 
 export type CustomReportPeriod =
   | 'TODAY'

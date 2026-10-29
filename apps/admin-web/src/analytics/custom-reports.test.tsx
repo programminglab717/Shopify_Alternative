@@ -181,7 +181,11 @@ describe('Custom reports in the admin (ANL-06, ADR-819)', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Best sellers' } });
     // Profit's lines say which plans have them.
     expect(await screen.findByLabelText('Profit (Growth and bigger plans)')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Rows'), { target: { value: 'PRODUCT' } });
+    // Rows may be by customer or city too (ADR-909).
+    const rows = screen.getByLabelText('Rows');
+    expect(within(rows).getByRole('option', { name: 'Each customer' })).toBeTruthy();
+    expect(within(rows).getByRole('option', { name: 'Each city' })).toBeTruthy();
+    fireEvent.change(rows, { target: { value: 'PRODUCT' } });
     fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'THIS_MONTH' } });
     // A report of products starts from its own usual columns.
     expect(((await screen.findByLabelText('Units sold')) as HTMLInputElement).checked).toBe(true);

@@ -216,6 +216,21 @@ describe.skipIf(!server)('Custom reports (ANL-06, ADR-817)', () => {
     expect(byChannel.rows).toEqual([
       { key: 'api', label: 'Apps', values: [3, 10_500_00n, 6_900_00n, 0.6571] },
     ]);
+
+    // By city and by customer (ADR-909): the fixture's orders all go to Ayesha in Karachi.
+    const byCity = unwrap(
+      await reports.create(f.a, { ...BY_DAY, name: 'by city', breakdown: 'city' }),
+    );
+    const cities = unwrap(await reports.run(f.a, byCity, true, at, over));
+    expect(cities.rows).toEqual([
+      { key: 'Karachi', label: 'Karachi', values: [10_500_00n, 3, 7_150_00n] },
+    ]);
+    const customers = unwrap(
+      await reports.run(f.a, { ...BY_DAY, breakdown: 'customer' }, true, at, over),
+    );
+    expect(customers.rows.map(({ label, values }) => [label, ...values])).toEqual([
+      ['Ayesha Khan', 10_500_00n, 3, 7_150_00n],
+    ]);
   });
 
   it('exports a report as a workbook of one sheet, its total last', async () => {

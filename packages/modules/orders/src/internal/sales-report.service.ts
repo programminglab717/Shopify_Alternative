@@ -25,10 +25,11 @@ export const SALES_INTERVALS = ['day', 'week', 'month'] as const;
 export type SalesIntervalValue = (typeof SALES_INTERVALS)[number];
 
 /**
- * What a sales report breaks its sales down by: the orders' channels (`source`), or where their
- * last visits from elsewhere came from and their campaigns (ADR-140).
+ * What a sales report breaks its sales down by: the orders' channels (`source`), where their
+ * last visits from elsewhere came from and their campaigns (ADR-140), or their customers and the
+ * cities they went to (ADR-909).
  */
-export const SALES_DIMENSIONS = ['source', 'visit_source', 'campaign'] as const;
+export const SALES_DIMENSIONS = ['source', 'visit_source', 'campaign', 'customer', 'city'] as const;
 export type SalesDimension = (typeof SALES_DIMENSIONS)[number];
 
 export interface SalesReportInput {
@@ -176,7 +177,22 @@ const SALES_GROUPS: Readonly<Record<SalesDimension, { key: SQL; title: SQL }>> =
   visit_source: { key: VISIT_SOURCE_SQL, title: VISIT_SOURCE_SQL },
   // Campaigns in any letter case are one, as COD health has them.
   campaign: { key: sql`lower(${VISIT_CAMPAIGN_SQL})`, title: VISIT_CAMPAIGN_SQL },
+  // A customer by the name their orders went to most, else their phone; neither once erased.
+  customer: {
+    key: sql`o.customer_id::text`,
+    title: sql`coalesce(nullif(btrim(o.shipping_address ->> 'name'), ''), o.phone)`,
+  },
+  // Cities in any letter case are one, as COD health has them; erasing keeps an order's city.
+  city: {
+    key: sql`lower(nullif(btrim(o.shipping_address ->> 'city'), ''))`,
+    title: sql`nullif(btrim(o.shipping_address ->> 'city'), '')`,
+  },
 };
+
+/** A row of a customer whose details were erased. */
+export const ERASED_CUSTOMER = 'Customer erased';
+/** The row of orders without a city, picked up in the shop, say. */
+export const NO_CITY = 'No city';
 
 type ProductRow = {
   product_id: string;
@@ -485,7 +501,16 @@ async function salesRowsIn(
   const group = SALES_GROUPS[by];
   const { rows } = await tx.execute<GroupRow>(sql`
     ${salesWith(shopId, period, group.key, group.title)}
-    SELECT s.key, s.title, ${TALLY_COLUMNS} FROM sales s`);
+    SELECT s.key, s.title, ${TALLY_COLUMNS} FROM sales s
+    ${
+      // A shop's customers and cities run to thousands: only the rows asked for leave the
+      // database, but campaigns' ad spend has to meet them all first.
+      by === 'campaign'
+        ? sql``
+        : sql`ORDER BY s.gross - s.discounts - s.returns + s.shipping + s.fees + s.taxes DESC,
+                       s.orders DESC
+              LIMIT ${first}`
+    }`);
   let tallied = rows.map((row): SalesRow => ({
     ...rowName(by, row),
     ...tallyOfRow(row),
@@ -523,6 +548,12 @@ function rowName(by: SalesDimension, row: GroupRow): Pick<SalesRow, 'key' | 'tit
     case 'campaign':
       return row.key === null
         ? { key: null, title: NO_CAMPAIGN }
+        : { key: row.title ?? row.key, title: row.title ?? row.key };
+    case 'customer':
+      return { key: row.key, title: row.title ?? ERASED_CUSTOMER };
+    case 'city':
+      return row.key === null
+        ? { key: null, title: NO_CITY }
         : { key: row.title ?? row.key, title: row.title ?? row.key };
   }
 }

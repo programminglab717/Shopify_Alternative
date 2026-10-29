@@ -29,8 +29,9 @@ const SYSTEM =
   "You read a Pakistani online shop owner's question about their own shop's numbers into a " +
   'report that answers it. Questions come in English, Urdu or Roman Urdu. Choose the report ' +
   "through the tool, from its lists alone. Rows are by 'day', 'week' or 'month' over time, by " +
-  "'product', or by 'source' (sales channel), 'visit_source' or 'campaign'. Choose the fewest " +
-  'columns that answer it, the one asked for first. Take periods as the owner means them: ' +
+  "'product', by 'source' (sales channel), 'visit_source' or 'campaign', or by 'customer' or " +
+  "'city' (where orders went). Choose the fewest columns that answer it, the one asked for " +
+  'first. Take periods as the owner means them: ' +
   "'aaj' is today, 'kal' yesterday, 'pichle hafte' last week, 'is mahine' this month. A question " +
   "that isn't about the shop's sales, orders, products, profit or visits, or that no report of " +
   "the lists answers, isn't answerable: say why in a short sentence in the question's language. " +

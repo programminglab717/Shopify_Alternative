@@ -51,6 +51,8 @@ export const BREAKDOWNS: readonly CustomReportBreakdown[] = [
   'SOURCE',
   'VISIT_SOURCE',
   'CAMPAIGN',
+  'CUSTOMER',
+  'CITY',
 ];
 
 export const PERIODS: readonly CustomReportPeriod[] = [

@@ -16,7 +16,7 @@ import {
 } from './sales-report.service.js';
 import { estimateParcelChargesIn } from './parcel-estimates.js';
 import { SalesReportExportService, periodLabel } from './sales-report-export.js';
-import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
+import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
 
@@ -498,6 +498,92 @@ describe.skipIf(!server)('SalesReportService', () => {
     const report = unwrap(await sales.report(f.a, days({ by: 'visit_source' })));
     expect(totalSales(report.totals)).toBe(16_000_00n);
     expect(unwrap(await sales.report(f.a, days())).rows).toEqual([]);
+  });
+
+  it('breaks sales down by customer and by the city orders went to (ADR-909)', async () => {
+    const to = (name: string, phone: string, city: string) => ({
+      shippingAddress: { ...ADDRESS, name, phone, city },
+    });
+    const customerOf = async (id: string) =>
+      (
+        await f.admin.query<{ customer_id: string }>(
+          'SELECT customer_id FROM orders.orders WHERE id = $1',
+          [id],
+        )
+      ).rows[0]!.customer_id;
+    // Ayesha's two kurtas to Karachi; Bilal's shawl to Lahore and a kurta to "lahore"; Sana's
+    // kurta to Lahore; Zara's to no city given; and Ayesha's shawl, cancelled.
+    const ayesha = await placedAt(
+      '2026-09-29T05:00:00Z',
+      [kurta, kurta],
+      to('Ayesha Khan', '0300-1234567', 'khi'),
+    );
+    const bilal = await placedAt(
+      '2026-09-29T06:00:00Z',
+      [shawl],
+      to('Bilal Ahmed', '0321-7654321', 'Lahore'),
+    );
+    await placedAt('2026-09-29T07:00:00Z', [kurta], to('Bilal Ahmed', '0321-7654321', 'lahore'));
+    const sana = await placedAt(
+      '2026-09-29T08:00:00Z',
+      [kurta],
+      to('Sana Malik', '0333-1112223', 'Lahore'),
+    );
+    const zara = await placedAt(
+      '2026-09-29T09:00:00Z',
+      [kurta],
+      to('Zara Hussain', '0345-9998887', 'Multan'),
+    );
+    await f.admin.query(
+      `UPDATE orders.orders SET shipping_address = shipping_address || '{"city": " "}'
+        WHERE id = $1`,
+      [zara.id],
+    );
+    const cancelled = await placedAt(
+      '2026-09-29T10:00:00Z',
+      [shawl],
+      to('Ayesha Khan', '0300-1234567', 'khi'),
+    );
+    unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
+    const [ayeshaId, bilalId, sanaId, zaraId] = await Promise.all(
+      [ayesha, bilal, sana, zara].map((order) => customerOf(order.id)),
+    );
+
+    const rows = async (by: SalesReportInput['by'], first?: number) =>
+      unwrap(await sales.report(f.a, days({ by, first }))).rows.map((row) => [
+        row.key,
+        row.title,
+        row.orders,
+        totalSales(row),
+      ]);
+    expect(await rows('customer')).toEqual([
+      [bilalId, 'Bilal Ahmed', 2, 7_000_00n],
+      [ayeshaId, 'Ayesha Khan', 1, 4_000_00n],
+      [sanaId, 'Sana Malik', 1, 2_000_00n],
+      [zaraId, 'Zara Hussain', 1, 2_000_00n],
+    ]);
+    expect(await rows('customer', 1)).toEqual([[bilalId, 'Bilal Ahmed', 2, 7_000_00n]]);
+    // Typed two ways, a city goes by the way most orders have it.
+    expect(await rows('city')).toEqual([
+      ['Lahore', 'Lahore', 3, 9_000_00n],
+      ['Karachi', 'Karachi', 1, 4_000_00n],
+      [null, 'No city', 1, 2_000_00n],
+    ]);
+
+    // Erased, a customer's orders keep their sales and city, but not their name or phone.
+    await f.admin.query(
+      `UPDATE orders.orders
+          SET phone = NULL, customer_erased_at = now(),
+              shipping_address = shipping_address || '{"name": null}'
+        WHERE customer_id = $1`,
+      [sanaId],
+    );
+    expect((await rows('customer')).find((row) => row[0] === sanaId)).toEqual([
+      sanaId,
+      'Customer erased',
+      1,
+      2_000_00n,
+    ]);
   });
 
   it('takes what the shop spent on its ads off what the orders made, day by day and by campaign (ADR-553)', async () => {

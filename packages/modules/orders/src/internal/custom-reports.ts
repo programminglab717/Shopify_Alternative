@@ -49,6 +49,8 @@ export const REPORT_BREAKDOWNS = [
   'source',
   'visit_source',
   'campaign',
+  'customer',
+  'city',
 ] as const;
 export type ReportBreakdown = (typeof REPORT_BREAKDOWNS)[number];
 
@@ -84,7 +86,7 @@ interface ColumnDefinition<T> {
   value: (row: T) => ReportValue;
 }
 
-/** The columns of a report of sales by period, channel, visit source or campaign. */
+/** The columns of a report of sales by period, channel, visit source, campaign, customer or city. */
 export const SALES_REPORT_COLUMNS: Readonly<Record<string, ColumnDefinition<SalesTally>>> = {
   orders: { title: 'Orders', kind: 'number', value: (t) => t.orders },
   gross_sales: { title: 'Gross sales', kind: 'amount', value: (t) => t.grossSales },
@@ -170,7 +172,7 @@ export interface CustomReportColumn {
 }
 
 export interface CustomReportRow {
-  /** The product's ID, the channel or the visit source as the report keys them; null by period. */
+  /** The product's ID, the channel, visit source, customer's ID or city as the report keys them; null by period. */
   key: string | null;
   /** "2026-10-01" for a day or a week from it, "2026-10" for a month; else the row's name. */
   label: string;
@@ -579,6 +581,8 @@ const BREAKDOWN_HEADERS: Record<ReportBreakdown, string> = {
   source: 'Channel',
   visit_source: 'Visit source',
   campaign: 'Campaign',
+  customer: 'Customer',
+  city: 'City',
 };
 
 /** A report's rows as a workbook of one sheet named for it. */

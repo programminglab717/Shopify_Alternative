@@ -4461,6 +4461,12 @@ enum CustomReportBreakdown {
   """The campaign of each order's last visit from elsewhere."""
   CAMPAIGN
 
+  """The 250 cities orders went to most, their sales first (ADR-909)."""
+  CITY
+
+  """The 250 customers who bought most, their sales first (ADR-909)."""
+  CUSTOMER
+
   """Each day, in the shop's time zone."""
   DAY
 
@@ -4570,7 +4576,7 @@ type CustomReportResult {
 """A row of a custom report's."""
 type CustomReportRow {
   """
-  The product's ID, the channel as OrderSource names it, or the visit source or campaign as the sales report keys them; null by day, week or month.
+  The product's ID, the channel as OrderSource names it, or the visit source, campaign, customer's ID or city as the sales report keys them; null by day, week or month.
   """
   key: String
 
@@ -18136,7 +18142,7 @@ type Query {
   rolePresets: [RolePreset!]!
 
   """
-  Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, the products that sold most, and by channel, or by where their last visits came from or their campaigns. Worked out from the orders when asked. Its true profit lines are on Growth and bigger plans (ADR-529).
+  Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, the products that sold most, and by channel, by where their last visits came from or their campaigns, or by customer or city (ADR-909). Worked out from the orders when asked. Its true profit lines are on Growth and bigger plans (ADR-529).
   """
   salesReport(
     """What to break the sales down by. Without it, `rows` is empty."""
@@ -19324,6 +19330,16 @@ enum SalesDimension {
   """
   CAMPAIGN
 
+  """
+  The city each order went to, in any letter case, in the spelling most used; orders without one together (ADR-909).
+  """
+  CITY
+
+  """
+  The customer who placed each order, keyed by their ID and named as their orders were addressed most, else by their phone; "Customer erased" once erased (ADR-909).
+  """
+  CUSTOMER
+
   """The channel each order came through, as OrderSource says."""
   SOURCE
 
@@ -19384,10 +19400,12 @@ type SalesReportExportPayload {
   userErrors: [UserError!]!
 }
 
-"""What the orders of one channel, source or campaign came to."""
+"""
+What the orders of one channel, source, campaign, customer or city came to.
+"""
 type SalesRow {
   """
-  The OrderSource value, where the visits came from as CustomerVisit.source has it, or the campaign in the spelling most used; null for orders without a visit, or a campaign.
+  The OrderSource value, where the visits came from as CustomerVisit.source has it, the campaign or city in the spelling most used, or the customer's ID; null for orders without a visit, a campaign or a city.
   """
   key: String
   sales: Sales!
