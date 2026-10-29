@@ -37,7 +37,12 @@ export function ExpertProfile() {
   const queryClient = useQueryClient();
   const profile = useQuery({
     queryKey: KEY,
-    queryFn: () => store.auth<{ expert: Expert | null }>('/auth/partner/expert'),
+    queryFn: () =>
+      store.auth<{
+        expert: Expert | null;
+        /** What the shops that hired them said (ADR-917); absent from older cores. */
+        reviews?: { shopName: string; rating: number; body: string; updatedAt: string }[];
+      }>('/auth/partner/expert'),
   });
   const enquiries = useQuery({
     queryKey: ['partner', 'enquiries'],
@@ -60,6 +65,27 @@ export function ExpertProfile() {
           expert={expert}
           onSaved={() => void queryClient.invalidateQueries({ queryKey: KEY })}
         />
+      )}
+      {(profile.data?.reviews ?? []).length > 0 && (
+        <>
+          <h3 className="pt-2 font-semibold">{t('expertProfile.reviews')}</h3>
+          <ul className="flex flex-col gap-2">
+            {profile.data!.reviews!.map((review) => (
+              <li key={`${review.shopName}-${review.updatedAt}`}>
+                <Card className="flex flex-col gap-1 p-3">
+                  <span className="font-medium" dir="auto">
+                    {t('expertProfile.review', { shop: review.shopName, rating: review.rating })}
+                  </span>
+                  {review.body && (
+                    <p className="whitespace-pre-line" dir="auto">
+                      {review.body}
+                    </p>
+                  )}
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <h3 className="pt-2 font-semibold">{t('expertProfile.enquiries')}</h3>
       {(enquiries.data?.enquiries ?? []).length === 0 ? (

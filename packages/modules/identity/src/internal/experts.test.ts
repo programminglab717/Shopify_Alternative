@@ -193,4 +193,58 @@ describe.skipIf(!server)('Experts shops hire (PRT-03, ADR-855)', () => {
     await experts.review(studio, false);
     expect((await authError(ask(owner))).code).toBe('NOT_FOUND');
   });
+
+  it('takes the reviews of shops that gave the expert access, one a shop, and rates them (ADR-917)', async () => {
+    const lens = await partner('Bilal', 'Shutter Bazaar');
+    await experts.save(lens, {
+      headline: 'Product photos',
+      services: ['photography'],
+      languages: ['en'],
+    });
+    await experts.review(lens, true);
+    // The shop's manager: they hire experts as its owner does.
+    const hirer = await user('Ayesha');
+    await member(hirer, 'manager');
+    const packer = await user('Danish');
+    await member(packer, 'packer');
+    const rate = (who: string, rating: number, body?: string) =>
+      experts.rate(who, { partnerId: lens, shopId: shop, rating, body });
+
+    // Until the shop gave the expert access, it has not hired them.
+    expect(await experts.reviewOfShop(hirer, lens, shop)).toEqual({ allowed: false, review: null });
+    expect((await authError(rate(hirer, 5))).code).toBe('FORBIDDEN');
+    await admin.query(
+      `INSERT INTO identity.access_requests
+              (id, shop_id, user_id, role, access_days, status, expires_at, decided_at)
+       VALUES ($1, $2, $3, 'marketer', 30, 'approved', now() + interval '7 days', now())`,
+      [newId(), shop, lens],
+    );
+    expect(await experts.reviewOfShop(hirer, lens, shop)).toEqual({ allowed: true, review: null });
+    // Owners and managers alone review; from 1 to 5.
+    expect((await authError(rate(packer, 5))).code).toBe('FORBIDDEN');
+    expect((await authError(rate(hirer, 6))).code).toBe('INVALID_INPUT');
+    expect((await authError(rate(hirer, 4, 'x'.repeat(1_001)))).code).toBe('INVALID_INPUT');
+
+    expect(await rate(hirer, 4, '  Sharp photos, a day late. ')).toMatchObject({
+      shopName: 'Zari',
+      rating: 4,
+      body: 'Sharp photos, a day late.',
+    });
+    // Written again, the shop's one review changes.
+    await rate(hirer, 5, 'Sharp photos.');
+    expect(await experts.reviewsOf(lens)).toEqual([
+      { shopName: 'Zari', rating: 5, body: 'Sharp photos.', updatedAt: expect.any(Date) },
+    ]);
+    expect(await experts.reviewOfShop(hirer, lens, shop)).toEqual({
+      allowed: true,
+      review: { rating: 5, body: 'Sharp photos.' },
+    });
+    expect((await experts.profile(lens))!.rating).toEqual({ average: 5, count: 1 });
+    expect(
+      (await experts.directory({ service: 'photography' })).find((each) => each.partnerId === lens)!
+        .rating,
+    ).toEqual({ average: 5, count: 1 });
+    // An expert reviews no one as a shop of theirs, even one they work for.
+    expect((await authError(rate(lens, 5))).code).toBe('FORBIDDEN');
+  });
 });

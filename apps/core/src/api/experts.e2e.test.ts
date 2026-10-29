@@ -131,5 +131,43 @@ describe.skipIf(!server)('Experts shops hire, over /auth (PRT-03)', () => {
         message: 'Forty kurtas to shoot before Eid.',
       }),
     ]);
+
+    // Given access to the shop, the expert is reviewed by it (ADR-917).
+    const reviews = `/auth/experts/${profile.id}/reviews`;
+    const asked = `${reviews}?shopId=${toPublicId('shop', shop)}`;
+    expect((await send('GET', asked, owner.token)).json()).toEqual({
+      reviews: [],
+      shop: { allowed: false, review: null },
+    });
+    await admin.query(
+      `INSERT INTO identity.access_requests
+              (id, shop_id, user_id, role, access_days, status, expires_at, decided_at)
+       VALUES ($1, $2, $3, 'marketer', 30, 'approved', now() + interval '7 days', now())`,
+      [newId(), shop, expert.userId],
+    );
+    const posted = await send('POST', reviews, owner.token, {
+      shopId: toPublicId('shop', shop),
+      rating: 5,
+      body: 'Sharp photos, on time.',
+    });
+    expect(posted.statusCode).toBe(200);
+    expect((await send('GET', asked, owner.token)).json()).toEqual({
+      reviews: [
+        {
+          shopName: 'Zari',
+          rating: 5,
+          body: 'Sharp photos, on time.',
+          updatedAt: expect.any(String),
+        },
+      ],
+      shop: { allowed: true, review: { rating: 5, body: 'Sharp photos, on time.' } },
+    });
+    expect(
+      ((await send('GET', '/auth/experts', owner.token)).json() as Json).experts[0].rating,
+    ).toEqual({ average: 5, count: 1 });
+    // The expert sees it on their own page.
+    expect(
+      ((await send('GET', '/auth/partner/expert', expert.token)).json() as Json).reviews,
+    ).toEqual([expect.objectContaining({ shopName: 'Zari', rating: 5 })]);
   });
 });

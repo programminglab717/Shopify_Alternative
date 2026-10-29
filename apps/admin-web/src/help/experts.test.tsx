@@ -14,6 +14,7 @@ const LENS = {
   languages: ['ur', 'en'],
   startingPrice: 15000,
   listed: true,
+  rating: { average: 4.5, count: 2 },
 };
 
 function core(role: StaffRole) {
@@ -27,6 +28,25 @@ function core(role: StaffRole) {
         return { experts: !service || LENS.services.includes(service) ? [LENS] : [] };
       }
       if (path === '/auth/experts/expt_1/enquiries') return { enquiry: { id: 'q1' } };
+      // Reviews by the shops that hired them (ADR-917): this one gave the expert access.
+      if (path === '/auth/experts/expt_1/reviews?shopId=shop_1') {
+        return {
+          reviews: [
+            {
+              shopName: 'Kapra',
+              rating: 4,
+              body: 'Good light, a day late.',
+              updatedAt: '2026-10-20T09:00:00Z',
+            },
+          ],
+          shop: { allowed: role === 'owner', review: null },
+        };
+      }
+      if (path === '/auth/experts/expt_1/reviews') {
+        return {
+          review: { shopName: 'Zari', rating: 5, body: '', updatedAt: '2026-10-29T09:00:00Z' },
+        };
+      }
       if (path === '/auth/partner/expert') return { expert: null };
       if (path === '/auth/partner/enquiries') {
         return {
@@ -88,6 +108,26 @@ describe('Experts shops hire (PRT-03, ADR-855)', () => {
       service: 'photography',
       message: 'Forty kurtas to shoot before Eid.',
     });
+  });
+
+  it("shows experts' ratings and reviews, and takes the shop's own once it hired them (ADR-917)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/help/experts');
+
+    expect(await screen.findByText('4.5 out of 5, from 2 shops')).toBeTruthy();
+    await press('Reviews of Lens Lahore');
+    const reviews = await screen.findByRole('list', { name: "Shops' reviews of Lens Lahore" });
+    expect(within(reviews).getByText('Kapra')).toBeTruthy();
+    expect(within(reviews).getByText('Good light, a day late.')).toBeTruthy();
+    expect(within(reviews).getByText('4 out of 5')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Your shop's rating"), { target: { value: '5' } });
+    await press('Post your review');
+    expect(await screen.findByText('Thank you: your review is posted.')).toBeTruthy();
+    expect(
+      fake.sent.find((each) => each.operation === '/auth/experts/expt_1/reviews')?.variables,
+    ).toEqual({ shopId: 'shop_1', rating: 5, body: null });
   });
 
   it('leaves contacting experts to owners and managers', async () => {

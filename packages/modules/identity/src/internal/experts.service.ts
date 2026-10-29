@@ -32,6 +32,9 @@ export const EXPERT_LIMITS = {
   /** Enquiries one person sends a day, and to one expert. */
   enquiriesPerDay: 10,
   enquiriesPerExpertPerDay: 1,
+  /** A review's words (ADR-917), and the reviews an expert's page shows. */
+  review: 1000,
+  reviewsShown: 20,
 } as const;
 
 /** The roles that hire experts for a shop: owners and managers. */
@@ -60,6 +63,16 @@ export interface ExpertRecord {
   listed: boolean;
   /** Whether they hold Hatti's certificate, still good (ADR-858). */
   certified: boolean;
+  /** Their shops' ratings out of five (ADR-917): the average to one place; null for none. */
+  rating: { average: number | null; count: number };
+  updatedAt: Date;
+}
+
+/** A shop's review of an expert it hired (ADR-917). */
+export interface ExpertReviewRecord {
+  shopName: string;
+  rating: number;
+  body: string;
   updatedAt: Date;
 }
 
@@ -84,6 +97,8 @@ type ExpertRow = {
   starting_price: string;
   listed_at: Date | string | null;
   certified: boolean;
+  rating_average: string | null;
+  rating_count: number;
   updated_at: Date | string;
 };
 
@@ -91,7 +106,11 @@ const COLUMNS = sql`e.partner_id, p.business_name, p.website, e.headline, e.abou
                     e.cities, e.languages, e.starting_price::text, e.listed_at, e.updated_at,
                     EXISTS (SELECT 1 FROM identity.partner_certificates c
                              WHERE c.partner_id = e.partner_id AND c.expires_at > now())
-                      AS certified`;
+                      AS certified,
+                    (SELECT round(avg(r.rating), 1)::text FROM identity.expert_reviews r
+                      WHERE r.partner_id = e.partner_id) AS rating_average,
+                    (SELECT count(*)::int FROM identity.expert_reviews r
+                      WHERE r.partner_id = e.partner_id) AS rating_count`;
 
 const toRecord = (row: ExpertRow): ExpertRecord => ({
   partnerId: row.partner_id,
@@ -105,6 +124,10 @@ const toRecord = (row: ExpertRow): ExpertRecord => ({
   startingPrice: BigInt(row.starting_price),
   listed: row.listed_at !== null,
   certified: row.certified,
+  rating: {
+    average: row.rating_average === null ? null : Number(row.rating_average),
+    count: row.rating_count,
+  },
   updatedAt: new Date(row.updated_at),
 });
 
@@ -286,6 +309,108 @@ export class ExpertsService {
       message: row.message,
       createdAt: new Date(row.created_at),
     }));
+  }
+
+  /**
+   * The reviews of expert `partnerId`, the latest first, up to {@link EXPERT_LIMITS.reviewsShown}:
+   * each with the shop's name, as shops and the expert read them (ADR-917).
+   */
+  async reviewsOf(partnerId: string): Promise<ExpertReviewRecord[]> {
+    const { rows } = await this.db.execute<{
+      shop_name: string;
+      rating: number;
+      body: string;
+      updated_at: Date | string;
+    }>(sql`
+      SELECT s.name AS shop_name, r.rating, r.body, r.updated_at
+        FROM identity.expert_reviews r
+        JOIN control.shops s ON s.id = r.shop_id
+       WHERE r.partner_id = ${partnerId}
+       ORDER BY r.updated_at DESC, r.shop_id
+       LIMIT ${EXPERT_LIMITS.reviewsShown}`);
+    return rows.map((row) => ({
+      shopName: row.shop_name,
+      rating: row.rating,
+      body: row.body,
+      updatedAt: new Date(row.updated_at),
+    }));
+  }
+
+  /**
+   * Whether the signed-in member may review expert `partnerId` for `shopId`, and the shop's
+   * review if it wrote one: an owner or a manager of a shop that gave the expert access to it
+   * (ADR-488), as having hired them.
+   */
+  async reviewOfShop(
+    userId: string,
+    partnerId: string,
+    shopId: string,
+  ): Promise<{ allowed: boolean; review: { rating: number; body: string } | null }> {
+    const { rows } = await this.db.execute<{
+      role: string;
+      hired: boolean;
+      rating: number | null;
+      body: string | null;
+    }>(sql`
+      SELECT m.role,
+             EXISTS (SELECT 1 FROM identity.access_requests a
+                      WHERE a.shop_id = m.shop_id AND a.user_id = ${partnerId}
+                        AND a.status = 'approved') AS hired,
+             r.rating, r.body
+        FROM identity.memberships m
+        JOIN control.shops s ON s.id = m.shop_id AND s.status = 'active'
+        LEFT JOIN identity.expert_reviews r
+               ON r.partner_id = ${partnerId} AND r.shop_id = m.shop_id
+       WHERE m.user_id = ${userId} AND m.shop_id = ${shopId} AND m.status = 'active'`);
+    const row = rows[0];
+    return {
+      allowed: !!row && HIRERS.has(row.role) && row.hired && partnerId !== userId,
+      review: row && row.rating !== null ? { rating: row.rating, body: row.body ?? '' } : null,
+    };
+  }
+
+  /**
+   * Rates expert `partnerId` out of five for `shopId`, with words of how the work went or none,
+   * by its owner or a manager, the shop having given the expert access to it: once a shop,
+   * written again as it changes its mind.
+   */
+  async rate(
+    userId: string,
+    input: { partnerId: string; shopId: string; rating: number; body?: string | null },
+  ): Promise<ExpertReviewRecord> {
+    const body = input.body?.trim() ?? '';
+    if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+      throw invalid('Rate the expert from 1 to 5');
+    }
+    if (body.length > EXPERT_LIMITS.review) {
+      throw invalid(`Write your review in ${EXPERT_LIMITS.review} characters at most`);
+    }
+    const expert = (await this.#find(sql`e.partner_id = ${input.partnerId}`))[0];
+    if (!expert) throw new AuthError('NOT_FOUND', 404, 'No such expert');
+    if (!(await this.reviewOfShop(userId, input.partnerId, input.shopId)).allowed) {
+      throw new AuthError(
+        'FORBIDDEN',
+        403,
+        "A shop's owner or a manager reviews an expert the shop gave access to",
+      );
+    }
+    const { rows } = await this.db.execute<{ updated_at: Date | string; shop_name: string }>(sql`
+      WITH kept AS (
+        INSERT INTO identity.expert_reviews (partner_id, shop_id, user_id, rating, body)
+        VALUES (${input.partnerId}, ${input.shopId}, ${userId}, ${input.rating}, ${body})
+        ON CONFLICT (partner_id, shop_id) DO UPDATE
+           SET user_id = excluded.user_id, rating = excluded.rating, body = excluded.body,
+               updated_at = now()
+        RETURNING shop_id, updated_at
+      )
+      SELECT kept.updated_at, s.name AS shop_name
+        FROM kept JOIN control.shops s ON s.id = kept.shop_id`);
+    return {
+      shopName: rows[0]!.shop_name,
+      rating: input.rating,
+      body,
+      updatedAt: new Date(rows[0]!.updated_at),
+    };
   }
 
   /** For Hatti's review: every profile, those waiting first. */

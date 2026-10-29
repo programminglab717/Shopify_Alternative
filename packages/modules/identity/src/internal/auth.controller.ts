@@ -25,7 +25,7 @@ import { AuthError } from './errors.js';
 import { PartnerAppsService, type PartnerAppRecord } from './partner-apps.service.js';
 import { PartnerThemesService } from './partner-themes.service.js';
 import { CertificationService, type CertificateRecord } from './certification.service.js';
-import { ExpertsService, type ExpertRecord } from './experts.service.js';
+import { ExpertsService, type ExpertRecord, type ExpertReviewRecord } from './experts.service.js';
 import {
   IdentityService,
   type AuthenticatedSession,
@@ -189,6 +189,12 @@ const enquiryBody = z.object({
   service: z.string().max(40),
   message: z.string().max(4_000),
 });
+const reviewBody = z.object({
+  shopId: z.string().max(100),
+  rating: z.number().int(),
+  body: z.string().max(4_000).nullish(),
+});
+const reviewsQuery = z.object({ shopId: z.string().max(100).optional() });
 const attemptBody = z.object({
   answers: z.record(z.string().max(40), z.number().int().min(0).max(10)),
 });
@@ -284,7 +290,18 @@ function expertJson(expert: ExpertRecord) {
     startingPrice: Number(expert.startingPrice / 100n),
     listed: expert.listed,
     certified: expert.certified,
+    rating: expert.rating,
     updatedAt: expert.updatedAt.toISOString(),
+  };
+}
+
+/** A shop's review of an expert (ADR-917), its date as an ISO string. */
+function reviewJson(review: ExpertReviewRecord) {
+  return {
+    shopName: review.shopName,
+    rating: review.rating,
+    body: review.body,
+    updatedAt: review.updatedAt.toISOString(),
   };
 }
 
@@ -1191,8 +1208,11 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     noStore(reply);
-    const expert = await this.experts.profile((await this.session(request)).userId);
-    return { expert: expert && expertJson(expert) };
+    const { userId } = await this.session(request);
+    const expert = await this.experts.profile(userId);
+    // With what the shops that hired them said (ADR-917).
+    const reviews = expert ? await this.experts.reviewsOf(userId) : [];
+    return { expert: expert && expertJson(expert), reviews: reviews.map(reviewJson) };
   }
 
   /**
@@ -1276,6 +1296,57 @@ export class AuthController {
       message: input.message,
     });
     return { enquiry: { id: sent.id } };
+  }
+
+  /**
+   * An expert's reviews by the shops that hired them (ADR-917), the latest first: `{ reviews }`;
+   * with `?shopId`, whether that shop of the signed-in member's may review them, and its review.
+   */
+  @Get('experts/:id/reviews')
+  async expertReviews(
+    @Param('id') id: string,
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const { userId } = await this.session(request);
+    const partnerId = tryFromPublicId(id, 'expert');
+    if (!partnerId) throw new AuthError('NOT_FOUND', 404, 'No such expert');
+    const { shopId } = parse(reviewsQuery, query);
+    const shop = shopId ? tryFromPublicId(shopId, 'shop') : null;
+    const reviews = await this.experts.reviewsOf(partnerId);
+    return {
+      reviews: reviews.map(reviewJson),
+      shop: shop ? await this.experts.reviewOfShop(userId, partnerId, shop) : null,
+    };
+  }
+
+  /**
+   * Rates an expert for a shop that gave them access, as its owner or a manager: `{ shopId,
+   * rating, body? }`, the rating from 1 to 5. Once a shop; written again, it is changed.
+   */
+  @Post('experts/:id/reviews')
+  @HttpCode(200)
+  async reviewExpert(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const partnerId = tryFromPublicId(id, 'expert');
+    if (!partnerId) throw new AuthError('NOT_FOUND', 404, 'No such expert');
+    const input = parse(reviewBody, body);
+    const shopId = tryFromPublicId(input.shopId, 'shop');
+    if (!shopId) throw new AuthError('NOT_FOUND', 404, 'No such shop');
+    const review = await this.experts.rate((await this.session(request)).userId, {
+      partnerId,
+      shopId,
+      rating: input.rating,
+      body: input.body ?? null,
+    });
+    return { review: reviewJson(review) };
   }
 
   /**

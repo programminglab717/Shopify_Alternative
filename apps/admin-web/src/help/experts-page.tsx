@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Star } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
 import { errorText } from '../i18n/errors';
-import { formatMoney } from '../i18n/format';
+import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { TextArea } from '../products/product-form';
 import { SelectField } from '../settings/settings-form';
-import { useShop } from '../shell/shop-context';
+import { useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -40,6 +40,22 @@ export interface Expert {
   listed: boolean;
   /** Whether they hold Hatti's certificate (ADR-858). */
   certified?: boolean;
+  /** Their shops' ratings out of five (ADR-917). */
+  rating?: { average: number | null; count: number };
+}
+
+/** A shop's review of an expert it hired (ADR-917). */
+interface ExpertReview {
+  shopName: string;
+  rating: number;
+  body: string;
+  updatedAt: string;
+}
+
+interface ExpertReviews {
+  reviews: ExpertReview[];
+  /** Whether this shop may review the expert, having given them access, and its review. */
+  shop: { allowed: boolean; review: { rating: number; body: string } | null } | null;
 }
 
 const serviceKey = (service: string) => `experts.service.${service}` as MessageKey;
@@ -107,6 +123,114 @@ function Enquire({ expert }: { expert: Expert }) {
 }
 
 /**
+ * An expert's reviews by the shops that hired them (ADR-917), the latest first; and this shop's
+ * own, to write or change, where it gave the expert access and the member hires.
+ */
+function Reviews({ expert, hires }: { expert: Expert; hires: boolean }) {
+  const { t, locale } = useLocale();
+  const store = useSessionStore();
+  const shop = useShop();
+  const timezone = useShopTimezone();
+  const query = useQuery({
+    queryKey: ['expertReviews', expert.id, shop.id],
+    queryFn: () =>
+      store.auth<ExpertReviews>(
+        `/auth/experts/${expert.id}/reviews?${new URLSearchParams({ shopId: shop.id })}`,
+      ),
+  });
+  const [rating, setRating] = useState<string | null>(null);
+  const [body, setBody] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  if (query.isPending) return <Loading label={t('state.loading')} />;
+  if (query.isError) return <Alert tone="danger">{errorText(query.error, t)}</Alert>;
+  const { reviews, shop: mine } = query.data;
+  const chosen = rating ?? String(mine?.review?.rating ?? 5);
+  const words = body ?? mine?.review?.body ?? '';
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setProblem(null);
+    setSaved(false);
+    try {
+      await store.auth(`/auth/experts/${expert.id}/reviews`, {
+        body: { shopId: shop.id, rating: Number(chosen), body: words.trim() || null },
+      });
+      setSaved(true);
+      await query.refetch();
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-line pt-3">
+      {reviews.length === 0 ? (
+        <p className="text-secondary">{t('experts.noReviews')}</p>
+      ) : (
+        <ul
+          className="flex flex-col gap-2"
+          aria-label={t('experts.reviewsOf', { name: expert.businessName })}
+        >
+          {reviews.map((review) => (
+            <li key={`${review.shopName}-${review.updatedAt}`} className="flex flex-col gap-1">
+              <span className="flex flex-wrap items-baseline gap-2">
+                <span className="font-medium" dir="auto">
+                  {review.shopName}
+                </span>
+                <span className="num">{t('experts.stars', { rating: review.rating })}</span>
+                <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {formatDate(review.updatedAt, timezone, locale)}
+                </span>
+              </span>
+              {review.body && (
+                <p className="text-secondary" dir="auto">
+                  {review.body}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {hires && mine?.allowed && (
+        <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-3">
+          <SelectField
+            label={t('experts.yourRating')}
+            value={chosen}
+            options={[5, 4, 3, 2, 1].map((each) => ({
+              value: String(each),
+              label: t('experts.stars', { rating: each }),
+            }))}
+            onChange={(value) => {
+              setSaved(false);
+              setRating(value);
+            }}
+          />
+          <TextArea
+            label={t('experts.yourReview')}
+            value={words}
+            onChange={(value) => {
+              setSaved(false);
+              setBody(value);
+            }}
+          />
+          {problem && <Alert tone="danger">{problem}</Alert>}
+          {saved && <Alert tone="success">{t('experts.reviewSaved')}</Alert>}
+          <Button type="submit" busy={busy} className="self-start">
+            {mine.review ? t('experts.changeReview') : t('experts.saveReview')}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/**
  * Experts a shop hires (PRT-03, ADR-855): Hatti's partners who set stores up, design them,
  * photograph products, run ads, move shops from other platforms, build apps or write, each
  * listed after Hatti's look. The owner or a manager sends one an enquiry, which the expert
@@ -118,6 +242,7 @@ export function ExpertsPage() {
   const shop = useShop();
   const [service, setService] = useState('');
   const [city, setCity] = useState('');
+  const [reading, setReading] = useState<string | null>(null);
   const hires = shop.role === 'owner' || shop.role === 'manager';
   const query = useQuery({
     queryKey: ['experts', service, city.trim().toLowerCase()],
@@ -165,6 +290,17 @@ export function ExpertsPage() {
                     : t('experts.ask')}
                 </span>
               </span>
+              {expert.rating && expert.rating.count > 0 && (
+                <span className="inline-flex items-center gap-1 self-start">
+                  <Star aria-hidden className="size-4 text-primary" />
+                  <span className="num">
+                    {t('experts.rating', {
+                      average: expert.rating.average ?? 0,
+                      count: expert.rating.count,
+                    })}
+                  </span>
+                </span>
+              )}
               <p dir="auto">{expert.headline}</p>
               <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                 {expert.services.map((each) => t(serviceKey(each))).join(' · ')}
@@ -196,6 +332,15 @@ export function ExpertsPage() {
                 </a>
               )}
               {hires && <Enquire expert={expert} />}
+              <Button
+                variant="tertiary"
+                className="self-start"
+                aria-expanded={reading === expert.id}
+                onClick={() => setReading(reading === expert.id ? null : expert.id)}
+              >
+                {t('experts.reviews', { name: expert.businessName })}
+              </Button>
+              {reading === expert.id && <Reviews expert={expert} hires={hires} />}
             </Card>
           </li>
         ))}
