@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-947 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-948 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -955,6 +955,7 @@
 | 945 | Customers owing on payment terms are reminded before the due date and once past it, on WhatsApp and by email, with what is left and the order's page | Accepted |
 | 946 | The Storefront API keeps a signed-in shopper's address book, as Shopify's does, through the core's: in Pakistan alone, a landmark besides | Accepted |
 | 947 | The headless starter keeps the shopper's address book: each address to change, deliver to first or take out, and one to add | Accepted |
+| 948 | An expansion store's collections may have a margin of their own over its rate, the first of a product's collections giving it | Accepted |
 
 ---
 
@@ -31001,3 +31002,26 @@
 * **Consequences:**
   * A headless site's shoppers keep their addresses as on the shop's own pages.
   * Not yet: wishlists and data requests on the starter's account page; a package of components.
+
+## ADR-948 · An expansion store's collections may have a margin of their own over its rate, the first of a product's collections giving it
+
+* **Context:** ADR-933 puts an expansion store's copied prices one percent over its rate for
+  every product. Selling abroad doesn't cost the same for everything: freight for a sofa is dearer
+  than for a scarf. ADR-933 left a margin by product or collection for later.
+* **Decision:**
+  * **Up to ten of the shop's collections, in order, may each have a margin** over the store's
+    rate, a whole percent from 0 to 100 (migration 0422, `collection_margins` on the link;
+    `expansionStoreCollectionMarginsSet`).
+  * **A product takes the first of its collections in the list.** Products in none of them take
+    the store's own margin. Smart collections count as manual ones do, their products as they
+    are kept.
+  * **The copier gives the CSV's rescaling a margin by handle**, so that every variant of a
+    product takes the same one. Rounding and costs at the rate alone are as ADR-933 has them.
+  * **Setting them** marks the link's rate changed, so copying as products change copies again
+    within the hour. A collection deleted since is left out, and an unknown one is refused.
+  * **The owner alone, of both shops,** having signed in lately, as for the rest of its pricing.
+  * **Admin:** under each store's pricing, "Margins by collection" lists them, to add, change and
+    take out, each collection once, saved together.
+* **Consequences:**
+  * A shop prices furniture and scarves abroad as each costs it to sell there.
+  * Not yet: a margin for a single product, beyond a collection of one.
