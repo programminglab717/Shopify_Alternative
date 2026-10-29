@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-949 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-950 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -957,6 +957,7 @@
 | 947 | The headless starter keeps the shopper's address book: each address to change, deliver to first or take out, and one to add | Accepted |
 | 948 | An expansion store's collections may have a margin of their own over its rate, the first of a product's collections giving it | Accepted |
 | 949 | Buy buttons may lay a product out across, its photo beside it, and a collection as a list or a carousel | Accepted |
+| 950 | hatti function run --order tries a function on one of the shop's own orders, made into the input checkout would give it | Accepted |
 
 ---
 
@@ -31046,3 +31047,27 @@
 * **Consequences:**
   * A shop's products fit a narrow sidebar or a row across a page as well as a grid.
   * Not yet: a layout per product within a collection.
+
+## ADR-950 · hatti function run --order tries a function on one of the shop's own orders, made into the input checkout would give it
+
+* **Context:** `hatti function run` (ADR-927) runs a function on an input file, the starter's
+  sample cart (ADR-935) to begin with. A function is better tried on what the shop really sells
+  before the shop turns it on. ADR-927 and ADR-935 left an input made from a shop's real cart for
+  later.
+* **Decision:**
+  * **The Admin API's `appFunctionInput(orderId, handle)`** makes one of the shop's orders into the
+    input checkout would give a function had the order's cart been at checkout. It has the order's
+    lines, subtotal, currency, city and province (the province's code, as checkout's form has it).
+    It offers every way to pay checkout may offer, for the function to choose among. Where the
+    calling app's function `handle` is named, it carries that function's settings in the shop.
+  * **Nothing else of the customer's is in it**: no name, number or street. It needs
+    `read_orders`, and is null for an order the shop doesn't have.
+  * **An order rather than a cart:** a cart lives in a shopper's browser, and the Admin API has
+    no way to name one, while an app can list the shop's orders.
+  * **`hatti function run --order <id>`** asks for it with the app's token, builds the function
+    and runs it on that input as checkout would, saying its answer and how long it took.
+    `--save <file>` keeps the input to edit and run again with `--input`.
+* **Consequences:**
+  * A developer tries a function on the shop's real products and cities before it is turned on.
+  * The ways to pay are all of them, not those the shop offers that order: the saved file can be
+    narrowed by hand.
