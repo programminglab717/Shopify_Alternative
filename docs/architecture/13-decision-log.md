@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-914 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-915 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -922,6 +922,7 @@
 | 912 | App Bridge: an app inside the admin asks it, over postMessage, for a fresh session token, a toast, a page of the admin or the save bar, and each answers the other alone | Accepted |
 | 913 | Expansion stores kept in step: products copied as they change, once left alone ten minutes and at most hourly, as the owner of both, failures kept with why | Accepted |
 | 914 | An app is told of its own charges as they are declined or paid, through the APP_PURCHASES_ONE_TIME_UPDATE webhook, as Shopify's apps are | Accepted |
+| 915 | A shop may have each customer's transfer receipt read by the AI as it arrives, a credit each, rather than when staff ask | Accepted |
 
 ---
 
@@ -30211,3 +30212,24 @@
 * **Consequences:**
   * An app unlocks what it charged for the moment the shop pays.
   * Recurring and usage charges are still not done.
+
+## ADR-915 · A shop may have each customer's transfer receipt read by the AI as it arrives, a credit each, rather than when staff ask
+
+* **Context:** ADR-845 reads a receipt only when staff press "Read with AI", so no credit is spent
+  unasked. It left reading each one as it arrives, as a shop's setting. A shop taking many
+  transfers wants each order to show what its receipt says when staff first open it.
+* **Decision:**
+  * **The setting:** "Read each receipt with AI as it arrives", with the shop's bank transfer
+    settings (`readReceipts`, migration 0409). It is audited with them, before and after, and is
+    off until the shop turns it on.
+  * **The worker** hears a receipt arrive: the order's update that names `transferReceipt`.
+    Where the shop has it on and the AI is set up, it reads each of the order's receipts not yet
+    read, as staff asking would.
+  * **Credits are spent as asking spends them**, one a reading. Without credits, a receipt stays
+    unread for staff to ask once there are some. A receipt the AI couldn't read is kept so, and
+    left for staff to try again.
+  * **Nothing else changes.** Hatti still checks the reading itself, and a reading never marks an
+    order paid.
+* **Consequences:**
+  * Staff see what each receipt says, and what doesn't match, when they open the order.
+  * Telling staff of a mismatch on WhatsApp (ADR-247) is still not done.
