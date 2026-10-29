@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-953 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-954 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -961,6 +961,7 @@
 | 951 | The Storefront API keeps a signed-in shopper's wishlist, the products the shop still sells, as their account on the shop's own pages does | Accepted |
 | 952 | A theme experiment's drafts may each have a share of their own, the live theme shown to no fewer shoppers than any | Accepted |
 | 953 | The headless starter keeps the shopper's wishlist: Save for later on each product's page, and a page of what was kept | Accepted |
+| 954 | Overdue payment terms are reminded again each week, four times past the date at most | Accepted |
 
 ---
 
@@ -31135,3 +31136,23 @@
   * A headless site's shoppers keep products for later as on the shop's own pages.
   * Not yet: a product saved before signing in kept in the browser and joined to the account on
     signing in, as the shop's own pages do.
+
+## ADR-954 · Overdue payment terms are reminded again each week, four times past the date at most
+
+* **Context:** ADR-945 reminds a customer owing on payment terms once before the due date and once
+  a day past it, and left reminders repeated while overdue for later. A reseller who let the one
+  reminder pass heard nothing more, and the shop chased them by hand.
+* **Decision:**
+  * **Again each week:** an order still owed past its date is reminded again seven days after the
+    last reminder, four times at most past the date: about three weeks of reminders after the
+    first, and then the shop's own call.
+  * **Migration 0424** lets `terms_reminded` count to 5 (1 the reminder before the date, 2 to 5
+    those after it) and adds `terms_reminded_at`, when the last went. Orders reminded already
+    count their week from the migration. The sweep's partial index is rebuilt for the new count.
+  * **What the customer hears** is the same `payment_terms_overdue` message, with what is left and
+    the order's page. The event carries which reminder it is, and each repeat is sent once: the
+    notification's key names the reminder, so a repeated sweep doesn't send it twice.
+  * Nothing is added to OWN-23: the repeats use the overdue template already there.
+* **Consequences:**
+  * A late reseller is reminded about weekly for a month, without the shop's hand.
+  * Not yet: the shop choosing how often, or how many times.
