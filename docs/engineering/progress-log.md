@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Functions tried on a shop's orders
+### c563fd0 · Functions tried on a shop's orders
 
 * **`hatti function run --order <id>` runs a function on one of the shop's own orders**, made
   into the input checkout would give it; `--save` keeps it ([ADR-950](../architecture/13-decision-log.md#adr-950--hatti-function-run---order-tries-a-function-on-one-of-the-shops-own-orders-made-into-the-input-checkout-would-give-it)).
