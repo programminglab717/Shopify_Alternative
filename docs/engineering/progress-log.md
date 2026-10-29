@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Combined listings in Urdu and in the export
+### 4bf4f10 · Combined listings in Urdu and in the export
 
 * **A combined listing's option and values in Urdu,** kept with the listing and shown on Urdu
   pages ([ADR-902](../architecture/13-decision-log.md#adr-902--a-combined-listings-option-and-values-have-the-shops-urdu-kept-with-the-listing-and-shown-on-urdu-pages-and-the-stores-export-holds-the-listings)).
