@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; combined listings as one card in collections, in Urdu and in the store's export (CAT-23) are built; the Storefront API's `@inContext` for Urdu and metafields (DEV-02) are built; workflows that hold an order for review, run on stock and run on a schedule (MKT-04) are built; wholesale customers' credit limits (CUS-06) are built; the store MCP's policies and delivery tools and a switch to keep agents out (OS-23), reports by customer and by city (ANL-06, ANL-08), custom reports of stock (ANL-06), the support agent's FAQs and product facts (MSG-07), App Bridge (DEV-06), expansion stores kept in step (CH-11), apps told of their charges by webhook (DEV-05), receipts read as they arrive (PAY-08), a shopper's subscriptions on their account (CAT-16), reviews of experts (PRT-03), buy buttons' cart (CH-08), SSO domains proved through DNS (ADM-09), the order page saying payment terms (CUS-06), theme experiments' revenue a session (OS-22) and the CLI's functions (DEV-07) are built; next, the decisions' own gaps that need no partner: the rest of their "not yet" lists. Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; combined listings as one card in collections, in Urdu and in the store's export (CAT-23) are built; the Storefront API's `@inContext` for Urdu and metafields (DEV-02) are built; workflows that hold an order for review, run on stock and run on a schedule (MKT-04) are built; wholesale customers' credit limits (CUS-06) are built; the store MCP's policies and delivery tools and a switch to keep agents out (OS-23), reports by customer and by city (ANL-06, ANL-08), custom reports of stock (ANL-06), the support agent's FAQs and product facts (MSG-07), App Bridge (DEV-06), expansion stores kept in step (CH-11), apps told of their charges by webhook (DEV-05), receipts read as they arrive (PAY-08), a shopper's subscriptions on their account (CAT-16), reviews of experts (PRT-03), buy buttons' cart (CH-08), SSO domains proved through DNS (ADM-09), the order page saying payment terms (CUS-06), theme experiments' revenue a session (OS-22), the CLI's functions (DEV-07) and the support agent's name and tone (MSG-07) are built; next, the decisions' own gaps that need no partner: the rest of their "not yet" lists. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,12 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-29
+
+### The support agent's name and tone
+
+* **A shop names its AI assistant and sets its tone**, warm or formal; the name is given the
+  model as the shop's words, the tone as one of Hatti's own instructions ([ADR-923](../architecture/13-decision-log.md#adr-923--a-shop-names-the-ai-assistant-that-answers-its-customers-and-sets-its-tone-warm-or-formal-the-name-given-the-model-as-the-shops-words-the-tone-as-one-of-hattis-own-instructions)).
+* 4949 tests (5 new).
 
 ### 29a1a70 · The CLI's functions
 
@@ -38,7 +44,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 * **A shop's SSO email domains are proved** by a TXT record of its token; a proved domain is
   one shop's alone and takes its sign-ins ([ADR-919](../architecture/13-decision-log.md#adr-919--a-shops-sso-email-domains-are-proved-its-through-a-txt-record-of-its-token-a-proved-domain-one-shops-alone-taking-every-sign-in-by-email-of-it)).
-* 4938 tests: one new, and the admin's counted as run, one more than recorded.
+* 4938 tests (2 new: the check's admin document is validated against the schema, as each is).
 
 ### 0fbcb3d · Buy buttons' cart
 

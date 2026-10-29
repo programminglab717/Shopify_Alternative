@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-922 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-923 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -930,6 +930,7 @@
 | 920 | An order on payment terms tells its customer, on its page, what they owe by transfer and by which day, or that it was due, and takes their receipt, shipped or not | Accepted |
 | 921 | Theme experiments count each arm's revenue from the orders its sessions place at checkout, once an order, and say by Welch's test whether the draft brings more or less money a session | Accepted |
 | 922 | The command line builds an app's checkout functions with the developer's own tool and deploys them by their handle, from a directory's hatti.function.json | Accepted |
+| 923 | A shop names the AI assistant that answers its customers and sets its tone, warm or formal: the name given the model as the shop's words, the tone as one of Hatti's own instructions | Accepted |
 
 ---
 
@@ -30406,3 +30407,24 @@
     way.
   * Not yet: running a function locally on a sample input (`function run`), and scaffolding a new
     one (`app init`).
+
+## ADR-923 · A shop names the AI assistant that answers its customers and sets its tone, warm or formal: the name given the model as the shop's words, the tone as one of Hatti's own instructions
+
+* **Context:** ADR-849's support agent answers every shop's customers the same way: brief and
+  warm, as a shopkeeper would, nameless. A bridal boutique wants formal Urdu with "aap"; a brand
+  wants its assistant to be "Sana from Zari". ADR-911 left a per-shop tone or name for later.
+* **Decision:**
+  * **The settings** (migration 0412, `supportAgentVoiceSet`): a name of 40 characters at most,
+    or none; and a tone, `warm` (as before) or `formal`. Owners and managers set them under
+    Settings › Messages › AI answers.
+  * **The name is data, never an instruction:** it goes to the model between `<assistant_name>`
+    tags, with `<` and `>` refused when saved and stripped when sent, and the system prompt says
+    to answer as that name and give it when asked who it is.
+  * **The tone picks one of Hatti's own sentences:** formal adds "polite and respectful, 'aap' in
+    Urdu, no slang, jokes or emoji". The shop writes no instruction of its own, so nothing it
+    types can change what the assistant may say or do.
+  * Everything else is as before: the facts it answers from, handing over to staff, the day's
+    limit.
+* **Consequences:**
+  * Each shop's assistant sounds like the shop.
+  * Not yet: voice notes and pictures from customers, which the agent still leaves to staff.
