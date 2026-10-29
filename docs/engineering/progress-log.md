@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The headless starter's accounts
+### b803fe1 · The headless starter's accounts
 
 * **The Next.js starter signs shoppers in with a code sent to their number** and shows their
   orders, each line to buy again, and their store credit ([ADR-944](../architecture/13-decision-log.md#adr-944--the-headless-starter-signs-shoppers-in-with-a-code-sent-to-their-number-and-shows-their-orders-to-buy-again-and-their-store-credit)).
