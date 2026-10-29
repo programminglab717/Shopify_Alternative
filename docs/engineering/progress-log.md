@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Buy buttons' whole collections
+### 7a93b48 · Buy buttons' whole collections
 
 * **A buy button's collection shows twelve products at a time**, Show more giving the next page,
   past its first twelve ([ADR-937](../architecture/13-decision-log.md#adr-937--a-buy-buttons-collection-shows-twelve-products-at-a-time-show-more-giving-the-next-page-past-its-first-twelve)).
