@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Expansion stores' margins by collection
+### 5da3beb · Expansion stores' margins by collection
 
 * **An expansion store's collections may each have a margin over its rate**, the first of a
   product's collections giving it, the rest the store's own ([ADR-948](../architecture/13-decision-log.md#adr-948--an-expansion-stores-collections-may-have-a-margin-of-their-own-over-its-rate-the-first-of-a-products-collections-giving-it)).
