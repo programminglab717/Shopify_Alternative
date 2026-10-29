@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-913 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-914 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -921,6 +921,7 @@
 | 911 | The AI answering customers answers from the shop's own answers to common questions, and from the products a customer asks of: their prices and whether each can be bought now | Accepted |
 | 912 | App Bridge: an app inside the admin asks it, over postMessage, for a fresh session token, a toast, a page of the admin or the save bar, and each answers the other alone | Accepted |
 | 913 | Expansion stores kept in step: products copied as they change, once left alone ten minutes and at most hourly, as the owner of both, failures kept with why | Accepted |
+| 914 | An app is told of its own charges as they are declined or paid, through the APP_PURCHASES_ONE_TIME_UPDATE webhook, as Shopify's apps are | Accepted |
 
 ---
 
@@ -30188,3 +30189,25 @@
   * Products removed here stay there, as with a copy asked for. So do collections and
     metafields, which the product file doesn't carry. Rates from a currency feed, and one page of
     the stores' sales, are still not done.
+
+## ADR-914 · An app is told of its own charges as they are declined or paid, through the APP_PURCHASES_ONE_TIME_UPDATE webhook, as Shopify's apps are
+
+* **Context:** ADR-854 left out a webhook to the app when a charge is paid. An app had to ask
+  `appPurchaseOneTime` until it said `PAID`, after the owner returned to it or later. A shop
+  paying its invoice days on was missed.
+* **Decision:**
+  * **The topic** `app_purchases_one_time/update` (`APP_PURCHASES_ONE_TIME_UPDATE` in the API)
+    tells an app of its own charges. It needs no scope, as `app/uninstalled` does.
+  * **What it says:** the charge's ID and its status, `DECLINED` or `PAID`. It is posted as the
+    owner declines a charge, pays a test charge by approving it, or pays its invoice.
+  * **Who is told:** the app that asked the charge, alone. The charge's event now carries its
+    app, and the webhook fan-out sends a topic of an app's own only to that app's
+    subscriptions, while its access stands.
+  * **Topics' names** are read back from the API's by looking them up, as this topic's resource
+    is three words.
+  * **The token exchange** (ADR-851) said it took JSON alone. It already took a form-encoded
+    body too, through the API's form parser, as OAuth libraries send it. Its test now trades a
+    code that way, and its error names both.
+* **Consequences:**
+  * An app unlocks what it charged for the moment the shop pays.
+  * Recurring and usage charges are still not done.
