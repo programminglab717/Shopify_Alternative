@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The headless starter's address book
+### ef656f4 · The headless starter's address book
 
 * **The Next.js starter keeps the shopper's address book**: each address to change, deliver to
   first or take out, and one to add; an update through the API now clears a field given as null
