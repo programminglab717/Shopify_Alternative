@@ -194,6 +194,28 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       { name: 'Zari Abroad', priceRate: '0.004' },
     ]);
 
+    // A margin over the rate, its prices rounded up to .99 (ADR-933): Rs 2,500 is $10 at the
+    // rate, $11 with 10% over it, and $11.99 shown.
+    const PRICING = `mutation ($shopId: ID!, $margin: Int!, $rounding: String!) {
+      expansionStorePricingSet(shopId: $shopId, marginPercent: $margin, rounding: $rounding) {
+        expansionStore { marginPercent rounding } userErrors { field message } } }`;
+    const pricing = (margin: number, rounding: string) =>
+      value(owner.token, zari, PRICING, { shopId: toPublicId('shop', abroad), margin, rounding });
+    expect((await pricing(150, 'whole')).userErrors).toEqual([
+      { field: ['marginPercent'], message: 'Margin percent must be a whole number from 0 to 100' },
+    ]);
+    expect((await pricing(10, 'cents')).userErrors).toEqual([
+      { field: ['rounding'], message: 'Rounding must be exact, whole or ninety_nine' },
+    ]);
+    expect((await pricing(10, 'ninety_nine')).expansionStore).toEqual({
+      marginPercent: 10,
+      rounding: 'ninety_nine',
+    });
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '11.99', currencyCode: 'USD' } },
+    ]);
+
     // A manager of the shop keeps none of it.
     const manager = await account([[zari, 'manager']]);
     expect(

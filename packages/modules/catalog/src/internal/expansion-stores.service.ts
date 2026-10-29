@@ -1,5 +1,6 @@
 import { failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, toDate } from '@hatti/db';
+import { PRESENTMENT_ROUNDINGS, type PresentmentRounding } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
@@ -7,7 +8,11 @@ import { sql } from 'drizzle-orm';
 // copied from, and the rate a price here is multiplied by there. The core checks the same owner
 // holds both and runs the copy, through the product export and import, a shop at a time.
 
-export const EXPANSION_STORE_LIMITS = { perShop: 5 } as const;
+export const EXPANSION_STORE_LIMITS = {
+  perShop: 5,
+  /** The most a store's prices are put over its rate (ADR-933). */
+  marginPercent: 100,
+} as const;
 
 /**
  * Copying as products change (ADR-913): once the shop's products have been left alone
@@ -38,6 +43,9 @@ export interface ExpansionStoreRecord {
   autoCopy: boolean;
   /** Whether its rate follows the day's rate between the shops' currencies (ADR-929). */
   followRate: boolean;
+  /** What its copied prices are put over its rate, a whole percent, and how rounded (ADR-933). */
+  marginPercent: number;
+  rounding: PresentmentRounding;
   /** Why the last copy as products changed failed, and when; null once one succeeds. */
   copyError: string | null;
   failedAt: Date | null;
@@ -51,13 +59,15 @@ type Row = {
   last_result: ExpansionCopyResult | null;
   auto_copy: boolean;
   follow_rate: boolean;
+  margin_percent: number;
+  rounding: PresentmentRounding;
   copy_error: string | null;
   failed_at: Date | string | null;
   created_at: Date | string;
 };
 
 const COLUMNS = sql`target_shop_id, price_rate::text, synced_at, last_result, auto_copy, follow_rate,
-  copy_error, failed_at, created_at`;
+  margin_percent, rounding, copy_error, failed_at, created_at`;
 
 const toRecord = (row: Row): ExpansionStoreRecord => ({
   targetShopId: row.target_shop_id,
@@ -66,6 +76,8 @@ const toRecord = (row: Row): ExpansionStoreRecord => ({
   lastResult: row.last_result,
   autoCopy: row.auto_copy,
   followRate: row.follow_rate,
+  marginPercent: row.margin_percent,
+  rounding: row.rounding,
   copyError: row.copy_error,
   failedAt: row.failed_at === null ? null : toDate(row.failed_at),
   createdAt: toDate(row.created_at),
@@ -202,6 +214,42 @@ export class ExpansionStoreService {
       tx.execute<Row>(sql`
         UPDATE catalog.expansion_stores
            SET auto_copy = ${enabled}, failed_at = NULL, copy_error = NULL
+         WHERE shop_id = ${tenant.shopId} AND target_shop_id = ${targetShopId}
+        RETURNING ${COLUMNS}`),
+    );
+    return rows[0]
+      ? { ok: true, value: toRecord(rows[0]) }
+      : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store');
+  }
+
+  /**
+   * Puts `targetShopId`'s copied prices `marginPercent` over its rate, 0 to 100, and rounds them
+   * as `rounding` says (ADR-933): changed, copying as products change copies them again.
+   */
+  async setPricing(
+    tenant: TenantContext,
+    targetShopId: string,
+    marginPercent: number,
+    rounding: string,
+  ): Promise<MutationResult<ExpansionStoreRecord>> {
+    const most = EXPANSION_STORE_LIMITS.marginPercent;
+    if (!Number.isInteger(marginPercent) || marginPercent < 0 || marginPercent > most) {
+      return failOne(
+        ['marginPercent'],
+        'INVALID',
+        `Margin percent must be a whole number from 0 to ${most}`,
+      );
+    }
+    if (!(PRESENTMENT_ROUNDINGS as readonly string[]).includes(rounding)) {
+      return failOne(['rounding'], 'INVALID', 'Rounding must be exact, whole or ninety_nine');
+    }
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<Row>(sql`
+        UPDATE catalog.expansion_stores
+           SET rate_changed_at = CASE WHEN margin_percent = ${marginPercent}
+                                       AND rounding = ${rounding}
+                                      THEN rate_changed_at ELSE now() END,
+               margin_percent = ${marginPercent}, rounding = ${rounding}
          WHERE shop_id = ${tenant.shopId} AND target_shop_id = ${targetShopId}
         RETURNING ${COLUMNS}`),
     );

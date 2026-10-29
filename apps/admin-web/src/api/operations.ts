@@ -9944,6 +9944,8 @@ const EXPANSION_STORE = /* GraphQL */ `
     copyError
     copyFailedAt
     followRate
+    marginPercent
+    rounding
   }
 `;
 
@@ -10037,6 +10039,22 @@ export const ExpansionStoreSalesQuery = /* GraphQL */ `
     }
   }
   ${MONEY}
+`;
+
+/** A margin over the rate, and how copied prices are rounded (ADR-933). */
+export const ExpansionStorePricingSetMutation = /* GraphQL */ `
+  mutation ExpansionStorePricingSet($shopId: ID!, $marginPercent: Int!, $rounding: String!) {
+    expansionStorePricingSet(shopId: $shopId, marginPercent: $marginPercent, rounding: $rounding) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
 `;
 
 export const ExpansionStoreRemoveMutation = /* GraphQL */ `

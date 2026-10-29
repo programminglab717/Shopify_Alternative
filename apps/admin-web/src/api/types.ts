@@ -4854,6 +4854,9 @@ export interface ExpansionStore {
   copyFailedAt: string | null;
   /** The price rate follows the day's rate between the currencies (ADR-929). */
   followRate: boolean;
+  /** Copied prices a percent over the rate, and how rounded (ADR-933). */
+  marginPercent: number;
+  rounding: PresentmentRounding;
 }
 
 /** What one of the owner's shops sold in a period (ADR-932). */
@@ -4882,6 +4885,7 @@ export interface ExpansionStorePayloadData {
   expansionStoreCopy?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreAutoCopySet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreFollowRateSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
+  expansionStorePricingSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreRemove?: { userErrors: UserError[] };
 }
 

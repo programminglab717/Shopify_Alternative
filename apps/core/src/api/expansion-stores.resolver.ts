@@ -76,6 +76,18 @@ export class ExpansionStore {
   })
   followRate!: boolean;
 
+  @Field(() => Int, {
+    description: 'What its copied prices are put over its rate, a whole percent (ADR-933).',
+  })
+  marginPercent!: number;
+
+  @Field({
+    description:
+      'How its copied prices are rounded: exact, to the cent; whole, to a whole unit; or ' +
+      'ninety_nine, up to .99 (ADR-933). Costs are copied exact.',
+  })
+  rounding!: string;
+
   @Field(() => String, {
     nullable: true,
     description: 'Why the last copy as products changed failed; null once one succeeds.',
@@ -323,6 +335,31 @@ export class ExpansionStoreResolver {
     return this.#payload(await this.stores.setFollowRate(tenant, target, enabled, rate));
   }
 
+  @Mutation(() => ExpansionStorePayload, {
+    description:
+      "Puts an expansion store's copied prices a percent over its rate, 0 to 100, for what " +
+      'selling abroad costs, and rounds them as its prices are: exact, whole or ninety_nine ' +
+      '(ADR-933). Costs are copied at the rate alone, exact. Copying as products change copies ' +
+      'them again. The owner alone, of both shops, having signed in lately.',
+  })
+  @RequireScopes('write_products')
+  @RequireRecentAuthentication()
+  async expansionStorePricingSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('shopId', { type: () => ID }) shopId: string,
+    @Args('marginPercent', { type: () => Int }) marginPercent: number,
+    @Args('rounding') rounding: string,
+  ): Promise<ExpansionStorePayload> {
+    const actor = owner(tenant);
+    const target = tryFromPublicId(shopId, 'shop');
+    if (!target || !(await this.copier.owns(actor.userId, target))) {
+      return this.#payload(failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+    }
+    return this.#payload(
+      await this.stores.setPricing(tenant, target, marginPercent, rounding.toLowerCase()),
+    );
+  }
+
   async #shown(record: ExpansionStoreRecord): Promise<ExpansionStore> {
     const profile = await this.db.tenant(record.targetShopId, (tx) =>
       shopProfile(tx, record.targetShopId),
@@ -336,6 +373,8 @@ export class ExpansionStoreResolver {
       lastCopy: record.lastResult && Object.assign(new ExpansionCopy(), record.lastResult),
       autoCopy: record.autoCopy,
       followRate: record.followRate,
+      marginPercent: record.marginPercent,
+      rounding: record.rounding,
       copyError: record.copyError,
       copyFailedAt: record.failedAt,
     });

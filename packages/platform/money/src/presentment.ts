@@ -73,12 +73,27 @@ export function presentFromRupees(
   const absolute = negative ? -paisa : paisa;
   // Paisa and cents are both hundredths: the rate's scale is all that differs.
   const scale = 10n ** BigInt(CURRENCIES[currency].exponent);
-  let minor = divideRounded(absolute * RATE_SCALE * scale, rate * 100n, 'half-up');
-  if (minor > 0n && rounding === 'whole') {
-    // A price of something is never shown as nothing.
-    minor = (divideRounded(minor, scale, 'half-up') || 1n) * scale;
-  } else if (minor > 0n && rounding === 'ninety_nine') {
-    minor = divideRounded(minor + 1n, scale, 'ceil') * scale - 1n;
-  }
+  const minor = roundedPrice(
+    divideRounded(absolute * RATE_SCALE * scale, rate * 100n, 'half-up'),
+    rounding,
+    CURRENCIES[currency].exponent,
+  );
   return money(negative ? -minor : minor, currency as CurrencyCode);
+}
+
+/**
+ * A price of `minor` units, of a currency of `exponent` decimals, rounded as asked: a whole unit
+ * half up, never a price of something to nothing, or up to the next .99; exact as it is. As the
+ * storefront shows prices abroad (ADR-865), and an expansion store's copied prices are written
+ * (ADR-933).
+ */
+export function roundedPrice(minor: bigint, rounding: PresentmentRounding, exponent = 2): bigint {
+  const scale = 10n ** BigInt(exponent);
+  if (minor > 0n && rounding === 'whole') {
+    return (divideRounded(minor, scale, 'half-up') || 1n) * scale;
+  }
+  if (minor > 0n && rounding === 'ninety_nine') {
+    return divideRounded(minor + 1n, scale, 'ceil') * scale - 1n;
+  }
+  return minor;
 }

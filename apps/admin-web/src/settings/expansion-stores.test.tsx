@@ -21,6 +21,8 @@ function core(role: StaffRole = 'owner') {
           copyError: null,
           copyFailedAt: null,
           followRate: false,
+          marginPercent: 0,
+          rounding: 'exact',
         };
         stores = [made];
         return { expansionStoreSave: { expansionStore: made, userErrors: [] } };
@@ -49,6 +51,13 @@ function core(role: StaffRole = 'owner') {
           priceRate: variables.enabled ? '0.00357' : each.priceRate,
         }));
         return { expansionStoreFollowRateSet: { expansionStore: stores[0], userErrors: [] } };
+      case 'ExpansionStorePricingSet':
+        stores = stores.map((each) => ({
+          ...each,
+          marginPercent: variables.marginPercent,
+          rounding: variables.rounding,
+        }));
+        return { expansionStorePricingSet: { expansionStore: stores[0], userErrors: [] } };
       case 'ExpansionStoreSales':
         // This shop's sales, and its store's in dollars and at the day's rate in rupees.
         return {
@@ -154,6 +163,16 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
     expect(sentOf(fake, 'ExpansionStoreFollowRateSet')).toEqual([
       { shopId: 'shop_2', enabled: true },
     ]);
+
+    // Its prices 10% over the rate, rounded up to .99 (ADR-933).
+    type('Margin over the rate (%)', '10');
+    fireEvent.change(screen.getByLabelText('Rounding'), { target: { value: 'ninety_nine' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save pricing for Zari Abroad' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'ExpansionStorePricingSet')).toEqual([
+        { shopId: 'shop_2', marginPercent: 10, rounding: 'ninety_nine' },
+      ]),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop copying to Zari Abroad' }));
     await waitFor(() =>

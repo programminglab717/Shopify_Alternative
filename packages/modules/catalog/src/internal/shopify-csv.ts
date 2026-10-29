@@ -1,5 +1,11 @@
 import { CsvError, parseCsv, toCsv } from '@hatti/csv';
-import { money, toMajorString, type CurrencyCode } from '@hatti/money';
+import {
+  money,
+  roundedPrice,
+  toMajorString,
+  type CurrencyCode,
+  type PresentmentRounding,
+} from '@hatti/money';
 import { toHandle } from './handle.js';
 import { LIMITS } from './input-checker.js';
 import type { CreateProductInput } from './product.service.js';
@@ -583,20 +589,34 @@ function decodeEntities(text: string): string {
 /**
  * The file `csv` with its prices, compare-at prices and costs multiplied by `rate`, to two places,
  * for an expansion store priced in its own currency (CH-11, ADR-859); every other cell as it was.
+ * Prices and compare-at prices are put `marginPercent` over it and rounded as `rounding` says, a
+ * whole unit or up to .99 (ADR-933); costs are the rate's alone, exact.
  */
-export function rescaledShopifyPrices(csv: string, rate: number): string {
+export function rescaledShopifyPrices(
+  csv: string,
+  rate: number,
+  {
+    rounding = 'exact',
+    marginPercent = 0,
+  }: {
+    rounding?: PresentmentRounding;
+    marginPercent?: number;
+  } = {},
+): string {
   const rows = parseCsv(csv);
   const [headings, ...body] = rows;
   if (!headings) return csv;
-  const columns = [COLUMNS.price, COLUMNS.compareAtPrice, COLUMNS.cost]
-    .map((name) => headings.indexOf(name))
-    .filter((index) => index >= 0);
+  const priced = [COLUMNS.price, COLUMNS.compareAtPrice].map((name) => headings.indexOf(name));
+  const columns = [...priced, headings.indexOf(COLUMNS.cost)].filter((index) => index >= 0);
   for (const row of body) {
     for (const index of columns) {
       const cell = row[index]?.trim();
       if (!cell) continue;
       const value = Number(cell.replace(/,/g, ''));
-      if (Number.isFinite(value)) row[index] = (Math.round(value * rate * 100) / 100).toFixed(2);
+      if (!Number.isFinite(value)) continue;
+      const price = priced.includes(index);
+      const cents = BigInt(Math.round(value * rate * (price ? 1 + marginPercent / 100 : 1) * 100));
+      row[index] = (Number(price ? roundedPrice(cents, rounding) : cents) / 100).toFixed(2);
     }
   }
   return toCsv([headings, ...body]);

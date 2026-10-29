@@ -6208,10 +6208,20 @@ type ExpansionStore {
   """
   followRate: Boolean!
   lastCopy: ExpansionCopy
+
+  """
+  What its copied prices are put over its rate, a whole percent (ADR-933).
+  """
+  marginPercent: Int!
   name: String!
 
   """What a price here is multiplied by there: "0.0036"."""
   priceRate: String!
+
+  """
+  How its copied prices are rounded: exact, to the cent; whole, to a whole unit; or ninety_nine, up to .99 (ADR-933). Costs are copied exact.
+  """
+  rounding: String!
   shopId: ID!
 }
 
@@ -10656,6 +10666,11 @@ type Mutation {
   Has an expansion store's rate follow the day's rate between the shops' currencies, as the currency feed gives it, products copied as they change being copied again at each new rate; or keeps the rate it has, fixed (ADR-929). The owner alone, of both shops, having signed in lately.
   """
   expansionStoreFollowRateSet(enabled: Boolean!, shopId: ID!): ExpansionStorePayload!
+
+  """
+  Puts an expansion store's copied prices a percent over its rate, 0 to 100, for what selling abroad costs, and rounds them as its prices are: exact, whole or ninety_nine (ADR-933). Costs are copied at the rate alone, exact. Copying as products change copies them again. The owner alone, of both shops, having signed in lately.
+  """
+  expansionStorePricingSet(marginPercent: Int!, rounding: String!, shopId: ID!): ExpansionStorePayload!
 
   """
   Ends an expansion store's link; it keeps what was copied. The owner alone.

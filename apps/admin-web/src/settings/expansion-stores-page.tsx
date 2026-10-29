@@ -5,15 +5,18 @@ import {
   ExpansionStoreAutoCopySetMutation,
   ExpansionStoreCopyMutation,
   ExpansionStoreFollowRateSetMutation,
+  ExpansionStorePricingSetMutation,
   ExpansionStoreRemoveMutation,
   ExpansionStoreSalesQuery,
   ExpansionStoreSaveMutation,
   ExpansionStoresQuery,
 } from '../api/operations';
 import type {
+  ExpansionStore,
   ExpansionStorePayloadData,
   ExpansionStoreSalesData,
   ExpansionStoresData,
+  PresentmentRounding,
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { useMe } from '../auth/context';
@@ -61,6 +64,10 @@ export function ExpansionStoresPage() {
   const follow = useAdminMutation<ExpansionStorePayloadData, { shopId: string; enabled: boolean }>(
     ExpansionStoreFollowRateSetMutation,
   );
+  const pricing = useAdminMutation<
+    ExpansionStorePayloadData,
+    { shopId: string; marginPercent: number; rounding: PresentmentRounding }
+  >(ExpansionStorePricingSetMutation);
   const recent = useRecentAuthentication();
   const [chosen, setChosen] = useState('');
   const [rate, setRate] = useState('1');
@@ -110,6 +117,21 @@ export function ExpansionStoresPage() {
       const done = (await follow.mutateAsync({ shopId, enabled })).expansionStoreFollowRateSet!;
       if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
     }, onError);
+  };
+
+  const onPricing = async (
+    shopId: string,
+    marginPercent: number,
+    rounding: PresentmentRounding,
+  ) => {
+    setProblem(null);
+    setBusy(`pricing-${shopId}`);
+    await recent.run(async () => {
+      const done = (await pricing.mutateAsync({ shopId, marginPercent, rounding }))
+        .expansionStorePricingSet!;
+      if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
+    }, onError);
+    setBusy(null);
   };
 
   const onRemove = async (shopId: string) => {
@@ -170,6 +192,11 @@ export function ExpansionStoresPage() {
                     onChange={(enabled) =>
                       !follow.isPending && void onFollow(store.shopId, enabled)
                     }
+                  />
+                  <Pricing
+                    store={store}
+                    busy={busy === `pricing-${store.shopId}`}
+                    onSave={(margin, rounding) => void onPricing(store.shopId, margin, rounding)}
                   />
                   <CheckField
                     label={t('expansion.auto', { name: store.name })}
@@ -334,5 +361,53 @@ function StoreSales() {
         )}
       </Card>
     </section>
+  );
+}
+
+/**
+ * An expansion store's copied prices a percent over its rate, and rounded as its prices abroad
+ * are (ADR-933).
+ */
+function Pricing({
+  store,
+  busy,
+  onSave,
+}: {
+  store: ExpansionStore;
+  busy: boolean;
+  onSave: (marginPercent: number, rounding: PresentmentRounding) => void;
+}) {
+  const { t } = useLocale();
+  const [margin, setMargin] = useState(String(store.marginPercent));
+  const [rounding, setRounding] = useState<PresentmentRounding>(store.rounding);
+  return (
+    <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+      <TextField
+        label={t('expansion.margin')}
+        hint={t('expansion.marginHint')}
+        inputMode="numeric"
+        dir="ltr"
+        value={margin}
+        onChange={(event) => setMargin(event.target.value)}
+      />
+      <SelectField
+        label={t('currencies.rounding')}
+        value={rounding}
+        options={[
+          { value: 'exact', label: t('currencies.roundExact') },
+          { value: 'whole', label: t('currencies.roundWhole') },
+          { value: 'ninety_nine', label: t('currencies.roundNinetyNine') },
+        ]}
+        onChange={setRounding}
+      />
+      <Button
+        variant="secondary"
+        busy={busy}
+        aria-label={t('expansion.savePricing', { name: store.name })}
+        onClick={() => onSave(Number(margin.trim() || '0'), rounding)}
+      >
+        {t('expansion.save')}
+      </Button>
+    </div>
   );
 }

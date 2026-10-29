@@ -30,6 +30,7 @@ export {
   parseRate,
   presentFromRupees,
   rateFromUnitsPerRupee,
+  roundedPrice,
   type PresentmentCurrency,
   type PresentmentRounding,
 } from './presentment.js';
