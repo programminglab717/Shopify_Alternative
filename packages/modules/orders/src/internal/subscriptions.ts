@@ -10,6 +10,7 @@ import {
   SELLING_PLAN_PROPERTY,
   VariantService,
   planPrice,
+  planSells,
   sellingPlansForIn,
   sellingPlansIn,
   type SellingPlanInterval,
@@ -364,7 +365,8 @@ export class SubscriptionService {
         return 0;
       }
       const plans = await sellingPlansIn(tx, shopId);
-      // A line is subscribed on a plan its product is sold on, as its cart priced it.
+      // A line is subscribed on a plan its product is sold on that sells its variant (ADR-930),
+      // as its cart priced it.
       const offered = await sellingPlansForIn(
         tx,
         shopId,
@@ -374,7 +376,10 @@ export class SubscriptionService {
       for (const line of order.lines) {
         const named = line.properties[SELLING_PLAN_PROPERTY];
         const planId = named ? tryFromPublicId(named, 'sellingPlan') : null;
-        if (!planId || !offered.get(line.productId)?.some((plan) => plan.id === planId)) continue;
+        const sold = offered
+          .get(line.productId)
+          ?.some((plan) => plan.id === planId && planSells(plan, line.variantId));
+        if (!planId || !sold) continue;
         const { [SELLING_PLAN_PROPERTY]: _plan, ...properties } = line.properties;
         byPlan.set(planId, [
           ...(byPlan.get(planId) ?? []),

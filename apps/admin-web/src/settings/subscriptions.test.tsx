@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn, type } from '../test-support';
 
+const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
+
 const SUBSCRIPTION = {
   id: 'osub_1',
   status: 'ACTIVE',
@@ -40,10 +42,44 @@ function core(role: StaffRole = 'owner') {
             },
           };
         }
-        const made = { ...input, id: 'slpl_1' };
+        // The core says its chosen variants' titles (ADR-930).
+        const titles: Record<string, string> = { var_2: 'Lawn suit · Large' };
+        const { variantIds, ...rest } = input as { variantIds: string[] | null };
+        const made = {
+          ...rest,
+          id: 'slpl_1',
+          variants: variantIds && variantIds.map((id) => ({ id, title: titles[id] })),
+        };
         plans = [made];
         return { sellingPlanCreate: { sellingPlan: made, userErrors: [] } };
       }
+      case 'DraftVariants':
+        return {
+          products: {
+            nodes: [
+              {
+                id: 'prod_1',
+                title: 'Lawn suit',
+                variants: [
+                  {
+                    id: 'var_1',
+                    title: 'Small',
+                    availableForSale: true,
+                    inventoryQuantity: 8,
+                    price: pkr('4500.00'),
+                  },
+                  {
+                    id: 'var_2',
+                    title: 'Large',
+                    availableForSale: true,
+                    inventoryQuantity: 3,
+                    price: pkr('4800.00'),
+                  },
+                ],
+              },
+            ],
+          },
+        };
       case 'SellingPlanDelete':
         plans = [];
         return { sellingPlanDelete: { deletedSellingPlanId: variables.id, userErrors: [] } };
@@ -98,6 +134,7 @@ describe('Subscriptions (CAT-16, ADR-862)', () => {
         discountPercent: 10,
         productTag: 'chai',
         minimumOrders: 3,
+        variantIds: null,
       },
     });
 
@@ -118,6 +155,37 @@ describe('Subscriptions (CAT-16, ADR-862)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Every month' }));
     expect(await screen.findByText(/No selling plans yet/)).toBeTruthy();
+  });
+
+  it('adds a selling plan for chosen variants alone (ADR-930)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/subscriptions');
+    expect(await screen.findByText(/No selling plans yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose variants' }));
+    type('Find products by name or SKU', 'lawn');
+    fireEvent.click(screen.getByRole('button', { name: 'Find' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Lawn suit · Large' }));
+    // Chosen variants, the plan is for no tag.
+    expect(screen.getByRole('button', { name: 'Remove Lawn suit · Large' })).toBeTruthy();
+    expect(screen.queryByLabelText('Product tag')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add plan' }));
+    expect(await screen.findByText('For Lawn suit · Large')).toBeTruthy();
+    expect(sentOf(fake, 'SellingPlanCreate')).toEqual([
+      {
+        input: {
+          name: 'Every month',
+          intervalUnit: 'MONTH',
+          intervalCount: 1,
+          discountPercent: 10,
+          productTag: null,
+          minimumOrders: 0,
+          variantIds: ['var_2'],
+        },
+      },
+    ]);
+    // The form is cleared for the next plan.
+    expect(screen.getByLabelText('Product tag')).toBeTruthy();
   });
 
   it('shows an accountant no plans to add and no subscriptions to change', async () => {

@@ -19753,7 +19753,7 @@ type SelectedOption {
 }
 
 """
-How the shop sells by subscription (CAT-16, ADR-862): "Every month, 10% off", for its products of a tag, or all of them. A shopper subscribes on a product's page; their order is placed again each interval, by cash on delivery, at the plan's price.
+How the shop sells by subscription (CAT-16, ADR-862): "Every month, 10% off", for its products of a tag, all of them, or chosen variants (ADR-930). A shopper subscribes on a product's page; their order is placed again each interval, by cash on delivery, at the plan's price.
 """
 type SellingPlan {
   """What it takes off the items' prices, 0 to 50 percent."""
@@ -19775,6 +19775,9 @@ type SellingPlan {
   """
   productTag: String
   updatedAt: DateTime!
+
+  """The variants it is for alone (ADR-930); null where it is for products."""
+  variants: [SellingPlanVariant!]
 }
 
 type SellingPlanDeletePayload {
@@ -19791,6 +19794,11 @@ input SellingPlanInput {
   minimumOrders: Int
   name: String!
   productTag: String
+
+  """
+  The variants it is for alone, 50 at most, rather than its products of a tag or all of them (ADR-930); none, or not given, for those.
+  """
+  variantIds: [ID!]
 }
 
 enum SellingPlanInterval {
@@ -19801,6 +19809,14 @@ enum SellingPlanInterval {
 type SellingPlanPayload {
   sellingPlan: SellingPlan
   userErrors: [UserError!]!
+}
+
+"""A variant a selling plan is for alone (ADR-930)."""
+type SellingPlanVariant {
+  id: ID!
+
+  """The product's title, and the variant's where it has several."""
+  title: String!
 }
 
 """

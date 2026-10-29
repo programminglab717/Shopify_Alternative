@@ -384,6 +384,103 @@ describe.skipIf(!server)('Subscriptions: selling plans and orders placed again (
     ]);
   });
 
+  it('sells a plan for chosen variants on those alone (ADR-930)', async () => {
+    const tea = await data(
+      `mutation ($input: ProductCreateInput!) {
+        productCreate(input: $input) { product { variants { id title } } } }`,
+      {
+        input: {
+          title: 'Green tea',
+          status: 'ACTIVE',
+          options: [{ name: 'Size', values: ['Sample', 'Tin'] }],
+          variants: [
+            { optionValues: ['Sample'], price: '300' },
+            { optionValues: ['Tin'], price: '1,500' },
+          ],
+        },
+      },
+    );
+    const [sample, tin] = tea.product.variants.map((each: Json) => each.id as string);
+    const input = {
+      name: 'Every month, the tin',
+      intervalUnit: 'MONTH',
+      intervalCount: 1,
+      discountPercent: 20,
+      variantIds: [tin],
+    };
+    // A tag's products or chosen variants, not both; and the shop's variants alone.
+    const both = await data(
+      `mutation ($input: SellingPlanInput!) {
+        sellingPlanCreate(input: $input) { sellingPlan { id } userErrors { field message } } }`,
+      { input: { ...input, productTag: 'tea' } },
+    );
+    expect(both.userErrors).toEqual([
+      {
+        field: ['input', 'variantIds'],
+        message: "A plan is for a tag's products or for chosen variants, not both",
+      },
+    ]);
+    const stranger = await data(
+      `mutation ($input: SellingPlanInput!) {
+        sellingPlanCreate(input: $input) { sellingPlan { id } userErrors { field message } } }`,
+      { input: { ...input, variantIds: [toPublicId('variant', newId())] } },
+    );
+    expect(stranger.userErrors).toEqual([
+      { field: ['input', 'variantIds'], message: 'No variant of the shop has one of these IDs' },
+    ]);
+    const made = await data(
+      `mutation ($input: SellingPlanInput!) {
+        sellingPlanCreate(input: $input) {
+          sellingPlan { ${PLAN} variants { id title } } userErrors { message } } }`,
+      { input },
+    );
+    expect(made.sellingPlan).toMatchObject({
+      productTag: null,
+      variants: [{ id: tin, title: 'Green tea · Tin' }],
+    });
+    const plan = made.sellingPlan.id as string;
+
+    // The tin is priced on it; the sample, though its line names it, is bought once.
+    const { id: order, cart } = await checkout(
+      [
+        {
+          variantId: fromPublicId(tin, 'variant'),
+          quantity: 1,
+          properties: { _selling_plan: plan },
+        },
+        {
+          variantId: fromPublicId(sample, 'variant'),
+          quantity: 1,
+          properties: { _selling_plan: plan },
+        },
+      ],
+      '0300 7654322',
+    );
+    const lines = cart.cart.items;
+    expect(lines.find((line) => line.variantId === fromPublicId(tin, 'variant'))).toMatchObject({
+      price: 120_000,
+      sellingPlan: { id: plan },
+    });
+    const once = lines.find((line) => line.variantId === fromPublicId(sample, 'variant'))!;
+    expect(once.price).toBe(30_000);
+    expect(once.sellingPlan).toBeUndefined();
+    // Its subscription holds the tin alone.
+    await hear('order.created', order);
+    const subscription = (await data(SUBSCRIPTIONS)).find(
+      (each: Json) => each.originOrderId === toPublicId('order', order),
+    );
+    expect(subscription).toMatchObject({
+      planName: 'Every month, the tin',
+      lines: [{ quantity: 1 }],
+    });
+    await data(`mutation ($id: ID!) { sellingPlanDelete(id: $id) { userErrors { message } } }`, {
+      id: plan,
+    });
+    await admin.query('DELETE FROM orders.subscriptions WHERE id = $1', [
+      fromPublicId(subscription.id, 'orderSubscription'),
+    ]);
+  });
+
   it('cancels a subscription with its first order, and forgets it with its erased customer', async () => {
     const [plan] = await data(`{ sellingPlans { ${PLAN} } }`);
     const { rows } = await admin.query<{ id: string }>(

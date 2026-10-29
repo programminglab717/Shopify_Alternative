@@ -363,6 +363,7 @@ export {
   SellingPlanEvents,
   SellingPlanService,
   planOfLine,
+  planSells,
   planPrice,
   sellingPlanPropertyOf,
   sellingPlansForIn,

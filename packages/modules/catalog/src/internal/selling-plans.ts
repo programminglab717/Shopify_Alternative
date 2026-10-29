@@ -12,7 +12,8 @@ import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 // Selling plans (CAT-16, ADR-862): how a shop sells its products by subscription, as Shopify's
-// selling plans are: "Every month, 10% off", for its products of a tag, or all of them. A cart
+// selling plans are: "Every month, 10% off", for its products of a tag, all of them, or chosen
+// variants (ADR-930). A cart
 // line subscribed says so as its hidden `_selling_plan` property, the plan's public ID, and is
 // priced at the plan's discount; the order it becomes keeps the property, and the orders module
 // makes the subscription of it.
@@ -33,6 +34,8 @@ export const SELLING_PLAN_LIMITS = {
   discountPercent: { min: 0, max: 50 },
   /** How many orders a subscriber takes before cancelling themselves; 0 for none (ADR-928). */
   minimumOrders: { min: 0, max: 12 },
+  /** The variants a plan may be for alone (ADR-930). */
+  variants: 50,
 } as const;
 
 export type SellingPlanInterval = 'week' | 'month';
@@ -47,6 +50,8 @@ export interface SellingPlanRecord {
   productTag: string | null;
   /** The orders a subscriber takes before they may cancel themselves; 0 for none (ADR-928). */
   minimumOrders: number;
+  /** The variants it is for alone, rather than its products' all (ADR-930); null for those. */
+  variantIds: string[] | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +63,8 @@ export interface SellingPlanInput {
   discountPercent: number;
   productTag?: string | null;
   minimumOrders?: number | null;
+  /** The variants it is for alone (ADR-930), rather than a tag's products or all of them. */
+  variantIds?: readonly string[] | null;
 }
 
 type PlanRow = {
@@ -68,6 +75,7 @@ type PlanRow = {
   discount_percent: number;
   product_tag: string | null;
   minimum_orders: number;
+  variant_ids: string[] | null;
   created_at: Date | string;
   updated_at: Date | string;
 };
@@ -80,13 +88,14 @@ const toRecord = (row: PlanRow): SellingPlanRecord => ({
   discountPercent: row.discount_percent,
   productTag: row.product_tag,
   minimumOrders: row.minimum_orders,
+  variantIds: row.variant_ids,
   createdAt: toDate(row.created_at),
   updatedAt: toDate(row.updated_at),
 });
 
 const COLUMNS = sql.raw(
   'id, name, interval_unit, interval_count, discount_percent, product_tag, minimum_orders, ' +
-    'created_at, updated_at',
+    'variant_ids::text[] AS variant_ids, created_at, updated_at',
 );
 
 /** A unit's price on the plan: `price` less its discount, to the nearest minor unit. */
@@ -94,15 +103,27 @@ export function planPrice(price: bigint, discountPercent: number): bigint {
   return price - (price * BigInt(discountPercent) + 50n) / 100n;
 }
 
-/** The plan a line's properties name, of those its product is sold on; null for none. */
-export function planOfLine<T extends { id: string }>(
+/** Whether `plan` sells `variantId`, of a product it is for: a plan for chosen variants, one. */
+export function planSells(
+  plan: { variantIds?: readonly string[] | null },
+  variantId: string,
+): boolean {
+  return !plan.variantIds || plan.variantIds.includes(variantId);
+}
+
+/**
+ * The plan a line's properties name, of those its product is sold on, where it sells the line's
+ * variant (ADR-930); null for none.
+ */
+export function planOfLine<T extends { id: string; variantIds?: readonly string[] | null }>(
   plans: readonly T[] | undefined,
   properties: Readonly<Record<string, string>>,
+  variantId: string,
 ): T | null {
   const named = properties[SELLING_PLAN_PROPERTY];
   if (!named || !plans) return null;
   const id = tryFromPublicId(named, 'sellingPlan');
-  return plans.find((plan) => plan.id === id) ?? null;
+  return plans.find((plan) => plan.id === id && planSells(plan, variantId)) ?? null;
 }
 
 /** The shop's plans, in the order made, in the caller's transaction `tx`. */
@@ -114,7 +135,8 @@ export async function sellingPlansIn(tx: Tx, shopId: string): Promise<SellingPla
 
 /**
  * The plans each of `productIds` is sold on, in the caller's transaction `tx`: those for all the
- * shop's products, and those for a tag it has, ignoring case. A product on none is not in the map.
+ * shop's products, those for a tag it has, ignoring case, and those for chosen variants, one of
+ * them its own (ADR-930: `planSells` says which variants). A product on none is not in the map.
  */
 export async function sellingPlansForIn(
   tx: Tx,
@@ -124,12 +146,19 @@ export async function sellingPlansForIn(
   if (productIds.length === 0) return new Map();
   const { rows } = await tx.execute<PlanRow & { product_id: string }>(sql`
     SELECT p.id AS product_id, s.id, s.name, s.interval_unit, s.interval_count,
-           s.discount_percent, s.product_tag, s.minimum_orders, s.created_at, s.updated_at
+           s.discount_percent, s.product_tag, s.minimum_orders,
+           s.variant_ids::text[] AS variant_ids, s.created_at, s.updated_at
       FROM catalog.products p
       JOIN catalog.selling_plans s ON s.shop_id = p.shop_id
      WHERE p.shop_id = ${shopId} AND p.id = ANY (${sql.param([...productIds])}::uuid[])
-       AND (s.product_tag IS NULL
-            OR EXISTS (SELECT 1 FROM unnest(p.tags) tag WHERE lower(tag) = lower(s.product_tag)))
+       AND CASE WHEN s.variant_ids IS NOT NULL
+                THEN EXISTS (SELECT 1 FROM catalog.variants v
+                              WHERE v.shop_id = p.shop_id AND v.product_id = p.id
+                                AND v.id = ANY (s.variant_ids))
+                ELSE s.product_tag IS NULL
+                     OR EXISTS (SELECT 1 FROM unnest(p.tags) tag
+                                 WHERE lower(tag) = lower(s.product_tag))
+           END
      ORDER BY s.created_at, s.id`);
   const plans = new Map<string, SellingPlanRecord[]>();
   for (const row of rows) {
@@ -144,6 +173,19 @@ export function sellingPlanPropertyOf(planId: string): string {
 }
 
 const NOT_FOUND = 'No selling plan of the shop has this ID';
+const NO_VARIANT = 'No variant of the shop has one of these IDs';
+
+/** Whether each of `variantIds` is the shop's (ADR-930). */
+async function variantsAreTheShops(
+  tx: Tx,
+  shopId: string,
+  variantIds: readonly string[],
+): Promise<boolean> {
+  const { rows } = await tx.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count FROM catalog.variants
+     WHERE shop_id = ${shopId} AND id = ANY (${sql.param([...variantIds])}::uuid[])`);
+  return rows[0]!.count === variantIds.length;
+}
 
 /**
  * The shop's selling plans (ADR-862), kept by staff who write products: ten at most. Each change
@@ -155,6 +197,33 @@ export class SellingPlanService {
 
   async list(tenant: TenantContext): Promise<SellingPlanRecord[]> {
     return this.db.tenant(tenant.shopId, (tx) => sellingPlansIn(tx, tenant.shopId));
+  }
+
+  /**
+   * The titles of a plan's chosen variants (ADR-930), in its order: "Kurta · Large", or the
+   * product's alone where it has one variant. A variant deleted since is left out.
+   */
+  async variantTitles(
+    tenant: TenantContext,
+    variantIds: readonly string[],
+  ): Promise<{ id: string; title: string }[]> {
+    if (variantIds.length === 0) return [];
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<{ id: string; title: string }>(sql`
+        SELECT v.id,
+               CASE WHEN (SELECT count(*) FROM catalog.variants o
+                           WHERE o.shop_id = v.shop_id AND o.product_id = v.product_id) > 1
+                    THEN p.title || ' · ' || v.title ELSE p.title END AS title
+          FROM catalog.variants v
+          JOIN catalog.products p ON p.shop_id = v.shop_id AND p.id = v.product_id
+         WHERE v.shop_id = ${tenant.shopId}
+           AND v.id = ANY (${sql.param([...variantIds])}::uuid[])`),
+    );
+    const titles = new Map(rows.map((row) => [row.id, row.title]));
+    return variantIds.flatMap((id) => {
+      const title = titles.get(id);
+      return title === undefined ? [] : [{ id, title }];
+    });
   }
 
   async create(
@@ -174,12 +243,16 @@ export class SellingPlanService {
         );
       }
       const plan = checked.value;
+      if (plan.variantIds && !(await variantsAreTheShops(tx, tenant.shopId, plan.variantIds))) {
+        return failOne<SellingPlanRecord>(['input', 'variantIds'], 'NOT_FOUND', NO_VARIANT);
+      }
       const { rows } = await tx.execute<PlanRow>(sql`
         INSERT INTO catalog.selling_plans
                (shop_id, name, interval_unit, interval_count, discount_percent, product_tag,
-                minimum_orders)
+                minimum_orders, variant_ids)
         VALUES (${tenant.shopId}, ${plan.name}, ${plan.intervalUnit}, ${plan.intervalCount},
-                ${plan.discountPercent}, ${plan.productTag}, ${plan.minimumOrders})
+                ${plan.discountPercent}, ${plan.productTag}, ${plan.minimumOrders},
+                ${plan.variantIds && sql`${sql.param(plan.variantIds)}::uuid[]`})
         RETURNING ${COLUMNS}`);
       const record = toRecord(rows[0]!);
       await this.#changed(tx, tenant, record, 'selling_plan.created');
@@ -197,11 +270,15 @@ export class SellingPlanService {
     if (!checked.ok) return checked;
     const plan = checked.value;
     return this.db.tenant(tenant.shopId, async (tx) => {
+      if (plan.variantIds && !(await variantsAreTheShops(tx, tenant.shopId, plan.variantIds))) {
+        return failOne<SellingPlanRecord>(['input', 'variantIds'], 'NOT_FOUND', NO_VARIANT);
+      }
       const { rows } = await tx.execute<PlanRow>(sql`
         UPDATE catalog.selling_plans
            SET name = ${plan.name}, interval_unit = ${plan.intervalUnit},
                interval_count = ${plan.intervalCount}, discount_percent = ${plan.discountPercent},
                product_tag = ${plan.productTag}, minimum_orders = ${plan.minimumOrders},
+               variant_ids = ${plan.variantIds && sql`${sql.param(plan.variantIds)}::uuid[]`},
                updated_at = now()
          WHERE shop_id = ${tenant.shopId} AND id = ${id}
         RETURNING ${COLUMNS}`);
@@ -251,6 +328,7 @@ function checkInput(input: SellingPlanInput): MutationResult<
     intervalUnit: SellingPlanInterval;
     productTag: string | null;
     minimumOrders: number;
+    variantIds: string[] | null;
   }
 > {
   const check = new InputChecker();
@@ -279,6 +357,22 @@ function checkInput(input: SellingPlanInput): MutationResult<
     input.minimumOrders ?? 0,
     SELLING_PLAN_LIMITS.minimumOrders,
   );
+  // Chosen variants, each once; none chosen is the plan's products' all (ADR-930).
+  const variantIds = input.variantIds?.length ? [...new Set(input.variantIds)] : null;
+  if (variantIds && variantIds.length > SELLING_PLAN_LIMITS.variants) {
+    check.addMessage(
+      ['input', 'variantIds'],
+      'TOO_MANY',
+      `A plan is for ${SELLING_PLAN_LIMITS.variants} variants at most`,
+    );
+  }
+  if (variantIds && productTag) {
+    check.addMessage(
+      ['input', 'variantIds'],
+      'INVALID',
+      "A plan is for a tag's products or for chosen variants, not both",
+    );
+  }
   if (!check.ok) return { ok: false, errors: check.errors };
   return {
     ok: true,
@@ -289,6 +383,7 @@ function checkInput(input: SellingPlanInput): MutationResult<
       discountPercent: discountPercent!,
       productTag,
       minimumOrders: minimumOrders!,
+      variantIds,
     },
   };
 }

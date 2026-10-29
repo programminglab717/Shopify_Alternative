@@ -13074,6 +13074,10 @@ const SELLING_PLAN = /* GraphQL */ `
     discountPercent
     productTag
     minimumOrders
+    variants {
+      id
+      title
+    }
   }
 `;
 

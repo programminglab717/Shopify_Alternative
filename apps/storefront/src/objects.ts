@@ -153,19 +153,34 @@ export interface ObjectContext {
 }
 
 /**
+ * The shop's plans a product is sold on (ADR-862): those for all its products, those for a tag it
+ * has, and those for chosen variants, one of them its own (ADR-930).
+ */
+function plansOffered(
+  plans: readonly SellingPlanDoc[] | undefined,
+  doc: Pick<ProductDoc, 'tags' | 'variants'>,
+): SellingPlanDoc[] {
+  const tags = new Set(doc.tags.map((tag) => tag.toLowerCase()));
+  return (plans ?? []).filter((plan) =>
+    plan.variantIds
+      ? doc.variants.some((variant) => plan.variantIds!.includes(variant.id))
+      : plan.productTag === null || tags.has(plan.productTag.toLowerCase()),
+  );
+}
+
+/**
  * The selling plan groups a product is sold on (CAT-16, ADR-862), as Shopify's
  * `product.selling_plan_groups`: one, "Subscribe and save", holding the shop's plans for all its
- * products and those for a tag it has, each with its percentage off; none for a product on no
- * plan. A product form's `selling_plan` field names the plan its line is subscribed on.
+ * products, those for a tag it has and those for its chosen variants (ADR-930), each with its
+ * percentage off; none for a product on no plan. A product form's `selling_plan` field names the
+ * plan its line is subscribed on; each variant's `selling_plan_allocations` says which it is sold
+ * on.
  */
 export function sellingPlanGroups(
   plans: readonly SellingPlanDoc[] | undefined,
-  doc: Pick<ProductDoc, 'tags'>,
+  doc: Pick<ProductDoc, 'tags' | 'variants'>,
 ): Record<string, unknown>[] {
-  const tags = new Set(doc.tags.map((tag) => tag.toLowerCase()));
-  const offered = (plans ?? []).filter(
-    (plan) => plan.productTag === null || tags.has(plan.productTag.toLowerCase()),
-  );
+  const offered = plansOffered(plans, doc);
   if (offered.length === 0) return [];
   const option = 'Delivery every';
   return [
@@ -189,6 +204,31 @@ export function sellingPlanGroups(
       })),
     },
   ];
+}
+
+/**
+ * The plans a variant is sold on, as Shopify's `variant.selling_plan_allocations` (ADR-930): each
+ * its plan's ID and the variant's price on it, a plan for chosen variants on those alone.
+ */
+export function sellingPlanAllocations(
+  plans: readonly SellingPlanDoc[] | undefined,
+  doc: Pick<ProductDoc, 'tags' | 'variants'>,
+  variant: Pick<VariantDoc, 'id' | 'price'>,
+): Record<string, unknown>[] {
+  return plansOffered(plans, doc)
+    .filter((plan) => !plan.variantIds || plan.variantIds.includes(variant.id))
+    .map((plan) => {
+      // As checkout prices it: the discount to the nearest paisa.
+      const price = variant.price - Math.floor((variant.price * plan.discountPercent + 50) / 100);
+      return {
+        selling_plan_id: plan.id,
+        selling_plan_group_id: 'subscribe-and-save',
+        price,
+        compare_at_price: variant.price,
+        per_delivery_price: price,
+        price_adjustments: [{ position: 1, price }],
+      };
+    });
 }
 
 /**
@@ -385,7 +425,7 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
   const images = doc.images.map((image) => new ImageDrop(image));
   const media = mediaOf(doc, images);
   const prefix = ctx.prefix ?? '';
-  const variants = doc.variants.map((variant) => variantObject(variant, doc, images, prefix));
+  const variants = doc.variants.map((variant) => variantObject(variant, doc, images, ctx));
   const available = variants.filter((variant) => variant.available);
   const selected = variants.find((variant) => variant.id === ctx.query.variant) ?? null;
   const current = selected ?? available[0] ?? variants[0] ?? null;
@@ -661,8 +701,9 @@ function variantObject(
   variant: VariantDoc,
   product: ProductDoc,
   images: readonly ImageDrop[],
-  prefix: string,
+  ctx: ObjectContext,
 ) {
+  const prefix = ctx.prefix ?? '';
   const image = variant.image === null ? null : (images[variant.image] ?? null);
   return {
     id: variant.id,
@@ -683,6 +724,10 @@ function variantObject(
     image,
     featured_image: image,
     metafields: metafieldsObject(variant.metafields),
+    // The plans it is sold on (ADR-930), read once the shop's document is, as the product's are.
+    get selling_plan_allocations() {
+      return sellingPlanAllocations(ctx.sellingPlans, product, variant);
+    },
   };
 }
 

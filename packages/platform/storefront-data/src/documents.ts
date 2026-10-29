@@ -183,6 +183,11 @@ export interface SellingPlanDoc {
    * documents written before, for none.
    */
   minimumOrders?: number;
+  /**
+   * The variants it is for alone (ADR-930), rather than its products of a tag or all of them;
+   * absent for those.
+   */
+  variantIds?: string[];
 }
 
 /** A shop's running theme experiment, as its storefront splits its shoppers (ADR-866). */

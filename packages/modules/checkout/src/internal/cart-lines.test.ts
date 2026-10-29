@@ -457,6 +457,7 @@ describe('cart lines', () => {
       discountPercent: 10,
       productTag: null,
       minimumOrders: 0,
+      variantIds: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -485,5 +486,32 @@ describe('cart lines', () => {
       compareAtPrice: 3_000_00,
     });
     expect(json.subtotal).toBe(2 * 2_700_00 + 4_500_00 + 3_000_00);
+  });
+
+  it('prices a line on a plan for chosen variants where its variant is one (ADR-930)', () => {
+    const plan = {
+      id: '01937c4e-0000-7000-8000-0000000000aa',
+      name: 'Every month',
+      intervalUnit: 'month' as const,
+      intervalCount: 1,
+      discountPercent: 10,
+      productTag: null,
+      minimumOrders: 0,
+      variantIds: [SHAWL],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const named = { _selling_plan: toPublicId('sellingPlan', plan.id) };
+    const priced = (variantIds: string[]) =>
+      cartJson(
+        { ...EMPTY_CART, lines: [line(SHAWL, 1, named)] },
+        FACTS,
+        new Map(),
+        new Map(),
+        new Map([['product-of-Shawl', [{ ...plan, variantIds }]]]),
+      ).items[0]!.price;
+    expect(priced([SHAWL])).toBe(2_700_00);
+    // Another variant's plan: the shawl is bought once.
+    expect(priced(['another-variant'])).toBe(3_000_00);
   });
 });

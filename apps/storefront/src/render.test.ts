@@ -2053,6 +2053,61 @@ describe('Storefront rendering', () => {
     expect(plain.html).not.toContain('<fieldset class="product__selling-plans">');
   });
 
+  it('offers a plan for chosen variants on those alone, as their allocations say (ADR-930)', async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const small = first!.variants[0]!;
+    const large = { ...small, id: `${small.id}-large`, title: 'Large', price: small.price * 2 };
+    const chai = { ...first!, variants: [small, large] };
+    const shop = new MemoryStore({
+      ...sample,
+      shop: {
+        ...sample.shop,
+        sellingPlans: [
+          {
+            id: 'slpl_large',
+            name: 'Every month',
+            intervalUnit: 'month',
+            intervalCount: 1,
+            discountPercent: 10,
+            productTag: null,
+            variantIds: [large.id],
+          },
+        ],
+      },
+      products: [chai, ...rest],
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    // The first variant is not sold on it: the plan is there, hidden, for the script to show.
+    const page = await renderer.render({ path: `/products/${chai.handle}` }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain('<label class="pill" data-selling-plan="slpl_large" hidden>');
+    const variants = JSON.parse(
+      /<script type="application\/json" data-variants>(.*?)<\/script>/s.exec(page.html)![1]!,
+    ) as { id: string; selling_plan_allocations: { selling_plan_id: string; price: number }[] }[];
+    expect(variants.map((each) => each.selling_plan_allocations)).toEqual([
+      [],
+      [
+        expect.objectContaining({
+          selling_plan_id: 'slpl_large',
+          price: large.price - Math.floor((large.price * 10 + 50) / 100),
+          compare_at_price: large.price,
+        }),
+      ],
+    ]);
+    // Picked, it shows.
+    const picked = await renderer.render(
+      { path: `/products/${chai.handle}`, query: { variant: large.id } },
+      shop.fresh(),
+    );
+    expect(picked.html.replace(/\s+/g, ' ')).toContain(
+      '<label class="pill" data-selling-plan="slpl_large">',
+    );
+    // A product with none of its variants is offered no plan.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('<fieldset class="product__selling-plans">');
+  });
+
   it("shows prices in the shopper's currency, of the shop's, and says checkout charges rupees (ADR-865)", async () => {
     const sample = sampleStore();
     const product = sample.products[0]!;

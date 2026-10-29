@@ -6451,7 +6451,14 @@ export interface SellingPlan {
   productTag: string | null;
   /** The orders a subscriber takes before cancelling themselves; 0 for none (ADR-928). */
   minimumOrders: number;
+  /** The variants it is for alone (ADR-930); null where it is for products. */
+  variants: { id: string; title: string }[] | null;
 }
+
+/** What a selling plan is made of: its chosen variants by their IDs (ADR-930). */
+export type SellingPlanInput = Omit<SellingPlan, 'id' | 'variants'> & {
+  variantIds: string[] | null;
+};
 
 export interface OrderSubscription {
   id: string;

@@ -447,13 +447,31 @@
   // With the options picked, the matching variant goes in the form; without JavaScript, the list does.
   const form = document.getElementById('product-form');
   const variants = JSON.parse(document.querySelector('[data-variants]')?.textContent ?? '[]');
+  // A plan for chosen variants (ADR-930) shows for those alone: picked on another, it is bought once.
+  function showPlans(variant) {
+    const sold = new Set((variant.selling_plan_allocations ?? []).map((each) => each.selling_plan_id));
+    for (const label of document.querySelectorAll('[data-selling-plan]')) {
+      label.hidden = !sold.has(label.dataset.sellingPlan);
+      const input = label.querySelector('input');
+      if (label.hidden && input?.checked) {
+        input.checked = false;
+        form.querySelector('input[name="selling_plan"][value=""]').checked = true;
+      }
+    }
+  }
   form?.addEventListener('change', (event) => {
+    if (event.target.name === 'id') {
+      const chosen = variants.find((each) => String(each.id) === event.target.value);
+      if (chosen) showPlans(chosen);
+      return;
+    }
     if (!event.target.name?.startsWith('option-')) return;
     const picked = [...form.querySelectorAll('fieldset')].map((set) => set.querySelector('input:checked')?.value);
     const variant = variants.find((each) => each.options.every((value, index) => value === picked[index]));
     if (!variant) return;
     form.elements.id.value = variant.id;
     showOwnPrice(variant.id);
+    showPlans(variant);
     // WhatsApp's messages name the variant picked, and link to it.
     for (const link of document.querySelectorAll('[data-whatsapp-template]')) {
       link.href = link.dataset.whatsappTemplate

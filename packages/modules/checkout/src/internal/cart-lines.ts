@@ -357,8 +357,9 @@ export function cartJson(
     const variant = facts.get(line.variantId)!;
     const all = inCart.get(line.variantId)!;
     const short = variant.sellable !== null && all > variant.sellable;
-    // Subscribed on a plan its product is sold on, the variant's price less the plan's discount.
-    const plan = planOfLine(plans.get(variant.productId), line.properties);
+    // Subscribed on a plan its product is sold on that sells its variant (ADR-930), the variant's
+    // price less the plan's discount.
+    const plan = planOfLine(plans.get(variant.productId), line.properties, line.variantId);
     const extras =
       personalisationPrice(asked.get(variant.productId) ?? [], line.properties) +
       stitchingPrice(stitching.get(variant.productId), line.properties);

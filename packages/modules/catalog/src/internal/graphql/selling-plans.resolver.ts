@@ -9,7 +9,9 @@ import {
   Int,
   Mutation,
   ObjectType,
+  Parent,
   Query,
+  ResolveField,
   Resolver,
   registerEnumType,
 } from '@nestjs/graphql';
@@ -22,10 +24,19 @@ export enum SellingPlanInterval {
 
 registerEnumType(SellingPlanInterval, { name: 'SellingPlanInterval' });
 
+@ObjectType({ description: 'A variant a selling plan is for alone (ADR-930).' })
+export class SellingPlanVariant {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: "The product's title, and the variant's where it has several." })
+  title!: string;
+}
+
 @ObjectType({
   description:
     'How the shop sells by subscription (CAT-16, ADR-862): "Every month, 10% off", for its ' +
-    "products of a tag, or all of them. A shopper subscribes on a product's page; their order is " +
+    "products of a tag, all of them, or chosen variants (ADR-930). A shopper subscribes on a product's page; their order is " +
     "placed again each interval, by cash on delivery, at the plan's price.",
 })
 export class SellingPlan {
@@ -57,6 +68,9 @@ export class SellingPlan {
   })
   minimumOrders!: number;
 
+  /** Internal IDs of the variants it is for alone, read by `variants`. */
+  variantIds!: string[] | null;
+
   @Field(() => GraphQLISODateTime)
   updatedAt!: Date;
 }
@@ -80,6 +94,14 @@ export class SellingPlanInput {
 
   @Field(() => Int, { nullable: true, description: '0 to 12; 0 for none, unless given.' })
   minimumOrders?: number | null;
+
+  @Field(() => [ID], {
+    nullable: true,
+    description:
+      'The variants it is for alone, 50 at most, rather than its products of a tag or all of ' +
+      'them (ADR-930); none, or not given, for those.',
+  })
+  variantIds?: string[] | null;
 }
 
 @ObjectType()
@@ -101,6 +123,7 @@ export class SellingPlanDeletePayload {
 }
 
 const NOT_FOUND = 'No selling plan of the shop has this ID';
+const NO_VARIANT = 'No variant of the shop has one of these IDs';
 
 const toPlan = (record: SellingPlanRecord) =>
   Object.assign(new SellingPlan(), {
@@ -115,10 +138,19 @@ const payload = (result: Awaited<ReturnType<SellingPlanService['create']>>) =>
     userErrors: result.ok ? [] : UserError.list(result.errors),
   });
 
-const inputOf = (input: SellingPlanInput) => ({
-  ...input,
-  intervalUnit: input.intervalUnit.toLowerCase(),
-});
+/** The service's input, or null where a variant's ID is no variant's. */
+const inputOf = (input: SellingPlanInput) => {
+  const variantIds = (input.variantIds ?? []).map((id) => tryFromPublicId(id, 'variant'));
+  if (variantIds.some((id) => id === null)) return null;
+  return {
+    ...input,
+    intervalUnit: input.intervalUnit.toLowerCase(),
+    variantIds: variantIds as string[],
+  };
+};
+
+const noVariant = () =>
+  failOne<SellingPlanRecord>(['input', 'variantIds'], 'NOT_FOUND', NO_VARIANT);
 
 /** The shop's selling plans (ADR-862). */
 @Resolver(() => SellingPlan)
@@ -131,13 +163,31 @@ export class SellingPlanResolver {
     return (await this.plans.list(tenant)).map(toPlan);
   }
 
+  @ResolveField(() => [SellingPlanVariant], {
+    nullable: true,
+    description: 'The variants it is for alone (ADR-930); null where it is for products.',
+  })
+  async variants(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() plan: SellingPlan,
+  ): Promise<SellingPlanVariant[] | null> {
+    if (!plan.variantIds) return null;
+    return (await this.plans.variantTitles(tenant, plan.variantIds)).map((each) =>
+      Object.assign(new SellingPlanVariant(), {
+        id: toPublicId('variant', each.id),
+        title: each.title,
+      }),
+    );
+  }
+
   @Mutation(() => SellingPlanPayload, { description: 'Makes a selling plan: ten a shop at most.' })
   @RequireScopes('write_products')
   async sellingPlanCreate(
     @CurrentTenant() tenant: TenantContext,
     @Args('input') input: SellingPlanInput,
   ): Promise<SellingPlanPayload> {
-    return payload(await this.plans.create(tenant, inputOf(input)));
+    const checked = inputOf(input);
+    return payload(checked ? await this.plans.create(tenant, checked) : noVariant());
   }
 
   @Mutation(() => SellingPlanPayload, {
@@ -150,11 +200,9 @@ export class SellingPlanResolver {
     @Args('input') input: SellingPlanInput,
   ): Promise<SellingPlanPayload> {
     const uuid = tryFromPublicId(id, 'sellingPlan');
-    return payload(
-      uuid
-        ? await this.plans.update(tenant, uuid, inputOf(input))
-        : failOne(['id'], 'NOT_FOUND', NOT_FOUND),
-    );
+    const checked = inputOf(input);
+    if (!uuid) return payload(failOne(['id'], 'NOT_FOUND', NOT_FOUND));
+    return payload(checked ? await this.plans.update(tenant, uuid, checked) : noVariant());
   }
 
   @Mutation(() => SellingPlanDeletePayload, {

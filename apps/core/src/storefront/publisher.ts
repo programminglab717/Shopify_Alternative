@@ -1112,6 +1112,7 @@ export class StorefrontPublisher {
         discountPercent: plan.discountPercent,
         productTag: plan.productTag,
         ...(plan.minimumOrders > 0 && { minimumOrders: plan.minimumOrders }),
+        ...(plan.variantIds && { variantIds: plan.variantIds }),
       })),
       await shownCurrenciesIn(tx, shopId),
       running && experiment

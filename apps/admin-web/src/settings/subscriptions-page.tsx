@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Repeat, Trash2 } from 'lucide-react';
+import { ListPlus, Repeat, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -11,12 +11,13 @@ import {
 import type {
   OrderSubscription,
   OrderSubscriptionChangeData,
-  SellingPlan,
+  SellingPlanInput,
   SellingPlanPayloadData,
   SubscriptionsData,
   UserError,
 } from '../api/types';
 import { can } from '../auth/permissions';
+import { ProductPicker } from '../drafts/new-draft-page';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -32,7 +33,7 @@ type Change = 'SKIP' | 'PAUSE' | 'RESUME' | 'CANCEL';
 
 /**
  * Subscriptions (CAT-16, ADR-862): the shop's selling plans, "Every month, 10% off", for its
- * products of a tag or all of them, which its product pages offer; and its customers'
+ * products of a tag, all of them or chosen variants (ADR-930), which its product pages offer; and its customers'
  * subscriptions, each an order placed again each interval by cash on delivery, to skip, pause,
  * resume or cancel for them.
  */
@@ -40,7 +41,7 @@ export function SubscriptionsPage() {
   const { t } = useLocale();
   const shop = useShop();
   const query = useAdminQuery<SubscriptionsData>(['subscriptions'], SubscriptionsQuery);
-  const create = useAdminMutation<SellingPlanPayloadData, { input: Omit<SellingPlan, 'id'> }>(
+  const create = useAdminMutation<SellingPlanPayloadData, { input: SellingPlanInput }>(
     SellingPlanCreateMutation,
   );
   const remove = useAdminMutation<SellingPlanPayloadData, { id: string }>(
@@ -55,6 +56,8 @@ export function SubscriptionsPage() {
   const [discount, setDiscount] = useState('10');
   const [tag, setTag] = useState('');
   const [minimum, setMinimum] = useState('0');
+  const [variants, setVariants] = useState<{ id: string; title: string }[]>([]);
+  const [picking, setPicking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const writes = can(shop, 'write_products');
@@ -83,11 +86,16 @@ export function SubscriptionsPage() {
           intervalUnit: unit,
           intervalCount: Number(count),
           discountPercent: Number(discount),
-          productTag: tag.trim() || null,
+          productTag: variants.length > 0 ? null : tag.trim() || null,
           minimumOrders: Number(minimum) || 0,
+          variantIds: variants.length > 0 ? variants.map((each) => each.id) : null,
         },
       });
-      if (show(done.sellingPlanCreate!.userErrors)) setTag('');
+      if (show(done.sellingPlanCreate!.userErrors)) {
+        setTag('');
+        setVariants([]);
+        setPicking(false);
+      }
     });
     setBusy(false);
   };
@@ -124,9 +132,13 @@ export function SubscriptionsPage() {
                       })}
                     </span>
                     <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                      {plan.productTag
-                        ? t('subscriptions.forTag', { tag: plan.productTag })
-                        : t('subscriptions.forAll')}
+                      {plan.variants
+                        ? t('subscriptions.forVariants', {
+                            titles: plan.variants.map((each) => each.title).join(', '),
+                          })
+                        : plan.productTag
+                          ? t('subscriptions.forTag', { tag: plan.productTag })
+                          : t('subscriptions.forAll')}
                       {plan.minimumOrders > 0 &&
                         ` · ${t('subscriptions.minimumLine', { count: plan.minimumOrders })}`}
                     </span>
@@ -181,12 +193,59 @@ export function SubscriptionsPage() {
                 value={discount}
                 onChange={(event) => setDiscount(event.target.value)}
               />
-              <TextField
-                label={t('subscriptions.tag')}
-                hint={t('subscriptions.tagHint')}
-                value={tag}
-                onChange={(event) => setTag(event.target.value)}
-              />
+              {variants.length === 0 && (
+                <TextField
+                  label={t('subscriptions.tag')}
+                  hint={t('subscriptions.tagHint')}
+                  value={tag}
+                  onChange={(event) => setTag(event.target.value)}
+                />
+              )}
+              <div className="flex flex-col gap-2">
+                <span className="font-medium">{t('subscriptions.variants')}</span>
+                <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {t('subscriptions.variantsHint')}
+                </span>
+                {variants.length > 0 && (
+                  <ul className="divide-y divide-line rounded-control border border-line">
+                    {variants.map((variant) => (
+                      <li key={variant.id} className="flex items-center gap-2 px-3 py-1">
+                        <span className="min-w-0 flex-1" dir="auto">
+                          {variant.title}
+                        </span>
+                        <Button
+                          variant="tertiary"
+                          icon={<Trash2 aria-hidden className="size-5" />}
+                          aria-label={t('subscriptions.removeVariant', { title: variant.title })}
+                          onClick={() =>
+                            setVariants((now) => now.filter((each) => each.id !== variant.id))
+                          }
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {picking ? (
+                  <ProductPicker
+                    onAdd={(picked) =>
+                      setVariants((now) =>
+                        now.some((each) => each.id === picked.variantId)
+                          ? now
+                          : [...now, { id: picked.variantId, title: picked.title }],
+                      )
+                    }
+                  />
+                ) : (
+                  <Button
+                    variant="secondary"
+                    className="self-start"
+                    icon={<ListPlus aria-hidden className="size-5" />}
+                    onClick={() => setPicking(true)}
+                  >
+                    {t('subscriptions.chooseVariants')}
+                  </Button>
+                )}
+              </div>
               <TextField
                 label={t('subscriptions.minimum')}
                 hint={t('subscriptions.minimumHint')}
