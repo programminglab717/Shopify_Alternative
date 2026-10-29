@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Subscriptions' minimum orders
+### 62150fb · Subscriptions' minimum orders
 
 * **A selling plan may ask for up to twelve orders** before its subscribers cancel themselves;
   until then their order's page offers skip and pause alone ([ADR-928](../architecture/13-decision-log.md#adr-928--a-selling-plan-may-ask-for-up-to-twelve-orders-before-its-subscribers-cancel-themselves-until-then-their-orders-page-offers-skip-and-pause-alone-staff-cancelling-whenever-they-must)).
