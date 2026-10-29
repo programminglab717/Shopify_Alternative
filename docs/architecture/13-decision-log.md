@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-959 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-960 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -967,6 +967,7 @@
 | 957 | The headless starter keeps a wishlist on the device before the shopper signs in, and joins it to their account's when they do | Accepted |
 | 958 | A running theme experiment's shares may be changed, the shoppers already shown a theme keeping it | Accepted |
 | 959 | The Storefront API's nodes gives pages, blogs and articles by their IDs too | Accepted |
+| 960 | An expansion store's copied price may take a margin of its own for a single product, before its collections' | Accepted |
 
 ---
 
@@ -31263,3 +31264,24 @@
 * **Consequences:**
   * Every kind of the Storefront API's ID but a variant's can be asked for in one request.
   * Not yet: variants by `nodes`.
+
+## ADR-960 · An expansion store's copied price may take a margin of its own for a single product, before its collections'
+
+* **Context:** ADR-948 puts a collection's products a margin of their own over an expansion
+  store's rate. One product of a collection can cost far more to sell abroad than the rest: the
+  teak sofa among the cushions. ADR-948 left a single product's margin for later.
+* **Decision:**
+  * **Migration 0425** keeps a list on the store link (`product_margins`), each a product of
+    this shop's and a whole percent from 0 to 100; twenty-five at most, each product once.
+  * **A product's own margin comes first**, before its collections' (ADR-948) and the store's
+    (ADR-933); the price is then rounded as the store asks.
+  * **`expansionStoreProductMarginsSet(shopId, margins)`**, the owner alone, of both shops,
+    signed in lately, as the other pricing; none takes them all away. A product not of the shop
+    is refused. A change is copied again when products are copied as they change (ADR-913).
+  * **`ExpansionStore.productMargins`** gives each with the product's title; a product deleted
+    since is left out.
+  * **Admin:** under each expansion store, "Products with a margin of their own": a search for a
+    product, "Give Teak sofa a margin", its percent, and Save.
+* **Consequences:**
+  * The few products dearer to ship are priced for it, without a collection of their own.
+  * Not yet: a margin by product type or vendor.
