@@ -2638,6 +2638,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
           : request.ip;
       const signInsLeft = async () =>
         limiter === null || (await limiter.hit(ACCOUNT_LOGINS, buyer)).allowed;
+      // As many requests of their own data as the shop's own pages take (ADR-962).
+      const dataRequestsLeft = async () =>
+        limiter === null || (await limiter.hit(ACCOUNT_DATA_REQUESTS, buyer)).allowed;
       const answer = await storefrontApiAnswer(request.body, {
         shopId: found.shopId,
         store: found.store,
@@ -2661,6 +2664,14 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
               wishlist: (token) => core.accountWishlist(found.shopId, token),
               wishlistAdd: (token, ids) => core.accountWishlistAdd(found.shopId, token, ids),
               wishlistRemove: (token, id) => core.accountWishlistRemove(found.shopId, token, id),
+              dataExport: async (token) =>
+                (await dataRequestsLeft())
+                  ? core.accountDataExport(found.shopId, token)
+                  : 'too_many_requests',
+              dataErase: async (token) =>
+                (await dataRequestsLeft())
+                  ? core.accountDataErase(found.shopId, token)
+                  : 'too_many_requests',
             }
           : null,
         search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),

@@ -846,6 +846,25 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
         wished = wished.filter((each) => each !== id);
         return Promise.resolve(wished);
       },
+      dataExport: (token) => {
+        if (busy) return Promise.resolve('too_many_requests');
+        if (!signedIn(token)) return Promise.resolve(null);
+        return Promise.resolve({
+          state: 'ready',
+          readyAt: '2026-10-29T10:00:00.000Z',
+          expiresAt: '2026-10-30T10:00:00.000Z',
+          made: true,
+          url: 'https://files.hatti.pk/exports/ayesha.json?signature=abc',
+        });
+      },
+      dataErase: (token) => {
+        if (!signedIn(token)) return Promise.resolve(null);
+        return Promise.resolve({
+          state: 'waiting',
+          requestedAt: '2026-10-29T10:00:00.000Z',
+          eraseAfter: '2026-11-28T10:00:00.000Z',
+        });
+      },
     };
     return { kept, asked, signedOut, busy: () => (busy = true) };
   }
@@ -1245,6 +1264,50 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     expect((await book()).defaultAddress.id).toBe(id);
     await ask(q.CUSTOMER_ADDRESS_DELETE_MUTATION!, { ...token, id }, at);
     expect((await book()).addresses.nodes.map((address: Json) => address.city)).toEqual(['Lahore']);
+  });
+
+  it('gives the shopper their own data, and asks for its erasure once they confirm (ADR-962)', async () => {
+    const core = accounts();
+    const at = { ...api(), accounts: core.kept };
+    const EXPORT = `mutation ($token: String!) {
+      customerDataExport(customerAccessToken: $token) {
+        dataExport { readyAt expiresAt url } customerUserErrors { field code }
+      }
+    }`;
+    const ERASE = `mutation ($token: String!, $confirm: Boolean!) {
+      customerDataErase(customerAccessToken: $token, confirm: $confirm) {
+        erasure { state requestedAt eraseAfter } customerUserErrors { field code }
+      }
+    }`;
+    expect((await ask(EXPORT, { token: TOKEN }, at)).data.customerDataExport).toEqual({
+      dataExport: {
+        readyAt: '2026-10-29T10:00:00.000Z',
+        expiresAt: '2026-10-30T10:00:00.000Z',
+        url: 'https://files.hatti.pk/exports/ayesha.json?signature=abc',
+      },
+      customerUserErrors: [],
+    });
+    // Not until they say they understand; and only theirs.
+    expect((await ask(ERASE, { token: TOKEN, confirm: false }, at)).data.customerDataErase).toEqual(
+      { erasure: null, customerUserErrors: [{ field: ['confirm'], code: 'INVALID' }] },
+    );
+    expect(
+      (await ask(ERASE, { token: 'someone-elses-token-0123456789abcd', confirm: true }, at)).data
+        .customerDataErase.customerUserErrors,
+    ).toEqual([{ field: ['customerAccessToken'], code: 'UNIDENTIFIED_CUSTOMER' }]);
+    expect((await ask(ERASE, { token: TOKEN, confirm: true }, at)).data.customerDataErase).toEqual({
+      erasure: {
+        state: 'WAITING',
+        requestedAt: '2026-10-29T10:00:00.000Z',
+        eraseAfter: '2026-11-28T10:00:00.000Z',
+      },
+      customerUserErrors: [],
+    });
+    // Too many of late, as the shop's own pages count them.
+    core.busy();
+    expect(
+      (await ask(EXPORT, { token: TOKEN }, at)).data.customerDataExport.customerUserErrors,
+    ).toEqual([{ field: [], code: 'TOO_MANY_REQUESTS' }]);
   });
 
   it("keeps the wishlist as the headless starter's page does (ADR-953)", async () => {

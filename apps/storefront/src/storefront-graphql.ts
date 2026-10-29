@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type {
   AccountAddress,
   AccountAddressRequest,
+  AccountDataEraseResponse,
+  AccountDataExportResponse,
   AccountErrorResponse,
   AccountJson,
   AccountLoginStartRequest,
@@ -243,6 +245,18 @@ const SDL = /* GraphQL */ `
     """
     customerWishlistAdd(customerAccessToken: String!, productIds: [ID!]!): CustomerWishlistPayload
     customerWishlistRemove(customerAccessToken: String!, productId: ID!): CustomerWishlistPayload
+    """
+    The file of the signed-in shopper's own data (ADR-962), as their account on the shop's own
+    pages makes it (ADR-572): made, or the one kept for the day given again, with a link that
+    downloads it for a few minutes. None where the shop keeps nothing of them.
+    """
+    customerDataExport(customerAccessToken: String!): CustomerDataExportPayload
+    """
+    Asks for the erasure of the signed-in shopper's data (ADR-962), as the shop's staff would for
+    them (ADR-572), once confirm says they understand: it waits, and the shop may still cancel it
+    while an order of theirs is under way. None where the shop keeps nothing of them.
+    """
+    customerDataErase(customerAccessToken: String!, confirm: Boolean!): CustomerDataErasePayload
     cartCreate(input: CartInput): CartCreatePayload
     cartLinesAdd(cartId: ID!, lines: [CartLineInput!]!): CartLinesAddPayload
     cartLinesUpdate(cartId: ID!, lines: [CartLineUpdateInput!]!): CartLinesUpdatePayload
@@ -771,6 +785,56 @@ const SDL = /* GraphQL */ `
   }
 
   """
+  The file of a shopper's own data (ADR-962).
+  """
+  type CustomerDataExport {
+    """
+    ISO 8601: when it was made.
+    """
+    readyAt: String!
+    """
+    ISO 8601: when it is let go, and another may be made.
+    """
+    expiresAt: String!
+    """
+    Downloads it for a few minutes; ask again for another.
+    """
+    url: String!
+  }
+
+  type CustomerDataExportPayload {
+    """
+    Null where the shop keeps nothing of the shopper, or with an error.
+    """
+    dataExport: CustomerDataExport
+    customerUserErrors: [CustomerUserError!]!
+  }
+
+  """
+  A shopper's erasure, asked for, as it waits (ADR-962).
+  """
+  type CustomerDataErasure {
+    """
+    WAITING until eraseAfter, unless the shop cancels it; HELD while an order of theirs is under
+    way or the shop owes them store credit.
+    """
+    state: String!
+    requestedAt: String!
+    """
+    ISO 8601: the soonest it happens.
+    """
+    eraseAfter: String!
+  }
+
+  type CustomerDataErasePayload {
+    """
+    Null where the shop keeps nothing of the shopper, or with an error.
+    """
+    erasure: CustomerDataErasure
+    customerUserErrors: [CustomerUserError!]!
+  }
+
+  """
   An address in Pakistan, as checkout takes it.
   """
   type MailingAddress {
@@ -963,6 +1027,13 @@ export interface StorefrontApiAccounts {
   wishlist(token: string): Promise<string[] | null>;
   wishlistAdd(token: string, productIds: readonly string[]): Promise<string[] | null>;
   wishlistRemove(token: string, productId: string): Promise<string[] | null>;
+  /**
+   * The file of the shopper's own data, made or kept (ADR-962); `too_many_requests` where the
+   * buyer asked too many of late; null without a session.
+   */
+  dataExport(token: string): Promise<AccountDataExportResponse | 'too_many_requests' | null>;
+  /** Asks for the shopper's erasure, likewise. */
+  dataErase(token: string): Promise<AccountDataEraseResponse | 'too_many_requests' | null>;
 }
 
 /** What a request of the Storefront API reads and changes. */
@@ -1622,6 +1693,11 @@ function rootOf(api: StorefrontApiShop) {
     return api.accounts;
   };
   const tooManyAsked = customerError([], 'Too many sign-ins: wait a minute', 'TOO_MANY_REQUESTS');
+  const tooManyRequests = customerError(
+    [],
+    'Too many requests of your data: wait a minute',
+    'TOO_MANY_REQUESTS',
+  );
   const unidentified = customerError(
     ['customerAccessToken'],
     "Sign in again: that access token is no one's",
@@ -1729,6 +1805,54 @@ function rootOf(api: StorefrontApiShop) {
           ? accounts().wishlistRemove(args.customerAccessToken, id)
           : accounts().wishlist(args.customerAccessToken),
       );
+    },
+    customerDataExport: async (args: { customerAccessToken: string }) => {
+      const asked = CUSTOMER_TOKEN.test(args.customerAccessToken)
+        ? await accounts().dataExport(args.customerAccessToken)
+        : null;
+      if (asked === null) return { dataExport: null, customerUserErrors: [unidentified] };
+      if (asked === 'too_many_requests') {
+        return { dataExport: null, customerUserErrors: [tooManyRequests] };
+      }
+      return {
+        dataExport:
+          asked.state === 'none'
+            ? null
+            : { readyAt: asked.readyAt, expiresAt: asked.expiresAt, url: asked.url },
+        customerUserErrors: [],
+      };
+    },
+    customerDataErase: async (args: { customerAccessToken: string; confirm: boolean }) => {
+      if (!args.confirm) {
+        return {
+          erasure: null,
+          customerUserErrors: [
+            customerError(
+              ['confirm'],
+              'Confirm that you understand your data will be erased',
+              'INVALID',
+            ),
+          ],
+        };
+      }
+      const asked = CUSTOMER_TOKEN.test(args.customerAccessToken)
+        ? await accounts().dataErase(args.customerAccessToken)
+        : null;
+      if (asked === null) return { erasure: null, customerUserErrors: [unidentified] };
+      if (asked === 'too_many_requests') {
+        return { erasure: null, customerUserErrors: [tooManyRequests] };
+      }
+      return {
+        erasure:
+          asked.state === 'none'
+            ? null
+            : {
+                state: asked.state.toUpperCase(),
+                requestedAt: asked.requestedAt,
+                eraseAfter: asked.eraseAfter,
+              },
+        customerUserErrors: [],
+      };
     },
     customerAddressCreate: (args: { customerAccessToken: string; address: AddressInput }) =>
       savedAddress(args.customerAccessToken, args.address, null),
