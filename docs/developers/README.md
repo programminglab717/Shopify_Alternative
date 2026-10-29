@@ -75,6 +75,30 @@ hatti theme dev  --theme thm_… --dir my-theme   # push each file as it is save
 The theme shoppers see is changed only with `--allow-live`. The token is read from the
 environment and never written to disk.
 
+An app's functions (ADR-868) are built and deployed the same way, from a directory with a
+`hatti.function.json`:
+
+```json
+{
+  "handle": "cod-above-limit",
+  "title": "No cash on delivery above Rs 10,000",
+  "target": "payment_customization",
+  "build": "javy build src/index.js -o dist/function.wasm",
+  "module": "dist/function.wasm"
+}
+```
+
+```sh
+export HATTI_ACCESS_TOKEN=…   # the app's token, with write_settings
+
+hatti function build    # run its build, and check its module is WebAssembly of 256 KiB at most
+hatti function deploy   # build it, then give it to the shop as the app's new version
+hatti function list     # the app's functions in the shop, on or off, and their last failure
+```
+
+`build` is the developer's own tool: Javy, TinyGo or Rust's `wasm32-wasi`. A new version runs as
+the last did; a function the shop hasn't turned on stays off (ADR-922).
+
 ## Public apps
 
 A partner (ADR-504) registers an app on their partner page: its address, its redirect URLs and
