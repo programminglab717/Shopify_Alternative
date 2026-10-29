@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-936 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-937 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -944,6 +944,7 @@
 | 934 | A shop's single sign-on domains are looked up in DNS again each day, and one whose record has been gone three days is no longer proved the shop's | Accepted |
 | 935 | `hatti function init` begins an app's function from its target's starter, in JavaScript built with Javy, with a sample cart to run it on | Accepted |
 | 936 | A selling plan is changed from the admin as it was made, its chosen variants among the rest | Accepted |
+| 937 | A buy button's collection shows twelve products at a time, Show more giving the next page, past its first twelve | Accepted |
 
 ---
 
@@ -30738,3 +30739,21 @@
     after it.
 * **Consequences:**
   * A shop changes a plan's discount or variants in place, its customers' subscriptions kept.
+
+## ADR-937 · A buy button's collection shows twelve products at a time, Show more giving the next page, past its first twelve
+
+* **Context:** ADR-925's collection embed shows a collection's first twelve products on another
+  website and no more: a shop embedding its whole Eid collection shows a twelfth of it. Shopify's
+  collection buy button pages through a collection. ADR-925 left collections past their first
+  twelve for later.
+* **Decision:**
+  * **The embed takes `?page=`** (`/buy-button/collections/<handle>?page=2`): twelve products a
+    page, in the collection's order, up to the hundredth page; a page that is no page is the
+    first. Its answer says `next`, the page after it, while the collection has more.
+  * **The script's Show more**, "مزید دیکھیں" in Urdu, under the grid, fetches the next page and
+    adds its products to the grid, each with its buttons and the same cart (ADR-918), until the
+    last.
+  * **Each page is as public as the collection's page**, kept at the edge as it is.
+* **Consequences:**
+  * A shop embeds a whole collection, its shoppers shown it a page at a time.
+  * Not yet: layouts other than cards in a grid.
