@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-924 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-925 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -932,6 +932,7 @@
 | 922 | The command line builds an app's checkout functions with the developer's own tool and deploys them by their handle, from a directory's hatti.function.json | Accepted |
 | 923 | A shop names the AI assistant that answers its customers and sets its tone, warm or formal: the name given the model as the shop's words, the tone as one of Hatti's own instructions | Accepted |
 | 924 | The Ajax cart gives scripts its amounts in the currency the shopper picked, as the money filter shows prices, with what checkout charges in rupees besides | Accepted |
+| 925 | Buy buttons embed a collection as a grid of its first twelve products, each with its own buttons, and take the shop's colour | Accepted |
 
 ---
 
@@ -30450,3 +30451,25 @@
   * A theme's own cart script shows dirhams in Dubai without knowing the rate.
   * Checkout, feeds, structured data and the Storefront API stay in rupees; prices a shop sets per
     currency, and charging in it (PAY-12), are still not done.
+
+## ADR-925 · Buy buttons embed a collection as a grid of its first twelve products, each with its own buttons, and take the shop's colour
+
+* **Context:** ADR-860's buy buttons show one product each; ADR-918 gave them a cart across a
+  page's buttons. A blogger writing about the Eid edit pasted a snippet per product, and every
+  button was the platform's teal on any site. ADR-860 left collections as embeds, and a choice of
+  colours and layout, for later.
+* **Decision:**
+  * **A collection's snippet** (`data-hatti-buy-collection="<handle>"`) draws its title, linked to
+    its page, and a grid of its first 12 products in its order, each a card as a product's button
+    is: photo, price, variants, Buy now and Add to cart into the page's one cart. The grid fills
+    the space it is given, a column on a phone.
+  * **Its products** come from `/buy-button/collections/<handle>`, as public as the collection's
+    page: none for a collection the storefront doesn't show, nor while the shop is behind its
+    password; products with nothing to sell are left out.
+  * **A colour** (`data-color="#7c2d12"`, six hex digits) colours a snippet's buttons, and the
+    cart's bar takes the page's first button's. Anything else is ignored.
+  * **The admin** offers a collection's code on its page, and on both a colour picker beside the
+    language.
+* **Consequences:**
+  * One snippet sells a whole collection from a blog post, in the brand's colours.
+  * Not yet: layouts other than cards in a grid, and collections past their first twelve.
