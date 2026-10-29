@@ -275,7 +275,13 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
       image: { src: `${origin}/img/${handle}.jpg`, alt: handle },
       currency: 'PKR',
       variants: [
-        { id: `v-${handle}`, title: 'Default', available: true, price: '1500.00', compareAtPrice: null },
+        {
+          id: `v-${handle}`,
+          title: 'Default',
+          available: true,
+          price: '1500.00',
+          compareAtPrice: null,
+        },
       ],
     });
     const window = new Window({ url: 'https://blog.example.pk/' });

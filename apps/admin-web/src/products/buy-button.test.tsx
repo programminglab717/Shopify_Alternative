@@ -104,6 +104,23 @@ describe("A product's buy button for other websites (CH-08, ADR-860)", () => {
     expect(within(card).queryByText(/data-color/)).toBeNull();
   });
 
+  it('lays the product out as the shop picks, the default said in nothing (ADR-949)', async () => {
+    vi.stubGlobal('fetch', core().fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+    const heading = await screen.findByRole('heading', { name: 'Buy button' });
+    const card = heading.closest('section') ?? heading.parentElement!.parentElement!;
+    const layout = within(card).getByLabelText('Layout') as HTMLSelectElement;
+    expect([...layout.options].map((option) => option.textContent)).toEqual([
+      'A card',
+      'Across, its photo beside it',
+    ]);
+    expect(within(card).queryByText(/data-layout/)).toBeNull();
+    fireEvent.change(layout, { target: { value: 'horizontal' } });
+    expect(
+      within(card).getByText(/data-hatti-buy-button="khussa" data-layout="horizontal"/),
+    ).toBeTruthy();
+  });
+
   it('is offered for products the storefront shows alone', async () => {
     vi.stubGlobal('fetch', core('DRAFT').fetcher);
     renderAdmin('/shop_1/products/prod_1');

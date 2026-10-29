@@ -10,22 +10,36 @@ import { FormSection } from './product-form';
 const DEFAULT_COLOR = '#0f766e';
 
 /**
+ * How the storefront's script lays an embed out (ADR-949), the first of each its default, said in
+ * the snippet only where another is chosen.
+ */
+export const BUY_BUTTON_LAYOUTS = {
+  product: ['card', 'horizontal'],
+  collection: ['grid', 'list', 'carousel'],
+} as const;
+
+/**
  * The snippet another website pastes to show the product, or with `collection` the collection
- * (ADR-925), as the storefront serves it; its buttons in `color` where given.
+ * (ADR-925), as the storefront serves it; its buttons in `color` where given, laid out as
+ * `layout` says (ADR-949).
  */
 export function buyButtonSnippet(
   storefront: string,
   handle: string,
   language: 'en' | 'ur',
-  options: { collection?: boolean; color?: string | null } = {},
+  options: { collection?: boolean; color?: string | null; layout?: string | null } = {},
 ): string {
   const origin = storefront.replace(/\/+$/, '');
   const lang = language === 'ur' ? ' data-language="ur"' : '';
   const color =
     options.color && /^#[0-9a-f]{6}$/i.test(options.color) ? ` data-color="${options.color}"` : '';
   const kind = options.collection ? 'data-hatti-buy-collection' : 'data-hatti-buy-button';
+  const layouts: readonly string[] =
+    BUY_BUTTON_LAYOUTS[options.collection ? 'collection' : 'product'];
+  const layout =
+    options.layout && layouts.indexOf(options.layout) > 0 ? ` data-layout="${options.layout}"` : '';
   return (
-    `<div ${kind}="${handle}"${lang}${color}></div>\n` +
+    `<div ${kind}="${handle}"${lang}${color}${layout}></div>\n` +
     `<script src="${origin}/buy-button.js" async></script>`
   );
 }
@@ -50,9 +64,10 @@ export function BuyButtonCard({
   const { t } = useLocale();
   const [language, setLanguage] = useState<'en' | 'ur'>('en');
   const [color, setColor] = useState<string | null>(null);
+  const [layout, setLayout] = useState<string>(collection ? 'grid' : 'card');
   const [copied, setCopied] = useState(false);
   if (!active || !storefront) return null;
-  const snippet = buyButtonSnippet(storefront, handle, language, { collection, color });
+  const snippet = buyButtonSnippet(storefront, handle, language, { collection, color, layout });
   return (
     <FormSection
       title={t(collection ? 'buyButton.collectionTitle' : 'buyButton.title')}
@@ -67,6 +82,18 @@ export function BuyButtonCard({
         ]}
         onChange={(value) => {
           setLanguage(value);
+          setCopied(false);
+        }}
+      />
+      <SelectField
+        label={t('buyButton.layout')}
+        value={layout}
+        options={BUY_BUTTON_LAYOUTS[collection ? 'collection' : 'product'].map((value) => ({
+          value,
+          label: t(`buyButton.layout.${value}`),
+        }))}
+        onChange={(value) => {
+          setLayout(value);
           setCopied(false);
         }}
       />
