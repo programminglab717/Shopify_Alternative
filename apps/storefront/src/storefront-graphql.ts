@@ -170,8 +170,8 @@ const SDL = /* GraphQL */ `
     """
     products(first: Int, after: String, query: String): ProductConnection!
     """
-    The products and collections with these IDs, in their order, null for one the shop doesn't
-    sell (ADR-956): up to 250 at once, as Shopify's.
+    The products, collections, pages, blogs and articles with these IDs (ADR-956, ADR-959), in
+    their order, null for one the shop doesn't show: up to 250 at once, as Shopify's.
     """
     nodes(ids: [ID!]!): [Node]!
     collection(id: ID, handle: String): Collection
@@ -313,7 +313,7 @@ const SDL = /* GraphQL */ `
     items: [MenuItem!]!
   }
 
-  type Page {
+  type Page implements Node {
     id: ID!
     handle: String!
     title: String!
@@ -332,7 +332,7 @@ const SDL = /* GraphQL */ `
     name: String!
   }
 
-  type Article {
+  type Article implements Node {
     id: ID!
     handle: String!
     title: String!
@@ -349,7 +349,7 @@ const SDL = /* GraphQL */ `
     blog: Blog!
   }
 
-  type Blog {
+  type Blog implements Node {
     id: ID!
     handle: String!
     title: String!
@@ -444,7 +444,8 @@ const SDL = /* GraphQL */ `
   }
 
   """
-  What nodes gives by its ID (ADR-956): a product or a collection.
+  What nodes gives by its ID (ADR-956): a product, a collection, or a page, blog or article
+  (ADR-959).
   """
   interface Node {
     id: ID!
@@ -976,6 +977,7 @@ export interface StorefrontApiShop {
     | 'handles'
     | 'menu'
     | 'pageByHandle'
+    | 'pages'
     | 'blogByHandle'
     | 'articleByHandle'
     | 'articles'
@@ -1937,11 +1939,42 @@ function rootOf(api: StorefrontApiShop) {
           if (doc) collections.set(doc.id, doc);
         }
       }
+      // Pages and articles at once, as products (ADR-959); blogs, as collections, by handle.
+      const pageIds = args.ids.flatMap((id) => idOf('Page', id) ?? []);
+      const pages = new Map(
+        (pageIds.length > 0 ? await api.store.pages(pageIds) : []).flatMap((doc) =>
+          doc ? [[doc.id, doc] as const] : [],
+        ),
+      );
+      const articleIds = args.ids.flatMap((id) => idOf('Article', id) ?? []);
+      const articles = new Map(
+        (articleIds.length > 0 ? await api.store.articles(articleIds) : []).flatMap((doc) =>
+          doc ? [[doc.id, doc] as const] : [],
+        ),
+      );
+      const blogs = new Map<string, BlogDoc>();
+      const wantsBlogs = args.ids.some((id) => idOf('Blog', id));
+      if (wantsBlogs || articles.size > 0) {
+        for (const handle of await api.store.handles('blog')) {
+          const doc = await api.store.blogByHandle(handle);
+          if (doc) blogs.set(doc.handle, doc);
+        }
+      }
+      const blogsById = new Map([...blogs.values()].map((doc) => [doc.id, doc]));
       return args.ids.map((id) => {
         const product = products.get(idOf('Product', id) ?? '');
         if (product) return { __typename: 'Product', ...productOf(product, api) };
         const collection = collections.get(idOf('Collection', id) ?? '');
-        return collection ? { __typename: 'Collection', ...collectionOf(collection, api) } : null;
+        if (collection) return { __typename: 'Collection', ...collectionOf(collection, api) };
+        const page = pages.get(idOf('Page', id) ?? '');
+        if (page) return { __typename: 'Page', ...pageOf(page, api) };
+        const blog = blogsById.get(idOf('Blog', id) ?? '');
+        if (blog) return { __typename: 'Blog', ...blogOf(blog, api) };
+        const article = articles.get(idOf('Article', id) ?? '');
+        const itsBlog = article && blogs.get(article.blogHandle);
+        return article && itsBlog
+          ? { __typename: 'Article', ...articleOf(article, itsBlog, api) }
+          : null;
       });
     },
     collection: async (args: { id?: string | null; handle?: string | null }) => {

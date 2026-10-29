@@ -501,6 +501,36 @@ describe("The Storefront API's menus, pages, blogs and policies (ADR-890)", () =
     expect(data.pages.pageInfo.hasNextPage).toBe(handles.length > 2);
   });
 
+  it('gives pages, blogs and articles by their IDs at once, as products (ADR-959)', async () => {
+    const page = sample.pages!.find((each) => each.handle === 'returns')!;
+    const blog = sample.blogs!.find((each) => each.handle === 'news')!;
+    const article = sample.articles![0]!;
+    const ids = [
+      `gid://hatti/Article/${article.id}`,
+      `gid://hatti/Page/${page.id}`,
+      'gid://hatti/Page/gone',
+      `gid://hatti/Blog/${blog.id}`,
+    ];
+    const { data, errors } = await ask(
+      `query ($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          __typename id
+          ... on Page { handle }
+          ... on Blog { handle }
+          ... on Article { handle blog { handle } }
+        }
+      }`,
+      { ids },
+    );
+    expect(errors).toBeUndefined();
+    expect(data.nodes).toEqual([
+      { __typename: 'Article', id: ids[0], handle: article.handle, blog: { handle: 'news' } },
+      { __typename: 'Page', id: ids[1], handle: 'returns' },
+      null,
+      { __typename: 'Blog', id: ids[3], handle: 'news' },
+    ]);
+  });
+
   it("gives a blog's articles, the latest first, and an article by its handle", async () => {
     const { data } = await ask(`{
       blog(handle: "news") {
