@@ -7,6 +7,7 @@ import { HattiAdminApiError, HattiAdminClient } from '@hatti/admin-client';
 import {
   FUNCTION_CONFIG,
   FunctionError,
+  LANGUAGES,
   RUN_LIMITS,
   TARGETS,
   buildFunction,
@@ -40,7 +41,8 @@ Theme commands:
   dev --theme <id>             Push each file as it is saved, with the theme's preview
 
 Function commands, for the function ${FUNCTION_CONFIG} describes:
-  init <handle> --target <t>   Begin one in the directory: ${TARGETS.join(' or ')}
+  init <handle> --target <t>   Begin one in the directory: ${TARGETS.join(' or ')};
+       [--lang <l>]            in ${LANGUAGES.join(' or ')}, javascript unless given
   build                        Run its build, and check its module as Hatti will
   run --input <file.json>      Build it, then run it on that input as checkout runs it
   deploy                       Build it, then give it to the shop as the app's new version
@@ -75,6 +77,7 @@ export async function run(
       'no-build': { type: 'boolean' },
       input: { type: 'string' },
       target: { type: 'string' },
+      lang: { type: 'string' },
       title: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -92,9 +95,14 @@ export async function run(
         handle: positionals[2] ?? '',
         target: typeof values.target === 'string' ? values.target : '',
         ...(typeof values.title === 'string' && { title: values.title }),
+        ...(typeof values.lang === 'string' && { language: values.lang }),
       });
       out.log(`Began ${positionals[2]} in ${dir}: ${written.join(', ')}`);
-      out.log('Build it with Javy (https://github.com/bytecodealliance/javy), then:');
+      out.log(
+        values.lang === 'rust'
+          ? 'Build it with Rust, its target added once: rustup target add wasm32-wasip1. Then:'
+          : 'Build it with Javy (https://github.com/bytecodealliance/javy), then:',
+      );
       out.log('  hatti function run --input input.json');
       return 0;
     } catch (error) {

@@ -10,11 +10,13 @@ import { FunctionRunner, RUN_LIMITS, WasmError, takeWasm, type RunResult } from 
 // `appFunctionSet` (ADR-868), as Shopify's CLI deploys its functions. A function's directory says
 // what it is in `hatti.function.json`. Its module is checked, and run on a sample input, with
 // Hatti's own code, as checkout runs it (ADR-927). A new one is begun from a starter of its target
-// (ADR-935).
+// (ADR-935), in JavaScript or Rust (ADR-942).
 
 export const FUNCTION_CONFIG = 'hatti.function.json';
 
 export const TARGETS = ['payment_customization', 'cart_validation'] as const;
+/** The languages a function is begun in: JavaScript built with Javy, or Rust (ADR-942). */
+export const LANGUAGES = ['javascript', 'rust'] as const;
 const HANDLE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 /** What `hatti.function.json` says of the function in its directory. */
@@ -170,6 +172,89 @@ writeOutput({ errors });
   },
 };
 
+/** The crate a Rust starter is, its module as small as Rust makes it: 256 KiB is the most. */
+const CARGO_TOML = `[package]
+name = "hatti-function"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde_json = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+`;
+
+/** Standard input read as JSON, and the answer written to standard output, as WASI gives them. */
+const RUST_IO = `use serde_json::{json, Value};
+use std::io::{self, Read, Write};
+
+fn read_input() -> Value {
+    let mut text = String::new();
+    io::stdin().read_to_string(&mut text).expect("its input");
+    serde_json::from_str(&text).expect("its input, as JSON")
+}
+
+fn write_output(output: Value) {
+    io::stdout()
+        .write_all(output.to_string().as_bytes())
+        .expect("its answer");
+}
+`;
+
+/** Each target's starter in Rust (ADR-942), as its JavaScript one does. */
+const RUST_STARTERS: Record<FunctionConfig['target'], string> = {
+  payment_customization: `// A payment customisation (ADR-868): it reads the cart and the ways to pay checkout would
+// offer, and hides some. Here, cash on delivery above the shop's limit, Rs 10,000 unless the
+// function's configuration says another, in paisa: { "limit": 1500000 }.
+${RUST_IO}
+fn main() {
+    let input = read_input();
+    let limit = input["configuration"]["limit"].as_i64().unwrap_or(1_000_000);
+    let subtotal = input["cart"]["subtotal"].as_i64().unwrap_or(0);
+    let offered = input["paymentMethods"]
+        .as_array()
+        .is_some_and(|methods| methods.iter().any(|method| method == "cash_on_delivery"));
+    let mut operations = Vec::new();
+    if subtotal > limit && offered {
+        operations.push(json!({ "hide": { "paymentMethod": "cash_on_delivery" } }));
+    }
+    write_output(json!({ "operations": operations }));
+}
+`,
+  cart_validation: `// A cart validation (ADR-868): it reads the cart, and says what is wrong, which refuses the
+// order, three messages at most. Here, more of an item than the shop sells to one shopper, 5
+// unless the function's configuration says another: { "maxQuantity": 3 }.
+${RUST_IO}
+fn main() {
+    let input = read_input();
+    let most = input["configuration"]["maxQuantity"].as_i64().unwrap_or(5);
+    let errors: Vec<Value> = input["cart"]["lines"]
+        .as_array()
+        .map(|lines| lines.as_slice())
+        .unwrap_or_default()
+        .iter()
+        .filter(|line| line["quantity"].as_i64().unwrap_or(0) > most)
+        .take(3)
+        .map(|line| {
+            let title = line["title"].as_str().unwrap_or("An item");
+            json!({ "message": format!("{title}: {most} at most for each order") })
+        })
+        .collect();
+    write_output(json!({ "errors": errors }));
+}
+`,
+};
+
+/** How a Rust starter is built: for WASI, its module copied to where Hatti reads it. */
+const RUST_BUILD =
+  'cargo build --release --target wasm32-wasip1 && mkdir -p dist && ' +
+  'cp target/wasm32-wasip1/release/hatti-function.wasm dist/function.wasm';
+
 /** A cart as checkout gives a function (ADR-868), to run a starter on. */
 const SAMPLE_INPUT = {
   cart: {
@@ -194,13 +279,13 @@ const SAMPLE_INPUT = {
 
 /**
  * Begins a function of `target` in `dir` (ADR-935), as Shopify's CLI generates an extension: its
- * `hatti.function.json`, a starter in JavaScript built with Javy, and a sample cart to run it on
- * with `hatti function run --input input.json`. Refused where `dir` holds a function already.
- * The files it wrote.
+ * `hatti.function.json`, a starter in JavaScript built with Javy, or in Rust built with Cargo for
+ * WASI (ADR-942), and a sample cart to run it on with `hatti function run --input input.json`.
+ * Refused where `dir` holds a function already. The files it wrote.
  */
 export async function initFunction(
   dir: string,
-  options: { handle: string; target: string; title?: string },
+  options: { handle: string; target: string; title?: string; language?: string },
 ): Promise<string[]> {
   if (!HANDLE.test(options.handle)) {
     throw new FunctionError('Give the function a handle of lowercase letters, digits and hyphens');
@@ -208,7 +293,12 @@ export async function initFunction(
   if (!TARGETS.includes(options.target as FunctionConfig['target'])) {
     throw new FunctionError(`Its target is one of ${TARGETS.join(' and ')}`);
   }
+  const language = options.language ?? 'javascript';
+  if (!LANGUAGES.includes(language as (typeof LANGUAGES)[number])) {
+    throw new FunctionError(`Its language is one of ${LANGUAGES.join(' and ')}`);
+  }
   const target = options.target as FunctionConfig['target'];
+  const rust = language === 'rust';
   const exists = await readFile(join(dir, FUNCTION_CONFIG), 'utf8').then(
     () => true,
     () => false,
@@ -218,13 +308,19 @@ export async function initFunction(
     handle: options.handle,
     title: options.title?.trim() || STARTERS[target].title,
     target,
-    build: 'javy build src/index.js -o dist/function.wasm',
+    build: rust ? RUST_BUILD : 'javy build src/index.js -o dist/function.wasm',
     module: 'dist/function.wasm',
   };
   await mkdir(join(dir, 'src'), { recursive: true });
   const files: [string, string][] = [
     [FUNCTION_CONFIG, `${JSON.stringify(config, null, 2)}\n`],
-    ['src/index.js', STARTERS[target].code],
+    ...(rust
+      ? ([
+          ['Cargo.toml', CARGO_TOML],
+          ['src/main.rs', RUST_STARTERS[target]],
+          ['.gitignore', '/target\n/dist\n'],
+        ] as [string, string][])
+      : ([['src/index.js', STARTERS[target].code]] as [string, string][])),
     ['input.json', `${JSON.stringify(SAMPLE_INPUT, null, 2)}\n`],
   ];
   for (const [path, text] of files) await writeFile(join(dir, path), text, { flag: 'wx' });

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,11 +11,23 @@ import {
   buildFunction,
   functionConfigIn,
   initFunction,
+  runFunction,
   type FunctionConfig,
 } from './function.js';
 import { run } from './main.js';
 
 type Asked = { query: string; variables: Record<string, unknown> };
+
+/** Whether this machine builds Rust for WASI, as a Rust starter needs (ADR-942). */
+const rustForWasi = (() => {
+  try {
+    return execFileSync('rustup', ['target', 'list', '--installed'], { encoding: 'utf8' })
+      .split('\n')
+      .includes('wasm32-wasip1');
+  } catch {
+    return false;
+  }
+})();
 
 /** A function that answers with its input, as Hatti's tests build one. */
 const wasm = () => Buffer.from(echoing());
@@ -278,4 +291,66 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
       /^Began cod-lahore in .*: hatti\.function\.json, src\/index\.js, input\.json$/,
     );
   });
+
+  it('begins a function in Rust, built with Cargo for WASI (ADR-942)', async () => {
+    const payments = join(dir, 'cod');
+    expect(
+      await initFunction(payments, {
+        handle: 'cod-above-limit',
+        target: 'payment_customization',
+        language: 'rust',
+      }),
+    ).toEqual([FUNCTION_CONFIG, 'Cargo.toml', 'src/main.rs', '.gitignore', 'input.json']);
+    expect((await functionConfigIn(payments)).build).toBe(
+      'cargo build --release --target wasm32-wasip1 && mkdir -p dist && ' +
+        'cp target/wasm32-wasip1/release/hatti-function.wasm dist/function.wasm',
+    );
+    expect(await readFile(join(payments, 'Cargo.toml'), 'utf8')).toContain('serde_json = "1"');
+    await expect(
+      initFunction(join(dir, 'x'), {
+        handle: 'in-go',
+        target: 'cart_validation',
+        language: 'go',
+      }),
+    ).rejects.toThrow('Its language is one of javascript and rust');
+    expect(
+      await run(
+        [
+          'function',
+          'init',
+          'five',
+          '--target',
+          'cart_validation',
+          '--lang',
+          'rust',
+          '--dir',
+          join(dir, 'cli'),
+        ],
+        {},
+        out,
+      ),
+    ).toBe(0);
+    expect(lines[1]).toContain('rustup target add wasm32-wasip1');
+  });
+
+  // Where Rust builds for WASI, the starters are built and run as checkout runs them.
+  it.skipIf(!rustForWasi)(
+    'builds each Rust starter into a module Hatti runs, which answers its sample cart (ADR-942)',
+    async () => {
+      const answers: unknown[] = [];
+      for (const target of ['payment_customization', 'cart_validation'] as const) {
+        const at = join(dir, target);
+        await initFunction(at, { handle: 'starter', target, language: 'rust' });
+        const module = await buildFunction(at, await functionConfigIn(at), out);
+        const sample = JSON.parse(await readFile(join(at, 'input.json'), 'utf8'));
+        const result = await runFunction(module, sample);
+        answers.push(result.ok ? result.output : result);
+      }
+      expect(answers).toEqual([
+        { operations: [{ hide: { paymentMethod: 'cash_on_delivery' } }] },
+        { errors: [{ message: 'Lawn suit: 5 at most for each order' }] },
+      ]);
+    },
+    600_000,
+  );
 });

@@ -78,11 +78,15 @@ environment and never written to disk.
 An app's functions (ADR-868) are built and deployed the same way, from a directory with a
 `hatti.function.json`. `hatti function init` begins one (ADR-935): its `hatti.function.json`, a
 starter in JavaScript for its target, built with [Javy](https://github.com/bytecodealliance/javy),
-and a sample cart to run it on:
+and a sample cart to run it on. With `--lang rust` the starter is a Rust crate instead, built with
+Cargo for WASI once `rustup target add wasm32-wasip1` has been run (ADR-942); it reads and writes
+its JSON with `serde_json`, and its module is about 90 KB of the 256 KiB a function may be:
 
 ```sh
 hatti function init cod-above-limit --target payment_customization --dir cod-above-limit
 cd cod-above-limit && hatti function run --input input.json
+
+hatti function init five-at-most --target cart_validation --lang rust --dir five-at-most
 ```
 
 A payment customisation's starter hides cash on delivery above a limit, a cart validation's refuses
