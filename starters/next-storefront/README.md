@@ -35,6 +35,10 @@ a server of your own. Set the same variables there.
   Storefront API's schema, so they keep working as the API changes.
 - `app/actions.ts`: the cart, its ID kept in an httpOnly cookie, changed by server actions.
 - `app/`: the pages: home and search, `products/[handle]`, `collections/[handle]`, `cart`.
+- `lib/language.ts` and `lib/words.ts`: English or Urdu, as the header's switch keeps it in a
+  cookie. The catalog and the cart are asked for in it with `@inContext(language:)`, the shop's
+  Urdu words where it wrote them; pages in Urdu are right to left, and the site's own words are
+  in `lib/words.ts`.
 
 The Storefront API speaks Shopify's dialect, so Shopify headless examples mostly carry over: the
 same headers, `cartCreate`, `cartLinesAdd`, `checkoutUrl`.

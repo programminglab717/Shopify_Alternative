@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-925 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-926 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -933,6 +933,7 @@
 | 923 | A shop names the AI assistant that answers its customers and sets its tone, warm or formal: the name given the model as the shop's words, the tone as one of Hatti's own instructions | Accepted |
 | 924 | The Ajax cart gives scripts its amounts in the currency the shopper picked, as the money filter shows prices, with what checkout charges in rupees besides | Accepted |
 | 925 | Buy buttons embed a collection as a grid of its first twelve products, each with its own buttons, and take the shop's colour | Accepted |
+| 926 | The headless starter shows its pages in Urdu, right to left, as the shopper picks: the catalog and cart asked for in Urdu through @inContext, its own words in Urdu too | Accepted |
 
 ---
 
@@ -30473,3 +30474,23 @@
 * **Consequences:**
   * One snippet sells a whole collection from a blog post, in the brand's colours.
   * Not yet: layouts other than cards in a grid, and collections past their first twelve.
+
+## ADR-926 · The headless starter shows its pages in Urdu, right to left, as the shopper picks: the catalog and cart asked for in Urdu through @inContext, its own words in Urdu too
+
+* **Context:** ADR-869's Next.js starter is in English, its pages left to right, with `dir="auto"`
+  on the shop's own words alone. Hatti's own storefronts are in Urdu too (ADR-625), and the
+  Storefront API answers in Urdu since ADR-903. ADR-869 left Urdu and right-to-left pages for
+  later.
+* **Decision:**
+  * **The shopper picks** with a switch in the header, a server action keeping `hatti_language`
+    (`en` or `ur`) a year and returning them to the page they were on, on the site alone.
+  * **The catalog and the cart are asked for in it:** the starter's product, products, collection
+    and cart queries take `$language: LanguageCode = EN` and `@inContext(language: $language)`,
+    so the shop's Urdu titles and descriptions come back where it wrote them, its own otherwise.
+  * **Pages in Urdu are right to left** (`<html lang="ur" dir="rtl">`), a little larger and
+    looser. The starter's own words, buttons and headings, are in `lib/words.ts` in both.
+  * **Kept working:** the storefront's tests run the starter's queries in Urdu and in English, and
+    the starter was built with Next.js for this change, as ADR-869 asks.
+* **Consequences:**
+  * A partner's headless site serves Urdu shoppers as Hatti's own storefront does.
+  * Not yet: accounts and sign-in through the API, and a package of components.
