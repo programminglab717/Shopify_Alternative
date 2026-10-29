@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Payment terms reminded to the customer
+### 2b90f81 · Payment terms reminded to the customer
 
 * **A customer owing on payment terms is reminded before the due date and once past it**, with
   what is left and the order's page; the shop may turn either off ([ADR-945](../architecture/13-decision-log.md#adr-945--customers-owing-on-payment-terms-are-reminded-before-the-due-date-and-once-past-it-on-whatsapp-and-by-email-with-what-is-left-and-the-orders-page)). Two WhatsApp
