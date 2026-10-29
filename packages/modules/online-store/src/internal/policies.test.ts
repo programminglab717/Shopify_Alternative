@@ -22,6 +22,10 @@ class NoDns extends DnsLookup {
   async addresses(): Promise<string[]> {
     return [];
   }
+
+  async texts(): Promise<string[]> {
+    return [];
+  }
 }
 
 const FACTS: PolicyFacts = {

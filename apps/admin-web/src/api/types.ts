@@ -6488,12 +6488,21 @@ export interface StockSeasonData {
   stockSeason: StockSeason | null;
 }
 
+/** One of the shop's SSO email domains, proved its through DNS or not (ADR-919). */
+export interface ShopSsoDomain {
+  domain: string;
+  recordName: string;
+  provedAt: string | null;
+}
+
 /** The shop's single sign-on (ADM-09, ADR-864). */
 export interface ShopSso {
   issuer: string;
   clientId: string;
   secretHint: string;
   emailDomains: string[];
+  domains: ShopSsoDomain[];
+  proofRecord: string;
   required: boolean;
   providerMfa: boolean;
   callbackUrl: string;
@@ -6505,6 +6514,10 @@ export interface ShopSsoData {
 
 export interface ShopSsoUpdateData {
   shopSsoUpdate: { sso: ShopSso | null; userErrors: UserError[] };
+}
+
+export interface ShopSsoDomainsCheckData {
+  shopSsoDomainsCheck: { sso: ShopSso | null; userErrors: UserError[] };
 }
 
 export type PresentmentRounding = 'exact' | 'whole' | 'ninety_nine';

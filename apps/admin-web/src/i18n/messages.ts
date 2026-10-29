@@ -4689,6 +4689,14 @@ const en = {
   'sso.save': 'Save single sign-on',
   'sso.saved': 'Saved.',
   'sso.remove': 'Turn off single sign-on',
+  'sso.proofTitle': 'Prove your domains',
+  'sso.proofHint':
+    "Add a TXT record with this value at each domain's name below. Once DNS shows it, the domain is your shop's alone: sign-ins with its emails come here, and no other shop can name it.",
+  'sso.proofValue': 'TXT value:',
+  'sso.proved': 'Proved',
+  'sso.notProved': 'Not yet',
+  'sso.check': 'Check DNS',
+  'sso.checkedNone': "DNS doesn't show the record yet. A new record can take an hour to appear.",
   'error.SSO_REQUIRED':
     "This shop's staff sign in with their organisation's account. Sign out, then sign in with SSO.",
   'error.SSO_NOT_SET_UP': "No shop signs its staff in with this email's organisation.",
@@ -11879,6 +11887,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'sso.save': 'سنگل سائن آن محفوظ کریں',
   'sso.saved': 'محفوظ ہو گیا۔',
   'sso.remove': 'سنگل سائن آن بند کریں',
+  'sso.proofTitle': 'اپنے ڈومینز ثابت کریں',
+  'sso.proofHint':
+    'نیچے ہر ڈومین کے نام پر اس قدر کا TXT ریکارڈ شامل کریں۔ جب DNS اسے دکھائے، ڈومین صرف آپ کی دکان کا ہو جاتا ہے: اس کی ای میلز سے سائن ان یہیں آتے ہیں، اور کوئی اور دکان اسے درج نہیں کر سکتی۔',
+  'sso.proofValue': 'TXT قدر:',
+  'sso.proved': 'ثابت شدہ',
+  'sso.notProved': 'ابھی نہیں',
+  'sso.check': 'DNS جانچیں',
+  'sso.checkedNone': 'DNS ابھی ریکارڈ نہیں دکھاتا۔ نیا ریکارڈ ظاہر ہونے میں ایک گھنٹہ لگ سکتا ہے۔',
   'error.SSO_REQUIRED':
     'اس دکان کا عملہ اپنی تنظیم کے اکاؤنٹ سے سائن ان کرتا ہے۔ سائن آؤٹ کریں، پھر SSO سے سائن ان کریں۔',
   'error.SSO_NOT_SET_UP': 'کوئی دکان اس ای میل کی تنظیم سے اپنے عملے کو سائن ان نہیں کرتی۔',

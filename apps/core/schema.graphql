@@ -11758,6 +11758,11 @@ type Mutation {
   shopSsoDelete: Boolean!
 
   """
+  Looks in DNS for the shop's TXT record at each of its email domains not yet proved: one that shows it is proved the shop's, unless another shop proved it first. The owner alone.
+  """
+  shopSsoDomainsCheck: ShopSsoPayload!
+
+  """
   Sets the shop's identity provider and its staff's email domains, or changes them. The owner alone, having signed in lately.
   """
   shopSsoUpdate(input: ShopSsoInput!): ShopSsoPayload!
@@ -20010,12 +20015,20 @@ type ShopSso {
   """Where the provider sends staff back: register it there."""
   callbackUrl: String!
   clientId: String!
+
+  """
+  Each email domain, proved the shop's through DNS or not. A proved domain is the shop's alone: sign-ins by email of it come here, and no other shop names it.
+  """
+  domains: [ShopSsoDomain!]!
   emailDomains: [String!]!
 
   """
   The provider's issuer: https://login.microsoftonline.com/<tenant>/v2.0.
   """
   issuer: String!
+
+  """The TXT record's value that proves a domain the shop's."""
+  proofRecord: String!
 
   """
   The provider asks for a second factor itself: its sign-ins count as two-step.
@@ -20028,6 +20041,19 @@ type ShopSso {
   """The client secret's last four characters."""
   secretHint: String!
   updatedAt: DateTime!
+}
+
+"""
+One of the shop's email domains, and whether DNS proved it the shop's (ADR-919): a TXT record of `proofRecord` at `recordName`.
+"""
+type ShopSsoDomain {
+  domain: String!
+
+  """When DNS proved it the shop's; null while not yet."""
+  provedAt: DateTime
+
+  """Where the TXT record goes: _hatti-sso.zari.pk."""
+  recordName: String!
 }
 
 input ShopSsoInput {

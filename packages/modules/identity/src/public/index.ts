@@ -150,10 +150,13 @@ export {
 } from '../internal/support-access.service.js';
 export {
   SSO_LIMITS,
+  SSO_PROOF,
   ShopSsoService,
+  type ShopSsoDomain,
   type ShopSsoInput,
   type ShopSsoSettings,
   type SsoOptions,
+  type TxtLookup,
 } from '../internal/sso.js';
 export {
   CONSOLE_LIMITS,

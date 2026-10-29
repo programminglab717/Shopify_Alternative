@@ -13110,6 +13110,12 @@ const SHOP_SSO = /* GraphQL */ `
     required
     providerMfa
     callbackUrl
+    domains {
+      domain
+      recordName
+      provedAt
+    }
+    proofRecord
   }
 `;
 
@@ -13126,6 +13132,22 @@ export const ShopSsoQuery = /* GraphQL */ `
 export const ShopSsoUpdateMutation = /* GraphQL */ `
   mutation ShopSsoUpdate($input: ShopSsoInput!) {
     shopSsoUpdate(input: $input) {
+      sso {
+        ...ShopSsoFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_SSO}
+  ${USER_ERRORS}
+`;
+
+/** Looks in DNS for the shop's record at its SSO domains not yet proved (ADR-919). */
+export const ShopSsoDomainsCheckMutation = /* GraphQL */ `
+  mutation ShopSsoDomainsCheck {
+    shopSsoDomainsCheck {
       sso {
         ...ShopSsoFields
       }

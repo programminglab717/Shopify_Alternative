@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  DnsLookup,
   PublicSite,
   RequireRecentAuthentication,
   RequireScopes,
@@ -24,6 +25,25 @@ import {
 
 @ObjectType({
   description:
+    "One of the shop's email domains, and whether DNS proved it the shop's (ADR-919): a TXT record " +
+    'of `proofRecord` at `recordName`.',
+})
+export class ShopSsoDomain {
+  @Field()
+  domain!: string;
+
+  @Field({ description: 'Where the TXT record goes: _hatti-sso.zari.pk.' })
+  recordName!: string;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: "When DNS proved it the shop's; null while not yet.",
+  })
+  provedAt!: Date | null;
+}
+
+@ObjectType({
+  description:
     "The shop's single sign-on (ADM-09, ADR-864): the organisation's identity provider, any that " +
     "speaks OpenID Connect, which signs in the shop's staff whose emails are of its domains.",
 })
@@ -39,6 +59,16 @@ export class ShopSso {
 
   @Field(() => [String])
   emailDomains!: string[];
+
+  @Field(() => [ShopSsoDomain], {
+    description:
+      "Each email domain, proved the shop's through DNS or not. A proved domain is the shop's " +
+      'alone: sign-ins by email of it come here, and no other shop names it.',
+  })
+  domains!: ShopSsoDomain[];
+
+  @Field({ description: "The TXT record's value that proves a domain the shop's." })
+  proofRecord!: string;
 
   @Field({ description: 'Its members other than the owner reach the shop only through it.' })
   required!: boolean;
@@ -99,6 +129,7 @@ export class ShopSsoResolver {
     private readonly sso: ShopSsoService,
     private readonly site: PublicSite,
     private readonly db: Database,
+    private readonly dns: DnsLookup,
   ) {}
 
   @Query(() => ShopSso, {
@@ -135,6 +166,29 @@ export class ShopSsoResolver {
     return Object.assign(new ShopSsoPayload(), {
       sso: result.ok ? this.#toSso(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => ShopSsoPayload, {
+    description:
+      "Looks in DNS for the shop's TXT record at each of its email domains not yet proved: one " +
+      "that shows it is proved the shop's, unless another shop proved it first. The owner alone.",
+  })
+  @RequireScopes('write_settings')
+  async shopSsoDomainsCheck(@CurrentTenant() tenant: TenantContext): Promise<ShopSsoPayload> {
+    owning(tenant);
+    const before = await this.sso.settingsOf(tenant.shopId);
+    const after = await this.sso.proveDomains(tenant.shopId, (host) => this.dns.texts(host));
+    const proved = (after?.domains ?? [])
+      .filter(
+        (each) =>
+          each.provedAt && !before?.domains.find((was) => was.domain === each.domain)?.provedAt,
+      )
+      .map((each) => each.domain);
+    if (proved.length > 0) await this.#audit(tenant, 'sso.domains_proved', { domains: proved });
+    return Object.assign(new ShopSsoPayload(), {
+      sso: after ? this.#toSso(after) : null,
+      userErrors: after ? [] : [UserError.of(null, 'NOT_FOUND', 'Set up single sign-on first')],
     });
   }
 

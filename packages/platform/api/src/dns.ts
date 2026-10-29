@@ -2,13 +2,16 @@ import { Resolver } from 'node:dns/promises';
 
 /**
  * What DNS says of a host, for checking that a shop's own domain points at the platform
- * (ADR-048). Provided by the host application; tests give one of their own.
+ * (ADR-048), or that a domain is a shop's (ADR-919). Provided by the host application; tests give
+ * one of their own.
  */
 export abstract class DnsLookup {
   /** The hosts the host's CNAME records name; none when it has none, or does not exist. */
   abstract cnames(host: string): Promise<string[]>;
   /** The host's IPv4 and IPv6 addresses; none when it has none, or does not exist. */
   abstract addresses(host: string): Promise<string[]>;
+  /** The host's TXT records, each one's strings joined; none when it has none, or does not exist. */
+  abstract texts(host: string): Promise<string[]>;
 }
 
 /** Answers that mean there is nothing of the kind asked for, rather than that DNS failed. */
@@ -29,9 +32,14 @@ export class SystemDnsLookup extends DnsLookup {
     ]);
     return [...v4, ...v6];
   }
+
+  async texts(host: string): Promise<string[]> {
+    const records = await this.#resolver.resolveTxt(host).catch(nothingOr<string[]>);
+    return records.map((strings) => strings.join(''));
+  }
 }
 
-function nothingOr(error: NodeJS.ErrnoException): string[] {
+function nothingOr<T = string>(error: NodeJS.ErrnoException): T[] {
   if (error.code && NOTHING.has(error.code)) return [];
   throw error;
 }

@@ -2089,6 +2089,9 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       async addresses(): Promise<string[]> {
         return [];
       }
+      async texts(): Promise<string[]> {
+        return [];
+      }
     })();
     const domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
     const www = unwrap(await domains.create(tenant, { host: 'www.zari.pk' }));

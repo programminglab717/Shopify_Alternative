@@ -102,8 +102,26 @@ describe("Signing in through the shop's organisation (ADM-09, ADR-864)", () => {
             required: input.required,
             providerMfa: input.providerMfa,
             callbackUrl: 'https://api.hatti.pk/auth/sso/callback',
+            domains: (input.emailDomains as string[]).map((domain) => ({
+              domain,
+              recordName: `_hatti-sso.${domain}`,
+              provedAt: null,
+            })),
+            proofRecord: 'hatti-sso=0123456789abcdef0123456789abcdef',
           };
           return { shopSsoUpdate: { sso: saved, userErrors: [] } };
+        }
+        case 'ShopSsoDomainsCheck': {
+          // DNS shows the record at the first domain alone.
+          const domains = saved!.domains as { domain: string; provedAt: string | null }[];
+          saved = {
+            ...saved,
+            domains: domains.map((each, index) => ({
+              ...each,
+              provedAt: index === 0 ? '2026-10-29T05:00:00.000Z' : null,
+            })),
+          };
+          return { shopSsoDomainsCheck: { sso: saved, userErrors: [] } };
         }
         default:
           return undefined;
@@ -132,5 +150,16 @@ describe("Signing in through the shop's organisation (ADM-09, ADR-864)", () => {
     );
     expect(await screen.findByText('https://api.hatti.pk/auth/sso/callback')).toBeTruthy();
     expect(screen.getByText('Leave it blank to keep the one ending 0042.')).toBeTruthy();
+
+    // Its domains, proved through DNS (ADR-919): the record to add, and a check.
+    expect(screen.getByText('hatti-sso=0123456789abcdef0123456789abcdef')).toBeTruthy();
+    expect(screen.getByText('_hatti-sso.zari.pk')).toBeTruthy();
+    expect(screen.getAllByText('Not yet')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Check DNS' }));
+    expect(await screen.findByText('Proved')).toBeTruthy();
+    expect(screen.getAllByText('Not yet')).toHaveLength(1);
+    expect(
+      screen.getByText("DNS doesn't show the record yet. A new record can take an hour to appear."),
+    ).toBeTruthy();
   });
 });

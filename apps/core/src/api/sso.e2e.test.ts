@@ -6,7 +6,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startTestApi, type TestApi } from '../testing/api.js';
+import { TestDns, startTestApi, type TestApi } from '../testing/api.js';
 import { fakeOidcProvider } from '../testing/oidc-provider.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
@@ -28,6 +28,9 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
   let provider: Awaited<ReturnType<typeof fakeProvider>>;
   const shop = newId();
   const otherShop = newId();
+  const dns = new TestDns();
+  /** Zari's owner, signed in with their password. */
+  let owner: string;
 
   const post = (url: string, payload: object, token?: string) =>
     api.app.inject({
@@ -37,7 +40,12 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
       headers: token ? { authorization: `Bearer ${token}` } : {},
     });
 
-  async function account(email: string, role: StaffRole, twoStep = true): Promise<string> {
+  async function account(
+    email: string,
+    role: StaffRole,
+    twoStep = true,
+    shopId = shop,
+  ): Promise<string> {
     const body = (
       await post('/auth/sign-up', { email, password: PASSWORD, name: 'Sana Iqbal' })
     ).json() as {
@@ -46,7 +54,7 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
     };
     await admin.query(
       'INSERT INTO identity.memberships (user_id, shop_id, role) VALUES ($1, $2, $3)',
-      [fromPublicId(body.user.id, 'user'), shop, role],
+      [fromPublicId(body.user.id, 'user'), shopId, role],
     );
     if (twoStep) {
       const { secret } = (await post('/auth/two-step/totp/setup', {}, body.accessToken)).json() as {
@@ -108,7 +116,7 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
       [shop, otherShop],
     );
     provider = await fakeProvider();
-    api = await startTestApi(testDb);
+    api = await startTestApi(testDb, { dns });
   });
 
   afterAll(async () => {
@@ -119,7 +127,7 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
   });
 
   it("signs the shop's staff in through its provider, and admits them alone where it requires it", async () => {
-    const owner = await account('owner@zari.pk', 'owner');
+    owner = await account('owner@zari.pk', 'owner');
     const managerPassword = await account('ali@zari.pk', 'manager');
     await account('saima@zari.pk', 'confirmation_agent', false);
 
@@ -228,5 +236,86 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
       'sso.updated',
       'sso.deleted',
     ]);
+  });
+
+  it("proves a domain the shop's through DNS, which then takes its sign-ins alone (ADR-919)", async () => {
+    const zari = owner;
+    const rang = await account('rang@rang.pk', 'owner', true, otherShop);
+    const SAVE = `mutation ($input: ShopSsoInput!) {
+      shopSsoUpdate(input: $input) {
+        sso { emailDomains domains { domain recordName provedAt } proofRecord }
+        userErrors { field code message } } }`;
+    const CHECK = `mutation { shopSsoDomainsCheck {
+      sso { domains { domain recordName provedAt } proofRecord } userErrors { code message } } }`;
+    const input = (clientId: string, emailDomains: string[]) => ({
+      issuer: provider.issuer,
+      clientId,
+      clientSecret: CLIENT.secret,
+      emailDomains,
+      required: false,
+      providerMfa: true,
+    });
+    /** The client a sign-in by `email` is sent to the provider as. */
+    const routedTo = async (email: string) => {
+      const started = (await post('/auth/sso/start', { email })).json() as { url: string };
+      return new URL(started.url).searchParams.get('client_id');
+    };
+
+    // No SSO yet: nothing to check.
+    expect((await gql(zari, CHECK)).data.shopSsoDomainsCheck).toEqual({
+      sso: null,
+      userErrors: [{ code: 'NOT_FOUND', message: 'Set up single sign-on first' }],
+    });
+
+    const saved = (await gql(zari, SAVE, { input: input(CLIENT.id, ['zari.pk']) })).data
+      .shopSsoUpdate.sso;
+    expect(saved.domains).toEqual([
+      { domain: 'zari.pk', recordName: '_hatti-sso.zari.pk', provedAt: null },
+    ]);
+    expect(saved.proofRecord).toMatch(/^hatti-sso=[0-9a-f]{32}$/);
+    // Rang names the same domain later: unproved, a sign-in by email goes to the shop that named
+    // it last.
+    const rangSaved = (await gql(rang, SAVE, { input: input('rang', ['zari.pk']) }, otherShop)).data
+      .shopSsoUpdate.sso;
+    expect(rangSaved.proofRecord).not.toBe(saved.proofRecord);
+    expect(await routedTo('sadia@zari.pk')).toBe('rang');
+
+    // DNS without the record, or with another shop's, proves nothing.
+    dns.records.set('_hatti-sso.zari.pk', { texts: ['v=spf1 -all', rangSaved.proofRecord] });
+    expect((await gql(zari, CHECK)).data.shopSsoDomainsCheck.sso.domains[0].provedAt).toBeNull();
+    // With Zari's, the domain is proved Zari's, and its sign-ins go there alone.
+    dns.records.set('_hatti-sso.zari.pk', { texts: ['v=spf1 -all', saved.proofRecord] });
+    const proved = (await gql(zari, CHECK)).data.shopSsoDomainsCheck.sso;
+    expect(proved.domains[0].provedAt).toEqual(expect.any(String));
+    expect(await routedTo('sadia@zari.pk')).toBe(CLIENT.id);
+    // Rang's record is not there, and the domain is Zari's now: Rang cannot prove it, nor name it.
+    dns.records.set('_hatti-sso.zari.pk', { texts: [rangSaved.proofRecord] });
+    expect(
+      (await gql(rang, CHECK, undefined, otherShop)).data.shopSsoDomainsCheck.sso.domains[0]
+        .provedAt,
+    ).toBeNull();
+    expect(
+      (await gql(rang, SAVE, { input: input('rang', ['zari.pk', 'rang.pk']) }, otherShop)).data
+        .shopSsoUpdate.userErrors,
+    ).toEqual([
+      {
+        field: ['input', 'emailDomains'],
+        code: 'TAKEN',
+        message: "zari.pk is proved another shop's, through DNS",
+      },
+    ]);
+    expect(await routedTo('sadia@zari.pk')).toBe(CLIENT.id);
+
+    // A domain Zari no longer names is no longer proved its: Rang's sign-ins by it again.
+    const dropped = (await gql(zari, SAVE, { input: input(CLIENT.id, ['zari.com.pk']) })).data
+      .shopSsoUpdate.sso;
+    expect(dropped.domains).toEqual([
+      { domain: 'zari.com.pk', recordName: '_hatti-sso.zari.com.pk', provedAt: null },
+    ]);
+    expect(await routedTo('sadia@zari.pk')).toBe('rang');
+    const { rows } = await admin.query(
+      `SELECT details FROM platform.audit_log WHERE action = 'sso.domains_proved'`,
+    );
+    expect(rows).toEqual([{ details: { domains: ['zari.pk'] } }]);
   });
 });

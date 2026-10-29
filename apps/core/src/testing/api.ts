@@ -187,7 +187,10 @@ export async function startTestApi(
 
 /** DNS for tests: the records a test sets, and nothing else. */
 export class TestDns extends DnsLookup {
-  readonly records = new Map<string, { cnames?: string[]; addresses?: string[] }>();
+  readonly records = new Map<
+    string,
+    { cnames?: string[]; addresses?: string[]; texts?: string[] }
+  >();
 
   async cnames(host: string): Promise<string[]> {
     return this.records.get(host)?.cnames ?? [];
@@ -195,5 +198,9 @@ export class TestDns extends DnsLookup {
 
   async addresses(host: string): Promise<string[]> {
     return this.records.get(host)?.addresses ?? [];
+  }
+
+  async texts(host: string): Promise<string[]> {
+    return this.records.get(host)?.texts ?? [];
   }
 }

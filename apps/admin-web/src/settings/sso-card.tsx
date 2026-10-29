@@ -1,8 +1,18 @@
 import { Building2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ShopSsoDeleteMutation, ShopSsoQuery, ShopSsoUpdateMutation } from '../api/operations';
-import type { ShopSso, ShopSsoData, ShopSsoUpdateData } from '../api/types';
+import {
+  ShopSsoDeleteMutation,
+  ShopSsoDomainsCheckMutation,
+  ShopSsoQuery,
+  ShopSsoUpdateMutation,
+} from '../api/operations';
+import type {
+  ShopSso,
+  ShopSsoData,
+  ShopSsoDomainsCheckData,
+  ShopSsoUpdateData,
+} from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -35,6 +45,7 @@ const formOf = (sso: ShopSso | null): Form => ({
  * The shop's single sign-on, for its owner (ADM-09, ADR-864): the organisation's identity
  * provider, its staff's email domains, and whether the shop admits its staff only through it,
  * with the address to register at the provider. Saving asks the owner to confirm who they are.
+ * Each domain is proved the shop's by a TXT record DNS shows (ADR-919).
  */
 export function SsoCard() {
   const { t } = useLocale();
@@ -45,6 +56,10 @@ export function SsoCard() {
   const remove = useAdminMutation<{ shopSsoDelete: boolean }, Record<string, never>>(
     ShopSsoDeleteMutation,
   );
+  const check = useAdminMutation<ShopSsoDomainsCheckData, Record<string, never>>(
+    ShopSsoDomainsCheckMutation,
+  );
+  const [checked, setChecked] = useState<'none' | null>(null);
   const recent = useRecentAuthentication();
   const [form, setForm] = useState<Form | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -86,6 +101,18 @@ export function SsoCard() {
       (failure) => setProblem(errorText(failure, t)),
     );
     setBusy(false);
+  };
+
+  const onCheck = async () => {
+    setProblem(null);
+    setChecked(null);
+    try {
+      const done = (await check.mutateAsync({})).shopSsoDomainsCheck;
+      if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
+      else if (done.sso?.domains.some((each) => !each.provedAt)) setChecked('none');
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
   };
 
   const onRemove = () =>
@@ -172,6 +199,38 @@ export function SsoCard() {
           </div>
         </form>
       </Card>
+      {sso && (
+        <Card className="p-4 flex flex-col gap-3">
+          <h3 className="font-semibold">{t('sso.proofTitle')}</h3>
+          <p className="text-secondary">{t('sso.proofHint')}</p>
+          <p>
+            {t('sso.proofValue')}{' '}
+            <code className="break-all" dir="ltr">
+              {sso.proofRecord}
+            </code>
+          </p>
+          <ul className="flex flex-col gap-1">
+            {sso.domains.map((each) => (
+              <li key={each.domain} className="flex flex-wrap items-center gap-2">
+                <code className="break-all" dir="ltr">
+                  {each.recordName}
+                </code>
+                <span className={each.provedAt ? 'text-success' : 'text-secondary'}>
+                  {each.provedAt ? t('sso.proved') : t('sso.notProved')}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {checked === 'none' && <Alert tone="info">{t('sso.checkedNone')}</Alert>}
+          {sso.domains.some((each) => !each.provedAt) && (
+            <div>
+              <Button variant="secondary" busy={check.isPending} onClick={() => void onCheck()}>
+                {t('sso.check')}
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
       {recent.panel}
     </section>
   );

@@ -22,6 +22,10 @@ class FakeDns extends DnsLookup {
   async addresses(host: string): Promise<string[]> {
     return this.records.get(host)?.addresses ?? [];
   }
+
+  async texts(): Promise<string[]> {
+    return [];
+  }
 }
 
 /** A plan, such as Free, that leaves out every feature it may. */

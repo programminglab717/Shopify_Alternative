@@ -12,6 +12,11 @@ import { OIDC_LIMITS, OidcRelyingParty, confirmedEmailOf, pkcePair } from './oid
 // keys, for that client, with the nonce sent, and its email of one of the shop's domains. Then
 // the member of the shop with that email is signed in. No account is made: staff are invited
 // first. The provider's addresses are fetched only where they are on the public internet.
+//
+// A domain is proved the shop's through DNS (ADR-919): a TXT record of the shop's token at
+// _hatti-sso.<domain>. A proved domain is one shop's alone: sign-ins by email of it go there,
+// and no other shop names it. A domain no shop proved goes, as before, to the shop that named
+// it last.
 
 export const SSO_LIMITS = {
   domains: 10,
@@ -26,6 +31,23 @@ export const SSO_LIMITS = {
   clockToleranceSeconds: OIDC_LIMITS.clockToleranceSeconds,
 } as const;
 
+/** The TXT record that proves a domain a shop's (ADR-919): at `_hatti-sso.<domain>`. */
+export const SSO_PROOF = {
+  label: '_hatti-sso',
+  prefix: 'hatti-sso=',
+} as const;
+
+/** One of the shop's email domains, and whether DNS proved it the shop's. */
+export interface ShopSsoDomain {
+  domain: string;
+  /** Where its TXT record goes: `_hatti-sso.zari.pk`. */
+  recordName: string;
+  provedAt: Date | null;
+}
+
+/** A host's TXT records, as DNS gives them. */
+export type TxtLookup = (host: string) => Promise<string[]>;
+
 export interface SsoOptions {
   /** Tests' providers run on this machine: allows http and private addresses. */
   allowPrivateAddresses?: boolean;
@@ -37,6 +59,10 @@ export interface ShopSsoSettings {
   /** The client secret's last four characters. */
   secretHint: string;
   emailDomains: string[];
+  /** Each email domain, and whether it is proved the shop's. */
+  domains: ShopSsoDomain[];
+  /** The TXT record's value that proves a domain the shop's: `hatti-sso=<token>`. */
+  proofRecord: string;
   required: boolean;
   providerMfa: boolean;
   updatedAt: Date;
@@ -70,8 +96,11 @@ type SettingsRow = {
   email_domains: string[];
   required: boolean;
   provider_mfa: boolean;
+  proof_token: string;
   updated_at: Date | string;
 };
+
+const recordNameOf = (domain: string) => `${SSO_PROOF.label}.${domain}`;
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const sealedFor = (shopId: string) => `shop_sso:${shopId}`;
@@ -111,7 +140,7 @@ export class ShopSsoService {
   /** The shop's settings, its secret's last characters alone; null while it has none. */
   async settingsOf(shopId: string): Promise<ShopSsoSettings | null> {
     const row = await this.#row(shopId);
-    return row && this.#settings(shopId, row);
+    return row && this.#settings(shopId, row, await this.#proved(shopId));
   }
 
   /** Sets the shop's provider and domains, or changes them: the owner's to do. */
@@ -142,6 +171,17 @@ export class ShopSsoService {
     const wrong = domains.find((each) => !DOMAIN.test(each));
     if (wrong) check.addMessage(['input', 'emailDomains'], 'INVALID', `${wrong} isn't a domain`);
     if (!check.ok) return { ok: false, errors: check.errors };
+    const { rows: taken } = await this.#db.execute<{ domain: string }>(sql`
+      SELECT domain FROM identity.sso_domains
+       WHERE domain = ANY (${sql.param(domains)}::text[]) AND shop_id <> ${shopId}
+       ORDER BY domain LIMIT 1`);
+    if (taken[0]) {
+      return failOne(
+        ['input', 'emailDomains'],
+        'TAKEN',
+        `${taken[0].domain} is proved another shop's, through DNS`,
+      );
+    }
     const current = await this.#row(shopId);
     if (!secret && !current) {
       return failOne(['input', 'clientSecret'], 'BLANK', "Client secret can't be blank");
@@ -159,6 +199,10 @@ export class ShopSsoService {
              client_secret = EXCLUDED.client_secret, email_domains = EXCLUDED.email_domains,
              required = EXCLUDED.required, provider_mfa = EXCLUDED.provider_mfa,
              updated_at = now()`);
+    // A domain the shop no longer names is no longer proved its.
+    await this.#db.execute(sql`
+      DELETE FROM identity.sso_domains
+       WHERE shop_id = ${shopId} AND NOT (domain = ANY (${sql.param(domains)}::text[]))`);
     return { ok: true, value: (await this.settingsOf(shopId))! };
   }
 
@@ -167,6 +211,28 @@ export class ShopSsoService {
     const { rows } = await this.#db.execute<{ shop_id: string }>(sql`
       DELETE FROM identity.shop_sso WHERE shop_id = ${shopId} RETURNING shop_id`);
     return rows.length > 0;
+  }
+
+  /**
+   * Looks in DNS for the shop's token at each of its domains not yet proved, through `lookup`:
+   * one that shows it is proved the shop's, unless another shop proved it first. The settings
+   * after; null while the shop has none.
+   */
+  async proveDomains(shopId: string, lookup: TxtLookup): Promise<ShopSsoSettings | null> {
+    const row = await this.#row(shopId);
+    if (!row) return null;
+    const proved = await this.#proved(shopId);
+    const expected = SSO_PROOF.prefix + row.proof_token;
+    for (const domain of row.email_domains.filter((each) => !proved.has(each))) {
+      // A DNS failure proves nothing, and is not the owner's to read: the domain stays unproved.
+      const texts = await lookup(recordNameOf(domain)).catch(() => [] as string[]);
+      if (!texts.some((text) => text.trim() === expected)) continue;
+      await this.#db.execute(sql`
+        INSERT INTO identity.sso_domains (domain, shop_id, proved_at)
+        VALUES (${domain}, ${shopId}, ${this.#now()})
+        ON CONFLICT (domain) DO NOTHING`);
+    }
+    return this.#settings(shopId, row, await this.#proved(shopId));
   }
 
   /**
@@ -179,11 +245,15 @@ export class ShopSsoService {
     callbackUrl: string,
   ): Promise<{ url: string; state: string } | { problem: SsoProblem }> {
     const domain = input.email ? domainOf(input.email) : null;
+    // A domain proved a shop's goes to it alone; one no shop proved, to the shop that named it.
+    const byDomain = sql`(shop_id = (SELECT shop_id FROM identity.sso_domains WHERE domain = ${domain})
+       OR (${domain} = ANY (email_domains)
+           AND NOT EXISTS (SELECT 1 FROM identity.sso_domains WHERE domain = ${domain})))`;
     const { rows } = await this.#db.execute<{ shop_id: string } & SettingsRow>(sql`
       SELECT shop_id, issuer, client_id, client_secret, email_domains, required, provider_mfa,
-             updated_at
+             proof_token, updated_at
         FROM identity.shop_sso
-       WHERE ${input.shopId ? sql`shop_id = ${input.shopId}` : sql`${domain} = ANY (email_domains)`}
+       WHERE ${input.shopId ? sql`shop_id = ${input.shopId}` : byDomain}
        ORDER BY updated_at DESC LIMIT 1`);
     const found = rows[0];
     if (!found) return { problem: 'no_sso' };
@@ -253,10 +323,14 @@ export class ShopSsoService {
     if ('problem' in checked) return { problem: checked.problem, shopId };
     const email = confirmedEmailOf(checked.payload);
     // Only an email of the organisation's own domains names a member: the owner vouched for them.
+    // Not one proved another shop's: its people sign in there.
     const domain = email && domainOf(email);
     if (!email || !domain || !settings.email_domains.includes(domain)) {
       return { problem: 'not_member', shopId };
     }
+    const { rows: elsewhere } = await this.#db.execute(sql`
+      SELECT 1 FROM identity.sso_domains WHERE domain = ${domain} AND shop_id <> ${shopId}`);
+    if (elsewhere.length > 0) return { problem: 'not_member', shopId };
     const { rows: members } = await this.#db.execute<{ id: string }>(sql`
       SELECT u.id FROM identity.users u
         JOIN identity.memberships m ON m.user_id = u.id AND m.shop_id = ${shopId}
@@ -293,18 +367,32 @@ export class ShopSsoService {
 
   async #row(shopId: string): Promise<SettingsRow | null> {
     const { rows } = await this.#db.execute<SettingsRow>(sql`
-      SELECT issuer, client_id, client_secret, email_domains, required, provider_mfa, updated_at
+      SELECT issuer, client_id, client_secret, email_domains, required, provider_mfa,
+             proof_token, updated_at
         FROM identity.shop_sso WHERE shop_id = ${shopId}`);
     return rows[0] ?? null;
   }
 
-  #settings(shopId: string, row: SettingsRow): ShopSsoSettings {
+  /** The domains proved the shop's, and when. */
+  async #proved(shopId: string): Promise<Map<string, Date>> {
+    const { rows } = await this.#db.execute<{ domain: string; proved_at: Date | string }>(sql`
+      SELECT domain, proved_at FROM identity.sso_domains WHERE shop_id = ${shopId}`);
+    return new Map(rows.map((row) => [row.domain, new Date(row.proved_at)]));
+  }
+
+  #settings(shopId: string, row: SettingsRow, proved: Map<string, Date>): ShopSsoSettings {
     const secret = this.#box.decrypt(row.client_secret, sealedFor(shopId)).toString('utf8');
     return {
       issuer: row.issuer,
       clientId: row.client_id,
       secretHint: secret.slice(-4),
       emailDomains: row.email_domains,
+      domains: row.email_domains.map((domain) => ({
+        domain,
+        recordName: recordNameOf(domain),
+        provedAt: proved.get(domain) ?? null,
+      })),
+      proofRecord: SSO_PROOF.prefix + row.proof_token,
       required: row.required,
       providerMfa: row.provider_mfa,
       updatedAt: new Date(row.updated_at),
