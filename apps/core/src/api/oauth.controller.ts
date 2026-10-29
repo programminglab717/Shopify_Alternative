@@ -17,7 +17,8 @@ function grantOf(body: unknown): { clientId: string; clientSecret: string; code:
 
 /**
  * A public app's token (DEV-05, ADR-851), as Shopify's apps get theirs: `POST
- * /admin/oauth/access_token` with `{ client_id, client_secret, code }`, the code the shop's owner
+ * /admin/oauth/access_token` with `{ client_id, client_secret, code }`, as JSON or form-encoded as
+ * OAuth libraries send it (ADR-914), the code the shop's owner
  * or a manager approved within ten minutes. `{ access_token, scope }`, the token the app then
  * sends in `x-hatti-access-token`, with the scopes approved, comma separated. A code is traded
  * once; installed again, an app's earlier token stops working.
@@ -38,7 +39,7 @@ export class OAuthController {
       throw new HttpException(
         {
           error: 'invalid_request',
-          error_description: 'Send client_id, client_secret and code as JSON',
+          error_description: 'Send client_id, client_secret and code, as JSON or as a form',
         },
         400,
       );

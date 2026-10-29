@@ -215,7 +215,17 @@ describe.skipIf(!server)('Public apps installed through OAuth (DEV-05)', () => {
     const wrong = await tokenFor(app.clientId, 'hcs_wrong', code);
     expect(wrong.statusCode).toBe(400);
     expect(wrong.json()).toMatchObject({ error: 'invalid_grant' });
-    const traded = await tokenFor(app.clientId, clientSecret, code);
+    // Form-encoded, as OAuth libraries send it, or as JSON.
+    const traded = await api.app.inject({
+      method: 'POST',
+      url: '/admin/oauth/access_token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        client_id: app.clientId,
+        client_secret: clientSecret,
+        code,
+      }).toString(),
+    });
     expect(traded.statusCode).toBe(200);
     const { access_token: accessToken, scope } = traded.json() as Json;
     expect(scope).toBe('read_products');
