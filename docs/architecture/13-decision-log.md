@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-926 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-927 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -934,6 +934,7 @@
 | 924 | The Ajax cart gives scripts its amounts in the currency the shopper picked, as the money filter shows prices, with what checkout charges in rupees besides | Accepted |
 | 925 | Buy buttons embed a collection as a grid of its first twelve products, each with its own buttons, and take the shop's colour | Accepted |
 | 926 | The headless starter shows its pages in Urdu, right to left, as the shopper picks: the catalog and cart asked for in Urdu through @inContext, its own words in Urdu too | Accepted |
+| 927 | The command line checks and runs an app's function with Hatti's own code, moved to a package of its own, so that a function behaves on the developer's machine as at checkout | Accepted |
 
 ---
 
@@ -30494,3 +30495,24 @@
 * **Consequences:**
   * A partner's headless site serves Urdu shoppers as Hatti's own storefront does.
   * Not yet: accounts and sign-in through the API, and a package of components.
+
+## ADR-927 · The command line checks and runs an app's function with Hatti's own code, moved to a package of its own, so that a function behaves on the developer's machine as at checkout
+
+* **Context:** ADR-922's `hatti function build` checked only a module's header and size, so a
+  module that imported its memory, or didn't compile, was refused at deploy. Nothing ran a
+  function before the shop's checkout did; Shopify's CLI runs one on a sample input. ADR-922 left
+  `function run` for later. Hatti's runner and its module checks (ADR-868) lived inside the apps
+  module, which the CLI, to be published to npm, should not carry.
+* **Decision:**
+  * **`@hatti/functions`**, a platform package of its own, holds them: `capWasm` (the size, the
+    memory its own and capped at 10 MiB), `takeWasm` (capped, then compiled, as the Admin API
+    takes a module), and the `FunctionRunner` worker (its input on standard input alone, 50 ms,
+    64 KiB of answer). The apps module re-exports them, so nothing else changes, and
+    `appFunctionSet` takes modules through `takeWasm`.
+  * **`hatti function build`** checks the module with `takeWasm`, saying the API's own words.
+  * **`hatti function run --input cart.json`** builds it (`--no-build` to skip), then runs it on
+    the file's JSON in Hatti's worker, printing its answer and how long it took against the 50 ms
+    Hatti allows; one past its time is stopped as at checkout, and says so. It needs no token.
+* **Consequences:**
+  * A developer sees what checkout will see before deploying, in CI as on their machine.
+  * Not yet: scaffolding a new function (`app init`), and an input made from a shop's real cart.
