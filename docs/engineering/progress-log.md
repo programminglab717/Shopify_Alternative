@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Subscriptions on the shopper's account
+### 3b38b39 · Subscriptions on the shopper's account
 
 * **A shopper's account lists their subscriptions,** each managed from its latest order's page
   ([ADR-916](../architecture/13-decision-log.md#adr-916--a-shoppers-account-lists-their-subscriptions-each-managed-from-its-latest-orders-page)).
