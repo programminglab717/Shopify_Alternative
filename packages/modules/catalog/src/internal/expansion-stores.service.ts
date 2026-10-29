@@ -14,11 +14,19 @@ export const EXPANSION_STORE_LIMITS = {
   marginPercent: 100,
   /** Collections given a margin of their own (ADR-948). */
   collectionMargins: 10,
+  /** Products given a margin of their own (ADR-960). */
+  productMargins: 25,
 } as const;
 
 /** A collection's products put a margin of their own over the store's rate (ADR-948). */
 export interface ExpansionCollectionMargin {
   collectionId: string;
+  marginPercent: number;
+}
+
+/** A product put a margin of its own over the store's rate, over its collections' (ADR-960). */
+export interface ExpansionProductMargin {
+  productId: string;
   marginPercent: number;
 }
 
@@ -59,6 +67,8 @@ export interface ExpansionStoreRecord {
    * of a product's collections here giving its margin; the store's own for the rest.
    */
   collectionMargins: ExpansionCollectionMargin[];
+  /** Products put a margin of their own over the rate (ADR-960), before their collections'. */
+  productMargins: ExpansionProductMargin[];
   /** Why the last copy as products changed failed, and when; null once one succeeds. */
   copyError: string | null;
   failedAt: Date | null;
@@ -75,13 +85,14 @@ type Row = {
   margin_percent: number;
   rounding: PresentmentRounding;
   collection_margins: ExpansionCollectionMargin[];
+  product_margins: ExpansionProductMargin[];
   copy_error: string | null;
   failed_at: Date | string | null;
   created_at: Date | string;
 };
 
 const COLUMNS = sql`target_shop_id, price_rate::text, synced_at, last_result, auto_copy, follow_rate,
-  margin_percent, rounding, collection_margins, copy_error, failed_at, created_at`;
+  margin_percent, rounding, collection_margins, product_margins, copy_error, failed_at, created_at`;
 
 const toRecord = (row: Row): ExpansionStoreRecord => ({
   targetShopId: row.target_shop_id,
@@ -93,6 +104,7 @@ const toRecord = (row: Row): ExpansionStoreRecord => ({
   marginPercent: row.margin_percent,
   rounding: row.rounding,
   collectionMargins: row.collection_margins,
+  productMargins: row.product_margins,
   copyError: row.copy_error,
   failedAt: row.failed_at === null ? null : toDate(row.failed_at),
   createdAt: toDate(row.created_at),
@@ -337,15 +349,88 @@ export class ExpansionStoreService {
   }
 
   /**
+   * Gives products of the shop's a margin of their own over `targetShopId`'s rate (ADR-960), in
+   * place of their collections' and the store's: twenty-five at most, each a whole percent from 0
+   * to the store's most. None takes them all away.
+   */
+  async setProductMargins(
+    tenant: TenantContext,
+    targetShopId: string,
+    margins: readonly ExpansionProductMargin[],
+  ): Promise<MutationResult<ExpansionStoreRecord>> {
+    const most = EXPANSION_STORE_LIMITS;
+    if (margins.length > most.productMargins) {
+      return failOne(
+        ['margins'],
+        'INVALID',
+        `${most.productMargins} products at most have a margin of their own`,
+      );
+    }
+    for (const [at, margin] of margins.entries()) {
+      const percent = margin.marginPercent;
+      if (!Number.isInteger(percent) || percent < 0 || percent > most.marginPercent) {
+        return failOne(
+          ['margins', String(at), 'marginPercent'],
+          'INVALID',
+          `Margin percent must be a whole number from 0 to ${most.marginPercent}`,
+        );
+      }
+    }
+    const ids = margins.map((margin) => margin.productId);
+    if (new Set(ids).size !== ids.length) {
+      return failOne(['margins'], 'INVALID', 'Give each product one margin');
+    }
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows: found } = await tx.execute<{ id: string }>(sql`
+        SELECT id FROM catalog.products
+         WHERE shop_id = ${tenant.shopId} AND id = ANY(${sql.param(ids)}::uuid[])`);
+      const known = new Set(found.map((row) => row.id));
+      const missing = ids.findIndex((id) => !known.has(id));
+      if (missing >= 0) {
+        return failOne(['margins', String(missing), 'productId'], 'NOT_FOUND', 'No such product');
+      }
+      const kept = JSON.stringify(
+        margins.map(({ productId, marginPercent }) => ({ productId, marginPercent })),
+      );
+      const { rows } = await tx.execute<Row>(sql`
+        UPDATE catalog.expansion_stores
+           SET rate_changed_at = CASE WHEN product_margins = ${kept}::jsonb
+                                      THEN rate_changed_at ELSE now() END,
+               product_margins = ${kept}::jsonb
+         WHERE shop_id = ${tenant.shopId} AND target_shop_id = ${targetShopId}
+        RETURNING ${COLUMNS}`);
+      return rows[0]
+        ? { ok: true as const, value: toRecord(rows[0]) }
+        : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store');
+    });
+  }
+
+  /**
    * The margin of each product of the shop's that `margins` give one (ADR-948), by its handle, as
-   * its export names it: its first collection's in the list.
+   * its export names it: its first collection's in the list; a product's own (ADR-960) before it.
    */
   async marginsByHandle(
     tenant: TenantContext,
     margins: readonly ExpansionCollectionMargin[],
+    productMargins: readonly ExpansionProductMargin[] = [],
   ): Promise<Map<string, number>> {
-    if (margins.length === 0) return new Map();
-    return this.db.tenant(tenant.shopId, (tx) => marginsByHandleIn(tx, tenant.shopId, margins));
+    if (margins.length === 0 && productMargins.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const chosen =
+        margins.length > 0 ? await marginsByHandleIn(tx, tenant.shopId, margins) : new Map();
+      if (productMargins.length > 0) {
+        const { rows } = await tx.execute<{ id: string; handle: string }>(sql`
+          SELECT id, handle FROM catalog.products
+           WHERE shop_id = ${tenant.shopId}
+             AND id = ANY(${sql.param(productMargins.map((each) => each.productId))}::uuid[])`);
+        const handleOf = new Map(rows.map((row) => [row.id, row.handle]));
+        for (const margin of productMargins) {
+          const handle = handleOf.get(margin.productId);
+          if (handle !== undefined) chosen.set(handle, margin.marginPercent);
+        }
+      }
+      return chosen;
+    });
   }
 
   /**

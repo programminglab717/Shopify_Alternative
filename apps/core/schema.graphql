@@ -6205,6 +6205,21 @@ type ExpansionCopy {
 }
 
 """
+A product of this shop's put a margin of its own over an expansion store's rate, before its collections' (ADR-960).
+"""
+type ExpansionProductMargin {
+  marginPercent: Int!
+  productId: ID!
+  productTitle: String!
+}
+
+input ExpansionProductMarginInput {
+  """A whole percent, 0 to 100."""
+  marginPercent: Int!
+  productId: ID!
+}
+
+"""
 Another shop of the owner's whose products are copied from this one, priced at a rate (CH-11, ADR-859), as Shopify Plus's expansion stores.
 """
 type ExpansionStore {
@@ -6238,6 +6253,11 @@ type ExpansionStore {
 
   """What a price here is multiplied by there: "0.0036"."""
   priceRate: String!
+
+  """
+  Products put a margin of their own over its rate, in place of their collections' and its own (ADR-960). A product deleted since is left out.
+  """
+  productMargins: [ExpansionProductMargin!]!
 
   """
   How its copied prices are rounded: exact, to the cent; whole, to a whole unit; or ninety_nine, up to .99 (ADR-933). Costs are copied exact.
@@ -10736,6 +10756,11 @@ type Mutation {
   Puts an expansion store's copied prices a percent over its rate, 0 to 100, for what selling abroad costs, and rounds them as its prices are: exact, whole or ninety_nine (ADR-933). Costs are copied at the rate alone, exact. Copying as products change copies them again. The owner alone, of both shops, having signed in lately.
   """
   expansionStorePricingSet(marginPercent: Int!, rounding: String!, shopId: ID!): ExpansionStorePayload!
+
+  """
+  Gives each of this shop's products listed a margin of its own over the expansion store's rate, in place of its collections' and the store's (ADR-960). Twenty-five at most; none takes them away. Copying as products change copies them again. The owner alone, of both shops, having signed in lately.
+  """
+  expansionStoreProductMarginsSet(margins: [ExpansionProductMarginInput!]!, shopId: ID!): ExpansionStorePayload!
 
   """
   Ends an expansion store's link; it keeps what was copied. The owner alone.

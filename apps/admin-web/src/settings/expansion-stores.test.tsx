@@ -30,6 +30,7 @@ function core(role: StaffRole = 'owner') {
           marginPercent: 0,
           rounding: 'exact',
           collectionMargins: [],
+          productMargins: [],
         };
         stores = [made];
         return { expansionStoreSave: { expansionStore: made, userErrors: [] } };
@@ -79,6 +80,33 @@ function core(role: StaffRole = 'owner') {
         }));
         return {
           expansionStoreCollectionMarginsSet: { expansionStore: stores[0], userErrors: [] },
+        };
+      }
+      case 'Products':
+        // The search for a product to give a margin of its own (ADR-960).
+        return {
+          products: {
+            nodes: [
+              { id: 'prod_1', title: 'Teak sofa' },
+              { id: 'prod_2', title: 'Silk scarf' },
+            ].filter((product) =>
+              product.title.toLowerCase().includes(String(variables.query).toLowerCase()),
+            ),
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        };
+      case 'ExpansionStoreProductMarginsSet': {
+        const titles: Record<string, string> = { prod_1: 'Teak sofa', prod_2: 'Silk scarf' };
+        const margins = variables.margins as { productId: string; marginPercent: number }[];
+        stores = stores.map((each) => ({
+          ...each,
+          productMargins: margins.map((margin) => ({
+            ...margin,
+            productTitle: titles[margin.productId],
+          })),
+        }));
+        return {
+          expansionStoreProductMarginsSet: { expansionStore: stores[0], userErrors: [] },
         };
       }
       case 'ExpansionStorePricingSet':
@@ -241,6 +269,33 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
         { shopId: 'shop_2', margins: [{ collectionId: 'col_2', marginPercent: 40 }] },
       ]),
     );
+  });
+
+  it('gives a product found by a search a margin of its own (ADR-960)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/expansion-stores');
+    await screen.findByLabelText('Price rate');
+    type('Price rate', '0.0036');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
+    fireEvent.change(await screen.findByLabelText('Find a product'), {
+      target: { value: 'sofa' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Give Teak sofa a margin' }));
+    // Given one, it is offered no more.
+    expect(screen.queryByRole('button', { name: 'Give Teak sofa a margin' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Margin for Teak sofa (%)'), {
+      target: { value: '45' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: "Save Zari Abroad's product margins" }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'ExpansionStoreProductMarginsSet')).toEqual([
+        { shopId: 'shop_2', margins: [{ productId: 'prod_1', marginPercent: 45 }] },
+      ]),
+    );
+    // Searched as typed, ten at most.
+    expect(sentOf(fake, 'Products')[0]).toEqual({ first: 10, query: 'sofa' });
   });
 
   it("shows each store's sales on one page, and all of them together in rupees (ADR-932)", async () => {

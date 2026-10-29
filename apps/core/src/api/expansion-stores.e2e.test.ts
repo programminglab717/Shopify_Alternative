@@ -251,6 +251,36 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
       { price: { amount: '15.99', currencyCode: 'USD' } },
     ]);
+    // A product's own margin (ADR-960), before its collection's: 20% over the rate, $12.99.
+    const PRODUCT_MARGINS = `mutation ($shopId: ID!, $margins: [ExpansionProductMarginInput!]!) {
+      expansionStoreProductMarginsSet(shopId: $shopId, margins: $margins) {
+        expansionStore { productMargins { productId productTitle marginPercent } }
+        userErrors { field message } } }`;
+    const productMargins = (list: { productId: string; marginPercent: number }[]) =>
+      value(owner.token, zari, PRODUCT_MARGINS, {
+        shopId: toPublicId('shop', abroad),
+        margins: list,
+      });
+    expect(
+      (await productMargins([{ productId: toPublicId('product', newId()), marginPercent: 5 }]))
+        .userErrors,
+    ).toEqual([{ field: ['margins', '0', 'productId'], message: 'No such product' }]);
+    expect(
+      (
+        await productMargins([
+          { productId: kurta, marginPercent: 20 },
+          { productId: kurta, marginPercent: 30 },
+        ])
+      ).userErrors,
+    ).toEqual([{ field: ['margins'], message: 'Give each product one margin' }]);
+    expect(
+      (await productMargins([{ productId: kurta, marginPercent: 20 }])).expansionStore,
+    ).toEqual({ productMargins: [{ productId: kurta, productTitle: 'Kurta', marginPercent: 20 }] });
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '12.99', currencyCode: 'USD' } },
+    ]);
+    await productMargins([]);
     // None: the store's own margin again.
     await margins([]);
     await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });

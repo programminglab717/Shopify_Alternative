@@ -4859,6 +4859,8 @@ export interface ExpansionStore {
   rounding: PresentmentRounding;
   /** Collections whose products have a margin of their own, the first of a product's (ADR-948). */
   collectionMargins: { collectionId: string; collectionTitle: string; marginPercent: number }[];
+  /** Products with a margin of their own, before their collections' (ADR-960). */
+  productMargins: { productId: string; productTitle: string; marginPercent: number }[];
 }
 
 /** What one of the owner's shops sold in a period (ADR-932). */

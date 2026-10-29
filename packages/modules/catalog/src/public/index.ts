@@ -354,6 +354,7 @@ export {
   EXPANSION_STORE_LIMITS,
   ExpansionStoreService,
   type ExpansionCollectionMargin,
+  type ExpansionProductMargin,
   type ExpansionCopyDue,
   type ExpansionStoreRecord,
   type ExpansionCopyResult,

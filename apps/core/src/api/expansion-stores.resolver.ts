@@ -67,6 +67,31 @@ export class ExpansionCollectionMargin {
   marginPercent!: number;
 }
 
+@ObjectType({
+  description:
+    "A product of this shop's put a margin of its own over an expansion store's rate, before its " +
+    "collections' (ADR-960).",
+})
+export class ExpansionProductMargin {
+  @Field(() => ID)
+  productId!: string;
+
+  @Field()
+  productTitle!: string;
+
+  @Field(() => Int)
+  marginPercent!: number;
+}
+
+@InputType()
+export class ExpansionProductMarginInput {
+  @Field(() => ID)
+  productId!: string;
+
+  @Field(() => Int, { description: 'A whole percent, 0 to 100.' })
+  marginPercent!: number;
+}
+
 @InputType()
 export class ExpansionCollectionMarginInput {
   @Field(() => ID)
@@ -129,6 +154,13 @@ export class ExpansionStore {
       'collection deleted since is left out.',
   })
   collectionMargins!: ExpansionCollectionMargin[];
+
+  @Field(() => [ExpansionProductMargin], {
+    description:
+      "Products put a margin of their own over its rate, in place of their collections' and its " +
+      'own (ADR-960). A product deleted since is left out.',
+  })
+  productMargins!: ExpansionProductMargin[];
 
   @Field(() => String, {
     nullable: true,
@@ -508,6 +540,47 @@ export class ExpansionStoreResolver {
     );
   }
 
+  @Mutation(() => ExpansionStorePayload, {
+    description:
+      "Gives each of this shop's products listed a margin of its own over the expansion store's " +
+      "rate, in place of its collections' and the store's (ADR-960). Twenty-five at most; none " +
+      'takes them away. Copying as products change copies them again. The owner alone, of both ' +
+      'shops, having signed in lately.',
+  })
+  @RequireScopes('write_products')
+  @RequireRecentAuthentication()
+  async expansionStoreProductMarginsSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('shopId', { type: () => ID }) shopId: string,
+    @Args('margins', { type: () => [ExpansionProductMarginInput] })
+    margins: ExpansionProductMarginInput[],
+  ): Promise<ExpansionStorePayload> {
+    const actor = owner(tenant);
+    const target = tryFromPublicId(shopId, 'shop');
+    if (!target || !(await this.copier.owns(actor.userId, target))) {
+      return this.#payload(tenant, failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+    }
+    const ids = margins.map((margin) => tryFromPublicId(margin.productId, 'product'));
+    const unknown = ids.findIndex((id) => !id);
+    if (unknown >= 0) {
+      return this.#payload(
+        tenant,
+        failOne(['margins', String(unknown), 'productId'], 'NOT_FOUND', 'No such product'),
+      );
+    }
+    return this.#payload(
+      tenant,
+      await this.stores.setProductMargins(
+        tenant,
+        target,
+        margins.map((margin, at) => ({
+          productId: ids[at]!,
+          marginPercent: margin.marginPercent,
+        })),
+      ),
+    );
+  }
+
   async #shown(tenant: TenantContext, record: ExpansionStoreRecord): Promise<ExpansionStore> {
     const profile = await this.db.tenant(record.targetShopId, (tx) =>
       shopProfile(tx, record.targetShopId),
@@ -524,6 +597,7 @@ export class ExpansionStoreResolver {
       marginPercent: record.marginPercent,
       rounding: record.rounding,
       collectionMargins: await this.#margins(record, tenant.shopId),
+      productMargins: await this.#productMargins(record, tenant.shopId),
       copyError: record.copyError,
       copyFailedAt: record.failedAt,
     });
@@ -550,6 +624,33 @@ export class ExpansionStoreResolver {
             Object.assign(new ExpansionCollectionMargin(), {
               collectionId: toPublicId('collection', margin.collectionId),
               collectionTitle: title,
+              marginPercent: margin.marginPercent,
+            }),
+          ];
+    });
+  }
+
+  /** Its products' own margins, as this shop's products are titled; those deleted left out. */
+  async #productMargins(
+    record: ExpansionStoreRecord,
+    shopId: string,
+  ): Promise<ExpansionProductMargin[]> {
+    if (record.productMargins.length === 0) return [];
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<{ id: string; title: string }>(sql`
+        SELECT id, title FROM catalog.products
+         WHERE shop_id = ${shopId}
+           AND id = ANY(${sql.param(record.productMargins.map((each) => each.productId))}::uuid[])`),
+    );
+    const titles = new Map(rows.map((row) => [row.id, row.title]));
+    return record.productMargins.flatMap((margin) => {
+      const title = titles.get(margin.productId);
+      return title === undefined
+        ? []
+        : [
+            Object.assign(new ExpansionProductMargin(), {
+              productId: toPublicId('product', margin.productId),
+              productTitle: title,
               marginPercent: margin.marginPercent,
             }),
           ];

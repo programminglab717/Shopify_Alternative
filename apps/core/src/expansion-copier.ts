@@ -81,12 +81,16 @@ export class ExpansionCopier {
     };
     const imported = await this.imports.import(
       there,
-      // Its margin over its rate, its collections' own (ADR-948), and its prices rounded as it
-      // asks (ADR-933).
+      // Its margin over its rate, its collections' own (ADR-948) and its products' (ADR-960), and
+      // its prices rounded as it asks (ADR-933).
       rescaledShopifyPrices(exported.value.csv, Number(link.priceRate), {
         rounding: link.rounding,
         marginPercent: link.marginPercent,
-        marginOf: await this.stores.marginsByHandle(tenant, link.collectionMargins),
+        marginOf: await this.stores.marginsByHandle(
+          tenant,
+          link.collectionMargins,
+          link.productMargins,
+        ),
       }),
       { overwrite: true },
     );

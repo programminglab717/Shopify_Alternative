@@ -9951,6 +9951,11 @@ const EXPANSION_STORE = /* GraphQL */ `
       collectionTitle
       marginPercent
     }
+    productMargins {
+      productId
+      productTitle
+      marginPercent
+    }
   }
 `;
 
@@ -10069,6 +10074,25 @@ export const ExpansionStorePricingSetMutation = /* GraphQL */ `
 `;
 
 /** Collections' own margins over the rate, the first of a product's giving it (ADR-948). */
+/** Products given a margin of their own over an expansion store's rate (ADR-960). */
+export const ExpansionStoreProductMarginsSetMutation = /* GraphQL */ `
+  mutation ExpansionStoreProductMarginsSet(
+    $shopId: ID!
+    $margins: [ExpansionProductMarginInput!]!
+  ) {
+    expansionStoreProductMarginsSet(shopId: $shopId, margins: $margins) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
+`;
+
 export const ExpansionStoreCollectionMarginsSetMutation = /* GraphQL */ `
   mutation ExpansionStoreCollectionMarginsSet(
     $shopId: ID!
