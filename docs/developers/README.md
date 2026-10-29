@@ -76,7 +76,17 @@ The theme shoppers see is changed only with `--allow-live`. The token is read fr
 environment and never written to disk.
 
 An app's functions (ADR-868) are built and deployed the same way, from a directory with a
-`hatti.function.json`:
+`hatti.function.json`. `hatti function init` begins one (ADR-935): its `hatti.function.json`, a
+starter in JavaScript for its target, built with [Javy](https://github.com/bytecodealliance/javy),
+and a sample cart to run it on:
+
+```sh
+hatti function init cod-above-limit --target payment_customization --dir cod-above-limit
+cd cod-above-limit && hatti function run --input input.json
+```
+
+A payment customisation's starter hides cash on delivery above a limit, a cart validation's refuses
+more than a few of an item; each reads its limit from the function's configuration. The file:
 
 ```json
 {

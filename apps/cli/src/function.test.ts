@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HattiAdminClient } from '@hatti/admin-client';
@@ -9,6 +9,7 @@ import {
   FunctionError,
   buildFunction,
   functionConfigIn,
+  initFunction,
   type FunctionConfig,
 } from './function.js';
 import { run } from './main.js';
@@ -188,5 +189,93 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
       await run(['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')], {}, out),
     ).toBe(1);
     expect(lines.at(-1)).toBe(`! ${join(dir, 'input.json')} is not JSON`);
+  });
+
+  it('begins a function of each target from its starter, which answers its sample cart (ADR-935)', async () => {
+    /** The starter run as Javy runs it, its input on standard input: what it wrote. */
+    const ran = (code: string, input: unknown) => {
+      const stdin = new TextEncoder().encode(JSON.stringify(input));
+      let read = 0;
+      let written = '';
+      const Javy = {
+        IO: {
+          readSync: (_fd: number, buffer: Uint8Array) => {
+            const chunk = stdin.subarray(read, read + buffer.length);
+            buffer.set(chunk);
+            read += chunk.length;
+            return chunk.length;
+          },
+          writeSync: (_fd: number, bytes: Uint8Array) => {
+            written += new TextDecoder().decode(bytes);
+          },
+        },
+      };
+      new Function('Javy', code)(Javy);
+      return JSON.parse(written) as unknown;
+    };
+    const payments = join(dir, 'cod');
+    expect(
+      await initFunction(payments, { handle: 'cod-above-limit', target: 'payment_customization' }),
+    ).toEqual([FUNCTION_CONFIG, 'src/index.js', 'input.json']);
+    expect(await functionConfigIn(payments)).toEqual({
+      handle: 'cod-above-limit',
+      title: 'No cash on delivery above a limit',
+      target: 'payment_customization',
+      build: 'javy build src/index.js -o dist/function.wasm',
+      module: 'dist/function.wasm',
+    });
+    const sample = JSON.parse(await readFile(join(payments, 'input.json'), 'utf8'));
+    const code = await readFile(join(payments, 'src/index.js'), 'utf8');
+    // Rs 12,500 is over Rs 10,000: cash on delivery hidden; under a limit of Rs 15,000, not.
+    expect(ran(code, sample)).toEqual({
+      operations: [{ hide: { paymentMethod: 'cash_on_delivery' } }],
+    });
+    expect(ran(code, { ...sample, configuration: { limit: 1500000 } })).toEqual({ operations: [] });
+
+    const validation = join(dir, 'most');
+    await initFunction(validation, {
+      handle: 'five-at-most',
+      target: 'cart_validation',
+      title: 'Five of each at most',
+    });
+    expect((await functionConfigIn(validation)).title).toBe('Five of each at most');
+    expect(ran(await readFile(join(validation, 'src/index.js'), 'utf8'), sample)).toEqual({
+      errors: [{ message: 'Lawn suit: 5 at most for each order' }],
+    });
+
+    // Never over one there already, nor of a handle or target Hatti doesn't take.
+    await expect(
+      initFunction(payments, { handle: 'again', target: 'cart_validation' }),
+    ).rejects.toThrow(`has a ${FUNCTION_CONFIG} already`);
+    await expect(
+      initFunction(join(dir, 'x'), { handle: 'Not A Handle', target: 'cart_validation' }),
+    ).rejects.toThrow(FunctionError);
+    await expect(
+      initFunction(join(dir, 'y'), { handle: 'shipping', target: 'delivery_customization' }),
+    ).rejects.toThrow('Its target is one of payment_customization and cart_validation');
+    // From the command line, likewise.
+    const lines: string[] = [];
+    const out = {
+      log: (line: string) => lines.push(line),
+      error: (line: string) => lines.push(line),
+    };
+    expect(
+      await run(
+        [
+          'function',
+          'init',
+          'cod-lahore',
+          '--target',
+          'payment_customization',
+          '--dir',
+          join(dir, 'cli'),
+        ],
+        {},
+        out,
+      ),
+    ).toBe(0);
+    expect(lines[0]).toMatch(
+      /^Began cod-lahore in .*: hatti\.function\.json, src\/index\.js, input\.json$/,
+    );
   });
 });

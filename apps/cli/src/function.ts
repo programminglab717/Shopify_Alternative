@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 import type { HattiAdminClient } from '@hatti/admin-client';
 import { FunctionRunner, RUN_LIMITS, WasmError, takeWasm, type RunResult } from '@hatti/functions';
@@ -9,11 +9,12 @@ import { FunctionRunner, RUN_LIMITS, WasmError, takeWasm, type RunResult } from 
 // chose, Javy, TinyGo or Rust's wasm32-wasi, and deployed to the shop through the Admin API's
 // `appFunctionSet` (ADR-868), as Shopify's CLI deploys its functions. A function's directory says
 // what it is in `hatti.function.json`. Its module is checked, and run on a sample input, with
-// Hatti's own code, as checkout runs it (ADR-927).
+// Hatti's own code, as checkout runs it (ADR-927). A new one is begun from a starter of its target
+// (ADR-935).
 
 export const FUNCTION_CONFIG = 'hatti.function.json';
 
-const TARGETS = ['payment_customization', 'cart_validation'] as const;
+export const TARGETS = ['payment_customization', 'cart_validation'] as const;
 const HANDLE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 /** What `hatti.function.json` says of the function in its directory. */
@@ -110,6 +111,124 @@ export async function functionConfigIn(dir: string): Promise<FunctionConfig> {
     module: config.module,
     ...(config.build && { build: config.build }),
   };
+}
+
+/** Javy's own way to read standard input and write standard output, as JSON. */
+const JAVY_IO = `function readInput() {
+  const chunks = [];
+  for (;;) {
+    const buffer = new Uint8Array(1024);
+    const read = Javy.IO.readSync(0, buffer);
+    if (read === 0) break;
+    chunks.push(buffer.subarray(0, read));
+  }
+  const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function writeOutput(output) {
+  Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify(output)));
+}
+`;
+
+/** Each target's starter: its code, and a cart to run it on. */
+const STARTERS: Record<FunctionConfig['target'], { code: string; title: string }> = {
+  payment_customization: {
+    title: 'No cash on delivery above a limit',
+    code: `// A payment customisation (ADR-868): it reads the cart and the ways to pay checkout would
+// offer, and hides some. Here, cash on delivery above the shop's limit, Rs 10,000 unless the
+// function's configuration says another, in paisa: { "limit": 1500000 }.
+${JAVY_IO}
+const input = readInput();
+const limit = Number(input.configuration?.limit ?? 1000000);
+const operations = [];
+if (input.cart.subtotal > limit && input.paymentMethods.includes('cash_on_delivery')) {
+  operations.push({ hide: { paymentMethod: 'cash_on_delivery' } });
+}
+writeOutput({ operations });
+`,
+  },
+  cart_validation: {
+    title: 'At most a few of each item',
+    code: `// A cart validation (ADR-868): it reads the cart, and says what is wrong, which refuses the
+// order, three messages at most. Here, more of an item than the shop sells to one shopper, 5
+// unless the function's configuration says another: { "maxQuantity": 3 }.
+${JAVY_IO}
+const input = readInput();
+const most = Number(input.configuration?.maxQuantity ?? 5);
+const errors = input.cart.lines
+  .filter((line) => line.quantity > most)
+  .slice(0, 3)
+  .map((line) => ({ message: \`\${line.title}: \${most} at most for each order\` }));
+writeOutput({ errors });
+`,
+  },
+};
+
+/** A cart as checkout gives a function (ADR-868), to run a starter on. */
+const SAMPLE_INPUT = {
+  cart: {
+    subtotal: 1250000,
+    currency: 'PKR',
+    lines: [
+      {
+        variantId: 'var_1',
+        productId: 'prod_1',
+        title: 'Lawn suit',
+        variantTitle: 'Medium',
+        sku: 'LAWN-M',
+        quantity: 6,
+        price: 250000,
+      },
+    ],
+  },
+  deliveryAddress: { city: 'Lahore', province: 'Punjab' },
+  paymentMethods: ['cash_on_delivery', 'bank_transfer'],
+  configuration: {},
+};
+
+/**
+ * Begins a function of `target` in `dir` (ADR-935), as Shopify's CLI generates an extension: its
+ * `hatti.function.json`, a starter in JavaScript built with Javy, and a sample cart to run it on
+ * with `hatti function run --input input.json`. Refused where `dir` holds a function already.
+ * The files it wrote.
+ */
+export async function initFunction(
+  dir: string,
+  options: { handle: string; target: string; title?: string },
+): Promise<string[]> {
+  if (!HANDLE.test(options.handle)) {
+    throw new FunctionError('Give the function a handle of lowercase letters, digits and hyphens');
+  }
+  if (!TARGETS.includes(options.target as FunctionConfig['target'])) {
+    throw new FunctionError(`Its target is one of ${TARGETS.join(' and ')}`);
+  }
+  const target = options.target as FunctionConfig['target'];
+  const exists = await readFile(join(dir, FUNCTION_CONFIG), 'utf8').then(
+    () => true,
+    () => false,
+  );
+  if (exists) throw new FunctionError(`${dir} has a ${FUNCTION_CONFIG} already`);
+  const config: FunctionConfig = {
+    handle: options.handle,
+    title: options.title?.trim() || STARTERS[target].title,
+    target,
+    build: 'javy build src/index.js -o dist/function.wasm',
+    module: 'dist/function.wasm',
+  };
+  await mkdir(join(dir, 'src'), { recursive: true });
+  const files: [string, string][] = [
+    [FUNCTION_CONFIG, `${JSON.stringify(config, null, 2)}\n`],
+    ['src/index.js', STARTERS[target].code],
+    ['input.json', `${JSON.stringify(SAMPLE_INPUT, null, 2)}\n`],
+  ];
+  for (const [path, text] of files) await writeFile(join(dir, path), text, { flag: 'wx' });
+  return files.map(([path]) => path);
 }
 
 /** Whether `path`, relative to `dir`, stays within it. */

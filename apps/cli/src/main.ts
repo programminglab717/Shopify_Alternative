@@ -8,9 +8,11 @@ import {
   FUNCTION_CONFIG,
   FunctionError,
   RUN_LIMITS,
+  TARGETS,
   buildFunction,
   deployFunction,
   functionConfigIn,
+  initFunction,
   listFunctions,
   runFunction,
 } from './function.js';
@@ -38,6 +40,7 @@ Theme commands:
   dev --theme <id>             Push each file as it is saved, with the theme's preview
 
 Function commands, for the function ${FUNCTION_CONFIG} describes:
+  init <handle> --target <t>   Begin one in the directory: ${TARGETS.join(' or ')}
   build                        Run its build, and check its module as Hatti will
   run --input <file.json>      Build it, then run it on that input as checkout runs it
   deploy                       Build it, then give it to the shop as the app's new version
@@ -71,6 +74,8 @@ export async function run(
       'allow-live': { type: 'boolean' },
       'no-build': { type: 'boolean' },
       input: { type: 'string' },
+      target: { type: 'string' },
+      title: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -80,6 +85,26 @@ export async function run(
     return values.help ? 0 : 1;
   }
   const dir = resolve(typeof values.dir === 'string' ? values.dir : '.');
+  // Begun on this machine alone, from the target's starter (ADR-935).
+  if (area === 'function' && command === 'init') {
+    try {
+      const written = await initFunction(dir, {
+        handle: positionals[2] ?? '',
+        target: typeof values.target === 'string' ? values.target : '',
+        ...(typeof values.title === 'string' && { title: values.title }),
+      });
+      out.log(`Began ${positionals[2]} in ${dir}: ${written.join(', ')}`);
+      out.log('Build it with Javy (https://github.com/bytecodealliance/javy), then:');
+      out.log('  hatti function run --input input.json');
+      return 0;
+    } catch (error) {
+      if (error instanceof FunctionError) {
+        out.error(error.message);
+        return 1;
+      }
+      throw error;
+    }
+  }
   // Built and run on this machine alone: no token needed.
   if (area === 'function' && (command === 'build' || command === 'run')) {
     try {
