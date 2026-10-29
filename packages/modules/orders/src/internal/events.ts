@@ -27,6 +27,11 @@ export const OrderEvents = {
   OrderPaid: 'order.paid',
   /** Its customer is reminded to pay before it is cancelled unpaid (ADR-174). */
   OrderPaymentReminded: 'order.payment_reminded',
+  /**
+   * Its customer, owing on payment terms, is reminded before its due date, or once past it
+   * (ADR-945).
+   */
+  OrderPaymentTermsReminded: 'order.payment_terms_reminded',
   /** Its customer, who has not answered, is asked once more to confirm it (ADR-175). */
   OrderConfirmationReminded: 'order.confirmation_reminded',
   /** Its customer, who left the reminder unanswered, is called to confirm it (ADR-611). */
@@ -137,6 +142,13 @@ export interface OrderCancelledPayload extends OrderState {
 export interface OrderPaymentRemindedPayload extends OrderState {
   /** When it is cancelled, still unpaid: ISO 8601. */
   cancelAt: string;
+}
+
+export interface OrderPaymentTermsRemindedPayload extends OrderState {
+  /** When what it owes is due: ISO 8601. */
+  dueAt: string;
+  /** Whether that is past: the reminder after it, rather than before. */
+  overdue: boolean;
 }
 
 /** An order given to a member of staff to see through (ORD-10, ADR-191). */

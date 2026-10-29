@@ -902,6 +902,45 @@ describe("Messages' words", () => {
     ]);
   });
 
+  it('reminds a customer on payment terms of what is owed, before its date and past it (ADR-945)', () => {
+    const owed = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      amount: 'Rs 52,500',
+      date: '4 Nov, 3:00 pm',
+      url: 'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    };
+    expect(messageText('payment_terms_due', 'en', owed)).toBe(
+      'Assalam-o-Alaikum Ayesha! Rs 52,500 for your order #1043 from Zari Fashions is due by ' +
+        '4 Nov, 3:00 pm, as agreed. Its page says how to pay: ' +
+        'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    );
+    expect(messageText('payment_terms_overdue', 'en', owed)).toBe(
+      'Assalam-o-Alaikum Ayesha! Rs 52,500 for your order #1043 from Zari Fashions was due on ' +
+        '4 Nov, 3:00 pm and is still owed. Please pay it now. Its page says how: ' +
+        'https://hatti.pk/o/Zx8kQ2mN4pR6sT0vW1yA3b',
+    );
+    for (const kind of ['payment_terms_due', 'payment_terms_overdue'] as const) {
+      expect(templateParameters(kind, owed)).toEqual([
+        'Ayesha',
+        'Zari Fashions',
+        '#1043',
+        'Rs 52,500',
+        '4 Nov, 3:00 pm',
+      ]);
+      expect(templateButtons(kind, owed)).toEqual([
+        {
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [{ type: 'text', text: 'Zx8kQ2mN4pR6sT0vW1yA3b' }],
+        },
+      ]);
+      expect(messageText(kind, 'ur', owed)).toContain('#1043');
+    }
+  });
+
   it("carries an order's news by email too, its link a button, right to left in Urdu (ADR-181)", () => {
     // News of the order, and Hatti's notices of the shop's bills to its owner (ADR-195): not the
     // answers WhatsApp's buttons bring, codes or the shop's alerts.
@@ -918,6 +957,8 @@ describe("Messages' words", () => {
       'order_advance_paid',
       'order_part_paid',
       'order_payment_reminder',
+      'payment_terms_due',
+      'payment_terms_overdue',
       'order_confirmation_reminder',
       'return_approved',
       'return_declined',

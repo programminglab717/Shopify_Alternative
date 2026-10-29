@@ -25,6 +25,8 @@ export enum MessageKind {
   ORDER_ADVANCE_PAID = 'ORDER_ADVANCE_PAID',
   ORDER_PART_PAID = 'ORDER_PART_PAID',
   ORDER_PAYMENT_REMINDER = 'ORDER_PAYMENT_REMINDER',
+  PAYMENT_TERMS_DUE = 'PAYMENT_TERMS_DUE',
+  PAYMENT_TERMS_OVERDUE = 'PAYMENT_TERMS_OVERDUE',
   ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
   ORDER_CONFIRMATION_CALL = 'ORDER_CONFIRMATION_CALL',
   RETURN_APPROVED = 'RETURN_APPROVED',
@@ -150,6 +152,16 @@ registerEnumType(MessageKind, {
       description:
         'Their order still waits for its payment, a day before the shop cancels it unpaid: what ' +
         'it waits for, by when, and its page (ADR-174).',
+    },
+    PAYMENT_TERMS_DUE: {
+      description:
+        'Their order on payment terms still owes, its due date near: what, by when, and its ' +
+        'page (ADR-945).',
+    },
+    PAYMENT_TERMS_OVERDUE: {
+      description:
+        'Their order on payment terms still owes a day past its due date: what, since when, and ' +
+        'its page (ADR-945).',
     },
     RETURN_APPROVED: {
       description:

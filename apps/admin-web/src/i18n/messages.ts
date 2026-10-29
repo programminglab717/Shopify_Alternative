@@ -2890,6 +2890,8 @@ const en = {
   'messages.kind.ORDER_PLACED': 'Order placed',
   'messages.kind.ORDER_CONFIRMED': 'Order confirmed',
   'messages.kind.ORDER_PAYMENT_REMINDER': 'Payment reminder',
+  'messages.kind.PAYMENT_TERMS_DUE': 'Payment terms due',
+  'messages.kind.PAYMENT_TERMS_OVERDUE': 'Payment terms overdue',
   'messages.kind.ORDER_PAID': 'Payment received',
   'messages.kind.ORDER_ADVANCE_PAID': 'Advance received',
   'messages.kind.ORDER_PART_PAID': 'Part of a payment received',
@@ -2927,6 +2929,10 @@ const en = {
   'messages.hint.ORDER_PLACED': 'Its total, as it is placed.',
   'messages.hint.ORDER_CONFIRMED': 'Once they or your staff confirm it.',
   'messages.hint.ORDER_PAYMENT_REMINDER': 'A day before an unpaid order is cancelled.',
+  'messages.hint.PAYMENT_TERMS_DUE':
+    'Up to three days before an order on payment terms is due, while it still owes.',
+  'messages.hint.PAYMENT_TERMS_OVERDUE':
+    'A day after an order on payment terms was due, still owing.',
   'messages.hint.ORDER_PAID': 'When the whole order is paid before it ships.',
   'messages.hint.ORDER_ADVANCE_PAID':
     'When their advance comes in, with what is left for the rider.',
@@ -10154,6 +10160,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.ORDER_PLACED': 'آرڈر آ گیا',
   'messages.kind.ORDER_CONFIRMED': 'آرڈر کنفرم ہو گیا',
   'messages.kind.ORDER_PAYMENT_REMINDER': 'ادائیگی کی یاد دہانی',
+  'messages.kind.PAYMENT_TERMS_DUE': 'ادھار کی ادائیگی قریب',
+  'messages.kind.PAYMENT_TERMS_OVERDUE': 'ادھار کی ادائیگی میں تاخیر',
   'messages.kind.ORDER_PAID': 'ادائیگی مل گئی',
   'messages.kind.ORDER_ADVANCE_PAID': 'ایڈوانس مل گیا',
   'messages.kind.ORDER_PART_PAID': 'ادائیگی کا کچھ حصہ مل گیا',
@@ -10191,6 +10199,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.hint.ORDER_PLACED': 'آرڈر آنے پر، اس کا ٹوٹل۔',
   'messages.hint.ORDER_CONFIRMED': 'جب وہ یا آپ کا اسٹاف کنفرم کرے۔',
   'messages.hint.ORDER_PAYMENT_REMINDER': 'بغیر ادائیگی آرڈر منسوخ ہونے سے ایک دن پہلے۔',
+  'messages.hint.PAYMENT_TERMS_DUE':
+    'ادھار والے آرڈر کی ادائیگی کی تاریخ سے تین دن پہلے تک، جب تک رقم باقی ہو۔',
+  'messages.hint.PAYMENT_TERMS_OVERDUE':
+    'ادھار والے آرڈر کی تاریخ گزرنے کے ایک دن بعد، رقم باقی ہو تو۔',
   'messages.hint.ORDER_PAID': 'جب روانگی سے پہلے پورا آرڈر ادا ہو جائے۔',
   'messages.hint.ORDER_ADVANCE_PAID': 'جب ان کا ایڈوانس آئے، رائیڈر کو باقی رقم کے ساتھ۔',
   'messages.hint.ORDER_PART_PAID':

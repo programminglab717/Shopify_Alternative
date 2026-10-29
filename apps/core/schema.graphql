@@ -9426,6 +9426,16 @@ enum MessageKind {
   PAYMENT_OVERDUE
 
   """
+  Their order on payment terms still owes, its due date near: what, by when, and its page (ADR-945).
+  """
+  PAYMENT_TERMS_DUE
+
+  """
+  Their order on payment terms still owes a day past its due date: what, since when, and its page (ADR-945).
+  """
+  PAYMENT_TERMS_OVERDUE
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its plan ended, its invoice unpaid, and it is on Free (ADR-169, ADR-195).
   """
   PLAN_ENDED

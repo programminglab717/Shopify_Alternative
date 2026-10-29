@@ -27,6 +27,8 @@ export const MESSAGE_KINDS = [
   'order_advance_paid',
   'order_part_paid',
   'order_payment_reminder',
+  'payment_terms_due',
+  'payment_terms_overdue',
   'order_confirmation_reminder',
   'order_confirmation_call',
   'return_approved',
@@ -683,6 +685,44 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: 'Your order {order} is waiting for its payment',
       ur: 'آپ کا آرڈر {order} ادائیگی کا منتظر ہے',
+    },
+  },
+  // What an order on payment terms owes, before its due date and once past it (ADR-945).
+  payment_terms_due: {
+    whatsapp: 'hatti_payment_terms_due',
+    category: 'utility',
+    parameters: ['name', 'shop', 'order', 'amount', 'date'],
+    // Its page, which says how to pay.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {amount} for your order {order} from {shop} is due by {date}, ' +
+        'as agreed. Its page says how to pay:',
+      ur:
+        'السلام علیکم {name}! {shop} سے آپ کے آرڈر {order} کے {amount} طے شدہ وقت کے مطابق ' +
+        '{date} تک واجب الادا ہیں۔ ادائیگی کا طریقہ آرڈر کے صفحے پر ہے:',
+    },
+    subject: {
+      en: '{amount} for order {order} is due by {date}',
+      ur: 'آرڈر {order} کے {amount} {date} تک واجب الادا ہیں',
+    },
+  },
+  payment_terms_overdue: {
+    whatsapp: 'hatti_payment_terms_overdue',
+    category: 'utility',
+    parameters: ['name', 'shop', 'order', 'amount', 'date'],
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {amount} for your order {order} from {shop} was due on {date} ' +
+        'and is still owed. Please pay it now. Its page says how:',
+      ur:
+        'السلام علیکم {name}! {shop} سے آپ کے آرڈر {order} کے {amount} {date} کو واجب الادا تھے ' +
+        'اور ابھی باقی ہیں۔ براہ کرم ابھی ادائیگی کریں۔ ادائیگی کا طریقہ آرڈر کے صفحے پر ہے:',
+    },
+    subject: {
+      en: '{amount} for order {order} is overdue',
+      ur: 'آرڈر {order} کے {amount} کی ادائیگی کا وقت گزر گیا',
     },
   },
   order_delivered: {

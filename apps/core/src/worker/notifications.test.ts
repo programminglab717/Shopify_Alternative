@@ -52,6 +52,7 @@ import {
   OrderSettingsService,
   ReturnRequestService,
   ReturnService,
+  remindPaymentTermsIn,
   type OnlinePayments,
   type OrderToPlace,
 } from '@hatti/orders/public';
@@ -1758,6 +1759,59 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect((await timeline(waiting.id)).filter(([kind]) => kind === 'link')).toEqual([
       ['link', 'Sent the customer a link with the message reminding them to pay'],
     ]);
+  });
+
+  it('reminds a customer owing on payment terms before the due date, and once past it (ADR-945)', async () => {
+    const service = orders();
+    const reminders = async () =>
+      (await queued())
+        .filter((message) => message.kind.startsWith('payment_terms_'))
+        .map((message) => ({
+          kind: message.kind,
+          orderId: message.order_id,
+          amount: message.variables.amount,
+          date: message.variables.date,
+        }));
+    const sweep = (at: Date) =>
+      database.tenant(shopId, (tx) => remindPaymentTermsIn(tx, shopId, at));
+    const terms = { paymentMethod: 'bank_transfer', paymentTermsDays: 10 } as const;
+    const owing = await placeOnline(terms);
+    const paying = await placeOnline(terms);
+    await dispatch();
+    const dueAt = (await service.get(tenant, owing.id))!.paymentDueAt!;
+    const day = 86_400_000;
+    // Three days before it at most: not at four.
+    expect(await sweep(new Date(dueAt.getTime() - 4 * day))).toBe(0);
+    expect(await sweep(new Date(dueAt.getTime() - 2 * day))).toBe(2);
+    // Once.
+    expect(await sweep(new Date(dueAt.getTime() - day))).toBe(0);
+    await dispatch(2);
+    const due = shopTime('Asia/Karachi', dueAt);
+    expect(await reminders()).toEqual(
+      [owing, paying].map((order) => ({
+        kind: 'payment_terms_due',
+        orderId: order.id,
+        amount: 'Rs 5,250',
+        date: due,
+      })),
+    );
+    // Paid in part, then past its date: what is left; the one paid in full is told nothing more.
+    unwrap(await service.markAsPaid(tenant, paying.id));
+    unwrap(await service.recordPayment(tenant, owing.id, { amount: '2,000' }));
+    expect(await sweep(new Date(dueAt.getTime() + day / 2))).toBe(0);
+    expect(await sweep(new Date(dueAt.getTime() + 2 * day))).toBe(1);
+    expect(await sweep(new Date(dueAt.getTime() + 9 * day))).toBe(0);
+    await dispatch(2);
+    expect((await reminders()).slice(2)).toEqual([
+      { kind: 'payment_terms_overdue', orderId: owing.id, amount: 'Rs 3,250', date: due },
+    ]);
+    // Each with the order's page, which says how to pay.
+    const pages = (await queued())
+      .filter((message) => message.kind.startsWith('payment_terms_'))
+      .map((message) => message.variables.url);
+    expect(pages).toEqual(
+      Array(3).fill(expect.stringMatching(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/)),
+    );
   });
 
   it('tells the customer the shop agreed to take back what they asked to return, or why not (ADR-676)', async () => {

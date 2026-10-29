@@ -72,6 +72,8 @@ const LINK_LABELS: Partial<Record<MessageKind, Record<MessageLanguage, string>>>
   order_out_for_delivery: { en: 'Track your order', ur: 'آرڈر ٹریک کریں' },
   order_part_paid: { en: 'Pay the rest', ur: 'باقی ادائیگی کریں' },
   order_payment_reminder: { en: 'Pay now', ur: 'ابھی ادائیگی کریں' },
+  payment_terms_due: { en: 'Pay now', ur: 'ابھی ادائیگی کریں' },
+  payment_terms_overdue: { en: 'Pay now', ur: 'ابھی ادائیگی کریں' },
   return_approved: { en: 'See your order', ur: 'اپنا آرڈر دیکھیں' },
   return_declined: { en: 'See your order', ur: 'اپنا آرڈر دیکھیں' },
   review_request: { en: 'Rate your order', ur: 'رائے دیں' },

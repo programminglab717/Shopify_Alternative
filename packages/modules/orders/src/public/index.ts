@@ -299,6 +299,7 @@ export {
   type OrderExportCreatedPayload,
   type OrderPaidPayload,
   type OrderPaymentRemindedPayload,
+  type OrderPaymentTermsRemindedPayload,
   type OrderConfirmationRemindedPayload,
   type OrderConfirmationCalledPayload,
   type OrderReceiptsErasedPayload,
@@ -530,3 +531,7 @@ export {
   priceQuantityPayload,
   type DarazSettings,
 } from '../internal/daraz-client.js';
+export {
+  PAYMENT_TERMS_REMINDERS,
+  remindPaymentTermsIn,
+} from '../internal/payment-terms.service.js';

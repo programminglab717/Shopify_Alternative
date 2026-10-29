@@ -1,15 +1,77 @@
 import { InputChecker, fail, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { CustomerService } from '@hatti/customers/public';
+import { appendEvent } from '@hatti/events';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { OrderEvents, type OrderPaymentTermsRemindedPayload } from './events.js';
 
 // What wholesale customers owe on orders on payment terms (CUS-06, ADR-888): each customer's
 // orders still owed, what they come to, and what of it is past its due date, the most overdue
-// first, for the shop to chase.
+// first, for the shop to chase. Its customer is reminded before the date, and once past it
+// (ADR-945).
 
 export const TERMS_OWED_LIMITS = { first: 100 } as const;
+
+export const PAYMENT_TERMS_REMINDERS = {
+  /** The reminder before the due date: this long before it at most, and halfway there at least. */
+  beforeMs: 3 * 86_400_000,
+  /** The reminder after it: this long past it, the day's grace for a transfer on its way. */
+  afterMs: 86_400_000,
+  /** Orders one sweep of a shop reminds at most, the earliest due first. */
+  batch: 200,
+} as const;
+
+/**
+ * Reminds the customers of the shop's orders on payment terms still owed (ADR-945), in the
+ * caller's transaction: once before the due date, {@link PAYMENT_TERMS_REMINDERS.beforeMs} before
+ * it and no sooner than halfway from the order to it; and once
+ * {@link PAYMENT_TERMS_REMINDERS.afterMs} past it. One already past its date when first found is
+ * reminded once, as overdue. An event says which, for the worker to tell the customer. How many
+ * it reminded.
+ */
+export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Promise<number> {
+  const now = at.toISOString();
+  const soon = new Date(at.getTime() + PAYMENT_TERMS_REMINDERS.beforeMs).toISOString();
+  const late = new Date(at.getTime() - PAYMENT_TERMS_REMINDERS.afterMs).toISOString();
+  const { rows } = await tx.execute<{
+    id: string;
+    stage: OrderPaymentTermsRemindedPayload['stage'];
+    version: number;
+    payment_due_at: Date | string;
+    terms_reminded: number;
+  }>(sql`
+    UPDATE orders.orders o
+       SET terms_reminded = CASE WHEN o.payment_due_at <= ${late}::timestamptz THEN 2 ELSE 1 END
+     WHERE o.shop_id = ${shopId}
+       AND o.id IN (
+         SELECT id FROM orders.orders
+          WHERE shop_id = ${shopId} AND payment_due_at IS NOT NULL AND terms_reminded < 2
+            AND status <> 'cancelled' AND amount_paid < total
+            AND ((payment_due_at <= ${late}::timestamptz)
+              OR (terms_reminded = 0 AND payment_due_at > ${now}::timestamptz
+                  AND payment_due_at <= ${soon}::timestamptz
+                  AND created_at + (payment_due_at - created_at) / 2 <= ${now}::timestamptz))
+          ORDER BY payment_due_at, id
+          LIMIT ${PAYMENT_TERMS_REMINDERS.batch}
+          FOR UPDATE SKIP LOCKED)
+    RETURNING o.id, o.stage, o.version, o.payment_due_at, o.terms_reminded`);
+  for (const row of rows) {
+    await appendEvent<OrderPaymentTermsRemindedPayload>(tx, shopId, {
+      type: OrderEvents.OrderPaymentTermsReminded,
+      aggregateType: 'order',
+      aggregateId: row.id,
+      payload: {
+        stage: row.stage,
+        version: row.version,
+        dueAt: new Date(row.payment_due_at).toISOString(),
+        overdue: row.terms_reminded === 2,
+      },
+    });
+  }
+  return rows.length;
+}
 
 export interface CustomerOwed {
   customerId: string;

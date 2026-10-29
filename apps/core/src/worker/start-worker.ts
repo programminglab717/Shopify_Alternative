@@ -210,6 +210,7 @@ import { StoreSignals } from './store-signals.js';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
+import { PaymentTermsReminders } from './payment-terms-reminders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 import { LapsedShifts } from './lapsed-shifts.js';
 
@@ -725,6 +726,9 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => unpaid.stop());
+    // Customers owing on payment terms reminded before the date and past it (ADR-945).
+    const terms = new PaymentTermsReminders(database, logger).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => terms.stop());
     const erasures = new CustomerErasures(database, workerCustomerData(database), logger).start(
       config.SWEEP_INTERVAL_MS,
     );

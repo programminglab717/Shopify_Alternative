@@ -40,6 +40,7 @@ import {
   type OrderCreatedPayload,
   type OrderPaidPayload,
   type OrderPaymentRemindedPayload,
+  type OrderPaymentTermsRemindedPayload,
   type OrderUpdatedPayload,
   type OrderNotificationFacts,
 } from '@hatti/orders/public';
@@ -82,6 +83,7 @@ export class OrderNotifications {
     OrderEvents.OrderCancelled,
     OrderEvents.OrderPaid,
     OrderEvents.OrderPaymentReminded,
+    OrderEvents.OrderPaymentTermsReminded,
     OrderEvents.OrderConfirmationReminded,
     OrderEvents.OrderConfirmationCalled,
     OrderEvents.FulfillmentCreated,
@@ -139,6 +141,13 @@ export class OrderNotifications {
       case OrderEvents.OrderPaymentReminded: {
         const { cancelAt } = event.payload as Partial<OrderPaymentRemindedPayload>;
         if (cancelAt) await this.#remind(event.shopId, event.aggregateId, new Date(cancelAt));
+        return;
+      }
+      case OrderEvents.OrderPaymentTermsReminded: {
+        const { dueAt, overdue } = event.payload as Partial<OrderPaymentTermsRemindedPayload>;
+        if (dueAt) {
+          await this.#termsOwed(event.shopId, event.aggregateId, new Date(dueAt), overdue === true);
+        }
         return;
       }
       case OrderEvents.FulfillmentCreated: {
@@ -347,6 +356,35 @@ export class OrderNotifications {
           ...(await this.#variables(tx, shopId, order)),
           amount: formatMoney(money(order.awaited, order.currency as CurrencyCode)),
           date: shopTime(timezone, cancelAt),
+        },
+      });
+      if (id) await this.#carryPage(tx, shopId, orderId, id, 'reminding them to pay');
+    });
+  }
+
+  /**
+   * An order on payment terms still owes (ADR-945): its customer is told what, and by when it is
+   * due, or since when it was, in the shop's time, with its page, which says how to pay. Nothing
+   * for one paid or cancelled meanwhile.
+   */
+  async #termsOwed(shopId: string, orderId: string, dueAt: Date, overdue: boolean): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      const owed = order ? order.total - order.amountPaid : 0n;
+      if (!order || order.erased || !order.phone || order.cancelReason || owed <= 0n) return;
+      const { timezone } = await shopProfile(tx, shopId);
+      const kind = overdue ? 'payment_terms_overdue' : 'payment_terms_due';
+      const id = await this.messages.queueIn(tx, shopId, {
+        kind,
+        recipient: order.phone,
+        email: order.email,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `${kind}:${orderId}`,
+        variables: {
+          ...(await this.#variables(tx, shopId, order)),
+          amount: formatMoney(money(owed, order.currency as CurrencyCode)),
+          date: shopTime(timezone, dueAt),
         },
       });
       if (id) await this.#carryPage(tx, shopId, orderId, id, 'reminding them to pay');
