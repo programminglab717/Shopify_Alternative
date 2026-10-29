@@ -291,6 +291,30 @@ describe.skipIf(!server)('SalesReportService', () => {
     expect(other.periods).toHaveLength(3);
   });
 
+  it("says a shop's sales by another shop's days, for its owner's chart of their stores (ADR-955)", async () => {
+    await aFewDaysOfOrders();
+    // London's 28 to 30 September: the two kurtas at 21:30 on the 28th, the shawl on the 29th,
+    // and both kurtas of the 30th, the last at 20:30 there, still the period's.
+    const london = {
+      placedFrom: new Date('2026-09-28T00:00:00+01:00'),
+      placedBefore: new Date('2026-10-01T00:00:00+01:00'),
+      interval: 'day' as const,
+    };
+    const periods = unwrap(await sales.periodsOf(f.a.shopId, london, 'Europe/London'));
+    expect(periods.map((each) => [each.start.toISOString(), each.orders])).toEqual([
+      ['2026-09-27T23:00:00.000Z', 1],
+      ['2026-09-28T23:00:00.000Z', 1],
+      ['2026-09-29T23:00:00.000Z', 2],
+    ]);
+    // In the shop's own time, as its totals.
+    const own = unwrap(await sales.periodsOf(f.a.shopId, days()));
+    expect(own.map((each) => each.orders)).toEqual([0, 2, 1]);
+    expect(unwrap(await sales.totalsOf(f.a.shopId, days())).orders).toBe(3);
+    expect(
+      errorsOf(await sales.periodsOf(f.a.shopId, { ...london, placedBefore: london.placedFrom })),
+    ).toEqual([['placedBefore', 'INVALID']]);
+  });
+
   it('counts what the courier lost as returns, as what was refused: neither was sold', async () => {
     const lost = await placedAt('2026-09-30T10:00:00Z', [shawl]);
     unwrap(await f.orders.confirm(f.a, lost.id));

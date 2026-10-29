@@ -296,6 +296,20 @@ export class SalesReportService {
     shopId: string,
     period: Pick<SalesReportInput, 'placedFrom' | 'placedBefore'>,
   ): Promise<MutationResult<SalesTally>> {
+    const periods = await this.periodsOf(shopId, { ...period, interval: 'month' });
+    return periods.ok ? { ok: true, value: tallyOf(periods.value) } : periods;
+  }
+
+  /**
+   * As `totalsOf`, day by day, week by week or month by month, in `timezone` rather than the
+   * shop's where given: the owner's chart of their stores' sales, each store's days the owner's
+   * shop's (ADR-955).
+   */
+  async periodsOf(
+    shopId: string,
+    period: Pick<SalesReportInput, 'placedFrom' | 'placedBefore' | 'interval'>,
+    timezone?: string,
+  ): Promise<MutationResult<SalesPeriod[]>> {
     const span = period.placedBefore.getTime() - period.placedFrom.getTime();
     if (span <= 0) {
       return failOne(['placedBefore'], 'INVALID', 'Placed before must be later than placed from');
@@ -308,9 +322,8 @@ export class SalesReportService {
       );
     }
     return this.db.tenant(shopId, async (tx) => {
-      const { timezone } = await shopProfile(tx, shopId);
-      const periods = await salesPeriodsIn(tx, shopId, timezone, { ...period, interval: 'month' });
-      return { ok: true, value: tallyOf(periods) };
+      const zone = timezone ?? (await shopProfile(tx, shopId)).timezone;
+      return { ok: true, value: await salesPeriodsIn(tx, shopId, zone, period) };
     });
   }
 }

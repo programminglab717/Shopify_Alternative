@@ -1,7 +1,13 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, presetAccess, renderAdmin, signedIn, type } from '../test-support';
+
+/** A day's sales in rupees, from midnight in Karachi. */
+const day = (date: string, amount: string) => ({
+  start: `${date}T00:00:00+05:00`,
+  totalSalesHere: { amount, currencyCode: 'PKR' },
+});
 
 function core(role: StaffRole = 'owner') {
   let stores: Record<string, unknown>[] = [];
@@ -94,6 +100,7 @@ function core(role: StaffRole = 'owner') {
               orders: 12,
               totalSales: { amount: '60000.00', currencyCode: 'PKR' },
               totalSalesHere: { amount: '60000.00', currencyCode: 'PKR' },
+              periods: [day('2026-10-27', '25000.00'), day('2026-10-28', '35000.00')],
             },
             {
               shopId: 'shop_2',
@@ -103,6 +110,7 @@ function core(role: StaffRole = 'owner') {
               orders: 3,
               totalSales: { amount: '150.00', currencyCode: 'USD' },
               totalSalesHere: { amount: '42000.00', currencyCode: 'PKR' },
+              periods: [day('2026-10-27', '0.00'), day('2026-10-28', '42000.00')],
             },
           ],
         };
@@ -243,7 +251,8 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
     type('Price rate', '0.0036');
     fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
     expect(await screen.findByRole('heading', { name: 'Sales across your stores' })).toBeTruthy();
-    expect(await screen.findByText('Zari (this shop)')).toBeTruthy();
+    // In the list, and in the chart's key (ADR-955).
+    expect(await screen.findAllByText('Zari (this shop)')).toHaveLength(2);
     expect(screen.getByText('3 orders · USD 150')).toBeTruthy();
     expect(screen.getByText('≈ Rs 42,000 at the day’s rate')).toBeTruthy();
     expect(screen.getByText('All your stores: Rs 102,000')).toBeTruthy();
@@ -253,6 +262,34 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
     expect(Math.round(days)).toBe(30);
     fireEvent.change(screen.getByLabelText('Period'), { target: { value: '7' } });
     await waitFor(() => expect(sentOf(fake, 'ExpansionStoreSales').length).toBe(2));
+  });
+
+  it("draws each store's part of each day's sales in rupees, and each week's over 90 days (ADR-955)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/expansion-stores');
+    await screen.findByLabelText('Price rate');
+    type('Price rate', '0.0036');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
+    const chart = await screen.findByRole('list', { name: 'Sales by day, at the day’s rate' });
+    const bars = within(chart).getAllByRole('listitem');
+    expect(bars.map((bar) => bar.getAttribute('aria-label'))).toEqual([
+      expect.stringMatching(/: Rs 25,000$/),
+      expect.stringMatching(/: Rs 77,000$/),
+    ]);
+    // The first day this shop's alone; the second both stores', each a part of the bar.
+    expect(bars[0]!.children).toHaveLength(1);
+    expect(bars[1]!.children).toHaveLength(2);
+    expect(screen.getAllByText('Zari Abroad').length).toBeGreaterThan(0);
+    const [asked] = sentOf(fake, 'ExpansionStoreSales') as { interval: string }[];
+    expect(asked!.interval).toBe('DAY');
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: '90' } });
+    expect(
+      await screen.findByRole('list', { name: 'Sales by week, at the day’s rate' }),
+    ).toBeTruthy();
+    expect((sentOf(fake, 'ExpansionStoreSales').at(-1) as { interval: string }).interval).toBe(
+      'WEEK',
+    );
   });
 
   it('is kept by the owner alone', async () => {

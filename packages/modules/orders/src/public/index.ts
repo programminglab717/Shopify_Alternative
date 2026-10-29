@@ -378,6 +378,7 @@ export {
   grossProfit,
   netSales,
   profit,
+  tallyOf,
   totalSales,
   type ProductSales,
   type SalesDimension,

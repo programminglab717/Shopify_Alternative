@@ -4872,6 +4872,13 @@ export interface ExpansionStoreSales {
   totalSales: MoneyValue;
   /** In this shop's currency at the day's rate; null where Hatti has none. */
   totalSalesHere: MoneyValue | null;
+  /** Its sales day by day, or week by week, in this shop's time (ADR-955). */
+  periods: ExpansionStoreSalesPeriod[];
+}
+
+export interface ExpansionStoreSalesPeriod {
+  start: string;
+  totalSalesHere: MoneyValue | null;
 }
 
 export interface ExpansionStoreSalesData {

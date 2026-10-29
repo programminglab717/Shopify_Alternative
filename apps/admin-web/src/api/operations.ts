@@ -10028,8 +10028,8 @@ export const ExpansionStoreFollowRateSetMutation = /* GraphQL */ `
 
 /** What this shop and each expansion store sold, on one page (ADR-932). */
 export const ExpansionStoreSalesQuery = /* GraphQL */ `
-  query ExpansionStoreSales($from: DateTime!, $before: DateTime!) {
-    expansionStoreSales(placedFrom: $from, placedBefore: $before) {
+  query ExpansionStoreSales($from: DateTime!, $before: DateTime!, $interval: SalesInterval) {
+    expansionStoreSales(placedFrom: $from, placedBefore: $before, interval: $interval) {
       shopId
       name
       here
@@ -10040,6 +10040,12 @@ export const ExpansionStoreSalesQuery = /* GraphQL */ `
       }
       totalSalesHere {
         ...Money
+      }
+      periods {
+        start
+        totalSalesHere {
+          ...Money
+        }
       }
     }
   }

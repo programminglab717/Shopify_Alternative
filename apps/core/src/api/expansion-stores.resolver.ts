@@ -15,7 +15,14 @@ import { ExpansionStoreService, type ExpansionStoreRecord } from '@hatti/catalog
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { isCurrencyCode, money } from '@hatti/money';
-import { SalesReportService, netSales, totalSales } from '@hatti/orders/public';
+import {
+  SalesInterval,
+  SalesReportService,
+  netSales,
+  tallyOf,
+  totalSales,
+  type SalesIntervalValue,
+} from '@hatti/orders/public';
 import { ExpansionCopier } from '../expansion-copier.js';
 import { convertBetween, dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
 import {
@@ -135,6 +142,30 @@ export class ExpansionStore {
 
 @ObjectType({
   description:
+    "A day, week or month of what one of the owner's shops sold (ADR-955), from its start in " +
+    "this shop's time, so that each store's days are the same.",
+})
+export class ExpansionStoreSalesPeriod {
+  @Field(() => GraphQLISODateTime, { description: "When it starts, in this shop's time zone." })
+  start!: Date;
+
+  @Field(() => Int, { description: 'Its orders, cancelled ones aside.' })
+  orders!: number;
+
+  @Field(() => Money, { description: 'Its total sales, in the store’s own currency.' })
+  totalSales!: Money;
+
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      "Its total sales in this shop's currency at the day's rate, as the store's; null where " +
+      'the feed has no rate for its currency.',
+  })
+  totalSalesHere!: Money | null;
+}
+
+@ObjectType({
+  description:
     "What one of the owner's shops sold in a period (ADR-932): this shop, or an expansion store " +
     'of it, in its own currency and in this shop’s at the day’s rate.',
 })
@@ -167,6 +198,13 @@ export class ExpansionStoreSales {
       'where the feed has no rate for its currency.',
   })
   totalSalesHere!: Money | null;
+
+  @Field(() => [ExpansionStoreSalesPeriod], {
+    description:
+      "Its sales day by day, week by week or month by month, as the query's interval says, in " +
+      "this shop's time zone (ADR-955): each store's periods are the same, for one chart.",
+  })
+  periods!: ExpansionStoreSalesPeriod[];
 }
 
 @ObjectType()
@@ -207,13 +245,20 @@ export class ExpansionStoreResolver {
     description:
       'What this shop and each of its expansion stores sold in a period, on one page (ADR-932): ' +
       "each in its own currency and in this shop's at the day's rate, this shop first, then the " +
-      'stores the owner still owns, oldest first. 366 days at most. The owner alone.',
+      'stores the owner still owns, oldest first, each by day, week or month in this shop’s time ' +
+      '(ADR-955). 366 days at most. The owner alone.',
   })
   @RequireScopes('read_orders')
   async expansionStoreSales(
     @CurrentTenant() tenant: TenantContext,
     @Args('placedFrom', { type: () => GraphQLISODateTime }) placedFrom: Date,
     @Args('placedBefore', { type: () => GraphQLISODateTime }) placedBefore: Date,
+    @Args('interval', {
+      type: () => SalesInterval,
+      defaultValue: SalesInterval.DAY,
+      description: 'How `periods` divide the period.',
+    })
+    interval: SalesInterval,
   ): Promise<ExpansionStoreSales[]> {
     const actor = owner(tenant);
     const linked = await this.stores.list(tenant);
@@ -222,25 +267,49 @@ export class ExpansionStoreResolver {
       if (await this.copier.owns(actor.userId, record.targetShopId))
         shops.push(record.targetShopId);
     }
-    const rates = await this.db.tenant(tenant.shopId, (tx) => rupeeRatesIn(tx));
+    const [rates, { timezone }] = await this.db.tenant(tenant.shopId, async (tx) => [
+      await rupeeRatesIn(tx),
+      await shopProfile(tx, tenant.shopId),
+    ]);
     const rows: ExpansionStoreSales[] = [];
     for (const shopId of shops) {
-      const result = await this.#sales.totalsOf(shopId, { placedFrom, placedBefore });
-      if (!result.ok) throw badUserInput(result.errors[0]!.message);
+      // Each store's days are this shop's, for one chart of them all.
+      const periods = await this.#sales.periodsOf(
+        shopId,
+        {
+          placedFrom,
+          placedBefore,
+          interval: interval.toLowerCase() as SalesIntervalValue,
+        },
+        timezone,
+      );
+      if (!periods.ok) throw badUserInput(periods.errors[0]!.message);
       const profile = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
       const currency = isCurrencyCode(profile.currency) ? profile.currency : 'PKR';
-      const total = totalSales(result.value);
-      const here = convertBetween(rates, total, currency, tenant.currency);
+      const totals = tallyOf(periods.value);
+      const total = totalSales(totals);
+      const hereOf = (amount: bigint) => {
+        const converted = convertBetween(rates, amount, currency, tenant.currency);
+        return converted === null ? null : Money.from(money(converted, tenant.currency));
+      };
       rows.push(
         Object.assign(new ExpansionStoreSales(), {
           shopId: toPublicId('shop', shopId),
           name: profile.name,
           here: shopId === tenant.shopId,
           currencyCode: currency,
-          orders: result.value.orders,
-          netSales: Money.from(money(netSales(result.value), currency)),
+          orders: totals.orders,
+          netSales: Money.from(money(netSales(totals), currency)),
           totalSales: Money.from(money(total, currency)),
-          totalSalesHere: here === null ? null : Money.from(money(here, tenant.currency)),
+          totalSalesHere: hereOf(total),
+          periods: periods.value.map((period) =>
+            Object.assign(new ExpansionStoreSalesPeriod(), {
+              start: period.start,
+              orders: period.orders,
+              totalSales: Money.from(money(totalSales(period), currency)),
+              totalSalesHere: hereOf(totalSales(period)),
+            }),
+          ),
         }),
       );
     }

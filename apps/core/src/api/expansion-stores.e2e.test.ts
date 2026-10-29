@@ -437,7 +437,7 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     });
   });
 
-  it("gives one page of each store's sales, in its currency and in this shop's at the day's rate (ADR-932)", async () => {
+  it("gives one page of each store's sales, in its currency and in this shop's at the day's rate, by this shop's days (ADR-932, ADR-955)", async () => {
     const lahore = newId();
     const dubai = newId();
     const sold = newId();
@@ -530,6 +530,33 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
         totalSalesHere: { amount: '7645.21', currencyCode: 'PKR' },
       },
     ]);
+    // Day by day in Lahore's time, whatever Dubai's (ADR-955): yesterday and today in Karachi,
+    // each store's days the same, today's its order.
+    await admin.query(`UPDATE control.shops SET timezone = 'Asia/Dubai' WHERE id = $1`, [dubai]);
+    const DAYS = `query ($from: DateTime!, $before: DateTime!) {
+      expansionStoreSales(placedFrom: $from, placedBefore: $before, interval: DAY) {
+        name periods { start orders totalSales { amount } totalSalesHere { amount } } } }`;
+    const day = 86_400_000;
+    const karachi = 5 * 3_600_000;
+    const today = Math.floor((Date.now() + karachi) / day) * day - karachi;
+    const byDay = (await value(owner.token, lahore, DAYS, {
+      from: new Date(today - day).toISOString(),
+      before: new Date(today + day).toISOString(),
+    })) as { name: string; periods: { start: string }[] }[];
+    const starts = [new Date(today - day).toISOString(), new Date(today).toISOString()];
+    expect(byDay.map((row) => row.periods.map((each) => each.start))).toEqual([starts, starts]);
+    expect(byDay[1]).toEqual({
+      name: 'Dubai Lawn',
+      periods: [
+        expect.objectContaining({ orders: 0, totalSalesHere: { amount: '0.00' } }),
+        {
+          start: starts[1],
+          orders: 1,
+          totalSales: { amount: '100.00' },
+          totalSalesHere: { amount: '7645.21' },
+        },
+      ],
+    });
     // From the Dubai store, rupees are dirhams at the day's rate; it has no stores of its own.
     expect(await value(owner.token, dubai, SALES, period)).toEqual([
       expect.objectContaining({

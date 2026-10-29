@@ -6266,6 +6266,11 @@ type ExpansionStoreSales {
 
   """Its orders placed in the period, cancelled ones aside."""
   orders: Int!
+
+  """
+  Its sales day by day, week by week or month by month, as the query's interval says, in this shop's time zone (ADR-955): each store's periods are the same, for one chart.
+  """
+  periods: [ExpansionStoreSalesPeriod!]!
   shopId: ID!
 
   """As the sales report says it, in its own currency."""
@@ -6273,6 +6278,25 @@ type ExpansionStoreSales {
 
   """
   Its total sales in this shop's currency at the day's rate from the currency feed; null where the feed has no rate for its currency.
+  """
+  totalSalesHere: Money
+}
+
+"""
+A day, week or month of what one of the owner's shops sold (ADR-955), from its start in this shop's time, so that each store's days are the same.
+"""
+type ExpansionStoreSalesPeriod {
+  """Its orders, cancelled ones aside."""
+  orders: Int!
+
+  """When it starts, in this shop's time zone."""
+  start: DateTime!
+
+  """Its total sales, in the store’s own currency."""
+  totalSales: Money!
+
+  """
+  Its total sales in this shop's currency at the day's rate, as the store's; null where the feed has no rate for its currency.
   """
   totalSalesHere: Money
 }
@@ -17562,9 +17586,14 @@ type Query {
   drops: [Drop!]!
 
   """
-  What this shop and each of its expansion stores sold in a period, on one page (ADR-932): each in its own currency and in this shop's at the day's rate, this shop first, then the stores the owner still owns, oldest first. 366 days at most. The owner alone.
+  What this shop and each of its expansion stores sold in a period, on one page (ADR-932): each in its own currency and in this shop's at the day's rate, this shop first, then the stores the owner still owns, oldest first, each by day, week or month in this shop’s time (ADR-955). 366 days at most. The owner alone.
   """
-  expansionStoreSales(placedBefore: DateTime!, placedFrom: DateTime!): [ExpansionStoreSales!]!
+  expansionStoreSales(
+    """How `periods` divide the period."""
+    interval: SalesInterval! = DAY
+    placedBefore: DateTime!
+    placedFrom: DateTime!
+  ): [ExpansionStoreSales!]!
 
   """The shop's expansion stores, oldest first."""
   expansionStores: [ExpansionStore!]!

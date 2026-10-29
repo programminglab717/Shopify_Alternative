@@ -94,3 +94,86 @@ export function Bars({ title, bars }: { title: string; bars: readonly Bar[] }) {
     </FormSection>
   );
 }
+
+/** The colours of a chart's series, in order: one for each of up to six. */
+export const SERIES_COLOURS = [
+  'bg-primary',
+  'bg-accent',
+  'bg-info',
+  'bg-success',
+  'bg-warning',
+  'bg-danger',
+] as const;
+
+/** A day's or week's bar of several series stacked: each series' part, in the series' order. */
+export interface Stack {
+  start: string;
+  parts: readonly number[];
+  label: string;
+}
+
+/**
+ * Days or weeks as bars, each the series' parts stacked in their colours, the first at the
+ * foot, with a key of which colour is which; each bar says what it was to a screen reader.
+ */
+export function StackedBars({
+  title,
+  series,
+  stacks,
+}: {
+  title: string;
+  series: readonly string[];
+  stacks: readonly Stack[];
+}) {
+  const { locale } = useLocale();
+  const timezone = useShopTimezone();
+  const sum = (stack: Stack) => stack.parts.reduce((total, part) => total + part, 0);
+  const most = Math.max(...stacks.map(sum), 1);
+  const first = stacks[0];
+  const last = stacks.at(-1);
+  return (
+    <FormSection title={title}>
+      <ul className="flex h-40 items-end gap-px" aria-label={title}>
+        {stacks.map((stack) => (
+          <li
+            key={stack.start}
+            aria-label={stack.label}
+            title={stack.label}
+            className="flex h-full min-w-0 flex-1 flex-col-reverse"
+          >
+            {sum(stack) === 0 ? (
+              <span className="h-[1%] w-full rounded-t-sm bg-line" />
+            ) : (
+              stack.parts.map((part, index) =>
+                part > 0 ? (
+                  <span
+                    key={index}
+                    className={`w-full ${SERIES_COLOURS[index % SERIES_COLOURS.length]}`}
+                    style={{ height: `${(part / most) * 100}%` }}
+                  />
+                ) : null,
+              )
+            )}
+          </li>
+        ))}
+      </ul>
+      {first && last && (
+        <div className="flex justify-between text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+          <span>{formatDate(first.start, timezone, locale)}</span>
+          <span>{formatDate(last.start, timezone, locale)}</span>
+        </div>
+      )}
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[length:var(--hatti-type-body-sm-size)]">
+        {series.map((name, index) => (
+          <li key={name + index} className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className={`size-3 rounded-sm ${SERIES_COLOURS[index % SERIES_COLOURS.length]}`}
+            />
+            <span dir="auto">{name}</span>
+          </li>
+        ))}
+      </ul>
+    </FormSection>
+  );
+}

@@ -5199,6 +5199,9 @@ const en = {
   'expansion.salesTotal': 'All your stores: {amount}',
   'expansion.salesUnconverted':
     'Hatti has no day’s rate for some of them: they are left out of the total.',
+  'expansion.salesChart': 'Sales by day, at the day’s rate',
+  'expansion.salesChartWeeks': 'Sales by week, at the day’s rate',
+  'expansion.salesBar': '{date}: {amount}',
   'expansion.failed':
     'Copying as products changed failed on {date}: {error}. It is tried again an hour on.',
   'expansion.remove': 'Stop copying to {name}',
@@ -12473,6 +12476,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'expansion.salesHere': 'روزانہ ریٹ پر تقریباً {amount}',
   'expansion.salesTotal': 'آپ کے تمام اسٹورز: {amount}',
   'expansion.salesUnconverted': 'ان میں سے کچھ کا روزانہ ریٹ ہٹی کے پاس نہیں: وہ کل میں شامل نہیں۔',
+  'expansion.salesChart': 'روزانہ فروخت، روزانہ ریٹ پر',
+  'expansion.salesChartWeeks': 'ہفتہ وار فروخت، روزانہ ریٹ پر',
+  'expansion.salesBar': '{date}: {amount}',
   'expansion.failed':
     'مصنوعات بدلنے پر کاپی {date} کو نہ ہو سکی: {error}۔ ایک گھنٹے بعد پھر کوشش ہو گی۔',
   'expansion.remove': '{name} میں کاپی بند کریں',

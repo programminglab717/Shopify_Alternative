@@ -24,7 +24,9 @@ import type {
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { useMe } from '../auth/context';
 import { errorText } from '../i18n/errors';
-import { formatDateTime, formatMoney } from '../i18n/format';
+import { StackedBars } from '../analytics/figures';
+import { startOfDay } from '../analytics/period';
+import { formatDate, formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
 import {
@@ -308,19 +310,24 @@ const PERIODS = [7, 30, 90] as const;
 
 /**
  * What this shop and each of its expansion stores sold lately, on one page (ADR-932): each in its
- * own currency and in this shop's at the day's rate, and all of them together.
+ * own currency and in this shop's at the day's rate, and all of them together; and day by day, or
+ * week by week over 90 days, each store's part of each bar in rupees (ADR-955).
  */
 function StoreSales() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const timezone = useShopTimezone();
   const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
-  // Up to now, as the page was opened: the same period however often it is drawn.
-  const [now] = useState(() => Date.now());
+  // Whole days in the shop's time, today's included, as the page was opened: the same period
+  // however often it is drawn, its days the chart's.
+  const [now] = useState(() => new Date());
+  const weeks = days > 30;
   const period = useMemo(
     () => ({
-      from: new Date(now - days * 86_400_000).toISOString(),
-      before: new Date(now + 60_000).toISOString(),
+      from: startOfDay(timezone, days - 1, now).toISOString(),
+      before: startOfDay(timezone, -1, now).toISOString(),
+      interval: weeks ? 'WEEK' : 'DAY',
     }),
-    [now, days],
+    [now, days, timezone, weeks],
   );
   const query = useAdminQuery<ExpansionStoreSalesData>(
     ['expansionStoreSales', days],
@@ -331,6 +338,20 @@ function StoreSales() {
   const here = rows.find((row) => row.here)?.currencyCode ?? 'PKR';
   const total = rows.reduce((sum, row) => sum + Number(row.totalSalesHere?.amount ?? 0), 0);
   const unconverted = rows.some((row) => row.totalSalesHere === null);
+  // The stores with a day's rate, each a part of each bar.
+  const charted = rows.filter((row) => row.totalSalesHere !== null);
+  const stacks = (charted[0]?.periods ?? []).map((each, index) => {
+    const parts = charted.map((row) => Number(row.periods[index]?.totalSalesHere?.amount ?? 0));
+    const sum = parts.reduce((total, part) => total + part, 0);
+    return {
+      start: each.start,
+      parts,
+      label: t('expansion.salesBar', {
+        date: formatDate(each.start, timezone, locale),
+        amount: formatMoney(sum.toFixed(2), here),
+      }),
+    };
+  });
   return (
     <section aria-labelledby="expansion-sales" className="flex flex-col gap-2">
       <h2 id="expansion-sales" className="font-semibold">
@@ -382,6 +403,13 @@ function StoreSales() {
             <p className="num font-semibold">
               {t('expansion.salesTotal', { amount: formatMoney(total.toFixed(2), here) })}
             </p>
+            <StackedBars
+              title={t(weeks ? 'expansion.salesChartWeeks' : 'expansion.salesChart')}
+              series={charted.map((row) =>
+                row.here ? t('expansion.thisShop', { name: row.name }) : row.name,
+              )}
+              stacks={stacks}
+            />
             {unconverted && <p className="text-secondary">{t('expansion.salesUnconverted')}</p>}
           </>
         )}
