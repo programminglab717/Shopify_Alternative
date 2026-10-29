@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Functions begun in Rust
+### 10c6ec4 · Functions begun in Rust
 
 * **`hatti function init --lang rust` begins a function as a Cargo crate**, built for WASI into a
   module of about 90 KB that Hatti's runner runs; TinyGo is not yet ([ADR-942](../architecture/13-decision-log.md#adr-942--hatti-function-init-begins-a-function-in-rust-built-with-cargo-for-wasi)).
