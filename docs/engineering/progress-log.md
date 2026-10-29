@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Buy buttons' layouts
+### 57d2164 · Buy buttons' layouts
 
 * **A buy button may lay its product out across**, and a collection embed be a list or a
   carousel, picked in the admin's buy button card ([ADR-949](../architecture/13-decision-log.md#adr-949--buy-buttons-may-lay-a-product-out-across-its-photo-beside-it-and-a-collection-as-a-list-or-a-carousel)).
