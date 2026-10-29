@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-907 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-908 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -915,6 +915,7 @@
 | 905 | Workflows start on a variant's stock running low or out, once a spell as the shop's low-stock alert tells, reading its product, variant, SKU, units left and the line | Accepted |
 | 906 | Workflows run on a schedule: days of the week at an hour of the shop's own time, each slot once, their run telling the shop's queues then | Accepted |
 | 907 | A wholesale customer's credit limit on payment terms: an order on terms that would take what they owe past it is refused, saying what they would owe | Accepted |
+| 908 | A shop keeps AI shopping agents out, its UCP profile and store MCP answering none, and the store MCP tells agents its policies and delivery to a city with cash on delivery | Accepted |
 
 ---
 
@@ -30018,3 +30019,30 @@
     register.
   * Reminders before and after the due date still need Meta's templates (OWN-23). The
     storefront's order page saying the terms is still not done.
+
+## ADR-908 · A shop keeps AI shopping agents out, its UCP profile and store MCP answering none, and the store MCP tells agents its policies and delivery to a city with cash on delivery
+
+* **Context:** ADR-847 left a shop's switch to keep agents out for later. Its tools for policies
+  and for delivery and cash on delivery by city (09 §5) were also left. Shoppers ask an agent
+  "can I return it?" and "do they deliver to Multan, cash on delivery?" before they buy.
+* **Decision:**
+  * **`agentsBlocked`**, a storefront preference (migration 0404), is set in the admin's
+    storefront settings. While it is on:
+    * `/.well-known/ucp` and `/api/mcp` answer 404, as for a shop with neither;
+    * the shop's pages, feeds and Storefront API stay as they are.
+  * **`get_policies`** gives the shop's policies that it has: refunds, privacy, shipping and
+    terms. Each comes with its title and page, and its words as plain text, up to 20,000
+    characters.
+  * **`get_delivery`**, given a city, gives:
+    * its zone's charge, or the shop's charge everywhere else, in minor units;
+    * what orders are free above, and the working days;
+    * whether cash on delivery is taken, with its fee and the most it takes.
+    The city is matched in any letter case. The answer says the checkout gives the exact charge,
+    by the order's weight and value.
+  * **Both are Hatti's own,** named in `tools/list` and the server's instructions. They give no
+    UCP capability, as UCP has none for them.
+* **Consequences:**
+  * A shop that does not want agents ordering for shoppers keeps them out, and agents can answer
+    shoppers' first questions from the shop's own words.
+  * FAQs as a tool, UCP's checkout capability (Scale) and agents' request signatures are still
+    not done.
