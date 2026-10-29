@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Every store's sales by day
+### ed175cb · Every store's sales by day
 
 * **The expansion stores' page charts each day's sales**, each store's part of the bar in rupees
   at the day's rate, on this shop's days ([ADR-955](../architecture/13-decision-log.md#adr-955--every-stores-sales-by-day-on-one-chart-each-stores-part-of-each-days-bar-in-this-shops-currency-at-the-days-rate)).
