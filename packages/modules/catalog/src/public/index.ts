@@ -350,8 +350,10 @@ export {
   type DigitalLine,
 } from '../internal/digital-deliveries.js';
 export {
+  EXPANSION_AUTO_COPY,
   EXPANSION_STORE_LIMITS,
   ExpansionStoreService,
+  type ExpansionCopyDue,
   type ExpansionStoreRecord,
   type ExpansionCopyResult,
 } from '../internal/expansion-stores.service.js';

@@ -17,6 +17,9 @@ function core(role: StaffRole = 'owner') {
           priceRate: variables.priceRate,
           copiedAt: null,
           lastCopy: null,
+          autoCopy: false,
+          copyError: null,
+          copyFailedAt: null,
         };
         stores = [made];
         return { expansionStoreSave: { expansionStore: made, userErrors: [] } };
@@ -28,6 +31,15 @@ function core(role: StaffRole = 'owner') {
           lastCopy: { created: 12, updated: 3, problems: 1 },
         }));
         return { expansionStoreCopy: { expansionStore: stores[0], userErrors: [] } };
+      case 'ExpansionStoreAutoCopySet':
+        // As the worker would leave it, a copy having failed since.
+        stores = stores.map((each) => ({
+          ...each,
+          autoCopy: variables.enabled,
+          copyError: 'The same person no longer owns both shops',
+          copyFailedAt: '2026-10-28T10:00:00Z',
+        }));
+        return { expansionStoreAutoCopySet: { expansionStore: stores[0], userErrors: [] } };
       case 'ExpansionStoreRemove':
         stores = [];
         return { expansionStoreRemove: { userErrors: [] } };
@@ -85,6 +97,19 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy products to Zari Abroad' }));
     expect(await screen.findByText(/: 12 made, 3 updated, 1 not taken\.$/)).toBeTruthy();
+
+    // Copied as products change, and told when that failed (ADR-913).
+    const auto = screen.getByLabelText(
+      'Copy to Zari Abroad as products change, within the hour',
+    ) as HTMLInputElement;
+    expect(auto.checked).toBe(false);
+    fireEvent.click(auto);
+    expect(
+      await screen.findByText(/The same person no longer owns both shops\. It is tried again/),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'ExpansionStoreAutoCopySet')).toEqual([
+      { shopId: 'shop_2', enabled: true },
+    ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop copying to Zari Abroad' }));
     await waitFor(() =>

@@ -6186,7 +6186,13 @@ type ExpansionCopy {
 Another shop of the owner's whose products are copied from this one, priced at a rate (CH-11, ADR-859), as Shopify Plus's expansion stores.
 """
 type ExpansionStore {
+  """Whether products are copied as they change, within the hour (ADR-913)."""
+  autoCopy: Boolean!
   copiedAt: DateTime
+
+  """Why the last copy as products changed failed; null once one succeeds."""
+  copyError: String
+  copyFailedAt: DateTime
 
   """Its currency, as its prices are: 'USD'."""
   currencyCode: String!
@@ -10598,6 +10604,11 @@ type Mutation {
 
   """Changes a drop that has not ended, all of it."""
   dropUpdate(id: ID!, input: DropInput!): DropPayload!
+
+  """
+  Has the shop's products copied to an expansion store as they change, within the hour of being left alone ten minutes, or only when asked (ADR-913). The owner alone, of both shops, having signed in lately.
+  """
+  expansionStoreAutoCopySet(enabled: Boolean!, shopId: ID!): ExpansionStorePayload!
 
   """
   Copies the shop's products to an expansion store, at its rate: those it has already, by handle, updated, and new ones added as drafts or as they are here. The owner alone, of both shops, having signed in lately.

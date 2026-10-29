@@ -9,8 +9,12 @@ import {
 } from '@hatti/billing/public';
 import {
   CollectionService,
+  ExpansionStoreService,
   MediaProcessing,
+  MediaService,
   PriceSaleService,
+  ProductExportService,
+  ProductImportService,
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
@@ -183,6 +187,8 @@ import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 import { ScheduledExports } from './scheduled-exports.js';
 import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
+import { ExpansionAutoCopy } from './expansion-auto-copy.js';
+import { ExpansionCopier } from '../expansion-copier.js';
 import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
 import { StatusShopNotices } from './status-shop-notices.js';
@@ -654,6 +660,24 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => lapsed.stop());
+    // Expansion stores copying as products change, copied within the hour (ADR-913).
+    const site = new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000');
+    const expansions = new ExpansionAutoCopy(
+      new ExpansionCopier(
+        database,
+        new ExpansionStoreService(database),
+        new ProductExportService(database, site),
+        new ProductImportService(
+          database,
+          new ProductService(database),
+          new MediaService(database),
+          new VariantService(database),
+          site,
+        ),
+      ),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => expansions.stop());
     // Customers who have not answered asked once more to confirm (ADR-175).
     const asking = new ConfirmationReminders(database, workerOrders(database), logger).start(
       config.SWEEP_INTERVAL_MS,

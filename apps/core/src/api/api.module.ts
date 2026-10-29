@@ -73,6 +73,7 @@ import { OAuthController } from './oauth.controller.js';
 import { AppSessionResolver } from './app-sessions.resolver.js';
 import { ThemeStoreResolver } from './theme-store.resolver.js';
 import { AppChargeResolver } from './app-charges.resolver.js';
+import { ExpansionCopier } from '../expansion-copier.js';
 import { ExpansionStoreResolver } from './expansion-stores.resolver.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
@@ -430,6 +431,7 @@ export class ApiModule {
         ThemeStoreResolver,
         AppChargeResolver,
         ExpansionStoreResolver,
+        ExpansionCopier,
         FileUsesResolver,
         PaymentLinkOrdersResolver,
         OrderAssignmentResolver,

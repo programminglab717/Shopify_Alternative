@@ -4846,6 +4846,10 @@ export interface ExpansionStore {
   priceRate: string;
   copiedAt: string | null;
   lastCopy: { created: number; updated: number; problems: number } | null;
+  /** Copied as products change (ADR-913), and why the last such copy failed. */
+  autoCopy: boolean;
+  copyError: string | null;
+  copyFailedAt: string | null;
 }
 
 export interface ExpansionStoresData {
@@ -4855,6 +4859,7 @@ export interface ExpansionStoresData {
 export interface ExpansionStorePayloadData {
   expansionStoreSave?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreCopy?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
+  expansionStoreAutoCopySet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreRemove?: { userErrors: UserError[] };
 }
 

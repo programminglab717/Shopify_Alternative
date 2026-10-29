@@ -9939,6 +9939,9 @@ const EXPANSION_STORE = /* GraphQL */ `
       updated
       problems
     }
+    autoCopy
+    copyError
+    copyFailedAt
   }
 `;
 
@@ -9970,6 +9973,22 @@ export const ExpansionStoreSaveMutation = /* GraphQL */ `
 export const ExpansionStoreCopyMutation = /* GraphQL */ `
   mutation ExpansionStoreCopy($shopId: ID!) {
     expansionStoreCopy(shopId: $shopId) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
+`;
+
+/** Copying as products change, within the hour (ADR-913). */
+export const ExpansionStoreAutoCopySetMutation = /* GraphQL */ `
+  mutation ExpansionStoreAutoCopySet($shopId: ID!, $enabled: Boolean!) {
+    expansionStoreAutoCopySet(shopId: $shopId, enabled: $enabled) {
       expansionStore {
         ...ExpansionStoreFields
       }

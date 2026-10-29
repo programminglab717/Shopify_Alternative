@@ -5119,6 +5119,9 @@ const en = {
   'expansion.copy': 'Copy products to {name}',
   'expansion.copied': 'Copied {date}: {created} made, {updated} updated, {problems} not taken.',
   'expansion.never': 'Not copied yet.',
+  'expansion.auto': 'Copy to {name} as products change, within the hour',
+  'expansion.failed':
+    'Copying as products changed failed on {date}: {error}. It is tried again an hour on.',
   'expansion.remove': 'Stop copying to {name}',
   'expansion.rateOf': '{rate} {currency} for each {from}',
   'settings.apps': 'Apps',
@@ -12289,6 +12292,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'expansion.copied':
     '{date} کو کاپی ہوا: {created} نئی، {updated} اپڈیٹ، {problems} نہیں لی گئیں۔',
   'expansion.never': 'ابھی کاپی نہیں ہوا۔',
+  'expansion.auto': 'مصنوعات بدلنے پر گھنٹے کے اندر {name} میں کاپی کریں',
+  'expansion.failed':
+    'مصنوعات بدلنے پر کاپی {date} کو نہ ہو سکی: {error}۔ ایک گھنٹے بعد پھر کوشش ہو گی۔',
   'expansion.remove': '{name} میں کاپی بند کریں',
   'expansion.rateOf': 'ہر {from} کے {rate} {currency}',
   'settings.apps': 'ایپس',

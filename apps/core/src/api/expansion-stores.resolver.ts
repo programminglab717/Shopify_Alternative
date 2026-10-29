@@ -1,6 +1,5 @@
 import {
   CurrentTenant,
-  ROLE_SCOPES,
   RequireRecentAuthentication,
   RequireScopes,
   UserError,
@@ -10,18 +9,10 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import {
-  ExpansionStoreService,
-  ProductExportService,
-  ProductImportService,
-  rescaledShopifyPrices,
-  type ExpansionCopyResult,
-  type ExpansionStoreRecord,
-} from '@hatti/catalog/public';
+import { ExpansionStoreService, type ExpansionStoreRecord } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
-import { StaffService } from '@hatti/identity/public';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
-import { isCurrencyCode } from '@hatti/money';
+import { ExpansionCopier } from '../expansion-copier.js';
 import {
   Args,
   Field,
@@ -69,6 +60,18 @@ export class ExpansionStore {
 
   @Field(() => ExpansionCopy, { nullable: true })
   lastCopy!: ExpansionCopy | null;
+
+  @Field({ description: 'Whether products are copied as they change, within the hour (ADR-913).' })
+  autoCopy!: boolean;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Why the last copy as products changed failed; null once one succeeds.',
+  })
+  copyError!: string | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  copyFailedAt!: Date | null;
 }
 
 @ObjectType()
@@ -98,9 +101,7 @@ export class ExpansionStoreResolver {
   constructor(
     private readonly db: Database,
     private readonly stores: ExpansionStoreService,
-    private readonly staff: StaffService,
-    private readonly exports: ProductExportService,
-    private readonly imports: ProductImportService,
+    private readonly copier: ExpansionCopier,
   ) {}
 
   @Query(() => [ExpansionStore], { description: "The shop's expansion stores, oldest first." })
@@ -125,7 +126,7 @@ export class ExpansionStoreResolver {
     const actor = owner(tenant);
     const target = tryFromPublicId(shopId, 'shop');
     const result: MutationResult<ExpansionStoreRecord> =
-      target && (await this.#owns(actor.userId, target))
+      target && (await this.copier.owns(actor.userId, target))
         ? await this.stores.save(tenant, target, priceRate)
         : failOne(['shopId'], 'NOT_FOUND', 'You own no other shop of that ID');
     return this.#payload(result);
@@ -166,48 +167,33 @@ export class ExpansionStoreResolver {
   ): Promise<ExpansionStorePayload> {
     const actor = owner(tenant);
     const target = tryFromPublicId(shopId, 'shop');
-    const link = target ? await this.stores.get(tenant, target) : null;
-    if (!target || !link || !(await this.#owns(actor.userId, target))) {
-      return this.#payload(failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
-    }
-    const exported = await this.exports.export(tenant, '', null);
-    if (!exported.ok) return this.#payload(exported);
-    const currency = (await this.db.tenant(target, (tx) => shopProfile(tx, target))).currency;
-    if (!isCurrencyCode(currency)) {
-      return this.#payload(
-        failOne(['shopId'], 'INVALID', 'The expansion store has no currency Hatti knows'),
-      );
-    }
-    // The owner, acting in the other shop as its owner.
-    const there: TenantContext = {
-      shopId: target,
-      currency,
-      scopes: new Set(ROLE_SCOPES.owner),
-      actor: { ...actor, role: 'owner', customRoleId: null },
-    };
-    const imported = await this.imports.import(
-      there,
-      rescaledShopifyPrices(exported.value.csv, Number(link.priceRate)),
-      { overwrite: true },
-    );
-    if (!imported.ok) return this.#payload(imported);
-    const result: ExpansionCopyResult = {
-      created: imported.value.created,
-      updated: imported.value.updated,
-      problems: imported.value.rowErrorCount,
-    };
-    const saved = await this.stores.copied(tenant, target, result);
     return this.#payload(
-      saved
-        ? { ok: true, value: saved }
+      target
+        ? await this.copier.copy(tenant, actor, target)
         : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'),
     );
   }
 
-  /** Whether `userId` is the owner of `shopId`. */
-  async #owns(userId: string, shopId: string): Promise<boolean> {
-    const members = await this.staff.staffOf(shopId);
-    return members.some((member) => member.userId === userId && member.role === 'owner');
+  @Mutation(() => ExpansionStorePayload, {
+    description:
+      "Has the shop's products copied to an expansion store as they change, within the hour of " +
+      'being left alone ten minutes, or only when asked (ADR-913). The owner alone, of both ' +
+      'shops, having signed in lately.',
+  })
+  @RequireScopes('write_products')
+  @RequireRecentAuthentication()
+  async expansionStoreAutoCopySet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('shopId', { type: () => ID }) shopId: string,
+    @Args('enabled') enabled: boolean,
+  ): Promise<ExpansionStorePayload> {
+    const actor = owner(tenant);
+    const target = tryFromPublicId(shopId, 'shop');
+    return this.#payload(
+      target && (await this.copier.owns(actor.userId, target))
+        ? await this.stores.setAutoCopy(tenant, target, enabled)
+        : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'),
+    );
   }
 
   async #shown(record: ExpansionStoreRecord): Promise<ExpansionStore> {
@@ -221,6 +207,9 @@ export class ExpansionStoreResolver {
       priceRate: record.priceRate,
       copiedAt: record.syncedAt,
       lastCopy: record.lastResult && Object.assign(new ExpansionCopy(), record.lastResult),
+      autoCopy: record.autoCopy,
+      copyError: record.copyError,
+      copyFailedAt: record.failedAt,
     });
   }
 

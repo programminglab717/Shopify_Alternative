@@ -2,6 +2,7 @@ import { Copy, Globe, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  ExpansionStoreAutoCopySetMutation,
   ExpansionStoreCopyMutation,
   ExpansionStoreRemoveMutation,
   ExpansionStoreSaveMutation,
@@ -25,7 +26,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { BackToSettings } from './settings-page';
-import { SelectField } from './settings-form';
+import { CheckField, SelectField } from './settings-form';
 
 /**
  * Expansion stores (CH-11, ADR-859): other shops of the owner's, an international store say,
@@ -47,6 +48,9 @@ export function ExpansionStoresPage() {
   );
   const remove = useAdminMutation<ExpansionStorePayloadData, { shopId: string }>(
     ExpansionStoreRemoveMutation,
+  );
+  const auto = useAdminMutation<ExpansionStorePayloadData, { shopId: string; enabled: boolean }>(
+    ExpansionStoreAutoCopySetMutation,
   );
   const recent = useRecentAuthentication();
   const [chosen, setChosen] = useState('');
@@ -81,6 +85,14 @@ export function ExpansionStoresPage() {
       if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
     }, onError);
     setBusy(null);
+  };
+
+  const onAuto = async (shopId: string, enabled: boolean) => {
+    setProblem(null);
+    await recent.run(async () => {
+      const done = (await auto.mutateAsync({ shopId, enabled })).expansionStoreAutoCopySet!;
+      if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
+    }, onError);
   };
 
   const onRemove = async (shopId: string) => {
@@ -135,6 +147,19 @@ export function ExpansionStoresPage() {
                         })
                       : t('expansion.never')}
                   </span>
+                  <CheckField
+                    label={t('expansion.auto', { name: store.name })}
+                    checked={store.autoCopy}
+                    onChange={(enabled) => !auto.isPending && void onAuto(store.shopId, enabled)}
+                  />
+                  {store.autoCopy && store.copyError && store.copyFailedAt && (
+                    <Alert tone="danger">
+                      {t('expansion.failed', {
+                        date: formatDateTime(store.copyFailedAt, timezone, locale),
+                        error: store.copyError,
+                      })}
+                    </Alert>
+                  )}
                   <span className="flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
