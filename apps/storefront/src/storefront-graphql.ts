@@ -169,6 +169,11 @@ const SDL = /* GraphQL */ `
     The shop's products: those a search finds, the likeliest first, where query is given.
     """
     products(first: Int, after: String, query: String): ProductConnection!
+    """
+    The products and collections with these IDs, in their order, null for one the shop doesn't
+    sell (ADR-956): up to 250 at once, as Shopify's.
+    """
+    nodes(ids: [ID!]!): [Node]!
     collection(id: ID, handle: String): Collection
     collections(first: Int, after: String): CollectionConnection!
     cart(id: ID!): Cart
@@ -438,7 +443,14 @@ const SDL = /* GraphQL */ `
     value: String!
   }
 
-  type Product {
+  """
+  What nodes gives by its ID (ADR-956): a product or a collection.
+  """
+  interface Node {
+    id: ID!
+  }
+
+  type Product implements Node {
     id: ID!
     handle: String!
     title: String!
@@ -508,7 +520,7 @@ const SDL = /* GraphQL */ `
     metafields(identifiers: [HasMetafieldsIdentifier!]!): [Metafield]!
   }
 
-  type Collection {
+  type Collection implements Node {
     id: ID!
     handle: String!
     title: String!
@@ -1906,6 +1918,31 @@ function rootOf(api: StorefrontApiShop) {
       const terms = args.query?.trim().slice(0, 200) ?? '';
       const ids = terms ? await api.search(terms) : await api.store.productIds();
       return productPage(ids, args, api);
+    },
+    nodes: async (args: { ids: string[] }) => {
+      if (args.ids.length > STOREFRONT_API_LIMITS.first) {
+        throw new GraphQLError(`Ask for ${STOREFRONT_API_LIMITS.first} IDs at most`);
+      }
+      // The products at once; the collections, as the storefront has them, by handle.
+      const productIds = args.ids.flatMap((id) => idOf('Product', id) ?? []);
+      const products = new Map(
+        (productIds.length > 0 ? await api.store.products(productIds) : []).flatMap((doc) =>
+          doc ? [[doc.id, doc] as const] : [],
+        ),
+      );
+      const collections = new Map<string, CollectionDoc>();
+      if (args.ids.some((id) => idOf('Collection', id))) {
+        for (const handle of await api.store.handles('collection')) {
+          const doc = await api.store.collectionByHandle(handle);
+          if (doc) collections.set(doc.id, doc);
+        }
+      }
+      return args.ids.map((id) => {
+        const product = products.get(idOf('Product', id) ?? '');
+        if (product) return { __typename: 'Product', ...productOf(product, api) };
+        const collection = collections.get(idOf('Collection', id) ?? '');
+        return collection ? { __typename: 'Collection', ...collectionOf(collection, api) } : null;
+      });
     },
     collection: async (args: { id?: string | null; handle?: string | null }) => {
       const handle = args.handle ?? null;

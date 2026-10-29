@@ -227,6 +227,46 @@ describe('The Storefront API (DEV-02, ADR-848)', () => {
     expect(collections.data.collection.title).toBe(collection.title);
   });
 
+  it('gives products and collections by their IDs at once, in their order, null for one it has not (ADR-956)', async () => {
+    const collection = sample.collections[0]!;
+    const other = sample.products.find((each) => each.id !== lawn.id)!;
+    const ids = [
+      `gid://hatti/Product/${other.id}`,
+      'gid://hatti/Product/gone',
+      `gid://hatti/Collection/${collection.id}`,
+      `gid://hatti/Product/${lawn.id}`,
+      'gid://hatti/Page/anything',
+    ];
+    const { data, errors } = await ask(
+      `query ($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          __typename id
+          ... on Product { handle priceRange { minVariantPrice { currencyCode } } }
+          ... on Collection { title }
+        }
+      }`,
+      { ids },
+    );
+    expect(errors).toBeUndefined();
+    expect(data.nodes).toEqual([
+      {
+        __typename: 'Product',
+        id: ids[0],
+        handle: other.handle,
+        priceRange: { minVariantPrice: { currencyCode: 'PKR' } },
+      },
+      null,
+      { __typename: 'Collection', id: ids[2], title: collection.title },
+      expect.objectContaining({ __typename: 'Product', handle: lawn.handle }),
+      null,
+    ]);
+    // 250 at most, as Shopify's.
+    const many = await ask(`query ($ids: [ID!]!) { nodes(ids: $ids) { id } }`, {
+      ids: Array.from({ length: 251 }, (_, index) => `gid://hatti/Product/${index}`),
+    });
+    expect(many.errors?.[0]?.message).toBe('Ask for 250 IDs at most');
+  });
+
   it('searches through the core where a query is given', async () => {
     const { data } = await ask(`{ products(first: 5, query: "lawn") { nodes { id } } }`);
     expect(data.products.nodes).toEqual([{ id: `gid://hatti/Product/${lawn.id}` }]);
