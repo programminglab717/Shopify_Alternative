@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-903 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-904 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -911,6 +911,7 @@
 | 901 | A combined listing the shop chooses is one card in collections: the first of its products in each collection's order stands for the rest, its card naming their values | Accepted |
 | 902 | A combined listing's option and values have the shop's Urdu, kept with the listing and shown on Urdu pages, and the store's export holds the listings | Accepted |
 | 903 | The Storefront API answers in Urdu where a query asks with @inContext, its pages at their Urdu addresses, and gives the metafields the shop shows | Accepted |
+| 904 | A workflow may hold an order for review, as one is held for its risk, until staff confirm it: an open order not yet handed on, its timeline naming the workflow | Accepted |
 
 ---
 
@@ -29927,3 +29928,22 @@
   * Hydrogen's localization query asks for more than this, such as markets and available
     countries, and is refused until it is cut to this subset.
   * Customer accounts and cost-based limits on the Storefront API are still not done.
+
+## ADR-904 · A workflow may hold an order for review, as one is held for its risk, until staff confirm it: an open order not yet handed on, its timeline naming the workflow
+
+* **Context:** ADR-861 and ADR-886 left actions that do more than tag an order. OWN-52 named
+  holding an order for review as one shops ask for: "hold COD orders over Rs 20,000 from new
+  customers until I call them".
+* **Decision:**
+  * **`HOLD_ORDER`**, an action of workflows whose trigger tells of an order, holds it for
+    review as an order is held for its risk or a refused parcel (ADR-674). It waits at To
+    review until staff confirm it, and then goes on where it was.
+  * **Only an open order to confirm, pack or book is held.** Its timeline says "Held for review
+    by the workflow" and the workflow's name, by the system.
+  * **An order held already, or handed on, closed or cancelled, is left.** The step is skipped
+    with why. A missing order fails the step.
+  * **The admin's editor** offers it for order triggers, saying where the order waits.
+* **Consequences:**
+  * With a wait and a check (ADR-886), "a day later, if still unconfirmed, hold it" is a workflow.
+  * Cancelling an order from a workflow, a WhatsApp message to the customer (approved templates,
+    OWN-23), and scheduled and stock triggers are still not done.
