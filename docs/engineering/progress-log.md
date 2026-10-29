@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Selling plans changed in the admin
+### 2c2b9c2 · Selling plans changed in the admin
 
 * **A selling plan is changed from the admin** as it was made, its chosen variants among the
   rest; subscriptions made keep it as it was ([ADR-936](../architecture/13-decision-log.md#adr-936--a-selling-plan-is-changed-from-the-admin-as-it-was-made-its-chosen-variants-among-the-rest)).
