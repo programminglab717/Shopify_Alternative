@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-911 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-912 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -919,6 +919,7 @@
 | 909 | Sales and custom reports break sales down by customer and by city, and the AI question box reads questions of them | Accepted |
 | 910 | A custom report may be of stock: each tracked variant's stock now and what sold of it over the period, as the inventory report has them | Accepted |
 | 911 | The AI answering customers answers from the shop's own answers to common questions, and from the products a customer asks of: their prices and whether each can be bought now | Accepted |
+| 912 | App Bridge: an app inside the admin asks it, over postMessage, for a fresh session token, a toast, a page of the admin or the save bar, and each answers the other alone | Accepted |
 
 ---
 
@@ -30123,3 +30124,35 @@
   * A product the customer names by a word its listing lacks isn't found. The AI then hands the
     chat over or says it doesn't know, as before.
   * A per-shop tone or name, and voice notes and pictures, are still not done.
+
+## ADR-912 · App Bridge: an app inside the admin asks it, over postMessage, for a fresh session token, a toast, a page of the admin or the save bar, and each answers the other alone
+
+* **Context:** ADR-852 opened apps inside the admin with a session token of a minute's life in
+  the frame's address. It left out an App Bridge script. An app had no fresh token once the
+  minute passed, and no way to show a toast, send the merchant to an order, or hold their unsaved
+  changes, as Shopify's App Bridge does.
+* **Decision:**
+  * **The app's side** is `@hatti/admin-client/app-bridge`, a browser entry of the client
+    (ADR-850), without anything of Node's. `createAppBridge()` gives:
+    * `idToken()`, a fresh session token, which waits ten seconds for the admin at most;
+    * `toast(message, { error })`, of 200 characters at most;
+    * `navigate(path)`, to a path of the shop's admin, never another site;
+    * `saveBar.show({ onSave, onDiscard })` and `hide()`.
+  * **The protocol:** messages are `{ bridge: 'hatti-app-bridge', version: 1, id?, message }`
+    over `postMessage`. A token asked for carries an `id`, and its answer the same.
+  * **Each answers the other alone:**
+    * The frame's address now carries `host`, the admin's origin. The bridge posts only to it,
+      https or this machine's, and takes messages only from it and from the window that framed
+      it.
+    * The admin answers only messages from the app's own frame and origin. It posts only to that
+      origin.
+    * A path is taken only as a path of the admin, never `//` or `..`.
+  * **The admin's frame page:**
+    * A token is a new `appSession`, the same as the first.
+    * Toasts show above the frame for five seconds, read out politely.
+    * The save bar sits above the frame with Save and Discard, which tell the app.
+    * Navigation goes to the path within the shop's admin.
+* **Consequences:**
+  * An embedded app keeps working past the first minute and feels part of the admin.
+  * Extensions of admin pages, such as an order's, and app blocks in themes' sections are still
+    not done.
