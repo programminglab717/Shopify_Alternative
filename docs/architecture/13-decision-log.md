@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-948 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-949 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -956,6 +956,7 @@
 | 946 | The Storefront API keeps a signed-in shopper's address book, as Shopify's does, through the core's: in Pakistan alone, a landmark besides | Accepted |
 | 947 | The headless starter keeps the shopper's address book: each address to change, deliver to first or take out, and one to add | Accepted |
 | 948 | An expansion store's collections may have a margin of their own over its rate, the first of a product's collections giving it | Accepted |
+| 949 | Buy buttons may lay a product out across, its photo beside it, and a collection as a list or a carousel | Accepted |
 
 ---
 
@@ -31025,3 +31026,23 @@
 * **Consequences:**
   * A shop prices furniture and scarves abroad as each costs it to sell there.
   * Not yet: a margin for a single product, beyond a collection of one.
+
+## ADR-949 · Buy buttons may lay a product out across, its photo beside it, and a collection as a list or a carousel
+
+* **Context:** ADR-860's buy button shows a product as a card, and ADR-925's collection embed a
+  grid of cards. A blog's sidebar wants a single column, and a page's footer a row to scroll;
+  Shopify's Buy Button offers such layouts. ADR-925 and ADR-937 left layouts other than a grid for
+  later.
+* **Decision:**
+  * **The snippet's `data-layout`** says how an embed is laid out:
+    * a product as a card, or `horizontal`, across with its photo beside it;
+    * a collection as a grid of cards, a `list` of products laid across, or a `carousel` scrolled
+      sideways, snapping to each, Show more at its end.
+  * **Defaults need no attribute**, and a layout not of the embed's kind, or no layout at all, is
+    left out of the snippet. The collection's heading now stands above its products, whatever
+    their layout.
+  * **Admin:** the buy button card picks the layout, a product's or a collection's, and the
+    snippet shows it.
+* **Consequences:**
+  * A shop's products fit a narrow sidebar or a row across a page as well as a grid.
+  * Not yet: a layout per product within a collection.
