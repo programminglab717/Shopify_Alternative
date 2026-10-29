@@ -23,6 +23,7 @@ import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { BuyButtonCard } from '../products/buy-button';
 import { FormSection, TextArea } from '../products/product-form';
 import { EDITS_PRODUCTS, ProductStatusBadge } from '../products/status';
 import { useAttempt } from '../returns/parcel';
@@ -431,6 +432,14 @@ export function CollectionPage() {
             />
           )}
           <Products collection={collection} edits={edits} />
+          {/* Embedded on other websites, a grid of its products' buttons (ADR-925). */}
+          {edits && (
+            <BuyButtonCard
+              handle={collection.handle}
+              storefront={query.data.shop?.url ?? ''}
+              collection
+            />
+          )}
           <CollectionUrduCard collectionId={collection.id} />
           {edits && <Delete collection={collection} />}
         </>

@@ -88,6 +88,22 @@ describe("A product's buy button for other websites (CH-08, ADR-860)", () => {
     expect(within(card).getByText(/data-language="ur"/)).toBeTruthy();
   });
 
+  it("puts the buttons in the shop's own colour where it picks one (ADR-925)", async () => {
+    vi.stubGlobal('fetch', core().fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+    const heading = await screen.findByRole('heading', { name: 'Buy button' });
+    const card = heading.closest('section') ?? heading.parentElement!.parentElement!;
+    fireEvent.click(within(card).getByRole('checkbox', { name: /Buttons in your own colour/ }));
+    fireEvent.change(within(card).getByLabelText('Colour of the buttons'), {
+      target: { value: '#7c2d12' },
+    });
+    expect(
+      within(card).getByText(/data-hatti-buy-button="khussa" data-color="#7c2d12"/),
+    ).toBeTruthy();
+    fireEvent.click(within(card).getByRole('checkbox', { name: /Buttons in your own colour/ }));
+    expect(within(card).queryByText(/data-color/)).toBeNull();
+  });
+
   it('is offered for products the storefront shows alone', async () => {
     vi.stubGlobal('fetch', core('DRAFT').fetcher);
     renderAdmin('/shop_1/products/prod_1');

@@ -129,4 +129,63 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     expect(window.localStorage.getItem('hatti-buy-button-cart:https://zari.hatti.pk')).toBe('[]');
     await window.happyDOM.close();
   });
+
+  it("embeds a collection as a grid of its products' buttons, in the shop's colour (ADR-925)", async () => {
+    expect(
+      buyButtonSnippet('https://zari.hatti.pk', 'eid-edit', 'en', {
+        collection: true,
+        color: '#7c2d12',
+      }),
+    ).toBe(
+      '<div data-hatti-buy-collection="eid-edit" data-color="#7c2d12"></div>\n' +
+        '<script src="https://zari.hatti.pk/buy-button.js" async></script>',
+    );
+    // A colour that is no colour is left out.
+    expect(
+      buyButtonSnippet('https://zari.hatti.pk', 'eid-edit', 'en', { color: 'red;x' }),
+    ).not.toContain('data-color');
+
+    const product = (handle: string, id: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `https://zari.hatti.pk/products/${handle}`,
+      image: null,
+      currency: 'PKR',
+      variants: [{ id, title: 'Default', available: true, price: '1500.00', compareAtPrice: null }],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    document.body.innerHTML =
+      '<div data-hatti-buy-collection="eid-edit" data-color="#7c2d12"></div>';
+    const asked: string[] = [];
+    window.fetch = (async (url: string) => {
+      asked.push(url);
+      return {
+        ok: true,
+        json: async () => ({
+          handle: 'eid-edit',
+          title: 'Eid edit',
+          url: 'https://zari.hatti.pk/collections/eid-edit',
+          products: [product('kurta', 'v-k'), product('dupatta', 'v-d')],
+        }),
+      };
+    }) as never;
+    const script = document.createElement('script');
+    script.setAttribute('src', 'https://zari.hatti.pk/buy-button.js');
+    Object.defineProperty(document, 'currentScript', { value: script });
+    window.eval(BUY_BUTTON_SCRIPT);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(asked).toEqual(['https://zari.hatti.pk/buy-button/collections/eid-edit']);
+    const host = document.querySelector('[data-hatti-buy-collection]')!;
+    expect(host.getAttribute('style')).toContain('--hatti-color: #7c2d12');
+    const grid = host.shadowRoot!;
+    expect(grid.querySelector('.heading')!.textContent).toBe('Eid edit');
+    const cards = [...grid.querySelectorAll('.grid > div')].map((cell) => cell.shadowRoot!);
+    expect(cards.map((card) => card.querySelector('.buy')!.getAttribute('href'))).toEqual([
+      'https://zari.hatti.pk/cart/v-k:1',
+      'https://zari.hatti.pk/cart/v-d:1',
+    ]);
+    await window.happyDOM.close();
+  });
 });

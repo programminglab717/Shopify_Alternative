@@ -1,43 +1,63 @@
 import { Copy } from 'lucide-react';
 import { useState } from 'react';
 import { useLocale } from '../i18n/locale';
-import { SelectField } from '../settings/settings-form';
+import { CheckField, SelectField } from '../settings/settings-form';
 import { Button } from '../ui/button';
+import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 
-/** The snippet another website pastes to show the product, as the storefront serves it. */
+/** The colour the buttons take until the shop picks its own: the platform's teal. */
+const DEFAULT_COLOR = '#0f766e';
+
+/**
+ * The snippet another website pastes to show the product, or with `collection` the collection
+ * (ADR-925), as the storefront serves it; its buttons in `color` where given.
+ */
 export function buyButtonSnippet(
   storefront: string,
   handle: string,
   language: 'en' | 'ur',
+  options: { collection?: boolean; color?: string | null } = {},
 ): string {
   const origin = storefront.replace(/\/+$/, '');
   const lang = language === 'ur' ? ' data-language="ur"' : '';
+  const color =
+    options.color && /^#[0-9a-f]{6}$/i.test(options.color) ? ` data-color="${options.color}"` : '';
+  const kind = options.collection ? 'data-hatti-buy-collection' : 'data-hatti-buy-button';
   return (
-    `<div data-hatti-buy-button="${handle}"${lang}></div>\n` +
+    `<div ${kind}="${handle}"${lang}${color}></div>\n` +
     `<script src="${origin}/buy-button.js" async></script>`
   );
 }
 
 /**
- * A buy button for the product (CH-08, ADR-860): the snippet to paste into a blog, a site or a
- * link page, which shows its photo, price and variants there, Buy now opening the shop's
- * checkout. For an active product, as the storefront shows no other.
+ * A buy button for the product (CH-08, ADR-860), or for a collection, a grid of its products'
+ * (ADR-925): the snippet to paste into a blog, a site or a link page, which shows its photos,
+ * prices and variants there, Buy now opening the shop's checkout, in the shop's colour if it
+ * picks one. For an active product, as the storefront shows no other.
  */
 export function BuyButtonCard({
-  product,
+  handle,
   storefront,
+  collection = false,
+  active = true,
 }: {
-  product: { handle: string; status: string };
+  handle: string;
   storefront: string;
+  collection?: boolean;
+  active?: boolean;
 }) {
   const { t } = useLocale();
   const [language, setLanguage] = useState<'en' | 'ur'>('en');
+  const [color, setColor] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  if (product.status !== 'ACTIVE' || !storefront) return null;
-  const snippet = buyButtonSnippet(storefront, product.handle, language);
+  if (!active || !storefront) return null;
+  const snippet = buyButtonSnippet(storefront, handle, language, { collection, color });
   return (
-    <FormSection title={t('buyButton.title')} hint={t('buyButton.hint')}>
+    <FormSection
+      title={t(collection ? 'buyButton.collectionTitle' : 'buyButton.title')}
+      hint={t(collection ? 'buyButton.collectionHint' : 'buyButton.hint')}
+    >
       <SelectField
         label={t('buyButton.language')}
         value={language}
@@ -50,6 +70,25 @@ export function BuyButtonCard({
           setCopied(false);
         }}
       />
+      <CheckField
+        label={t('buyButton.ownColor')}
+        checked={color !== null}
+        onChange={(on) => {
+          setColor(on ? DEFAULT_COLOR : null);
+          setCopied(false);
+        }}
+      />
+      {color !== null && (
+        <TextField
+          label={t('buyButton.color')}
+          type="color"
+          value={color}
+          onChange={(event) => {
+            setColor(event.target.value);
+            setCopied(false);
+          }}
+        />
+      )}
       <pre
         className="num overflow-x-auto whitespace-pre-wrap break-all rounded-control bg-canvas p-2 text-[length:var(--hatti-type-body-sm-size)]"
         dir="ltr"

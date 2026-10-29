@@ -2926,6 +2926,32 @@ describe('Carts', () => {
       404,
       '*',
     ]);
+    // A collection, as its embed shows it: its first products, in its order (ADR-925).
+    const collection = sample.collections.find((each) => each.productIds.length > 0)!;
+    const embed = await app.inject({
+      method: 'GET',
+      url: `/buy-button/collections/${collection.handle}`,
+      headers: { host: 'localhost', origin: 'https://blog.example.pk' },
+    });
+    expect([embed.statusCode, embed.headers['access-control-allow-origin']]).toEqual([200, '*']);
+    const shown = embed.json() as { title: string; url: string; products: { handle: string }[] };
+    expect(shown).toMatchObject({
+      title: collection.title,
+      url: `http://localhost/collections/${collection.handle}`,
+    });
+    const handles = new Map(sample.products.map((each) => [each.id, each.handle]));
+    expect(shown.products.map((each) => each.handle)).toEqual(
+      collection.productIds.slice(0, 12).map((id) => handles.get(id)),
+    );
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/buy-button/collections/no-such-thing',
+          headers: { host: 'localhost' },
+        })
+      ).statusCode,
+    ).toBe(404);
     await app.close();
   });
 

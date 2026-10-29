@@ -1,4 +1,4 @@
-import type { ProductDoc } from '@hatti/storefront-data';
+import type { CollectionDoc, ProductDoc } from '@hatti/storefront-data';
 import { imageAddress } from './liquid.js';
 
 // Buy buttons (CH-08, ADR-860): a shop's products on any other website, as Shopify's Buy Button
@@ -7,7 +7,8 @@ import { imageAddress } from './liquid.js';
 // public as its pages are, and shows its photo, title, price and variants, in English or Urdu;
 // Buy now opens the shop's checkout holding it, through a cart permalink (ADR-709). Add to cart
 // keeps it in a cart of the page's own, across the shop's buttons there, its bar opening the
-// checkout holding all of it (ADR-918).
+// checkout holding all of it (ADR-918). A collection is embedded as a grid of its products, each
+// with its buttons; and the buttons take the shop's colour (ADR-925).
 
 /** A buy button's cart (ADR-918): its lines at most, and as many of each. */
 export const BUY_BUTTON_CART = { lines: 20, quantity: 10 } as const;
@@ -15,7 +16,14 @@ export const BUY_BUTTON_CART = { lines: 20, quantity: 10 } as const;
 export const BUY_BUTTON_PATHS = {
   script: '/buy-button.js',
   product: '/buy-button/products/:handle',
+  collection: '/buy-button/collections/:handle',
 } as const;
+
+/** How many of a collection's products its embed shows, the first in its order (ADR-925). */
+export const BUY_BUTTON_COLLECTION = { products: 12 } as const;
+
+/** A colour for the buttons, as the snippet gives it: "#0f766e". */
+const COLOR = /^#[0-9a-fA-F]{6}$/;
 
 /** A product as the buy button shows it: prices in the shop's currency, as decimals. */
 export interface BuyButtonProduct {
@@ -62,6 +70,34 @@ export function buyButtonProduct(
   };
 }
 
+/** A collection as its embed shows it (ADR-925): its title, address and first products. */
+export interface BuyButtonCollection {
+  handle: string;
+  title: string;
+  url: string;
+  products: BuyButtonProduct[];
+}
+
+/**
+ * The collection's embed: `products` are its first, in its order, as the storefront shows them,
+ * those with nothing to sell left out.
+ */
+export function buyButtonCollection(
+  collection: CollectionDoc,
+  products: readonly (ProductDoc | null)[],
+  origin: string,
+  currency: string,
+): BuyButtonCollection {
+  return {
+    handle: collection.handle,
+    title: collection.title,
+    url: `${origin}/collections/${encodeURIComponent(collection.handle)}`,
+    products: products
+      .filter((product): product is ProductDoc => product !== null && product.variants.length > 0)
+      .map((product) => buyButtonProduct(product, origin, currency)),
+  };
+}
+
 /**
  * The script itself, the same for every shop: it finds where it was served from, reads each
  * `[data-hatti-buy-button]` element's product, and draws it in a shadow root of its own, so that
@@ -98,6 +134,9 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     var lines = load();
     if (!bar) {
       var host = el('div', { 'data-hatti-buy-button-cart': '' });
+      // In the colour of the page's first button (ADR-925).
+      var first = document.querySelector('[data-hatti-buy-button],[data-hatti-buy-collection]');
+      if (first) colour(first, host);
       document.body.appendChild(host);
       var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
       root.appendChild(el('style', {}, BAR_STYLE));
@@ -150,16 +189,16 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     '.title{font-weight:600;color:inherit;text-decoration:none}' +
     '.price s{color:#78716c;margin-inline-start:.4rem}' +
     'select{font:inherit;padding:.4rem;border:1px solid #d6d3d1;border-radius:8px}' +
-    '.buy{display:block;text-align:center;padding:.6rem;border-radius:8px;background:#0f766e;color:#fff;font-weight:600;text-decoration:none}' +
+    '.buy{display:block;text-align:center;padding:.6rem;border-radius:8px;background:var(--hatti-color,#0f766e);color:#fff;font-weight:600;text-decoration:none}' +
     '.buy[aria-disabled=true]{background:#a8a29e;pointer-events:none}' +
-    '.add{font:inherit;padding:.55rem;border:1px solid #0f766e;border-radius:8px;background:#fff;color:#0f766e;font-weight:600;cursor:pointer}' +
+    '.add{font:inherit;padding:.55rem;border:1px solid var(--hatti-color,#0f766e);border-radius:8px;background:#fff;color:var(--hatti-color,#0f766e);font-weight:600;cursor:pointer}' +
     '.add[disabled]{border-color:#a8a29e;color:#a8a29e;cursor:default}';
   var BAR_STYLE =
     ':host{all:initial;position:fixed;inset-inline:1rem;bottom:1rem;z-index:2147483000;font:15px/1.4 system-ui,sans-serif}' +
     ':host([hidden]){display:none}' +
     '.bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;max-width:28rem;margin:auto;padding:.6rem .9rem;border-radius:12px;background:#1c1917;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25)}' +
     '.count{flex:1}' +
-    '.go{padding:.45rem .9rem;border-radius:8px;background:#0f766e;color:#fff;font-weight:600;text-decoration:none}' +
+    '.go{padding:.45rem .9rem;border-radius:8px;background:var(--hatti-color,#0f766e);color:#fff;font-weight:600;text-decoration:none}' +
     '.empty{font:inherit;background:none;border:0;color:#d6d3d1;text-decoration:underline;cursor:pointer}';
   function draw(host, product, lang) {
     var words = WORDS[lang] || WORDS.en;
@@ -205,7 +244,29 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     if (choose) choose.value = String(product.variants.indexOf(first));
     show(first);
   }
-  var hosts = document.querySelectorAll('[data-hatti-buy-button]');
+  var GRID_STYLE =
+    ':host{all:initial;display:block;font:15px/1.4 system-ui,sans-serif;color:#1c1917}' +
+    '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:1rem}' +
+    '.heading{grid-column:1/-1;font-weight:700;font-size:1.2em;color:inherit;text-decoration:none}';
+  // A collection (ADR-925): its title, then each of its products as a button of its own.
+  function drawCollection(host, collection, lang) {
+    var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+    root.appendChild(el('style', {}, GRID_STYLE));
+    var grid = el('div', { class: 'grid', lang: lang, dir: lang === 'ur' ? 'rtl' : 'ltr' });
+    grid.appendChild(el('a', { class: 'heading', href: collection.url, target: '_blank', rel: 'noopener' }, collection.title));
+    collection.products.forEach(function (product) {
+      var cell = el('div', {});
+      grid.appendChild(cell);
+      draw(cell, product, lang);
+    });
+    root.appendChild(grid);
+  }
+  // The shop's colour for the buttons, as the snippet says it; the platform's teal otherwise.
+  function colour(host, target) {
+    var color = host.getAttribute('data-color') || '';
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) target.style.setProperty('--hatti-color', color);
+  }
+  var hosts = document.querySelectorAll('[data-hatti-buy-button],[data-hatti-buy-collection]');
   // A cart kept from an earlier visit shows at once.
   if (hosts.length && load().length) {
     drawBar(hosts[0].getAttribute('data-language') === 'ur' ? 'ur' : 'en');
@@ -213,25 +274,39 @@ export const BUY_BUTTON_SCRIPT = `(function () {
   Array.prototype.forEach.call(hosts, function (host) {
     if (host.getAttribute('data-hatti-drawn')) return;
     host.setAttribute('data-hatti-drawn', '1');
-    var handle = host.getAttribute('data-hatti-buy-button');
+    colour(host, host);
     var lang = host.getAttribute('data-language') === 'ur' ? 'ur' : 'en';
-    fetch(origin + '/buy-button/products/' + encodeURIComponent(handle))
+    var collection = host.getAttribute('data-hatti-buy-collection');
+    var path = collection
+      ? '/buy-button/collections/' + encodeURIComponent(collection)
+      : '/buy-button/products/' + encodeURIComponent(host.getAttribute('data-hatti-buy-button'));
+    fetch(origin + path)
       .then(function (answer) { return answer.ok ? answer.json() : null; })
-      .then(function (product) { if (product && product.variants.length) draw(host, product, lang); })
+      .then(function (found) {
+        if (!found) return;
+        if (collection) { if (found.products && found.products.length) drawCollection(host, found, lang); }
+        else if (found.variants && found.variants.length) draw(host, found, lang);
+      })
       .catch(function () {});
   });
 })();
 `;
 
-/** The snippet a shop pastes into another website for `handle`, in `language`. */
+/**
+ * The snippet a shop pastes into another website for the product `handle`, or with
+ * `collection` the collection's (ADR-925), in `language`, its buttons in `color` where given.
+ */
 export function buyButtonSnippet(
   origin: string,
   handle: string,
   language: 'en' | 'ur' = 'en',
+  options: { collection?: boolean; color?: string | null } = {},
 ): string {
   const lang = language === 'ur' ? ' data-language="ur"' : '';
+  const color = options.color && COLOR.test(options.color) ? ` data-color="${options.color}"` : '';
+  const kind = options.collection ? 'data-hatti-buy-collection' : 'data-hatti-buy-button';
   return (
-    `<div data-hatti-buy-button="${handle.replace(/[^a-z0-9-]/g, '')}"${lang}></div>\n` +
+    `<div ${kind}="${handle.replace(/[^a-z0-9-]/g, '')}"${lang}${color}></div>\n` +
     `<script src="${origin}${BUY_BUTTON_PATHS.script}" async></script>`
   );
 }

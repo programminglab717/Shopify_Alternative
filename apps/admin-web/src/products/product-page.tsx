@@ -635,7 +635,13 @@ function ProductView() {
       {edits && <DigitalProductCard key={`digital-${product.id}`} product={product} />}
       {edits && <CategoryCard product={product} />}
       {edits && <ProductSearchListing product={product} storefront={storefront?.url ?? ''} />}
-      {edits && <BuyButtonCard product={product} storefront={storefront?.url ?? ''} />}
+      {edits && (
+        <BuyButtonCard
+          handle={product.handle}
+          active={product.status === 'ACTIVE'}
+          storefront={storefront?.url ?? ''}
+        />
+      )}
       {edits && <EasternWearCard product={product} />}
       {edits && <ProductMetafieldsCard product={product} />}
       {edits && <GiftCardProduct key={String(product.isGiftCard)} product={product} />}

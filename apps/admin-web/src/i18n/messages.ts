@@ -6199,6 +6199,11 @@ const en = {
     'Paste this into a blog, another website or a link page: it shows this product with its photo, price and sizes. Buy now opens your checkout; Add to cart keeps it with your other buttons there, all checked out together.',
   'buyButton.language': 'Language of the button',
   'buyButton.copy': 'Copy the code',
+  'buyButton.collectionTitle': 'Buy buttons for this collection',
+  'buyButton.collectionHint':
+    'Paste this into a blog, another website or a link page: it shows the first 12 products of this collection, each with Buy now and Add to cart, all checked out together.',
+  'buyButton.ownColor': 'Buttons in your own colour',
+  'buyButton.color': 'Colour of the buttons',
   'certification.title': 'Hatti certification',
   'certification.hint':
     'Read the lessons, then answer the ten questions: {mark} right certify you for a year, and shops see it on your expert profile.',
@@ -13408,6 +13413,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'یہ کسی بلاگ، دوسری ویب سائٹ یا لنک پیج میں لگائیں: یہ اس پراڈکٹ کو تصویر، قیمت اور سائز کے ساتھ دکھاتا ہے۔ ابھی خریدیں آپ کا چیک آؤٹ کھولتا ہے؛ کارٹ میں ڈالیں اسے وہاں آپ کے دوسرے بٹنوں کے ساتھ رکھتا ہے، سب ایک ساتھ چیک آؤٹ۔',
   'buyButton.language': 'بٹن کی زبان',
   'buyButton.copy': 'کوڈ کاپی کریں',
+  'buyButton.collectionTitle': 'اس کلیکشن کے خریدنے کے بٹن',
+  'buyButton.collectionHint':
+    'اسے کسی بلاگ، دوسری ویب سائٹ یا لنک پیج میں لگائیں: یہ اس کلیکشن کی پہلی 12 مصنوعات دکھاتا ہے، ہر ایک کے ساتھ ابھی خریدیں اور کارٹ میں ڈالیں، سب ایک ساتھ چیک آؤٹ۔',
+  'buyButton.ownColor': 'بٹن آپ کے اپنے رنگ میں',
+  'buyButton.color': 'بٹنوں کا رنگ',
   'certification.title': 'Hatti سرٹیفکیشن',
   'certification.hint':
     'اسباق پڑھیں، پھر دس سوالوں کے جواب دیں: {mark} درست ہوں تو آپ ایک سال کے لیے سرٹیفائیڈ ہیں، اور دکانیں یہ آپ کے ماہر پروفائل پر دیکھتی ہیں۔',

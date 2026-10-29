@@ -169,6 +169,27 @@ describe('Collections', () => {
     await waitFor(() => expect(sentOf(fake, 'Collection')).toEqual({ id: 'col_7' }));
   });
 
+  it('gives the code for buy buttons of the collection, to paste into another website (ADR-925)', async () => {
+    const fake = fakeCore('owner', (operation) =>
+      operation === 'Collection'
+        ? { collection: HAND, shop: { url: 'https://zari.hatti.pk/' } }
+        : undefined,
+    );
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/collections/col_1');
+    const heading = await screen.findByRole('heading', { name: 'Buy buttons for this collection' });
+    const card = heading.closest('section') ?? heading.parentElement!.parentElement!;
+    expect(
+      within(card).getByText(
+        (_text, node) =>
+          node?.tagName === 'PRE' &&
+          node.textContent ===
+            `<div data-hatti-buy-collection="${HAND.handle}"></div>\n` +
+              '<script src="https://zari.hatti.pk/buy-button.js" async></script>',
+      ),
+    ).toBeTruthy();
+  });
+
   it('puts a collection made by hand in order, takes a product out and adds another', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);
