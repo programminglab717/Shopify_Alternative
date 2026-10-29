@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-923 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-924 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -931,6 +931,7 @@
 | 921 | Theme experiments count each arm's revenue from the orders its sessions place at checkout, once an order, and say by Welch's test whether the draft brings more or less money a session | Accepted |
 | 922 | The command line builds an app's checkout functions with the developer's own tool and deploys them by their handle, from a directory's hatti.function.json | Accepted |
 | 923 | A shop names the AI assistant that answers its customers and sets its tone, warm or formal: the name given the model as the shop's words, the tone as one of Hatti's own instructions | Accepted |
+| 924 | The Ajax cart gives scripts its amounts in the currency the shopper picked, as the money filter shows prices, with what checkout charges in rupees besides | Accepted |
 
 ---
 
@@ -30428,3 +30429,24 @@
 * **Consequences:**
   * Each shop's assistant sounds like the shop.
   * Not yet: voice notes and pictures from customers, which the agent still leaves to staff.
+
+## ADR-924 · The Ajax cart gives scripts its amounts in the currency the shopper picked, as the money filter shows prices, with what checkout charges in rupees besides
+
+* **Context:** ADR-865 shows a shopper in Dubai every page in dirhams, but kept the Ajax cart in
+  rupees. A theme whose script draws its cart from `/cart.js`, rather than from sections rendered
+  by the `money` filter, showed rupees beside a page in dirhams. ADR-865 left the Ajax cart in the
+  shopper's currency for later.
+* **Decision:**
+  * **`/cart.js`, `/cart/change.js`, `/cart/update.js`, `/cart/clear.js` and `/cart/add.js`**
+    answer, for a shopper whose `currency` cookie names one of the shop's currencies, with
+    `currency` set to it and every amount in its minor units: prices, line prices, totals,
+    discounts' amounts and fixed values. Each is converted as the `money` filter converts it, at
+    the shop's rate and rounding, as Shopify's are in the presentment currency.
+  * **What checkout charges** stays said: `hatti_checkout_currency` (`PKR`) and
+    `hatti_checkout_total_price`, in paisa, for a script that wants to say it.
+  * A currency the shop doesn't show, or none, answers in rupees as before. Hatti Base's drawer
+    renders through sections, so it shows the shopper's currency as its pages do.
+* **Consequences:**
+  * A theme's own cart script shows dirhams in Dubai without knowing the rate.
+  * Checkout, feeds, structured data and the Storefront API stay in rupees; prices a shop sets per
+    currency, and charging in it (PAY-12), are still not done.
