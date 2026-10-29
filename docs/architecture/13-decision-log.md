@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-962 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-963 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -970,6 +970,7 @@
 | 960 | An expansion store's copied price may take a margin of its own for a single product, before its collections' | Accepted |
 | 961 | The headless starter shows the products viewed before, on each product's page and the home page, kept by the shopper's browser alone | Accepted |
 | 962 | Shoppers download, or ask to erase, their own data through the Storefront API, as their account page lets them | Accepted |
+| 963 | The headless starter's account page lets shoppers download or ask to erase their own data | Accepted |
 
 ---
 
@@ -31328,3 +31329,22 @@
 * **Consequences:**
   * A headless shop gives its shoppers their data rights as Hatti's own pages do.
   * Not yet: the starter's account page offering them.
+
+## ADR-963 · The headless starter's account page lets shoppers download or ask to erase their own data
+
+* **Context:** ADR-962 gives a shopper's data requests through the Storefront API. The Next.js
+  starter's account page (ADR-944) didn't offer them, though the shop's own account page does
+  (ADR-572).
+* **Decision:**
+  * **"Your data" on the account page:** "Download my data" sends the shopper on to their file
+    through the link the API gives, which lasts minutes; "Erase my data" asks for their erasure
+    once they tick that they understand what it erases.
+  * **Told on the page** in their language: nothing kept to download or erase, the erasure asked
+    for, the box not ticked, or too many requests of late. A token that is no one's sends them
+    to sign in.
+  * **The buyer's address goes with each request**, as for sign-in (ADR-944), so that the shop's
+    count of requests is the shopper's, not the site's.
+  * Hatti's tests run the starter's two mutations against the Storefront API.
+* **Consequences:**
+  * A headless shop built on the starter offers its shoppers their data rights from the start.
+  * Not yet: the file's link shown on the page, rather than followed at once.
