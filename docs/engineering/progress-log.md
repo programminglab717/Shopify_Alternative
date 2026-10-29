@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Apps told of their charges
+### 2ca574d · Apps told of their charges
 
 * **An app is told of its own charges** as they are declined or paid, through
   `APP_PURCHASES_ONE_TIME_UPDATE` ([ADR-914](../architecture/13-decision-log.md#adr-914--an-app-is-told-of-its-own-charges-as-they-are-declined-or-paid-through-the-app_purchases_one_time_update-webhook-as-shopifys-apps-are)).
