@@ -248,4 +248,76 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     expect(grid.querySelector('.more')).toBeNull();
     await window.happyDOM.close();
   });
+
+  it('lays a product out across, and a collection as a list or a carousel (ADR-949)', async () => {
+    const origin = 'https://zari.hatti.pk';
+    expect(buyButtonSnippet(origin, 'lawn-suit', 'en', { layout: 'horizontal' })).toContain(
+      '<div data-hatti-buy-button="lawn-suit" data-layout="horizontal"></div>',
+    );
+    expect(
+      buyButtonSnippet(origin, 'eid-edit', 'en', { collection: true, layout: 'carousel' }),
+    ).toContain('data-layout="carousel"');
+    // Its default, or one not of its kind, is left out.
+    expect(buyButtonSnippet(origin, 'lawn-suit', 'en', { layout: 'card' })).not.toContain(
+      'data-layout',
+    );
+    expect(buyButtonSnippet(origin, 'lawn-suit', 'en', { layout: 'carousel' })).not.toContain(
+      'data-layout',
+    );
+    expect(
+      buyButtonSnippet(origin, 'eid-edit', 'en', { collection: true, layout: '"><x' }),
+    ).not.toContain('data-layout');
+
+    const product = (handle: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `${origin}/products/${handle}`,
+      image: { src: `${origin}/img/${handle}.jpg`, alt: handle },
+      currency: 'PKR',
+      variants: [
+        { id: `v-${handle}`, title: 'Default', available: true, price: '1500.00', compareAtPrice: null },
+      ],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    document.body.innerHTML =
+      '<div data-hatti-buy-button="kurta" data-layout="horizontal"></div>' +
+      '<div data-hatti-buy-collection="eid" data-layout="list"></div>' +
+      '<div data-hatti-buy-collection="sale" data-layout="carousel"></div>';
+    window.fetch = (async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/products/')
+          ? product('kurta')
+          : {
+              handle: 'eid',
+              title: 'Eid',
+              url: `${origin}/collections/eid`,
+              products: [product('kurta'), product('dupatta')],
+            },
+    })) as never;
+    const script = document.createElement('script');
+    script.setAttribute('src', `${origin}/buy-button.js`);
+    Object.defineProperty(document, 'currentScript', { value: script });
+    window.eval(BUY_BUTTON_SCRIPT);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const [single, list, carousel] = [
+      ...document.querySelectorAll('[data-hatti-buy-button],[data-hatti-buy-collection]'),
+    ].map((host) => host.shadowRoot!);
+    expect(single!.querySelector('.card')!.getAttribute('class')).toBe('card wide');
+    expect(list!.querySelector('.grid')!.getAttribute('class')).toBe('grid list');
+    // A list's products across, each card wide.
+    const cells = [...list!.querySelectorAll('.grid > div')];
+    expect(cells.map((cell) => cell.getAttribute('data-layout'))).toEqual([
+      'horizontal',
+      'horizontal',
+    ]);
+    expect(cells[0]!.shadowRoot!.querySelector('.card')!.getAttribute('class')).toBe('card wide');
+    expect(carousel!.querySelector('.grid')!.getAttribute('class')).toBe('grid carousel');
+    expect(carousel!.querySelector('.heading')!.textContent).toBe('Eid');
+    const carouselCard = carousel!.querySelector('.grid > div')!.shadowRoot!.querySelector('.card');
+    expect(carouselCard!.getAttribute('class')).toBe('card');
+    await window.happyDOM.close();
+  });
 });
