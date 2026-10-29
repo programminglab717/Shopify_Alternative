@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-940 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-941 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -948,6 +948,7 @@
 | 938 | A shop hears on WhatsApp and by email the first time its single sign-on domain's record is found gone, with the day the domain stops being proved its | Accepted |
 | 939 | A theme experiment's draft that sells clearly worse is stopped alone, its shoppers shown the live theme, the other drafts going on | Accepted |
 | 940 | The AI support agent hears a customer's voice note and answers its words, and hands a picture, a video or a file without words to staff | Accepted |
+| 941 | The AI support agent reads a customer's photo into searches of the shop's products, and answers with what they find | Accepted |
 
 ---
 
@@ -30825,3 +30826,24 @@
 * **Consequences:**
   * Customers who speak are answered as those who type.
   * Not yet: pictures read by the AI, as visual search reads a shopper's photo (ADR-870).
+
+## ADR-941 · The AI support agent reads a customer's photo into searches of the shop's products, and answers with what they find
+
+* **Context:** ADR-940 hands a customer's picture without words to staff. On WhatsApp, a picture
+  is how a shopper most often asks "do you have this?": a screenshot of a suit from Instagram, a
+  photo of a kurta a friend wore. Visual search (ADR-870) already reads a shopper's photo into
+  searches of a shop's catalogue.
+* **Decision:**
+  * **A photo without words** (JPEG, PNG, WebP or GIF) is fetched from WhatsApp and read as visual
+    search reads one: into up to three searches, the most particular first.
+  * **The products those searches find are the ones the AI is given**, with their prices and what
+    is in stock, as for words asked of them (ADR-911); the conversation the AI reads says the
+    customer sent a photo of what looks like the first search.
+  * **Reading the photo spends a visual-search credit**, and the reply a support credit, as each
+    would alone.
+  * **A photo of nothing a shop sells**, or one that can't be fetched or read, is handed to staff,
+    as a video or a file is (ADR-940).
+  * A photo with a caption is answered from its caption, as before.
+* **Consequences:**
+  * "Yeh hai aap ke paas?" with a picture is answered with the shop's own products, prices and stock.
+  * The photo is read and forgotten; what is kept is the reply and its outcome.
