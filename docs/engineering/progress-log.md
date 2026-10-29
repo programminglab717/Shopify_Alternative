@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Custom reports of stock
+### 9440f29 · Custom reports of stock
 
 * **A custom report may be of stock:** each tracked variant's stock, and what sold of it over the
   period ([ADR-910](../architecture/13-decision-log.md#adr-910--a-custom-report-may-be-of-stock-each-tracked-variants-stock-now-and-what-sold-of-it-over-the-period-as-the-inventory-report-has-them)).
