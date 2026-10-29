@@ -17,6 +17,8 @@ export enum WorkflowTriggerType {
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_RETURNED = 'ORDER_RETURNED',
   CUSTOMER_CREATED = 'CUSTOMER_CREATED',
+  STOCK_LOW = 'STOCK_LOW',
+  STOCK_OUT = 'STOCK_OUT',
   APP = 'APP',
 }
 
@@ -24,7 +26,9 @@ registerEnumType(WorkflowTriggerType, {
   name: 'WorkflowTriggerType',
   description:
     'What starts a workflow (DEV-11, ADR-861): an order placed, confirmed, paid or cancelled; ' +
-    'its parcel delivered or returned; a customer created; or APP, a trigger an app offers.',
+    'its parcel delivered or returned; a customer created; STOCK_LOW and STOCK_OUT, a variant ' +
+    "fallen to the shop's low-stock line or run out, once a spell as its alert is (ADR-905); " +
+    'or APP, a trigger an app offers.',
 });
 
 export enum WorkflowMatch {

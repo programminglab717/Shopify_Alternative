@@ -3,6 +3,7 @@ export {
   InventoryEvents,
   type InventoryItemUpdatedPayload,
   type InventoryLevelUpdatedPayload,
+  type StockAlertedPayload,
   type InventoryTransferPayload,
   type LocationCreatedPayload,
   type LocationDeletedPayload,

@@ -78,6 +78,50 @@ describe('Workflows (DEV-11, ADR-861)', () => {
     ]);
   });
 
+  it("makes a variant's stock triggers of its alert, with what it tells as facts (ADR-905)", () => {
+    const alerted = (state: string, sku: string | null) =>
+      triggersOf(
+        event('stock.alerted', {
+          productId: 'product-1',
+          state,
+          available: state === 'out' ? 0 : 3,
+          threshold: 5,
+          productTitle: 'Lawn suit',
+          variantTitle: 'Maroon',
+          sku,
+        }),
+      );
+    expect(alerted('low', 'LS-12')).toEqual([
+      {
+        trigger: 'stock_low',
+        extensionId: null,
+        subject: {
+          orderId: null,
+          customerId: null,
+          properties: {
+            product: 'Lawn suit',
+            variant: 'Maroon',
+            sku: 'LS-12',
+            available: '3',
+            threshold: '5',
+          },
+        },
+      },
+    ]);
+    expect(alerted('out', null)[0]).toMatchObject({
+      trigger: 'stock_out',
+      subject: { properties: { sku: '', available: '0' } },
+    });
+    expect(fieldsOf('stock_out', null)).toEqual([
+      { key: 'trigger.product', type: 'text' },
+      { key: 'trigger.variant', type: 'text' },
+      { key: 'trigger.sku', type: 'text' },
+      { key: 'trigger.available', type: 'number' },
+      { key: 'trigger.threshold', type: 'number' },
+    ]);
+    expect(subjectsOf('stock_low', null)).toEqual({ order: false, customer: false });
+  });
+
   it("reads an order's and customer's facts, and an app's trigger's own", () => {
     expect(fieldsOf('order_created', null)).toEqual([...ORDER_FIELDS, ...CUSTOMER_FIELDS]);
     expect(fieldsOf('customer_created', null)).toEqual(CUSTOMER_FIELDS);

@@ -26,7 +26,25 @@ export const InventoryEvents = {
   InventoryTransferClosed: 'inventory_transfer.closed',
   /** A product put on pre-order, its day changed, or taken off (ADR-403). */
   ProductPreorderUpdated: 'product_preorder.updated',
+  /**
+   * A variant fallen to the shop's low-stock line, or run out after running low: once a spell, as
+   * its alert is (ADR-157). Workflows start on it (ADR-905).
+   */
+  StockAlerted: 'stock.alerted',
 } as const;
+
+/** The aggregate is the variant. */
+export interface StockAlertedPayload {
+  productId: string;
+  state: 'low' | 'out';
+  /** Units that can be sold online. */
+  available: number;
+  /** The shop's low-stock line. */
+  threshold: number;
+  productTitle: string;
+  variantTitle: string;
+  sku: string | null;
+}
 
 /** The aggregate is the product. */
 export interface ProductPreorderUpdatedPayload {

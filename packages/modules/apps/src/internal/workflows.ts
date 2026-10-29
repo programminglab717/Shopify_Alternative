@@ -49,6 +49,10 @@ export const WORKFLOW_TRIGGERS = {
   order_delivered: { subject: 'order' },
   order_returned: { subject: 'order' },
   customer_created: { subject: 'customer' },
+  // A variant fallen to the shop's low-stock line, or run out (ADR-905): about no order or
+  // customer, what it tells being its facts.
+  stock_low: { subject: null },
+  stock_out: { subject: null },
   app: { subject: null },
 } as const satisfies Record<string, { subject: 'order' | 'customer' | null }>;
 
@@ -105,6 +109,27 @@ export function triggersOf(
       if (payload.status === 'returned') return order('order_returned', payload.orderId);
       return [];
     }
+    // As the shop's low-stock alert tells it, once a spell (ADR-905).
+    case 'stock.alerted': {
+      const sku = typeof payload.sku === 'string' ? payload.sku : '';
+      return [
+        {
+          trigger: payload.state === 'out' ? 'stock_out' : 'stock_low',
+          extensionId: null,
+          subject: {
+            orderId: null,
+            customerId: null,
+            properties: {
+              product: String(payload.productTitle ?? ''),
+              variant: String(payload.variantTitle ?? ''),
+              sku,
+              available: String(payload.available ?? 0),
+              threshold: String(payload.threshold ?? 0),
+            },
+          },
+        },
+      ];
+    }
     case 'customer.created':
       return [
         {
@@ -140,6 +165,7 @@ export const WORKFLOW_EVENTS: readonly string[] = [
   'order.cancelled',
   'fulfillment.updated',
   'customer.created',
+  'stock.alerted',
   FlowEvents.TriggerReceived,
 ];
 
@@ -233,6 +259,21 @@ export interface FlowField {
   required: boolean;
 }
 
+/** What a variant's stock trigger tells (ADR-905), each fact `trigger.<key>`. */
+const STOCK_FIELDS: readonly FlowField[] = [
+  { key: 'product', label: 'Product', type: 'text', required: true },
+  { key: 'variant', label: 'Variant', type: 'text', required: true },
+  { key: 'sku', label: 'SKU', type: 'text', required: false },
+  { key: 'available', label: 'Units left for sale online', type: 'number', required: true },
+  { key: 'threshold', label: "The shop's low-stock line", type: 'number', required: true },
+];
+
+/** What Hatti's own triggers tell beside an order or customer, as an app's trigger's fields. */
+export const TRIGGER_FIELDS: Partial<Record<WorkflowTrigger, readonly FlowField[]>> = {
+  stock_low: STOCK_FIELDS,
+  stock_out: STOCK_FIELDS,
+};
+
 /** The facts a workflow on `trigger` reads: of its order and customer, and what the app sends. */
 export function fieldsOf(
   trigger: WorkflowTrigger,
@@ -243,12 +284,9 @@ export function fieldsOf(
   return [
     ...(subject === 'order' ? ORDER_FIELDS : []),
     ...(subject === 'order' || subject === 'customer' ? CUSTOMER_FIELDS : []),
-    ...(trigger === 'app'
-      ? (extension?.fields ?? []).map((field) => ({
-          key: `trigger.${field.key}`,
-          type: field.type,
-        }))
-      : []),
+    ...(trigger === 'app' ? (extension?.fields ?? []) : (TRIGGER_FIELDS[trigger] ?? [])).map(
+      (field) => ({ key: `trigger.${field.key}`, type: field.type }),
+    ),
   ];
 }
 

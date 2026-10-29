@@ -23078,7 +23078,7 @@ enum WorkflowStepOutcome {
 }
 
 """
-What starts a workflow (DEV-11, ADR-861): an order placed, confirmed, paid or cancelled; its parcel delivered or returned; a customer created; or APP, a trigger an app offers.
+What starts a workflow (DEV-11, ADR-861): an order placed, confirmed, paid or cancelled; its parcel delivered or returned; a customer created; STOCK_LOW and STOCK_OUT, a variant fallen to the shop's low-stock line or run out, once a spell as its alert is (ADR-905); or APP, a trigger an app offers.
 """
 enum WorkflowTriggerType {
   APP
@@ -23089,4 +23089,6 @@ enum WorkflowTriggerType {
   ORDER_DELIVERED
   ORDER_PAID
   ORDER_RETURNED
+  STOCK_LOW
+  STOCK_OUT
 }

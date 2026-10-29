@@ -213,6 +213,27 @@ describe('Workflows (DEV-11, ADR-861)', () => {
     ]);
   });
 
+  it("offers a variant's stock as a trigger, what it tells to check, and no order's actions (ADR-905)", async () => {
+    vi.stubGlobal('fetch', core().fetcher);
+    renderAdmin('/shop_1/settings/workflows');
+    fireEvent.click(await screen.findByRole('button', { name: 'New workflow' }));
+    fireEvent.change(screen.getByLabelText('When'), { target: { value: 'STOCK_OUT' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add a condition' }));
+    const field = screen.getByLabelText('What condition 1 checks') as HTMLSelectElement;
+    expect([...field.options].map((each) => each.text)).toEqual([
+      'Units left for sale online',
+      'The low-stock line',
+      'Product',
+      'Variant',
+      'SKU',
+    ]);
+    const action = screen.getByLabelText('Action 1') as HTMLSelectElement;
+    const actions = [...action.options].map((each) => each.value);
+    expect(actions).toContain('NOTIFY_STAFF');
+    expect(actions).not.toContain('ADD_ORDER_TAGS');
+    expect(actions).not.toContain('HOLD_ORDER');
+  });
+
   it("offers an app's trigger, its fields to check, and its order's", async () => {
     vi.stubGlobal('fetch', core().fetcher);
     renderAdmin('/shop_1/settings/workflows');

@@ -6275,6 +6275,8 @@ export type WorkflowTriggerType =
   | 'ORDER_DELIVERED'
   | 'ORDER_RETURNED'
   | 'CUSTOMER_CREATED'
+  | 'STOCK_LOW'
+  | 'STOCK_OUT'
   | 'APP';
 
 export type WorkflowConditionOperator =

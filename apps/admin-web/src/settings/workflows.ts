@@ -96,8 +96,22 @@ export const TRIGGERS: readonly WorkflowTriggerType[] = [
   'ORDER_DELIVERED',
   'ORDER_RETURNED',
   'CUSTOMER_CREATED',
+  'STOCK_LOW',
+  'STOCK_OUT',
   'APP',
 ];
+
+/** What a variant's stock trigger tells (ADR-905). */
+export const STOCK_FIELDS: readonly FactField[] = [
+  { key: 'trigger.available', type: 'number' },
+  { key: 'trigger.threshold', type: 'number' },
+  { key: 'trigger.product', type: 'text' },
+  { key: 'trigger.variant', type: 'text' },
+  { key: 'trigger.sku', type: 'text' },
+];
+
+const isStock = (trigger: WorkflowTriggerType) =>
+  trigger === 'STOCK_LOW' || trigger === 'STOCK_OUT';
 
 export const OPERATORS: Record<FactType, readonly WorkflowConditionOperator[]> = {
   number: ['AT_LEAST', 'AT_MOST', 'GREATER_THAN', 'LESS_THAN', 'EQUALS', 'NOT_EQUALS'],
@@ -112,11 +126,14 @@ export function subjectsOf(
   trigger: WorkflowTriggerType,
   extension: FlowExtension | null,
 ): { order: boolean; customer: boolean } {
+  // A variant's stock tells of no order or customer (ADR-905).
   const order =
-    trigger === 'APP' ? extension?.resource === 'ORDER' : trigger !== 'CUSTOMER_CREATED';
+    trigger === 'APP'
+      ? extension?.resource === 'ORDER'
+      : trigger !== 'CUSTOMER_CREATED' && !isStock(trigger);
   return {
     order,
-    customer: order || (trigger === 'APP' ? extension?.resource === 'CUSTOMER' : true),
+    customer: order || (trigger === 'APP' ? extension?.resource === 'CUSTOMER' : !isStock(trigger)),
   };
 }
 
@@ -136,6 +153,7 @@ export function fieldsOf(
           label: field.label,
         }))
       : []),
+    ...(isStock(trigger) ? STOCK_FIELDS : []),
   ];
 }
 

@@ -12,7 +12,11 @@ import {
 } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { InventoryEvents, type InventorySettingsUpdatedPayload } from './events.js';
+import {
+  InventoryEvents,
+  type InventorySettingsUpdatedPayload,
+  type StockAlertedPayload,
+} from './events.js';
 import type { Page } from './records.js';
 
 export const LOW_STOCK_THRESHOLD = {
@@ -429,7 +433,8 @@ export class LowStockService {
 
   /**
    * Where a variant stands after its stock changed (ADR-157): the alert to send when it falls to
-   * the shop's threshold, or runs out after running low, once a spell; null otherwise. Its spell
+   * the shop's threshold, or runs out after running low, once a spell, recorded as
+   * `stock.alerted` for the shop's workflows (ADR-905); null otherwise. Its spell
    * of low stock is kept until it is stocked above the threshold again, or is no longer tracked or
    * for sale, when it ends. In the caller's transaction `tx`.
    */
@@ -472,6 +477,21 @@ export class LowStockService {
       alert = rows[0].state === 'low' && state === 'out';
     }
     if (!alert) return null;
+    // For the shop's workflows on stock (ADR-905), once a spell as the alert is.
+    await appendEvent<StockAlertedPayload>(tx, shopId, {
+      type: InventoryEvents.StockAlerted,
+      aggregateType: 'variant',
+      aggregateId: variantId,
+      payload: {
+        productId: snapshot.productId,
+        state,
+        available,
+        threshold,
+        productTitle: snapshot.productTitle,
+        variantTitle: snapshot.variantTitle,
+        sku: snapshot.sku,
+      },
+    });
     return {
       variantId,
       productId: snapshot.productId,

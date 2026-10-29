@@ -371,6 +371,22 @@ describe.skipIf(!server)('Low stock', () => {
     // A product not for sale tells nothing.
     unwrap(await set(shawl!, 0));
     expect(await alertOf(shawl)).toBeNull();
+    // Each alert recorded for the shop's workflows on stock (ADR-905): low, out, and low again.
+    const alerted = (await f.outbox()).filter((row) => row.event_type === 'stock.alerted');
+    expect(alerted.map((row) => (row.payload as { state: string }).state)).toEqual([
+      'low',
+      'out',
+      'low',
+    ]);
+    expect(alerted[0]!.payload).toEqual({
+      productId: low!.productId,
+      state: 'low',
+      available: 4,
+      threshold: 5,
+      productTitle: 'Lawn Kurta',
+      variantTitle: 'S',
+      sku: low!.sku,
+    });
   });
 
   it("counts units checkouts hold as the shop's still: a hold begins no spell (ADR-715)", async () => {

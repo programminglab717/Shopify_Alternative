@@ -651,4 +651,74 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
       'Held for review by the workflow “Hold big orders”',
     );
   });
+
+  it("runs on a variant's stock, checking what its alert tells (ADR-905)", async () => {
+    const owner = await account('manager');
+    await admin.query('UPDATE apps.workflows SET enabled = false WHERE shop_id = $1', [shop]);
+    const made = await data(owner, CREATE, {
+      input: {
+        name: 'Lawn running low',
+        trigger: 'STOCK_LOW',
+        conditions: [{ field: 'trigger.product', operator: 'CONTAINS', value: 'lawn' }],
+        actions: [
+          {
+            type: 'CONTINUE_IF',
+            conditions: [{ field: 'trigger.available', operator: 'AT_MOST', value: '2' }],
+          },
+          {
+            type: 'NOTIFY_STAFF',
+            title: '{{trigger.product}} ({{trigger.variant}}) is low',
+            message: '{{trigger.available}} left of {{trigger.threshold}}',
+          },
+        ],
+      },
+    });
+    expect(made.userErrors).toEqual([]);
+    // Its order's actions are not this trigger's.
+    const wrong = await data(owner, CREATE, {
+      input: {
+        name: 'Tag it',
+        trigger: 'STOCK_OUT',
+        actions: [{ type: 'ADD_ORDER_TAGS', tags: ['x'] }],
+      },
+    });
+    expect(wrong.userErrors[0]).toMatchObject({
+      message: 'This trigger tells of no order to change',
+    });
+
+    // The shop's low-stock alert, as the inventory module records it.
+    const alert = (productTitle: string, available: number) =>
+      admin.query(
+        `INSERT INTO platform.outbox_events (id, shop_id, aggregate_type, aggregate_id, event_type, payload)
+         VALUES ($1, $2, 'variant', $3, 'stock.alerted', $4)`,
+        [
+          randomUUID(),
+          shop,
+          randomUUID(),
+          {
+            productId: randomUUID(),
+            state: 'low',
+            available,
+            threshold: 5,
+            productTitle,
+            variantTitle: 'Maroon',
+            sku: null,
+          },
+        ],
+      );
+    await alert('Lawn suit', 2);
+    await alert('Lawn suit', 4);
+    await alert('Khaddar shawl', 1);
+    await hear('stock.alerted');
+    expect(await runs.sweep()).toMatchObject({ done: 2, skipped: 1, failed: 0 });
+    const ran = await data(owner, RUNS, { id: made.workflow.id });
+    expect(ran.map((run: Json) => run.status).sort()).toEqual(['DONE', 'DONE', 'SKIPPED']);
+    expect(ran.map((run: Json) => run.steps.map((step: Json) => step.outcome))).toContainEqual([
+      'DONE',
+      'SKIPPED',
+    ]);
+    expect(ran.map((run: Json) => run.steps.map((step: Json) => step.outcome))).toContainEqual([
+      'SKIPPED',
+    ]);
+  });
 });
