@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### App Bridge
+### 08ac2a6 · App Bridge
 
 * **An app inside the admin** asks it for a fresh session token, a toast, a page of the admin or
   the save bar, and each answers the other alone ([ADR-912](../architecture/13-decision-log.md#adr-912--app-bridge-an-app-inside-the-admin-asks-it-over-postmessage-for-a-fresh-session-token-a-toast-a-page-of-the-admin-or-the-save-bar-and-each-answers-the-other-alone)).
