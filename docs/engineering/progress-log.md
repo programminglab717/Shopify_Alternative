@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Buy buttons' cart
+### 0fbcb3d · Buy buttons' cart
 
 * **Buy buttons keep a cart** across the shop's buttons on a page, checked out together through
   one permalink ([ADR-918](../architecture/13-decision-log.md#adr-918--buy-buttons-keep-a-cart-of-the-pages-own-across-the-shops-buttons-there-kept-by-that-sites-browser-its-bar-checking-all-of-it-out-through-one-permalink)).
