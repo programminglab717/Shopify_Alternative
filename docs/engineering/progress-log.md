@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Workflows on stock
+### 326406b · Workflows on stock
 
 * **`STOCK_LOW` and `STOCK_OUT`** start workflows as the shop's low-stock alert tells, once a
   spell, reading the variant's product, SKU, units left and the line ([ADR-905](../architecture/13-decision-log.md#adr-905--workflows-start-on-a-variants-stock-running-low-or-out-once-a-spell-as-the-shops-low-stock-alert-tells-reading-its-product-variant-sku-units-left-and-the-line)).
