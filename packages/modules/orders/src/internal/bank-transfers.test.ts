@@ -55,6 +55,7 @@ describe.skipIf(!server)('Bank transfer', () => {
       enabled: false,
       account: null,
       discount: null,
+      readReceipts: false,
       updatedAt: null,
     });
     // Offering transfers needs an account; an account needs a title, a bank and a good IBAN.
@@ -129,7 +130,8 @@ describe.skipIf(!server)('Bank transfer', () => {
         enabled,
         account: after,
         discount: null,
-        before: { enabled: beforeEnabled, account: before, discount: null },
+        readReceipts: false,
+        before: { enabled: beforeEnabled, account: before, discount: null, readReceipts: false },
       },
     });
     expect(rows).toEqual([

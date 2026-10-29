@@ -137,10 +137,16 @@ describe.skipIf(!server)('Something off for paying by transfer', () => {
     );
     const percentage = { percentage: 5, cap: '500.00' };
     const amount = { amount: '150.00' };
+    const before = (discount: unknown) => ({
+      enabled: false,
+      account: null,
+      discount,
+      readReceipts: false,
+    });
     expect(rows.map((row) => [row.details.discount, row.details.before])).toEqual([
-      [percentage, { enabled: false, account: null, discount: null }],
-      [amount, { enabled: false, account: null, discount: percentage }],
-      [null, { enabled: false, account: null, discount: amount }],
+      [percentage, before(null)],
+      [amount, before(percentage)],
+      [null, before(amount)],
     ]);
   });
 
