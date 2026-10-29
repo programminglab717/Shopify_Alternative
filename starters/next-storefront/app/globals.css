@@ -179,3 +179,43 @@ button:disabled {
   flex-wrap: wrap;
   gap: 1rem;
 }
+.addresses {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.addresses li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+.addresses address {
+  flex: 1 1 16rem;
+  display: flex;
+  flex-direction: column;
+  font-style: normal;
+}
+.address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 28rem;
+}
+.address-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.address-form input,
+.address-form select {
+  padding: 0.5rem;
+  font: inherit;
+}
+button.quiet {
+  background: transparent;
+  color: var(--accent);
+  padding: 0;
+}

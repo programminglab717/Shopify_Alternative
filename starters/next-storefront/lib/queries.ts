@@ -292,3 +292,85 @@ export const CUSTOMER_QUERY = /* GraphQL */ `
     }
   }
 `;
+
+// The shopper's address book (ADR-946, ADR-947).
+
+export const CUSTOMER_ADDRESSES_QUERY = /* GraphQL */ `
+  query CustomerAddresses($customerAccessToken: String!) {
+    customer(customerAccessToken: $customerAccessToken) {
+      defaultAddress {
+        id
+      }
+      addresses(first: 20) {
+        nodes {
+          id
+          firstName
+          lastName
+          phone
+          address1
+          address2
+          landmark
+          city
+          province
+          zip
+          formatted
+        }
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_ADDRESS_CREATE_MUTATION = /* GraphQL */ `
+  mutation CustomerAddressCreate($customerAccessToken: String!, $address: MailingAddressInput!) {
+    customerAddressCreate(customerAccessToken: $customerAccessToken, address: $address) {
+      customerAddress {
+        id
+      }
+      customerUserErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_ADDRESS_UPDATE_MUTATION = /* GraphQL */ `
+  mutation CustomerAddressUpdate(
+    $customerAccessToken: String!
+    $id: ID!
+    $address: MailingAddressInput!
+  ) {
+    customerAddressUpdate(customerAccessToken: $customerAccessToken, id: $id, address: $address) {
+      customerAddress {
+        id
+      }
+      customerUserErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_ADDRESS_DELETE_MUTATION = /* GraphQL */ `
+  mutation CustomerAddressDelete($customerAccessToken: String!, $id: ID!) {
+    customerAddressDelete(customerAccessToken: $customerAccessToken, id: $id) {
+      deletedCustomerAddressId
+      customerUserErrors {
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_DEFAULT_ADDRESS_UPDATE_MUTATION = /* GraphQL */ `
+  mutation CustomerDefaultAddressUpdate($customerAccessToken: String!, $addressId: ID!) {
+    customerDefaultAddressUpdate(customerAccessToken: $customerAccessToken, addressId: $addressId) {
+      customerUserErrors {
+        code
+      }
+    }
+  }
+`;

@@ -91,3 +91,23 @@ export interface CustomerUserError {
   message: string;
   code: 'INVALID' | 'CODE_WRONG' | 'CODE_EXPIRED' | 'TOO_MANY_REQUESTS' | null;
 }
+
+export interface MailingAddress {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string;
+  address1: string;
+  address2: string | null;
+  landmark: string | null;
+  city: string;
+  province: string | null;
+  zip: string | null;
+  formatted: string[];
+}
+
+export interface AddressUserError {
+  field: string[] | null;
+  message: string;
+  code: string | null;
+}

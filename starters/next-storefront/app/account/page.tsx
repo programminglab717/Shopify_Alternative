@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { addToCart } from '@/app/actions';
 import { customerToken, signOut } from '@/app/account/actions';
@@ -75,6 +76,9 @@ export default async function AccountPage() {
           ))}
         </ul>
       )}
+      <p>
+        <Link href="/account/addresses">{words.addresses}</Link>
+      </p>
       <form action={signOut}>
         <button type="submit">{words.signOut}</button>
       </form>

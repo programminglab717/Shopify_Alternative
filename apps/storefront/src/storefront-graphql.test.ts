@@ -356,6 +356,11 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
       'COLLECTION_QUERY',
       'CUSTOMER_ACCESS_TOKEN_CREATE_MUTATION',
       'CUSTOMER_ACCESS_TOKEN_DELETE_MUTATION',
+      'CUSTOMER_ADDRESSES_QUERY',
+      'CUSTOMER_ADDRESS_CREATE_MUTATION',
+      'CUSTOMER_ADDRESS_DELETE_MUTATION',
+      'CUSTOMER_ADDRESS_UPDATE_MUTATION',
+      'CUSTOMER_DEFAULT_ADDRESS_UPDATE_MUTATION',
       'CUSTOMER_LOGIN_CODE_SEND_MUTATION',
       'CUSTOMER_QUERY',
       'PRODUCTS_QUERY',
@@ -1065,5 +1070,45 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     expect(
       (await ask(q.CUSTOMER_QUERY!, { customerAccessToken: token }, at)).data.customer,
     ).toBeNull();
+  });
+
+  it("keeps the address book as the headless starter's page does (ADR-947)", async () => {
+    const q = starterQueries();
+    const at = { ...api(), accounts: accounts().kept };
+    const token = { customerAccessToken: TOKEN };
+    const book = async () => (await ask(q.CUSTOMER_ADDRESSES_QUERY!, token, at)).data.customer;
+    expect((await book()).addresses.nodes.map((address: Json) => address.city)).toEqual(['Lahore']);
+    // The page's form, as its action sends it: blanks as null, Pakistan as the country.
+    const made = (
+      await ask(
+        q.CUSTOMER_ADDRESS_CREATE_MUTATION!,
+        {
+          ...token,
+          address: {
+            firstName: 'Ayesha',
+            lastName: 'Khan',
+            phone: '0321 7654321',
+            address1: 'Flat 3, Clifton Block 5',
+            address2: null,
+            landmark: null,
+            city: 'Karachi',
+            province: 'Sindh',
+            zip: null,
+            country: 'Pakistan',
+          },
+        },
+        at,
+      )
+    ).data.customerAddressCreate;
+    expect(made.customerUserErrors).toEqual([]);
+    const id = made.customerAddress.id as string;
+    const refused = (
+      await ask(q.CUSTOMER_ADDRESS_UPDATE_MUTATION!, { ...token, id, address: { city: null } }, at)
+    ).data.customerAddressUpdate.customerUserErrors;
+    expect(refused.map((error: Json) => error.field.at(-1))).toEqual(['city']);
+    await ask(q.CUSTOMER_DEFAULT_ADDRESS_UPDATE_MUTATION!, { ...token, addressId: id }, at);
+    expect((await book()).defaultAddress.id).toBe(id);
+    await ask(q.CUSTOMER_ADDRESS_DELETE_MUTATION!, { ...token, id }, at);
+    expect((await book()).addresses.nodes.map((address: Json) => address.city)).toEqual(['Lahore']);
   });
 });
