@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-956 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-957 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -964,6 +964,7 @@
 | 954 | Overdue payment terms are reminded again each week, four times past the date at most | Accepted |
 | 955 | Every store's sales by day on one chart: each store's part of each day's bar, in this shop's currency at the day's rate | Accepted |
 | 956 | The Storefront API gives products and collections by their IDs at once, as Shopify's nodes | Accepted |
+| 957 | The headless starter keeps a wishlist on the device before the shopper signs in, and joins it to their account's when they do | Accepted |
 
 ---
 
@@ -31200,3 +31201,23 @@
 * **Consequences:**
   * The headless starter shows a wishlist kept on the device in one request (ADR-957).
   * Not yet: pages, blogs, articles and variants by `nodes`.
+
+## ADR-957 · The headless starter keeps a wishlist on the device before the shopper signs in, and joins it to their account's when they do
+
+* **Context:** The starter's "Save for later" (ADR-953) sends a shopper who isn't signed in to
+  sign in first. A shopper browsing on their phone loses the product they meant to keep, and the
+  shop's own pages keep a browser's list before sign-in (ADR-575). ADR-953 left that for later.
+* **Decision:**
+  * **Kept on the device:** before signing in, "Save for later" keeps the product's ID in an
+    httpOnly cookie of the site's (`hatti_wishlist`), the newest first, 50 at most, for a year;
+    "Remove" takes it out. Nothing is kept by Hatti until they sign in.
+  * **The wishlist page shows it**, its products read at once by `nodes(ids:)` (ADR-956), those
+    the shop no longer sells left out, with a line saying it is kept on this device and a link
+    to sign in to keep it on every device.
+  * **Joined on signing in:** once the code is right, the kept products are added to the
+    account's wishlist, the newest first, and the cookie is cleared.
+  * Hatti's tests run the starter's query for it against the Storefront API.
+* **Consequences:**
+  * A shopper keeps what they like before giving their number, and finds it in their account
+    after.
+  * Not yet: recently viewed products, kept the same way.
