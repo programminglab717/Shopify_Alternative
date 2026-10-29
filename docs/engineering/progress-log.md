@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Expansion stores at the day's rate
+### 5676639 · Expansion stores at the day's rate
 
 * **An expansion store's price rate may follow the day's rate** between the shops' currencies,
   from the currency feed; copying as products change copies again at each new rate ([ADR-929](../architecture/13-decision-log.md#adr-929--an-expansion-stores-price-rate-may-follow-the-days-rate-between-the-shops-currencies-from-the-currency-feed-products-copied-as-they-change-being-copied-again-at-each-new-rate)).
