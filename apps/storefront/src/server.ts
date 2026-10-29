@@ -2434,13 +2434,16 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * The shop for AI shopping agents (OS-23, ADR-847): its UCP profile, which says where its store
    * MCP endpoint is and what its tools do; and the endpoint, JSON-RPC 2.0 over POST, whose tools
    * search and read the shop's products and make carts that its own checkout takes. Nothing while
-   * the shop is behind its password.
+   * the shop is behind its password, or keeps agents out (ADR-908).
    */
   app.get(AGENT_PATHS.profile, async (request, reply) => {
     const found = await shopFor(request, reply);
     if (!found) return notFound(reply, 'No shop answers at this address.');
     try {
       if (await lockOf(request, found)) return await notFound(reply, 'This shop is not open yet.');
+      if ((await found.store.shop()).agentsBlocked) {
+        return await notFound(reply, 'This shop takes no AI agents.');
+      }
       return await reply
         .header('cache-control', CRAWLER_CACHE)
         .header('cache-tag', shopTag(found.shopId))
@@ -2583,8 +2586,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     try {
       if (await lockOf(request, found)) return await notFound(reply, 'This shop is not open yet.');
       const shop = await found.store.shop();
+      // A shop that keeps agents out answers as if it had no endpoint (ADR-908).
+      if (shop.agentsBlocked) return await notFound(reply, 'This shop takes no AI agents.');
       const answer = await mcpAnswer(request.body, {
         store: found.store,
+        shop,
         search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),
         origin: await originOf(request, found),
         name: shop.name,

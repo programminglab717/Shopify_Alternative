@@ -2099,6 +2099,13 @@ const en = {
   'storefront.poweredBy': 'Show "Powered by Hatti"',
   'storefront.poweredByOn': 'Shoppers see a link to Hatti at the foot of every page.',
   'storefront.poweredByOff': 'Your storefront says nothing of Hatti.',
+  'storefront.agents': 'AI shopping agents',
+  'storefront.agentsHint':
+    'Assistants such as ChatGPT and Gemini can find your products and hand shoppers your own checkout, where they pay as anyone does.',
+  'storefront.agentsBlocked': 'Keep AI shopping agents out',
+  'storefront.agentsOn': 'Agents can read your products, policies and delivery, and make carts.',
+  'storefront.agentsOff':
+    'Agents find nothing: your shop answers them as if it had no store for them.',
   'storefront.consent': 'Cookie consent',
   'storefront.consentHint':
     'Ask shoppers before your Meta, TikTok and Google pixels load, as the law asks in some countries you may sell to.',
@@ -9256,6 +9263,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.poweredBy': '"ہٹی کے ذریعے" دکھائیں',
   'storefront.poweredByOn': 'خریداروں کو ہر صفحے کے آخر میں ہٹی کا لنک نظر آتا ہے۔',
   'storefront.poweredByOff': 'آپ کا اسٹور فرنٹ ہٹی کا ذکر نہیں کرتا۔',
+  'storefront.agents': 'اے آئی شاپنگ ایجنٹس',
+  'storefront.agentsHint':
+    'ChatGPT اور Gemini جیسے اسسٹنٹ آپ کی پراڈکٹس ڈھونڈ کر خریداروں کو آپ کا اپنا چیک آؤٹ دے سکتے ہیں، جہاں وہ عام طریقے سے ادائیگی کرتے ہیں۔',
+  'storefront.agentsBlocked': 'اے آئی شاپنگ ایجنٹس کو روکیں',
+  'storefront.agentsOn':
+    'ایجنٹس آپ کی پراڈکٹس، پالیسیاں اور ڈیلیوری پڑھ سکتے اور کارٹ بنا سکتے ہیں۔',
+  'storefront.agentsOff':
+    'ایجنٹس کو کچھ نہیں ملتا: آپ کی دکان انہیں ایسے جواب دیتی ہے جیسے ان کے لیے کوئی اسٹور نہ ہو۔',
   'storefront.consent': 'کوکیز کی اجازت',
   'storefront.consentHint':
     'اپنے میٹا، ٹک ٹاک اور گوگل پکسلز لوڈ ہونے سے پہلے خریداروں سے پوچھیں، جیسا کہ کچھ ملکوں کا قانون کہتا ہے جہاں آپ بیچ سکتے ہیں۔',

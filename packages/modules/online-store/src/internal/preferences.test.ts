@@ -44,6 +44,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     returns: { days: null, exchangesOnly: false },
     hidePoweredBy: false,
     consentBanner: false,
+    agentsBlocked: false,
     ageGateMinimum: null,
     storefrontFilters: null,
   };
@@ -91,9 +92,22 @@ describe.skipIf(!server)('PreferencesService', () => {
       returns: { days: null, exchangesOnly: false },
       hidePoweredBy: false,
       consentBanner: false,
+      agentsBlocked: false,
       ageGateMinimum: null,
       storefrontFilters: null,
     });
+  });
+
+  it('keeps AI shopping agents out, or lets them in, left as it is unless given (ADR-908)', async () => {
+    expect(unwrap(await f.preferences.update(f.a, { agentsBlocked: true })).agentsBlocked).toBe(
+      true,
+    );
+    unwrap(await f.preferences.update(f.a, { returnDays: 7 }));
+    expect((await f.preferences.get(f.a)).agentsBlocked).toBe(true);
+    expect((await f.preferences.get(f.b)).agentsBlocked).toBe(false);
+    expect(unwrap(await f.preferences.update(f.a, { agentsBlocked: false })).agentsBlocked).toBe(
+      false,
+    );
   });
 
   it('asks visitors their age, 13 to 25, until the gate is taken away (ADR-889)', async () => {

@@ -308,6 +308,26 @@ function ConsentForm({ preferences }: { preferences: StorefrontPreferences }) {
   );
 }
 
+/**
+ * AI shopping agents (OS-23, ADR-908): the shop's UCP profile and store MCP, through which agents
+ * find its products and hand shoppers its checkout, or nothing where the shop keeps them out.
+ */
+function AgentsForm({ preferences }: { preferences: StorefrontPreferences }) {
+  const { t } = useLocale();
+  const [blocked, setBlocked] = useState(preferences.agentsBlocked ?? false);
+  const input = blocked === (preferences.agentsBlocked ?? false) ? {} : { agentsBlocked: blocked };
+  return (
+    <PreferencesForm title={t('storefront.agents')} hint={t('storefront.agentsHint')} input={input}>
+      <CheckField
+        label={t('storefront.agentsBlocked')}
+        hint={t(blocked ? 'storefront.agentsOff' : 'storefront.agentsOn')}
+        checked={blocked}
+        onChange={setBlocked}
+      />
+    </PreferencesForm>
+  );
+}
+
 /** The ages a shop's age gate may ask for (ADR-889), the most common first. */
 const GATE_AGES = [18, 21, 13, 16, 25] as const;
 
@@ -469,6 +489,7 @@ export function StorefrontPreferencesTab() {
       <ReturnsForm preferences={preferences} />
       <BrandingForm preferences={preferences} />
       <ConsentForm preferences={preferences} />
+      <AgentsForm preferences={preferences} />
       <AgeGateForm preferences={preferences} />
       <HomeUrduCard />
     </div>

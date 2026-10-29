@@ -314,6 +314,29 @@ describe("The storefront's preferences and redirects", () => {
     );
   });
 
+  it('keeps AI shopping agents out where the shop says (ADR-908)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const agents = await screen.findByRole('region', { name: 'AI shopping agents' });
+    const save = within(agents).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    const blocked = within(agents).getByLabelText(
+      /Keep AI shopping agents out/,
+    ) as HTMLInputElement;
+    expect(blocked.checked).toBe(false);
+    expect(within(agents).getByText(/^Agents can read your products/)).toBeTruthy();
+    expect(save.disabled).toBe(true);
+    fireEvent.click(blocked);
+    expect(within(agents).getByText(/^Agents find nothing/)).toBeTruthy();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { agentsBlocked: true },
+      }),
+    );
+  });
+
   it('asks visitors their age before the storefront shows, once an age is chosen (ADR-889)', async () => {
     const fake = core('owner');
     vi.stubGlobal('fetch', fake.fetcher);

@@ -2938,6 +2938,25 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it('keeps AI agents out where the shop says, its profile and endpoint answering none (ADR-908)', async () => {
+    const docs = sampleStore();
+    docs.shop = { ...docs.shop, agentsBlocked: true };
+    const app = server({ sample: new MemoryStore(docs) });
+    const profile = await app.inject({
+      method: 'GET',
+      url: '/.well-known/ucp',
+      headers: { host: 'localhost' },
+    });
+    const rpc = await app.inject({
+      method: 'POST',
+      url: '/api/mcp',
+      headers: { host: 'localhost', 'content-type': 'application/json' },
+      payload: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect([profile.statusCode, rpc.statusCode]).toEqual([404, 404]);
+    await app.close();
+  });
+
   it("answers the Storefront API with the shop's tokens, and checks its carts out (DEV-02, ADR-848)", async () => {
     const docs = sampleStore();
     docs.shop = {

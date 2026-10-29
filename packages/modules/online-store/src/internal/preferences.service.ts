@@ -88,6 +88,8 @@ export interface PreferencesInput {
    * is if absent.
    */
   consentBanner?: boolean | null;
+  /** Keeps AI shopping agents out, or lets them in (ADR-908). Left as it is if absent. */
+  agentsBlocked?: boolean | null;
   /**
    * The age its storefront asks visitors to confirm before it shows, 13 to 25 (OS-15, ADR-889);
    * 0 takes the gate away. Left as it is if absent.
@@ -359,6 +361,7 @@ export class PreferencesService {
         },
         hidePoweredBy: input.hidePoweredBy ?? was.hidePoweredBy,
         consentBanner: input.consentBanner ?? was.consentBanner,
+        agentsBlocked: input.agentsBlocked ?? was.agentsBlocked,
         ageGateMinimum:
           input.ageGateMinimum === undefined || input.ageGateMinimum === null
             ? was.ageGateMinimum
@@ -415,6 +418,7 @@ export class PreferencesService {
           : []),
         ...(next.hidePoweredBy !== was.hidePoweredBy ? ['hidePoweredBy'] : []),
         ...(next.consentBanner !== was.consentBanner ? ['consentBanner'] : []),
+        ...(next.agentsBlocked !== was.agentsBlocked ? ['agentsBlocked'] : []),
         ...(next.ageGateMinimum !== was.ageGateMinimum ? ['ageGateMinimum'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
@@ -444,6 +448,7 @@ export class PreferencesService {
         returnExchangesOnly: next.returns.exchangesOnly,
         hidePoweredBy: next.hidePoweredBy,
         consentBanner: next.consentBanner,
+        agentsBlocked: next.agentsBlocked,
         ageGateMinimum: next.ageGateMinimum,
       };
       const [row] = await tx
@@ -594,6 +599,7 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
     },
     hidePoweredBy: row?.hidePoweredBy ?? false,
     consentBanner: row?.consentBanner ?? false,
+    agentsBlocked: row?.agentsBlocked ?? false,
     ageGateMinimum: row?.ageGateMinimum ?? null,
     // As the online store checked them when they were chosen (ADR-568).
     storefrontFilters:

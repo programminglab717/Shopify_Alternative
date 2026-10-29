@@ -2877,6 +2877,8 @@ export interface StorefrontPreferences {
   hidePoweredBy: boolean;
   /** Whether the storefront asks shoppers before the ad platforms' pixels load (ADR-551). */
   consentBanner: boolean;
+  /** Whether the shop keeps AI shopping agents out (ADR-908); absent where a fake core leaves it out. */
+  agentsBlocked?: boolean;
   /**
    * The age the storefront asks visitors to confirm (ADR-889); null for none, absent where a
    * fake core leaves it out.

@@ -810,6 +810,8 @@ export function shopDoc(
     ...(preferences.consentBanner && { consentBanner: true as const }),
     // Asking visitors' age (ADR-889), likewise.
     ...(preferences.ageGateMinimum && { ageGate: preferences.ageGateMinimum }),
+    // Keeping AI agents out (ADR-908), likewise.
+    ...(preferences.agentsBlocked && { agentsBlocked: true as const }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

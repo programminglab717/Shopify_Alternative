@@ -89,6 +89,8 @@ describe('The shop for AI shopping agents (OS-23, ADR-847)', () => {
       'create_cart',
       'get_cart',
       'update_cart',
+      'get_policies',
+      'get_delivery',
     ]);
     expect(
       await mcpAnswer({ jsonrpc: '2.0', id: 5, method: 'resources/list' }, shop()),
@@ -260,5 +262,67 @@ describe('The shop for AI shopping agents (OS-23, ADR-847)', () => {
     expect(await call('get_cart', { id: 'gid://hatti/Cart/bm9wZQ' })).toMatchObject({
       isError: true,
     });
+  });
+
+  it("tells the shop's policies and its delivery to a city, with cash on delivery (ADR-908)", async () => {
+    const withShop: AgentShop = {
+      ...shop(),
+      store: {
+        ...new MemoryStore(sample),
+        products: (ids) => new MemoryStore(sample).products(ids),
+        productByHandle: (handle) => new MemoryStore(sample).productByHandle(handle),
+        policy: (type) =>
+          Promise.resolve(
+            type === 'refund_policy'
+              ? '<h2>Returns</h2><p>Within <b>7</b> days &amp; unworn.</p><p>Exchanges too.</p>'
+              : null,
+          ),
+      },
+      shop: {
+        policies: ['refund_policy', 'privacy_policy'],
+        cod: { available: true, fee: 150_00, limit: 50_000_00 },
+        delivery: {
+          charge: 250_00,
+          freeAbove: 5_000_00,
+          days: { min: 2, max: 4 },
+          zones: [{ name: 'Lahore', cities: ['Lahore'], charge: 150_00, days: { min: 1, max: 1 } }],
+        },
+      },
+    };
+    const policies = await call('get_policies', {}, withShop);
+    expect(policies.structuredContent).toEqual({
+      policies: [
+        {
+          type: 'refund_policy',
+          title: 'Refund policy',
+          url: 'https://zari.hatti.pk/policies/refund-policy',
+          text: 'Returns\nWithin 7 days & unworn.\nExchanges too.',
+        },
+      ],
+    });
+    // Hatti's own tools name no UCP capability.
+    expect(policies.structuredContent).not.toHaveProperty('ucp');
+    const lahore = await call('get_delivery', { city: ' lahore ' }, withShop);
+    expect(lahore.structuredContent!.delivery).toMatchObject({
+      city: 'lahore',
+      zone: 'Lahore',
+      charge: 150_00,
+      free_above: 5_000_00,
+      days: { min: 1, max: 1 },
+      cash_on_delivery: { available: true, fee: 150_00, limit: 50_000_00 },
+    });
+    const elsewhere = await call('get_delivery', { city: 'Gilgit' }, withShop);
+    expect(elsewhere.structuredContent!.delivery).toMatchObject({
+      zone: null,
+      charge: 250_00,
+      days: { min: 2, max: 4 },
+    });
+    // A shop that tells none: nothing to say, no cash on delivery said.
+    expect((await call('get_delivery', {})).structuredContent!.delivery).toMatchObject({
+      city: null,
+      charge: 0,
+      cash_on_delivery: { available: false, fee: null },
+    });
+    expect((await call('get_policies', {})).structuredContent).toEqual({ policies: [] });
   });
 });

@@ -190,6 +190,13 @@ export class OnlineStorePreferences {
   })
   consentBanner!: boolean;
 
+  @Field({
+    description:
+      'Whether the shop keeps AI shopping agents out (ADR-908): its UCP profile and store MCP ' +
+      'endpoint answer as if it had none.',
+  })
+  agentsBlocked!: boolean;
+
   @Field(() => Int, {
     nullable: true,
     description:
@@ -370,6 +377,13 @@ export class OnlineStorePreferencesInput {
       'Left as it is if not given.',
   })
   consentBanner?: boolean | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Keeps AI shopping agents out, or lets them in (ADR-908). Left as it is if not given.',
+  })
+  agentsBlocked?: boolean | null;
 
   @Field(() => Int, {
     nullable: true,

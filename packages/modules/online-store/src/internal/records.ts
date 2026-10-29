@@ -294,6 +294,8 @@ export interface PreferencesRecord {
   hidePoweredBy: boolean;
   /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
   consentBanner: boolean;
+  /** Whether it keeps AI shopping agents out of its UCP profile and store MCP (ADR-908). */
+  agentsBlocked: boolean;
   /** The age its storefront asks visitors to confirm before it shows (ADR-889); null for none. */
   ageGateMinimum: number | null;
   /**

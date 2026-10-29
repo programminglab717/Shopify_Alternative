@@ -6442,6 +6442,7 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
     returnExchangesOnly
     hidePoweredBy
     consentBanner
+    agentsBlocked
     ageGateMinimum
     robotsTxtRules
   }
