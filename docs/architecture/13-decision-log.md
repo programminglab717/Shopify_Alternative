@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-952 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-953 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -960,6 +960,7 @@
 | 950 | hatti function run --order tries a function on one of the shop's own orders, made into the input checkout would give it | Accepted |
 | 951 | The Storefront API keeps a signed-in shopper's wishlist, the products the shop still sells, as their account on the shop's own pages does | Accepted |
 | 952 | A theme experiment's drafts may each have a share of their own, the live theme shown to no fewer shoppers than any | Accepted |
+| 953 | The headless starter keeps the shopper's wishlist: Save for later on each product's page, and a page of what was kept | Accepted |
 
 ---
 
@@ -31116,3 +31117,21 @@
 * **Consequences:**
   * A shop puts more of its shoppers on the draft it is surest of, and fewer on a riskier one.
   * Not yet: changing the shares of a running experiment.
+
+## ADR-953 · The headless starter keeps the shopper's wishlist: Save for later on each product's page, and a page of what was kept
+
+* **Context:** ADR-951 gives the Storefront API the shopper's wishlist. The starter's account
+  (ADR-944, ADR-947) left it for later.
+* **Decision:**
+  * **"Save for later"** on each product's page keeps the product with the shopper's account,
+    through `customerWishlistAdd`, then shows the wishlist. A shopper not signed in is sent to
+    sign in first.
+  * **`/account/wishlist`** shows the products kept as cards, in the shopper's language, each to
+    its page or taken off the list. The account page links to it.
+  * **It is the account's own wishlist**, so the shop's Hatti pages show the same one.
+  * **Kept working:** its three queries are checked against the schema and run in the
+    storefront's tests. The starter was built with Next.js 15.5 for this change.
+* **Consequences:**
+  * A headless site's shoppers keep products for later as on the shop's own pages.
+  * Not yet: a product saved before signing in kept in the browser and joined to the account on
+    signing in, as the shop's own pages do.
