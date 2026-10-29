@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Agents kept out, and told policies and delivery
+### 08920f1 · Agents kept out, and told policies and delivery
 
 * **A shop keeps AI shopping agents out:** its UCP profile and store MCP answer none ([ADR-908](../architecture/13-decision-log.md#adr-908--a-shop-keeps-ai-shopping-agents-out-its-ucp-profile-and-store-mcp-answering-none-and-the-store-mcp-tells-agents-its-policies-and-delivery-to-a-city-with-cash-on-delivery)).
 * **The store MCP's `get_policies` and `get_delivery`** tell the shop's policies, and delivery to
