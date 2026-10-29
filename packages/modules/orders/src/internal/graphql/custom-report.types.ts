@@ -21,6 +21,7 @@ export enum CustomReportBreakdown {
   CAMPAIGN = 'CAMPAIGN',
   CUSTOMER = 'CUSTOMER',
   CITY = 'CITY',
+  STOCK = 'STOCK',
 }
 
 registerEnumType(CustomReportBreakdown, {
@@ -36,6 +37,11 @@ registerEnumType(CustomReportBreakdown, {
     CAMPAIGN: { description: "The campaign of each order's last visit from elsewhere." },
     CUSTOMER: { description: 'The 250 customers who bought most, their sales first (ADR-909).' },
     CITY: { description: 'The 250 cities orders went to most, their sales first (ADR-909).' },
+    STOCK: {
+      description:
+        'The 250 tracked variants with the most on hand: what each has now, and what sold of it ' +
+        'over the period, as the inventory report has them (ADR-910).',
+    },
   },
 });
 
@@ -121,8 +127,8 @@ export class CustomReportRow {
   @Field(() => String, {
     nullable: true,
     description:
-      "The product's ID, the channel as OrderSource names it, or the visit source, campaign, " +
-      "customer's ID or city as the sales report keys them; null by day, week or month.",
+      "The product's or variant's ID, the channel as OrderSource names it, or the visit source, " +
+      "campaign, customer's ID or city as the sales report keys them; null by day, week or month.",
   })
   key!: string | null;
 

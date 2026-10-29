@@ -10,8 +10,11 @@ export const INVENTORY_REPORT_DAYS = [7, 30, 90] as const;
 /** How many variants a report lists, at most. */
 export const INVENTORY_REPORT_LIMIT = 250;
 
-/** What a report's variants are listed by. */
-export type InventoryReportSort = 'sell_through' | 'slowest' | 'stockouts';
+/**
+ * What a report's variants are listed by; `stock`, every variant, the most on hand first, is
+ * custom reports' (ADR-910).
+ */
+export type InventoryReportSort = 'sell_through' | 'slowest' | 'stockouts' | 'stock';
 
 /** Stock by how long ago it last sold: within 30 days, 31 to 60, 61 to 90, more, or never. */
 export const AGEING_BUCKETS = [
@@ -256,5 +259,8 @@ function sorted(rows: InventoryReportRow[], sort: InventoryReportSort): Inventor
       return rows
         .filter((row) => row.daysOut > 0 || row.stockouts > 0)
         .sort((a, b) => b.daysOut - a.daysOut || b.stockouts - a.stockouts || byTitle(a, b));
+    case 'stock':
+      // Every variant, the most on hand first, then what sold most.
+      return rows.sort((a, b) => b.onHand - a.onHand || b.sold - a.sold || byTitle(a, b));
   }
 }

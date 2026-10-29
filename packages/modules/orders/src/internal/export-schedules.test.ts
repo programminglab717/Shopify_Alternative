@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { InventoryReportService } from '@hatti/inventory/public';
+import { VariantService } from '@hatti/catalog/public';
 import {
   PlanAllowance,
   staffCapabilities,
@@ -525,7 +527,11 @@ describe.skipIf(!server)('Scheduled exports (ADR-183)', () => {
   });
 
   it('sends a custom report over the period that ended, true profit as the plan has it, and goes with the report (ADR-818)', async () => {
-    const reports = new CustomReportService(db, new SalesReportService(db));
+    const reports = new CustomReportService(
+      db,
+      new SalesReportService(db),
+      new InventoryReportService(db, new VariantService(db)),
+    );
     const withReports = new ExportScheduleService(db, f.exports, reports, new Free());
     const report = unwrap(
       await reports.create(f.a, {

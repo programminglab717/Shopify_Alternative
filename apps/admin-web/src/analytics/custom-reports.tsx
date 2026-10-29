@@ -53,6 +53,7 @@ export const BREAKDOWNS: readonly CustomReportBreakdown[] = [
   'CAMPAIGN',
   'CUSTOMER',
   'CITY',
+  'STOCK',
 ];
 
 export const PERIODS: readonly CustomReportPeriod[] = [
@@ -72,10 +73,16 @@ export const PERIODS: readonly CustomReportPeriod[] = [
 const FREQUENCIES: readonly OrderExportFrequency[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
 
 /** What a new report shows until the shop chooses. */
-const USUAL: Readonly<Record<'sales' | 'products', string[]>> = {
+const USUAL: Readonly<Record<'sales' | 'products' | 'stock', string[]>> = {
   sales: ['orders', 'net_sales', 'total_sales'],
   products: ['units_sold', 'gross_sales'],
+  stock: ['on_hand', 'units_sold', 'stock_value'],
 };
+
+/** Which kind of report a breakdown makes: each kind has columns of its own. */
+function kindOf(breakdown: CustomReportBreakdown): keyof typeof USUAL {
+  return breakdown === 'PRODUCT' ? 'products' : breakdown === 'STOCK' ? 'stock' : 'sales';
+}
 
 type Draft = Omit<CustomReportValue, 'id'>;
 
@@ -118,12 +125,9 @@ function ReportEditor({
   const offered = columns.data?.customReportColumns ?? [];
 
   const onBreakdown = (breakdown: CustomReportBreakdown) => {
-    const products = (each: CustomReportBreakdown) => each === 'PRODUCT';
-    // The columns of products are not those of sales: the usual ones of the other kind.
+    // The columns of products or stock are not those of sales: the usual ones of the other kind.
     const columns =
-      products(breakdown) === products(draft.breakdown)
-        ? draft.columns
-        : USUAL[products(breakdown) ? 'products' : 'sales'];
+      kindOf(breakdown) === kindOf(draft.breakdown) ? draft.columns : USUAL[kindOf(breakdown)];
     setDraft({ ...draft, breakdown, columns });
   };
 

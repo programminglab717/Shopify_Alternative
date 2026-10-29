@@ -18,6 +18,13 @@ const PRODUCT_COLUMNS = [
   { key: 'gross_profit', title: 'Gross profit', kind: 'AMOUNT', trueProfit: false },
 ];
 
+const STOCK_COLUMNS = [
+  { key: 'on_hand', title: 'On hand', kind: 'NUMBER', trueProfit: false },
+  { key: 'units_sold', title: 'Units sold', kind: 'NUMBER', trueProfit: false },
+  { key: 'sell_through', title: 'Sell-through', kind: 'RATIO', trueProfit: false },
+  { key: 'stock_value', title: 'Stock value', kind: 'AMOUNT', trueProfit: false },
+];
+
 const MONTHLY: CustomReportValue = {
   id: 'crep_1',
   name: 'Monthly by channel',
@@ -37,7 +44,11 @@ function core(role: StaffRole) {
         case 'CustomReportColumns':
           return {
             customReportColumns:
-              variables.breakdown === 'PRODUCT' ? PRODUCT_COLUMNS : SALES_COLUMNS,
+              variables.breakdown === 'PRODUCT'
+                ? PRODUCT_COLUMNS
+                : variables.breakdown === 'STOCK'
+                  ? STOCK_COLUMNS
+                  : SALES_COLUMNS,
           };
         case 'CustomReport': {
           const report = reports.find((each) => each.id === variables.id) ?? null;
@@ -181,10 +192,11 @@ describe('Custom reports in the admin (ANL-06, ADR-819)', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Best sellers' } });
     // Profit's lines say which plans have them.
     expect(await screen.findByLabelText('Profit (Growth and bigger plans)')).toBeTruthy();
-    // Rows may be by customer or city too (ADR-909).
+    // Rows may be by customer or city too (ADR-909), or of stock (ADR-910).
     const rows = screen.getByLabelText('Rows');
     expect(within(rows).getByRole('option', { name: 'Each customer' })).toBeTruthy();
     expect(within(rows).getByRole('option', { name: 'Each city' })).toBeTruthy();
+    expect(within(rows).getByRole('option', { name: "Each variant's stock" })).toBeTruthy();
     fireEvent.change(rows, { target: { value: 'PRODUCT' } });
     fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'THIS_MONTH' } });
     // A report of products starts from its own usual columns.
@@ -208,6 +220,32 @@ describe('Custom reports in the admin (ANL-06, ADR-819)', () => {
     // A marketer reads reports but takes none away.
     expect(screen.queryByRole('button', { name: 'Download as Excel' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Schedule email' })).toBeNull();
+  });
+
+  it("makes a report of stock from stock's usual columns (ADR-910)", async () => {
+    const fake = core('marketer');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/analytics/reports');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New report' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Stock on hand' } });
+    fireEvent.change(screen.getByLabelText('Rows'), { target: { value: 'STOCK' } });
+    expect(((await screen.findByLabelText('On hand')) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Sell-through') as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByLabelText('Sell-through'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save report' }));
+
+    expect(await screen.findByRole('heading', { name: 'Stock on hand' })).toBeTruthy();
+    expect(sentOf(fake, 'CustomReportCreate')).toEqual([
+      {
+        input: {
+          name: 'Stock on hand',
+          breakdown: 'STOCK',
+          columns: ['on_hand', 'units_sold', 'stock_value', 'sell_through'],
+          period: 'LAST_12_MONTHS',
+        },
+      },
+    ]);
   });
 
   it('shows a report, downloads it, emails it on a schedule, changes it and deletes it', async () => {

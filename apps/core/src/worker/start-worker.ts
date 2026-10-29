@@ -38,6 +38,7 @@ import {
 import { StoreExportService } from '@hatti/files/public';
 import { ImageFetcher, MAX_VIDEO_BYTES, VideoSizer } from '@hatti/images';
 import {
+  InventoryReportService,
   InventoryService,
   LocationService,
   LowStockService,
@@ -913,7 +914,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           database,
           new OrderExportService(database),
           // Custom reports sent too, true profit as each shop's plan has it (ADR-818).
-          new CustomReportService(database, new SalesReportService(database)),
+          new CustomReportService(
+            database,
+            new SalesReportService(database),
+            new InventoryReportService(database, new VariantService(database)),
+          ),
           new BillingService(
             database,
             new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),

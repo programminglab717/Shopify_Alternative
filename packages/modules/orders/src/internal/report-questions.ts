@@ -20,6 +20,7 @@ import {
   REPORT_BREAKDOWNS,
   REPORT_PERIODS,
   SALES_REPORT_COLUMNS,
+  STOCK_REPORT_COLUMNS,
   type CustomReportResult,
   type ReportBreakdown,
   type ReportPeriod,
@@ -56,6 +57,7 @@ export function reportChoicesOf(trueProfit: boolean): ReportChoices {
       (key) => trueProfit || !TRUE_PROFIT_COLUMNS.has(key),
     ),
     productColumns: Object.keys(PRODUCT_REPORT_COLUMNS),
+    stockColumns: Object.keys(STOCK_REPORT_COLUMNS),
   };
 }
 

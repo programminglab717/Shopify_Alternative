@@ -1,5 +1,5 @@
 import type { AiGateway, AiResult } from './gateway.js';
-import type { ReportChoices } from './report-question.js';
+import { allReportColumns, reportColumnsFor, type ReportChoices } from './report-question.js';
 
 // The merchant copilot (AI-01, ADR-894, ADR-896): a request in English, Urdu or Roman Urdu, such
 // as "Eid ke liye 15% off code bana do", read into a draft of one thing the admin makes: a
@@ -95,7 +95,8 @@ const SYSTEM =
   "the request's language, 320 characters at most, and when, as YYYY-MM-DDTHH:MM in Pakistan's " +
   'time within 30 days, none for now; the owner chooses the WhatsApp template. For a ' +
   "report, choose from its lists alone: rows by 'day', 'week', 'month', 'product', 'source', " +
-  "'visit_source', 'campaign', 'customer' or 'city', the fewest columns that answer it. 'aaj' " +
+  "'visit_source', 'campaign', 'customer', 'city' or 'stock', the fewest columns that answer " +
+  "it. 'aaj' " +
   "is today, 'kal' " +
   "yesterday, 'pichle hafte' last week, 'is mahine' this month. Anything else, such as changing " +
   'orders or products, or questions outside these, is kind none: say why in a short ' +
@@ -152,7 +153,7 @@ function toolOf(choices: CopilotChoices) {
             breakdown: { type: 'string', enum: [...report.breakdowns] },
             columns: {
               type: 'array',
-              items: { type: 'string', enum: [...report.salesColumns, ...report.productColumns] },
+              items: { type: 'string', enum: allReportColumns(report) },
               maxItems: COPILOT_LIMITS.columns,
             },
             period: { type: 'string', enum: [...report.periods] },
@@ -301,7 +302,7 @@ export function readCopilotRequest(
         case 'report': {
           const report = (answer.report ?? {}) as Record<string, unknown>;
           const { breakdown, period, columns } = report;
-          const { breakdowns, periods, productColumns, salesColumns } = choices.report;
+          const { breakdowns, periods } = choices.report;
           if (
             typeof breakdown !== 'string' ||
             typeof period !== 'string' ||
@@ -312,7 +313,7 @@ export function readCopilotRequest(
             return null;
           }
           // The columns of its own kind of report, each once, in the order chosen.
-          const allowed = breakdown === 'product' ? productColumns : salesColumns;
+          const allowed = reportColumnsFor(choices.report, breakdown);
           const chosen = [
             ...new Set(
               columns.filter((column): column is string => allowed.includes(column as string)),

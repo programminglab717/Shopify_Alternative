@@ -8,10 +8,16 @@ import {
 import { Database } from '@hatti/db';
 import { recordAudit } from '@hatti/events';
 import { newId } from '@hatti/ids';
+import {
+  INVENTORY_REPORT_LIMIT,
+  InventoryReportService,
+  type InventoryReportRow,
+} from '@hatti/inventory/public';
 import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { XLSX_CONTENT_TYPE, toXlsxWorkbook, type XlsxCell, type XlsxColumn } from '@hatti/xlsx';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { itemName } from './rules.js';
 import { periodLabel } from './sales-report-export.js';
 import {
   SALES_REPORT_LIMITS,
@@ -40,7 +46,10 @@ export const CUSTOM_REPORT_LIMITS = {
   columns: 20,
 } as const;
 
-/** What a report's rows are: days, weeks from Monday or months, products, or as the report's dimensions. */
+/**
+ * What a report's rows are: days, weeks from Monday or months, products, the sales report's
+ * dimensions, or variants' stock (ADR-910).
+ */
 export const REPORT_BREAKDOWNS = [
   'day',
   'week',
@@ -51,6 +60,7 @@ export const REPORT_BREAKDOWNS = [
   'campaign',
   'customer',
   'city',
+  'stock',
 ] as const;
 export type ReportBreakdown = (typeof REPORT_BREAKDOWNS)[number];
 
@@ -145,11 +155,44 @@ export const PRODUCT_REPORT_COLUMNS: Readonly<Record<string, ColumnDefinition<Pr
   },
 };
 
+/**
+ * The columns of a report of stock (ADR-910): what each variant has now, and what sold of it over
+ * the report's period, as the inventory report has them (ADR-455).
+ */
+export const STOCK_REPORT_COLUMNS: Readonly<Record<string, ColumnDefinition<InventoryReportRow>>> =
+  {
+    on_hand: { title: 'On hand', kind: 'number', value: (v) => v.onHand },
+    available: { title: 'Available', kind: 'number', value: (v) => v.available },
+    units_sold: { title: 'Units sold', kind: 'number', value: (v) => v.sold },
+    sell_through: {
+      title: 'Sell-through',
+      kind: 'ratio',
+      value: (v) => (v.sellThrough === null ? null : Math.round(v.sellThrough * 100) / 10_000),
+    },
+    days_since_sale: {
+      title: 'Days since last sale',
+      kind: 'number',
+      value: (v) => v.daysSinceSale,
+    },
+    days_out: { title: 'Days out of stock', kind: 'number', value: (v) => v.daysOut },
+    stockouts: { title: 'Times it ran out', kind: 'number', value: (v) => v.stockouts },
+    unit_cost: { title: 'Unit cost', kind: 'amount', value: (v) => v.cost },
+    stock_value: {
+      title: 'Stock value',
+      kind: 'amount',
+      value: (v) => (v.cost === null ? null : v.cost * BigInt(Math.max(v.onHand, 0))),
+    },
+  };
+
 /** The columns a breakdown takes. */
 export function reportColumnsOf(
   breakdown: ReportBreakdown,
 ): Readonly<Record<string, ColumnDefinition<never>>> {
-  return breakdown === 'product' ? PRODUCT_REPORT_COLUMNS : SALES_REPORT_COLUMNS;
+  return breakdown === 'product'
+    ? PRODUCT_REPORT_COLUMNS
+    : breakdown === 'stock'
+      ? STOCK_REPORT_COLUMNS
+      : SALES_REPORT_COLUMNS;
 }
 
 export interface CustomReportInput {
@@ -307,11 +350,15 @@ function checked(input: CustomReportInput): MutationResult<CustomReportInput> {
       'INVALID',
       input.breakdown === 'product'
         ? `A report of products has no column "${columns[unknown]}"`
-        : `A report of sales has no column "${columns[unknown]}"`,
+        : input.breakdown === 'stock'
+          ? `A report of stock has no column "${columns[unknown]}"`
+          : `A report of sales has no column "${columns[unknown]}"`,
     );
   }
   return { ok: true, value: { ...input, name, columns } };
 }
+
+const DAY_MS = 86_400_000;
 
 const INTERVALS: Partial<Record<ReportBreakdown, SalesIntervalValue>> = {
   day: 'day',
@@ -328,6 +375,7 @@ export class CustomReportService {
   constructor(
     private readonly db: Database,
     private readonly sales: SalesReportService,
+    private readonly stock: InventoryReportService,
   ) {}
 
   async list(tenant: TenantContext): Promise<CustomReportRecord[]> {
@@ -470,6 +518,9 @@ export class CustomReportService {
     const { placedFrom, placedBefore } =
       over ?? (await this.periodOf(tenant.shopId, report.period, at));
     const { breakdown } = report;
+    if (breakdown === 'stock') {
+      return { ok: true, value: await this.stockOf(tenant, report, at, placedFrom, placedBefore) };
+    }
     const interval = INTERVALS[breakdown];
     const result = await this.sales.report(tenant, {
       placedFrom,
@@ -517,6 +568,52 @@ export class CustomReportService {
         rows,
         totals: breakdown === 'product' ? null : values(sales.totals),
       },
+    };
+  }
+
+  /**
+   * A report of stock (ADR-910): every tracked variant, the most on hand first, with what it has
+   * now and what sold of it from the period's start to its end, or to `at` if sooner; its total
+   * of what all of them have, sold and are worth.
+   */
+  private async stockOf(
+    tenant: TenantContext,
+    report: Pick<CustomReportInput, 'columns'>,
+    at: Date,
+    placedFrom: Date,
+    placedBefore: Date,
+  ): Promise<CustomReportResult> {
+    const until = placedBefore < at ? placedBefore : at;
+    const record = await this.stock.report(
+      tenant,
+      {
+        days: Math.max(until.getTime() - placedFrom.getTime(), 0) / DAY_MS,
+        sort: 'stock',
+        first: INVENTORY_REPORT_LIMIT,
+      },
+      until,
+    );
+    const shown = report.columns.filter((key) => key in STOCK_REPORT_COLUMNS);
+    const totalOf: Partial<Record<string, ReportValue>> = {
+      on_hand: record.onHand,
+      units_sold: record.sold,
+      sell_through:
+        record.sellThrough === null ? null : Math.round(record.sellThrough * 100) / 10_000,
+      stock_value: record.ageing.reduce((sum, bucket) => sum + bucket.value, 0n),
+    };
+    return {
+      placedFrom,
+      placedBefore,
+      columns: shown.map((key) => {
+        const { title, kind } = STOCK_REPORT_COLUMNS[key]!;
+        return { key, title, kind };
+      }),
+      rows: record.rows.map((row) => ({
+        key: row.variantId,
+        label: itemName({ title: row.productTitle, variantTitle: row.variantTitle }),
+        values: shown.map((key) => STOCK_REPORT_COLUMNS[key]!.value(row)),
+      })),
+      totals: shown.map((key) => totalOf[key] ?? null),
     };
   }
 
@@ -583,6 +680,7 @@ const BREAKDOWN_HEADERS: Record<ReportBreakdown, string> = {
   campaign: 'Campaign',
   customer: 'Customer',
   city: 'City',
+  stock: 'Variant',
 };
 
 /** A report's rows as a workbook of one sheet named for it. */

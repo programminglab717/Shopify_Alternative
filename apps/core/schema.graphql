@@ -4479,6 +4479,11 @@ enum CustomReportBreakdown {
   """The channel each order came through."""
   SOURCE
 
+  """
+  The 250 tracked variants with the most on hand: what each has now, and what sold of it over the period, as the inventory report has them (ADR-910).
+  """
+  STOCK
+
   """Where each order's last visit from elsewhere came from."""
   VISIT_SOURCE
 
@@ -4576,7 +4581,7 @@ type CustomReportResult {
 """A row of a custom report's."""
 type CustomReportRow {
   """
-  The product's ID, the channel as OrderSource names it, or the visit source, campaign, customer's ID or city as the sales report keys them; null by day, week or month.
+  The product's or variant's ID, the channel as OrderSource names it, or the visit source, campaign, customer's ID or city as the sales report keys them; null by day, week or month.
   """
   key: String
 

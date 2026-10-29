@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { InventoryReportService } from '@hatti/inventory/public';
+import { VariantService } from '@hatti/catalog/public';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
 import { xlsxRows } from '@hatti/xlsx/testing';
@@ -77,7 +79,11 @@ describe.skipIf(!server)('Custom reports (ANL-06, ADR-817)', () => {
 
   beforeAll(async () => {
     f = await ordersFixture(server!);
-    reports = new CustomReportService(f.db, new SalesReportService(f.db));
+    reports = new CustomReportService(
+      f.db,
+      new SalesReportService(f.db),
+      new InventoryReportService(f.db, new VariantService(f.db)),
+    );
   });
 
   afterAll(async () => {
@@ -231,6 +237,49 @@ describe.skipIf(!server)('Custom reports (ANL-06, ADR-817)', () => {
     expect(customers.rows.map(({ label, values }) => [label, ...values])).toEqual([
       ['Ayesha Khan', 10_500_00n, 3, 7_150_00n],
     ]);
+  });
+
+  it("reports each variant's stock, and what sold of it over the period (ADR-910)", async () => {
+    // Its columns are stock's own.
+    expect(
+      errorsOf(
+        await reports.create(f.a, { ...BY_DAY, breakdown: 'stock', columns: ['net_sales'] }),
+      ),
+    ).toEqual([['input.columns.0', 'INVALID']]);
+    const report = unwrap(
+      await reports.create(f.a, {
+        name: 'Stock',
+        breakdown: 'stock',
+        columns: ['on_hand', 'available', 'units_sold', 'sell_through', 'unit_cost', 'stock_value'],
+        period: 'today',
+      }),
+    );
+    // The stock moved as the orders were placed, now; their dates aside.
+    const at = new Date();
+    const over = {
+      placedFrom: new Date(at.getTime() - 86_400_000),
+      placedBefore: new Date(at.getTime() + 86_400_000),
+    };
+    const stock = unwrap(await reports.run(f.a, report, true, at, over));
+    expect(stock.columns.map((column) => [column.key, column.kind])).toEqual([
+      ['on_hand', 'number'],
+      ['available', 'number'],
+      ['units_sold', 'number'],
+      ['sell_through', 'ratio'],
+      ['unit_cost', 'amount'],
+      ['stock_value', 'amount'],
+    ]);
+    // Three kurtas and a shawl ordered, not yet shipped: on hand still, but not available.
+    expect(stock.rows).toEqual([
+      { key: kurta, label: 'Kurta', values: [50, 47, 3, 0.06, 1_200_00n, 60_000_00n] },
+      { key: shawl, label: 'Pashmina Shawl', values: [50, 49, 1, 0.02, null, null] },
+    ]);
+    expect(stock.totals).toEqual([100, null, 4, 0.04, null, 60_000_00n]);
+
+    // Over a period before any of it moved, nothing sold.
+    const before = { placedFrom: new Date('2026-01-01'), placedBefore: new Date('2026-02-01') };
+    const then = unwrap(await reports.run(f.a, report, true, at, before));
+    expect(then.rows.map((row) => row.values[2])).toEqual([0, 0]);
   });
 
   it('exports a report as a workbook of one sheet, its total last', async () => {

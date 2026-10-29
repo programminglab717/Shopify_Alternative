@@ -61,6 +61,7 @@ import { TransferService } from './transfer.service.js';
     ProductInventoryResolver,
   ],
   exports: [
+    InventoryReportService,
     LocationService,
     InventoryService,
     StockService,

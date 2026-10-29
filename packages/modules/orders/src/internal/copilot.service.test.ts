@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { InventoryReportService } from '@hatti/inventory/public';
+import { VariantService } from '@hatti/catalog/public';
 import { AiGateway } from '@hatti/ai';
 import { AiCredits, type AiCreditBalance, type AiCreditUse } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
@@ -59,7 +61,11 @@ describe.skipIf(!server)('The merchant copilot (AI-01, ADR-894)', () => {
 
   beforeAll(async () => {
     f = await ordersFixture(server!);
-    reports = new CustomReportService(f.db, new SalesReportService(f.db));
+    reports = new CustomReportService(
+      f.db,
+      new SalesReportService(f.db),
+      new InventoryReportService(f.db, new VariantService(f.db)),
+    );
   });
 
   afterAll(async () => {

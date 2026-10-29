@@ -3571,7 +3571,8 @@ export type CustomReportBreakdown =
   | 'VISIT_SOURCE'
   | 'CAMPAIGN'
   | 'CUSTOMER'
-  | 'CITY';
+  | 'CITY'
+  | 'STOCK';
 
 export type CustomReportPeriod =
   | 'TODAY'

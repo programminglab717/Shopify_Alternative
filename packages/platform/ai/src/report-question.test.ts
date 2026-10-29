@@ -76,4 +76,45 @@ describe("A merchant's question read into a report (ANL-08, ADR-844)", () => {
       );
     }
   });
+
+  it("reads a question of stock into stock's own columns (ADR-910)", async () => {
+    const choices: ReportChoices = {
+      ...CHOICES,
+      breakdowns: [...CHOICES.breakdowns, 'stock'],
+      stockColumns: ['on_hand', 'units_sold', 'stock_value'],
+    };
+    const { gateway, requests } = provider({
+      answerable: true,
+      breakdown: 'stock',
+      // A report of sales' column on one of stock: left out.
+      columns: ['stock_value', 'total_sales', 'on_hand'],
+      period: 'today',
+    });
+    expect(await readReportQuestion(gateway, 'godown mein kitna maal para hai?', choices)).toEqual({
+      ok: true,
+      value: {
+        answerable: true,
+        breakdown: 'stock',
+        columns: ['stock_value', 'on_hand'],
+        period: 'today',
+      },
+      usage: { inputTokens: 300, outputTokens: 40 },
+    });
+    const tool = (
+      requests[0]!.tools as { input_schema: { properties: { columns: { items: unknown } } } }[]
+    )[0]!;
+    // Each column once, though products and stock both have units sold.
+    expect(tool.input_schema.properties.columns.items).toEqual({
+      type: 'string',
+      enum: [
+        'orders',
+        'total_sales',
+        'average_order_value',
+        'units_sold',
+        'gross_sales',
+        'on_hand',
+        'stock_value',
+      ],
+    });
+  });
 });

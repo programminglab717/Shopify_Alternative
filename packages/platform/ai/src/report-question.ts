@@ -8,9 +8,28 @@ import type { AiGateway, AiResult } from './gateway.js';
 export interface ReportChoices {
   breakdowns: readonly string[];
   periods: readonly string[];
-  /** The columns of each kind of report: of sales, and of products. */
+  /** The columns of each kind of report: of sales, of products, and of stock (ADR-910). */
   salesColumns: readonly string[];
   productColumns: readonly string[];
+  stockColumns?: readonly string[];
+}
+
+/** The columns a report of `breakdown` takes, of `choices`. */
+export function reportColumnsFor(choices: ReportChoices, breakdown: string): readonly string[] {
+  if (breakdown === 'product') return choices.productColumns;
+  if (breakdown === 'stock') return choices.stockColumns ?? [];
+  return choices.salesColumns;
+}
+
+/** Every column of `choices`, each once. */
+export function allReportColumns(choices: ReportChoices): string[] {
+  return [
+    ...new Set([
+      ...choices.salesColumns,
+      ...choices.productColumns,
+      ...(choices.stockColumns ?? []),
+    ]),
+  ];
 }
 
 /** The report a question asks for; or why none answers it. */
@@ -30,7 +49,8 @@ const SYSTEM =
   'report that answers it. Questions come in English, Urdu or Roman Urdu. Choose the report ' +
   "through the tool, from its lists alone. Rows are by 'day', 'week' or 'month' over time, by " +
   "'product', by 'source' (sales channel), 'visit_source' or 'campaign', or by 'customer' or " +
-  "'city' (where orders went). Choose the fewest columns that answer it, the one asked for " +
+  "'city' (where orders went), or 'stock' (each variant's stock now and what sold of it). " +
+  'Choose the fewest columns that answer it, the one asked for ' +
   'first. Take periods as the owner means them: ' +
   "'aaj' is today, 'kal' yesterday, 'pichle hafte' last week, 'is mahine' this month. A question " +
   "that isn't about the shop's sales, orders, products, profit or visits, or that no report of " +
@@ -48,7 +68,7 @@ function toolOf(choices: ReportChoices) {
         breakdown: { type: 'string', enum: [...choices.breakdowns] },
         columns: {
           type: 'array',
-          items: { type: 'string', enum: [...choices.salesColumns, ...choices.productColumns] },
+          items: { type: 'string', enum: allReportColumns(choices) },
           maxItems: REPORT_QUESTION_LIMITS.columns,
         },
         period: { type: 'string', enum: [...choices.periods] },
@@ -93,7 +113,7 @@ export function readReportQuestion(
         return null;
       }
       // The columns of its own kind of report, each once, in the order chosen.
-      const allowed = breakdown === 'product' ? choices.productColumns : choices.salesColumns;
+      const allowed = reportColumnsFor(choices, breakdown);
       const chosen = [
         ...new Set(
           columns.filter((column): column is string => allowed.includes(column as string)),
