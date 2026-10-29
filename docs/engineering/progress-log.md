@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Buy buttons for collections
+### edc81de · Buy buttons for collections
 
 * **A collection's snippet** draws a grid of its first twelve products' buy buttons on another
   site, and any snippet takes the shop's colour ([ADR-925](../architecture/13-decision-log.md#adr-925--buy-buttons-embed-a-collection-as-a-grid-of-its-first-twelve-products-each-with-its-own-buttons-and-take-the-shops-colour)).
