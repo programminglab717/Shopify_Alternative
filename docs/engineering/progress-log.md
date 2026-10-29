@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The expansion stores' sales on one page
+### c0dfccd · The expansion stores' sales on one page
 
 * **One page of what the shop and each of its expansion stores sold**, each in its own currency
   and in the shop's at the day's rate ([ADR-932](../architecture/13-decision-log.md#adr-932--one-page-of-what-the-owners-shop-and-each-of-its-expansion-stores-sold-each-in-its-own-currency-and-in-the-shops-at-the-days-rate)). ADR-859's "not yet"s left are collections and
