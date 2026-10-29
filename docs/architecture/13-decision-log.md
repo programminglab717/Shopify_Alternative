@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-950 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-951 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -958,6 +958,7 @@
 | 948 | An expansion store's collections may have a margin of their own over its rate, the first of a product's collections giving it | Accepted |
 | 949 | Buy buttons may lay a product out across, its photo beside it, and a collection as a list or a carousel | Accepted |
 | 950 | hatti function run --order tries a function on one of the shop's own orders, made into the input checkout would give it | Accepted |
+| 951 | The Storefront API keeps a signed-in shopper's wishlist, the products the shop still sells, as their account on the shop's own pages does | Accepted |
 
 ---
 
@@ -31071,3 +31072,21 @@
   * A developer tries a function on the shop's real products and cities before it is turned on.
   * The ways to pay are all of them, not those the shop offers that order: the saved file can be
     narrowed by hand.
+
+## ADR-951 · The Storefront API keeps a signed-in shopper's wishlist, the products the shop still sells, as their account on the shop's own pages does
+
+* **Context:** A shopper's account keeps a wishlist on the shop's own pages (ADR-575). ADR-943's
+  Storefront API accounts and ADR-946's address book left the wishlist for later. Shopify's API
+  has none: a headless site there keeps its own.
+* **Decision:**
+  * **`Customer.wishlist`** gives the products they keep for later, a page at a time, the newest
+    first. Products the shop no longer sells are left out, as on its pages.
+  * **`customerWishlistAdd(customerAccessToken, productIds)`** puts products first, and
+    **`customerWishlistRemove(customerAccessToken, productId)`** takes one off. Each answers with
+    the customer and their wishlist as it is now. A token that is no one's is
+    `UNIDENTIFIED_CUSTOMER`.
+  * **They go through the account's own wishlist**, so the shop's pages and a headless site show
+    the same one: 100 products at most, the oldest going to make room.
+* **Consequences:**
+  * A headless site keeps a shopper's wishlist across their devices and the shop's own pages.
+  * Not yet: the headless starter's wishlist page; data requests through the API.
