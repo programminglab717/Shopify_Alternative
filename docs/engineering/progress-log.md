@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Reports by customer and by city
+### 0a44737 · Reports by customer and by city
 
 * **Sales and custom reports, and the AI question box,** break sales down by customer and by
   city ([ADR-909](../architecture/13-decision-log.md#adr-909--sales-and-custom-reports-break-sales-down-by-customer-and-by-city-and-the-ai-question-box-reads-questions-of-them)).
