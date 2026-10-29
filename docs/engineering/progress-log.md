@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The headless starter's wishlist before sign-in
+### 9cb153b · The headless starter's wishlist before sign-in
 
 * **The Next.js starter keeps a wishlist on the device before the shopper signs in**, and joins
   it to their account's when they do ([ADR-957](../architecture/13-decision-log.md#adr-957--the-headless-starter-keeps-a-wishlist-on-the-device-before-the-shopper-signs-in-and-joins-it-to-their-accounts-when-they-do)).
