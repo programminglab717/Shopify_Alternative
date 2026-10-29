@@ -4,6 +4,7 @@ import { PRODUCTS_QUERY } from '@/lib/queries';
 import type { ProductCard } from '@/lib/types';
 import { wordsOf } from '@/lib/words';
 import { ProductGrid } from './product-grid';
+import { RecentlyViewed } from './recently-viewed';
 
 export default async function Home({
   searchParams,
@@ -35,6 +36,8 @@ export default async function Home({
         />
       </form>
       <ProductGrid products={products.nodes} words={words} />
+      {/* What the shopper looked at before, on the first page of the shop's (ADR-961). */}
+      {!q && !after && <RecentlyViewed words={words} />}
       {products.pageInfo.hasNextPage && products.pageInfo.endCursor && (
         <a
           className="more"

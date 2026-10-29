@@ -6,8 +6,9 @@ import { recentProducts } from '@/app/recent/actions';
 import type { ProductCard } from '@/lib/types';
 import type { Words } from '@/lib/words';
 
-// Products the shopper viewed lately (ADR-961), kept in their browser alone: this one put first,
-// the others shown under it. A browser that keeps nothing shows nothing.
+// Products the shopper viewed lately (ADR-961), kept in their browser alone: on a product's page,
+// it put first and the others shown under it; on the home page, all of them. A browser that keeps
+// nothing shows nothing.
 
 const VIEWED_KEY = 'hatti_viewed';
 /** This product, and the eight before it. */
@@ -22,17 +23,26 @@ function viewedBefore(): string[] {
   }
 }
 
-export function RecentlyViewed({ productId, words }: { productId: string; words: Words }) {
+export function RecentlyViewed({
+  productId = null,
+  words,
+}: {
+  /** The product whose page this is, kept first; none on other pages. */
+  productId?: string | null;
+  words: Words;
+}) {
   const [products, setProducts] = useState<ProductCard[]>([]);
   useEffect(() => {
     const others = viewedBefore().filter((id) => id !== productId);
-    try {
-      window.localStorage.setItem(
-        VIEWED_KEY,
-        JSON.stringify([productId, ...others].slice(0, KEPT)),
-      );
-    } catch {
-      // Kept nowhere: shown nowhere.
+    if (productId) {
+      try {
+        window.localStorage.setItem(
+          VIEWED_KEY,
+          JSON.stringify([productId, ...others].slice(0, KEPT)),
+        );
+      } catch {
+        // Kept nowhere: shown nowhere.
+      }
     }
     let shown = true;
     if (others.length > 0) {

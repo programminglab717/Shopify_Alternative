@@ -8,8 +8,8 @@ Storefront API. Shoppers sign in with a code sent to their mobile number, on Wha
 and see their orders, buy their items again, and their store credit (ADR-944), and keep their
 addresses (ADR-947) and a wishlist, "Save for later" on each product's page (ADR-953), kept on
 the device before they sign in and joined to their account's when they do (ADR-957). Each
-product's page shows the products viewed before it, kept by the shopper's browser alone
-(ADR-961). **Checkout is the shop's own**, at the cart's `checkoutUrl`: the address, delivery,
+product's page, and the home page, show the products viewed before, kept by the shopper's
+browser alone (ADR-961). **Checkout is the shop's own**, at the cart's `checkoutUrl`: the address, delivery,
 cash on delivery or paying online, and the order, as on the shop's Hatti storefront.
 
 ## Start

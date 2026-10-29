@@ -8,7 +8,7 @@ import { formatMoney } from '@/lib/money';
 import { PRODUCT_QUERY } from '@/lib/queries';
 import type { Product } from '@/lib/types';
 import { wordsOf } from '@/lib/words';
-import { RecentlyViewed } from './recently-viewed';
+import { RecentlyViewed } from '@/app/recently-viewed';
 
 export default async function ProductPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
