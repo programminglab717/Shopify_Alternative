@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The wishlist through the Storefront API
+### cc2b558 · The wishlist through the Storefront API
 
 * **A headless site keeps the signed-in shopper's wishlist**, the same one as the shop's own
   pages ([ADR-951](../architecture/13-decision-log.md#adr-951--the-storefront-api-keeps-a-signed-in-shoppers-wishlist-the-products-the-shop-still-sells-as-their-account-on-the-shops-own-pages-does)).
