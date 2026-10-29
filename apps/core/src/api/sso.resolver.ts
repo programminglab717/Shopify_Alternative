@@ -40,6 +40,14 @@ export class ShopSsoDomain {
     description: "When DNS proved it the shop's; null while not yet.",
   })
   provedAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      "Since when a proved domain's record is gone from DNS, as Hatti looks it up again each day " +
+      "(ADR-934): three days on, it is no longer proved the shop's. Null while it is there.",
+  })
+  missingSince!: Date | null;
 }
 
 @ObjectType({

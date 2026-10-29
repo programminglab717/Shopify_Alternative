@@ -106,6 +106,7 @@ describe("Signing in through the shop's organisation (ADM-09, ADR-864)", () => {
               domain,
               recordName: `_hatti-sso.${domain}`,
               provedAt: null,
+              missingSince: null,
             })),
             proofRecord: 'hatti-sso=0123456789abcdef0123456789abcdef',
           };
@@ -160,6 +161,47 @@ describe("Signing in through the shop's organisation (ADM-09, ADR-864)", () => {
     expect(screen.getAllByText('Not yet')).toHaveLength(1);
     expect(
       screen.getByText("DNS doesn't show the record yet. A new record can take an hour to appear."),
+    ).toBeTruthy();
+  });
+
+  it("says when a proved domain's record is gone from DNS, before it stops being proved (ADR-934)", async () => {
+    signedIn();
+    const fake = fakeCore('owner', (operation) => {
+      switch (operation) {
+        case 'Staff':
+          return { staffMembers: [], staffInvitations: [] };
+        case 'ShopSso':
+          return {
+            shopSso: {
+              issuer: 'https://login.microsoftonline.com/zari/v2.0',
+              clientId: 'hatti-zari',
+              secretHint: '0042',
+              emailDomains: ['zari.pk'],
+              required: false,
+              providerMfa: true,
+              callbackUrl: 'https://api.hatti.pk/auth/sso/callback',
+              domains: [
+                {
+                  domain: 'zari.pk',
+                  recordName: '_hatti-sso.zari.pk',
+                  provedAt: '2026-10-20T05:00:00.000Z',
+                  missingSince: '2026-10-28T05:00:00.000Z',
+                },
+              ],
+              proofRecord: 'hatti-sso=0123456789abcdef0123456789abcdef',
+            },
+          };
+        default:
+          return undefined;
+      }
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/staff');
+    expect(await screen.findByText('Proved')).toBeTruthy();
+    expect(
+      screen.getByText(
+        /^Hatti no longer finds the record, since 28 Oct 2026\. Put it back within three days/,
+      ),
     ).toBeTruthy();
   });
 });

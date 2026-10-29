@@ -4713,6 +4713,8 @@ const en = {
   'sso.proofValue': 'TXT value:',
   'sso.proved': 'Proved',
   'sso.notProved': 'Not yet',
+  'sso.missing':
+    'Hatti no longer finds the record, since {date}. Put it back within three days, or the domain is no longer proved yours.',
   'sso.check': 'Check DNS',
   'sso.checkedNone': "DNS doesn't show the record yet. A new record can take an hour to appear.",
   'error.SSO_REQUIRED':
@@ -11959,6 +11961,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'sso.proofValue': 'TXT قدر:',
   'sso.proved': 'ثابت شدہ',
   'sso.notProved': 'ابھی نہیں',
+  'sso.missing':
+    'ہٹی کو {date} سے ریکارڈ نہیں مل رہا۔ اسے تین دن کے اندر واپس لگائیں، ورنہ ڈومین آپ کا ثابت شدہ نہیں رہے گا۔',
   'sso.check': 'DNS جانچیں',
   'sso.checkedNone': 'DNS ابھی ریکارڈ نہیں دکھاتا۔ نیا ریکارڈ ظاہر ہونے میں ایک گھنٹہ لگ سکتا ہے۔',
   'error.SSO_REQUIRED':

@@ -2,12 +2,14 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import type { StaffRole } from '@hatti/api';
 import { base32Decode, totp } from '@hatti/crypto';
+import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TestDns, startTestApi, type TestApi } from '../testing/api.js';
 import { fakeOidcProvider } from '../testing/oidc-provider.js';
+import { SsoDomainChecks } from '../worker/sso-domain-checks.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
 const server = testDatabaseServer();
@@ -317,5 +319,58 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
       `SELECT details FROM platform.audit_log WHERE action = 'sso.domains_proved'`,
     );
     expect(rows).toEqual([{ details: { domains: ['zari.pk'] } }]);
+  });
+
+  it('looks a proved domain up again each day, and unproves it three days after its record goes (ADR-934)', async () => {
+    const zari = owner;
+    const SSO = '{ shopSso { proofRecord domains { domain provedAt missingSince } } }';
+    const CHECK = 'mutation { shopSsoDomainsCheck { sso { domains { domain provedAt } } } }';
+    const { proofRecord } = (await gql(zari, SSO)).data.shopSso;
+    dns.records.set('_hatti-sso.zari.com.pk', { texts: [proofRecord] });
+    expect((await gql(zari, CHECK)).data.shopSsoDomainsCheck.sso.domains[0].provedAt).toEqual(
+      expect.any(String),
+    );
+    const database = new Database({
+      appUrl: testDb.appUrl,
+      systemUrl: testDb.systemUrl,
+      applicationName: 'sso-domain-checks-test',
+    });
+    try {
+      const checks = new SsoDomainChecks(database.app, (host) => dns.texts(host));
+      const day = 86_400_000;
+      const at = Date.now() + 2 * day;
+      const swept = (offset: number, by = checks) => by.sweep(new Date(at + offset));
+      // Not due within the day of its proof.
+      expect(await checks.sweep(new Date())).toEqual({
+        proved: 0,
+        missing: 0,
+        unproved: 0,
+        unanswered: 0,
+      });
+      expect((await swept(0)).proved).toBe(1);
+      // Its record gone: missing, said so, still proved.
+      dns.records.delete('_hatti-sso.zari.com.pk');
+      expect((await swept(day + 1_000)).missing).toBe(1);
+      const missing = (await gql(zari, SSO)).data.shopSso.domains[0];
+      expect([missing.provedAt === null, missing.missingSince]).toEqual([
+        false,
+        new Date(at + day + 1_000).toISOString(),
+      ]);
+      // DNS failing changes nothing.
+      const failing = new SsoDomainChecks(database.app, async () => {
+        throw new Error('SERVFAIL');
+      });
+      expect((await swept(2 * day + 2_000, failing)).unanswered).toBe(1);
+      // Three days missing: no longer proved Zari's.
+      expect((await swept(4 * day + 3_000)).unproved).toBe(1);
+      expect((await gql(zari, SSO)).data.shopSso.domains).toEqual([
+        { domain: 'zari.com.pk', provedAt: null, missingSince: null },
+      ]);
+      // Put back, the owner proves it again as at first; the sweep asks nothing of it till then.
+      dns.records.set('_hatti-sso.zari.com.pk', { texts: [proofRecord] });
+      expect((await swept(6 * day)).proved).toBe(0);
+    } finally {
+      await database.close();
+    }
   });
 });

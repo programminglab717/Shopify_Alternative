@@ -6533,6 +6533,8 @@ export interface ShopSsoDomain {
   domain: string;
   recordName: string;
   provedAt: string | null;
+  /** Since when a proved domain's record is gone from DNS (ADR-934). */
+  missingSince: string | null;
 }
 
 /** The shop's single sign-on (ADM-09, ADR-864). */

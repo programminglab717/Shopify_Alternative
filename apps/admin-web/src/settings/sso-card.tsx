@@ -15,9 +15,10 @@ import type {
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
+import { formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
-import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -48,7 +49,8 @@ const formOf = (sso: ShopSso | null): Form => ({
  * Each domain is proved the shop's by a TXT record DNS shows (ADR-919).
  */
 export function SsoCard() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const timezone = useShopTimezone();
   const query = useAdminQuery<ShopSsoData>(['shopSso'], ShopSsoQuery);
   const save = useAdminMutation<ShopSsoUpdateData, { input: Record<string, unknown> }>(
     ShopSsoUpdateMutation,
@@ -218,6 +220,12 @@ export function SsoCard() {
                 <span className={each.provedAt ? 'text-success' : 'text-secondary'}>
                   {each.provedAt ? t('sso.proved') : t('sso.notProved')}
                 </span>
+                {/* Proved, then gone from DNS (ADR-934). */}
+                {each.provedAt && each.missingSince && (
+                  <Alert tone="warning">
+                    {t('sso.missing', { date: formatDate(each.missingSince, timezone, locale) })}
+                  </Alert>
+                )}
               </li>
             ))}
           </ul>

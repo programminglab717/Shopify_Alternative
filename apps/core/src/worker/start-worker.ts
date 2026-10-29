@@ -154,6 +154,7 @@ import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { DailySummaries } from './daily-summaries.js';
 import { DomainChecks } from './domain-checks.js';
+import { SsoDomainChecks } from './sso-domain-checks.js';
 import { DomainNotices } from './domain-notices.js';
 import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
@@ -875,6 +876,15 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => domainChecks.stop());
+    // Single sign-on domains looked up again each day, and those whose record is gone three
+    // days no longer proved the shop's (ADR-934).
+    const dns = new SystemDnsLookup();
+    const ssoDomainChecks = new SsoDomainChecks(
+      database.app,
+      (host) => dns.texts(host),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => ssoDomainChecks.stop());
     // Articles, pages and themes published at a time ahead shown once it comes (ADR-215,
     // ADR-217, ADR-695).
     const scheduledContent = new ScheduledContent(

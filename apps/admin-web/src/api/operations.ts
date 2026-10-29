@@ -13204,6 +13204,7 @@ const SHOP_SSO = /* GraphQL */ `
       domain
       recordName
       provedAt
+      missingSince
     }
     proofRecord
   }

@@ -20134,6 +20134,11 @@ One of the shop's email domains, and whether DNS proved it the shop's (ADR-919):
 type ShopSsoDomain {
   domain: String!
 
+  """
+  Since when a proved domain's record is gone from DNS, as Hatti looks it up again each day (ADR-934): three days on, it is no longer proved the shop's. Null while it is there.
+  """
+  missingSince: DateTime
+
   """When DNS proved it the shop's; null while not yet."""
   provedAt: DateTime
 

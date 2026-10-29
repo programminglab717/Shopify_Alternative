@@ -35,6 +35,10 @@ export const SSO_LIMITS = {
 export const SSO_PROOF = {
   label: '_hatti-sso',
   prefix: 'hatti-sso=',
+  /** How often a proved domain is looked up again (ADR-934). */
+  recheckMs: 24 * 60 * 60 * 1000,
+  /** How long its record may be gone before the domain is no longer proved the shop's. */
+  graceMs: 3 * 24 * 60 * 60 * 1000,
 } as const;
 
 /** One of the shop's email domains, and whether DNS proved it the shop's. */
@@ -43,6 +47,60 @@ export interface ShopSsoDomain {
   /** Where its TXT record goes: `_hatti-sso.zari.pk`. */
   recordName: string;
   provedAt: Date | null;
+  /**
+   * Since when a proved domain's record is gone from DNS (ADR-934): three days on, the domain is
+   * no longer proved the shop's. Null while it is there.
+   */
+  missingSince: Date | null;
+}
+
+/** What looking a proved domain up again came to (ADR-934). */
+export type SsoDomainCheck = 'proved' | 'missing' | 'unproved' | 'unanswered';
+
+/** A proved domain due a look again, and the record it should show (ADR-934). */
+export interface SsoDomainDue {
+  domain: string;
+  proofToken: string;
+}
+
+/**
+ * Proved domains due a look again at `at`, across shops, those looked at longest ago first,
+ * `limit` at most (ADR-934): through identity's own function, which the app login may run.
+ */
+export async function ssoDomainsToRecheck(
+  db: Pick<Db, 'execute'>,
+  at: Date,
+  limit: number,
+): Promise<SsoDomainDue[]> {
+  const due = new Date(at.getTime() - SSO_PROOF.recheckMs).toISOString();
+  const { rows } = await db.execute<{ domain: string; proof_token: string }>(sql`
+    SELECT domain, proof_token FROM identity.sso_domains_due(${due}::timestamptz, ${limit})`);
+  return rows.map((row) => ({ domain: row.domain, proofToken: row.proof_token }));
+}
+
+/**
+ * Looks proved `due` up again at `at`, through `lookup` (ADR-934): its shop's token there, it
+ * stays proved; gone, it is said missing since now, and three days missing it is no longer
+ * proved the shop's. A lookup that fails changes nothing but when it was last looked at.
+ */
+export async function recheckSsoDomain(
+  db: Pick<Db, 'execute'>,
+  due: SsoDomainDue,
+  lookup: TxtLookup,
+  at: Date,
+): Promise<SsoDomainCheck> {
+  let found: boolean | null;
+  try {
+    const texts = await lookup(recordNameOf(due.domain));
+    found = texts.some((text) => text.trim() === SSO_PROOF.prefix + due.proofToken);
+  } catch {
+    found = null;
+  }
+  const { rows } = await db.execute<{ check: SsoDomainCheck }>(sql`
+    SELECT identity.sso_domain_checked(
+             ${due.domain}, ${at.toISOString()}::timestamptz, ${found}::boolean,
+             make_interval(secs => ${SSO_PROOF.graceMs / 1000})) AS check`);
+  return rows[0]!.check;
 }
 
 /** A host's TXT records, as DNS gives them. */
@@ -373,14 +431,30 @@ export class ShopSsoService {
     return rows[0] ?? null;
   }
 
-  /** The domains proved the shop's, and when. */
-  async #proved(shopId: string): Promise<Map<string, Date>> {
-    const { rows } = await this.#db.execute<{ domain: string; proved_at: Date | string }>(sql`
-      SELECT domain, proved_at FROM identity.sso_domains WHERE shop_id = ${shopId}`);
-    return new Map(rows.map((row) => [row.domain, new Date(row.proved_at)]));
+  /** The domains proved the shop's, when, and since when their record is gone (ADR-934). */
+  async #proved(shopId: string): Promise<Map<string, { at: Date; missingSince: Date | null }>> {
+    const { rows } = await this.#db.execute<{
+      domain: string;
+      proved_at: Date | string;
+      missing_since: Date | string | null;
+    }>(sql`
+      SELECT domain, proved_at, missing_since FROM identity.sso_domains WHERE shop_id = ${shopId}`);
+    return new Map(
+      rows.map((row) => [
+        row.domain,
+        {
+          at: new Date(row.proved_at),
+          missingSince: row.missing_since === null ? null : new Date(row.missing_since),
+        },
+      ]),
+    );
   }
 
-  #settings(shopId: string, row: SettingsRow, proved: Map<string, Date>): ShopSsoSettings {
+  #settings(
+    shopId: string,
+    row: SettingsRow,
+    proved: Map<string, { at: Date; missingSince: Date | null }>,
+  ): ShopSsoSettings {
     const secret = this.#box.decrypt(row.client_secret, sealedFor(shopId)).toString('utf8');
     return {
       issuer: row.issuer,
@@ -390,7 +464,8 @@ export class ShopSsoService {
       domains: row.email_domains.map((domain) => ({
         domain,
         recordName: recordNameOf(domain),
-        provedAt: proved.get(domain) ?? null,
+        provedAt: proved.get(domain)?.at ?? null,
+        missingSince: proved.get(domain)?.missingSince ?? null,
       })),
       proofRecord: SSO_PROOF.prefix + row.proof_token,
       required: row.required,
