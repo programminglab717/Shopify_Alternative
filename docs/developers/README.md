@@ -142,6 +142,12 @@ Sign-ins are counted by the buyer's address, 20 a minute. A site calling from it
 with a private token names the buyer in `Shopify-Storefront-Buyer-IP`, as with Shopify, so that
 its shoppers aren't counted as one. `customerAccessTokenDelete` signs the shopper out.
 
+The token also keeps the shopper's address book (ADR-946), as Shopify's does: `customer { addresses
+defaultAddress }`, `customerAddressCreate`, `customerAddressUpdate`, `customerAddressDelete` and
+`customerDefaultAddressUpdate`. Addresses are in Pakistan alone, checked as checkout checks them,
+20 at most; `MailingAddressInput` takes a `landmark` besides Shopify's fields. A number that has
+never ordered has no book yet: its addresses come with its first order.
+
 ## Public apps
 
 A partner (ADR-504) registers an app on their partner page: its address, its redirect URLs and

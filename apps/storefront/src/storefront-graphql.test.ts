@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parse, validate } from 'graphql';
-import type { AccountJson, CartActionResult, CartJson } from '@hatti/storefront-api';
+import type {
+  AccountAddress,
+  AccountJson,
+  CartActionResult,
+  CartJson,
+} from '@hatti/storefront-api';
 import { MemoryStore, TranslatedStore } from '@hatti/storefront-data';
 import { describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
@@ -656,6 +661,24 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     const asked: unknown[] = [];
     const signedOut: string[] = [];
     let busy = false;
+    let next = 1;
+    /** The shopper's address book, as the core keeps it: the default first. */
+    let book: AccountAddress[] = [
+      {
+        id: 'addr_0',
+        name: 'Ayesha Khan',
+        phone: '+923217654321',
+        address1: 'House 12, Street 4',
+        address2: null,
+        landmark: 'Near the Jamia Masjid',
+        city: 'Lahore',
+        provinceCode: 'PB',
+        province: 'Punjab',
+        zip: '54000',
+        default: true,
+      },
+    ];
+    const signedIn = (token: string) => token === TOKEN && !signedOut.includes(token);
     const kept: StorefrontApiAccounts = {
       sendCode: (request) => {
         asked.push(request);
@@ -688,11 +711,43 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
           },
         });
       },
-      account: (token) =>
-        Promise.resolve(token === TOKEN && !signedOut.includes(token) ? ACCOUNT : null),
+      account: (token) => Promise.resolve(signedIn(token) ? ACCOUNT : null),
       signOut: (token) => {
         signedOut.push(token);
         return Promise.resolve();
+      },
+      addresses: (token) => Promise.resolve(signedIn(token) ? book : null),
+      saveAddress: (token, address, id) => {
+        if (!signedIn(token)) return Promise.resolve(null);
+        if (!address.city) {
+          return Promise.resolve({
+            ok: false,
+            errors: [{ field: 'city', message: 'Enter a city.' }],
+          });
+        }
+        const saved: AccountAddress = {
+          id: id ?? `addr_${next++}`,
+          name: address.name,
+          phone: address.phone,
+          address1: address.address1,
+          address2: address.address2 ?? null,
+          landmark: address.landmark ?? null,
+          city: address.city,
+          provinceCode: address.province === 'Sindh' ? 'SD' : (address.province ?? null),
+          province: address.province === 'Sindh' ? 'Sindh' : null,
+          zip: address.zip ?? null,
+          default: address.default === true,
+        };
+        const others = book
+          .filter((each) => each.id !== saved.id)
+          .map((each) => (saved.default ? { ...each, default: false } : each));
+        book = saved.default ? [saved, ...others] : [...others, saved];
+        return Promise.resolve({ ok: true, addresses: book });
+      },
+      deleteAddress: (token, id) => {
+        if (!signedIn(token)) return Promise.resolve(null);
+        book = book.filter((each) => each.id !== id);
+        return Promise.resolve(book);
       },
     };
     return { kept, asked, signedOut, busy: () => (busy = true) };
@@ -745,6 +800,145 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     const asked = core.asked.length;
     expect((await refused('0321 7654321')).customerUserErrors[0].code).toBe('TOO_MANY_REQUESTS');
     expect(core.asked).toHaveLength(asked + 1);
+  });
+
+  it("keeps the signed-in shopper's address book, as Shopify's does (ADR-946)", async () => {
+    const core = accounts();
+    const at = { ...api(), accounts: core.kept };
+    const book = async () =>
+      (
+        await ask(
+          `query Book($token: String!) {
+            customer(customerAccessToken: $token) {
+              defaultAddress { id city }
+              addresses(first: 5) {
+                nodes { id name firstName lastName city province provinceCode landmark formatted }
+              }
+            }
+          }`,
+          { token: TOKEN },
+          at,
+        )
+      ).data.customer;
+    const first = await book();
+    expect(first.defaultAddress).toEqual({
+      id: 'gid://hatti/MailingAddress/addr_0',
+      city: 'Lahore',
+    });
+    expect(first.addresses.nodes[0]).toEqual({
+      id: 'gid://hatti/MailingAddress/addr_0',
+      name: 'Ayesha Khan',
+      firstName: 'Ayesha',
+      lastName: 'Khan',
+      city: 'Lahore',
+      province: 'Punjab',
+      provinceCode: 'PB',
+      landmark: 'Near the Jamia Masjid',
+      formatted: [
+        'Ayesha Khan',
+        'House 12, Street 4',
+        'Near the Jamia Masjid',
+        'Lahore Punjab 54000',
+        'Pakistan',
+      ],
+    });
+
+    const create = `mutation Create($token: String!, $address: MailingAddressInput!) {
+      customerAddressCreate(customerAccessToken: $token, address: $address) {
+        customerAddress { id name city provinceCode }
+        customerUserErrors { field message code }
+      }
+    }`;
+    const karachi = {
+      firstName: 'Ayesha',
+      lastName: 'Khan',
+      phone: '0321 7654321',
+      address1: 'Flat 3, Clifton Block 5',
+      city: 'Karachi',
+      province: 'Sindh',
+      country: 'Pakistan',
+    };
+    const made = (await ask(create, { token: TOKEN, address: karachi }, at)).data
+      .customerAddressCreate;
+    expect(made).toEqual({
+      customerAddress: {
+        id: 'gid://hatti/MailingAddress/addr_1',
+        name: 'Ayesha Khan',
+        city: 'Karachi',
+        provinceCode: 'SD',
+      },
+      customerUserErrors: [],
+    });
+    // What the core refuses, by its field; another country, before asking it.
+    expect(
+      (await ask(create, { token: TOKEN, address: { ...karachi, city: '' } }, at)).data
+        .customerAddressCreate.customerUserErrors,
+    ).toEqual([{ field: ['address', 'city'], message: 'Enter a city.', code: 'INVALID' }]);
+    expect(
+      (await ask(create, { token: TOKEN, address: { ...karachi, country: 'India' } }, at)).data
+        .customerAddressCreate.customerUserErrors[0].field,
+    ).toEqual(['address', 'country']);
+
+    // Changed: what it gives alone, the rest kept.
+    const update = await ask(
+      `mutation Update($token: String!, $id: ID!) {
+        customerAddressUpdate(customerAccessToken: $token, id: $id, address: { address2: "Second floor" }) {
+          customerAddress { id address1 address2 city }
+          customerUserErrors { code }
+        }
+      }`,
+      { token: TOKEN, id: made.customerAddress.id },
+      at,
+    );
+    expect(update.data.customerAddressUpdate.customerAddress).toEqual({
+      id: 'gid://hatti/MailingAddress/addr_1',
+      address1: 'Flat 3, Clifton Block 5',
+      address2: 'Second floor',
+      city: 'Karachi',
+    });
+    // Delivered to first.
+    const defaulted = await ask(
+      `mutation Default($token: String!, $id: ID!) {
+        customerDefaultAddressUpdate(customerAccessToken: $token, addressId: $id) {
+          customer { defaultAddress { city } }
+          customerUserErrors { code }
+        }
+      }`,
+      { token: TOKEN, id: made.customerAddress.id },
+      at,
+    );
+    expect(defaulted.data.customerDefaultAddressUpdate).toEqual({
+      customer: { defaultAddress: { city: 'Karachi' } },
+      customerUserErrors: [],
+    });
+    const deleted = await ask(
+      `mutation Delete($token: String!, $id: ID!) {
+        customerAddressDelete(customerAccessToken: $token, id: $id) {
+          deletedCustomerAddressId
+          customerUserErrors { code }
+        }
+      }`,
+      { token: TOKEN, id: 'gid://hatti/MailingAddress/addr_0' },
+      at,
+    );
+    expect(deleted.data.customerAddressDelete).toEqual({
+      deletedCustomerAddressId: 'gid://hatti/MailingAddress/addr_0',
+      customerUserErrors: [],
+    });
+    expect((await book()).addresses.nodes.map((address: Json) => address.city)).toEqual([
+      'Karachi',
+    ]);
+    // An address not theirs, or a token no one's, changes nothing.
+    const missing = await ask(
+      `mutation { customerAddressDelete(customerAccessToken: "${TOKEN}", id: "gid://hatti/MailingAddress/addr_9") { customerUserErrors { code } } }`,
+      undefined,
+      at,
+    );
+    expect(missing.data.customerAddressDelete.customerUserErrors).toEqual([{ code: 'NOT_FOUND' }]);
+    expect(
+      (await ask(create, { token: 'someone-else-0123456789', address: karachi }, at)).data
+        .customerAddressCreate.customerUserErrors[0].code,
+    ).toBe('UNIDENTIFIED_CUSTOMER');
   });
 
   it("gives the signed-in shopper's orders, a page at a time, and signs them out", async () => {

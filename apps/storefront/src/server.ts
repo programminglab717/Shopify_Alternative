@@ -2654,6 +2654,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
                   : 'too_many_requests',
               account: (token) => core.account(found.shopId, token),
               signOut: (token) => core.accountLogout(found.shopId, token),
+              addresses: (token) => core.accountAddresses(found.shopId, token),
+              saveAddress: (token, address, id) =>
+                core.accountAddressSave(found.shopId, token, address, id),
+              deleteAddress: (token, id) => core.accountAddressDelete(found.shopId, token, id),
             }
           : null,
         search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),

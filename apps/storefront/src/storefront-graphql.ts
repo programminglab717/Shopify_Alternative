@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
 import type {
+  AccountAddress,
+  AccountAddressRequest,
+  AccountErrorResponse,
   AccountJson,
   AccountLoginStartRequest,
   AccountLoginStartResult,
@@ -47,7 +50,8 @@ import { POLICIES, policyTitle } from './policies.js';
 // and changes carts through the core, as its cart does; a cart's checkoutUrl is the shop's own
 // checkout. A subset of Shopify's schema, its names and shapes kept, so its clients ask it alike.
 // Shoppers sign in as on the shop's own pages, with a code sent to their mobile number (ADR-943),
-// and the access token it gives reads their account, as Shopify's customer access token does.
+// and the access token it gives reads their account, as Shopify's customer access token does,
+// and keeps their address book (ADR-946).
 
 export const STOREFRONT_API_LIMITS = {
   /** The longest query read, and how deep it may ask. */
@@ -207,6 +211,27 @@ const SDL = /* GraphQL */ `
       code: String!
     ): CustomerAccessTokenCreatePayload
     customerAccessTokenDelete(customerAccessToken: String!): CustomerAccessTokenDeletePayload
+    """
+    An address added to the signed-in shopper's book (ADR-946), checked as checkout's are; 20 at
+    most. A number that has never ordered has no book yet: its addresses come with its first order.
+    """
+    customerAddressCreate(
+      customerAccessToken: String!
+      address: MailingAddressInput!
+    ): CustomerAddressCreatePayload
+    customerAddressUpdate(
+      customerAccessToken: String!
+      id: ID!
+      address: MailingAddressInput!
+    ): CustomerAddressUpdatePayload
+    customerAddressDelete(customerAccessToken: String!, id: ID!): CustomerAddressDeletePayload
+    """
+    The address delivered to first.
+    """
+    customerDefaultAddressUpdate(
+      customerAccessToken: String!
+      addressId: ID!
+    ): CustomerDefaultAddressUpdatePayload
     cartCreate(input: CartInput): CartCreatePayload
     cartLinesAdd(cartId: ID!, lines: [CartLineInput!]!): CartLinesAddPayload
     cartLinesUpdate(cartId: ID!, lines: [CartLineUpdateInput!]!): CartLinesUpdatePayload
@@ -658,6 +683,11 @@ const SDL = /* GraphQL */ `
     """
     CODE_EXPIRED
     TOO_MANY_REQUESTS
+    """
+    The access token is no one's: signed out, expired or unknown.
+    """
+    UNIDENTIFIED_CUSTOMER
+    NOT_FOUND
   }
 
   type CustomerUserError {
@@ -705,6 +735,84 @@ const SDL = /* GraphQL */ `
     lastName: String
     storeCredit: MoneyV2!
     orders(first: Int, after: String): OrderConnection!
+    """
+    Their address book, the default first (ADR-946).
+    """
+    addresses(first: Int, after: String): MailingAddressConnection!
+    defaultAddress: MailingAddress
+  }
+
+  """
+  An address in Pakistan, as checkout takes it.
+  """
+  type MailingAddress {
+    id: ID!
+    name: String!
+    firstName: String
+    lastName: String
+    phone: String!
+    address1: String!
+    address2: String
+    """
+    A place a rider finds it by: "near the Jamia Masjid".
+    """
+    landmark: String
+    city: String!
+    province: String
+    provinceCode: String
+    zip: String
+    country: String!
+    countryCodeV2: String!
+    """
+    Its lines, as a label shows them.
+    """
+    formatted: [String!]!
+  }
+
+  input MailingAddressInput {
+    firstName: String
+    lastName: String
+    phone: String
+    address1: String
+    address2: String
+    landmark: String
+    city: String
+    """
+    Its name or its code: "Punjab", or "PB".
+    """
+    province: String
+    zip: String
+    """
+    Pakistan alone is delivered to: any other is refused.
+    """
+    country: String
+  }
+
+  type MailingAddressEdge {
+    cursor: String!
+    node: MailingAddress!
+  }
+  type MailingAddressConnection {
+    edges: [MailingAddressEdge!]!
+    nodes: [MailingAddress!]!
+    pageInfo: PageInfo!
+  }
+
+  type CustomerAddressCreatePayload {
+    customerAddress: MailingAddress
+    customerUserErrors: [CustomerUserError!]!
+  }
+  type CustomerAddressUpdatePayload {
+    customerAddress: MailingAddress
+    customerUserErrors: [CustomerUserError!]!
+  }
+  type CustomerAddressDeletePayload {
+    deletedCustomerAddressId: String
+    customerUserErrors: [CustomerUserError!]!
+  }
+  type CustomerDefaultAddressUpdatePayload {
+    customer: Customer
+    customerUserErrors: [CustomerUserError!]!
   }
 
   enum OrderStatus {
@@ -812,6 +920,17 @@ export interface StorefrontApiAccounts {
   ): Promise<AccountLoginVerifyResult | 'too_many_requests'>;
   account(token: string): Promise<AccountJson | null>;
   signOut(token: string): Promise<void>;
+  /** The account's address book (ADR-946); null without a session. */
+  addresses(token: string): Promise<AccountAddress[] | null>;
+  /** Adds an address, or changes the one `id` names: the book now, or why not; null without one. */
+  saveAddress(
+    token: string,
+    address: AccountAddressRequest,
+    id?: string,
+  ): Promise<
+    { ok: true; addresses: AccountAddress[] } | ({ ok: false } & AccountErrorResponse) | null
+  >;
+  deleteAddress(token: string, id: string): Promise<AccountAddress[] | null>;
 }
 
 /** What a request of the Storefront API reads and changes. */
@@ -1294,8 +1413,61 @@ function orderOf(order: AccountOrderJson) {
   };
 }
 
+/** An address of the shopper's book, as Shopify's MailingAddress. */
+function mailingAddressOf(address: AccountAddress) {
+  const [firstName, ...rest] = address.name.trim().split(/\s+/);
+  const street = [address.address1, address.address2].filter(Boolean).join(', ');
+  return {
+    id: gid('MailingAddress', address.id),
+    name: address.name,
+    firstName: firstName || null,
+    lastName: rest.join(' ') || null,
+    phone: address.phone,
+    address1: address.address1,
+    address2: address.address2,
+    landmark: address.landmark,
+    city: address.city,
+    province: address.province,
+    provinceCode: address.provinceCode,
+    zip: address.zip,
+    country: 'Pakistan',
+    countryCodeV2: 'PK',
+    formatted: [
+      address.name,
+      street,
+      ...(address.landmark ? [address.landmark] : []),
+      [address.city, address.province, address.zip].filter(Boolean).join(' '),
+      'Pakistan',
+    ],
+  };
+}
+
+/** What a MailingAddressInput asks, as the core takes an address; `kept` fills what it leaves out. */
+function addressRequestOf(
+  input: Record<string, string | null | undefined>,
+  kept?: AccountAddress,
+): AccountAddressRequest | 'not_pakistan' {
+  const country = input.country?.trim().toLowerCase();
+  if (country && !['pakistan', 'pk', 'pak'].includes(country)) return 'not_pakistan';
+  const given = (key: string) => (input[key] === undefined ? undefined : (input[key] ?? null));
+  const keptName = kept?.name.trim().split(/\s+/) ?? [];
+  const first = given('firstName') ?? keptName[0] ?? '';
+  const last = given('lastName') ?? keptName.slice(1).join(' ');
+  return {
+    name: [first, last].filter(Boolean).join(' '),
+    phone: given('phone') ?? kept?.phone ?? '',
+    address1: given('address1') ?? kept?.address1 ?? '',
+    address2: given('address2') !== undefined ? given('address2') : (kept?.address2 ?? null),
+    landmark: given('landmark') !== undefined ? given('landmark') : (kept?.landmark ?? null),
+    city: given('city') ?? kept?.city ?? '',
+    province: given('province') !== undefined ? given('province') : (kept?.provinceCode ?? null),
+    zip: given('zip') !== undefined ? given('zip') : (kept?.zip ?? null),
+    ...(kept?.default && { default: true }),
+  };
+}
+
 /** The signed-in shopper's account, as Shopify's Customer. */
-function customerOf(account: AccountJson) {
+function customerOf(account: AccountJson, book: () => Promise<AccountAddress[]> = async () => []) {
   const [firstName, ...rest] = (account.name ?? '').trim().split(/\s+/);
   const orders = account.orders.map(orderOf);
   return {
@@ -1307,6 +1479,12 @@ function customerOf(account: AccountJson) {
     lastName: rest.join(' ') || null,
     storeCredit: money(account.storeCredit.balance, account.storeCredit.currency),
     orders: (args: { first?: number; after?: string }) => connection(orders, args),
+    addresses: async (args: { first?: number; after?: string }) =>
+      connection((await book()).map(mailingAddressOf), args),
+    defaultAddress: async () => {
+      const first = (await book()).find((address) => address.default);
+      return first ? mailingAddressOf(first) : null;
+    },
   };
 }
 
@@ -1402,13 +1580,109 @@ function rootOf(api: StorefrontApiShop) {
     return api.accounts;
   };
   const tooManyAsked = customerError([], 'Too many sign-ins: wait a minute', 'TOO_MANY_REQUESTS');
+  const unidentified = customerError(
+    ['customerAccessToken'],
+    "Sign in again: that access token is no one's",
+    'UNIDENTIFIED_CUSTOMER',
+  );
+  const noAddress = (field: string[]) =>
+    customerError(field, 'No such address in the book', 'NOT_FOUND');
+  /** The book of the shopper `token` signed in, read once however often it is asked for. */
+  const bookOf = (token: string) => {
+    let read: Promise<AccountAddress[]> | null = null;
+    return () =>
+      (read ??= accounts()
+        .addresses(token)
+        .then((book) => book ?? []));
+  };
+  type AddressInput = Record<string, string | null | undefined>;
+  /** An address added, or the one `id` names changed, as a mutation's payload. */
+  const savedAddress = async (token: string, input: AddressInput, id: string | null) => {
+    const none = { customerAddress: null };
+    const book = CUSTOMER_TOKEN.test(token) ? await accounts().addresses(token) : null;
+    if (!book) return { ...none, customerUserErrors: [unidentified] };
+    const wanted = id === null ? null : idOf('MailingAddress', id);
+    const kept = wanted ? book.find((address) => address.id === wanted) : undefined;
+    if (id !== null && !kept) return { ...none, customerUserErrors: [noAddress(['id'])] };
+    const request = addressRequestOf(input, kept);
+    if (request === 'not_pakistan') {
+      return {
+        ...none,
+        customerUserErrors: [
+          customerError(
+            ['address', 'country'],
+            'Only addresses in Pakistan are delivered to',
+            'INVALID',
+          ),
+        ],
+      };
+    }
+    const saved = await accounts().saveAddress(token, request, kept?.id);
+    if (!saved) return { ...none, customerUserErrors: [unidentified] };
+    if (!saved.ok) {
+      return {
+        ...none,
+        customerUserErrors: saved.errors.map((error) =>
+          customerError(['address', error.field], error.message, 'INVALID'),
+        ),
+      };
+    }
+    // The one added is the one the book did not have; the one changed keeps its ID.
+    const before = new Set(book.map((address) => address.id));
+    const address =
+      (kept && saved.addresses.find((each) => each.id === kept.id)) ??
+      saved.addresses.find((each) => !before.has(each.id)) ??
+      null;
+    return {
+      customerAddress: address && mailingAddressOf(address),
+      customerUserErrors: [],
+    };
+  };
 
   return {
     localization,
     customer: async (args: { customerAccessToken: string }) => {
       if (!CUSTOMER_TOKEN.test(args.customerAccessToken)) return null;
       const account = await accounts().account(args.customerAccessToken);
-      return account ? customerOf(account) : null;
+      return account ? customerOf(account, bookOf(args.customerAccessToken)) : null;
+    },
+    customerAddressCreate: (args: { customerAccessToken: string; address: AddressInput }) =>
+      savedAddress(args.customerAccessToken, args.address, null),
+    customerAddressUpdate: (args: {
+      customerAccessToken: string;
+      id: string;
+      address: AddressInput;
+    }) => savedAddress(args.customerAccessToken, args.address, args.id),
+    customerAddressDelete: async (args: { customerAccessToken: string; id: string }) => {
+      const id = idOf('MailingAddress', args.id);
+      const book = CUSTOMER_TOKEN.test(args.customerAccessToken)
+        ? await accounts().addresses(args.customerAccessToken)
+        : null;
+      if (!book) return { deletedCustomerAddressId: null, customerUserErrors: [unidentified] };
+      if (!id || !book.some((address) => address.id === id)) {
+        return { deletedCustomerAddressId: null, customerUserErrors: [noAddress(['id'])] };
+      }
+      await accounts().deleteAddress(args.customerAccessToken, id);
+      return { deletedCustomerAddressId: args.id, customerUserErrors: [] };
+    },
+    customerDefaultAddressUpdate: async (args: {
+      customerAccessToken: string;
+      addressId: string;
+    }) => {
+      const token = args.customerAccessToken;
+      const id = idOf('MailingAddress', args.addressId);
+      const book = CUSTOMER_TOKEN.test(token) ? await accounts().addresses(token) : null;
+      if (!book) return { customer: null, customerUserErrors: [unidentified] };
+      const kept = book.find((address) => address.id === id);
+      if (!kept) return { customer: null, customerUserErrors: [noAddress(['addressId'])] };
+      const request = addressRequestOf({}, kept);
+      if (request === 'not_pakistan') return { customer: null, customerUserErrors: [] };
+      await accounts().saveAddress(token, { ...request, default: true }, kept.id);
+      const account = await accounts().account(token);
+      return {
+        customer: account ? customerOf(account, bookOf(token)) : null,
+        customerUserErrors: account ? [] : [unidentified],
+      };
     },
     customerLoginCodeSend: async (args: { phone: string; channel?: 'WHATSAPP' | 'SMS' | null }) => {
       const channel = args.channel === 'SMS' ? 'sms' : 'whatsapp';
