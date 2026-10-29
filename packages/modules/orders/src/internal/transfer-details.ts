@@ -2,7 +2,7 @@ import { html, ltr, say, text, type Html, type HtmlValue, type Words } from '@ha
 import { formatMoney, money } from '@hatti/money';
 import { formatIban, parsePkMobile } from '@hatti/pk';
 import type { OrderRecord } from './records.js';
-import { orderName, transferOwed } from './rules.js';
+import { orderName, termsOwed, transferOwed } from './rules.js';
 
 const WORDS = {
   payByTransfer: { en: 'Pay by bank transfer', ur: 'بینک ٹرانسفر سے ادائیگی' },
@@ -29,7 +29,7 @@ function nationalOf(e164: string): string {
  * total; a cash-on-delivery order, its advance.
  */
 function owedOf(order: OrderRecord): string {
-  return formatMoney(money(transferOwed(order), order.currency));
+  return formatMoney(money(transferOwed(order) || (termsOwed(order)?.owed ?? 0n), order.currency));
 }
 
 /**
@@ -79,11 +79,13 @@ export function transferWords(order: OrderRecord, shopName: string): { en: strin
  * reference, and what the shop says besides. The IBAN is grouped in fours, and it and the Raast
  * ID are selected whole with a tap, to copy. Only while the order waits for the money: not while
  * it is held for review, which may cancel it, nor once paid or cancelled; and nothing for an order
- * whose shop gave no account.
+ * whose shop gave no account. An order on payment terms (ADR-888), which waits for nothing, shows
+ * it while something is owed (ADR-920).
  */
 export function transferDetails(order: OrderRecord): Html {
   const account = order.bankAccount;
-  if (!account || order.stage !== 'awaiting_payment') return html``;
+  const onTerms = order.stage !== 'cancelled' && (termsOwed(order)?.owed ?? 0n) > 0n;
+  if (!account || (order.stage !== 'awaiting_payment' && !onTerms)) return html``;
   const row = (label: Words, value: HtmlValue, className = 'num') =>
     html`<tr>
       <td>${say('bilingual', label)}</td>

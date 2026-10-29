@@ -56,7 +56,7 @@ import type {
   FulfillmentRecord,
   OrderRecord,
 } from './records.js';
-import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
+import { addressChangeable, awaitsCustomer, itemName, orderName, termsOwed } from './rules.js';
 import {
   RETURN_PREFERENCES,
   RETURN_REASONS,
@@ -866,6 +866,17 @@ function statusPage(
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
+  // What an order on payment terms owes, by transfer, and by when (ADR-920).
+  const owing = order.stage === 'cancelled' ? null : termsOwed(order);
+  const onTerms = owing &&
+    owing.owed > 0n && [
+      paragraphs(
+        paymentTermsWords(order, owing.owed, owing.overdue, shop.timezone),
+        owing.overdue ? 'center error' : 'center strong',
+      ),
+      transferDetails(order),
+      receiptForm(receipts),
+    ];
   const pay =
     shown.due > 0n &&
     paragraphs(
@@ -901,6 +912,7 @@ function statusPage(
         heading(title),
         paragraphs(sentence, 'center'),
         order.splitFrom && paragraphs(partWords(order.splitFrom), 'center small muted'),
+        ...(onTerms || []),
         ...rest,
         // The customer's store credit, which pays their next order at checkout (ADR-596).
         storeCredit > 0n &&
@@ -1871,6 +1883,36 @@ function expectedByWords(day: string): Words {
     month: 'long',
   }).format(new Date(`${day}T00:00:00Z`));
   return { en: `Expected by ${words}`, ur: `${words} تک پہنچنے کی توقع` };
+}
+
+/**
+ * What an order on payment terms owes (ADR-888, ADR-920), as its page says it: what to pay by
+ * transfer and by which day, in the shop's time zone; or, past it, that it was due.
+ */
+function paymentTermsWords(
+  order: OrderRecord,
+  owed: bigint,
+  overdue: boolean,
+  timezone: string,
+): Sentence {
+  const due = amount(owed, order.currency);
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(order.paymentDueAt!);
+  const days = order.paymentTermsDays ?? 0;
+  return overdue
+    ? {
+        en: `${due} was due by ${day}. Please pay it by bank transfer now.`,
+        ur: html`${ltr(due)} کی ادائیگی ${day} تک واجب تھی۔ براہ کرم ابھی بینک ٹرانسفر سے ادا کریں۔`,
+      }
+    : {
+        en: `Your order is on ${days} days' terms: pay ${due} by bank transfer by ${day}.`,
+        ur: html`آپ کا آرڈر ${ltr(String(days))} دن کی مہلت پر ہے: ${ltr(due)} ${day} تک بینک
+        ٹرانسفر سے ادا کریں۔`,
+      };
 }
 
 /** The time chosen to have it delivered in, in Pakistan's time (ADR-770). */

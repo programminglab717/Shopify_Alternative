@@ -171,6 +171,57 @@ describe.skipIf(!server)('Receipts of transfers', () => {
     expect(rows).toEqual([]);
   });
 
+  it('shows an order on terms what it owes and by when, and takes its receipts once shipped (ADR-920)', async () => {
+    const order = await f.order(f.a, [kurta], {
+      paymentMethod: 'bank_transfer',
+      paymentTermsDays: 30,
+    });
+    expect(order.stage).toBe('to_pack');
+    const token = unwrap(await f.links.createLink(f.a, order.id)).url.split('/o/')[1]!;
+    const pageOf = async () => {
+      const view = await f.links.viewLink(token);
+      return orderLinkPage(shown(view)).html.replaceAll('&#39;', "'");
+    };
+    const day = (at: Date) =>
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Karachi',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(at);
+    const owing = await pageOf();
+    expect(owing).toContain(
+      `Your order is on 30 days' terms: pay Rs 2,000 by bank transfer by ${day(order.paymentDueAt!)}.`,
+    );
+    expect(owing).toContain('PK36 SCBL 0000 0011 2345 6702');
+    expect(owing).toContain('enctype="multipart/form-data"');
+    // Shipped or not, its receipt is taken while it owes something.
+    const sent = shown(await f.links.sendReceipt(token, { data: pdf }));
+    expect(sent).toMatchObject({ problem: null, receipts: 1 });
+
+    // Past its day, the page says it was due.
+    const past = new Date(Date.now() - 2 * 86_400_000);
+    await f.admin.query('UPDATE orders.orders SET payment_due_at = $1 WHERE id = $2', [
+      past,
+      order.id,
+    ]);
+    const overdue = await pageOf();
+    expect(overdue).toContain(
+      `Rs 2,000 was due by ${day(past)}. Please pay it by bank transfer now.`,
+    );
+    expect(overdue).toContain('class="text center error"');
+
+    // Paid, it owes nothing: no terms, no account, no receipts.
+    unwrap(await f.orders.markAsPaid(f.a, order.id));
+    const paid = await pageOf();
+    expect(paid).not.toContain("days' terms");
+    expect(paid).not.toContain('PK36 SCBL');
+    expect(shown(await f.links.sendReceipt(token, { data: pdf })).problem).toEqual({
+      kind: 'too_late',
+      action: 'receipt',
+    });
+  });
+
   it('counts the transfers to check, those with receipts, and finds them', async () => {
     const sent = await transferOrder();
     const waiting = await transferOrder();

@@ -9,7 +9,7 @@ import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import type { LinkProblem } from './links.js';
 import { addTimelineEntry } from './order-store.js';
 import type { RefundReceiptRecord } from './records.js';
-import { awaitsTransfer, orderName } from './rules.js';
+import { awaitsTransfer, orderName, termsOwed } from './rules.js';
 import { transferReceipts, type OrderRow } from './schema.js';
 
 /** What a receipt may weigh, and how many an order takes. */
@@ -197,7 +197,9 @@ export class TransferReceiptService {
     order: OrderRow,
     stored: StoredReceipt | LinkProblem,
   ): Promise<LinkProblem | null> {
-    if (order.status !== 'open' || !awaitsTransfer(order)) {
+    // An order on payment terms takes receipts while it owes something, shipped or not (ADR-920).
+    const onTerms = (termsOwed(order)?.owed ?? 0n) > 0n;
+    if (!onTerms && (order.status !== 'open' || !awaitsTransfer(order))) {
       return { kind: 'too_late', action: 'receipt' };
     }
     if ('kind' in stored) return stored;
