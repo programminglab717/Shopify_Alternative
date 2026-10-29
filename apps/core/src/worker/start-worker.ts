@@ -577,6 +577,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
                 ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
               }),
               new AiCreditsService(database),
+              // Voice notes heard by Hatti's speech-to-text, where it has one (ADR-940).
+              config.SPEECH_TO_TEXT_URL
+                ? new SpeechToText({
+                    url: config.SPEECH_TO_TEXT_URL,
+                    ...(config.SPEECH_TO_TEXT_KEY && { apiKey: config.SPEECH_TO_TEXT_KEY }),
+                    ...(config.SPEECH_TO_TEXT_MODEL && { model: config.SPEECH_TO_TEXT_MODEL }),
+                  })
+                : null,
             ),
           }),
         // Receipts read by the AI as they arrive, where the shop has them so (ADR-915).

@@ -356,4 +356,82 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
     expect(rows).toEqual([{ outcome: 'refused' }]);
     credits.left = 10;
   });
+
+  it('hears a voice note and answers its words, and hands a picture to staff (ADR-940)', async () => {
+    const heard: string[] = [];
+    // Sent on WhatsApp as the shop's, which this test's shop has no number for: what was sent.
+    const said: { conversationId: string; body: string }[] = [];
+    const listening = new AiCustomerReplies(
+      database,
+      agent,
+      {
+        reply: async (_tenant, conversationId, body) => {
+          said.push({ conversationId, body });
+          return { ok: true, value: {} } as never;
+        },
+        mediaOf: async (_shop: string, _via: string | null, mediaId: string) => {
+          heard.push(mediaId);
+          return { ok: true as const, data: Buffer.from('OggS'), mediaType: 'audio/ogg' };
+        },
+      },
+      gateway,
+      credits,
+      { transcribe: async () => ({ ok: true as const, text: 'mera kurta kab tak aaye ga?' }) },
+    );
+    /** A message without words from a customer on WhatsApp: its event. */
+    const sent = async (kind: string, phone: string) => {
+      const conversationId = newId();
+      const messageId = newId();
+      await admin.query(
+        `INSERT INTO messaging.conversations (shop_id, id, customer_phone, last_message_at)
+         VALUES ($1, $2, $3, now())`,
+        [owner.shopId, conversationId, phone],
+      );
+      await admin.query(
+        `INSERT INTO messaging.conversation_messages
+                (shop_id, id, conversation_id, direction, media_kind, media_id, at)
+         VALUES ($1, $2, $3, 'inbound', $4, $5, now())`,
+        [owner.shopId, messageId, conversationId, kind, `media-${kind}`],
+      );
+      return {
+        conversationId,
+        messageId,
+        event: {
+          id: newId(),
+          type: MessagingEvents.ConversationMessageReceived,
+          shopId: owner.shopId,
+          aggregateType: 'conversation',
+          aggregateId: conversationId,
+          payload: { messageId, at: new Date().toISOString(), startedWaiting: true },
+        } as unknown as DomainEvent,
+      };
+    };
+    answer = { reply: 'Ji, aap ka kurta kal pohanch jaye ga.', hand_off: false };
+    const voice = await sent('audio', '+923005556690');
+    const spent = credits.spent.length;
+    expect(await listening.handle(voice.event)).toBe('replied');
+    expect(heard).toEqual(['media-audio']);
+    // Answered as its words, which staff can read.
+    expect(prompts.at(-1)).toContain('mera kurta kab tak aaye ga?');
+    expect(said).toEqual([
+      { conversationId: voice.conversationId, body: 'Ji, aap ka kurta kal pohanch jaye ga.' },
+    ]);
+    const { rows } = await admin.query<{ transcript: string }>(
+      'SELECT transcript FROM messaging.conversation_messages WHERE id = $1',
+      [voice.messageId],
+    );
+    expect(rows).toEqual([{ transcript: 'mera kurta kab tak aaye ga?' }]);
+    expect(credits.spent.length).toBe(spent + 1);
+
+    // A picture: staff's, the AI asked nothing and nothing spent.
+    const asked = prompts.length;
+    const picture = await sent('image', '+923005556691');
+    expect(await listening.handle(picture.event)).toBe('handed_off');
+    expect(prompts.length).toBe(asked);
+    expect(said).toHaveLength(1);
+    expect(credits.spent.length).toBe(spent + 1);
+    // Without speech-to-text, a voice note is staff's too.
+    const unheard = await sent('audio', '+923005556692');
+    expect(await replies.handle(unheard.event)).toBe('handed_off');
+  });
 });

@@ -58,8 +58,18 @@ export interface SupportAgentTask {
   channel: 'whatsapp' | 'web';
   /** E.164: the customer's number, verified by WhatsApp; typed by the shopper in a web chat. */
   customerPhone: string;
-  /** The conversation's latest messages with words, oldest first. */
+  /**
+   * The conversation's latest messages with words, oldest first: a voice note as it was heard,
+   * where it was (ADR-940).
+   */
   history: { from: 'customer' | 'shop'; text: string }[];
+  /**
+   * The message to answer is a voice note without words (ADR-940): where WhatsApp keeps it, to
+   * be heard before it is answered.
+   */
+  listen?: { mediaId: string; viaPhoneNumberId: string | null };
+  /** The message to answer is a picture, a video or a file without words: staff's to see. */
+  unreadable?: string;
   /** The shop's answers to common questions (ADR-911). */
   faqs: SupportFaq[];
   /** Its assistant's name and tone (ADR-923). */
@@ -70,6 +80,7 @@ type ConversationRow = {
   channel: 'whatsapp' | 'web';
   customer_phone: string;
   assignee_id: string | null;
+  via_phone_number_id: string | null;
 };
 
 type HistoryRow = {
@@ -80,6 +91,8 @@ type HistoryRow = {
   at: Date | string;
   cart: boolean;
   media_kind: string | null;
+  media_id: string | null;
+  transcript: string | null;
 };
 
 async function answeredSince(tx: Tx, shopId: string, since: Date): Promise<number> {
@@ -231,7 +244,8 @@ export class SupportAgentService {
       const since = new Date(now.getTime() - SUPPORT_AGENT_QUIET_MS);
       if ((await answeredSince(tx, shopId, since)) >= SUPPORT_AGENT_DAILY) return null;
       const { rows: conversations } = await tx.execute<ConversationRow>(sql`
-        SELECT channel, customer_phone, assignee_id FROM messaging.conversations
+        SELECT channel, customer_phone, assignee_id, via_phone_number_id
+          FROM messaging.conversations
          WHERE shop_id = ${shopId} AND id = ${conversationId}`);
       const conversation = conversations[0];
       if (!conversation || conversation.assignee_id !== null) return null;
@@ -242,7 +256,8 @@ export class SupportAgentService {
          WHERE shop_id = ${shopId} AND conversation_id = ${conversationId}`);
       if (asked[0]?.handed || asked[0]?.answered) return null;
       const { rows } = await tx.execute<HistoryRow>(sql`
-        SELECT id, direction, body, actor_kind, at, cart IS NOT NULL AS cart, media_kind
+        SELECT id, direction, body, actor_kind, at, cart IS NOT NULL AS cart, media_kind,
+               media_id, transcript
           FROM messaging.conversation_messages
          WHERE shop_id = ${shopId} AND conversation_id = ${conversationId}
          ORDER BY at DESC, id DESC
@@ -263,18 +278,26 @@ export class SupportAgentService {
         return null;
       }
       const history = rows
-        .filter((row) => row.body)
+        .filter((row) => row.body ?? row.transcript)
         .reverse()
         .map((row) => ({
           from: row.direction === 'inbound' ? ('customer' as const) : ('shop' as const),
-          text: row.body!,
+          text: (row.body ?? row.transcript)!,
         }));
+      // Without words, a voice note is heard first, and anything else is staff's (ADR-940).
+      const wordless = !latest.body && !latest.transcript && latest.media_kind;
+      const listen =
+        wordless && latest.media_kind === 'audio' && latest.media_id
+          ? { mediaId: latest.media_id, viaPhoneNumberId: conversation.via_phone_number_id }
+          : null;
       return {
         conversationId,
         messageId,
         channel: conversation.channel,
         customerPhone: conversation.customer_phone,
         history,
+        ...(listen && { listen }),
+        ...(wordless && !listen && { unreadable: latest.media_kind! }),
         faqs: await faqsIn(tx, shopId),
         voice: await voiceIn(tx, shopId),
       };

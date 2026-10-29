@@ -1,4 +1,4 @@
-import { draftSupportReply, type AiGateway } from '@hatti/ai';
+import { SPEECH_LIMITS, draftSupportReply, type AiGateway, type SpeechToText } from '@hatti/ai';
 import { shopProfile, type AiCredits, type TenantContext } from '@hatti/api';
 import { askedProductsIn } from '@hatti/catalog/public';
 import type { Database, Tx } from '@hatti/db';
@@ -6,6 +6,7 @@ import type { DomainEvent } from '@hatti/events';
 import { sellableIn } from '@hatti/inventory/public';
 import {
   MessagingEvents,
+  keepTranscriptIn,
   type ConversationMessageReceivedPayload,
   type ConversationsService,
   type SupportAgentOutcome,
@@ -55,7 +56,9 @@ export function orderNumbersIn(history: SupportAgentTask['history']): number[] {
  * left. On WhatsApp the customer is the number WhatsApp verified, so their latest orders are
  * given; in the web chat the number was typed, so only orders they name by number, placed from it.
  * The reply is sent as the shop's, marked as the AI's; handed to staff, the conversation waits for
- * them. Each reply spends a credit; what came of each message is kept.
+ * them. Each reply spends a credit; what came of each message is kept. A voice note is heard by
+ * Hatti's speech-to-text and answered as its words, kept for staff to read; a picture, a video or
+ * a file without words is handed to staff, the AI asked nothing (ADR-940).
  */
 export class AiCustomerReplies {
   /** The events {@link handle} reads. */
@@ -64,9 +67,11 @@ export class AiCustomerReplies {
   constructor(
     private readonly database: Database,
     private readonly agent: SupportAgentService,
-    private readonly conversations: Pick<ConversationsService, 'reply'>,
+    private readonly conversations: Pick<ConversationsService, 'reply' | 'mediaOf'>,
     private readonly ai: AiGateway,
     private readonly credits: AiCredits | null,
+    /** Hatti's speech-to-text, where it has one: without it, voice notes are staff's. */
+    private readonly speech: Pick<SpeechToText, 'transcribe'> | null = null,
   ) {}
 
   /** What came of the message the event names; null where it was not the AI's to answer. */
@@ -76,10 +81,17 @@ export class AiCustomerReplies {
     if (!written.messageId) return null;
     const task = await this.agent.taskOf(shopId, conversationId, written.messageId, now);
     if (!task) return null;
+    // Nothing to read in it: staff's to see (ADR-940).
+    if (task.unreadable) return this.#handOff(shopId, task, now);
     const balance = await this.credits?.balanceOf(shopId, now);
     if (balance && balance.left <= 0) {
       await this.agent.record(shopId, task, 'refused', undefined, now);
       return 'refused';
+    }
+    if (task.listen) {
+      const heard = await this.#heard(shopId, task.messageId, task.listen);
+      if (!heard) return this.#handOff(shopId, task, now);
+      task.history.push({ from: 'customer', text: heard });
     }
     const { name, facts } = await this.database.tenant(shopId, async (tx) => {
       const profile = await shopProfile(tx, shopId);
@@ -115,6 +127,36 @@ export class AiCustomerReplies {
     await this.agent.record(shopId, task, outcome, usage, now);
     await this.credits?.spend(shopId, 'support_reply', now);
     return outcome;
+  }
+
+  /** Handed to staff without a word from the AI: nothing was spent. */
+  async #handOff(shopId: string, task: SupportAgentTask, now: Date): Promise<SupportAgentOutcome> {
+    await this.agent.handOff(shopId, task.conversationId, now);
+    await this.agent.record(shopId, task, 'handed_off', undefined, now);
+    return 'handed_off';
+  }
+
+  /**
+   * What the voice note said, heard as voice orders hear theirs (ADR-871), in Urdu, and kept for
+   * staff to read; null where it could not be fetched or heard, or said nothing.
+   */
+  async #heard(
+    shopId: string,
+    messageId: string,
+    listen: NonNullable<SupportAgentTask['listen']>,
+  ): Promise<string | null> {
+    if (!this.speech) return null;
+    const audio = await this.conversations.mediaOf(
+      shopId,
+      listen.viaPhoneNumberId,
+      listen.mediaId,
+      SPEECH_LIMITS.bytes,
+    );
+    if (!audio.ok) return null;
+    const heard = await this.speech.transcribe(audio.data, audio.mediaType, 'ur');
+    if (!heard.ok || !heard.text.trim()) return null;
+    await this.database.tenant(shopId, (tx) => keepTranscriptIn(tx, shopId, messageId, heard.text));
+    return heard.text;
   }
 }
 
