@@ -90,6 +90,10 @@ describe.skipIf(!server)(
       return body.accessToken;
     }
 
+    /** The shop's one owner, signed in once for every test. */
+    let owner: Promise<string> | null = null;
+    const theOwner = () => (owner ??= account('owner'));
+
     async function gql(token: string, query: string, variables?: object) {
       const response = await api.app.inject({
         method: 'POST',
@@ -139,7 +143,7 @@ describe.skipIf(!server)(
     });
 
     it('runs the functions the shop turned on, with their settings, and keeps what failed', async () => {
-      const owner = await account('owner');
+      const owner = await theOwner();
       const made = await data(
         owner,
         `mutation ($input: CustomAppInput!) {
@@ -241,6 +245,92 @@ describe.skipIf(!server)(
         (each: Json) => each.handle === 'cod-guard',
       );
       expect(stuck.lastError).toBe('It ran past 50 ms');
+    });
+
+    it("gives a function's input made from one of the shop's orders, its settings with it (ADR-950)", async () => {
+      const owner = await theOwner();
+      const made = await data(
+        owner,
+        `mutation ($input: CustomAppInput!) {
+        customAppCreate(input: $input) { accessToken userErrors { message } } }`,
+        { input: { name: 'Order tester', scopes: ['write_settings', 'read_orders'] } },
+      );
+      const app = made.accessToken as string;
+      const echo = await data(app, SET, {
+        input: {
+          handle: 'tried',
+          title: 'Tried',
+          target: 'cart_validation',
+          wasm: base64(echoing()),
+        },
+      });
+      await data(owner, ENABLE, {
+        id: echo.appFunction.id,
+        enabled: false,
+        configuration: '{"maxQuantity":3}',
+      });
+      const created = await data(
+        owner,
+        `mutation { productCreate(input: { title: "Kurta", status: ACTIVE,
+            variants: [{ price: "2,499", sku: "KUR-1" }] }) { product { id variants { id } } } }`,
+      );
+      const placed = await data(
+        owner,
+        `mutation ($variantId: ID!) {
+          orderCreate(input: {
+            lineItems: [{ variantId: $variantId, quantity: 2 }],
+            shippingAddress: { name: "Ayesha Khan", phone: "0300 1234567",
+                               address1: "House 12, Street 4", city: "Lahore" },
+            paymentMethod: CASH_ON_DELIVERY
+          }) { order { id } userErrors { message } } }`,
+        { variantId: created.product.variants[0].id },
+      );
+      const INPUT_OF = `query ($orderId: ID!, $handle: String) {
+        appFunctionInput(orderId: $orderId, handle: $handle) }`;
+      const text = await data(app, INPUT_OF, { orderId: placed.order.id, handle: 'tried' });
+      const input = JSON.parse(text);
+      expect(input).toEqual({
+        cart: {
+          subtotal: 499800,
+          currency: 'PKR',
+          lines: [
+            {
+              variantId: expect.any(String),
+              productId: expect.any(String),
+              title: 'Kurta',
+              variantTitle: expect.any(String),
+              sku: 'KUR-1',
+              quantity: 2,
+              price: 249900,
+            },
+          ],
+        },
+        deliveryAddress: { city: 'Lahore', province: expect.any(String) },
+        paymentMethods: ['cash_on_delivery', 'bank_transfer', 'online'],
+        configuration: { maxQuantity: 3 },
+      });
+      // No name, number or street of the customer's.
+      expect(text).not.toMatch(/Ayesha|0300|House 12/);
+      // Run as checkout runs it, it reads what it was given.
+      const ran = await runner.run('tried', echoing(), input);
+      expect(ran.ok && ran.output).toEqual(input);
+      // Another app's handle, or staff asking, has no settings; no such order is none.
+      expect(
+        JSON.parse(await data(owner, INPUT_OF, { orderId: placed.order.id, handle: 'tried' }))
+          .configuration,
+      ).toEqual({});
+      expect(
+        await data(app, INPUT_OF, { orderId: toPublicId('order', newId()), handle: 'tried' }),
+      ).toBeNull();
+      // An app without read_orders reads none.
+      const blind = await data(
+        owner,
+        `mutation ($input: CustomAppInput!) {
+        customAppCreate(input: $input) { accessToken userErrors { message } } }`,
+        { input: { name: 'Blind', scopes: ['write_settings'] } },
+      );
+      const refused = await gql(blind.accessToken, INPUT_OF, { orderId: placed.order.id });
+      expect(refused.errors?.[0].extensions.code).toBe('ACCESS_DENIED');
     });
   },
 );

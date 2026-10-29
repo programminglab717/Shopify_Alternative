@@ -204,6 +204,51 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
     expect(lines.at(-1)).toBe(`! ${join(dir, 'input.json')} is not JSON`);
   });
 
+  it("runs it on one of the shop's orders, as checkout would give it, and saves the input (ADR-950)", async () => {
+    const input = {
+      cart: { subtotal: 500000, currency: 'PKR', lines: [] },
+      deliveryAddress: { city: 'Lahore', province: 'PB' },
+      paymentMethods: ['cash_on_delivery', 'bank_transfer', 'online'],
+      configuration: { limit: 300000 },
+    };
+    const asked: Asked[] = [];
+    const fetch = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as Asked;
+      asked.push(body);
+      const known = body.variables.orderId === 'ord_1';
+      return new Response(
+        JSON.stringify({ data: { appFunctionInput: known ? JSON.stringify(input) : null } }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as unknown as typeof globalThis.fetch;
+    const client = new HattiAdminClient({
+      apiUrl: 'https://api.hatti.test',
+      accessToken: 'hat_x',
+      fetch,
+    });
+    await configure({ ...CONFIG, build: builds(wasm()) });
+    const saved = join(dir, 'order.json');
+    expect(
+      await run(
+        ['function', 'run', '--dir', dir, '--order', 'ord_1', '--save', saved],
+        {},
+        out,
+        client,
+      ),
+    ).toBe(0);
+    // The function's own settings asked for by its handle; the answer its input, echoed.
+    expect(asked[0]!.variables).toEqual({ orderId: 'ord_1', handle: 'cod-above-limit' });
+    expect(JSON.parse(await readFile(saved, 'utf8'))).toEqual(input);
+    expect(JSON.parse(lines.at(-2)!)).toEqual(input);
+    // No such order, or no token to ask with, it says.
+    expect(await run(['function', 'run', '--dir', dir, '--order', 'ord_9'], {}, out, client)).toBe(
+      1,
+    );
+    expect(lines.at(-1)).toBe('! The shop has no order ord_9');
+    expect(await run(['function', 'run', '--dir', dir, '--order', 'ord_1'], {}, out)).toBe(1);
+    expect(lines.at(-1)).toBe('! Set HATTI_ACCESS_TOKEN to read the order: read_orders');
+  });
+
   it('begins a function of each target from its starter, which answers its sample cart (ADR-935)', async () => {
     /** The starter run as Javy runs it, its input on standard input: what it wrote. */
     const ran = (code: string, input: unknown) => {

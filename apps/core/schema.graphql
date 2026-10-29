@@ -16955,6 +16955,11 @@ type Query {
   """
   appEmbeds: [AppEmbed!]!
 
+  """
+  A checkout function's input, as JSON, made from the order: its lines, subtotal, city and province, every way to pay checkout may offer, and the settings of the calling app’s function `handle` where named (ADR-950). Null for no such order. Nothing of the customer's but their city and province.
+  """
+  appFunctionInput(handle: String, orderId: ID!): String
+
   """The calling app's functions; for staff, every app's the shop has."""
   appFunctions: [AppFunction!]!
   appPurchaseOneTime(id: ID!): AppPurchaseOneTime

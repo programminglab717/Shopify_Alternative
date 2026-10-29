@@ -107,6 +107,7 @@ export HATTI_ACCESS_TOKEN=…   # the app's token, with write_settings
 
 hatti function build    # run its build, and check its module as Hatti will
 hatti function run --input cart.json   # build it, then run it on that input as checkout does
+hatti function run --order <id> --save order.json   # or on one of the shop's orders (read_orders)
 hatti function deploy   # build it, then give it to the shop as the app's new version
 hatti function list     # the app's functions in the shop, on or off, and their last failure
 ```
@@ -114,7 +115,11 @@ hatti function list     # the app's functions in the shop, on or off, and their 
 `build` is the developer's own tool: Javy, TinyGo or Rust's `wasm32-wasi`. A new version runs as
 the last did; a function the shop hasn't turned on stays off (ADR-922). `build` and `run` need no
 token: they check and run the module with Hatti's own code, its memory capped and its time limited
-to 50 ms as at checkout, and `run` prints its answer and how long it took (ADR-927).
+to 50 ms as at checkout, and `run` prints its answer and how long it took (ADR-927). With `--order`
+it runs on one of the shop's own orders instead, made into the input checkout would give it
+(ADR-950): its lines, subtotal, city and province, every way to pay checkout may offer, and the
+function's settings in the shop; `--save` keeps that input to edit and run again. No name, number
+or street of the customer's is in it.
 
 ## Shoppers' accounts on the Storefront API
 

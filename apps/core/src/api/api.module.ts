@@ -75,6 +75,7 @@ import { ThemeStoreResolver } from './theme-store.resolver.js';
 import { AppChargeResolver } from './app-charges.resolver.js';
 import { ExpansionCopier } from '../expansion-copier.js';
 import { ExpansionStoreResolver } from './expansion-stores.resolver.js';
+import { FunctionInputsResolver } from './function-inputs.resolver.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
@@ -432,6 +433,7 @@ export class ApiModule {
         AppChargeResolver,
         ExpansionStoreResolver,
         ExpansionCopier,
+        FunctionInputsResolver,
         FileUsesResolver,
         PaymentLinkOrdersResolver,
         OrderAssignmentResolver,

@@ -438,6 +438,29 @@ export async function deployFunction(
   return appFunction;
 }
 
+const ORDER_INPUT = /* GraphQL */ `
+  query AppFunctionInput($orderId: ID!, $handle: String) {
+    appFunctionInput(orderId: $orderId, handle: $handle)
+  }
+`;
+
+/**
+ * The input checkout would give the function `handle` for one of the shop's orders (ADR-950): its
+ * lines, subtotal, city and province, every way to pay, and the function's settings in the shop.
+ */
+export async function orderInput(
+  client: HattiAdminClient,
+  orderId: string,
+  handle: string,
+): Promise<unknown> {
+  const { data } = await client.request<{ appFunctionInput: string | null }>(ORDER_INPUT, {
+    orderId,
+    handle,
+  });
+  if (!data.appFunctionInput) throw new FunctionError(`The shop has no order ${orderId}`);
+  return JSON.parse(data.appFunctionInput) as unknown;
+}
+
 /** The calling app's functions in the shop. */
 export async function listFunctions(client: HattiAdminClient): Promise<FunctionSummary[]> {
   const { data } = await client.request<{ appFunctions: FunctionSummary[] }>(FUNCTIONS, {});

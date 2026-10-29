@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { watch } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { HattiAdminApiError, HattiAdminClient } from '@hatti/admin-client';
@@ -15,6 +15,7 @@ import {
   functionConfigIn,
   initFunction,
   listFunctions,
+  orderInput,
   runFunction,
 } from './function.js';
 import {
@@ -45,6 +46,7 @@ Function commands, for the function ${FUNCTION_CONFIG} describes:
        [--lang <l>]            in ${LANGUAGES.join(' or ')}, javascript unless given
   build                        Run its build, and check its module as Hatti will
   run --input <file.json>      Build it, then run it on that input as checkout runs it
+      --order <id> [--save f]  ...or on one of the shop's orders, as checkout would give it
   deploy                       Build it, then give it to the shop as the app's new version
   list                         The app's functions in the shop, and whether each is on
 
@@ -76,6 +78,8 @@ export async function run(
       'allow-live': { type: 'boolean' },
       'no-build': { type: 'boolean' },
       input: { type: 'string' },
+      order: { type: 'string' },
+      save: { type: 'string' },
       target: { type: 'string' },
       lang: { type: 'string' },
       title: { type: 'string' },
@@ -127,23 +131,27 @@ export async function run(
         out.log(`Built ${config.handle}: ${config.module}, ${module.length} bytes`);
         return 0;
       }
+      // Made from one of the shop's orders, with its token (ADR-950); else from a file.
+      if (typeof values.order === 'string') {
+        const api = client ?? clientOf(env);
+        if (!api) throw new FunctionError('Set HATTI_ACCESS_TOKEN to read the order: read_orders');
+        const input = await orderInput(api, values.order, config.handle);
+        if (typeof values.save === 'string') {
+          await writeFile(resolve(values.save), `${JSON.stringify(input, null, 2)}\n`);
+          out.log(`Saved the order's input to ${values.save}`);
+        }
+        return await runOn(module, input, out);
+      }
       return await runLocally(module, typeof values.input === 'string' ? values.input : null, out);
     } catch (error) {
-      if (error instanceof FunctionError) {
+      if (error instanceof FunctionError || error instanceof HattiAdminApiError) {
         out.error(error.message);
         return 1;
       }
       throw error;
     }
   }
-  const api =
-    client ??
-    (env.HATTI_ACCESS_TOKEN
-      ? new HattiAdminClient({
-          apiUrl: env.HATTI_API_URL ?? 'https://api.hatti.pk',
-          accessToken: env.HATTI_ACCESS_TOKEN,
-        })
-      : null);
+  const api = client ?? clientOf(env);
   if (!api) {
     out.error(
       `Set HATTI_ACCESS_TOKEN to a custom app token of the shop, with ${area === 'theme' ? 'write_themes' : 'write_settings'}.`,
@@ -213,6 +221,15 @@ async function runLocally(
   } catch {
     throw new FunctionError(`${inputPath} is not JSON`);
   }
+  return runOn(module, input, out);
+}
+
+/** The module run on `input`, its answer printed with how long it took: its exit code. */
+async function runOn(
+  module: Uint8Array,
+  input: unknown,
+  out: { log: (line: string) => void; error: (line: string) => void },
+): Promise<number> {
   const result = await runFunction(module, input);
   const took = `${result.ms.toFixed(1)} ms of the ${RUN_LIMITS.timeMs} ms Hatti allows`;
   if (!result.ok) {
@@ -223,6 +240,16 @@ async function runLocally(
   out.log(JSON.stringify(result.output, null, 2));
   out.log(`Ran in ${took}`);
   return 0;
+}
+
+/** The Admin API's client, with the token the environment gives; null without one. */
+function clientOf(env: Readonly<Record<string, string | undefined>>): HattiAdminClient | null {
+  return env.HATTI_ACCESS_TOKEN
+    ? new HattiAdminClient({
+        apiUrl: env.HATTI_API_URL ?? 'https://api.hatti.pk',
+        accessToken: env.HATTI_ACCESS_TOKEN,
+      })
+    : null;
 }
 
 /** `hatti function deploy` or `list`, through the API: its exit code. */
