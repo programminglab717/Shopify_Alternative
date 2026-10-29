@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-918 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-919 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -926,6 +926,7 @@
 | 916 | A shopper's account lists their subscriptions, each managed from its latest order's page | Accepted |
 | 917 | A shop that gave an expert access, having hired them, rates them out of five and says how the work went; shops see experts' ratings and reviews, and experts their own | Accepted |
 | 918 | Buy buttons keep a cart of the page's own across the shop's buttons there, kept by that site's browser, its bar checking all of it out through one permalink | Accepted |
+| 919 | A shop's SSO email domains are proved its through a TXT record of its token, a proved domain one shop's alone, taking every sign-in by email of it | Accepted |
 
 ---
 
@@ -30304,3 +30305,29 @@
 * **Consequences:**
   * A shopper buys several of a shop's products from a blog or a link page in one checkout.
   * Collections as embeds, and a choice of colours and layout, are still not done.
+
+## ADR-919 · A shop's SSO email domains are proved its through a TXT record of its token, a proved domain one shop's alone, taking every sign-in by email of it
+
+* **Context:** ADR-864's single sign-on routes a sign-in by email to the shop that names the
+  email's domain. Any shop could name any domain, and the one that saved it last took its
+  sign-ins: a shop naming another organisation's domain could send that organisation's staff to
+  a provider of its own choosing. ADR-864 left a domain proved through DNS for later.
+* **Decision:**
+  * **A token per shop**, made with its single sign-on (migration 0411). The TXT record
+    `hatti-sso=<token>` at `_hatti-sso.<domain>` proves the domain the shop's.
+  * **Checking** is the owner's, from Settings › Staff: "Check DNS" (`shopSsoDomainsCheck`) looks
+    up each domain not yet proved, through the platform's resolver, now able to read TXT records
+    (`DnsLookup.texts`). A domain whose record shows the token is proved, unless another shop
+    proved it first. A DNS failure proves nothing. Each proof is in the shop's audit log.
+  * **One shop's alone** (`identity.sso_domains`, keyed by the domain):
+    * sign-ins by email of a proved domain go to that shop;
+    * no other shop can save it ("zari.pk is proved another shop's, through DNS");
+    * a shop that named it before it was proved elsewhere admits no one by its emails.
+  * **A domain no shop proved** routes as before, to the shop that named it last, so that shops
+    already signing staff in keep working.
+  * A domain the shop no longer names is no longer proved its.
+* **Consequences:**
+  * Once an organisation proves its domain, no other shop can draw its staff's sign-ins away.
+  * Not yet:
+    * proofs checked again over time, to notice a record taken down;
+    * SAML, and SCIM, as ADR-864 left them.
