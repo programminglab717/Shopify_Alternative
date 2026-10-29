@@ -5,7 +5,8 @@ of their own design while Hatti keeps the catalog, carts, checkout and orders (O
 
 It shows the shop's products, a search, collections and product pages, and keeps a cart with the
 Storefront API. Shoppers sign in with a code sent to their mobile number, on WhatsApp or by SMS,
-and see their orders, buy their items again, and their store credit (ADR-944), and keep their
+and see their orders, buy their items again, and their store credit (ADR-944), download or ask
+to erase their own data (ADR-963), and keep their
 addresses (ADR-947) and a wishlist, "Save for later" on each product's page (ADR-953), kept on
 the device before they sign in and joined to their account's when they do (ADR-957). Each
 product's page, and the home page, show the products viewed before, kept by the shopper's

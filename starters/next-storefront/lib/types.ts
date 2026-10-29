@@ -89,7 +89,14 @@ export interface Customer {
 
 export interface CustomerUserError {
   message: string;
-  code: 'INVALID' | 'CODE_WRONG' | 'CODE_EXPIRED' | 'TOO_MANY_REQUESTS' | null;
+  code:
+    | 'INVALID'
+    | 'CODE_WRONG'
+    | 'CODE_EXPIRED'
+    | 'TOO_MANY_REQUESTS'
+    | 'UNIDENTIFIED_CUSTOMER'
+    | 'NOT_FOUND'
+    | null;
 }
 
 export interface MailingAddress {

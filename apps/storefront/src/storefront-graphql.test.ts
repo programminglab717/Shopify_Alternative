@@ -400,6 +400,8 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
       'CUSTOMER_ADDRESS_CREATE_MUTATION',
       'CUSTOMER_ADDRESS_DELETE_MUTATION',
       'CUSTOMER_ADDRESS_UPDATE_MUTATION',
+      'CUSTOMER_DATA_ERASE_MUTATION',
+      'CUSTOMER_DATA_EXPORT_MUTATION',
       'CUSTOMER_DEFAULT_ADDRESS_UPDATE_MUTATION',
       'CUSTOMER_LOGIN_CODE_SEND_MUTATION',
       'CUSTOMER_QUERY',
@@ -1303,6 +1305,21 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
       },
       customerUserErrors: [],
     });
+    // As the headless starter's account page asks (ADR-963).
+    const q = starterQueries();
+    expect(
+      (await ask(q.CUSTOMER_DATA_EXPORT_MUTATION!, { customerAccessToken: TOKEN }, at)).data
+        .customerDataExport.dataExport.url,
+    ).toMatch(/^https:\/\/files\.hatti\.pk\//);
+    expect(
+      (
+        await ask(
+          q.CUSTOMER_DATA_ERASE_MUTATION!,
+          { customerAccessToken: TOKEN, confirm: true },
+          at,
+        )
+      ).data.customerDataErase.erasure.state,
+    ).toBe('WAITING');
     // Too many of late, as the shop's own pages count them.
     core.busy();
     expect(

@@ -451,3 +451,32 @@ export const PRODUCTS_BY_ID_QUERY = /* GraphQL */ `
     }
   }
 `;
+
+// The shopper's own data (ADR-962, ADR-963): its file to download, or its erasure asked for.
+
+export const CUSTOMER_DATA_EXPORT_MUTATION = /* GraphQL */ `
+  mutation CustomerDataExport($customerAccessToken: String!) {
+    customerDataExport(customerAccessToken: $customerAccessToken) {
+      dataExport {
+        url
+      }
+      customerUserErrors {
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_DATA_ERASE_MUTATION = /* GraphQL */ `
+  mutation CustomerDataErase($customerAccessToken: String!, $confirm: Boolean!) {
+    customerDataErase(customerAccessToken: $customerAccessToken, confirm: $confirm) {
+      erasure {
+        state
+        eraseAfter
+      }
+      customerUserErrors {
+        code
+      }
+    }
+  }
+`;

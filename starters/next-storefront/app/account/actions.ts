@@ -7,6 +7,8 @@ import { languageCode, languageOf } from '@/lib/language';
 import {
   CUSTOMER_ACCESS_TOKEN_CREATE_MUTATION,
   CUSTOMER_ACCESS_TOKEN_DELETE_MUTATION,
+  CUSTOMER_DATA_ERASE_MUTATION,
+  CUSTOMER_DATA_EXPORT_MUTATION,
   CUSTOMER_LOGIN_CODE_SEND_MUTATION,
   CUSTOMER_WISHLIST_ADD_MUTATION,
 } from '@/lib/queries';
@@ -117,6 +119,54 @@ export async function verifyCode(form: FormData): Promise<void> {
     await keepGuestWishlist([]);
   }
   redirect('/account');
+}
+
+// The shopper's own data (ADR-963), as the shop's own account page offers it (ADR-962): the
+// file to download, or its erasure, asked for here and told on the account page.
+
+/** Where the account page says how a request of their data went. */
+const dataNotice = (notice: string) => `/account?data=${notice}#your-data`;
+
+/** On to the file of the shopper's own data, made or kept: its link lasts minutes. */
+export async function downloadMyData(): Promise<void> {
+  const token = await customerToken();
+  if (!token) redirect('/account/login');
+  const { customerDataExport: asked } = await storefront<{
+    customerDataExport: {
+      dataExport: { url: string } | null;
+      customerUserErrors: CustomerUserError[];
+    };
+  }>(
+    CUSTOMER_DATA_EXPORT_MUTATION,
+    { customerAccessToken: token },
+    { cache: 'none', buyerIp: await buyerIp() },
+  );
+  const refused = asked.customerUserErrors[0];
+  if (refused?.code === 'UNIDENTIFIED_CUSTOMER') redirect('/account/login');
+  if (refused) redirect(dataNotice('too_many'));
+  if (!asked.dataExport) redirect(dataNotice('export_none'));
+  redirect(asked.dataExport.url);
+}
+
+/** Asks for the erasure of the shopper's data, once they ticked that they understand. */
+export async function eraseMyData(form: FormData): Promise<void> {
+  const token = await customerToken();
+  if (!token) redirect('/account/login');
+  if (form.get('confirm') !== 'on') redirect(dataNotice('erase_unconfirmed'));
+  const { customerDataErase: asked } = await storefront<{
+    customerDataErase: {
+      erasure: { state: string; eraseAfter: string } | null;
+      customerUserErrors: CustomerUserError[];
+    };
+  }>(
+    CUSTOMER_DATA_ERASE_MUTATION,
+    { customerAccessToken: token, confirm: true },
+    { cache: 'none', buyerIp: await buyerIp() },
+  );
+  const refused = asked.customerUserErrors[0];
+  if (refused?.code === 'UNIDENTIFIED_CUSTOMER') redirect('/account/login');
+  if (refused) redirect(dataNotice('too_many'));
+  redirect(dataNotice(asked.erasure ? 'erase_requested' : 'erase_none'));
 }
 
 /** Signs the shopper out, here and at the shop. */

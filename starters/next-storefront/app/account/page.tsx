@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { addToCart } from '@/app/actions';
-import { customerToken, signOut } from '@/app/account/actions';
+import { customerToken, downloadMyData, eraseMyData, signOut } from '@/app/account/actions';
 import { storefront } from '@/lib/hatti';
 import { languageOf } from '@/lib/language';
 import { formatMoney } from '@/lib/money';
@@ -20,7 +20,20 @@ const statusOf = (order: Order, words: Words) =>
 
 // The signed-in shopper's account (ADR-944): their orders with the shop, each line to buy again,
 // and their store credit, read with the customer access token their cookie keeps. Never kept.
-export default async function AccountPage() {
+/** What the account page may say of a request of the shopper's data (ADR-963). */
+const DATA_NOTICES = [
+  'export_none',
+  'erase_none',
+  'erase_requested',
+  'erase_unconfirmed',
+  'too_many',
+] as const;
+
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ data?: string }>;
+}) {
   const token = await customerToken();
   if (!token) redirect('/account/login');
   const { customer } = await storefront<{ customer: Customer | null }>(
@@ -32,6 +45,8 @@ export default async function AccountPage() {
   if (!customer) redirect('/account/login');
   const language = await languageOf();
   const words = wordsOf(language);
+  const { data } = await searchParams;
+  const notice = DATA_NOTICES.find((each) => each === data);
   const dateOf = (at: string) =>
     new Date(at).toLocaleDateString(language === 'ur' ? 'ur-PK' : 'en-PK', { dateStyle: 'medium' });
   return (
@@ -80,6 +95,25 @@ export default async function AccountPage() {
         <Link href="/account/addresses">{words.addresses}</Link> ·{' '}
         <Link href="/account/wishlist">{words.wishlist}</Link>
       </p>
+      {/* Their own data (ADR-963): to download, or to erase. */}
+      <section id="your-data" className="your-data">
+        <h2>{words.yourData}</h2>
+        <p>{words.yourDataHint}</p>
+        {notice && <p role="status">{words[`data_${notice}`]}</p>}
+        <form action={downloadMyData}>
+          <button type="submit" className="quiet">
+            {words.downloadData}
+          </button>
+        </form>
+        <form action={eraseMyData}>
+          <label>
+            <input type="checkbox" name="confirm" required /> {words.eraseConfirm}
+          </label>
+          <button type="submit" className="quiet">
+            {words.eraseData}
+          </button>
+        </form>
+      </section>
       <form action={signOut}>
         <button type="submit">{words.signOut}</button>
       </form>

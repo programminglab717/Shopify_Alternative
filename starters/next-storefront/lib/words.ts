@@ -76,6 +76,17 @@ const WORDS = {
     saveForLater: 'Save for later',
     wishlistHere: 'Kept on this device. Sign in to keep it with your account, on every device.',
     recentlyViewed: 'Recently viewed',
+    yourData: 'Your data',
+    yourDataHint:
+      'Download what the shop keeps of you, or ask for it to be erased. Erasure waits a while, and while an order of yours is under way.',
+    downloadData: 'Download my data',
+    eraseConfirm: 'I understand my account, orders and details with the shop will be erased.',
+    eraseData: 'Erase my data',
+    data_export_none: 'The shop keeps nothing of you to download.',
+    data_erase_none: 'The shop keeps nothing of you to erase.',
+    data_erase_requested: 'Your erasure is asked for. The shop will let you know when it is done.',
+    data_erase_unconfirmed: 'Tick the box to say you understand, then ask again.',
+    data_too_many: 'Too many requests of your data: wait a minute.',
   },
   ur: {
     cart: 'کارٹ',
@@ -150,6 +161,18 @@ const WORDS = {
     wishlistHere:
       'اس ڈیوائس پر رکھا ہے۔ اسے اپنے اکاؤنٹ کے ساتھ ہر ڈیوائس پر رکھنے کے لیے سائن ان کریں۔',
     recentlyViewed: 'حال ہی میں دیکھی گئی',
+    yourData: 'آپ کا ڈیٹا',
+    yourDataHint:
+      'دکان کے پاس آپ کا جو ڈیٹا ہے اسے ڈاؤن لوڈ کریں، یا مٹانے کی درخواست دیں۔ مٹانے میں کچھ وقت لگتا ہے، اور جب تک آپ کا کوئی آرڈر جاری ہو۔',
+    downloadData: 'میرا ڈیٹا ڈاؤن لوڈ کریں',
+    eraseConfirm:
+      'میں سمجھتا/سمجھتی ہوں کہ دکان کے پاس میرا اکاؤنٹ، آرڈرز اور تفصیلات مٹا دی جائیں گی۔',
+    eraseData: 'میرا ڈیٹا مٹائیں',
+    data_export_none: 'دکان کے پاس آپ کا ڈاؤن لوڈ کرنے کے لیے کچھ نہیں۔',
+    data_erase_none: 'دکان کے پاس آپ کا مٹانے کے لیے کچھ نہیں۔',
+    data_erase_requested: 'آپ کا ڈیٹا مٹانے کی درخواست ہو گئی۔ مکمل ہونے پر دکان آپ کو بتائے گی۔',
+    data_erase_unconfirmed: 'سمجھنے کی تصدیق کے لیے خانہ نشان زد کریں، پھر دوبارہ درخواست دیں۔',
+    data_too_many: 'ڈیٹا کی بہت زیادہ درخواستیں: ایک منٹ رکیں۔',
   },
 } as const satisfies Record<Language, Record<string, string>>;
 
