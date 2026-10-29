@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
+### The feature catalogue's last rows
+
+* **Every row of the feature catalogue but seven is built**, each named by the ADRs that built it.
+  The seven wait on a partner or a business call rather than on code: buying domains in the
+  admin, COD advances, the Hatti Ship programme, 3PL integrations, international shipping, the
+  reseller network's commissions and certified POS hardware. They are
+  [OWN-67](./owner-actions.md#decisions).
+
 ### 7a93b48 · Buy buttons' whole collections
 
 * **A buy button's collection shows twelve products at a time**, Show more giving the next page,
