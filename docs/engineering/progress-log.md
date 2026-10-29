@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The headless starter's recently viewed products
+### 8f41376 · The headless starter's recently viewed products
 
 * **The Next.js starter shows the products viewed before**, on each product's page and the home
   page, kept by the shopper's browser alone ([ADR-961](../architecture/13-decision-log.md#adr-961--the-headless-starter-shows-the-products-viewed-before-on-each-products-page-and-the-home-page-kept-by-the-shoppers-browser-alone)).
