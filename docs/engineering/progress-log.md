@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The AI answers from FAQs and products
+### 6363ac8 · The AI answers from FAQs and products
 
 * **The AI answering customers** answers from the shop's own answers to common questions, and from
   the products asked of: their prices and whether each can be bought now ([ADR-911](../architecture/13-decision-log.md#adr-911--the-ai-answering-customers-answers-from-the-shops-own-answers-to-common-questions-and-from-the-products-a-customer-asks-of-their-prices-and-whether-each-can-be-bought-now)).
