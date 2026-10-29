@@ -83,6 +83,8 @@ function core(role: StaffRole, requests: Request[] = []) {
     answeredToday: 0,
     limitPerDay: 200,
     faqs: [{ question: 'Kya COD hai?', answer: 'Ji, poore Pakistan mein.' }],
+    name: null as string | null,
+    tone: 'warm',
   };
   let voice = { enabled: false, available: true, usedToday: 0, limitPerDay: 200 };
   return fakeCore(role, (operation, variables) => {
@@ -97,6 +99,9 @@ function core(role: StaffRole, requests: Request[] = []) {
       case 'SupportAgentUpdate':
         agent = { ...agent, enabled: Boolean(variables.enabled), answeredToday: 3 };
         return { supportAgentUpdate: { supportAgent: agent, userErrors: [] } };
+      case 'SupportAgentVoiceSet':
+        agent = { ...agent, name: variables.name as string | null, tone: String(variables.tone) };
+        return { supportAgentVoiceSet: { supportAgent: agent, userErrors: [] } };
       case 'SupportAgentFaqsSet': {
         const faqs = variables.faqs as { question: string; answer: string }[];
         if (faqs.some((faq) => faq.question.length > 100)) {
@@ -439,6 +444,28 @@ describe('Customer messages', () => {
     });
     fireEvent.click(within(card).getByRole('button', { name: 'Save answers' }));
     expect(await within(card).findByText(/Write the question, in 200 characters/)).toBeTruthy();
+  });
+
+  it('names the assistant and sets how it writes, blank for no name (ADR-923)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+    const card = await screen.findByRole('region', { name: 'AI answers' });
+    const name = (await within(card).findByLabelText('Its name')) as HTMLInputElement;
+    expect(name.value).toBe('');
+    fireEvent.change(name, { target: { value: ' Sana from Zari ' } });
+    fireEvent.change(within(card).getByLabelText('Tone'), { target: { value: 'formal' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'SupportAgentVoiceSet')).toEqual([
+        { name: 'Sana from Zari', tone: 'formal' },
+      ]),
+    );
+    fireEvent.change(name, { target: { value: '  ' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'SupportAgentVoiceSet').at(-1)).toEqual({ name: null, tone: 'formal' }),
+    );
   });
 
   it('takes orders by voice note, saying what it costs and how many it heard (ADR-871)', async () => {

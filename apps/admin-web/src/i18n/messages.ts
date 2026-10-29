@@ -2832,6 +2832,14 @@ const en = {
   'supportAgent.saveFaqs': 'Save answers',
   'supportAgent.saved': 'Saved.',
   'supportAgent.incomplete': 'Write both the question and its answer, or remove it.',
+  'supportAgent.voice': 'How it writes',
+  'supportAgent.name': 'Its name',
+  'supportAgent.nameHint':
+    'What it calls itself to customers, such as Sana from Zari. Leave it blank for none.',
+  'supportAgent.tone': 'Tone',
+  'supportAgent.tone.warm': 'Warm, as a shopkeeper would',
+  'supportAgent.tone.formal': 'Formal and polite',
+  'supportAgent.saveVoice': 'Save',
   'inbox.byAi': 'AI',
   'webChat.title': 'Chat on your online store',
   'webChat.hint':
@@ -10045,6 +10053,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'supportAgent.saveFaqs': 'جواب محفوظ کریں',
   'supportAgent.saved': 'محفوظ ہو گیا۔',
   'supportAgent.incomplete': 'سوال اور اس کا جواب دونوں لکھیں، یا اسے ہٹا دیں۔',
+  'supportAgent.voice': 'یہ کیسے لکھتا ہے',
+  'supportAgent.name': 'اس کا نام',
+  'supportAgent.nameHint':
+    'گاہکوں کو یہ اپنا جو نام بتائے، جیسے زری کی ثنا۔ نہ چاہیں تو خالی چھوڑ دیں۔',
+  'supportAgent.tone': 'انداز',
+  'supportAgent.tone.warm': 'اپنائیت سے، جیسے دکاندار بات کرتا ہے',
+  'supportAgent.tone.formal': 'رسمی اور مؤدبانہ',
+  'supportAgent.saveVoice': 'محفوظ کریں',
   'inbox.byAi': 'AI',
   'webChat.title': 'آپ کے آن لائن اسٹور پر چیٹ',
   'webChat.hint':

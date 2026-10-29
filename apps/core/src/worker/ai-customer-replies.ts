@@ -87,6 +87,8 @@ export class AiCustomerReplies {
     });
     const result = await draftSupportReply(this.ai, {
       shopName: name,
+      // Its name and tone, as the shop set them (ADR-923).
+      voice: task.voice,
       facts,
       history: task.history,
     });

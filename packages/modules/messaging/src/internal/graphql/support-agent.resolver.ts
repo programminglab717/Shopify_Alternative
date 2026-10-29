@@ -12,7 +12,9 @@ import {
   Resolver,
 } from '@nestjs/graphql';
 import {
+  SUPPORT_AGENT_NAME_MAX,
   SUPPORT_FAQ_LIMITS,
+  SUPPORT_TONES,
   SupportAgentService,
   type SupportAgentSettingsRecord,
 } from '../support-agent.service.js';
@@ -53,6 +55,16 @@ export class SupportAgent {
   })
   faqs!: SupportAgentFaq[];
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The name the shop gave its assistant, which it answers as (ADR-923); null for none.',
+  })
+  name!: string | null;
+
+  @Field({ description: `How it writes: ${SUPPORT_TONES.join(' or ')} (ADR-923).` })
+  tone!: string;
+
   @Field({ description: 'Whether Hatti answers at all: false until its AI is set up.' })
   available!: boolean;
 
@@ -81,7 +93,12 @@ export class SupportAgentResolver {
   ) {}
 
   #shown(record: SupportAgentSettingsRecord): SupportAgent {
-    return Object.assign(new SupportAgent(), { ...record, available: Boolean(this.ai) });
+    return Object.assign(new SupportAgent(), {
+      ...record,
+      name: record.voice.name,
+      tone: record.voice.tone,
+      available: Boolean(this.ai),
+    });
   }
 
   @Query(() => SupportAgent, { description: "Whether the AI answers the shop's customers." })
@@ -101,6 +118,24 @@ export class SupportAgentResolver {
     @Args('enabled') enabled: boolean,
   ): Promise<SupportAgentUpdatePayload> {
     const result = await this.agent.update(tenant, { enabled });
+    return Object.assign(new SupportAgentUpdatePayload(), {
+      supportAgent: result.ok ? this.#shown(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => SupportAgentUpdatePayload, {
+    description:
+      `Names the shop's assistant, ${SUPPORT_AGENT_NAME_MAX} characters at most, or leaves it ` +
+      `unnamed with a blank name, and sets how it writes: ${SUPPORT_TONES.join(' or ')} (ADR-923).`,
+  })
+  @RequireScopes('write_settings')
+  async supportAgentVoiceSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('name', { type: () => String, nullable: true }) name: string | null,
+    @Args('tone') tone: string,
+  ): Promise<SupportAgentUpdatePayload> {
+    const result = await this.agent.setVoice(tenant, { name, tone });
     return Object.assign(new SupportAgentUpdatePayload(), {
       supportAgent: result.ok ? this.#shown(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),

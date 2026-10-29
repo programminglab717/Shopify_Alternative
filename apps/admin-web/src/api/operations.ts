@@ -11573,6 +11573,8 @@ export const SupportAgentQuery = /* GraphQL */ `
         question
         answer
       }
+      name
+      tone
     }
   }
 `;
@@ -11589,6 +11591,32 @@ export const SupportAgentUpdateMutation = /* GraphQL */ `
           question
           answer
         }
+        name
+        tone
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The name the shop gives its assistant, and how it writes (ADR-923). */
+export const SupportAgentVoiceSetMutation = /* GraphQL */ `
+  mutation SupportAgentVoiceSet($name: String, $tone: String!) {
+    supportAgentVoiceSet(name: $name, tone: $tone) {
+      supportAgent {
+        enabled
+        available
+        answeredToday
+        limitPerDay
+        faqs {
+          question
+          answer
+        }
+        name
+        tone
       }
       userErrors {
         ...Problems
@@ -11611,6 +11639,8 @@ export const SupportAgentFaqsSetMutation = /* GraphQL */ `
           question
           answer
         }
+        name
+        tone
       }
       userErrors {
         ...Problems

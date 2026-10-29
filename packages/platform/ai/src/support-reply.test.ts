@@ -4,9 +4,11 @@ import { SUPPORT_REPLY_LIMITS, draftSupportReply } from './support-reply.js';
 
 /** A fake provider answering once through the reply tool, each request kept. */
 function provider(input: unknown) {
-  const requests: { messages: { content: string }[] }[] = [];
+  const requests: { system: string; messages: { content: string }[] }[] = [];
   const fetch = (async (_url: string, init: RequestInit) => {
-    requests.push(JSON.parse(init.body as string) as { messages: { content: string }[] });
+    requests.push(
+      JSON.parse(init.body as string) as { system: string; messages: { content: string }[] },
+    );
     return new Response(
       JSON.stringify({
         content: [{ type: 'tool_use', name: 'give_reply', input }],
@@ -66,5 +68,25 @@ describe("A reply to a shop's customer (MSG-07, ADR-849)", () => {
         })
       ).ok,
     ).toBe(false);
+  });
+
+  it('answers as the name the shop gave it, formally where the shop asks (ADR-923)', async () => {
+    const { gateway, requests } = provider({ reply: 'Ji, main Sana hoon.', hand_off: false });
+    const ask = (voice?: { name: string | null; tone: 'warm' | 'formal' }) =>
+      draftSupportReply(gateway, {
+        shopName: 'Zari',
+        ...(voice && { voice }),
+        facts: '',
+        history: [{ from: 'customer', text: 'aap kaun ho?' }],
+      });
+    await ask({ name: 'Sana <from Zari>', tone: 'formal' });
+    const [named, plain] = [requests[0]!, (await ask(), requests[1]!)];
+    expect(named.messages[0]!.content).toContain('<assistant_name>Sana from Zari</assistant_name>');
+    expect(named.system).toContain('Answer as that name');
+    expect(named.system).toContain('write formally');
+    // Unnamed and warm, as before.
+    expect(plain.messages[0]!.content).not.toContain('assistant_name');
+    expect(plain.system).not.toContain('write formally');
+    expect(plain.system).not.toContain('Answer as that name');
   });
 });

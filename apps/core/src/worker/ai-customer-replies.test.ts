@@ -332,6 +332,18 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
     unwrap(await agent.setFaqs(owner, []));
   });
 
+  it('answers as the name the shop gave its assistant (ADR-923)', async () => {
+    answer = { reply: 'Main Sana hoon, Zari ki taraf se.', hand_off: false };
+    unwrap(await agent.setVoice(owner, { name: 'Sana', tone: 'formal' }));
+    const asked = await chatOf('aap kaun hain?');
+    expect(await replies.handle(asked.event)).toBe('replied');
+    expect(prompts.at(-1)).toContain('<assistant_name>Sana</assistant_name>');
+    unwrap(await agent.setVoice(owner, { name: null, tone: 'warm' }));
+    await chatOf('shukriya');
+    expect(await replies.handle((await latest()).event)).toBe('replied');
+    expect(prompts.at(-1)).not.toContain('assistant_name');
+  });
+
   it('answers no one without a credit left, and keeps why', async () => {
     credits.left = 0;
     const asked = await chatOf('delivery kitne din mein?');

@@ -5,11 +5,14 @@ import {
   SupportAgentFaqsSetMutation,
   SupportAgentQuery,
   SupportAgentUpdateMutation,
+  SupportAgentVoiceSetMutation,
 } from '../api/operations';
 import type {
   SupportAgentData,
   SupportAgentFaqsSetData,
   SupportAgentUpdateData,
+  SupportAgentValue,
+  SupportAgentVoiceSetData,
   SupportFaqValue,
 } from '../api/types';
 import { permits } from '../auth/permissions';
@@ -20,7 +23,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { CheckField } from './settings-form';
+import { CheckField, SelectField } from './settings-form';
 import { SETS_SETTINGS } from './settings-page';
 
 /**
@@ -77,6 +80,7 @@ export function SupportAgentCard() {
           </p>
         )}
         {problem && <Alert tone="danger">{problem}</Alert>}
+        <VoiceForm saved={agent} may={may} />
         <FaqsForm saved={agent.faqs} may={may} />
       </div>
     );
@@ -85,6 +89,77 @@ export function SupportAgentCard() {
     <FormSection title={t('supportAgent.title')} hint={t('supportAgent.hint')}>
       {body}
     </FormSection>
+  );
+}
+
+/** The name the shop gives its assistant, and whether it writes warmly or formally (ADR-923). */
+function VoiceForm({ saved, may }: { saved: SupportAgentValue; may: boolean }) {
+  const { t } = useLocale();
+  const save = useAdminMutation<
+    SupportAgentVoiceSetData,
+    { name: string | null; tone: SupportAgentValue['tone'] }
+  >(SupportAgentVoiceSetMutation);
+  const [name, setName] = useState(saved.name ?? '');
+  const [tone, setTone] = useState(saved.tone);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    setDone(false);
+    try {
+      const { supportAgentVoiceSet } = await save.mutateAsync({ name: name.trim() || null, tone });
+      const error = supportAgentVoiceSet.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else setDone(true);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3 border-t border-line pt-3" onSubmit={onSubmit}>
+      <h3 className="font-medium">{t('supportAgent.voice')}</h3>
+      <fieldset className="flex flex-col gap-3" disabled={!may}>
+        <TextField
+          label={t('supportAgent.name')}
+          hint={t('supportAgent.nameHint')}
+          value={name}
+          maxLength={40}
+          dir="auto"
+          onChange={(event) => {
+            setDone(false);
+            setName(event.target.value);
+          }}
+        />
+        <SelectField
+          label={t('supportAgent.tone')}
+          value={tone}
+          options={[
+            { value: 'warm', label: t('supportAgent.tone.warm') },
+            { value: 'formal', label: t('supportAgent.tone.formal') },
+          ]}
+          onChange={(next) => {
+            setDone(false);
+            setTone(next);
+          }}
+        />
+      </fieldset>
+      {may && (
+        <div>
+          <Button
+            type="submit"
+            busy={save.isPending}
+            icon={<Save aria-hidden className="size-5" />}
+          >
+            {t('supportAgent.saveVoice')}
+          </Button>
+        </div>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      {done && <Alert tone="success">{t('supportAgent.saved')}</Alert>}
+    </form>
   );
 }
 

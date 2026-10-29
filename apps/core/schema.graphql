@@ -11933,6 +11933,11 @@ type Mutation {
   supportAgentUpdate(enabled: Boolean!): SupportAgentUpdatePayload!
 
   """
+  Names the shop's assistant, 40 characters at most, or leaves it unnamed with a blank name, and sets how it writes: warm or formal (ADR-923).
+  """
+  supportAgentVoiceSet(name: String, tone: String!): SupportAgentUpdatePayload!
+
+  """
   Closes one of the shop’s requests: answered enough, or no longer needed.
   """
   supportRequestClose(id: ID!): SupportRequestPayload!
@@ -21511,6 +21516,14 @@ type SupportAgent {
   """
   faqs: [SupportAgentFaq!]!
   limitPerDay: Int!
+
+  """
+  The name the shop gave its assistant, which it answers as (ADR-923); null for none.
+  """
+  name: String
+
+  """How it writes: warm or formal (ADR-923)."""
+  tone: String!
 }
 
 """A question the shop's customers ask, and the shop's answer (ADR-911)."""

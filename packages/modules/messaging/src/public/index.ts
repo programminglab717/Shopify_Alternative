@@ -302,8 +302,12 @@ export {
 export {
   SUPPORT_AGENT_DAILY,
   SUPPORT_AGENT_QUIET_MS,
+  SUPPORT_AGENT_NAME_MAX,
   SUPPORT_FAQ_LIMITS,
+  SUPPORT_TONES,
   type SupportFaq,
+  type SupportTone,
+  type SupportVoice,
   SupportAgentService,
   type SupportAgentOutcome,
   type SupportAgentTask,

@@ -17,6 +17,19 @@ export const SUPPORT_AGENT_DAILY = 200;
 /** The shop's answers to its customers' common questions, and how long each may be (ADR-911). */
 export const SUPPORT_FAQ_LIMITS = { faqs: 30, question: 200, answer: 1_000 } as const;
 
+/** How the AI writes to the shop's customers (ADR-923): as a shopkeeper would, or formally. */
+export const SUPPORT_TONES = ['warm', 'formal'] as const;
+export type SupportTone = (typeof SUPPORT_TONES)[number];
+
+/** The name the shop gives its assistant, and how long it may be (ADR-923). */
+export const SUPPORT_AGENT_NAME_MAX = 40;
+
+/** Who the AI is to the shop's customers (ADR-923): its name, if the shop gave one, and tone. */
+export interface SupportVoice {
+  name: string | null;
+  tone: SupportTone;
+}
+
 /** A question the shop's customers ask, and the shop's answer, for the AI to answer from. */
 export interface SupportFaq {
   question: string;
@@ -32,6 +45,7 @@ export type SupportAgentOutcome =
 export interface SupportAgentSettingsRecord {
   enabled: boolean;
   faqs: SupportFaq[];
+  voice: SupportVoice;
   /** How many messages it answered in the last day, and the most it answers. */
   answeredToday: number;
   limitPerDay: number;
@@ -48,6 +62,8 @@ export interface SupportAgentTask {
   history: { from: 'customer' | 'shop'; text: string }[];
   /** The shop's answers to common questions (ADR-911). */
   faqs: SupportFaq[];
+  /** Its assistant's name and tone (ADR-923). */
+  voice: SupportVoice;
 }
 
 type ConversationRow = {
@@ -89,6 +105,7 @@ export class SupportAgentService {
     return this.db.tenant(tenant.shopId, async (tx) => ({
       enabled: await enabledIn(tx, tenant.shopId),
       faqs: await faqsIn(tx, tenant.shopId),
+      voice: await voiceIn(tx, tenant.shopId),
       answeredToday: await answeredSince(
         tx,
         tenant.shopId,
@@ -166,6 +183,36 @@ export class SupportAgentService {
   }
 
   /**
+   * Names the shop's assistant, or leaves it unnamed with a blank `name`, and sets its tone
+   * (ADR-923): the name trimmed, 40 characters at most, and none of `<` or `>`, as it is given
+   * the model between tags.
+   */
+  async setVoice(
+    tenant: TenantContext,
+    input: { name?: string | null; tone: string },
+  ): Promise<MutationResult<SupportAgentSettingsRecord>> {
+    const name = (input.name ?? '').trim().replace(/\s+/g, ' ') || null;
+    if (name && (name.length > SUPPORT_AGENT_NAME_MAX || /[<>]/.test(name))) {
+      return failOne(
+        ['name'],
+        'INVALID',
+        `Give it a name of ${SUPPORT_AGENT_NAME_MAX} characters at most, without < or >`,
+      );
+    }
+    if (!(SUPPORT_TONES as readonly string[]).includes(input.tone)) {
+      return failOne(['tone'], 'INVALID', `Its tone is ${SUPPORT_TONES.join(' or ')}`);
+    }
+    await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute(sql`
+        INSERT INTO messaging.support_agent_settings (shop_id, agent_name, tone)
+        VALUES (${tenant.shopId}, ${name}, ${input.tone})
+        ON CONFLICT (shop_id) DO UPDATE
+           SET agent_name = excluded.agent_name, tone = excluded.tone, updated_at = now()`),
+    );
+    return { ok: true, value: await this.settings(tenant) };
+  }
+
+  /**
    * The message `messageId` of the conversation `conversationId`, as the AI is to answer it as
    * of `now`; null where it is not the AI's: the agent off, the day's answers given, the message
    * not the conversation's latest or not the customer's, already answered, or the conversation
@@ -229,6 +276,7 @@ export class SupportAgentService {
         customerPhone: conversation.customer_phone,
         history,
         faqs: await faqsIn(tx, shopId),
+        voice: await voiceIn(tx, shopId),
       };
     });
   }
@@ -271,6 +319,12 @@ async function faqsIn(tx: Tx, shopId: string): Promise<SupportFaq[]> {
   const { rows } = await tx.execute<{ faqs: SupportFaq[] }>(sql`
     SELECT faqs FROM messaging.support_agent_settings WHERE shop_id = ${shopId}`);
   return rows[0]?.faqs ?? [];
+}
+
+async function voiceIn(tx: Tx, shopId: string): Promise<SupportVoice> {
+  const { rows } = await tx.execute<{ agent_name: string | null; tone: SupportTone }>(sql`
+    SELECT agent_name, tone FROM messaging.support_agent_settings WHERE shop_id = ${shopId}`);
+  return { name: rows[0]?.agent_name ?? null, tone: rows[0]?.tone ?? 'warm' };
 }
 
 async function enabledIn(tx: Tx, shopId: string): Promise<boolean> {

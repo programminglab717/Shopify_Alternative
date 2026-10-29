@@ -5693,6 +5693,9 @@ export interface SupportAgentValue {
   limitPerDay: number;
   /** The shop's answers to common questions (ADR-911). */
   faqs: SupportFaqValue[];
+  /** Its assistant's name, and how it writes (ADR-923). */
+  name: string | null;
+  tone: 'warm' | 'formal';
 }
 
 export interface SupportFaqValue {
@@ -5706,6 +5709,10 @@ export interface SupportAgentData {
 
 export interface SupportAgentUpdateData {
   supportAgentUpdate: { supportAgent: SupportAgentValue | null; userErrors: UserError[] };
+}
+
+export interface SupportAgentVoiceSetData {
+  supportAgentVoiceSet: { supportAgent: SupportAgentValue | null; userErrors: UserError[] };
 }
 
 export interface SupportAgentFaqsSetData {

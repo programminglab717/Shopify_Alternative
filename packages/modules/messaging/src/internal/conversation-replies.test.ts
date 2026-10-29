@@ -453,6 +453,7 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     expect(await agent.settings(a)).toEqual({
       enabled: false,
       faqs: [],
+      voice: { name: null, tone: 'warm' },
       answeredToday: 0,
       limitPerDay: SUPPORT_AGENT_DAILY,
     });
@@ -528,5 +529,41 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     );
     expect((await agent.taskOf(a.shopId, id, rows[0]!.id, SOON))?.faqs).toEqual(faqs);
     expect(unwrap(await agent.setFaqs(a, [])).faqs).toEqual([]);
+  });
+
+  it('keeps the name and tone the shop gives its assistant, for the AI to answer as (ADR-923)', async () => {
+    const agent = new SupportAgentService(db);
+    // Unnamed and warm until the shop says otherwise.
+    expect((await agent.settings(a)).voice).toEqual({ name: null, tone: 'warm' });
+    const errorsOf = async (input: { name?: string | null; tone: string }) => {
+      const result = await agent.setVoice(a, input);
+      return result.ok ? [] : result.errors.map((error) => [error.field.join('.'), error.code]);
+    };
+    expect(await errorsOf({ name: 'x'.repeat(41), tone: 'warm' })).toEqual([['name', 'INVALID']]);
+    expect(await errorsOf({ name: '<system>', tone: 'warm' })).toEqual([['name', 'INVALID']]);
+    expect(await errorsOf({ name: 'Sana', tone: 'cheeky' })).toEqual([['tone', 'INVALID']]);
+    expect(
+      unwrap(await agent.setVoice(a, { name: '  Sana   from Zari ', tone: 'formal' })).voice,
+    ).toEqual({
+      name: 'Sana from Zari',
+      tone: 'formal',
+    });
+    expect((await agent.settings(b)).voice).toEqual({ name: null, tone: 'warm' });
+    const id = await sharedConversation();
+    const { rows } = await admin.query<{ id: string }>(
+      `SELECT id FROM messaging.conversation_messages
+        WHERE conversation_id = $1 ORDER BY at DESC, id DESC LIMIT 1`,
+      [id],
+    );
+    unwrap(await agent.update(a, { enabled: true }));
+    expect((await agent.taskOf(a.shopId, id, rows[0]!.id, SOON))?.voice).toEqual({
+      name: 'Sana from Zari',
+      tone: 'formal',
+    });
+    // A blank name leaves it unnamed.
+    expect(unwrap(await agent.setVoice(a, { name: ' ', tone: 'warm' })).voice).toEqual({
+      name: null,
+      tone: 'warm',
+    });
   });
 });
