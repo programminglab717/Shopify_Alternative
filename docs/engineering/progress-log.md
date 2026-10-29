@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Single sign-on domains checked again
+### bd5072f · Single sign-on domains checked again
 
 * **A shop's single sign-on domains are looked up in DNS again each day**: one whose record has
   been gone three days is no longer proved the shop's, and the admin says so meanwhile
