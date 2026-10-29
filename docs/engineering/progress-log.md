@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The headless starter in Urdu
+### a90502c · The headless starter in Urdu
 
 * **The Next.js starter** shows its pages in Urdu, right to left, as the shopper picks, the
   catalog and cart asked for in Urdu through `@inContext` ([ADR-926](../architecture/13-decision-log.md#adr-926--the-headless-starter-shows-its-pages-in-urdu-right-to-left-as-the-shopper-picks-the-catalog-and-cart-asked-for-in-urdu-through-incontext-its-own-words-in-urdu-too)).
