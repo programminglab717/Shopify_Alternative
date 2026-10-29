@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Shoppers sign in through the Storefront API
+### 0b9bfab · Shoppers sign in through the Storefront API
 
 * **A headless site signs a shopper in with a code sent to their number**, and the customer
   access token it gives reads their orders and store credit; sign-ins are counted per buyer
