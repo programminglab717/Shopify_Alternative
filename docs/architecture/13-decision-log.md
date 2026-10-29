@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-928 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-929 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -936,6 +936,7 @@
 | 926 | The headless starter shows its pages in Urdu, right to left, as the shopper picks: the catalog and cart asked for in Urdu through @inContext, its own words in Urdu too | Accepted |
 | 927 | The command line checks and runs an app's function with Hatti's own code, moved to a package of its own, so that a function behaves on the developer's machine as at checkout | Accepted |
 | 928 | A selling plan may ask for up to twelve orders before its subscribers cancel themselves: until then their order's page offers skip and pause alone, staff cancelling whenever they must | Accepted |
+| 929 | An expansion store's price rate may follow the day's rate between the shops' currencies, from the currency feed, products copied as they change being copied again at each new rate | Accepted |
 
 ---
 
@@ -30539,3 +30540,25 @@
 * **Consequences:**
   * A shop's discount for subscribing pays for itself across the orders it asked for.
   * Not yet: plans for single variants.
+
+## ADR-929 · An expansion store's price rate may follow the day's rate between the shops' currencies, from the currency feed, products copied as they change being copied again at each new rate
+
+* **Context:** ADR-859's expansion stores price their copies at a rate the owner types, so a
+  Lahore shop's Dubai store gets dirhams at whatever the rupee was worth that day. ADR-865
+  already reads an open currency feed each day for the storefront's diaspora prices. ADR-859 left
+  rates from a currency feed for later.
+* **Decision:**
+  * **A link may follow the day's rate** (migration 0414, `follow_rate`, `rate_changed_at`;
+    `expansionStoreFollowRateSet`): it is worked out from the rupees the feed gives for one unit
+    of each shop's currency, to six decimals at most. With no rate for either currency, following
+    is refused: "Hatti has no day's rate between these shops' currencies: give a rate by hand".
+  * **Each read of the feed** gives following links the new rate, and notes when it changed.
+  * **Copying as products change (ADR-913) copies again** once the rate has changed since the
+    last copy, so the other shop's prices move with the rate, at most hourly as before.
+  * **A rate given by hand stops following**, as the owner's own rate.
+  * **Admin:** Settings › Expansion stores has "Follow the day's rate from PKR to AED" on each
+    store; the owner alone, having signed in lately.
+* **Consequences:**
+  * An international store's prices keep up with the rupee without the owner's arithmetic.
+  * A sudden move larger than a quarter is held back by ADR-865's check, as for the storefront.
+  * Not yet: a margin over the day's rate, and rounding the copied prices to a shop's own steps.
