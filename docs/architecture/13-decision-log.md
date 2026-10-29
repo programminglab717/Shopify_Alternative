@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-933 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-934 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -941,6 +941,7 @@
 | 931 | A theme experiment may show up to three drafts, each its own share of shoppers, each compared with the live theme at a confidence split among them | Accepted |
 | 932 | One page of what the owner's shop and each of its expansion stores sold, each in its own currency and in the shop's at the day's rate | Accepted |
 | 933 | An expansion store's copied prices may be a percent over its rate and rounded as prices abroad are, its costs copied at the rate alone | Accepted |
+| 934 | A shop's single sign-on domains are looked up in DNS again each day, and one whose record has been gone three days is no longer proved the shop's | Accepted |
 
 ---
 
@@ -30672,3 +30673,27 @@
 * **Consequences:**
   * Prices abroad pay for selling abroad, and look as the shop's prices there would.
   * Not yet: a margin by product or collection.
+
+## ADR-934 · A shop's single sign-on domains are looked up in DNS again each day, and one whose record has been gone three days is no longer proved the shop's
+
+* **Context:** ADR-919 proves a domain a shop's once, when the owner asks Hatti to look for its
+  TXT record; after that the domain is the shop's for good. A domain sold, or given up when a
+  business closes, would keep sending its sign-ins to the old shop, and no other shop could
+  prove it. ADR-919 left proofs checked again over time for later.
+* **Decision:**
+  * **Each proved domain is looked up again a day after the last** (migration 0418,
+    `checked_at`, `missing_since`), by a worker sweep, a hundred at a time.
+  * **Its record there**, it stays proved. **Gone**, it is said missing since then; the admin's
+    single sign-on card says "Hatti no longer finds the record, since 28 Oct 2026. Put it back
+    within three days, or the domain is no longer proved yours." (`ShopSsoDomain.missingSince`).
+  * **Three days missing**, it is no longer proved the shop's: sign-ins by email of it go as for
+    any domain not proved (ADR-919), and the owner proves it again as at first.
+  * **A lookup that fails** (no answer, SERVFAIL) changes nothing but when it was last looked at:
+    DNS's trouble is no reason to take a domain away.
+  * **The worker keeps the app login**: it reads the domains due and records what it found
+    through two security-definer functions of the identity schema's own, as staff's expired
+    memberships are ended (ADR-487), never reading a shop's provider settings.
+* **Consequences:**
+  * A domain stays a shop's only while its DNS says so.
+  * Not yet: telling the owner by email when a domain goes missing; SAML, and SCIM, as ADR-864
+    left them.
