@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-937 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-938 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -945,6 +945,7 @@
 | 935 | `hatti function init` begins an app's function from its target's starter, in JavaScript built with Javy, with a sample cart to run it on | Accepted |
 | 936 | A selling plan is changed from the admin as it was made, its chosen variants among the rest | Accepted |
 | 937 | A buy button's collection shows twelve products at a time, Show more giving the next page, past its first twelve | Accepted |
+| 938 | A shop hears on WhatsApp and by email the first time its single sign-on domain's record is found gone, with the day the domain stops being proved its | Accepted |
 
 ---
 
@@ -30757,3 +30758,25 @@
 * **Consequences:**
   * A shop embeds a whole collection, its shoppers shown it a page at a time.
   * Not yet: layouts other than cards in a grid.
+
+## ADR-938 · A shop hears on WhatsApp and by email the first time its single sign-on domain's record is found gone, with the day the domain stops being proved its
+
+* **Context:** ADR-934 looks a proved single sign-on domain up again each day and, its record
+  three days gone, unproves it; the admin's single sign-on card says so meanwhile, but an owner
+  who doesn't open it learns of it once their staff's sign-ins stop going to the shop. ADR-934
+  left telling the owner for later.
+* **Decision:**
+  * **The first time a domain is found missing**, its shop is told as Hatti's notices of a custom
+    domain pointed elsewhere are (ADR-262): at its alerts number on WhatsApp and by email to its
+    owner, in their languages, at Hatti's cost; a new kind, `sso_domain_missing`, which the shop
+    cannot turn off, its WhatsApp template `hatti_sso_domain_missing`.
+  * **It names the domain and the day it stops being proved the shop's**, three days on, in the
+    shop's time zone, and where the TXT record goes back: `_hatti-sso.<domain>`.
+  * **Once a time it goes missing**: a domain still missing is not told again; found again, then
+    missing once more, it is.
+  * **The worker learns the domain's shop and whether it was missing already** from identity's
+    own function (migration 0419 replaces `identity.sso_domains_due`), keeping the app login.
+* **Consequences:**
+  * An owner has three days, and word of them, to put a record back.
+  * Its WhatsApp template waits for Meta's approval with Hatti's others (OWN-23); the email goes
+    meanwhile.
