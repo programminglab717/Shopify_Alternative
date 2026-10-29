@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Theme experiments' revenue a session
+### a5514a1 · Theme experiments' revenue a session
 
 * **Theme experiments count each arm's revenue**, once an order, and say by Welch's test whether
   the draft brings more or less money a session ([ADR-921](../architecture/13-decision-log.md#adr-921--theme-experiments-count-each-arms-revenue-from-the-orders-its-sessions-place-at-checkout-once-an-order-and-say-by-welchs-test-whether-the-draft-brings-more-or-less-money-a-session)).
