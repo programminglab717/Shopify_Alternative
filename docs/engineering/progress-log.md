@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The order page saying payment terms
+### b6f31c5 · The order page saying payment terms
 
 * **An order on payment terms says on its page** what is owed by transfer and by which day, or
   that it was due, with the account and the receipt form ([ADR-920](../architecture/13-decision-log.md#adr-920--an-order-on-payment-terms-tells-its-customer-on-its-page-what-they-owe-by-transfer-and-by-which-day-or-that-it-was-due-and-takes-their-receipt-shipped-or-not)).
