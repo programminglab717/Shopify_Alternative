@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-931 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-932 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -939,6 +939,7 @@
 | 929 | An expansion store's price rate may follow the day's rate between the shops' currencies, from the currency feed, products copied as they change being copied again at each new rate | Accepted |
 | 930 | A selling plan may be for chosen variants alone, rather than a tag's products or all of them: the product page shows it on those, checkout prices it there alone | Accepted |
 | 931 | A theme experiment may show up to three drafts, each its own share of shoppers, each compared with the live theme at a confidence split among them | Accepted |
+| 932 | One page of what the owner's shop and each of its expansion stores sold, each in its own currency and in the shop's at the day's rate | Accepted |
 
 ---
 
@@ -30622,3 +30623,28 @@
   * Each draft gets fewer shoppers, so an experiment of three needs longer to say anything.
   * Not yet: stopping only the draft that sells clearly worse, the others going on; shares that
     differ by draft; price tests (OWN-56).
+
+## ADR-932 · One page of what the owner's shop and each of its expansion stores sold, each in its own currency and in the shop's at the day's rate
+
+* **Context:** An owner with a Lahore shop and a Dubai expansion store (ADR-859) sees each
+  shop's sales report alone, in its own currency, signing in to each in turn. Shopify Plus gives
+  an organisation's stores' sales together. ADR-859 left a single page across the stores' sales
+  for later.
+* **Decision:**
+  * **`expansionStoreSales(placedFrom, placedBefore)`**: this shop first, then each expansion
+    store the owner still owns, oldest first, each with its orders, net and total sales as its
+    sales report says them, in its own currency, and its total sales in this shop's currency at
+    the day's rate the currency feed last gave (ADR-865, ADR-929), to the paisa. Null where the
+    feed has no rate for its currency. 366 days at most, as the sales report.
+  * **The owner alone**, as for everything else about expansion stores; a store they no longer
+    own is left out, whatever the link says.
+  * **Worked out when asked** from each shop's orders by the sales report's own sums; nothing is
+    stored.
+  * **Admin:** Settings › Expansion stores shows "Sales across your stores" for the last 7, 30 or
+    90 days: each store's orders and sales, "≈ Rs 42,000 at the day's rate", and all of them
+    together; a store without a day's rate is said to be left out of the total.
+* **Consequences:**
+  * An owner sees in one place how their stores abroad add to the business, in rupees.
+  * The day's rate is today's, not each order's day's: a page of the year in rupees is the
+    year's sales at today's rate.
+  * Not yet: the stores' sales by day on one chart, and the same page in the sales report.
