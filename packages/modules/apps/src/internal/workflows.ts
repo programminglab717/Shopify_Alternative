@@ -53,6 +53,8 @@ export const WORKFLOW_TRIGGERS = {
   // customer, what it tells being its facts.
   stock_low: { subject: null },
   stock_out: { subject: null },
+  // Days of the week at an hour of the shop's own time, the shop's queues then its facts (ADR-906).
+  scheduled: { subject: null },
   app: { subject: null },
 } as const satisfies Record<string, { subject: 'order' | 'customer' | null }>;
 
@@ -272,7 +274,65 @@ const STOCK_FIELDS: readonly FlowField[] = [
 export const TRIGGER_FIELDS: Partial<Record<WorkflowTrigger, readonly FlowField[]>> = {
   stock_low: STOCK_FIELDS,
   stock_out: STOCK_FIELDS,
+  scheduled: [
+    { key: 'orders_to_confirm', label: 'Orders to confirm', type: 'number', required: true },
+    { key: 'orders_to_review', label: 'Orders to review', type: 'number', required: true },
+    { key: 'orders_to_pack', label: 'Orders to pack', type: 'number', required: true },
+    { key: 'orders_to_book', label: 'Orders to book', type: 'number', required: true },
+    { key: 'variants_low', label: 'Variants running low', type: 'number', required: true },
+    { key: 'variants_out', label: 'Variants out of stock', type: 'number', required: true },
+  ],
 };
+
+/** When a scheduled workflow runs (ADR-906): days of the week, Monday 1, at an hour of the shop's. */
+export interface WorkflowSchedule {
+  days: number[];
+  hour: number;
+}
+
+/** How late a slot may still run, for a worker that was down at its hour: two hours. */
+export const SCHEDULE_CATCH_UP_MS = 2 * 3_600_000;
+
+/**
+ * The slot of `schedule` due at `at` in `timezone`, as an instant: today's at its hour, where
+ * today is one of its days, the hour has come, and it is no more than
+ * {@link SCHEDULE_CATCH_UP_MS} ago; null otherwise.
+ */
+export function dueSlot(schedule: WorkflowSchedule, timezone: string, at: Date): Date | null {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(at)
+      .map((part) => [part.type, part.value]),
+  );
+  const day = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(parts.weekday!) + 1;
+  if (!schedule.days.includes(day)) return null;
+  // The shop's wall clock now, as if in UTC, and how far that is from the instant: its offset.
+  const wall = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  const offset = wall - Math.floor(at.getTime() / 1000) * 1000;
+  const slot = new Date(
+    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), schedule.hour) -
+      offset,
+  );
+  const since = at.getTime() - slot.getTime();
+  return since >= 0 && since <= SCHEDULE_CATCH_UP_MS ? slot : null;
+}
 
 /** The facts a workflow on `trigger` reads: of its order and customer, and what the app sends. */
 export function fieldsOf(

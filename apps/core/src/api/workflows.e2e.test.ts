@@ -721,4 +721,102 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
       'SKIPPED',
     ]);
   });
+
+  it("runs on its days at its hour of the shop's own time, once a slot, with the shop's queues (ADR-906)", async () => {
+    const owner = await account('manager');
+    await admin.query('UPDATE apps.workflows SET enabled = false WHERE shop_id = $1', [shop]);
+    await admin.query("UPDATE control.shops SET timezone = 'Asia/Karachi' WHERE id = $1", [shop]);
+    const notify = {
+      type: 'NOTIFY_STAFF',
+      title: 'Good morning',
+      message: '{{trigger.orders_to_confirm}} to confirm, {{trigger.variants_out}} out of stock',
+    };
+    const refused = await data(owner, CREATE, {
+      input: {
+        name: 'Mornings',
+        trigger: 'SCHEDULED',
+        schedule: { days: [0, 8], hour: 24 },
+        actions: [notify],
+      },
+    });
+    expect(refused.userErrors).toEqual([
+      {
+        field: ['input', 'schedule', 'days'],
+        code: 'INVALID',
+        message: 'Give the days it runs, Monday 1 to Sunday 7',
+      },
+      {
+        field: ['input', 'schedule', 'hour'],
+        code: 'INVALID',
+        message: "Give the hour it runs, 0 to 23, of the shop's own time",
+      },
+    ]);
+    const astray = await data(owner, CREATE, {
+      input: {
+        name: 'Odd',
+        trigger: 'ORDER_CREATED',
+        schedule: { days: [1], hour: 9 },
+        actions: [{ ...notify, message: 'A new order' }],
+      },
+    });
+    expect(astray.userErrors[0]).toMatchObject({ field: ['input', 'schedule'] });
+    const made = await data(owner, CREATE, {
+      input: {
+        name: 'Mornings',
+        trigger: 'SCHEDULED',
+        schedule: { days: [3, 1, 3], hour: 9 },
+        conditions: [{ field: 'trigger.orders_to_confirm', operator: 'AT_LEAST', value: '1' }],
+        actions: [notify],
+      },
+    });
+    expect(made.userErrors).toEqual([]);
+    const read = await data(
+      owner,
+      `query ($id: ID!) { workflow(id: $id) { trigger schedule { days hour } } }`,
+      {
+        id: made.workflow.id,
+      },
+    );
+    expect(read).toEqual({ trigger: 'SCHEDULED', schedule: { days: [1, 3], hour: 9 } });
+
+    const asked: string[] = [];
+    const scheduled = new WorkflowRuns(
+      new WorkflowService(worker, new SecretBox([{ id: 'test', key: Buffer.alloc(32, 9) }])),
+      workerOrders(worker),
+      new CustomerService(worker),
+      worker,
+      sender,
+      null,
+      undefined,
+      (shopId) => {
+        asked.push(shopId);
+        return Promise.resolve({
+          orders_to_confirm: 4,
+          orders_to_review: 1,
+          orders_to_pack: 2,
+          orders_to_book: 0,
+          variants_low: 3,
+          variants_out: 1,
+        });
+      },
+    );
+    // Wednesday 28 October 2026, 08:59 in Karachi: not yet.
+    expect(await scheduled.sweep(new Date('2026-10-28T03:59:00Z'))).toMatchObject({ done: 0 });
+    // 09:30: its run, once however often the worker sweeps.
+    expect(await scheduled.sweep(new Date('2026-10-28T04:30:00Z'))).toMatchObject({ done: 1 });
+    expect(await scheduled.sweep(new Date('2026-10-28T04:31:00Z'))).toMatchObject({ done: 0 });
+    expect(asked).toEqual([shop]);
+    const [run] = await data(owner, RUNS, { id: made.workflow.id });
+    expect(run).toMatchObject({ status: 'DONE', orderId: null });
+    expect(run.steps).toEqual([
+      {
+        action: 'NOTIFY_STAFF',
+        outcome: 'SKIPPED',
+        detail: 'This server sends no pushes: it has no keys',
+      },
+    ]);
+    // Thursday is none of its days.
+    expect(await scheduled.sweep(new Date('2026-10-29T04:30:00Z'))).toMatchObject({ done: 0 });
+    expect(await data(owner, RUNS, { id: made.workflow.id })).toHaveLength(1);
+  });
 });

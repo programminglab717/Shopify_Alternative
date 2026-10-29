@@ -6277,6 +6277,7 @@ export type WorkflowTriggerType =
   | 'CUSTOMER_CREATED'
   | 'STOCK_LOW'
   | 'STOCK_OUT'
+  | 'SCHEDULED'
   | 'APP';
 
 export type WorkflowConditionOperator =
@@ -6345,8 +6346,15 @@ export interface Workflow {
   conditions: WorkflowCondition[];
   actions: WorkflowAction[];
   enabled: boolean;
+  /** When a scheduled workflow runs (ADR-906): days, Monday 1, and an hour of the shop's. */
+  schedule: WorkflowSchedule | null;
   lastRunStatus: WorkflowRunStatus | null;
   lastRunAt: string | null;
+}
+
+export interface WorkflowSchedule {
+  days: number[];
+  hour: number;
 }
 
 export interface WorkflowsData {
@@ -6380,6 +6388,7 @@ export interface WorkflowInput {
   conditions: WorkflowCondition[];
   actions: WorkflowAction[];
   enabled: boolean;
+  schedule?: WorkflowSchedule | null;
 }
 
 export interface WorkflowPayloadData {

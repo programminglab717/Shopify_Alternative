@@ -67,6 +67,7 @@ const toWorkflow = (record: WorkflowRecord): Workflow =>
     conditions: record.conditions.map((each) => ({ ...each, operator: enumOf(each.operator) })),
     actions: record.actions.map(toAction),
     enabled: record.enabled,
+    schedule: record.schedule,
     lastRunStatus: record.lastRun ? enumOf(record.lastRun.status) : null,
     lastRunAt: record.lastRun?.createdAt ?? null,
     createdAt: record.createdAt,
@@ -119,6 +120,7 @@ function inputOf(input: WorkflowInput): WorkflowServiceInput {
       })),
     })),
     enabled: input.enabled,
+    schedule: input.schedule ?? null,
   };
 }
 

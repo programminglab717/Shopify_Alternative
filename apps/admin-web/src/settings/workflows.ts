@@ -98,8 +98,22 @@ export const TRIGGERS: readonly WorkflowTriggerType[] = [
   'CUSTOMER_CREATED',
   'STOCK_LOW',
   'STOCK_OUT',
+  'SCHEDULED',
   'APP',
 ];
+
+/** What a scheduled workflow's run tells (ADR-906): the shop's queues then. */
+export const QUEUE_FIELDS: readonly FactField[] = [
+  { key: 'trigger.orders_to_confirm', type: 'number' },
+  { key: 'trigger.orders_to_review', type: 'number' },
+  { key: 'trigger.orders_to_pack', type: 'number' },
+  { key: 'trigger.orders_to_book', type: 'number' },
+  { key: 'trigger.variants_low', type: 'number' },
+  { key: 'trigger.variants_out', type: 'number' },
+];
+
+/** A new scheduled workflow's schedule: every day at nine. */
+export const DEFAULT_SCHEDULE = { days: [1, 2, 3, 4, 5, 6, 7], hour: 9 };
 
 /** What a variant's stock trigger tells (ADR-905). */
 export const STOCK_FIELDS: readonly FactField[] = [
@@ -112,6 +126,9 @@ export const STOCK_FIELDS: readonly FactField[] = [
 
 const isStock = (trigger: WorkflowTriggerType) =>
   trigger === 'STOCK_LOW' || trigger === 'STOCK_OUT';
+
+/** Triggers about no order or customer: a variant's stock (ADR-905), or a schedule (ADR-906). */
+const aboutNone = (trigger: WorkflowTriggerType) => isStock(trigger) || trigger === 'SCHEDULED';
 
 export const OPERATORS: Record<FactType, readonly WorkflowConditionOperator[]> = {
   number: ['AT_LEAST', 'AT_MOST', 'GREATER_THAN', 'LESS_THAN', 'EQUALS', 'NOT_EQUALS'],
@@ -130,10 +147,11 @@ export function subjectsOf(
   const order =
     trigger === 'APP'
       ? extension?.resource === 'ORDER'
-      : trigger !== 'CUSTOMER_CREATED' && !isStock(trigger);
+      : trigger !== 'CUSTOMER_CREATED' && !aboutNone(trigger);
   return {
     order,
-    customer: order || (trigger === 'APP' ? extension?.resource === 'CUSTOMER' : !isStock(trigger)),
+    customer:
+      order || (trigger === 'APP' ? extension?.resource === 'CUSTOMER' : !aboutNone(trigger)),
   };
 }
 
@@ -154,6 +172,7 @@ export function fieldsOf(
         }))
       : []),
     ...(isStock(trigger) ? STOCK_FIELDS : []),
+    ...(trigger === 'SCHEDULED' ? QUEUE_FIELDS : []),
   ];
 }
 

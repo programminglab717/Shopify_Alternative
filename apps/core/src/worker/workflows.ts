@@ -20,6 +20,7 @@ import { toPublicId } from '@hatti/ids';
 import type { Logger } from '@hatti/logger';
 import type { PushService } from '@hatti/messaging/public';
 import { isCurrencyCode, money, toMajorString } from '@hatti/money';
+import type { LowStockService } from '@hatti/inventory/public';
 import type { CustomerOrderStats, OrderRecord, OrderService } from '@hatti/orders/public';
 import { recipientsIn } from './push-notices.js';
 import { repeat } from './repeat.js';
@@ -31,6 +32,29 @@ function workerTenant(shopId: string): TenantContext {
     currency: 'PKR',
     actor: { kind: 'app', tokenId: '00000000-0000-0000-0000-000000000000' },
     scopes: new Set(),
+  };
+}
+
+/**
+ * The shop's queues now, as a scheduled workflow's run tells them (ADR-906): orders at each stage
+ * that waits for staff, and variants running low or out, as the admin's home counts them.
+ */
+export function shopQueues(
+  orders: Pick<OrderService, 'stageCounts'>,
+  lowStock: Pick<LowStockService, 'counts'>,
+): (shopId: string) => Promise<Record<string, number>> {
+  return async (shopId) => {
+    const tenant = workerTenant(shopId);
+    const stages = await orders.stageCounts(tenant);
+    const stock = await lowStock.counts(tenant);
+    return {
+      orders_to_confirm: stages.get('needs_confirmation') ?? 0,
+      orders_to_review: stages.get('needs_review') ?? 0,
+      orders_to_pack: stages.get('to_pack') ?? 0,
+      orders_to_book: stages.get('to_book') ?? 0,
+      variants_low: stock.low,
+      variants_out: stock.out,
+    };
   };
 }
 
@@ -116,7 +140,10 @@ interface Loaded {
  */
 export class WorkflowRuns {
   constructor(
-    private readonly workflows: Pick<WorkflowService, 'claimDue' | 'finish' | 'postAppAction'>,
+    private readonly workflows: Pick<
+      WorkflowService,
+      'claimDue' | 'finish' | 'postAppAction' | 'scheduledDue' | 'enqueueScheduled'
+    >,
     private readonly orders: Pick<
       OrderService,
       'getMany' | 'customerStats' | 'retag' | 'holdForReview'
@@ -126,10 +153,16 @@ export class WorkflowRuns {
     private readonly sender: WebhookSender,
     private readonly push: Pick<PushService, 'push' | 'publicKey'> | null = null,
     private readonly logger?: Logger,
+    /**
+     * The shop's queues, for its scheduled workflows' runs (ADR-906): orders to confirm, review,
+     * pack and book, and variants low or out. Without it, none is scheduled.
+     */
+    private readonly queues?: (shopId: string) => Promise<Record<string, number>>,
   ) {}
 
   /** One sweep at `at`. */
   async sweep(at: Date = new Date()): Promise<WorkflowSweep> {
+    await this.#schedule(at);
     const done: WorkflowSweep = { done: 0, skipped: 0, failed: 0, retrying: 0, waiting: 0 };
     for (const run of await this.workflows.claimDue(at)) {
       let outcome: WorkflowRunOutcome;
@@ -150,6 +183,30 @@ export class WorkflowRuns {
       this.logger?.info(done, 'workflows run');
     }
     return done;
+  }
+
+  /**
+   * The runs of scheduled workflows whose slot has come (ADR-906), each once, with the shop's
+   * queues as they are now: read once a shop however many of its workflows are due.
+   */
+  async #schedule(at: Date): Promise<void> {
+    const queues = this.queues;
+    if (!queues) return;
+    const read = new Map<string, Promise<Record<string, number>>>();
+    for (const due of await this.workflows.scheduledDue(at)) {
+      if (!read.has(due.shopId)) read.set(due.shopId, queues(due.shopId));
+      const counts = await read.get(due.shopId)!;
+      const properties = Object.fromEntries(
+        Object.entries(counts).map(([key, value]) => [key, String(value)]),
+      );
+      await this.workflows.enqueueScheduled(
+        due.shopId,
+        due.workflowId,
+        due.eventId,
+        due.slot,
+        properties,
+      );
+    }
   }
 
   /** Sweeps now, then every `intervalMs`, a sweep never overlapping the last. */

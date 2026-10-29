@@ -133,7 +133,7 @@ import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
 import { SubscriptionOrders, SubscriptionSweeps } from './subscriptions.js';
-import { WorkflowRuns, WorkflowTriggers } from './workflows.js';
+import { WorkflowRuns, WorkflowTriggers, shopQueues } from './workflows.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
 import {
   FbrDigitalInvoicingClient,
@@ -799,6 +799,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         ),
         new PushService(database, vapid && new WebPushSender(vapid)),
         logger,
+        // Scheduled workflows' runs tell the shop's queues (ADR-906).
+        shopQueues(
+          workerOrders(database),
+          new LowStockService(database, new VariantService(database)),
+        ),
       ).start(config.WEBHOOK_INTERVAL_MS);
       closers.push(() => workflowRuns.stop());
     } else {

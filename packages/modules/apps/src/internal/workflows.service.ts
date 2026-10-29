@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   InputChecker,
   actorColumnsOf,
@@ -24,6 +25,7 @@ import {
   WORKFLOW_LIMITS,
   conditionProblem,
   TRIGGER_FIELDS,
+  dueSlot,
   fieldsOf,
   isWorkflowTrigger,
   placeholdersOf,
@@ -38,6 +40,7 @@ import {
   type WorkflowCondition,
   type WorkflowStep,
   type WorkflowSubject,
+  type WorkflowSchedule,
   type WorkflowTrigger,
 } from './workflows.js';
 
@@ -84,6 +87,8 @@ export interface WorkflowRecord {
   conditions: WorkflowCondition[];
   actions: WorkflowAction[];
   enabled: boolean;
+  /** When it runs, for a scheduled workflow (ADR-906); null for the others. */
+  schedule: WorkflowSchedule | null;
   lastRun: { status: WorkflowRunStatus; createdAt: Date } | null;
   createdAt: Date;
   updatedAt: Date;
@@ -111,6 +116,8 @@ export interface WorkflowInput {
   conditions?: { field: string; operator: string; value: string }[] | null;
   actions: WorkflowActionInput[];
   enabled?: boolean | null;
+  /** For a scheduled workflow alone (ADR-906): its days, Monday 1, and hour, 0 to 23. */
+  schedule?: { days: number[]; hour: number } | null;
 }
 
 export type WorkflowRunStatus = 'pending' | 'done' | 'skipped' | 'failed';
@@ -197,6 +204,7 @@ type WorkflowRow = {
   conditions: WorkflowCondition[];
   actions: WorkflowAction[];
   enabled: boolean;
+  schedule: WorkflowSchedule | null;
   last_run: { status: WorkflowRunStatus; created_at: string } | null;
   created_at: Date | string;
   updated_at: Date | string;
@@ -443,10 +451,12 @@ export class WorkflowService {
       const value = checked.value;
       const { rows } = await tx.execute<{ id: string }>(sql`
         INSERT INTO apps.workflows
-               (shop_id, name, trigger, extension_id, match, conditions, actions, enabled)
+               (shop_id, name, trigger, extension_id, match, conditions, actions, enabled,
+                schedule)
         VALUES (${tenant.shopId}, ${value.name}, ${value.trigger}, ${value.extensionId},
                 ${value.match}, ${JSON.stringify(value.conditions)}::jsonb,
-                ${JSON.stringify(value.actions)}::jsonb, ${value.enabled})
+                ${JSON.stringify(value.actions)}::jsonb, ${value.enabled},
+                ${value.schedule && JSON.stringify(value.schedule)}::jsonb)
         RETURNING id`);
       return this.#saved(tx, tenant, rows[0]!.id, 'workflow.created');
     });
@@ -468,6 +478,7 @@ export class WorkflowService {
                extension_id = ${value.extensionId}, match = ${value.match},
                conditions = ${JSON.stringify(value.conditions)}::jsonb,
                actions = ${JSON.stringify(value.actions)}::jsonb, enabled = ${value.enabled},
+               schedule = ${value.schedule && JSON.stringify(value.schedule)}::jsonb,
                updated_at = now()
          WHERE shop_id = ${tenant.shopId} AND id = ${id}
         RETURNING id`);
@@ -541,6 +552,64 @@ export class WorkflowService {
       made += rows.length;
     }
     return made;
+  }
+
+  /**
+   * The scheduled workflows due a run at `at`, across shops (ADR-906): enabled ones whose day and
+   * hour of the shop's own time have come, no more than two hours since, and not yet run for that
+   * slot. Each with the slot's own event, the workflow and its slot by name.
+   */
+  async scheduledDue(
+    at: Date = new Date(),
+  ): Promise<{ shopId: string; workflowId: string; eventId: string; slot: Date }[]> {
+    return this.db.system(async (tx) => {
+      const { rows } = await tx.execute<{
+        shop_id: string;
+        id: string;
+        schedule: WorkflowSchedule;
+        timezone: string;
+      }>(sql`
+        SELECT w.shop_id, w.id, w.schedule, s.timezone
+          FROM apps.workflows w JOIN control.shops s ON s.id = w.shop_id
+         WHERE w.enabled AND w.trigger = 'scheduled' AND w.schedule IS NOT NULL`);
+      const due = rows.flatMap((row) => {
+        const slot = dueSlot(row.schedule, row.timezone, at);
+        return slot
+          ? [{ shopId: row.shop_id, workflowId: row.id, eventId: slotEventId(row.id, slot), slot }]
+          : [];
+      });
+      if (due.length === 0) return [];
+      const { rows: ran } = await tx.execute<{ event_id: string }>(sql`
+        SELECT event_id FROM apps.workflow_runs
+         WHERE event_id = ANY (${sql.param(due.map((each) => each.eventId))}::uuid[])`);
+      const done = new Set(ran.map((row) => row.event_id));
+      return due.filter((each) => !done.has(each.eventId));
+    });
+  }
+
+  /**
+   * A scheduled workflow's run for its slot (ADR-906), due from the slot, with the shop's queues
+   * then as what its trigger tells: once a slot, however often it is asked. Whether it was made.
+   */
+  async enqueueScheduled(
+    shopId: string,
+    workflowId: string,
+    eventId: string,
+    slot: Date,
+    properties: Record<string, string>,
+  ): Promise<boolean> {
+    const subject: WorkflowSubject = { orderId: null, customerId: null, properties };
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<{ id: string }>(sql`
+        INSERT INTO apps.workflow_runs (shop_id, workflow_id, event_id, subject, next_attempt_at)
+        SELECT w.shop_id, w.id, ${eventId}, ${JSON.stringify(subject)}::jsonb, ${slot}
+          FROM apps.workflows w
+         WHERE w.shop_id = ${shopId} AND w.id = ${workflowId} AND w.enabled
+           AND w.trigger = 'scheduled'
+        ON CONFLICT (shop_id, workflow_id, event_id) DO NOTHING
+        RETURNING id`),
+    );
+    return rows.length > 0;
   }
 
   /**
@@ -698,7 +767,7 @@ export class WorkflowService {
   async #workflows(tx: Tx, shopId: string, where: SQL): Promise<WorkflowRecord[]> {
     const { rows } = await tx.execute<WorkflowRow>(sql`
       SELECT w.id, w.name, w.trigger, w.extension_id, w.match, w.conditions, w.actions,
-             w.enabled, w.created_at, w.updated_at,
+             w.enabled, w.schedule, w.created_at, w.updated_at,
              (SELECT row_to_json(last) FROM (
                 SELECT r.status, r.created_at FROM apps.workflow_runs r
                  WHERE r.shop_id = w.shop_id AND r.workflow_id = w.id
@@ -720,6 +789,7 @@ export class WorkflowService {
       conditions: row.conditions,
       actions: row.actions,
       enabled: row.enabled,
+      schedule: row.schedule,
       lastRun: row.last_run && {
         status: row.last_run.status,
         createdAt: toDate(row.last_run.created_at),
@@ -839,6 +909,7 @@ interface CheckedWorkflow {
   conditions: WorkflowCondition[];
   actions: WorkflowAction[];
   enabled: boolean;
+  schedule: WorkflowSchedule | null;
 }
 
 /**
@@ -1008,6 +1079,29 @@ async function checkWorkflow(
       }
     }
   });
+  // When a scheduled workflow runs (ADR-906); none for the others.
+  let schedule: WorkflowSchedule | null = null;
+  if (trigger === 'scheduled') {
+    const days = [...new Set(input.schedule?.days ?? [])].sort((a, b) => a - b);
+    const hour = input.schedule?.hour;
+    if (days.length === 0 || !days.every((day) => Number.isInteger(day) && day >= 1 && day <= 7)) {
+      check.addMessage(
+        ['input', 'schedule', 'days'],
+        'INVALID',
+        'Give the days it runs, Monday 1 to Sunday 7',
+      );
+    }
+    if (hour === undefined || !Number.isInteger(hour) || hour < 0 || hour > 23) {
+      check.addMessage(
+        ['input', 'schedule', 'hour'],
+        'INVALID',
+        "Give the hour it runs, 0 to 23, of the shop's own time",
+      );
+    }
+    schedule = { days, hour: hour ?? 0 };
+  } else if (input.schedule) {
+    check.addMessage(['input', 'schedule'], 'INVALID', 'A schedule is for scheduled workflows');
+  }
   if (!check.ok) return fail(check.errors);
   return {
     ok: true,
@@ -1019,6 +1113,13 @@ async function checkWorkflow(
       conditions: checkedConditions,
       actions,
       enabled: input.enabled ?? true,
+      schedule,
     },
   };
+}
+
+/** The event a scheduled workflow's slot stands for (ADR-906): a UUID named by both. */
+export function slotEventId(workflowId: string, slot: Date): string {
+  const hex = createHash('sha256').update(`${workflowId}:${slot.toISOString()}`).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

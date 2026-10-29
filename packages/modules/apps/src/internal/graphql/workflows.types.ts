@@ -19,6 +19,7 @@ export enum WorkflowTriggerType {
   CUSTOMER_CREATED = 'CUSTOMER_CREATED',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
+  SCHEDULED = 'SCHEDULED',
   APP = 'APP',
 }
 
@@ -28,6 +29,7 @@ registerEnumType(WorkflowTriggerType, {
     'What starts a workflow (DEV-11, ADR-861): an order placed, confirmed, paid or cancelled; ' +
     'its parcel delivered or returned; a customer created; STOCK_LOW and STOCK_OUT, a variant ' +
     "fallen to the shop's low-stock line or run out, once a spell as its alert is (ADR-905); " +
+    "SCHEDULED, days of the week at an hour of the shop's own time, its queues then (ADR-906); " +
     'or APP, a trigger an app offers.',
 });
 
@@ -251,6 +253,29 @@ export class WorkflowAction {
 
 @ObjectType({
   description:
+    "When a scheduled workflow runs (ADR-906): days of the week at an hour of the shop's own " +
+    "time, each slot once. Its run tells the shop's queues then: orders to confirm, review, " +
+    'pack and book, and variants running low or out.',
+})
+export class WorkflowSchedule {
+  @Field(() => [Int], { description: 'Monday 1 to Sunday 7.' })
+  days!: number[];
+
+  @Field(() => Int, { description: "0 to 23, of the shop's own time." })
+  hour!: number;
+}
+
+@InputType()
+export class WorkflowScheduleInput {
+  @Field(() => [Int], { description: 'Monday 1 to Sunday 7.' })
+  days!: number[];
+
+  @Field(() => Int, { description: "0 to 23, of the shop's own time." })
+  hour!: number;
+}
+
+@ObjectType({
+  description:
     "The shop's own automation (DEV-11, ADR-861): a trigger, conditions on what it is about, " +
     'and actions done in turn.',
 })
@@ -281,6 +306,12 @@ export class Workflow {
 
   @Field()
   enabled!: boolean;
+
+  @Field(() => WorkflowSchedule, {
+    nullable: true,
+    description: 'When a SCHEDULED workflow runs (ADR-906); null for the others.',
+  })
+  schedule!: WorkflowSchedule | null;
 
   @Field(() => WorkflowRunStatus, { nullable: true })
   lastRunStatus!: WorkflowRunStatus | null;
@@ -446,6 +477,12 @@ export class WorkflowInput {
 
   @Field(() => Boolean, { nullable: true, description: 'On unless given.' })
   enabled?: boolean | null;
+
+  @Field(() => WorkflowScheduleInput, {
+    nullable: true,
+    description: 'For a SCHEDULED workflow alone, which needs it.',
+  })
+  schedule?: WorkflowScheduleInput | null;
 }
 
 @ObjectType()

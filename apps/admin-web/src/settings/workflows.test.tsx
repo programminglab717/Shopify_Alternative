@@ -234,6 +234,36 @@ describe('Workflows (DEV-11, ADR-861)', () => {
     expect(actions).not.toContain('HOLD_ORDER');
   });
 
+  it("runs on days at an hour of the shop's own time, reading its queues (ADR-906)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/workflows');
+    fireEvent.click(await screen.findByRole('button', { name: 'New workflow' }));
+    type('Name', 'Mornings');
+    fireEvent.change(screen.getByLabelText('When'), { target: { value: 'SCHEDULED' } });
+    // Every day at nine to start from: not Sundays, and at eight.
+    expect((screen.getByRole('checkbox', { name: 'Sunday' }) as HTMLInputElement).checked).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sunday' }));
+    fireEvent.change(screen.getByLabelText('At'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add a condition' }));
+    const field = screen.getByLabelText('What condition 1 checks') as HTMLSelectElement;
+    expect([...field.options].map((each) => each.text)).toEqual([
+      'Orders to confirm',
+      'Orders to review',
+      'Orders to pack',
+      'Orders to book',
+      'Variants running low',
+      'Variants out of stock',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save workflow' }));
+    await waitFor(() => expect(sentOf(fake, 'WorkflowCreate')).toHaveLength(1));
+    expect(sentOf(fake, 'WorkflowCreate')[0]).toMatchObject({
+      input: { trigger: 'SCHEDULED', schedule: { days: [1, 2, 3, 4, 5, 6], hour: 8 } },
+    });
+  });
+
   it("offers an app's trigger, its fields to check, and its order's", async () => {
     vi.stubGlobal('fetch', core().fetcher);
     renderAdmin('/shop_1/settings/workflows');

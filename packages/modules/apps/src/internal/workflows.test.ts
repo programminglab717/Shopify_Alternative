@@ -5,6 +5,7 @@ import {
   ORDER_FIELDS,
   conditionProblem,
   conditionsHold,
+  dueSlot,
   fieldsOf,
   holds,
   placeholdersOf,
@@ -120,6 +121,32 @@ describe('Workflows (DEV-11, ADR-861)', () => {
       { key: 'trigger.threshold', type: 'number' },
     ]);
     expect(subjectsOf('stock_low', null)).toEqual({ order: false, customer: false });
+  });
+
+  it("finds a schedule's slot due at its hour of the shop's own time, for two hours (ADR-906)", () => {
+    // Wednesdays and Saturdays at 9 in Karachi, five hours ahead of UTC.
+    const schedule = { days: [3, 6], hour: 9 };
+    const at = (iso: string) => dueSlot(schedule, 'Asia/Karachi', new Date(iso));
+    expect(at('2026-10-28T04:30:00Z')).toEqual(new Date('2026-10-28T04:00:00Z'));
+    expect(at('2026-10-28T04:00:00Z')).toEqual(new Date('2026-10-28T04:00:00Z'));
+    expect(at('2026-10-28T06:00:00Z')).toEqual(new Date('2026-10-28T04:00:00Z'));
+    // Before its hour, more than two hours after, or on another day: none.
+    expect(at('2026-10-28T03:59:00Z')).toBeNull();
+    expect(at('2026-10-28T06:01:00Z')).toBeNull();
+    expect(at('2026-10-29T04:30:00Z')).toBeNull();
+    // Saturday's, and in another zone its own hour.
+    expect(at('2026-10-31T04:10:00Z')).toEqual(new Date('2026-10-31T04:00:00Z'));
+    expect(
+      dueSlot({ days: [3], hour: 9 }, 'Europe/London', new Date('2026-10-28T09:30:00Z')),
+    ).toEqual(new Date('2026-10-28T09:00:00Z'));
+    expect(fieldsOf('scheduled', null).map((field) => field.key)).toEqual([
+      'trigger.orders_to_confirm',
+      'trigger.orders_to_review',
+      'trigger.orders_to_pack',
+      'trigger.orders_to_book',
+      'trigger.variants_low',
+      'trigger.variants_out',
+    ]);
   });
 
   it("reads an order's and customer's facts, and an app's trigger's own", () => {

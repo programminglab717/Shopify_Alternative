@@ -18,6 +18,7 @@ import type {
   WorkflowCondition,
   WorkflowDeleteData,
   WorkflowInput,
+  WorkflowSchedule,
   WorkflowPayloadData,
   WorkflowRunsData,
   WorkflowTriggerType,
@@ -37,6 +38,7 @@ import {
   MOST_ACTIONS,
   OPERATORS,
   TEMPLATES,
+  DEFAULT_SCHEDULE,
   TRIGGERS,
   actionsOf,
   blankAction,
@@ -45,6 +47,51 @@ import {
   valueLabel,
   type FactField,
 } from './workflows';
+
+/** A scheduled workflow's days and hour of the shop's own time (ADR-906). */
+function ScheduleFields({
+  schedule,
+  onChange,
+}: {
+  schedule: WorkflowSchedule;
+  onChange: (schedule: WorkflowSchedule) => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="font-medium">{t('workflow.days')}</legend>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+          <CheckField
+            key={day}
+            label={t(`workflow.day.${day}` as MessageKey)}
+            checked={schedule.days.includes(day)}
+            onChange={(on) =>
+              onChange({
+                ...schedule,
+                days: on
+                  ? [...schedule.days, day].sort((a, b) => a - b)
+                  : schedule.days.filter((each) => each !== day),
+              })
+            }
+          />
+        ))}
+      </div>
+      <SelectField
+        label={t('workflow.hour')}
+        value={String(schedule.hour)}
+        options={Array.from({ length: 24 }, (_, hour) => ({
+          value: String(hour),
+          label: `${String(hour).padStart(2, '0')}:00`,
+        }))}
+        onChange={(hour) => onChange({ ...schedule, hour: Number(hour) })}
+      />
+      <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+        {t('workflow.scheduleHint')}
+      </p>
+    </fieldset>
+  );
+}
 
 /** A workflow as it is edited: a new one has no ID. */
 type Draft = WorkflowInput & { id: string | null };
@@ -58,6 +105,7 @@ const draftOf = (workflow: Workflow): Draft => ({
   conditions: workflow.conditions,
   actions: workflow.actions,
   enabled: workflow.enabled,
+  schedule: workflow.schedule,
 });
 
 /**
@@ -401,9 +449,18 @@ function WorkflowEditor({
           options={triggerOptions}
           onChange={(value) => {
             const [trigger, extensionId] = value.split(':') as [WorkflowTriggerType, string?];
-            change({ trigger, extensionId: extensionId ?? null, conditions: [] });
+            change({
+              trigger,
+              extensionId: extensionId ?? null,
+              conditions: [],
+              // Every day at nine, to start from (ADR-906).
+              schedule: trigger === 'SCHEDULED' ? (draft.schedule ?? DEFAULT_SCHEDULE) : null,
+            });
           }}
         />
+        {draft.trigger === 'SCHEDULED' && draft.schedule && (
+          <ScheduleFields schedule={draft.schedule} onChange={(schedule) => change({ schedule })} />
+        )}
         <CheckField
           label={t('workflow.enabled')}
           checked={draft.enabled}

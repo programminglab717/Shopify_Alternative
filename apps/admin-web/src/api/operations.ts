@@ -12884,6 +12884,10 @@ const WORKFLOW = /* GraphQL */ `
       }
     }
     enabled
+    schedule {
+      days
+      hour
+    }
     lastRunStatus
     lastRunAt
   }
