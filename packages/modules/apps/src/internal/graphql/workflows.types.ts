@@ -62,6 +62,7 @@ export enum WorkflowActionType {
   REMOVE_ORDER_TAGS = 'REMOVE_ORDER_TAGS',
   ADD_CUSTOMER_TAGS = 'ADD_CUSTOMER_TAGS',
   REMOVE_CUSTOMER_TAGS = 'REMOVE_CUSTOMER_TAGS',
+  HOLD_ORDER = 'HOLD_ORDER',
   NOTIFY_STAFF = 'NOTIFY_STAFF',
   APP_ACTION = 'APP_ACTION',
   WAIT = 'WAIT',
@@ -71,7 +72,8 @@ export enum WorkflowActionType {
 registerEnumType(WorkflowActionType, {
   name: 'WorkflowActionType',
   description:
-    "What a workflow does: tags added to or taken from the order or its customer; the owner's " +
+    'What a workflow does: tags added to or taken from the order or its customer; HOLD_ORDER, ' +
+    "the order held for review until staff confirm it (ADR-904); the owner's " +
     "and managers' phones told; APP_ACTION, an action an app offers, posted to it signed; " +
     'WAIT, hours before the next action (ADR-886); or CONTINUE_IF, conditions checked of the ' +
     'order or customer as they are then, the rest left where they do not hold.',

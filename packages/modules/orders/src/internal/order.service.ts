@@ -2455,6 +2455,51 @@ export class OrderService {
   }
 
   /**
+   * Holds an order for review where a workflow says so (MKT-04, ADR-904), as one is held for its
+   * risk: staff look at it and confirm it to let it go ahead. Only an open order not yet packed
+   * and handed on, to confirm, pack or book, is held; its timeline names the workflow. `held`
+   * false, and why, for one held already or past review.
+   */
+  async holdForReview(
+    shopId: string,
+    id: string,
+    workflowName: string,
+  ): Promise<MutationResult<{ held: boolean; why: string | null }>> {
+    return this.db.tenant(shopId, async (tx) => {
+      const order = await lockOrder(tx, shopId, id);
+      if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+      if (order.confirmationStatus === 'needs_review') {
+        return { ok: true, value: { held: false, why: 'It is held for review already' } };
+      }
+      if (
+        order.status !== 'open' ||
+        !['needs_confirmation', 'to_pack', 'to_book'].includes(order.stage)
+      ) {
+        return {
+          ok: true,
+          value: { held: false, why: 'It is past review: handed on, closed or cancelled' },
+        };
+      }
+      const updated = await updateOrder(tx, shopId, order, { confirmationStatus: 'needs_review' });
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        'system',
+        'held',
+        `Held for review by the workflow “${workflowName}”`,
+      );
+      await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['held'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: { held: true, why: null } };
+    });
+  }
+
+  /**
    * Marks a confirmed or paid order as packed, ready to hand to a courier: it moves from To pack to
    * To book. Shipping does not need it; it is for shops that pack and book in separate steps.
    */

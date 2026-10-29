@@ -117,7 +117,10 @@ interface Loaded {
 export class WorkflowRuns {
   constructor(
     private readonly workflows: Pick<WorkflowService, 'claimDue' | 'finish' | 'postAppAction'>,
-    private readonly orders: Pick<OrderService, 'getMany' | 'customerStats' | 'retag'>,
+    private readonly orders: Pick<
+      OrderService,
+      'getMany' | 'customerStats' | 'retag' | 'holdForReview'
+    >,
     private readonly customers: Pick<CustomerService, 'get' | 'update'>,
     private readonly database: Database,
     private readonly sender: WebhookSender,
@@ -277,6 +280,14 @@ export class WorkflowRuns {
         const result = await this.customers.update(tenant, customer.id, { tags });
         if (!result.ok) return { outcome: 'failed', detail: result.errors[0]!.message };
         return { outcome: 'done', detail: action.tags.join(', ') };
+      }
+      case 'hold_order': {
+        if (!order) return { outcome: 'failed', detail: 'The trigger tells of no order' };
+        const result = await this.orders.holdForReview(run.shopId, order.id, run.workflowName);
+        if (!result.ok) return { outcome: 'failed', detail: result.errors[0]!.message };
+        return result.value.held
+          ? { outcome: 'done', detail: 'Held for review' }
+          : { outcome: 'skipped', detail: result.value.why };
       }
       case 'notify_staff': {
         const push = this.push;

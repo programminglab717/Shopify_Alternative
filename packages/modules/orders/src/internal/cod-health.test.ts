@@ -319,6 +319,28 @@ describe.skipIf(!server)('CodHealthService', () => {
     ]);
   });
 
+  it('holds an order for review where a workflow says so, until it is confirmed (ADR-904)', async () => {
+    const toPack = await confirmed(f.a, [kurta], 'Lahore');
+    expect(unwrap(await f.orders.holdForReview(f.a.shopId, toPack.id, 'Big orders'))).toEqual({
+      held: true,
+      why: null,
+    });
+    expect(await f.orders.get(f.a, toPack.id)).toMatchObject({ stage: 'needs_review' });
+    expect(unwrap(await f.orders.holdForReview(f.a.shopId, toPack.id, 'Big orders'))).toEqual({
+      held: false,
+      why: 'It is held for review already',
+    });
+    unwrap(await f.orders.confirm(f.a, toPack.id));
+    expect(await f.orders.get(f.a, toPack.id)).toMatchObject({ stage: 'to_pack' });
+    // Handed on, it is past review.
+    const handedOn = await confirmed(f.a, [kurta], 'Lahore');
+    await shipped(handedOn);
+    expect(unwrap(await f.orders.holdForReview(f.a.shopId, handedOn.id, 'Big orders'))).toEqual({
+      held: false,
+      why: 'It is past review: handed on, closed or cancelled',
+    });
+  });
+
   it("finds a customer's other confirmed orders not yet shipped, their parcel refused (ADR-672)", async () => {
     const refused = await confirmed(f.a, [kurta], 'Lahore');
     const parcel = await shipped(refused, 'PostEx');

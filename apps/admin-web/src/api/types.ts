@@ -6294,6 +6294,7 @@ export type WorkflowActionType =
   | 'REMOVE_ORDER_TAGS'
   | 'ADD_CUSTOMER_TAGS'
   | 'REMOVE_CUSTOMER_TAGS'
+  | 'HOLD_ORDER'
   | 'NOTIFY_STAFF'
   | 'APP_ACTION'
   | 'WAIT'

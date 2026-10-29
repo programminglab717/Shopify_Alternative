@@ -190,10 +190,16 @@ describe('Workflows (DEV-11, ADR-861)', () => {
     fireEvent.change(screen.getByLabelText('Action 2: Value for condition 2'), {
       target: { value: 'needs_confirmation' },
     });
+    // Then held for review, in place of its tag (ADR-904).
+    fireEvent.change(screen.getByLabelText('Action 3'), { target: { value: 'HOLD_ORDER' } });
+    expect(
+      screen.getByText('It waits at To review until staff look at it and confirm it.'),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Save workflow' }));
     await waitFor(() => expect(sentOf(fake, 'WorkflowCreate')).toHaveLength(1));
     const { actions } = (sentOf(fake, 'WorkflowCreate')[0] as { input: { actions: unknown[] } })
       .input;
+    expect(actions[2]).toEqual(expect.objectContaining({ type: 'HOLD_ORDER', tags: [] }));
     expect(actions.slice(0, 2)).toEqual([
       expect.objectContaining({ type: 'WAIT', hours: 48 }),
       expect.objectContaining({

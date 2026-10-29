@@ -925,6 +925,8 @@ async function checkWorkflow(
         }
         return [{ type, tags }];
       }
+      case 'hold_order':
+        return [{ type }];
       case 'notify_staff': {
         const title = check.text([...path, 'title'], action.title, {
           required: true,

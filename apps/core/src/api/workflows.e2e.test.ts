@@ -585,4 +585,70 @@ describe.skipIf(!server)('Workflows: triggers, conditions and actions (DEV-11, A
     expect(await tagsOf(waiting)).toEqual(['call-again']);
     expect(await tagsOf(confirmed)).toEqual([]);
   });
+
+  it('holds an order for review until staff confirm it (ADR-904)', async () => {
+    const owner = await account('manager');
+    await admin.query('UPDATE apps.workflows SET enabled = false WHERE shop_id = $1', [shop]);
+    const wrong = await data(owner, CREATE, {
+      input: {
+        name: 'Hold new customers',
+        trigger: 'CUSTOMER_CREATED',
+        actions: [{ type: 'HOLD_ORDER' }],
+      },
+    });
+    expect(wrong.userErrors).toEqual([
+      {
+        field: ['input', 'actions', '0', 'type'],
+        code: 'INVALID',
+        message: 'This trigger tells of no order to change',
+      },
+    ]);
+    const made = await data(owner, CREATE, {
+      input: {
+        name: 'Hold big orders',
+        trigger: 'ORDER_CREATED',
+        actions: [{ type: 'HOLD_ORDER' }, { type: 'HOLD_ORDER' }],
+      },
+    });
+    expect(made.userErrors).toEqual([]);
+    expect(made.workflow.actions.map((each: Json) => each.type)).toEqual([
+      'HOLD_ORDER',
+      'HOLD_ORDER',
+    ]);
+
+    const product = await data(
+      owner,
+      `mutation {
+        productCreate(input: { title: "Chador", status: ACTIVE, variants: [{ price: "2,500" }] }) {
+          product { variants { id } } } }`,
+    );
+    const placed = await data(
+      owner,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Sana Malik", phone: "0301 2345678",
+                             address1: "Flat 3, Block B", city: "Karachi" },
+          paymentMethod: CASH_ON_DELIVERY
+        }) { order { id stage } userErrors { message } } }`,
+      { variantId: product.product.variants[0].id },
+    );
+    expect(placed.order.stage).toBe('NEEDS_CONFIRMATION');
+    await hear('order.created');
+    expect(await runs.sweep()).toMatchObject({ done: 1, failed: 0 });
+    const [run] = await data(owner, RUNS, { id: made.workflow.id });
+    expect(run.steps).toEqual([
+      { action: 'HOLD_ORDER', outcome: 'DONE', detail: 'Held for review' },
+      { action: 'HOLD_ORDER', outcome: 'SKIPPED', detail: 'It is held for review already' },
+    ]);
+    const order = await data(
+      owner,
+      `query ($id: ID!) { order(id: $id) { stage events(first: 10) { nodes { message } } } }`,
+      { id: placed.order.id },
+    );
+    expect(order.stage).toBe('NEEDS_REVIEW');
+    expect(order.events.nodes.map((each: Json) => each.message)).toContain(
+      'Held for review by the workflow “Hold big orders”',
+    );
+  });
 });

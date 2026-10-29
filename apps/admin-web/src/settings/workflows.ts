@@ -143,7 +143,7 @@ export function fieldsOf(
 export function actionsOf(trigger: WorkflowTriggerType, extension: FlowExtension | null) {
   const has = subjectsOf(trigger, extension);
   return [
-    ...(has.order ? (['ADD_ORDER_TAGS', 'REMOVE_ORDER_TAGS'] as const) : []),
+    ...(has.order ? (['ADD_ORDER_TAGS', 'REMOVE_ORDER_TAGS', 'HOLD_ORDER'] as const) : []),
     ...(has.customer ? (['ADD_CUSTOMER_TAGS', 'REMOVE_CUSTOMER_TAGS'] as const) : []),
     'NOTIFY_STAFF',
     'WAIT',

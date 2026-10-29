@@ -464,6 +464,11 @@ function WorkflowEditor({
                   }
                 />
               )}
+              {action.type === 'HOLD_ORDER' && (
+                <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {t('workflow.holdHint')}
+                </p>
+              )}
               {action.type === 'NOTIFY_STAFF' && (
                 <>
                   <TextField

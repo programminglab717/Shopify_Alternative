@@ -370,6 +370,8 @@ export const WORKFLOW_ACTIONS = {
   remove_order_tags: { needs: 'order' },
   add_customer_tags: { needs: 'customer' },
   remove_customer_tags: { needs: 'customer' },
+  // The order held for review, as for its risk, until staff confirm it (ADR-904).
+  hold_order: { needs: 'order' },
   notify_staff: { needs: null },
   app_action: { needs: null },
   // The run waits, then goes on with the order or customer as they are then (ADR-886).
@@ -386,6 +388,7 @@ export type WorkflowAction =
       type: 'add_order_tags' | 'remove_order_tags' | 'add_customer_tags' | 'remove_customer_tags';
       tags: string[];
     }
+  | { type: 'hold_order' }
   | { type: 'notify_staff'; title: string; message: string }
   | { type: 'app_action'; extensionId: string; properties: Record<string, string> }
   | { type: 'wait'; hours: number }
