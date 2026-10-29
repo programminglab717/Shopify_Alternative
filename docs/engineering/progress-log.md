@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The AI agent reads photos
+### f4a4039 · The AI agent reads photos
 
 * **The AI support agent reads a customer's photo into searches of the shop's products** and
   answers with what they find; a photo of nothing a shop sells goes to staff ([ADR-941](../architecture/13-decision-log.md#adr-941--the-ai-support-agent-reads-a-customers-photo-into-searches-of-the-shops-products-and-answers-with-what-they-find)).
