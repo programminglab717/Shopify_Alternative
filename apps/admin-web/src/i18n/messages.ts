@@ -2819,6 +2819,16 @@ const en = {
     'Each answer uses one AI credit. Once someone in your team answers a chat, or takes it, the AI leaves it to them for a day.',
   'supportAgent.today': 'Answered today: {count} of {limit}',
   'supportAgent.unavailable': 'AI answers are not set up on Hatti yet.',
+  'supportAgent.faqs': 'Answers to common questions',
+  'supportAgent.faqsHint':
+    'The AI answers from these as well as from your policies, the products a customer asks about, with their prices and which sizes are in stock, and their own orders.',
+  'supportAgent.question': 'Question {number}',
+  'supportAgent.answer': 'Answer {number}',
+  'supportAgent.remove': 'Remove question {number}',
+  'supportAgent.add': 'Add a question',
+  'supportAgent.saveFaqs': 'Save answers',
+  'supportAgent.saved': 'Saved.',
+  'supportAgent.incomplete': 'Write both the question and its answer, or remove it.',
   'inbox.byAi': 'AI',
   'webChat.title': 'Chat on your online store',
   'webChat.hint':
@@ -9986,6 +9996,16 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'ہر جواب میں ایک AI کریڈٹ لگتا ہے۔ جب آپ کی ٹیم کا کوئی فرد چیٹ کا جواب دے یا اسے لے لے، تو AI ایک دن کے لیے اسے ان پر چھوڑ دیتی ہے۔',
   'supportAgent.today': 'آج جواب دیے: {limit} میں سے {count}',
   'supportAgent.unavailable': 'AI جوابات ابھی ہٹی پر سیٹ اپ نہیں ہوئے۔',
+  'supportAgent.faqs': 'عام سوالوں کے جواب',
+  'supportAgent.faqsHint':
+    'AI ان سے بھی جواب دیتا ہے، اور آپ کی پالیسیوں، گاہک جن پروڈکٹس کا پوچھے ان کی قیمتوں اور اسٹاک میں موجود سائز، اور ان کے اپنے آرڈرز سے بھی۔',
+  'supportAgent.question': 'سوال {number}',
+  'supportAgent.answer': 'جواب {number}',
+  'supportAgent.remove': 'سوال {number} ہٹائیں',
+  'supportAgent.add': 'سوال شامل کریں',
+  'supportAgent.saveFaqs': 'جواب محفوظ کریں',
+  'supportAgent.saved': 'محفوظ ہو گیا۔',
+  'supportAgent.incomplete': 'سوال اور اس کا جواب دونوں لکھیں، یا اسے ہٹا دیں۔',
   'inbox.byAi': 'AI',
   'webChat.title': 'آپ کے آن لائن اسٹور پر چیٹ',
   'webChat.hint':

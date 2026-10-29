@@ -278,6 +278,60 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
     expect(await replies.handle((await latest()).event)).toBeNull();
   });
 
+  it("answers from the shop's own answers and the products asked of, with what is in stock (ADR-911)", async () => {
+    answer = { reply: 'Ji, S mein hai, M khatam ho gaya.', hand_off: false };
+    unwrap(
+      await agent.setFaqs(owner, [
+        { question: 'Delivery kitne din mein?', answer: 'Karachi mein 2 din, baqi 3 se 5 din.' },
+      ]),
+    );
+    const suit = unwrap(
+      await new ProductService(database).create(owner, {
+        title: 'Lawn Suit',
+        status: 'active',
+        options: [{ name: 'Size', values: ['S', 'M'] }],
+        variants: [
+          { optionValues: ['S'], price: '3,500', compareAtPrice: '4,000' },
+          { optionValues: ['M'], price: '3,500' },
+        ],
+      }),
+    );
+    const location = await new LocationService(database).primary(owner);
+    unwrap(
+      await new InventoryService(database, new VariantService(database)).setQuantities(owner, {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: suit.variants.map((variant, at) => ({
+          inventoryItemId: variant.id,
+          locationId: location.id,
+          quantity: at === 0 ? 5 : 0,
+        })),
+      }),
+    );
+
+    const asked = await chatOf('Lawn suit M size mein milega?');
+    expect(await replies.handle(asked.event)).toBe('replied');
+    const prompt = prompts.at(-1)!;
+    expect(prompt).toContain(
+      "The shop's answers to common questions:\nQ: Delivery kitne din mein?\nA: Karachi mein 2 din, baqi 3 se 5 din.",
+    );
+    // Whether each size can be bought, never how many are left.
+    expect(prompt).toContain(
+      'Lawn Suit: S: Rs 3,500 (was Rs 4,000), in stock; M: Rs 3,500, out of stock',
+    );
+    expect(prompt).not.toContain('Kurta:');
+    // The customer's orders come first, the shop's own words after.
+    expect(prompt.indexOf('No order of this customer is known')).toBeLessThan(
+      prompt.indexOf("The shop's policies:"),
+    );
+
+    // A message of nothing the shop sells says so.
+    await chatOf('assalam o alaikum, kya haal hai?');
+    expect(await replies.handle((await latest()).event)).toBe('replied');
+    expect(prompts.at(-1)).toContain('No product of the shop matches what the customer wrote.');
+    unwrap(await agent.setFaqs(owner, []));
+  });
+
   it('answers no one without a credit left, and keeps why', async () => {
     credits.left = 0;
     const asked = await chatOf('delivery kitne din mein?');

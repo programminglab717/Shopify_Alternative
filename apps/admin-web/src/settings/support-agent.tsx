@@ -1,13 +1,25 @@
+import { Plus, Save, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { SupportAgentQuery, SupportAgentUpdateMutation } from '../api/operations';
-import type { SupportAgentData, SupportAgentUpdateData } from '../api/types';
+import type { FormEvent } from 'react';
+import {
+  SupportAgentFaqsSetMutation,
+  SupportAgentQuery,
+  SupportAgentUpdateMutation,
+} from '../api/operations';
+import type {
+  SupportAgentData,
+  SupportAgentFaqsSetData,
+  SupportAgentUpdateData,
+  SupportFaqValue,
+} from '../api/types';
 import { permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
-import { FormSection, problemText } from '../products/product-form';
+import { FormSection, TextArea, problemText } from '../products/product-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
+import { TextField } from '../ui/field';
 import { CheckField } from './settings-form';
 import { SETS_SETTINGS } from './settings-page';
 
@@ -65,6 +77,7 @@ export function SupportAgentCard() {
           </p>
         )}
         {problem && <Alert tone="danger">{problem}</Alert>}
+        <FaqsForm saved={agent.faqs} may={may} />
       </div>
     );
   }
@@ -72,5 +85,103 @@ export function SupportAgentCard() {
     <FormSection title={t('supportAgent.title')} hint={t('supportAgent.hint')}>
       {body}
     </FormSection>
+  );
+}
+
+/**
+ * The shop's answers to its customers' common questions (ADR-911), which the AI answers from as
+ * it does from the shop's policies: written, changed, removed and saved together, in order.
+ */
+function FaqsForm({ saved, may }: { saved: SupportFaqValue[]; may: boolean }) {
+  const { t } = useLocale();
+  const save = useAdminMutation<SupportAgentFaqsSetData, { faqs: SupportFaqValue[] }>(
+    SupportAgentFaqsSetMutation,
+  );
+  const [faqs, setFaqs] = useState<SupportFaqValue[]>(saved);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const change = (at: number, faq: Partial<SupportFaqValue>) => {
+    setDone(false);
+    setFaqs(faqs.map((each, index) => (index === at ? { ...each, ...faq } : each)));
+  };
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    setDone(false);
+    if (faqs.some((faq) => !faq.question.trim() || !faq.answer.trim())) {
+      setProblem(t('supportAgent.incomplete'));
+      return;
+    }
+    try {
+      const { supportAgentFaqsSet } = await save.mutateAsync({ faqs });
+      const error = supportAgentFaqsSet.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else setDone(true);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-3 border-t border-line pt-3" onSubmit={onSubmit}>
+      <h3 className="font-medium">{t('supportAgent.faqs')}</h3>
+      <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+        {t('supportAgent.faqsHint')}
+      </p>
+      {faqs.map((faq, at) => (
+        <fieldset key={at} className="flex flex-col gap-2" disabled={!may}>
+          <div className="flex items-end gap-2">
+            <TextField
+              className="grow"
+              label={t('supportAgent.question', { number: at + 1 })}
+              value={faq.question}
+              maxLength={200}
+              dir="auto"
+              onChange={(event) => change(at, { question: event.target.value })}
+            />
+            <Button
+              variant="danger"
+              icon={<Trash2 aria-hidden className="size-5" />}
+              aria-label={t('supportAgent.remove', { number: at + 1 })}
+              onClick={() => {
+                setDone(false);
+                setFaqs(faqs.filter((_, index) => index !== at));
+              }}
+            />
+          </div>
+          <TextArea
+            label={t('supportAgent.answer', { number: at + 1 })}
+            value={faq.answer}
+            onChange={(answer) => change(at, { answer })}
+          />
+        </fieldset>
+      ))}
+      {may && (
+        <div className="flex flex-wrap gap-2">
+          {faqs.length < 30 && (
+            <Button
+              variant="secondary"
+              icon={<Plus aria-hidden className="size-5" />}
+              onClick={() => {
+                setDone(false);
+                setFaqs([...faqs, { question: '', answer: '' }]);
+              }}
+            >
+              {t('supportAgent.add')}
+            </Button>
+          )}
+          <Button
+            type="submit"
+            busy={save.isPending}
+            icon={<Save aria-hidden className="size-5" />}
+          >
+            {t('supportAgent.saveFaqs')}
+          </Button>
+        </div>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      {done && <Alert tone="success">{t('supportAgent.saved')}</Alert>}
+    </form>
   );
 }

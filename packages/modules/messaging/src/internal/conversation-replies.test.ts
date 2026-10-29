@@ -452,6 +452,7 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     const agent = new SupportAgentService(db);
     expect(await agent.settings(a)).toEqual({
       enabled: false,
+      faqs: [],
       answeredToday: 0,
       limitPerDay: SUPPORT_AGENT_DAILY,
     });
@@ -477,5 +478,55 @@ describe.skipIf(!server)('Replies from the inbox (MSG-05, ADR-546)', () => {
     );
     expect(await agent.taskOf(a.shopId, id, written[0]!.id, SOON)).not.toBeNull();
     expect(await starter.taskOf(a.shopId, id, written[0]!.id, SOON)).toBeNull();
+  });
+
+  it("keeps the shop's answers to common questions, checked, for the AI to answer from (ADR-911)", async () => {
+    const agent = new SupportAgentService(db);
+    unwrap(await agent.update(a, { enabled: false }));
+    const errors = async (faqs: { question: string; answer: string }[]) => {
+      const result = await agent.setFaqs(a, faqs);
+      return result.ok ? [] : result.errors.map((error) => [error.field.join('.'), error.code]);
+    };
+    expect(await errors([{ question: '  ', answer: 'Haan' }])).toEqual([
+      ['faqs.0.question', 'INVALID'],
+    ]);
+    expect(await errors([{ question: 'COD?', answer: 'x'.repeat(1_001) }])).toEqual([
+      ['faqs.0.answer', 'INVALID'],
+    ]);
+    expect(
+      await errors([
+        { question: 'COD milta hai?', answer: 'Ji' },
+        { question: 'cod  milta hai?', answer: 'Haan' },
+      ]),
+    ).toEqual([['faqs.1.question', 'TAKEN']]);
+    expect(
+      await errors(Array.from({ length: 31 }, (_, at) => ({ question: `Q${at}`, answer: 'A' }))),
+    ).toEqual([['faqs', 'TOO_LONG']]);
+
+    const faqs = unwrap(
+      await agent.setFaqs(a, [
+        { question: ' Delivery kitne din mein? ', answer: 'Karachi mein 2 din, baqi 3 se 5 din.' },
+        { question: 'Kya COD hai?', answer: 'Ji, poore Pakistan mein.' },
+      ]),
+    ).faqs;
+    expect(faqs).toEqual([
+      { question: 'Delivery kitne din mein?', answer: 'Karachi mein 2 din, baqi 3 se 5 din.' },
+      { question: 'Kya COD hai?', answer: 'Ji, poore Pakistan mein.' },
+    ]);
+    // Set apart from whether the AI answers, and the shop's own.
+    expect(await agent.settings(a)).toMatchObject({ enabled: false, faqs });
+    expect((await agent.settings(b)).faqs).toEqual([]);
+    unwrap(await agent.update(a, { enabled: true }));
+    expect((await agent.settings(a)).faqs).toEqual(faqs);
+
+    // The AI is given them with the message it is to answer.
+    const id = await sharedConversation();
+    const { rows } = await admin.query<{ id: string }>(
+      `SELECT id FROM messaging.conversation_messages
+        WHERE conversation_id = $1 ORDER BY at DESC, id DESC LIMIT 1`,
+      [id],
+    );
+    expect((await agent.taskOf(a.shopId, id, rows[0]!.id, SOON))?.faqs).toEqual(faqs);
+    expect(unwrap(await agent.setFaqs(a, [])).faqs).toEqual([]);
   });
 });

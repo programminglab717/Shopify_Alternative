@@ -302,6 +302,8 @@ export {
 export {
   SUPPORT_AGENT_DAILY,
   SUPPORT_AGENT_QUIET_MS,
+  SUPPORT_FAQ_LIMITS,
+  type SupportFaq,
   SupportAgentService,
   type SupportAgentOutcome,
   type SupportAgentTask,

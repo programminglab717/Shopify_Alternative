@@ -222,6 +222,13 @@ export {
   type ProductBundleUpdatedPayload,
 } from '../internal/bundles.js';
 export { RELATED_PRODUCTS, relatedProductsIn } from '../internal/related-products.js';
+// The products a customer's message may ask of, for the AI answering them (ADR-911).
+export {
+  ASKED_PRODUCTS,
+  askedProductsIn,
+  askedWordsOf,
+  type AskedProduct,
+} from '../internal/asked-products.js';
 export { giftCardProductIdsIn } from '../internal/gift-card-products.js';
 export {
   collectionsOfProductsIn,

@@ -11549,6 +11549,10 @@ export const SupportAgentQuery = /* GraphQL */ `
       available
       answeredToday
       limitPerDay
+      faqs {
+        question
+        answer
+      }
     }
   }
 `;
@@ -11561,6 +11565,32 @@ export const SupportAgentUpdateMutation = /* GraphQL */ `
         available
         answeredToday
         limitPerDay
+        faqs {
+          question
+          answer
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's answers to its customers' common questions, for the AI to answer from (ADR-911). */
+export const SupportAgentFaqsSetMutation = /* GraphQL */ `
+  mutation SupportAgentFaqsSet($faqs: [SupportAgentFaqInput!]!) {
+    supportAgentFaqsSet(faqs: $faqs) {
+      supportAgent {
+        enabled
+        available
+        answeredToday
+        limitPerDay
+        faqs {
+          question
+          answer
+        }
       }
       userErrors {
         ...Problems

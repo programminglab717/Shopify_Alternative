@@ -11901,6 +11901,11 @@ type Mutation {
   ): SupportAccessGrantPayload!
 
   """
+  Sets the shop's answers to its customers' common questions, in order, 30 at most, for the AI to answer from (ADR-911).
+  """
+  supportAgentFaqsSet(faqs: [SupportAgentFaqInput!]!): SupportAgentUpdatePayload!
+
+  """
   Turns the AI's answers to customers on or off. Each answer spends an AI credit; staff answering a conversation, or taking it, leave it theirs.
   """
   supportAgentUpdate(enabled: Boolean!): SupportAgentUpdatePayload!
@@ -21446,7 +21451,7 @@ enum SupportAccessLevel {
 }
 
 """
-The AI answering the shop's customers on WhatsApp and in its web chat (MSG-07, ADR-849), from its policies and the customer's own orders, handing over to staff when it should.
+The AI answering the shop's customers on WhatsApp and in its web chat (MSG-07, ADR-849), from its policies, its answers to common questions, the products asked of and the customer's own orders, handing over to staff when it should.
 """
 type SupportAgent {
   """Messages it answered in the last day."""
@@ -21457,7 +21462,26 @@ type SupportAgent {
 
   """Whether the shop turned it on."""
   enabled: Boolean!
+
+  """
+  The shop's answers to its customers' common questions, which the AI answers from.
+  """
+  faqs: [SupportAgentFaq!]!
   limitPerDay: Int!
+}
+
+"""A question the shop's customers ask, and the shop's answer (ADR-911)."""
+type SupportAgentFaq {
+  answer: String!
+  question: String!
+}
+
+input SupportAgentFaqInput {
+  """1000 characters at most."""
+  answer: String!
+
+  """200 characters at most."""
+  question: String!
 }
 
 type SupportAgentUpdatePayload {

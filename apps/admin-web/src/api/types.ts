@@ -5682,6 +5682,13 @@ export interface SupportAgentValue {
   available: boolean;
   answeredToday: number;
   limitPerDay: number;
+  /** The shop's answers to common questions (ADR-911). */
+  faqs: SupportFaqValue[];
+}
+
+export interface SupportFaqValue {
+  question: string;
+  answer: string;
 }
 
 export interface SupportAgentData {
@@ -5690,6 +5697,10 @@ export interface SupportAgentData {
 
 export interface SupportAgentUpdateData {
   supportAgentUpdate: { supportAgent: SupportAgentValue | null; userErrors: UserError[] };
+}
+
+export interface SupportAgentFaqsSetData {
+  supportAgentFaqsSet: { supportAgent: SupportAgentValue | null; userErrors: UserError[] };
 }
 
 /** The chat on the shop's online store (ADR-810). */

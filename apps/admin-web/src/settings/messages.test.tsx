@@ -77,7 +77,13 @@ function core(role: StaffRole, requests: Request[] = []) {
     greeting: null as string | null,
     updatedAt: null as string | null,
   };
-  let agent = { enabled: false, available: true, answeredToday: 0, limitPerDay: 200 };
+  let agent = {
+    enabled: false,
+    available: true,
+    answeredToday: 0,
+    limitPerDay: 200,
+    faqs: [{ question: 'Kya COD hai?', answer: 'Ji, poore Pakistan mein.' }],
+  };
   let voice = { enabled: false, available: true, usedToday: 0, limitPerDay: 200 };
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -91,6 +97,25 @@ function core(role: StaffRole, requests: Request[] = []) {
       case 'SupportAgentUpdate':
         agent = { ...agent, enabled: Boolean(variables.enabled), answeredToday: 3 };
         return { supportAgentUpdate: { supportAgent: agent, userErrors: [] } };
+      case 'SupportAgentFaqsSet': {
+        const faqs = variables.faqs as { question: string; answer: string }[];
+        if (faqs.some((faq) => faq.question.length > 100)) {
+          return {
+            supportAgentFaqsSet: {
+              supportAgent: null,
+              userErrors: [
+                {
+                  field: ['faqs', '0', 'question'],
+                  code: 'INVALID',
+                  message: 'Write the question, in 200 characters at most',
+                },
+              ],
+            },
+          };
+        }
+        agent = { ...agent, faqs: faqs.map((faq) => ({ ...faq, question: faq.question.trim() })) };
+        return { supportAgentFaqsSet: { supportAgent: agent, userErrors: [] } };
+      }
       case 'WebChatSettings':
         return { webChatSettings: webChat };
       case 'WebChatSettingsUpdate': {
@@ -374,6 +399,46 @@ describe('Customer messages', () => {
     fireEvent.click(on);
     expect(await within(card).findByText('Answered today: 3 of 200')).toBeTruthy();
     expect(sentOf(fake, 'SupportAgentUpdate')).toEqual([{ enabled: true }]);
+  });
+
+  it("keeps the shop's answers to common questions for the AI to answer from (ADR-911)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const card = await screen.findByRole('region', { name: 'AI answers' });
+    expect(((await within(card).findByLabelText('Question 1')) as HTMLInputElement).value).toBe(
+      'Kya COD hai?',
+    );
+    expect((within(card).getByLabelText('Answer 1') as HTMLTextAreaElement).value).toBe(
+      'Ji, poore Pakistan mein.',
+    );
+    fireEvent.click(within(card).getByRole('button', { name: 'Add a question' }));
+    const question = within(card).getByLabelText('Question 2');
+    fireEvent.change(question, { target: { value: 'Delivery kitne din mein?' } });
+    // Each needs its answer.
+    fireEvent.click(within(card).getByRole('button', { name: 'Save answers' }));
+    expect(
+      await within(card).findByText('Write both the question and its answer, or remove it.'),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'SupportAgentFaqsSet')).toEqual([]);
+    fireEvent.change(within(card).getByLabelText('Answer 2'), {
+      target: { value: 'Karachi mein 2 din.' },
+    });
+    fireEvent.click(within(card).getByRole('button', { name: 'Remove question 1' }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Save answers' }));
+    expect(await within(card).findByText('Saved.')).toBeTruthy();
+    expect(sentOf(fake, 'SupportAgentFaqsSet')).toEqual([
+      { faqs: [{ question: 'Delivery kitne din mein?', answer: 'Karachi mein 2 din.' }] },
+    ]);
+    expect(within(card).queryByLabelText('Question 2')).toBeNull();
+
+    // What the core refuses, it says.
+    fireEvent.change(within(card).getByLabelText('Question 1'), {
+      target: { value: 'x'.repeat(150) },
+    });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save answers' }));
+    expect(await within(card).findByText(/Write the question, in 200 characters/)).toBeTruthy();
   });
 
   it('takes orders by voice note, saying what it costs and how many it heard (ADR-871)', async () => {

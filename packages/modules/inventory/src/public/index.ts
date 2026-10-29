@@ -18,6 +18,8 @@ export { toLocation } from '../internal/graphql/mappers.js';
 // What copies a duplicated product's stock settings for the catalog (ADR-343), which the host binds.
 export { InventoryCopiedVariantStock } from '../internal/copied-stock.js';
 export { InventoryModule } from '../internal/inventory.module.js';
+// Which variants can be bought now, for the AI answering customers (ADR-911).
+export { sellableIn } from '../internal/sellable.js';
 // Inventory reports (ADR-455), which custom reports of stock run (ADR-910).
 export {
   INVENTORY_REPORT_LIMIT,

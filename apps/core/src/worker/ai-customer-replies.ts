@@ -1,7 +1,9 @@
 import { draftSupportReply, type AiGateway } from '@hatti/ai';
 import { shopProfile, type AiCredits, type TenantContext } from '@hatti/api';
+import { askedProductsIn } from '@hatti/catalog/public';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
+import { sellableIn } from '@hatti/inventory/public';
 import {
   MessagingEvents,
   type ConversationMessageReceivedPayload,
@@ -10,6 +12,7 @@ import {
   type SupportAgentService,
   type SupportAgentTask,
 } from '@hatti/messaging/public';
+import { formatMoney, isCurrencyCode, money } from '@hatti/money';
 import { shopPoliciesOf } from '@hatti/online-store/public';
 import { supportFactsIn } from '@hatti/orders/public';
 
@@ -47,8 +50,8 @@ export function orderNumbersIn(history: SupportAgentTask['history']): number[] {
 
 /**
  * Customers answered by the AI (MSG-07, ADR-849): as a customer writes, on WhatsApp or in the web
- * chat, a shop that turned it on has the AI answer from its policies and the customer's own
- * orders, while it is the AI's to answer (`SupportAgentService.taskOf`) and the shop has a credit
+ * chat, a shop that turned it on has the AI answer from its policies and answers to common
+ * questions, the products asked of (ADR-911) and the customer's own orders, while it is the AI's to answer (`SupportAgentService.taskOf`) and the shop has a credit
  * left. On WhatsApp the customer is the number WhatsApp verified, so their latest orders are
  * given; in the web chat the number was typed, so only orders they name by number, placed from it.
  * The reply is sent as the shop's, marked as the AI's; handed to staff, the conversation waits for
@@ -78,10 +81,10 @@ export class AiCustomerReplies {
       await this.agent.record(shopId, task, 'refused', undefined, now);
       return 'refused';
     }
-    const { name, facts } = await this.database.tenant(shopId, async (tx) => ({
-      name: (await shopProfile(tx, shopId)).name,
-      facts: await factsIn(tx, shopId, task),
-    }));
+    const { name, facts } = await this.database.tenant(shopId, async (tx) => {
+      const profile = await shopProfile(tx, shopId);
+      return { name: profile.name, facts: await factsIn(tx, shopId, task, profile.currency) };
+    });
     const result = await draftSupportReply(this.ai, {
       shopName: name,
       facts,
@@ -113,8 +116,57 @@ export class AiCustomerReplies {
   }
 }
 
-/** What the AI may answer from: the shop's policies, and the customer's own orders. */
-async function factsIn(tx: Tx, shopId: string, task: SupportAgentTask): Promise<string> {
+/** What the customer's last two messages may be asking of the shop's products. */
+const ASKED_TURNS = 2;
+
+/**
+ * The products the customer's latest messages may ask of (ADR-911), each a line: its price, or
+ * its variants' prices, and which of them can be bought now. Stock counts are never given.
+ */
+export async function productFactsIn(
+  tx: Tx,
+  shopId: string,
+  history: SupportAgentTask['history'],
+  currency: string,
+): Promise<string[]> {
+  const asked = history
+    .filter((turn) => turn.from === 'customer')
+    .slice(-ASKED_TURNS)
+    .map((turn) => turn.text)
+    .join(' ');
+  const products = await askedProductsIn(tx, shopId, asked);
+  const sellable = await sellableIn(
+    tx,
+    shopId,
+    products.flatMap((product) => product.variants.map((variant) => variant.variantId)),
+  );
+  const priced = (amount: bigint) =>
+    isCurrencyCode(currency) ? formatMoney(money(amount, currency)) : `${amount} ${currency}`;
+  const stock = (variantId: string) =>
+    sellable.get(variantId) === false ? 'out of stock' : 'in stock';
+  return products.map((product) => {
+    const variants = product.variants.map((variant) => {
+      const was =
+        variant.compareAtPrice !== null && variant.compareAtPrice > variant.price
+          ? ` (was ${priced(variant.compareAtPrice)})`
+          : '';
+      const price = `${priced(variant.price)}${was}, ${stock(variant.variantId)}`;
+      return variant.title === null ? price : `${variant.title}: ${price}`;
+    });
+    return `${product.title}: ${variants.join('; ') || 'not for sale now'}`;
+  });
+}
+
+/**
+ * What the AI may answer from: the shop's policies and answers to common questions, the products
+ * asked of, and the customer's own orders.
+ */
+async function factsIn(
+  tx: Tx,
+  shopId: string,
+  task: SupportAgentTask,
+  currency: string,
+): Promise<string> {
   const policies = (await shopPoliciesOf(tx, shopId))
     .filter((policy) => (POLICY_FACTS as readonly string[]).includes(policy.type))
     .map((policy) => {
@@ -127,14 +179,22 @@ async function factsIn(tx: Tx, shopId: string, task: SupportAgentTask): Promise<
     task.customerPhone,
     task.channel === 'web' ? orderNumbersIn(task.history) : undefined,
   );
+  const faqs = task.faqs.map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`);
+  const products = await productFactsIn(tx, shopId, task.history, currency);
+  // The customer's own orders and the products asked of first: what is cut, should the facts
+  // run long, is the end of what the shop wrote.
   return [
-    policies.length > 0
-      ? `The shop's policies:\n${policies.join('\n')}`
-      : 'The shop has written no policies.',
     orders.length > 0
       ? `The customer's orders:\n${orders.join('\n')}`
       : task.channel === 'web'
         ? 'No order of this customer is known: in this chat, they name an order by its number, such as #1023, to ask of it.'
         : 'The customer has no orders with the shop from this number.',
+    products.length > 0
+      ? `Products the customer may be asking of, with their prices and what is in stock now:\n${products.join('\n')}`
+      : 'No product of the shop matches what the customer wrote.',
+    ...(faqs.length > 0 ? [`The shop's answers to common questions:\n${faqs.join('\n')}`] : []),
+    policies.length > 0
+      ? `The shop's policies:\n${policies.join('\n')}`
+      : 'The shop has written no policies.',
   ].join('\n\n');
 }

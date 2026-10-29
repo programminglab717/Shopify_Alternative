@@ -14,6 +14,15 @@ import { voiceOrdersOnIn } from './voice-orders.service.js';
 /** The most the AI answers a shop's customers a day. */
 export const SUPPORT_AGENT_DAILY = 200;
 
+/** The shop's answers to its customers' common questions, and how long each may be (ADR-911). */
+export const SUPPORT_FAQ_LIMITS = { faqs: 30, question: 200, answer: 1_000 } as const;
+
+/** A question the shop's customers ask, and the shop's answer, for the AI to answer from. */
+export interface SupportFaq {
+  question: string;
+  answer: string;
+}
+
 /** How long the AI leaves a conversation once staff answer it, or it hands it to them. */
 export const SUPPORT_AGENT_QUIET_MS = 24 * 60 * 60 * 1000;
 
@@ -22,6 +31,7 @@ export type SupportAgentOutcome =
 
 export interface SupportAgentSettingsRecord {
   enabled: boolean;
+  faqs: SupportFaq[];
   /** How many messages it answered in the last day, and the most it answers. */
   answeredToday: number;
   limitPerDay: number;
@@ -36,6 +46,8 @@ export interface SupportAgentTask {
   customerPhone: string;
   /** The conversation's latest messages with words, oldest first. */
   history: { from: 'customer' | 'shop'; text: string }[];
+  /** The shop's answers to common questions (ADR-911). */
+  faqs: SupportFaq[];
 }
 
 type ConversationRow = {
@@ -76,6 +88,7 @@ export class SupportAgentService {
   ): Promise<SupportAgentSettingsRecord> {
     return this.db.tenant(tenant.shopId, async (tx) => ({
       enabled: await enabledIn(tx, tenant.shopId),
+      faqs: await faqsIn(tx, tenant.shopId),
       answeredToday: await answeredSince(
         tx,
         tenant.shopId,
@@ -103,6 +116,51 @@ export class SupportAgentService {
         INSERT INTO messaging.support_agent_settings (shop_id, enabled)
         VALUES (${tenant.shopId}, ${input.enabled})
         ON CONFLICT (shop_id) DO UPDATE SET enabled = excluded.enabled, updated_at = now()`),
+    );
+    return { ok: true, value: await this.settings(tenant) };
+  }
+
+  /**
+   * Sets the shop's answers to its customers' common questions, in the order given, for the AI to
+   * answer from (ADR-911): each question and answer trimmed, neither empty, none asked twice.
+   */
+  async setFaqs(
+    tenant: TenantContext,
+    given: readonly SupportFaq[],
+  ): Promise<MutationResult<SupportAgentSettingsRecord>> {
+    if (given.length > SUPPORT_FAQ_LIMITS.faqs) {
+      return failOne(['faqs'], 'TOO_LONG', `Keep ${SUPPORT_FAQ_LIMITS.faqs} questions at most`);
+    }
+    const faqs: SupportFaq[] = [];
+    const asked = new Set<string>();
+    for (const [at, faq] of given.entries()) {
+      const question = faq.question.trim().replace(/\s+/g, ' ');
+      const answer = faq.answer.trim();
+      if (!question || question.length > SUPPORT_FAQ_LIMITS.question) {
+        return failOne(
+          ['faqs', String(at), 'question'],
+          'INVALID',
+          `Write the question, in ${SUPPORT_FAQ_LIMITS.question} characters at most`,
+        );
+      }
+      if (!answer || answer.length > SUPPORT_FAQ_LIMITS.answer) {
+        return failOne(
+          ['faqs', String(at), 'answer'],
+          'INVALID',
+          `Write the answer, in ${SUPPORT_FAQ_LIMITS.answer} characters at most`,
+        );
+      }
+      if (asked.has(question.toLowerCase())) {
+        return failOne(['faqs', String(at), 'question'], 'TAKEN', 'That question is asked already');
+      }
+      asked.add(question.toLowerCase());
+      faqs.push({ question, answer });
+    }
+    await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute(sql`
+        INSERT INTO messaging.support_agent_settings (shop_id, faqs)
+        VALUES (${tenant.shopId}, ${JSON.stringify(faqs)}::jsonb)
+        ON CONFLICT (shop_id) DO UPDATE SET faqs = excluded.faqs, updated_at = now()`),
     );
     return { ok: true, value: await this.settings(tenant) };
   }
@@ -170,6 +228,7 @@ export class SupportAgentService {
         channel: conversation.channel,
         customerPhone: conversation.customer_phone,
         history,
+        faqs: await faqsIn(tx, shopId),
       };
     });
   }
@@ -206,6 +265,12 @@ export class SupportAgentService {
          WHERE shop_id = ${shopId} AND id = ${conversationId}`),
     );
   }
+}
+
+async function faqsIn(tx: Tx, shopId: string): Promise<SupportFaq[]> {
+  const { rows } = await tx.execute<{ faqs: SupportFaq[] }>(sql`
+    SELECT faqs FROM messaging.support_agent_settings WHERE shop_id = ${shopId}`);
+  return rows[0]?.faqs ?? [];
 }
 
 async function enabledIn(tx: Tx, shopId: string): Promise<boolean> {
