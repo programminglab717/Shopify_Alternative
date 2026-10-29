@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-957 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-958 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -965,6 +965,7 @@
 | 955 | Every store's sales by day on one chart: each store's part of each day's bar, in this shop's currency at the day's rate | Accepted |
 | 956 | The Storefront API gives products and collections by their IDs at once, as Shopify's nodes | Accepted |
 | 957 | The headless starter keeps a wishlist on the device before the shopper signs in, and joins it to their account's when they do | Accepted |
+| 958 | A running theme experiment's shares may be changed, the shoppers already shown a theme keeping it | Accepted |
 
 ---
 
@@ -31221,3 +31222,27 @@
   * A shopper keeps what they like before giving their number, and finds it in their account
     after.
   * Not yet: recently viewed products, kept the same way.
+
+## ADR-958 · A running theme experiment's shares may be changed, the shoppers already shown a theme keeping it
+
+* **Context:** ADR-952 gives each draft of a theme experiment its own share of shoppers, set when
+  it starts. A shop that sees a draft doing well a week in, and wants more shoppers on it, or
+  one that started too timid, had to end the experiment and start another, losing its counts.
+  ADR-952 left changing the shares of a running experiment for later.
+* **Decision:**
+  * **`themeExperimentSharesSet(id, shares)`** changes each draft's share of the shop's running
+    experiment, in the order of its drafts, checked as at its start: a share for each draft, a
+    whole percent from 1 to 50 each, the live theme shown to no fewer shoppers than any draft.
+    `write_themes`, as starting one.
+  * **The shoppers already shown a theme keep it**, as the storefront's cookie keeps each one's
+    arm; those still to come are drawn by the new shares once the storefront has them. The
+    counts go on: each arm's rates stay its own shoppers'.
+  * **A draft Hatti stopped (ADR-939) keeps its share**: its shoppers see the live theme, and a
+    change to it is refused.
+  * **Recorded** in the activity log (`theme_experiment.shares_changed`), with the shares before
+    and after. An ended experiment's shares can't change.
+  * **Admin:** the running experiment has a field for each draft still showing, "Shoppers shown
+    Quiet (%)", and Change shares, with a line saying those already shown a theme keep it.
+* **Consequences:**
+  * A shop can lean into a draft that is doing well, or ease off one, without starting over.
+  * Not yet: a draft added to, or taken out of, a running experiment.
