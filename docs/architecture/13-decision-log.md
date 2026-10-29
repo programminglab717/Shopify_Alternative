@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-935 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-936 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -943,6 +943,7 @@
 | 933 | An expansion store's copied prices may be a percent over its rate and rounded as prices abroad are, its costs copied at the rate alone | Accepted |
 | 934 | A shop's single sign-on domains are looked up in DNS again each day, and one whose record has been gone three days is no longer proved the shop's | Accepted |
 | 935 | `hatti function init` begins an app's function from its target's starter, in JavaScript built with Javy, with a sample cart to run it on | Accepted |
+| 936 | A selling plan is changed from the admin as it was made, its chosen variants among the rest | Accepted |
 
 ---
 
@@ -30723,3 +30724,17 @@
   * A developer has a function that builds, runs and deploys in a minute, and changes it from
     there.
   * Not yet: starters in Rust and TinyGo, and an input made from a shop's real cart.
+
+## ADR-936 · A selling plan is changed from the admin as it was made, its chosen variants among the rest
+
+* **Context:** ADR-862's selling plans could be changed through the Admin API's
+  `sellingPlanUpdate`, but the admin only made and deleted them; ADR-930's chosen variants made
+  a plan longer to make again, and left changing them from the admin for later.
+* **Decision:**
+  * **Each plan has a Change button** (Settings › Subscriptions): the plan's form takes the plan
+    as it is, its name, interval, discount, tag or chosen variants, and minimum orders, and saves
+    it through `sellingPlanUpdate`, or is cancelled; it then adds a new plan again.
+  * **Subscriptions made keep the plan as it was** (ADR-862): a change is for subscriptions made
+    after it.
+* **Consequences:**
+  * A shop changes a plan's discount or variants in place, its customers' subscriptions kept.
