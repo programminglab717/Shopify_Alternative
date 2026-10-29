@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Scheduled workflows
+### b09ac9a · Scheduled workflows
 
 * **`SCHEDULED`** workflows run on their days at their hour of the shop's own time, each slot
   once, telling the shop's queues of orders and stock then ([ADR-906](../architecture/13-decision-log.md#adr-906--workflows-run-on-a-schedule-days-of-the-week-at-an-hour-of-the-shops-own-time-each-slot-once-their-run-telling-the-shops-queues-then)).
