@@ -23,6 +23,7 @@ function core(role: StaffRole = 'owner') {
           followRate: false,
           marginPercent: 0,
           rounding: 'exact',
+          collectionMargins: [],
         };
         stores = [made];
         return { expansionStoreSave: { expansionStore: made, userErrors: [] } };
@@ -51,6 +52,29 @@ function core(role: StaffRole = 'owner') {
           priceRate: variables.enabled ? '0.00357' : each.priceRate,
         }));
         return { expansionStoreFollowRateSet: { expansionStore: stores[0], userErrors: [] } };
+      case 'Collections':
+        return {
+          collections: {
+            nodes: [
+              { id: 'col_1', title: 'Lawn', productsCount: 12, ruleSet: null },
+              { id: 'col_2', title: 'Furniture', productsCount: 4, ruleSet: null },
+            ],
+          },
+        };
+      case 'ExpansionStoreCollectionMarginsSet': {
+        const titles: Record<string, string> = { col_1: 'Lawn', col_2: 'Furniture' };
+        const margins = variables.margins as { collectionId: string; marginPercent: number }[];
+        stores = stores.map((each) => ({
+          ...each,
+          collectionMargins: margins.map((margin) => ({
+            ...margin,
+            collectionTitle: titles[margin.collectionId],
+          })),
+        }));
+        return {
+          expansionStoreCollectionMarginsSet: { expansionStore: stores[0], userErrors: [] },
+        };
+      }
       case 'ExpansionStorePricingSet':
         stores = stores.map((each) => ({
           ...each,
@@ -179,6 +203,36 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
       expect(sentOf(fake, 'ExpansionStoreRemove')).toEqual([{ shopId: 'shop_2' }]),
     );
     expect(await screen.findByText('No expansion store yet.')).toBeTruthy();
+  });
+
+  it("gives a collection's products a margin of their own, the first of a product's (ADR-948)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/expansion-stores');
+    await screen.findByLabelText('Price rate');
+    type('Price rate', '0.0036');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
+    const add = await screen.findByRole('button', { name: 'Add a collection' });
+    fireEvent.click(add);
+    fireEvent.click(screen.getByRole('button', { name: 'Add a collection' }));
+    // Two rows: Lawn first, then Furniture, each collection once.
+    const [first, second] = screen.getAllByLabelText('Collection') as HTMLSelectElement[];
+    expect([first!.value, second!.value]).toEqual(['col_1', 'col_2']);
+    fireEvent.change(second!, { target: { value: 'col_2' } });
+    const [lawn, furniture] = screen.getAllByLabelText("Margin for the collection's products (%)");
+    fireEvent.change(lawn!, { target: { value: '5' } });
+    fireEvent.change(furniture!, { target: { value: '40' } });
+    // Both collections given: no third to add.
+    expect(screen.queryByRole('button', { name: 'Add a collection' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the margin of Lawn' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: "Save Zari Abroad's margins by collection" }),
+    );
+    await waitFor(() =>
+      expect(sentOf(fake, 'ExpansionStoreCollectionMarginsSet')).toEqual([
+        { shopId: 'shop_2', margins: [{ collectionId: 'col_2', marginPercent: 40 }] },
+      ]),
+    );
   });
 
   it("shows each store's sales on one page, and all of them together in rupees (ADR-932)", async () => {

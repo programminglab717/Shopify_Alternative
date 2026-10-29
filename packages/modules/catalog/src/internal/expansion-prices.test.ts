@@ -49,4 +49,25 @@ describe("Expansion stores' prices (CH-11, ADR-859)", () => {
     expect(at('whole')).toEqual(['34.00', '41.00', '15.72']);
     expect(at('ninety_nine')).toEqual(['34.99', '41.99', '15.72']);
   });
+
+  it("puts a product its collection's own margin, by its handle, the rest the store's (ADR-948)", () => {
+    const csv = toCsv([
+      ['Handle', 'Variant Price', 'Variant Compare At Price', 'Cost per item'],
+      ['sofa', '100000.00', '', '60000.00'],
+      ['sofa', '120000.00', '', ''],
+      ['scarf', '2000.00', '2500.00', ''],
+    ]);
+    const rows = parseCsv(
+      rescaledShopifyPrices(csv, 0.01, {
+        marginPercent: 10,
+        marginOf: new Map([['sofa', 40]]),
+      }),
+    );
+    // Each of the sofa's variants 40% over; its cost at the rate alone; the scarf the store's 10%.
+    expect(rows.slice(1).map((row) => row.slice(1))).toEqual([
+      ['1400.00', '', '600.00'],
+      ['1680.00', '', ''],
+      ['22.00', '27.50', ''],
+    ]);
+  });
 });

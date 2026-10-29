@@ -23,12 +23,14 @@ import {
   Field,
   GraphQLISODateTime,
   ID,
+  InputType,
   Int,
   Mutation,
   ObjectType,
   Query,
   Resolver,
 } from '@nestjs/graphql';
+import { sql } from 'drizzle-orm';
 
 @ObjectType()
 export class ExpansionCopy {
@@ -40,6 +42,31 @@ export class ExpansionCopy {
 
   @Field(() => Int, { description: 'Rows the expansion store could not take.' })
   problems!: number;
+}
+
+@ObjectType({
+  description:
+    "A collection of this shop's whose products are put a margin of their own over an " +
+    "expansion store's rate (ADR-948).",
+})
+export class ExpansionCollectionMargin {
+  @Field(() => ID)
+  collectionId!: string;
+
+  @Field()
+  collectionTitle!: string;
+
+  @Field(() => Int)
+  marginPercent!: number;
+}
+
+@InputType()
+export class ExpansionCollectionMarginInput {
+  @Field(() => ID)
+  collectionId!: string;
+
+  @Field(() => Int, { description: 'A whole percent, 0 to 100.' })
+  marginPercent!: number;
 }
 
 @ObjectType({
@@ -87,6 +114,14 @@ export class ExpansionStore {
       'ninety_nine, up to .99 (ADR-933). Costs are copied exact.',
   })
   rounding!: string;
+
+  @Field(() => [ExpansionCollectionMargin], {
+    description:
+      'Collections whose products are put a margin of their own over its rate, the first of a ' +
+      "product's collections here giving its margin; its own margin for the rest (ADR-948). A " +
+      'collection deleted since is left out.',
+  })
+  collectionMargins!: ExpansionCollectionMargin[];
 
   @Field(() => String, {
     nullable: true,
@@ -216,7 +251,7 @@ export class ExpansionStoreResolver {
   @RequireScopes('read_products')
   async expansionStores(@CurrentTenant() tenant: TenantContext): Promise<ExpansionStore[]> {
     const records = await this.stores.list(tenant);
-    return Promise.all(records.map((record) => this.#shown(record)));
+    return Promise.all(records.map((record) => this.#shown(tenant, record)));
   }
 
   @Mutation(() => ExpansionStorePayload, {
@@ -237,7 +272,7 @@ export class ExpansionStoreResolver {
       target && (await this.copier.owns(actor.userId, target))
         ? await this.stores.save(tenant, target, priceRate)
         : failOne(['shopId'], 'NOT_FOUND', 'You own no other shop of that ID');
-    return this.#payload(result);
+    return this.#payload(tenant, result);
   }
 
   @Mutation(() => ExpansionStorePayload, {
@@ -276,6 +311,7 @@ export class ExpansionStoreResolver {
     const actor = owner(tenant);
     const target = tryFromPublicId(shopId, 'shop');
     return this.#payload(
+      tenant,
       target
         ? await this.copier.copy(tenant, actor, target)
         : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'),
@@ -298,6 +334,7 @@ export class ExpansionStoreResolver {
     const actor = owner(tenant);
     const target = tryFromPublicId(shopId, 'shop');
     return this.#payload(
+      tenant,
       target && (await this.copier.owns(actor.userId, target))
         ? await this.stores.setAutoCopy(tenant, target, enabled)
         : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'),
@@ -321,7 +358,7 @@ export class ExpansionStoreResolver {
     const actor = owner(tenant);
     const target = tryFromPublicId(shopId, 'shop');
     if (!target || !(await this.copier.owns(actor.userId, target))) {
-      return this.#payload(failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+      return this.#payload(tenant, failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
     }
     const rate = enabled
       ? await this.db.tenant(target, async (tx) =>
@@ -332,7 +369,7 @@ export class ExpansionStoreResolver {
           ),
         )
       : null;
-    return this.#payload(await this.stores.setFollowRate(tenant, target, enabled, rate));
+    return this.#payload(tenant, await this.stores.setFollowRate(tenant, target, enabled, rate));
   }
 
   @Mutation(() => ExpansionStorePayload, {
@@ -353,14 +390,56 @@ export class ExpansionStoreResolver {
     const actor = owner(tenant);
     const target = tryFromPublicId(shopId, 'shop');
     if (!target || !(await this.copier.owns(actor.userId, target))) {
-      return this.#payload(failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+      return this.#payload(tenant, failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
     }
     return this.#payload(
+      tenant,
       await this.stores.setPricing(tenant, target, marginPercent, rounding.toLowerCase()),
     );
   }
 
-  async #shown(record: ExpansionStoreRecord): Promise<ExpansionStore> {
+  @Mutation(() => ExpansionStorePayload, {
+    description:
+      "Gives the products of each of this shop's collections listed a margin of their own over " +
+      "the expansion store's rate, in the order given: a product in two takes the first's " +
+      '(ADR-948). Ten at most; none leaves its own margin for every product. Copying as products ' +
+      'change copies them again. The owner alone, of both shops, having signed in lately.',
+  })
+  @RequireScopes('write_products')
+  @RequireRecentAuthentication()
+  async expansionStoreCollectionMarginsSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('shopId', { type: () => ID }) shopId: string,
+    @Args('margins', { type: () => [ExpansionCollectionMarginInput] })
+    margins: ExpansionCollectionMarginInput[],
+  ): Promise<ExpansionStorePayload> {
+    const actor = owner(tenant);
+    const target = tryFromPublicId(shopId, 'shop');
+    if (!target || !(await this.copier.owns(actor.userId, target))) {
+      return this.#payload(tenant, failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+    }
+    const ids = margins.map((margin) => tryFromPublicId(margin.collectionId, 'collection'));
+    const unknown = ids.findIndex((id) => !id);
+    if (unknown >= 0) {
+      return this.#payload(
+        tenant,
+        failOne(['margins', String(unknown), 'collectionId'], 'NOT_FOUND', 'No such collection'),
+      );
+    }
+    return this.#payload(
+      tenant,
+      await this.stores.setCollectionMargins(
+        tenant,
+        target,
+        margins.map((margin, at) => ({
+          collectionId: ids[at]!,
+          marginPercent: margin.marginPercent,
+        })),
+      ),
+    );
+  }
+
+  async #shown(tenant: TenantContext, record: ExpansionStoreRecord): Promise<ExpansionStore> {
     const profile = await this.db.tenant(record.targetShopId, (tx) =>
       shopProfile(tx, record.targetShopId),
     );
@@ -375,14 +454,45 @@ export class ExpansionStoreResolver {
       followRate: record.followRate,
       marginPercent: record.marginPercent,
       rounding: record.rounding,
+      collectionMargins: await this.#margins(record, tenant.shopId),
       copyError: record.copyError,
       copyFailedAt: record.failedAt,
     });
   }
 
-  async #payload(result: MutationResult<ExpansionStoreRecord>): Promise<ExpansionStorePayload> {
+  /** Its collections' margins, as this shop's collections are titled; those deleted left out. */
+  async #margins(
+    record: ExpansionStoreRecord,
+    shopId: string,
+  ): Promise<ExpansionCollectionMargin[]> {
+    if (record.collectionMargins.length === 0) return [];
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<{ id: string; title: string }>(sql`
+        SELECT id, title FROM catalog.collections
+         WHERE shop_id = ${shopId}
+           AND id = ANY(${sql.param(record.collectionMargins.map((each) => each.collectionId))}::uuid[])`),
+    );
+    const titles = new Map(rows.map((row) => [row.id, row.title]));
+    return record.collectionMargins.flatMap((margin) => {
+      const title = titles.get(margin.collectionId);
+      return title === undefined
+        ? []
+        : [
+            Object.assign(new ExpansionCollectionMargin(), {
+              collectionId: toPublicId('collection', margin.collectionId),
+              collectionTitle: title,
+              marginPercent: margin.marginPercent,
+            }),
+          ];
+    });
+  }
+
+  async #payload(
+    tenant: TenantContext,
+    result: MutationResult<ExpansionStoreRecord>,
+  ): Promise<ExpansionStorePayload> {
     return Object.assign(new ExpansionStorePayload(), {
-      expansionStore: result.ok ? await this.#shown(result.value) : null,
+      expansionStore: result.ok ? await this.#shown(tenant, result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

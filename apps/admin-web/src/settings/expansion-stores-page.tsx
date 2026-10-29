@@ -2,7 +2,9 @@ import { Copy, Globe, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  CollectionsQuery,
   ExpansionStoreAutoCopySetMutation,
+  ExpansionStoreCollectionMarginsSetMutation,
   ExpansionStoreCopyMutation,
   ExpansionStoreFollowRateSetMutation,
   ExpansionStorePricingSetMutation,
@@ -12,6 +14,7 @@ import {
   ExpansionStoresQuery,
 } from '../api/operations';
 import type {
+  CollectionsData,
   ExpansionStore,
   ExpansionStorePayloadData,
   ExpansionStoreSalesData,
@@ -68,6 +71,10 @@ export function ExpansionStoresPage() {
     ExpansionStorePayloadData,
     { shopId: string; marginPercent: number; rounding: PresentmentRounding }
   >(ExpansionStorePricingSetMutation);
+  const marginsSet = useAdminMutation<
+    ExpansionStorePayloadData,
+    { shopId: string; margins: { collectionId: string; marginPercent: number }[] }
+  >(ExpansionStoreCollectionMarginsSetMutation);
   const recent = useRecentAuthentication();
   const [chosen, setChosen] = useState('');
   const [rate, setRate] = useState('1');
@@ -129,6 +136,20 @@ export function ExpansionStoresPage() {
     await recent.run(async () => {
       const done = (await pricing.mutateAsync({ shopId, marginPercent, rounding }))
         .expansionStorePricingSet!;
+      if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
+    }, onError);
+    setBusy(null);
+  };
+
+  const onMargins = async (
+    shopId: string,
+    margins: { collectionId: string; marginPercent: number }[],
+  ) => {
+    setProblem(null);
+    setBusy(`margins-${shopId}`);
+    await recent.run(async () => {
+      const done = (await marginsSet.mutateAsync({ shopId, margins }))
+        .expansionStoreCollectionMarginsSet!;
       if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
     }, onError);
     setBusy(null);
@@ -197,6 +218,11 @@ export function ExpansionStoresPage() {
                     store={store}
                     busy={busy === `pricing-${store.shopId}`}
                     onSave={(margin, rounding) => void onPricing(store.shopId, margin, rounding)}
+                  />
+                  <CollectionMargins
+                    store={store}
+                    busy={busy === `margins-${store.shopId}`}
+                    onSave={(margins) => void onMargins(store.shopId, margins)}
                   />
                   <CheckField
                     label={t('expansion.auto', { name: store.name })}
@@ -409,5 +435,103 @@ function Pricing({
         {t('expansion.save')}
       </Button>
     </div>
+  );
+}
+
+/**
+ * The store's collections with a margin of their own over its rate (ADR-948), the first of a
+ * product's giving it: each to change or take out, another to add, saved together.
+ */
+function CollectionMargins({
+  store,
+  busy,
+  onSave,
+}: {
+  store: ExpansionStore;
+  busy: boolean;
+  onSave: (margins: { collectionId: string; marginPercent: number }[]) => void;
+}) {
+  const { t } = useLocale();
+  const collections = useAdminQuery<CollectionsData>(['collections', ''], CollectionsQuery, {
+    query: null,
+  });
+  const [rows, setRows] = useState(
+    store.collectionMargins.map((each) => ({
+      collectionId: each.collectionId,
+      margin: String(each.marginPercent),
+    })),
+  );
+  const options = (collections.data?.collections.nodes ?? []).map((each) => ({
+    value: each.id,
+    label: each.title,
+  }));
+  const unused = options.filter((option) => !rows.some((row) => row.collectionId === option.value));
+  const change = (at: number, row: Partial<(typeof rows)[number]>) =>
+    setRows(rows.map((each, index) => (index === at ? { ...each, ...row } : each)));
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-sm font-medium">{t('expansion.collectionMargins')}</legend>
+      <p className="text-sm text-muted">{t('expansion.collectionMarginsHint')}</p>
+      {rows.map((row, at) => (
+        <div
+          key={row.collectionId || at}
+          className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[2fr_1fr_auto]"
+        >
+          <SelectField
+            label={t('expansion.collection')}
+            value={row.collectionId}
+            options={[
+              ...options.filter(
+                (option) =>
+                  option.value === row.collectionId ||
+                  !rows.some((other) => other.collectionId === option.value),
+              ),
+            ]}
+            onChange={(collectionId) => change(at, { collectionId })}
+          />
+          <TextField
+            label={t('expansion.collectionMargin')}
+            inputMode="numeric"
+            dir="ltr"
+            value={row.margin}
+            onChange={(event) => change(at, { margin: event.target.value })}
+          />
+          <Button
+            variant="secondary"
+            aria-label={t('expansion.removeCollectionMargin', {
+              title: options.find((option) => option.value === row.collectionId)?.label ?? '',
+            })}
+            onClick={() => setRows(rows.filter((_, index) => index !== at))}
+          >
+            <Trash2 size={16} aria-hidden />
+          </Button>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {unused.length > 0 && rows.length < 10 && (
+          <Button
+            variant="secondary"
+            onClick={() => setRows([...rows, { collectionId: unused[0]!.value, margin: '0' }])}
+          >
+            {t('expansion.addCollectionMargin')}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          busy={busy}
+          aria-label={t('expansion.saveCollectionMargins', { name: store.name })}
+          onClick={() =>
+            onSave(
+              rows.map((row) => ({
+                collectionId: row.collectionId,
+                marginPercent: Number(row.margin.trim() || '0'),
+              })),
+            )
+          }
+        >
+          {t('expansion.save')}
+        </Button>
+      </div>
+    </fieldset>
   );
 }

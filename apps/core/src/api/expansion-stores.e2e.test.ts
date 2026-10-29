@@ -216,6 +216,48 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       { price: { amount: '11.99', currencyCode: 'USD' } },
     ]);
 
+    // A collection's own margin (ADR-948): the kurta, on sale, 50% over the rate: $15, $15.99.
+    const [{ id: kurta }] = (
+      await value(owner.token, zari, '{ products(first: 1) { nodes { id } } }')
+    ).nodes;
+    const sale = (
+      await value(
+        owner.token,
+        zari,
+        'mutation ($products: [ID!]) { collectionCreate(input: { title: "Sale", products: $products }) { collection { id } } }',
+        { products: [kurta] },
+      )
+    ).collection.id as string;
+    const MARGINS = `mutation ($shopId: ID!, $margins: [ExpansionCollectionMarginInput!]!) {
+      expansionStoreCollectionMarginsSet(shopId: $shopId, margins: $margins) {
+        expansionStore { collectionMargins { collectionId collectionTitle marginPercent } }
+        userErrors { field message } } }`;
+    const margins = (list: { collectionId: string; marginPercent: number }[]) =>
+      value(owner.token, zari, MARGINS, { shopId: toPublicId('shop', abroad), margins: list });
+    expect((await margins([{ collectionId: sale, marginPercent: 150 }])).userErrors).toEqual([
+      {
+        field: ['margins', '0', 'marginPercent'],
+        message: 'Margin percent must be a whole number from 0 to 100',
+      },
+    ]);
+    expect(
+      (await margins([{ collectionId: toPublicId('collection', newId()), marginPercent: 5 }]))
+        .userErrors,
+    ).toEqual([{ field: ['margins', '0', 'collectionId'], message: 'No such collection' }]);
+    expect((await margins([{ collectionId: sale, marginPercent: 50 }])).expansionStore).toEqual({
+      collectionMargins: [{ collectionId: sale, collectionTitle: 'Sale', marginPercent: 50 }],
+    });
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '15.99', currencyCode: 'USD' } },
+    ]);
+    // None: the store's own margin again.
+    await margins([]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '11.99', currencyCode: 'USD' } },
+    ]);
+
     // A manager of the shop keeps none of it.
     const manager = await account([[zari, 'manager']]);
     expect(

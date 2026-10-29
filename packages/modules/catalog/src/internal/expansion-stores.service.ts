@@ -1,5 +1,5 @@
 import { failOne, type MutationResult, type TenantContext } from '@hatti/api';
-import { Database, toDate } from '@hatti/db';
+import { Database, toDate, type Tx } from '@hatti/db';
 import { PRESENTMENT_ROUNDINGS, type PresentmentRounding } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -12,7 +12,15 @@ export const EXPANSION_STORE_LIMITS = {
   perShop: 5,
   /** The most a store's prices are put over its rate (ADR-933). */
   marginPercent: 100,
+  /** Collections given a margin of their own (ADR-948). */
+  collectionMargins: 10,
 } as const;
+
+/** A collection's products put a margin of their own over the store's rate (ADR-948). */
+export interface ExpansionCollectionMargin {
+  collectionId: string;
+  marginPercent: number;
+}
 
 /**
  * Copying as products change (ADR-913): once the shop's products have been left alone
@@ -46,6 +54,11 @@ export interface ExpansionStoreRecord {
   /** What its copied prices are put over its rate, a whole percent, and how rounded (ADR-933). */
   marginPercent: number;
   rounding: PresentmentRounding;
+  /**
+   * Collections whose products are put a margin of their own over the rate (ADR-948), the first
+   * of a product's collections here giving its margin; the store's own for the rest.
+   */
+  collectionMargins: ExpansionCollectionMargin[];
   /** Why the last copy as products changed failed, and when; null once one succeeds. */
   copyError: string | null;
   failedAt: Date | null;
@@ -61,13 +74,14 @@ type Row = {
   follow_rate: boolean;
   margin_percent: number;
   rounding: PresentmentRounding;
+  collection_margins: ExpansionCollectionMargin[];
   copy_error: string | null;
   failed_at: Date | string | null;
   created_at: Date | string;
 };
 
 const COLUMNS = sql`target_shop_id, price_rate::text, synced_at, last_result, auto_copy, follow_rate,
-  margin_percent, rounding, copy_error, failed_at, created_at`;
+  margin_percent, rounding, collection_margins, copy_error, failed_at, created_at`;
 
 const toRecord = (row: Row): ExpansionStoreRecord => ({
   targetShopId: row.target_shop_id,
@@ -78,6 +92,7 @@ const toRecord = (row: Row): ExpansionStoreRecord => ({
   followRate: row.follow_rate,
   marginPercent: row.margin_percent,
   rounding: row.rounding,
+  collectionMargins: row.collection_margins,
   copyError: row.copy_error,
   failedAt: row.failed_at === null ? null : toDate(row.failed_at),
   createdAt: toDate(row.created_at),
@@ -259,6 +274,81 @@ export class ExpansionStoreService {
   }
 
   /**
+   * Gives the products of each of `margins`' collections, the shop's own, a margin of their own
+   * over `targetShopId`'s rate (ADR-948), in the order given: a product in two collections takes
+   * the first's. Ten at most, each collection once, each a whole percent from 0 to 100; none
+   * leaves the store's own margin for every product. Changed, copying as products change copies
+   * them again.
+   */
+  async setCollectionMargins(
+    tenant: TenantContext,
+    targetShopId: string,
+    margins: readonly ExpansionCollectionMargin[],
+  ): Promise<MutationResult<ExpansionStoreRecord>> {
+    const most = EXPANSION_STORE_LIMITS;
+    if (margins.length > most.collectionMargins) {
+      return failOne(
+        ['margins'],
+        'INVALID',
+        `${most.collectionMargins} collections at most have a margin of their own`,
+      );
+    }
+    for (const [at, margin] of margins.entries()) {
+      const percent = margin.marginPercent;
+      if (!Number.isInteger(percent) || percent < 0 || percent > most.marginPercent) {
+        return failOne(
+          ['margins', String(at), 'marginPercent'],
+          'INVALID',
+          `Margin percent must be a whole number from 0 to ${most.marginPercent}`,
+        );
+      }
+    }
+    const ids = margins.map((margin) => margin.collectionId);
+    if (new Set(ids).size !== ids.length) {
+      return failOne(['margins'], 'INVALID', 'Give each collection one margin');
+    }
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows: found } = await tx.execute<{ id: string }>(sql`
+        SELECT id FROM catalog.collections
+         WHERE shop_id = ${tenant.shopId} AND id = ANY(${sql.param(ids)}::uuid[])`);
+      const known = new Set(found.map((row) => row.id));
+      const missing = ids.findIndex((id) => !known.has(id));
+      if (missing >= 0) {
+        return failOne(
+          ['margins', String(missing), 'collectionId'],
+          'NOT_FOUND',
+          'No such collection',
+        );
+      }
+      const kept = JSON.stringify(
+        margins.map(({ collectionId, marginPercent }) => ({ collectionId, marginPercent })),
+      );
+      const { rows } = await tx.execute<Row>(sql`
+        UPDATE catalog.expansion_stores
+           SET rate_changed_at = CASE WHEN collection_margins = ${kept}::jsonb
+                                      THEN rate_changed_at ELSE now() END,
+               collection_margins = ${kept}::jsonb
+         WHERE shop_id = ${tenant.shopId} AND target_shop_id = ${targetShopId}
+        RETURNING ${COLUMNS}`);
+      return rows[0]
+        ? { ok: true as const, value: toRecord(rows[0]) }
+        : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store');
+    });
+  }
+
+  /**
+   * The margin of each product of the shop's that `margins` give one (ADR-948), by its handle, as
+   * its export names it: its first collection's in the list.
+   */
+  async marginsByHandle(
+    tenant: TenantContext,
+    margins: readonly ExpansionCollectionMargin[],
+  ): Promise<Map<string, number>> {
+    if (margins.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, (tx) => marginsByHandleIn(tx, tenant.shopId, margins));
+  }
+
+  /**
    * Has `targetShopId`'s rate follow the day's rate between the shops' currencies (ADR-929),
    * `rate` being that rate now, as the caller reads it from the feed's; or keep the rate it has,
    * fixed. Refused where Hatti has no day's rate between them.
@@ -380,4 +470,26 @@ export class ExpansionStoreService {
     );
     return rows.map((row) => ({ shopId: row.shop_id, targetShopId: row.target_shop_id }));
   }
+}
+
+/** {@link ExpansionStoreService.marginsByHandle}, in the caller's transaction. */
+async function marginsByHandleIn(
+  tx: Tx,
+  shopId: string,
+  margins: readonly ExpansionCollectionMargin[],
+): Promise<Map<string, number>> {
+  const { rows } = await tx.execute<{ handle: string; collection_id: string }>(sql`
+    SELECT p.handle, cp.collection_id
+      FROM catalog.collection_products cp
+      JOIN catalog.products p ON p.shop_id = cp.shop_id AND p.id = cp.product_id
+     WHERE cp.shop_id = ${shopId}
+       AND cp.collection_id = ANY(${sql.param(margins.map((margin) => margin.collectionId))}::uuid[])`);
+  const order = new Map(margins.map((margin, at) => [margin.collectionId, at]));
+  const chosen = new Map<string, number>();
+  for (const row of rows) {
+    const at = order.get(row.collection_id)!;
+    const before = chosen.get(row.handle);
+    if (before === undefined || at < before) chosen.set(row.handle, at);
+  }
+  return new Map([...chosen].map(([handle, at]) => [handle, margins[at]!.marginPercent]));
 }

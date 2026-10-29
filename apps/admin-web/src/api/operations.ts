@@ -9946,6 +9946,11 @@ const EXPANSION_STORE = /* GraphQL */ `
     followRate
     marginPercent
     rounding
+    collectionMargins {
+      collectionId
+      collectionTitle
+      marginPercent
+    }
   }
 `;
 
@@ -10045,6 +10050,25 @@ export const ExpansionStoreSalesQuery = /* GraphQL */ `
 export const ExpansionStorePricingSetMutation = /* GraphQL */ `
   mutation ExpansionStorePricingSet($shopId: ID!, $marginPercent: Int!, $rounding: String!) {
     expansionStorePricingSet(shopId: $shopId, marginPercent: $marginPercent, rounding: $rounding) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
+`;
+
+/** Collections' own margins over the rate, the first of a product's giving it (ADR-948). */
+export const ExpansionStoreCollectionMarginsSetMutation = /* GraphQL */ `
+  mutation ExpansionStoreCollectionMarginsSet(
+    $shopId: ID!
+    $margins: [ExpansionCollectionMarginInput!]!
+  ) {
+    expansionStoreCollectionMarginsSet(shopId: $shopId, margins: $margins) {
       expansionStore {
         ...ExpansionStoreFields
       }

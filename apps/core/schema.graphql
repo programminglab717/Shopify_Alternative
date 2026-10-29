@@ -6180,6 +6180,22 @@ enum EmailLanguage {
   UR
 }
 
+"""
+A collection of this shop's whose products are put a margin of their own over an expansion store's rate (ADR-948).
+"""
+type ExpansionCollectionMargin {
+  collectionId: ID!
+  collectionTitle: String!
+  marginPercent: Int!
+}
+
+input ExpansionCollectionMarginInput {
+  collectionId: ID!
+
+  """A whole percent, 0 to 100."""
+  marginPercent: Int!
+}
+
 type ExpansionCopy {
   created: Int!
 
@@ -6194,6 +6210,11 @@ Another shop of the owner's whose products are copied from this one, priced at a
 type ExpansionStore {
   """Whether products are copied as they change, within the hour (ADR-913)."""
   autoCopy: Boolean!
+
+  """
+  Collections whose products are put a margin of their own over its rate, the first of a product's collections here giving its margin; its own margin for the rest (ADR-948). A collection deleted since is left out.
+  """
+  collectionMargins: [ExpansionCollectionMargin!]!
   copiedAt: DateTime
 
   """Why the last copy as products changed failed; null once one succeeds."""
@@ -10671,6 +10692,11 @@ type Mutation {
   Has the shop's products copied to an expansion store as they change, within the hour of being left alone ten minutes, or only when asked (ADR-913). The owner alone, of both shops, having signed in lately.
   """
   expansionStoreAutoCopySet(enabled: Boolean!, shopId: ID!): ExpansionStorePayload!
+
+  """
+  Gives the products of each of this shop's collections listed a margin of their own over the expansion store's rate, in the order given: a product in two takes the first's (ADR-948). Ten at most; none leaves its own margin for every product. Copying as products change copies them again. The owner alone, of both shops, having signed in lately.
+  """
+  expansionStoreCollectionMarginsSet(margins: [ExpansionCollectionMarginInput!]!, shopId: ID!): ExpansionStorePayload!
 
   """
   Copies the shop's products to an expansion store, at its rate: those it has already, by handle, updated, and new ones added as drafts or as they are here. The owner alone, of both shops, having signed in lately.

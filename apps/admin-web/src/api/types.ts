@@ -4857,6 +4857,8 @@ export interface ExpansionStore {
   /** Copied prices a percent over the rate, and how rounded (ADR-933). */
   marginPercent: number;
   rounding: PresentmentRounding;
+  /** Collections whose products have a margin of their own, the first of a product's (ADR-948). */
+  collectionMargins: { collectionId: string; collectionTitle: string; marginPercent: number }[];
 }
 
 /** What one of the owner's shops sold in a period (ADR-932). */
@@ -4886,6 +4888,10 @@ export interface ExpansionStorePayloadData {
   expansionStoreAutoCopySet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreFollowRateSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStorePricingSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
+  expansionStoreCollectionMarginsSet?: {
+    expansionStore: ExpansionStore | null;
+    userErrors: UserError[];
+  };
   expansionStoreRemove?: { userErrors: UserError[] };
 }
 

@@ -353,6 +353,7 @@ export {
   EXPANSION_AUTO_COPY,
   EXPANSION_STORE_LIMITS,
   ExpansionStoreService,
+  type ExpansionCollectionMargin,
   type ExpansionCopyDue,
   type ExpansionStoreRecord,
   type ExpansionCopyResult,

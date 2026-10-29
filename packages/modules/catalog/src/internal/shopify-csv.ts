@@ -590,7 +590,8 @@ function decodeEntities(text: string): string {
  * The file `csv` with its prices, compare-at prices and costs multiplied by `rate`, to two places,
  * for an expansion store priced in its own currency (CH-11, ADR-859); every other cell as it was.
  * Prices and compare-at prices are put `marginPercent` over it and rounded as `rounding` says, a
- * whole unit or up to .99 (ADR-933); costs are the rate's alone, exact.
+ * whole unit or up to .99 (ADR-933); costs are the rate's alone, exact. A product `marginOf`
+ * gives a margin of its own, by its handle, takes that instead (ADR-948).
  */
 export function rescaledShopifyPrices(
   csv: string,
@@ -598,9 +599,11 @@ export function rescaledShopifyPrices(
   {
     rounding = 'exact',
     marginPercent = 0,
+    marginOf,
   }: {
     rounding?: PresentmentRounding;
     marginPercent?: number;
+    marginOf?: ReadonlyMap<string, number>;
   } = {},
 ): string {
   const rows = parseCsv(csv);
@@ -608,14 +611,16 @@ export function rescaledShopifyPrices(
   if (!headings) return csv;
   const priced = [COLUMNS.price, COLUMNS.compareAtPrice].map((name) => headings.indexOf(name));
   const columns = [...priced, headings.indexOf(COLUMNS.cost)].filter((index) => index >= 0);
+  const handleAt = headings.indexOf(COLUMNS.handle);
   for (const row of body) {
+    const margin = marginOf?.get(row[handleAt]?.trim() ?? '') ?? marginPercent;
     for (const index of columns) {
       const cell = row[index]?.trim();
       if (!cell) continue;
       const value = Number(cell.replace(/,/g, ''));
       if (!Number.isFinite(value)) continue;
       const price = priced.includes(index);
-      const cents = BigInt(Math.round(value * rate * (price ? 1 + marginPercent / 100 : 1) * 100));
+      const cents = BigInt(Math.round(value * rate * (price ? 1 + margin / 100 : 1) * 100));
       row[index] = (Number(price ? roundedPrice(cents, rounding) : cents) / 100).toFixed(2);
     }
   }
