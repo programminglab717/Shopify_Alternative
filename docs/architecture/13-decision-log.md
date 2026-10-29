@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-908 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-909 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -916,6 +916,7 @@
 | 906 | Workflows run on a schedule: days of the week at an hour of the shop's own time, each slot once, their run telling the shop's queues then | Accepted |
 | 907 | A wholesale customer's credit limit on payment terms: an order on terms that would take what they owe past it is refused, saying what they would owe | Accepted |
 | 908 | A shop keeps AI shopping agents out, its UCP profile and store MCP answering none, and the store MCP tells agents its policies and delivery to a city with cash on delivery | Accepted |
+| 909 | Sales and custom reports break sales down by customer and by city, and the AI question box reads questions of them | Accepted |
 
 ---
 
@@ -30046,3 +30047,24 @@
     shoppers' first questions from the shop's own words.
   * FAQs as a tool, UCP's checkout capability (Scale) and agents' request signatures are still
     not done.
+
+## ADR-909 · Sales and custom reports break sales down by customer and by city, and the AI question box reads questions of them
+
+* **Context:** Custom reports (ADR-817) and the AI question box (ADR-844) break sales down by
+  time, product, channel, visit source or campaign. Owners also ask "who are my best customers?"
+  and "which city buys most?". Shopify's reports answer these by customer and by city.
+* **Decision:**
+  * **Two more sales dimensions, `customer` and `city`.** They work in the sales report, in
+    custom reports (migration 0405 widens their check) and in the AI question box and copilot.
+    * **By customer:** a row is keyed by the customer's ID. It is named by the name their orders
+      were addressed to most, else their phone, and "Customer erased" once erased. Erasing keeps
+      the sales and city.
+    * **By city:** cities in any letter case are one row, named in the spelling most used, as
+      COD health has them. Orders without a city are one row, "No city".
+  * **Only the rows asked for leave the database,** most total sales first, at most 250. A shop's
+    customers run to thousands. Campaigns still meet their ad spend in full first.
+  * **Workbooks head the rows' column** "Customer" or "City". The admin offers "Each customer"
+    and "Each city" under Rows, in English and Urdu.
+* **Consequences:**
+  * Owners see who buys most and where, and can save, schedule and ask about it.
+  * Reports of stock (ANL-06) are still not done.
