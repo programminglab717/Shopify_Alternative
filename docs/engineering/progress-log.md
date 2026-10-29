@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Workflows hold an order for review
+### 066dbbe · Workflows hold an order for review
 
 * **`HOLD_ORDER`** holds an open order not yet handed on for review, until staff confirm it,
   its timeline naming the workflow ([ADR-904](../architecture/13-decision-log.md#adr-904--a-workflow-may-hold-an-order-for-review-as-one-is-held-for-its-risk-until-staff-confirm-it-an-open-order-not-yet-handed-on-its-timeline-naming-the-workflow)).
