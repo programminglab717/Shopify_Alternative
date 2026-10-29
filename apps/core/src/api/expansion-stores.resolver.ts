@@ -1,8 +1,10 @@
 import {
   CurrentTenant,
+  Money,
   RequireRecentAuthentication,
   RequireScopes,
   UserError,
+  badUserInput,
   deniedToRole,
   failOne,
   shopProfile,
@@ -12,8 +14,10 @@ import {
 import { ExpansionStoreService, type ExpansionStoreRecord } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
+import { isCurrencyCode, money } from '@hatti/money';
+import { SalesReportService, netSales, totalSales } from '@hatti/orders/public';
 import { ExpansionCopier } from '../expansion-copier.js';
-import { dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
+import { convertBetween, dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
 import {
   Args,
   Field,
@@ -82,6 +86,42 @@ export class ExpansionStore {
   copyFailedAt!: Date | null;
 }
 
+@ObjectType({
+  description:
+    "What one of the owner's shops sold in a period (ADR-932): this shop, or an expansion store " +
+    'of it, in its own currency and in this shop’s at the day’s rate.',
+})
+export class ExpansionStoreSales {
+  @Field(() => ID)
+  shopId!: string;
+
+  @Field()
+  name!: string;
+
+  @Field({ description: 'Whether it is this shop, rather than an expansion store of it.' })
+  here!: boolean;
+
+  @Field()
+  currencyCode!: string;
+
+  @Field(() => Int, { description: 'Its orders placed in the period, cancelled ones aside.' })
+  orders!: number;
+
+  @Field(() => Money, { description: 'As the sales report says it, in its own currency.' })
+  netSales!: Money;
+
+  @Field(() => Money, { description: 'As the sales report says it, in its own currency.' })
+  totalSales!: Money;
+
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      "Its total sales in this shop's currency at the day's rate from the currency feed; null " +
+      'where the feed has no rate for its currency.',
+  })
+  totalSalesHere!: Money | null;
+}
+
 @ObjectType()
 export class ExpansionStorePayload {
   @Field(() => ExpansionStore, { nullable: true })
@@ -106,11 +146,59 @@ function owner(tenant: TenantContext): Extract<TenantContext['actor'], { kind: '
  */
 @Resolver(() => ExpansionStore)
 export class ExpansionStoreResolver {
+  readonly #sales: SalesReportService;
+
   constructor(
     private readonly db: Database,
     private readonly stores: ExpansionStoreService,
     private readonly copier: ExpansionCopier,
-  ) {}
+  ) {
+    this.#sales = new SalesReportService(db);
+  }
+
+  @Query(() => [ExpansionStoreSales], {
+    description:
+      'What this shop and each of its expansion stores sold in a period, on one page (ADR-932): ' +
+      "each in its own currency and in this shop's at the day's rate, this shop first, then the " +
+      'stores the owner still owns, oldest first. 366 days at most. The owner alone.',
+  })
+  @RequireScopes('read_orders')
+  async expansionStoreSales(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('placedFrom', { type: () => GraphQLISODateTime }) placedFrom: Date,
+    @Args('placedBefore', { type: () => GraphQLISODateTime }) placedBefore: Date,
+  ): Promise<ExpansionStoreSales[]> {
+    const actor = owner(tenant);
+    const linked = await this.stores.list(tenant);
+    const shops = [tenant.shopId];
+    for (const record of linked) {
+      if (await this.copier.owns(actor.userId, record.targetShopId))
+        shops.push(record.targetShopId);
+    }
+    const rates = await this.db.tenant(tenant.shopId, (tx) => rupeeRatesIn(tx));
+    const rows: ExpansionStoreSales[] = [];
+    for (const shopId of shops) {
+      const result = await this.#sales.totalsOf(shopId, { placedFrom, placedBefore });
+      if (!result.ok) throw badUserInput(result.errors[0]!.message);
+      const profile = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
+      const currency = isCurrencyCode(profile.currency) ? profile.currency : 'PKR';
+      const total = totalSales(result.value);
+      const here = convertBetween(rates, total, currency, tenant.currency);
+      rows.push(
+        Object.assign(new ExpansionStoreSales(), {
+          shopId: toPublicId('shop', shopId),
+          name: profile.name,
+          here: shopId === tenant.shopId,
+          currencyCode: currency,
+          orders: result.value.orders,
+          netSales: Money.from(money(netSales(result.value), currency)),
+          totalSales: Money.from(money(total, currency)),
+          totalSalesHere: here === null ? null : Money.from(money(here, tenant.currency)),
+        }),
+      );
+    }
+    return rows;
+  }
 
   @Query(() => [ExpansionStore], { description: "The shop's expansion stores, oldest first." })
   @RequireScopes('read_products')

@@ -1,19 +1,24 @@
 import { Copy, Globe, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   ExpansionStoreAutoCopySetMutation,
   ExpansionStoreCopyMutation,
   ExpansionStoreFollowRateSetMutation,
   ExpansionStoreRemoveMutation,
+  ExpansionStoreSalesQuery,
   ExpansionStoreSaveMutation,
   ExpansionStoresQuery,
 } from '../api/operations';
-import type { ExpansionStorePayloadData, ExpansionStoresData } from '../api/types';
+import type {
+  ExpansionStorePayloadData,
+  ExpansionStoreSalesData,
+  ExpansionStoresData,
+} from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { useMe } from '../auth/context';
 import { errorText } from '../i18n/errors';
-import { formatDateTime } from '../i18n/format';
+import { formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
 import {
@@ -240,7 +245,94 @@ export function ExpansionStoresPage() {
       <p className="text-secondary">{t('expansion.hint')}</p>
       {problem && <Alert tone="danger">{problem}</Alert>}
       {body()}
+      {(query.data?.expansionStores.length ?? 0) > 0 && <StoreSales />}
       {recent.panel}
     </div>
+  );
+}
+
+const PERIODS = [7, 30, 90] as const;
+
+/**
+ * What this shop and each of its expansion stores sold lately, on one page (ADR-932): each in its
+ * own currency and in this shop's at the day's rate, and all of them together.
+ */
+function StoreSales() {
+  const { t } = useLocale();
+  const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
+  // Up to now, as the page was opened: the same period however often it is drawn.
+  const [now] = useState(() => Date.now());
+  const period = useMemo(
+    () => ({
+      from: new Date(now - days * 86_400_000).toISOString(),
+      before: new Date(now + 60_000).toISOString(),
+    }),
+    [now, days],
+  );
+  const query = useAdminQuery<ExpansionStoreSalesData>(
+    ['expansionStoreSales', days],
+    ExpansionStoreSalesQuery,
+    period,
+  );
+  const rows = query.data?.expansionStoreSales ?? [];
+  const here = rows.find((row) => row.here)?.currencyCode ?? 'PKR';
+  const total = rows.reduce((sum, row) => sum + Number(row.totalSalesHere?.amount ?? 0), 0);
+  const unconverted = rows.some((row) => row.totalSalesHere === null);
+  return (
+    <section aria-labelledby="expansion-sales" className="flex flex-col gap-2">
+      <h2 id="expansion-sales" className="font-semibold">
+        {t('expansion.sales')}
+      </h2>
+      <Card className="flex flex-col gap-3 p-4">
+        <SelectField
+          label={t('expansion.salesPeriod')}
+          value={String(days)}
+          options={PERIODS.map((each) => ({
+            value: String(each),
+            label: t('expansion.days', { count: each }),
+          }))}
+          onChange={(value) => setDays(Number(value) as (typeof PERIODS)[number])}
+        />
+        {query.isPending ? (
+          <Loading label={t('state.loading')} />
+        ) : query.isError ? (
+          <Alert tone="danger">{errorText(query.error, t)}</Alert>
+        ) : (
+          <>
+            <ul className="divide-y divide-line">
+              {rows.map((row) => (
+                <li key={row.shopId} className="flex flex-wrap justify-between gap-2 py-2">
+                  <span className="font-medium" dir="auto">
+                    {row.here ? t('expansion.thisShop', { name: row.name }) : row.name}
+                  </span>
+                  <span className="num flex flex-col items-end text-secondary">
+                    <span>
+                      {t('expansion.salesLine', {
+                        orders: row.orders,
+                        amount: formatMoney(row.totalSales.amount, row.totalSales.currencyCode),
+                      })}
+                    </span>
+                    {!row.here && row.totalSalesHere && (
+                      <span className="text-[length:var(--hatti-type-body-sm-size)]">
+                        {t('expansion.salesHere', {
+                          amount: formatMoney(
+                            row.totalSalesHere.amount,
+                            row.totalSalesHere.currencyCode,
+                          ),
+                        })}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="num font-semibold">
+              {t('expansion.salesTotal', { amount: formatMoney(total.toFixed(2), here) })}
+            </p>
+            {unconverted && <p className="text-secondary">{t('expansion.salesUnconverted')}</p>}
+          </>
+        )}
+      </Card>
+    </section>
   );
 }

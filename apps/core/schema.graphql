@@ -6220,6 +6220,32 @@ type ExpansionStorePayload {
   userErrors: [UserError!]!
 }
 
+"""
+What one of the owner's shops sold in a period (ADR-932): this shop, or an expansion store of it, in its own currency and in this shop’s at the day’s rate.
+"""
+type ExpansionStoreSales {
+  currencyCode: String!
+
+  """Whether it is this shop, rather than an expansion store of it."""
+  here: Boolean!
+  name: String!
+
+  """As the sales report says it, in its own currency."""
+  netSales: Money!
+
+  """Its orders placed in the period, cancelled ones aside."""
+  orders: Int!
+  shopId: ID!
+
+  """As the sales report says it, in its own currency."""
+  totalSales: Money!
+
+  """
+  Its total sales in this shop's currency at the day's rate from the currency feed; null where the feed has no rate for its currency.
+  """
+  totalSalesHere: Money
+}
+
 """A YouTube or Vimeo video (ADR-258)."""
 type ExternalVideo {
   """Where pages embed it from."""
@@ -17473,6 +17499,11 @@ type Query {
 
   """The shop's drops, the latest to start first."""
   drops: [Drop!]!
+
+  """
+  What this shop and each of its expansion stores sold in a period, on one page (ADR-932): each in its own currency and in this shop's at the day's rate, this shop first, then the stores the owner still owns, oldest first. 366 days at most. The owner alone.
+  """
+  expansionStoreSales(placedBefore: DateTime!, placedFrom: DateTime!): [ExpansionStoreSales!]!
 
   """The shop's expansion stores, oldest first."""
   expansionStores: [ExpansionStore!]!

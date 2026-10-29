@@ -10019,6 +10019,26 @@ export const ExpansionStoreFollowRateSetMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** What this shop and each expansion store sold, on one page (ADR-932). */
+export const ExpansionStoreSalesQuery = /* GraphQL */ `
+  query ExpansionStoreSales($from: DateTime!, $before: DateTime!) {
+    expansionStoreSales(placedFrom: $from, placedBefore: $before) {
+      shopId
+      name
+      here
+      currencyCode
+      orders
+      totalSales {
+        ...Money
+      }
+      totalSalesHere {
+        ...Money
+      }
+    }
+  }
+  ${MONEY}
+`;
+
 export const ExpansionStoreRemoveMutation = /* GraphQL */ `
   mutation ExpansionStoreRemove($shopId: ID!) {
     expansionStoreRemove(shopId: $shopId) {

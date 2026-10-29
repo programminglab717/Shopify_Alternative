@@ -377,6 +377,7 @@ export {
   grossProfit,
   netSales,
   profit,
+  totalSales,
   type ProductSales,
   type SalesDimension,
   type SalesIntervalValue,

@@ -4856,6 +4856,23 @@ export interface ExpansionStore {
   followRate: boolean;
 }
 
+/** What one of the owner's shops sold in a period (ADR-932). */
+export interface ExpansionStoreSales {
+  shopId: string;
+  name: string;
+  /** This shop, rather than an expansion store of it. */
+  here: boolean;
+  currencyCode: string;
+  orders: number;
+  totalSales: MoneyValue;
+  /** In this shop's currency at the day's rate; null where Hatti has none. */
+  totalSalesHere: MoneyValue | null;
+}
+
+export interface ExpansionStoreSalesData {
+  expansionStoreSales: ExpansionStoreSales[];
+}
+
 export interface ExpansionStoresData {
   expansionStores: ExpansionStore[];
 }

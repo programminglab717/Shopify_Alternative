@@ -49,6 +49,30 @@ function core(role: StaffRole = 'owner') {
           priceRate: variables.enabled ? '0.00357' : each.priceRate,
         }));
         return { expansionStoreFollowRateSet: { expansionStore: stores[0], userErrors: [] } };
+      case 'ExpansionStoreSales':
+        // This shop's sales, and its store's in dollars and at the day's rate in rupees.
+        return {
+          expansionStoreSales: [
+            {
+              shopId: 'shop_1',
+              name: 'Zari',
+              here: true,
+              currencyCode: 'PKR',
+              orders: 12,
+              totalSales: { amount: '60000.00', currencyCode: 'PKR' },
+              totalSalesHere: { amount: '60000.00', currencyCode: 'PKR' },
+            },
+            {
+              shopId: 'shop_2',
+              name: 'Zari Abroad',
+              here: false,
+              currencyCode: 'USD',
+              orders: 3,
+              totalSales: { amount: '150.00', currencyCode: 'USD' },
+              totalSalesHere: { amount: '42000.00', currencyCode: 'PKR' },
+            },
+          ],
+        };
       case 'ExpansionStoreRemove':
         stores = [];
         return { expansionStoreRemove: { userErrors: [] } };
@@ -136,6 +160,26 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
       expect(sentOf(fake, 'ExpansionStoreRemove')).toEqual([{ shopId: 'shop_2' }]),
     );
     expect(await screen.findByText('No expansion store yet.')).toBeTruthy();
+  });
+
+  it("shows each store's sales on one page, and all of them together in rupees (ADR-932)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/expansion-stores');
+    await screen.findByLabelText('Price rate');
+    type('Price rate', '0.0036');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
+    expect(await screen.findByRole('heading', { name: 'Sales across your stores' })).toBeTruthy();
+    expect(await screen.findByText('Zari (this shop)')).toBeTruthy();
+    expect(screen.getByText('3 orders · USD 150')).toBeTruthy();
+    expect(screen.getByText('≈ Rs 42,000 at the day’s rate')).toBeTruthy();
+    expect(screen.getByText('All your stores: Rs 102,000')).toBeTruthy();
+    // Over the last 30 days unless another period is picked.
+    const [asked] = sentOf(fake, 'ExpansionStoreSales') as { from: string; before: string }[];
+    const days = (Date.parse(asked!.before) - Date.parse(asked!.from)) / 86_400_000;
+    expect(Math.round(days)).toBe(30);
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: '7' } });
+    await waitFor(() => expect(sentOf(fake, 'ExpansionStoreSales').length).toBe(2));
   });
 
   it('is kept by the owner alone', async () => {

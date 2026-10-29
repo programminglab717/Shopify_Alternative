@@ -372,4 +372,110 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       followRate: false,
     });
   });
+
+  it("gives one page of each store's sales, in its currency and in this shop's at the day's rate (ADR-932)", async () => {
+    const lahore = newId();
+    const dubai = newId();
+    const sold = newId();
+    await admin.query(
+      `INSERT INTO control.shops (id, name, handle, currency)
+       VALUES ($1, 'Lahore Lawn', 'lahore-lawn', 'PKR'), ($2, 'Dubai Lawn', 'dubai-lawn', 'AED'),
+              ($3, 'Sold on', 'sold-on', 'AED')`,
+      [lahore, dubai, sold],
+    );
+    await admin.query(
+      `INSERT INTO platform.currency_rates (currency, rate, rate_date, fetched_at)
+       VALUES ('AED', 76.4521, current_date, now())
+       ON CONFLICT (currency) DO UPDATE SET rate = excluded.rate`,
+    );
+    /** An order of `total` minor units in `shop`'s currency, placed now. */
+    const order = async (shop: string, currency: string, total: number) => {
+      const customer = newId();
+      const id = newId();
+      // A customer and their number at once, as each must name the other.
+      await admin.query('BEGIN');
+      await admin.query(
+        `INSERT INTO customers.customers (shop_id, id, phone) VALUES ($1, $2, '+923001234567')`,
+        [shop, customer],
+      );
+      await admin.query(
+        `INSERT INTO customers.customer_phones (shop_id, phone, customer_id)
+         VALUES ($1, '+923001234567', $2)`,
+        [shop, customer],
+      );
+      await admin.query('COMMIT');
+      await admin.query(
+        `INSERT INTO orders.orders
+           (shop_id, id, number, source, confirmation_status, financial_status, stage,
+            payment_method, currency, subtotal, discount, shipping, total, amount_paid, cod_amount,
+            phone, shipping_address, location_id, customer_id)
+         VALUES ($1, $2, 1001, 'online_store', 'pending', 'pending', 'needs_confirmation',
+                 'cash_on_delivery', $3, $4, 0, 0, $4, 0, $4, '+923001234567', '{}', $5, $6)`,
+        [shop, id, currency, total, newId(), customer],
+      );
+      await admin.query(
+        `INSERT INTO orders.lines
+           (shop_id, id, order_id, position, variant_id, product_id, title, variant_title,
+            quantity, unit_price, total)
+         VALUES ($1, $2, $3, 1, $4, $5, 'Lawn suit', 'M', 1, $6, $6)`,
+        [shop, newId(), id, newId(), newId(), total],
+      );
+    };
+    await order(lahore, 'PKR', 350_000);
+    await order(dubai, 'AED', 10_000);
+    await order(sold, 'AED', 99_900);
+    const owner = await account([
+      [lahore, 'owner'],
+      [dubai, 'owner'],
+      [sold, 'owner'],
+    ]);
+    const shop = (id: string) => toPublicId('shop', id);
+    await value(owner.token, lahore, SAVE, { shopId: shop(dubai), rate: '0.0131' });
+    await value(owner.token, lahore, SAVE, { shopId: shop(sold), rate: '0.0131' });
+    // A store sold since: its owner is someone else now, and it is left out.
+    await admin.query('DELETE FROM identity.memberships WHERE user_id = $1 AND shop_id = $2', [
+      owner.userId,
+      sold,
+    ]);
+    const SALES = `query ($from: DateTime!, $before: DateTime!) {
+      expansionStoreSales(placedFrom: $from, placedBefore: $before) {
+        shopId name here currencyCode orders
+        totalSales { amount currencyCode } totalSalesHere { amount currencyCode } } }`;
+    const period = {
+      from: new Date(Date.now() - 86_400_000).toISOString(),
+      before: new Date(Date.now() + 86_400_000).toISOString(),
+    };
+    expect(await value(owner.token, lahore, SALES, period)).toEqual([
+      {
+        shopId: shop(lahore),
+        name: 'Lahore Lawn',
+        here: true,
+        currencyCode: 'PKR',
+        orders: 1,
+        totalSales: { amount: '3500.00', currencyCode: 'PKR' },
+        totalSalesHere: { amount: '3500.00', currencyCode: 'PKR' },
+      },
+      {
+        shopId: shop(dubai),
+        name: 'Dubai Lawn',
+        here: false,
+        currencyCode: 'AED',
+        orders: 1,
+        // AED 100 at Rs 76.4521 each.
+        totalSales: { amount: '100.00', currencyCode: 'AED' },
+        totalSalesHere: { amount: '7645.21', currencyCode: 'PKR' },
+      },
+    ]);
+    // From the Dubai store, rupees are dirhams at the day's rate; it has no stores of its own.
+    expect(await value(owner.token, dubai, SALES, period)).toEqual([
+      expect.objectContaining({
+        here: true,
+        totalSalesHere: { amount: '100.00', currencyCode: 'AED' },
+      }),
+    ]);
+    // Staff but the owner see none of it.
+    const manager = await account([[lahore, 'manager']]);
+    const refused = await data(manager.token, lahore, SALES, period);
+    expect(refused.errors?.[0]?.message).toContain('Only the shop');
+  });
 });

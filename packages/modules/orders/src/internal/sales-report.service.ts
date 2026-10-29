@@ -287,6 +287,32 @@ export class SalesReportService {
       return { ok: true, value: report };
     });
   }
+
+  /**
+   * What a period's orders came to in shop `shopId`, as a report's totals, for a caller that has
+   * already said who may see them: the owner's page of their expansion stores' sales (ADR-932).
+   */
+  async totalsOf(
+    shopId: string,
+    period: Pick<SalesReportInput, 'placedFrom' | 'placedBefore'>,
+  ): Promise<MutationResult<SalesTally>> {
+    const span = period.placedBefore.getTime() - period.placedFrom.getTime();
+    if (span <= 0) {
+      return failOne(['placedBefore'], 'INVALID', 'Placed before must be later than placed from');
+    }
+    if (span > SALES_REPORT_LIMITS.days * 86_400_000) {
+      return failOne(
+        ['placedBefore'],
+        'INVALID',
+        `A sales report covers at most ${SALES_REPORT_LIMITS.days} days at a time`,
+      );
+    }
+    return this.db.tenant(shopId, async (tx) => {
+      const { timezone } = await shopProfile(tx, shopId);
+      const periods = await salesPeriodsIn(tx, shopId, timezone, { ...period, interval: 'month' });
+      return { ok: true, value: tallyOf(periods) };
+    });
+  }
 }
 
 /**
