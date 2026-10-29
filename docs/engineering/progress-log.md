@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### A running experiment's shares changed
+### 1717e5d · A running experiment's shares changed
 
 * **A running theme experiment's shares may be changed**, the shoppers already shown a theme
   keeping it, a stopped draft keeping its own ([ADR-958](../architecture/13-decision-log.md#adr-958--a-running-theme-experiments-shares-may-be-changed-the-shoppers-already-shown-a-theme-keeping-it)).
