@@ -1,5 +1,6 @@
 import type { RenderedPage } from '@hatti/documents';
 import { createHash } from 'node:crypto';
+import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
 import { checkPassword } from '@hatti/crypto';
 import { metrics } from '@opentelemetry/api';
@@ -115,6 +116,7 @@ import {
   buyButtonProduct,
 } from './buy-button.js';
 import {
+  STOREFRONT_BUYER_IP_HEADER,
   STOREFRONT_TOKEN_HEADERS,
   storefrontApiAnswer,
   storefrontTokenOf,
@@ -2627,10 +2629,33 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
           .code(429)
           .send({ errors: [{ message: 'Too many calls: wait a minute' }] });
       }
+      // Who signs in: the buyer a shop's own server calls for, as Shopify's header says, where
+      // its private token vouches for it; the caller otherwise (ADR-943).
+      const said = request.headers[STOREFRONT_BUYER_IP_HEADER];
+      const buyer =
+        kind === 'private' && typeof said === 'string' && isIP(said.trim())
+          ? said.trim()
+          : request.ip;
+      const signInsLeft = async () =>
+        limiter === null || (await limiter.hit(ACCOUNT_LOGINS, buyer)).allowed;
       const answer = await storefrontApiAnswer(request.body, {
         shopId: found.shopId,
         store: found.store,
         shop,
+        accounts: core
+          ? {
+              sendCode: async (asked) =>
+                (await signInsLeft())
+                  ? core.accountLoginStart(found.shopId, asked, { ip: buyer })
+                  : 'too_many_requests',
+              signIn: async (asked) =>
+                (await signInsLeft())
+                  ? core.accountLoginVerify(found.shopId, asked)
+                  : 'too_many_requests',
+              account: (token) => core.account(found.shopId, token),
+              signOut: (token) => core.accountLogout(found.shopId, token),
+            }
+          : null,
         search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),
         carts: core
           ? {

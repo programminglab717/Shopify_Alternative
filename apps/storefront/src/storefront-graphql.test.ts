@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parse, validate } from 'graphql';
-import type { CartActionResult, CartJson } from '@hatti/storefront-api';
+import type { AccountJson, CartActionResult, CartJson } from '@hatti/storefront-api';
 import { MemoryStore, TranslatedStore } from '@hatti/storefront-data';
 import { describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
@@ -11,6 +11,7 @@ import {
   STOREFRONT_API_SCHEMA,
   storefrontApiAnswer,
   storefrontTokenOf,
+  type StorefrontApiAccounts,
   type StorefrontApiShop,
 } from './storefront-graphql.js';
 
@@ -591,5 +592,238 @@ describe('The Storefront API in Urdu, and its metafields (ADR-903)', () => {
       metafields: [{ key: 'fabric' }, null],
       variants: { edges: [{ node: { metafield: { type: 'number_integer', value: '3' } } }] },
     });
+  });
+});
+
+describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
+  const TOKEN = 'sEsSiOn_SeCrEt-0123456789abcdefghijk';
+  const ACCOUNT: AccountJson = {
+    phone: '+923217654321',
+    name: 'Ayesha Khan',
+    orders: [
+      {
+        id: 'ord_1',
+        name: '#1002',
+        placedAt: '2026-10-01T09:00:00.000Z',
+        status: 'open',
+        financialStatus: 'pending',
+        fulfillmentStatus: 'partially_fulfilled',
+        total: 1_250_000,
+        currency: 'PKR',
+        itemCount: 2,
+        hasPage: true,
+        lines: [
+          {
+            variantId: first.id,
+            productTitle: 'Lawn 3-piece',
+            variantTitle: 'M',
+            quantity: 1,
+            available: true,
+          },
+          {
+            variantId: null,
+            productTitle: 'Eid bundle',
+            variantTitle: null,
+            quantity: 1,
+            available: false,
+          },
+        ],
+      },
+      {
+        id: 'ord_0',
+        name: '#1001',
+        placedAt: '2026-09-01T09:00:00.000Z',
+        status: 'cancelled',
+        financialStatus: 'voided',
+        fulfillmentStatus: 'unfulfilled',
+        total: 300_000,
+        currency: 'PKR',
+        itemCount: 1,
+        hasPage: false,
+        lines: [],
+      },
+    ],
+    storeCredit: { balance: 50_000, currency: 'PKR', expiring: null },
+    dataRequests: { export: null, erasure: null },
+  } as AccountJson;
+
+  /** The core's sign-in, as it answers: a code sent, and the code it takes. */
+  function accounts() {
+    const asked: unknown[] = [];
+    const signedOut: string[] = [];
+    let busy = false;
+    const kept: StorefrontApiAccounts = {
+      sendCode: (request) => {
+        asked.push(request);
+        if (busy) return Promise.resolve('too_many_requests');
+        if (!/^03\d{9}$/.test(request.phone.replace(/\s/g, ''))) {
+          return Promise.resolve({
+            ok: false,
+            errors: [{ field: 'phone', message: 'Give a Pakistani mobile number' }],
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          state: request.phone.startsWith('0300') ? 'too_many' : 'sent',
+          phone: '0321 ••••321',
+          channel: request.channel ?? 'whatsapp',
+        });
+      },
+      signIn: (request) => {
+        asked.push(request);
+        if (request.code === '000000') return Promise.resolve({ ok: false, error: 'expired' });
+        if (request.code !== '123456') return Promise.resolve({ ok: false, error: 'wrong' });
+        return Promise.resolve({
+          ok: true,
+          token: TOKEN,
+          session: {
+            phone: ACCOUNT.phone,
+            name: ACCOUNT.name,
+            signedInAt: '2026-10-29T10:00:00.000Z',
+            expiresAt: '2026-11-28T10:00:00.000Z',
+          },
+        });
+      },
+      account: (token) =>
+        Promise.resolve(token === TOKEN && !signedOut.includes(token) ? ACCOUNT : null),
+      signOut: (token) => {
+        signedOut.push(token);
+        return Promise.resolve();
+      },
+    };
+    return { kept, asked, signedOut, busy: () => (busy = true) };
+  }
+
+  it('sends a code to the number, and signs the shopper in with it, saying why not where it does not', async () => {
+    const core = accounts();
+    const at = { ...api(), accounts: core.kept };
+    const send = `mutation Send($phone: String!, $channel: CustomerLoginCodeChannel) {
+      customerLoginCodeSend(phone: $phone, channel: $channel) {
+        sentTo channel customerUserErrors { field message code }
+      }
+    }`;
+    expect((await ask(send, { phone: ' 0321 7654321 ', channel: 'SMS' }, at)).data).toEqual({
+      customerLoginCodeSend: { sentTo: '0321 ••••321', channel: 'SMS', customerUserErrors: [] },
+    });
+    expect(core.asked[0]).toEqual({ phone: '0321 7654321', channel: 'sms', locale: 'en' });
+    const refused = async (phone: string) =>
+      (await ask(send, { phone }, at)).data.customerLoginCodeSend;
+    expect(await refused('12345')).toEqual({
+      sentTo: null,
+      channel: null,
+      customerUserErrors: [
+        { field: ['phone'], message: 'Give a Pakistani mobile number', code: 'INVALID' },
+      ],
+    });
+    expect((await refused('0300 1234567')).customerUserErrors[0].code).toBe('TOO_MANY_REQUESTS');
+
+    const signIn = `mutation SignIn($code: String!) {
+      customerAccessTokenCreateWithCode(phone: "0321 7654321", code: $code) {
+        customerAccessToken { accessToken expiresAt }
+        customerUserErrors { field code }
+      }
+    }`;
+    const signed = async (code: string) =>
+      (await ask(signIn, { code }, at)).data.customerAccessTokenCreateWithCode;
+    expect(await signed('111111')).toEqual({
+      customerAccessToken: null,
+      customerUserErrors: [{ field: ['code'], code: 'CODE_WRONG' }],
+    });
+    expect((await signed('000000')).customerUserErrors).toEqual([
+      { field: ['code'], code: 'CODE_EXPIRED' },
+    ]);
+    expect(await signed(' 123 456 ')).toEqual({
+      customerAccessToken: { accessToken: TOKEN, expiresAt: '2026-11-28T10:00:00.000Z' },
+      customerUserErrors: [],
+    });
+    // A buyer asking too many of late is answered so, the core asked nothing.
+    core.busy();
+    const asked = core.asked.length;
+    expect((await refused('0321 7654321')).customerUserErrors[0].code).toBe('TOO_MANY_REQUESTS');
+    expect(core.asked).toHaveLength(asked + 1);
+  });
+
+  it("gives the signed-in shopper's orders, a page at a time, and signs them out", async () => {
+    const core = accounts();
+    const at = { ...api(), accounts: core.kept };
+    const query = `query Customer($token: String!, $after: String) {
+      customer(customerAccessToken: $token) {
+        id phone displayName firstName lastName
+        storeCredit { amount currencyCode }
+        orders(first: 1, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id name orderNumber processedAt status financialStatus fulfillmentStatus
+            totalPrice { amount currencyCode }
+            lineItems(first: 5) { nodes { title variantTitle quantity merchandiseId availableForSale } }
+          }
+        }
+      }
+    }`;
+    const answered = await ask(query, { token: TOKEN }, at);
+    expect(answered.errors).toBeUndefined();
+    const customer = answered.data.customer;
+    expect(customer).toMatchObject({
+      phone: '+923217654321',
+      displayName: 'Ayesha Khan',
+      firstName: 'Ayesha',
+      lastName: 'Khan',
+      storeCredit: { amount: '500.00', currencyCode: 'PKR' },
+    });
+    // Its ID is not the number.
+    expect(customer.id).toMatch(/^gid:\/\/hatti\/Customer\/[0-9a-f]{24}$/);
+    expect(customer.orders.nodes).toEqual([
+      {
+        id: 'gid://hatti/Order/ord_1',
+        name: '#1002',
+        orderNumber: 1002,
+        processedAt: '2026-10-01T09:00:00.000Z',
+        status: 'OPEN',
+        financialStatus: 'PENDING',
+        fulfillmentStatus: 'PARTIALLY_FULFILLED',
+        totalPrice: { amount: '12500.00', currencyCode: 'PKR' },
+        lineItems: {
+          nodes: [
+            {
+              title: 'Lawn 3-piece',
+              variantTitle: 'M',
+              quantity: 1,
+              merchandiseId: `gid://hatti/ProductVariant/${first.id}`,
+              availableForSale: true,
+            },
+            {
+              title: 'Eid bundle',
+              variantTitle: null,
+              quantity: 1,
+              merchandiseId: null,
+              availableForSale: false,
+            },
+          ],
+        },
+      },
+    ]);
+    expect(customer.orders.pageInfo.hasNextPage).toBe(true);
+    const next = await ask(query, { token: TOKEN, after: customer.orders.pageInfo.endCursor }, at);
+    expect(next.data.customer.orders.nodes.map((order: Json) => order.status)).toEqual([
+      'CANCELLED',
+    ]);
+
+    // A token not one the core makes, or one signed out, is no one.
+    expect((await ask(query, { token: 'nope' }, at)).data).toEqual({ customer: null });
+    const out = await ask(
+      `mutation { customerAccessTokenDelete(customerAccessToken: "${TOKEN}") { deletedAccessToken userErrors { message } } }`,
+      undefined,
+      at,
+    );
+    expect(out.data.customerAccessTokenDelete).toEqual({
+      deletedAccessToken: TOKEN,
+      userErrors: [],
+    });
+    expect(core.signedOut).toEqual([TOKEN]);
+    expect((await ask(query, { token: TOKEN }, at)).data).toEqual({ customer: null });
+    // A storefront keeping no accounts says so.
+    expect((await ask(query, { token: TOKEN })).errors?.[0]?.message).toBe(
+      'This storefront keeps no accounts',
+    );
   });
 });

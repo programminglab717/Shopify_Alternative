@@ -1,5 +1,16 @@
 import { createHash } from 'node:crypto';
-import type { CartActionResult, CartError, CartJson, CartLineJson } from '@hatti/storefront-api';
+import type {
+  AccountJson,
+  AccountLoginStartRequest,
+  AccountLoginStartResult,
+  AccountLoginVerifyRequest,
+  AccountLoginVerifyResult,
+  AccountOrderJson,
+  CartActionResult,
+  CartError,
+  CartJson,
+  CartLineJson,
+} from '@hatti/storefront-api';
 import {
   articleHandle,
   type ArticleDoc,
@@ -35,6 +46,8 @@ import { POLICIES, policyTitle } from './policies.js';
 // public or private. It reads the shop's catalog from its storefront documents, as its pages do,
 // and changes carts through the core, as its cart does; a cart's checkoutUrl is the shop's own
 // checkout. A subset of Shopify's schema, its names and shapes kept, so its clients ask it alike.
+// Shoppers sign in as on the shop's own pages, with a code sent to their mobile number (ADR-943),
+// and the access token it gives reads their account, as Shopify's customer access token does.
 
 export const STOREFRONT_API_LIMITS = {
   /** The longest query read, and how deep it may ask. */
@@ -51,6 +64,12 @@ export const STOREFRONT_TOKEN_HEADERS = {
   public: 'x-shopify-storefront-access-token',
   private: 'shopify-storefront-private-token',
 } as const;
+
+/**
+ * The header a shop's own server names its shopper's address in (ADR-943), as Shopify's: read
+ * with a private token alone, so that each shopper's sign-ins are counted, not the server's.
+ */
+export const STOREFRONT_BUYER_IP_HEADER = 'shopify-storefront-buyer-ip';
 
 const SDL = /* GraphQL */ `
   """
@@ -164,9 +183,30 @@ const SDL = /* GraphQL */ `
     Every blog's published articles, by their blogs' handles and their own.
     """
     articles(first: Int, after: String): ArticleConnection!
+    """
+    The shopper a customer access token signed in (ADR-943); null once it is none: signed out,
+    expired or unknown.
+    """
+    customer(customerAccessToken: String!): Customer
   }
 
   type Mutation {
+    """
+    Sends a code to sign in with to a Pakistani mobile number (ADR-943), on WhatsApp unless SMS is
+    asked, as the shop's sign-in page does: the same answer whether or not the number shops there.
+    """
+    customerLoginCodeSend(
+      phone: String!
+      channel: CustomerLoginCodeChannel = WHATSAPP
+    ): CustomerLoginCodeSendPayload
+    """
+    The code sent, typed with the number it went to: a customer access token, for \`customer\`.
+    """
+    customerAccessTokenCreateWithCode(
+      phone: String!
+      code: String!
+    ): CustomerAccessTokenCreatePayload
+    customerAccessTokenDelete(customerAccessToken: String!): CustomerAccessTokenDeletePayload
     cartCreate(input: CartInput): CartCreatePayload
     cartLinesAdd(cartId: ID!, lines: [CartLineInput!]!): CartLinesAddPayload
     cartLinesUpdate(cartId: ID!, lines: [CartLineUpdateInput!]!): CartLinesUpdatePayload
@@ -601,6 +641,143 @@ const SDL = /* GraphQL */ `
     cart: Cart
     userErrors: [CartUserError!]!
   }
+
+  enum CustomerLoginCodeChannel {
+    WHATSAPP
+    SMS
+  }
+
+  enum CustomerErrorCode {
+    INVALID
+    """
+    The code is not the one sent; tries are left.
+    """
+    CODE_WRONG
+    """
+    Its ten minutes are up, its tries used, or none was sent: ask for another.
+    """
+    CODE_EXPIRED
+    TOO_MANY_REQUESTS
+  }
+
+  type CustomerUserError {
+    field: [String!]
+    message: String!
+    code: CustomerErrorCode
+  }
+
+  type CustomerLoginCodeSendPayload {
+    """
+    The number, masked, for the page to say where the code went: "0300 ••••567".
+    """
+    sentTo: String
+    channel: CustomerLoginCodeChannel
+    customerUserErrors: [CustomerUserError!]!
+  }
+
+  type CustomerAccessToken {
+    accessToken: String!
+    expiresAt: String!
+  }
+
+  type CustomerAccessTokenCreatePayload {
+    customerAccessToken: CustomerAccessToken
+    customerUserErrors: [CustomerUserError!]!
+  }
+
+  type CustomerAccessTokenDeletePayload {
+    deletedAccessToken: String
+    userErrors: [CartUserError!]!
+  }
+
+  """
+  A shopper signed in with their mobile number: their orders with the shop, the newest first, and
+  their store credit.
+  """
+  type Customer {
+    id: ID!
+    """
+    E.164: the number they proved.
+    """
+    phone: String!
+    displayName: String!
+    firstName: String
+    lastName: String
+    storeCredit: MoneyV2!
+    orders(first: Int, after: String): OrderConnection!
+  }
+
+  enum OrderStatus {
+    OPEN
+    CLOSED
+    CANCELLED
+  }
+
+  enum OrderFinancialStatus {
+    PENDING
+    AUTHORIZED
+    PAID
+    PARTIALLY_PAID
+    PARTIALLY_REFUNDED
+    REFUNDED
+    VOIDED
+  }
+
+  enum OrderFulfillmentStatus {
+    UNFULFILLED
+    PARTIALLY_FULFILLED
+    FULFILLED
+    RETURNED
+    PARTIALLY_RETURNED
+  }
+
+  type Order {
+    id: ID!
+    """
+    "#1001".
+    """
+    name: String!
+    orderNumber: Int!
+    processedAt: String!
+    status: OrderStatus!
+    financialStatus: OrderFinancialStatus
+    fulfillmentStatus: OrderFulfillmentStatus!
+    totalPrice: MoneyV2!
+    lineItems(first: Int, after: String): OrderLineItemConnection!
+  }
+
+  type OrderLineItem {
+    title: String!
+    """
+    "M / Red", as it was sold; null for a product without options.
+    """
+    variantTitle: String
+    quantity: Int!
+    """
+    The variant, for cartLinesAdd to buy it again; null for one the shop no longer has.
+    """
+    merchandiseId: ID
+    availableForSale: Boolean!
+  }
+
+  type OrderEdge {
+    cursor: String!
+    node: Order!
+  }
+  type OrderConnection {
+    edges: [OrderEdge!]!
+    nodes: [Order!]!
+    pageInfo: PageInfo!
+  }
+  type OrderLineItemEdge {
+    cursor: String!
+    node: OrderLineItem!
+  }
+  type OrderLineItemConnection {
+    edges: [OrderLineItemEdge!]!
+    nodes: [OrderLineItem!]!
+    pageInfo: PageInfo!
+  }
 `;
 
 const SCHEMA = buildSchema(SDL);
@@ -617,6 +794,24 @@ export interface StorefrontApiCarts {
     action: string,
     body: unknown,
   ): Promise<CartActionResult>;
+}
+
+/**
+ * Shoppers' sign-in and accounts, as the core keeps them (ADR-570), for the shop and the buyer the
+ * request is of (ADR-943): the buyer's address, and how many sign-ins it asked of late, are the
+ * caller's to bind.
+ */
+export interface StorefrontApiAccounts {
+  /** Sends a code; `too_many_requests` where the buyer asked too many of late. */
+  sendCode(
+    request: AccountLoginStartRequest,
+  ): Promise<AccountLoginStartResult | 'too_many_requests'>;
+  /** Checks the code; `too_many_requests` likewise. */
+  signIn(
+    request: AccountLoginVerifyRequest,
+  ): Promise<AccountLoginVerifyResult | 'too_many_requests'>;
+  account(token: string): Promise<AccountJson | null>;
+  signOut(token: string): Promise<void>;
 }
 
 /** What a request of the Storefront API reads and changes. */
@@ -640,6 +835,8 @@ export interface StorefrontApiShop {
   /** The shop's products a search finds, the likeliest first. */
   search: (terms: string) => Promise<string[]>;
   carts: StorefrontApiCarts | null;
+  /** Shoppers' sign-in and accounts (ADR-943); without them, none is signed in. */
+  accounts?: StorefrontApiAccounts | null;
   /** Where the shop answers: "https://zari.hatti.pk". */
   origin: string;
   currency: string;
@@ -1068,6 +1265,57 @@ function cartOf(cart: CartJson, token: string, api: StorefrontApiShop) {
 
 type UserErrorJson = { field: string[] | null; message: string; code: string | null };
 
+/** A customer access token, as the core makes a session's secret; anything else is none. */
+const CUSTOMER_TOKEN = /^[\w-]{16,128}$/;
+
+/** The longest number and code read of what a shopper typed, as the shop's pages read them. */
+const PHONE_MAX = 40;
+const CODE_MAX = 20;
+
+/** An order of the shopper's, as Shopify's Order. */
+function orderOf(order: AccountOrderJson) {
+  const lines = order.lines.map((line) => ({
+    title: line.productTitle,
+    variantTitle: line.variantTitle,
+    quantity: line.quantity,
+    merchandiseId: line.variantId ? gid('ProductVariant', line.variantId) : null,
+    availableForSale: line.available,
+  }));
+  return {
+    id: gid('Order', order.id),
+    name: order.name,
+    orderNumber: Number(order.name.replace(/\D/g, '')) || 0,
+    processedAt: order.placedAt,
+    status: order.status.toUpperCase(),
+    financialStatus: order.financialStatus.toUpperCase(),
+    fulfillmentStatus: order.fulfillmentStatus.toUpperCase(),
+    totalPrice: money(order.total, order.currency),
+    lineItems: (args: { first?: number; after?: string }) => connection(lines, args),
+  };
+}
+
+/** The signed-in shopper's account, as Shopify's Customer. */
+function customerOf(account: AccountJson) {
+  const [firstName, ...rest] = (account.name ?? '').trim().split(/\s+/);
+  const orders = account.orders.map(orderOf);
+  return {
+    // Not their number, which `phone` gives only to who holds the token.
+    id: gid('Customer', createHash('sha256').update(account.phone).digest('hex').slice(0, 24)),
+    phone: account.phone,
+    displayName: account.name?.trim() || account.phone,
+    firstName: firstName || null,
+    lastName: rest.join(' ') || null,
+    storeCredit: money(account.storeCredit.balance, account.storeCredit.currency),
+    orders: (args: { first?: number; after?: string }) => connection(orders, args),
+  };
+}
+
+const customerError = (field: string[], message: string, code: string) => ({
+  field,
+  message,
+  code,
+});
+
 /** Why the core refused a cart's change, as Shopify's cart says it. */
 function cartUserError(error: CartError, field: string[]): UserErrorJson {
   switch (error.code) {
@@ -1149,8 +1397,95 @@ function rootOf(api: StorefrontApiShop) {
     userErrors: [userError([field], `${STOREFRONT_API_LIMITS.lines} lines at a time at most`)],
   });
 
+  const accounts = () => {
+    if (!api.accounts) throw new GraphQLError('This storefront keeps no accounts');
+    return api.accounts;
+  };
+  const tooManyAsked = customerError([], 'Too many sign-ins: wait a minute', 'TOO_MANY_REQUESTS');
+
   return {
     localization,
+    customer: async (args: { customerAccessToken: string }) => {
+      if (!CUSTOMER_TOKEN.test(args.customerAccessToken)) return null;
+      const account = await accounts().account(args.customerAccessToken);
+      return account ? customerOf(account) : null;
+    },
+    customerLoginCodeSend: async (args: { phone: string; channel?: 'WHATSAPP' | 'SMS' | null }) => {
+      const channel = args.channel === 'SMS' ? 'sms' : 'whatsapp';
+      const started = await accounts().sendCode({
+        phone: args.phone.trim().slice(0, PHONE_MAX),
+        channel,
+        locale: api.locale === 'ur' ? 'ur' : 'en',
+      });
+      const none = { sentTo: null, channel: null };
+      if (started === 'too_many_requests') return { ...none, customerUserErrors: [tooManyAsked] };
+      if (!started.ok) {
+        return {
+          ...none,
+          customerUserErrors: [
+            customerError(
+              ['phone'],
+              started.errors[0]?.message ?? 'Give a mobile number',
+              'INVALID',
+            ),
+          ],
+        };
+      }
+      if (started.state === 'too_many') {
+        return {
+          ...none,
+          customerUserErrors: [
+            customerError(
+              ['phone'],
+              'Too many codes sent to this number: wait a while',
+              'TOO_MANY_REQUESTS',
+            ),
+          ],
+        };
+      }
+      return {
+        sentTo: started.phone,
+        channel: started.channel.toUpperCase(),
+        customerUserErrors: [],
+      };
+    },
+    customerAccessTokenCreateWithCode: async (args: { phone: string; code: string }) => {
+      const signed = await accounts().signIn({
+        phone: args.phone.trim().slice(0, PHONE_MAX),
+        code: args.code.replace(/\s+/g, '').slice(0, CODE_MAX),
+      });
+      const refused = (error: ReturnType<typeof customerError>) => ({
+        customerAccessToken: null,
+        customerUserErrors: [error],
+      });
+      if (signed === 'too_many_requests') return refused(tooManyAsked);
+      if (!signed.ok) {
+        switch (signed.error) {
+          case 'wrong':
+            return refused(customerError(['code'], 'That is not the code sent', 'CODE_WRONG'));
+          case 'invalid':
+            return refused(customerError(['phone'], 'Give a mobile number', 'INVALID'));
+          default:
+            return refused(
+              customerError(['code'], 'That code is over: ask for another', 'CODE_EXPIRED'),
+            );
+        }
+      }
+      return {
+        customerAccessToken: { accessToken: signed.token, expiresAt: signed.session.expiresAt },
+        customerUserErrors: [],
+      };
+    },
+    customerAccessTokenDelete: async (args: { customerAccessToken: string }) => {
+      if (!CUSTOMER_TOKEN.test(args.customerAccessToken)) {
+        return {
+          deletedAccessToken: null,
+          userErrors: [userError(['customerAccessToken'], 'No such access token')],
+        };
+      }
+      await accounts().signOut(args.customerAccessToken);
+      return { deletedAccessToken: args.customerAccessToken, userErrors: [] };
+    },
     shop: () => ({
       name: api.shop.name,
       primaryDomain: { host: new URL(api.origin).host, url: api.origin },

@@ -3106,6 +3106,81 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("signs shoppers in through the Storefront API, counting each buyer a shop's server names (ADR-943)", async () => {
+    const docs = sampleStore();
+    const digest = (token: string) => createHash('sha256').update(token).digest('hex');
+    docs.shop = {
+      ...docs.shop,
+      storefrontTokens: [
+        { digest: digest('hsf_public'), private: false },
+        { digest: digest('hsf_private'), private: true },
+      ],
+    };
+    const app = server({ sample: new MemoryStore(docs) });
+    const api = (headers: Record<string, string>, query: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/2026-10/graphql.json',
+        headers: { host: 'localhost', 'content-type': 'application/json', ...headers },
+        payload: JSON.stringify({ query }),
+      });
+    const send = 'mutation { customerLoginCodeSend(phone: "0321 7654321") { sentTo channel } }';
+    core.loginStarts.length = 0;
+    const sent = await api(
+      {
+        'shopify-storefront-private-token': 'hsf_private',
+        'shopify-storefront-buyer-ip': '203.0.113.9',
+      },
+      send,
+    );
+    expect(sent.json()).toEqual({
+      data: { customerLoginCodeSend: { sentTo: '0300 ••••567', channel: 'WHATSAPP' } },
+    });
+    // The buyer's address with a private token; the caller's own with a public one.
+    await api(
+      {
+        'x-shopify-storefront-access-token': 'hsf_public',
+        'shopify-storefront-buyer-ip': '203.0.113.9',
+      },
+      send,
+    );
+    expect(core.loginStarts.map((each) => [each.request.phone, each.client?.ip])).toEqual([
+      ['0321 7654321', '203.0.113.9'],
+      ['0321 7654321', '127.0.0.1'],
+    ]);
+    core.loginVerified = {
+      ok: true,
+      token: ACCOUNT_TOKEN,
+      session: {
+        phone: ACCOUNT.phone,
+        name: ACCOUNT.name,
+        signedInAt: '2026-10-29T10:00:00.000Z',
+        expiresAt: '2026-11-28T10:00:00.000Z',
+      },
+    };
+    core.accounts.set(ACCOUNT_TOKEN, ACCOUNT);
+    const signed = await api(
+      { 'x-shopify-storefront-access-token': 'hsf_public' },
+      'mutation { customerAccessTokenCreateWithCode(phone: "0321 7654321", code: "123 456") { customerAccessToken { accessToken } } }',
+    );
+    const token =
+      signed.json().data.customerAccessTokenCreateWithCode.customerAccessToken.accessToken;
+    expect(core.loginVerifies.at(-1)?.request).toEqual({ phone: '0321 7654321', code: '123456' });
+    const customer = await api(
+      { 'x-shopify-storefront-access-token': 'hsf_public' },
+      `{ customer(customerAccessToken: "${token}") { displayName orders(first: 1) { nodes { name } } } }`,
+    );
+    expect(customer.json()).toEqual({
+      data: { customer: { displayName: 'Ayesha Khan', orders: { nodes: [{ name: '#1002' }] } } },
+    });
+    await api(
+      { 'x-shopify-storefront-access-token': 'hsf_public' },
+      `mutation { customerAccessTokenDelete(customerAccessToken: "${token}") { deletedAccessToken } }`,
+    );
+    expect(core.signedOut).toContain(ACCOUNT_TOKEN);
+    await app.close();
+  });
+
   it("gives a blog's Atom feed at its address with .atom, kept at the edge as its page is (ADR-209)", async () => {
     const app = server();
     const get = (url: string, host = 'localhost') =>

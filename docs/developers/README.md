@@ -116,6 +116,32 @@ the last did; a function the shop hasn't turned on stays off (ADR-922). `build` 
 token: they check and run the module with Hatti's own code, its memory capped and its time limited
 to 50 ms as at checkout, and `run` prints its answer and how long it took (ADR-927).
 
+## Shoppers' accounts on the Storefront API
+
+A headless site signs shoppers in as the shop's own pages do, with a code sent to their mobile
+number, on WhatsApp unless they ask for SMS (ADR-943). The code gives a customer access token,
+which reads their orders and store credit as Shopify's does:
+
+```graphql
+mutation { customerLoginCodeSend(phone: "0321 7654321") { sentTo customerUserErrors { code } } }
+mutation {
+  customerAccessTokenCreateWithCode(phone: "0321 7654321", code: "123456") {
+    customerAccessToken { accessToken expiresAt }
+    customerUserErrors { field code }
+  }
+}
+query ($token: String!) {
+  customer(customerAccessToken: $token) {
+    displayName
+    orders(first: 10) { nodes { name processedAt totalPrice { amount } lineItems(first: 5) { nodes { title merchandiseId } } } }
+  }
+}
+```
+
+Sign-ins are counted by the buyer's address, 20 a minute. A site calling from its own server
+with a private token names the buyer in `Shopify-Storefront-Buyer-IP`, as with Shopify, so that
+its shoppers aren't counted as one. `customerAccessTokenDelete` signs the shopper out.
+
 ## Public apps
 
 A partner (ADR-504) registers an app on their partner page: its address, its redirect URLs and
