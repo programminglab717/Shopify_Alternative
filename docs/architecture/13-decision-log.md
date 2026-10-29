@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-905 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-906 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -913,6 +913,7 @@
 | 903 | The Storefront API answers in Urdu where a query asks with @inContext, its pages at their Urdu addresses, and gives the metafields the shop shows | Accepted |
 | 904 | A workflow may hold an order for review, as one is held for its risk, until staff confirm it: an open order not yet handed on, its timeline naming the workflow | Accepted |
 | 905 | Workflows start on a variant's stock running low or out, once a spell as the shop's low-stock alert tells, reading its product, variant, SKU, units left and the line | Accepted |
+| 906 | Workflows run on a schedule: days of the week at an hour of the shop's own time, each slot once, their run telling the shop's queues then | Accepted |
 
 ---
 
@@ -29968,3 +29969,27 @@
   * A shop tells its staff, or its supplier through an app, when stock runs low, with its own
     conditions such as "lawn" in the product's name.
   * Scheduled triggers are still not done.
+
+## ADR-906 · Workflows run on a schedule: days of the week at an hour of the shop's own time, each slot once, their run telling the shop's queues then
+
+* **Context:** ADR-886 and ADR-905 left scheduled triggers for later. Shops ask for "every
+  morning at nine, tell me how many orders wait to be confirmed and what is out of stock".
+* **Decision:**
+  * **A `SCHEDULED` workflow has a schedule:** days of the week, Monday 1 to Sunday 7, and an
+    hour, 0 to 23, of the shop's own time zone (migration 0402). The schedule is for scheduled
+    workflows alone.
+  * **The worker's sweep makes its run** once its hour has come on one of its days.
+    * A slot that went by while the worker was down still runs for up to two hours.
+    * Each slot runs once. The run's event is a UUID named by the workflow and the slot, so
+      sweeps that ask again make nothing.
+    * The run is due from its slot.
+  * **What it tells are the shop's queues** when it is made, read once a shop however many of
+    its workflows are due: `trigger.orders_to_confirm`, `_to_review`, `_to_pack` and `_to_book`,
+    `trigger.variants_low` and `trigger.variants_out`. Conditions check them and templates fill
+    them in. Like stock triggers (ADR-905), it is about no order or customer.
+  * **The admin's editor** sets its days and hour, every day at nine to start from.
+* **Consequences:**
+  * "Each morning, if any order waits to be confirmed, tell the owner" is a workflow.
+  * A schedule is of days and an hour, not of minutes or dates.
+  * Cancelling an order from a workflow, and a WhatsApp message to the customer (approved
+    templates, OWN-23), are still not done.
