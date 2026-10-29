@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-920 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-921 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -928,6 +928,7 @@
 | 918 | Buy buttons keep a cart of the page's own across the shop's buttons there, kept by that site's browser, its bar checking all of it out through one permalink | Accepted |
 | 919 | A shop's SSO email domains are proved its through a TXT record of its token, a proved domain one shop's alone, taking every sign-in by email of it | Accepted |
 | 920 | An order on payment terms tells its customer, on its page, what they owe by transfer and by which day, or that it was due, and takes their receipt, shipped or not | Accepted |
+| 921 | Theme experiments count each arm's revenue from the orders its sessions place at checkout, once an order, and say by Welch's test whether the draft brings more or less money a session | Accepted |
 
 ---
 
@@ -30352,3 +30353,29 @@
 * **Consequences:**
   * A wholesale customer sees what they owe and where to pay it from the link they already have.
   * Reminders before and after the due day still wait for WhatsApp templates Meta approves.
+
+## ADR-921 · Theme experiments count each arm's revenue from the orders its sessions place at checkout, once an order, and say by Welch's test whether the draft brings more or less money a session
+
+* **Context:** ADR-866's experiments judge a draft theme by the share of sessions that ordered. A
+  draft that sells as often but larger baskets, through a bundle on the home page or an offer's
+  banner, looked no different. ADR-866 left revenue per session as the measure for later.
+* **Decision:**
+  * **Checkout tells the storefront what it placed:** its answer to a placed order carries the
+    order's ID and total in minor units (`sale`).
+  * **The storefront counts it** in the arm the shopper's `hatti_ab` cookie keeps, as it counts
+    the conversion, not for robots or previews. Each order is counted once, however often it is
+    told (a key per order, kept as long as the experiment's counts). The arm keeps its revenue and
+    the sum of each order's square, for the spread.
+  * **The worker keeps them** with the experiment's counts every minute, as before.
+  * **The verdict of money** (`revenueVerdict`): once each arm has 200 sessions, Welch's test of
+    revenue a session, sessions without an order counting nothing, says whether the draft brings
+    more or less at 95%, or no difference. Each order counts as its session's revenue.
+  * **The admin** shows each arm's money a visit beside its visits and orders, and the verdict of
+    money below the verdict of orders, once there is one.
+  * The guardrail still ends a draft by its orders alone.
+* **Consequences:**
+  * A shop sees that the draft with the bundle brings Rs 120 a visit to the live theme's Rs 95,
+    though as many shoppers order.
+  * Orders paid online whose thank-you page carries the gateway's form are counted neither as
+    conversions nor as revenue, as before.
+  * Not yet: more than two arms, tests of a section alone, price tests (OWN-56).
