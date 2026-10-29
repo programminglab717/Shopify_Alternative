@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### A theme experiment's worse draft stopped alone
+### ebc9fa3 · A theme experiment's worse draft stopped alone
 
 * **A theme experiment's draft that sells clearly worse is stopped alone**, its shoppers shown
   the live theme and counted in no arm, the other drafts going on ([ADR-939](../architecture/13-decision-log.md#adr-939--a-theme-experiments-draft-that-sells-clearly-worse-is-stopped-alone-its-shoppers-shown-the-live-theme-the-other-drafts-going-on)).
