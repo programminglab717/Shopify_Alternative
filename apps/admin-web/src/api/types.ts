@@ -4852,6 +4852,8 @@ export interface ExpansionStore {
   autoCopy: boolean;
   copyError: string | null;
   copyFailedAt: string | null;
+  /** The price rate follows the day's rate between the currencies (ADR-929). */
+  followRate: boolean;
 }
 
 export interface ExpansionStoresData {
@@ -4862,6 +4864,7 @@ export interface ExpansionStorePayloadData {
   expansionStoreSave?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreCopy?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreAutoCopySet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
+  expansionStoreFollowRateSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreRemove?: { userErrors: UserError[] };
 }
 

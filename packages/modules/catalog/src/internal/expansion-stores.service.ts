@@ -36,6 +36,8 @@ export interface ExpansionStoreRecord {
   lastResult: ExpansionCopyResult | null;
   /** Whether products are copied as they change (ADR-913). */
   autoCopy: boolean;
+  /** Whether its rate follows the day's rate between the shops' currencies (ADR-929). */
+  followRate: boolean;
   /** Why the last copy as products changed failed, and when; null once one succeeds. */
   copyError: string | null;
   failedAt: Date | null;
@@ -48,13 +50,14 @@ type Row = {
   synced_at: Date | string | null;
   last_result: ExpansionCopyResult | null;
   auto_copy: boolean;
+  follow_rate: boolean;
   copy_error: string | null;
   failed_at: Date | string | null;
   created_at: Date | string;
 };
 
-const COLUMNS = sql`target_shop_id, price_rate::text, synced_at, last_result, auto_copy, copy_error,
-  failed_at, created_at`;
+const COLUMNS = sql`target_shop_id, price_rate::text, synced_at, last_result, auto_copy, follow_rate,
+  copy_error, failed_at, created_at`;
 
 const toRecord = (row: Row): ExpansionStoreRecord => ({
   targetShopId: row.target_shop_id,
@@ -62,6 +65,7 @@ const toRecord = (row: Row): ExpansionStoreRecord => ({
   syncedAt: row.synced_at === null ? null : toDate(row.synced_at),
   lastResult: row.last_result,
   autoCopy: row.auto_copy,
+  followRate: row.follow_rate,
   copyError: row.copy_error,
   failedAt: row.failed_at === null ? null : toDate(row.failed_at),
   createdAt: toDate(row.created_at),
@@ -95,7 +99,8 @@ export class ExpansionStoreService {
 
   /**
    * Makes `targetShopId` an expansion store of the shop, or changes its rate: a decimal, "1" for
-   * the same currency. The caller checks the same owner holds both.
+   * the same currency. A rate given so stops following the day's (ADR-929). The caller checks
+   * the same owner holds both.
    */
   async save(
     tenant: TenantContext,
@@ -127,7 +132,8 @@ export class ExpansionStoreService {
       const { rows } = await tx.execute<Row>(sql`
         INSERT INTO catalog.expansion_stores (shop_id, target_shop_id, price_rate)
         VALUES (${tenant.shopId}, ${targetShopId}, ${rate}::numeric)
-        ON CONFLICT (shop_id, target_shop_id) DO UPDATE SET price_rate = EXCLUDED.price_rate
+        ON CONFLICT (shop_id, target_shop_id) DO UPDATE
+           SET price_rate = EXCLUDED.price_rate, follow_rate = false
         RETURNING ${COLUMNS}`);
       return { ok: true, value: toRecord(rows[0]!) };
     });
@@ -205,6 +211,71 @@ export class ExpansionStoreService {
   }
 
   /**
+   * Has `targetShopId`'s rate follow the day's rate between the shops' currencies (ADR-929),
+   * `rate` being that rate now, as the caller reads it from the feed's; or keep the rate it has,
+   * fixed. Refused where Hatti has no day's rate between them.
+   */
+  async setFollowRate(
+    tenant: TenantContext,
+    targetShopId: string,
+    enabled: boolean,
+    rate: string | null,
+  ): Promise<MutationResult<ExpansionStoreRecord>> {
+    if (enabled && (!rate || !RATE.test(rate) || Number(rate) <= 0)) {
+      return failOne(
+        ['shopId'],
+        'INVALID',
+        "Hatti has no day's rate between these shops' currencies: give a rate by hand",
+      );
+    }
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<Row>(sql`
+        UPDATE catalog.expansion_stores
+           SET follow_rate = ${enabled},
+               ${
+                 enabled
+                   ? sql`rate_changed_at = CASE WHEN price_rate = ${rate}::numeric
+                                              THEN rate_changed_at ELSE now() END,
+                         price_rate = ${rate}::numeric`
+                   : sql`rate_changed_at = rate_changed_at`
+               }
+         WHERE shop_id = ${tenant.shopId} AND target_shop_id = ${targetShopId}
+        RETURNING ${COLUMNS}`),
+    );
+    return rows[0]
+      ? { ok: true, value: toRecord(rows[0]) }
+      : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store');
+  }
+
+  /**
+   * Keeps the day's rate on a link following it, as the worker read the feed (ADR-929): a rate
+   * that changed is kept with when, so that a store copied to as products change is copied again.
+   * Whether it changed.
+   */
+  async followed(shopId: string, targetShopId: string, rate: string, at: Date): Promise<boolean> {
+    if (!RATE.test(rate) || Number(rate) <= 0) return false;
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute(sql`
+        UPDATE catalog.expansion_stores
+           SET price_rate = ${rate}::numeric, rate_changed_at = ${at.toISOString()}
+         WHERE shop_id = ${shopId} AND target_shop_id = ${targetShopId} AND follow_rate
+           AND price_rate <> ${rate}::numeric
+        RETURNING target_shop_id`),
+    );
+    return rows.length > 0;
+  }
+
+  /** The links following the day's rate, across shops (ADR-929). */
+  async following(): Promise<ExpansionCopyDue[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string; target_shop_id: string }>(sql`
+        SELECT shop_id, target_shop_id FROM catalog.expansion_stores
+         WHERE follow_rate ORDER BY shop_id, target_shop_id`),
+    );
+    return rows.map((row) => ({ shopId: row.shop_id, targetShopId: row.target_shop_id }));
+  }
+
+  /**
    * Whether products copied from `from` as they change reach `to`, through copies of copies: each
    * shop's links read as that shop's, as the API's login reads them.
    */
@@ -232,7 +303,8 @@ export class ExpansionStoreService {
   /**
    * The links due a copy as products changed, as of `at`, across shops: copying as they change,
    * a product or variant of the shop changed since the last copy and none in the last
-   * {@link EXPANSION_AUTO_COPY.quietMs}, and neither a copy nor a failure within the hour.
+   * {@link EXPANSION_AUTO_COPY.quietMs}, or its rate changed since, following the day's
+   * (ADR-929); and neither a copy nor a failure within the hour.
    */
   async dueForCopy(at: Date): Promise<ExpansionCopyDue[]> {
     const quiet = new Date(at.getTime() - EXPANSION_AUTO_COPY.quietMs).toISOString();
@@ -240,7 +312,7 @@ export class ExpansionStoreService {
     const { rows } = await this.db.system((tx) =>
       tx.execute<{ shop_id: string; target_shop_id: string }>(sql`
         WITH changed AS (
-          SELECT e.shop_id, e.target_shop_id, e.synced_at,
+          SELECT e.shop_id, e.target_shop_id, e.synced_at, e.rate_changed_at,
                  greatest(
                    (SELECT max(p.updated_at) FROM catalog.products p WHERE p.shop_id = e.shop_id),
                    (SELECT max(v.updated_at) FROM catalog.variants v WHERE v.shop_id = e.shop_id)
@@ -251,8 +323,10 @@ export class ExpansionStoreService {
              AND (e.failed_at IS NULL OR e.failed_at < ${since})
         )
         SELECT shop_id, target_shop_id FROM changed
-         WHERE last_change IS NOT NULL AND last_change < ${quiet}
-           AND (synced_at IS NULL OR last_change > synced_at)
+         WHERE (last_change IS NOT NULL AND last_change < ${quiet}
+                AND (synced_at IS NULL OR last_change > synced_at))
+            OR (rate_changed_at IS NOT NULL
+                AND (synced_at IS NULL OR rate_changed_at > synced_at))
          ORDER BY synced_at NULLS FIRST, shop_id, target_shop_id
          LIMIT ${EXPANSION_AUTO_COPY.perSweep}`),
     );

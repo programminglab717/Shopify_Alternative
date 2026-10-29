@@ -16,6 +16,7 @@ import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ExpansionCopier } from '../expansion-copier.js';
+import { CurrencyRates } from '../worker/currency-rates.js';
 import { startTestApi, type TestApi } from '../testing/api.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
@@ -34,6 +35,9 @@ const COPY = `mutation ($shopId: ID!) {
 const AUTO = `mutation ($shopId: ID!, $enabled: Boolean!) {
   expansionStoreAutoCopySet(shopId: $shopId, enabled: $enabled) {
     expansionStore { autoCopy copyError copyFailedAt } userErrors { field message } } }`;
+const FOLLOW = `mutation ($shopId: ID!, $enabled: Boolean!) {
+  expansionStoreFollowRateSet(shopId: $shopId, enabled: $enabled) {
+    expansionStore { priceRate followRate } userErrors { field message } } }`;
 const PRODUCTS =
   '{ products(first: 10) { nodes { title status variants { price { amount currencyCode } } } } }';
 
@@ -289,6 +293,83 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     expect(await copier.sweep(later(160))).toBe(1);
     expect((await value(owner.token, home, '{ expansionStores { copyError } }'))[0]).toEqual({
       copyError: null,
+    });
+  });
+
+  it("follows the day's rate between the shops' currencies, copying again as it changes (ADR-929)", async () => {
+    const pk = newId();
+    const gulf = newId();
+    const us = newId();
+    await admin.query(
+      `INSERT INTO control.shops (id, name, handle, currency)
+       VALUES ($1, 'Lahore', 'lahore', 'PKR'), ($2, 'Dubai', 'dubai', 'AED'),
+              ($3, 'Houston', 'houston', 'USD')`,
+      [pk, gulf, us],
+    );
+    await admin.query(
+      `INSERT INTO platform.currency_rates (currency, rate, rate_date, fetched_at)
+       VALUES ('AED', 76.4521, current_date, now())
+       ON CONFLICT (currency) DO UPDATE SET rate = excluded.rate`,
+    );
+    await admin.query(`DELETE FROM platform.currency_rates WHERE currency = 'USD'`);
+    const owner = await account([
+      [pk, 'owner'],
+      [gulf, 'owner'],
+      [us, 'owner'],
+    ]);
+    const shop = (id: string) => toPublicId('shop', id);
+    await value(owner.token, pk, SAVE, { shopId: shop(gulf), rate: '0.013' });
+    // Rs 1 is 1 / 76.4521 dirhams.
+    expect(
+      (await value(owner.token, pk, FOLLOW, { shopId: shop(gulf), enabled: true })).expansionStore,
+    ).toEqual({ priceRate: '0.01308', followRate: true });
+    // No day's rate for dollars: given by hand alone.
+    await value(owner.token, pk, SAVE, { shopId: shop(us), rate: '0.0036' });
+    expect(
+      (await value(owner.token, pk, FOLLOW, { shopId: shop(us), enabled: true })).userErrors,
+    ).toEqual([
+      {
+        field: ['shopId'],
+        message: "Hatti has no day's rate between these shops' currencies: give a rate by hand",
+      },
+    ]);
+
+    // The feed moves: the link takes the new rate, and copying as products change copies it.
+    await value(owner.token, pk, AUTO, { shopId: shop(gulf), enabled: true });
+    const stores = new ExpansionStoreService(database);
+    const at = new Date(Date.now() + 60_000);
+    // Its rate changed as it began following: a copy is due, at that rate.
+    expect(await stores.dueForCopy(at)).toEqual([{ shopId: pk, targetShopId: gulf }]);
+    // As a copy then would leave it.
+    await admin.query(
+      'UPDATE catalog.expansion_stores SET synced_at = $1 WHERE shop_id = $2 AND target_shop_id = $3',
+      [at, pk, gulf],
+    );
+    const later = new Date(at.getTime() + 2 * 3_600_000);
+    expect(await stores.dueForCopy(later)).toEqual([]);
+    const feed = (async () =>
+      new Response(JSON.stringify({ date: '2026-10-29', pkr: { aed: 0.0125 } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as unknown as typeof fetch;
+    await new CurrencyRates(
+      database,
+      'https://feed.example/pkr.json',
+      feed,
+      undefined,
+      stores,
+    ).sweep(new Date(at.getTime() + 60_000));
+    const [followed] = await value(owner.token, pk, '{ expansionStores { priceRate followRate } }');
+    expect(followed).toEqual({ priceRate: '0.0125', followRate: true });
+    expect(await stores.dueForCopy(later)).toEqual([{ shopId: pk, targetShopId: gulf }]);
+
+    // A rate given by hand stops following.
+    expect(
+      (await value(owner.token, pk, SAVE, { shopId: shop(gulf), rate: '0.02' })).expansionStore
+        .priceRate,
+    ).toBe('0.02');
+    expect((await value(owner.token, pk, '{ expansionStores { followRate } }'))[0]).toEqual({
+      followRate: false,
     });
   });
 });

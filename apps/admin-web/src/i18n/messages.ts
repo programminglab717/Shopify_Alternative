@@ -5148,6 +5148,7 @@ const en = {
   'expansion.copied': 'Copied {date}: {created} made, {updated} updated, {problems} not taken.',
   'expansion.never': 'Not copied yet.',
   'expansion.auto': 'Copy to {name} as products change, within the hour',
+  'expansion.follow': "Follow the day's rate from {from} to {currency}",
   'expansion.failed':
     'Copying as products changed failed on {date}: {error}. It is tried again an hour on.',
   'expansion.remove': 'Stop copying to {name}',
@@ -12366,6 +12367,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     '{date} کو کاپی ہوا: {created} نئی، {updated} اپڈیٹ، {problems} نہیں لی گئیں۔',
   'expansion.never': 'ابھی کاپی نہیں ہوا۔',
   'expansion.auto': 'مصنوعات بدلنے پر گھنٹے کے اندر {name} میں کاپی کریں',
+  'expansion.follow': '{from} سے {currency} کا روزانہ ریٹ اپنائیں',
   'expansion.failed':
     'مصنوعات بدلنے پر کاپی {date} کو نہ ہو سکی: {error}۔ ایک گھنٹے بعد پھر کوشش ہو گی۔',
   'expansion.remove': '{name} میں کاپی بند کریں',

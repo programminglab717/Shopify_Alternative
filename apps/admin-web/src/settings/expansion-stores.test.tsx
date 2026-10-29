@@ -20,6 +20,7 @@ function core(role: StaffRole = 'owner') {
           autoCopy: false,
           copyError: null,
           copyFailedAt: null,
+          followRate: false,
         };
         stores = [made];
         return { expansionStoreSave: { expansionStore: made, userErrors: [] } };
@@ -40,6 +41,14 @@ function core(role: StaffRole = 'owner') {
           copyFailedAt: '2026-10-28T10:00:00Z',
         }));
         return { expansionStoreAutoCopySet: { expansionStore: stores[0], userErrors: [] } };
+      case 'ExpansionStoreFollowRateSet':
+        // The day's rate from rupees to dollars, as the core would take it.
+        stores = stores.map((each) => ({
+          ...each,
+          followRate: variables.enabled,
+          priceRate: variables.enabled ? '0.00357' : each.priceRate,
+        }));
+        return { expansionStoreFollowRateSet: { expansionStore: stores[0], userErrors: [] } };
       case 'ExpansionStoreRemove':
         stores = [];
         return { expansionStoreRemove: { userErrors: [] } };
@@ -108,6 +117,17 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
       await screen.findByText(/The same person no longer owns both shops\. It is tried again/),
     ).toBeTruthy();
     expect(sentOf(fake, 'ExpansionStoreAutoCopySet')).toEqual([
+      { shopId: 'shop_2', enabled: true },
+    ]);
+
+    // The price rate follows the day's rate between the currencies (ADR-929).
+    const follow = screen.getByLabelText(
+      "Follow the day's rate from PKR to USD",
+    ) as HTMLInputElement;
+    expect(follow.checked).toBe(false);
+    fireEvent.click(follow);
+    expect(await screen.findByText('0.00357 USD for each PKR')).toBeTruthy();
+    expect(sentOf(fake, 'ExpansionStoreFollowRateSet')).toEqual([
       { shopId: 'shop_2', enabled: true },
     ]);
 

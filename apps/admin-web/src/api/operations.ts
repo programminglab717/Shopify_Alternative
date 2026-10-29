@@ -9943,6 +9943,7 @@ const EXPANSION_STORE = /* GraphQL */ `
     autoCopy
     copyError
     copyFailedAt
+    followRate
   }
 `;
 
@@ -9990,6 +9991,22 @@ export const ExpansionStoreCopyMutation = /* GraphQL */ `
 export const ExpansionStoreAutoCopySetMutation = /* GraphQL */ `
   mutation ExpansionStoreAutoCopySet($shopId: ID!, $enabled: Boolean!) {
     expansionStoreAutoCopySet(shopId: $shopId, enabled: $enabled) {
+      expansionStore {
+        ...ExpansionStoreFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPANSION_STORE}
+  ${USER_ERRORS}
+`;
+
+/** Following the day's rate between the shops' currencies (ADR-929). */
+export const ExpansionStoreFollowRateSetMutation = /* GraphQL */ `
+  mutation ExpansionStoreFollowRateSet($shopId: ID!, $enabled: Boolean!) {
+    expansionStoreFollowRateSet(shopId: $shopId, enabled: $enabled) {
       expansionStore {
         ...ExpansionStoreFields
       }

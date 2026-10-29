@@ -1034,6 +1034,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.CURRENCY_FEED_URL,
       fetch,
       logger,
+      // Expansion stores following the day's rate (ADR-929).
+      new ExpansionStoreService(database),
     ).start(config.CURRENCY_RATES_INTERVAL_MS);
     closers.push(() => currencyRates.stop());
     // Shops' Daraz accounts kept in step (ADR-875), where Hatti has its app on Daraz.

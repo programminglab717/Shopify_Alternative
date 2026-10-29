@@ -13,6 +13,7 @@ import { ExpansionStoreService, type ExpansionStoreRecord } from '@hatti/catalog
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { ExpansionCopier } from '../expansion-copier.js';
+import { dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
 import {
   Args,
   Field,
@@ -63,6 +64,13 @@ export class ExpansionStore {
 
   @Field({ description: 'Whether products are copied as they change, within the hour (ADR-913).' })
   autoCopy!: boolean;
+
+  @Field({
+    description:
+      "Whether its rate follows the day's rate between the shops' currencies, as the currency " +
+      'feed gives it, rather than one given by hand (ADR-929).',
+  })
+  followRate!: boolean;
 
   @Field(() => String, {
     nullable: true,
@@ -196,6 +204,37 @@ export class ExpansionStoreResolver {
     );
   }
 
+  @Mutation(() => ExpansionStorePayload, {
+    description:
+      "Has an expansion store's rate follow the day's rate between the shops' currencies, as the " +
+      'currency feed gives it, products copied as they change being copied again at each new ' +
+      'rate; or keeps the rate it has, fixed (ADR-929). The owner alone, of both shops, having ' +
+      'signed in lately.',
+  })
+  @RequireScopes('write_products')
+  @RequireRecentAuthentication()
+  async expansionStoreFollowRateSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('shopId', { type: () => ID }) shopId: string,
+    @Args('enabled') enabled: boolean,
+  ): Promise<ExpansionStorePayload> {
+    const actor = owner(tenant);
+    const target = tryFromPublicId(shopId, 'shop');
+    if (!target || !(await this.copier.owns(actor.userId, target))) {
+      return this.#payload(failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+    }
+    const rate = enabled
+      ? await this.db.tenant(target, async (tx) =>
+          dayRateBetween(
+            await rupeeRatesIn(tx),
+            tenant.currency,
+            (await shopProfile(tx, target)).currency,
+          ),
+        )
+      : null;
+    return this.#payload(await this.stores.setFollowRate(tenant, target, enabled, rate));
+  }
+
   async #shown(record: ExpansionStoreRecord): Promise<ExpansionStore> {
     const profile = await this.db.tenant(record.targetShopId, (tx) =>
       shopProfile(tx, record.targetShopId),
@@ -208,6 +247,7 @@ export class ExpansionStoreResolver {
       copiedAt: record.syncedAt,
       lastCopy: record.lastResult && Object.assign(new ExpansionCopy(), record.lastResult),
       autoCopy: record.autoCopy,
+      followRate: record.followRate,
       copyError: record.copyError,
       copyFailedAt: record.failedAt,
     });

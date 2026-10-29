@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import {
   ExpansionStoreAutoCopySetMutation,
   ExpansionStoreCopyMutation,
+  ExpansionStoreFollowRateSetMutation,
   ExpansionStoreRemoveMutation,
   ExpansionStoreSaveMutation,
   ExpansionStoresQuery,
@@ -52,6 +53,9 @@ export function ExpansionStoresPage() {
   const auto = useAdminMutation<ExpansionStorePayloadData, { shopId: string; enabled: boolean }>(
     ExpansionStoreAutoCopySetMutation,
   );
+  const follow = useAdminMutation<ExpansionStorePayloadData, { shopId: string; enabled: boolean }>(
+    ExpansionStoreFollowRateSetMutation,
+  );
   const recent = useRecentAuthentication();
   const [chosen, setChosen] = useState('');
   const [rate, setRate] = useState('1');
@@ -91,6 +95,14 @@ export function ExpansionStoresPage() {
     setProblem(null);
     await recent.run(async () => {
       const done = (await auto.mutateAsync({ shopId, enabled })).expansionStoreAutoCopySet!;
+      if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
+    }, onError);
+  };
+
+  const onFollow = async (shopId: string, enabled: boolean) => {
+    setProblem(null);
+    await recent.run(async () => {
+      const done = (await follow.mutateAsync({ shopId, enabled })).expansionStoreFollowRateSet!;
       if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
     }, onError);
   };
@@ -147,6 +159,13 @@ export function ExpansionStoresPage() {
                         })
                       : t('expansion.never')}
                   </span>
+                  <CheckField
+                    label={t('expansion.follow', { currency: store.currencyCode, from })}
+                    checked={store.followRate}
+                    onChange={(enabled) =>
+                      !follow.isPending && void onFollow(store.shopId, enabled)
+                    }
+                  />
                   <CheckField
                     label={t('expansion.auto', { name: store.name })}
                     checked={store.autoCopy}

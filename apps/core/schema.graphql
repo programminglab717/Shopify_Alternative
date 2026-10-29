@@ -6202,6 +6202,11 @@ type ExpansionStore {
 
   """Its currency, as its prices are: 'USD'."""
   currencyCode: String!
+
+  """
+  Whether its rate follows the day's rate between the shops' currencies, as the currency feed gives it, rather than one given by hand (ADR-929).
+  """
+  followRate: Boolean!
   lastCopy: ExpansionCopy
   name: String!
 
@@ -10620,6 +10625,11 @@ type Mutation {
   Copies the shop's products to an expansion store, at its rate: those it has already, by handle, updated, and new ones added as drafts or as they are here. The owner alone, of both shops, having signed in lately.
   """
   expansionStoreCopy(shopId: ID!): ExpansionStorePayload!
+
+  """
+  Has an expansion store's rate follow the day's rate between the shops' currencies, as the currency feed gives it, products copied as they change being copied again at each new rate; or keeps the rate it has, fixed (ADR-929). The owner alone, of both shops, having signed in lately.
+  """
+  expansionStoreFollowRateSet(enabled: Boolean!, shopId: ID!): ExpansionStorePayload!
 
   """
   Ends an expansion store's link; it keeps what was copied. The owner alone.

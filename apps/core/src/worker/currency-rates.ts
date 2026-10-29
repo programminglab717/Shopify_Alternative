@@ -1,3 +1,4 @@
+import type { ExpansionStoreService } from '@hatti/catalog/public';
 import type { Database } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import type { Logger } from '@hatti/logger';
@@ -10,6 +11,7 @@ import {
 } from '@hatti/money';
 import { OnlineStoreEvents } from '@hatti/online-store/public';
 import { sql } from 'drizzle-orm';
+import { dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
 import { repeat } from './repeat.js';
 
 /** How far a day's rate may move from the last before it is taken for the feed's mistake. */
@@ -20,7 +22,8 @@ const MOST_MOVED = 0.25;
  * open currency feed: units of each for one rupee, as Fawaz Ahmed's exchange API gives them. Each
  * rate is kept as rupees for one unit; a rate that moved more than a quarter since the last is
  * left as it was and logged, as a feed's mistake would be. Each shop showing a currency whose rate
- * changed and that it doesn't fix is written again, its pages showing the new rate.
+ * changed and that it doesn't fix is written again, its pages showing the new rate. Expansion
+ * stores following the day's rate between their shops' currencies take the new one (ADR-929).
  */
 export class CurrencyRates {
   constructor(
@@ -28,6 +31,7 @@ export class CurrencyRates {
     private readonly feedUrl: string,
     private readonly fetcher: typeof fetch = fetch,
     private readonly logger?: Pick<Logger, 'warn' | 'info'>,
+    private readonly expansion?: Pick<ExpansionStoreService, 'following' | 'followed'>,
   ) {}
 
   /** One read of the feed: the currencies whose rate changed. */
@@ -89,8 +93,34 @@ export class CurrencyRates {
         }),
       );
     }
-    this.logger?.info({ day, changed, shops: shops.length }, 'currency rates read');
+    const followed = await this.#follow(at);
+    this.logger?.info({ day, changed, shops: shops.length, followed }, 'currency rates read');
     return changed;
+  }
+
+  /** Expansion stores following the day's rate, given it (ADR-929): how many took a new one. */
+  async #follow(at: Date): Promise<number> {
+    const links = (await this.expansion?.following()) ?? [];
+    if (links.length === 0) return 0;
+    const ids = [...new Set(links.flatMap((link) => [link.shopId, link.targetShopId]))];
+    const { rates, currencies } = await this.database.system(async (tx) => {
+      const { rows } = await tx.execute<{ id: string; currency: string }>(sql`
+        SELECT id, currency FROM control.shops WHERE id = ANY (${sql.param(ids)}::uuid[])`);
+      return {
+        rates: await rupeeRatesIn(tx),
+        currencies: new Map(rows.map((row) => [row.id, row.currency])),
+      };
+    });
+    let taken = 0;
+    for (const link of links) {
+      const from = currencies.get(link.shopId);
+      const to = currencies.get(link.targetShopId);
+      const rate = from && to ? dayRateBetween(rates, from, to) : null;
+      if (rate && (await this.expansion!.followed(link.shopId, link.targetShopId, rate, at))) {
+        taken += 1;
+      }
+    }
+    return taken;
   }
 
   /** Reads now, then every `intervalMs`, a read never overlapping the last. */
