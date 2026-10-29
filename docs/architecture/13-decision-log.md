@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-910 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-911 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -918,6 +918,7 @@
 | 908 | A shop keeps AI shopping agents out, its UCP profile and store MCP answering none, and the store MCP tells agents its policies and delivery to a city with cash on delivery | Accepted |
 | 909 | Sales and custom reports break sales down by customer and by city, and the AI question box reads questions of them | Accepted |
 | 910 | A custom report may be of stock: each tracked variant's stock now and what sold of it over the period, as the inventory report has them | Accepted |
+| 911 | The AI answering customers answers from the shop's own answers to common questions, and from the products a customer asks of: their prices and whether each can be bought now | Accepted |
 
 ---
 
@@ -30092,3 +30093,33 @@
 * **Consequences:**
   * A shop can save, schedule and ask about its stock as it does its sales.
   * Stock at a moment in the past is not reported: the ledger would have to be replayed for it.
+
+## ADR-911 · The AI answering customers answers from the shop's own answers to common questions, and from the products a customer asks of: their prices and whether each can be bought now
+
+* **Context:** ADR-849 left the shop's FAQs and its products' facts out of what the AI answers
+  from. "Is it COD?", "how many days to Multan?" and "is the lawn suit in medium?" are what
+  customers ask most after "where is my order". Without these facts the AI hands such chats to
+  staff, or says it does not know.
+* **Decision:**
+  * **The shop's answers to common questions:** up to 30, each a question of up to 200
+    characters and an answer of up to 1,000. They are kept with the AI's settings (migration 0407)
+    and set together in order (`supportAgentFaqsSet`). No question may be asked twice in any
+    letter case. The admin's AI answers card writes, removes and saves them.
+  * **The products asked of:** the customer's last two messages are read for words a product is
+    found by. Search keys them as it does for product search, and words of any question ("kya",
+    "price", "please") are left out. Up to three of the shop's active products with the most of
+    those words, at a word's start, are given. For each variant the AI gets:
+    * its price, and the price it was, if higher;
+    * whether it can be bought online now, as the storefront has it. How many are left is never
+      given.
+  * **What comes first:** the customer's orders, then the products, then the FAQs, then the
+    policies. The facts are cut at 20,000 characters, up from 12,000, so long policies can't
+    crowd out an order.
+  * **The AI's instructions** say a size is in stock, or give a price, only as the facts have it,
+    and only of the product the customer means.
+* **Consequences:**
+  * Customers' most common questions get an answer at once, from the shop's own words and its
+    stock as it is.
+  * A product the customer names by a word its listing lacks isn't found. The AI then hands the
+    chat over or says it doesn't know, as before.
+  * A per-shop tone or name, and voice notes and pictures, are still not done.
