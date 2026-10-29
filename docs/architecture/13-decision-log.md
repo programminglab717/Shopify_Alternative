@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-958 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-959 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -966,6 +966,7 @@
 | 956 | The Storefront API gives products and collections by their IDs at once, as Shopify's nodes | Accepted |
 | 957 | The headless starter keeps a wishlist on the device before the shopper signs in, and joins it to their account's when they do | Accepted |
 | 958 | A running theme experiment's shares may be changed, the shoppers already shown a theme keeping it | Accepted |
+| 959 | The Storefront API's nodes gives pages, blogs and articles by their IDs too | Accepted |
 
 ---
 
@@ -31246,3 +31247,19 @@
 * **Consequences:**
   * A shop can lean into a draft that is doing well, or ease off one, without starting over.
   * Not yet: a draft added to, or taken out of, a running experiment.
+
+## ADR-959 · The Storefront API's nodes gives pages, blogs and articles by their IDs too
+
+* **Context:** ADR-956's `nodes(ids:)` gives products and collections, and left pages, blogs,
+  articles and variants for later. A headless site that keeps a reader's saved articles, or
+  links pages by ID, asks for each in turn.
+* **Decision:**
+  * **`Page`, `Blog` and `Article` implement `Node`**, and `nodes` gives them by their IDs, in
+    the order asked, null for one the shop doesn't show.
+  * **Pages and articles are read at once**, as products are, from the storefront's documents;
+    blogs by handle, as collections, and an article's blog with them.
+  * **Variants aren't given yet:** the storefront's documents keep a variant within its product,
+    with no lookup by the variant's ID.
+* **Consequences:**
+  * Every kind of the Storefront API's ID but a variant's can be asked for in one request.
+  * Not yet: variants by `nodes`.
