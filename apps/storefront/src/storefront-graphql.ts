@@ -51,7 +51,7 @@ import { POLICIES, policyTitle } from './policies.js';
 // checkout. A subset of Shopify's schema, its names and shapes kept, so its clients ask it alike.
 // Shoppers sign in as on the shop's own pages, with a code sent to their mobile number (ADR-943),
 // and the access token it gives reads their account, as Shopify's customer access token does,
-// and keeps their address book (ADR-946).
+// and keeps their address book (ADR-946) and wishlist (ADR-951).
 
 export const STOREFRONT_API_LIMITS = {
   /** The longest query read, and how deep it may ask. */
@@ -232,6 +232,12 @@ const SDL = /* GraphQL */ `
       customerAccessToken: String!
       addressId: ID!
     ): CustomerDefaultAddressUpdatePayload
+    """
+    Products put first on the signed-in shopper's wishlist (ADR-951), as their account on the
+    shop's own pages keeps it; 100 at most, the oldest going to make room.
+    """
+    customerWishlistAdd(customerAccessToken: String!, productIds: [ID!]!): CustomerWishlistPayload
+    customerWishlistRemove(customerAccessToken: String!, productId: ID!): CustomerWishlistPayload
     cartCreate(input: CartInput): CartCreatePayload
     cartLinesAdd(cartId: ID!, lines: [CartLineInput!]!): CartLinesAddPayload
     cartLinesUpdate(cartId: ID!, lines: [CartLineUpdateInput!]!): CartLinesUpdatePayload
@@ -740,6 +746,15 @@ const SDL = /* GraphQL */ `
     """
     addresses(first: Int, after: String): MailingAddressConnection!
     defaultAddress: MailingAddress
+    """
+    The products they keep to buy later, the newest first, those the shop still sells (ADR-951).
+    """
+    wishlist(first: Int, after: String): ProductConnection!
+  }
+
+  type CustomerWishlistPayload {
+    customer: Customer
+    customerUserErrors: [CustomerUserError!]!
   }
 
   """
@@ -931,6 +946,10 @@ export interface StorefrontApiAccounts {
     { ok: true; addresses: AccountAddress[] } | ({ ok: false } & AccountErrorResponse) | null
   >;
   deleteAddress(token: string, id: string): Promise<AccountAddress[] | null>;
+  /** The account's wishlist, its products' IDs the newest first (ADR-951); null without one. */
+  wishlist(token: string): Promise<string[] | null>;
+  wishlistAdd(token: string, productIds: readonly string[]): Promise<string[] | null>;
+  wishlistRemove(token: string, productId: string): Promise<string[] | null>;
 }
 
 /** What a request of the Storefront API reads and changes. */
@@ -1468,8 +1487,13 @@ function addressRequestOf(
   };
 }
 
-/** The signed-in shopper's account, as Shopify's Customer. */
-function customerOf(account: AccountJson, book: () => Promise<AccountAddress[]> = async () => []) {
+/** The signed-in shopper's account, as Shopify's Customer, its book and wishlist read as asked. */
+function customerOf(
+  account: AccountJson,
+  api: StorefrontApiShop,
+  book: () => Promise<AccountAddress[]> = async () => [],
+  wishlist: () => Promise<string[]> = async () => [],
+) {
   const [firstName, ...rest] = (account.name ?? '').trim().split(/\s+/);
   const orders = account.orders.map(orderOf);
   return {
@@ -1487,6 +1511,8 @@ function customerOf(account: AccountJson, book: () => Promise<AccountAddress[]> 
       const first = (await book()).find((address) => address.default);
       return first ? mailingAddressOf(first) : null;
     },
+    wishlist: async (args: { first?: number; after?: string }) =>
+      productPage(await wishlist(), args, api),
   };
 }
 
@@ -1597,6 +1623,24 @@ function rootOf(api: StorefrontApiShop) {
         .addresses(token)
         .then((book) => book ?? []));
   };
+  /** The wishlist of the shopper `token` signed in, read once. */
+  const wishOf = (token: string) => {
+    let read: Promise<string[]> | null = null;
+    return () =>
+      (read ??= accounts()
+        .wishlist(token)
+        .then((ids) => ids ?? []));
+  };
+  /** The wishlist after `change`, as a mutation's payload. */
+  const wished = async (token: string, change: () => Promise<string[] | null>) => {
+    const ids = CUSTOMER_TOKEN.test(token) ? await change() : null;
+    const account = ids ? await accounts().account(token) : null;
+    if (!ids || !account) return { customer: null, customerUserErrors: [unidentified] };
+    return {
+      customer: customerOf(account, api, bookOf(token), async () => ids),
+      customerUserErrors: [],
+    };
+  };
   type AddressInput = Record<string, string | null | undefined>;
   /** An address added, or the one `id` names changed, as a mutation's payload. */
   const savedAddress = async (token: string, input: AddressInput, id: string | null) => {
@@ -1646,7 +1690,31 @@ function rootOf(api: StorefrontApiShop) {
     customer: async (args: { customerAccessToken: string }) => {
       if (!CUSTOMER_TOKEN.test(args.customerAccessToken)) return null;
       const account = await accounts().account(args.customerAccessToken);
-      return account ? customerOf(account, bookOf(args.customerAccessToken)) : null;
+      return account
+        ? customerOf(
+            account,
+            api,
+            bookOf(args.customerAccessToken),
+            wishOf(args.customerAccessToken),
+          )
+        : null;
+    },
+    customerWishlistAdd: (args: { customerAccessToken: string; productIds: string[] }) => {
+      const ids = args.productIds
+        .slice(0, STOREFRONT_API_LIMITS.first)
+        .map((id) => idOf('Product', id))
+        .filter((id): id is string => id !== null);
+      return wished(args.customerAccessToken, () =>
+        accounts().wishlistAdd(args.customerAccessToken, ids),
+      );
+    },
+    customerWishlistRemove: (args: { customerAccessToken: string; productId: string }) => {
+      const id = idOf('Product', args.productId);
+      return wished(args.customerAccessToken, async () =>
+        id
+          ? accounts().wishlistRemove(args.customerAccessToken, id)
+          : accounts().wishlist(args.customerAccessToken),
+      );
     },
     customerAddressCreate: (args: { customerAccessToken: string; address: AddressInput }) =>
       savedAddress(args.customerAccessToken, args.address, null),
@@ -1682,7 +1750,7 @@ function rootOf(api: StorefrontApiShop) {
       await accounts().saveAddress(token, { ...request, default: true }, kept.id);
       const account = await accounts().account(token);
       return {
-        customer: account ? customerOf(account, bookOf(token)) : null,
+        customer: account ? customerOf(account, api, bookOf(token), wishOf(token)) : null,
         customerUserErrors: account ? [] : [unidentified],
       };
     },

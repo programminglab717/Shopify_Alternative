@@ -684,6 +684,8 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
       },
     ];
     const signedIn = (token: string) => token === TOKEN && !signedOut.includes(token);
+    /** Their wishlist, the newest first: a product the shop no longer sells among them. */
+    let wished: string[] = ['gone-product'];
     const kept: StorefrontApiAccounts = {
       sendCode: (request) => {
         asked.push(request);
@@ -753,6 +755,17 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
         if (!signedIn(token)) return Promise.resolve(null);
         book = book.filter((each) => each.id !== id);
         return Promise.resolve(book);
+      },
+      wishlist: (token) => Promise.resolve(signedIn(token) ? wished : null),
+      wishlistAdd: (token, ids) => {
+        if (!signedIn(token)) return Promise.resolve(null);
+        wished = [...ids, ...wished.filter((id) => !ids.includes(id))];
+        return Promise.resolve(wished);
+      },
+      wishlistRemove: (token, id) => {
+        if (!signedIn(token)) return Promise.resolve(null);
+        wished = wished.filter((each) => each !== id);
+        return Promise.resolve(wished);
       },
     };
     return { kept, asked, signedOut, busy: () => (busy = true) };
@@ -944,6 +957,49 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
       (await ask(create, { token: 'someone-else-0123456789', address: karachi }, at)).data
         .customerAddressCreate.customerUserErrors[0].code,
     ).toBe('UNIDENTIFIED_CUSTOMER');
+  });
+
+  it("keeps the signed-in shopper's wishlist, the products the shop still sells (ADR-951)", async () => {
+    const at = { ...api(), accounts: accounts().kept };
+    const other = sample.products.find((product) => product.id !== lawn.id)!;
+    const WISHED = `customer { wishlist(first: 10) { nodes { handle } } }
+      customerUserErrors { code }`;
+    const add = await ask(
+      `mutation ($token: String!, $ids: [ID!]!) {
+        customerWishlistAdd(customerAccessToken: $token, productIds: $ids) { ${WISHED} } }`,
+      { token: TOKEN, ids: [`gid://hatti/Product/${other.id}`, `gid://hatti/Product/${lawn.id}`] },
+      at,
+    );
+    // The newest first; one the shop no longer sells left out.
+    expect(add.data.customerWishlistAdd).toEqual({
+      customer: { wishlist: { nodes: [{ handle: other.handle }, { handle: lawn.handle }] } },
+      customerUserErrors: [],
+    });
+    const removed = await ask(
+      `mutation ($token: String!, $id: ID!) {
+        customerWishlistRemove(customerAccessToken: $token, productId: $id) { ${WISHED} } }`,
+      { token: TOKEN, id: `gid://hatti/Product/${other.id}` },
+      at,
+    );
+    expect(removed.data.customerWishlistRemove.customer.wishlist.nodes).toEqual([
+      { handle: lawn.handle },
+    ]);
+    const read = await ask(
+      `query ($token: String!) { customer(customerAccessToken: $token) { wishlist(first: 5) { nodes { handle } } } }`,
+      { token: TOKEN },
+      at,
+    );
+    expect(read.data.customer.wishlist.nodes).toEqual([{ handle: lawn.handle }]);
+    // A token no one's changes nothing.
+    const refused = await ask(
+      `mutation { customerWishlistRemove(customerAccessToken: "someone-else-0123456789", productId: "gid://hatti/Product/x") { customer { displayName } customerUserErrors { code } } }`,
+      undefined,
+      at,
+    );
+    expect(refused.data.customerWishlistRemove).toEqual({
+      customer: null,
+      customerUserErrors: [{ code: 'UNIDENTIFIED_CUSTOMER' }],
+    });
   });
 
   it("gives the signed-in shopper's orders, a page at a time, and signs them out", async () => {

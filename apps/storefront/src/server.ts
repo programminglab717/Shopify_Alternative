@@ -2658,6 +2658,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
               saveAddress: (token, address, id) =>
                 core.accountAddressSave(found.shopId, token, address, id),
               deleteAddress: (token, id) => core.accountAddressDelete(found.shopId, token, id),
+              wishlist: (token) => core.accountWishlist(found.shopId, token),
+              wishlistAdd: (token, ids) => core.accountWishlistAdd(found.shopId, token, ids),
+              wishlistRemove: (token, id) => core.accountWishlistRemove(found.shopId, token, id),
             }
           : null,
         search: async (terms) => (core ? core.search(found.shopId, terms, { prefix: 'none' }) : []),

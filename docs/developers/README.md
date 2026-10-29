@@ -151,7 +151,9 @@ The token also keeps the shopper's address book (ADR-946), as Shopify's does: `c
 defaultAddress }`, `customerAddressCreate`, `customerAddressUpdate`, `customerAddressDelete` and
 `customerDefaultAddressUpdate`. Addresses are in Pakistan alone, checked as checkout checks them,
 20 at most; `MailingAddressInput` takes a `landmark` besides Shopify's fields. A number that has
-never ordered has no book yet: its addresses come with its first order.
+never ordered has no book yet: its addresses come with its first order. Its wishlist is kept too (ADR-951):
+`customer { wishlist }`, `customerWishlistAdd` and `customerWishlistRemove`, as on the shop's own
+pages.
 
 ## Public apps
 
