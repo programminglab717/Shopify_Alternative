@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The CLI's functions
+### 29a1a70 · The CLI's functions
 
 * **`hatti function build`, `deploy` and `list`** build an app's checkout functions with the
   developer's own tool and deploy them by their handle ([ADR-922](../architecture/13-decision-log.md#adr-922--the-command-line-builds-an-apps-checkout-functions-with-the-developers-own-tool-and-deploys-them-by-their-handle-from-a-directorys-hattifunctionjson)).
