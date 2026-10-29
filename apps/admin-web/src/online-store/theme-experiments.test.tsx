@@ -16,12 +16,15 @@ const theme = (id: string, name: string, role: 'MAIN' | 'UNPUBLISHED') => ({
   updatedAt: EARLIER,
 });
 
+/** An arm whose orders were Rs 5,000 each. */
 const arm = (sessions: number, converted: number) => ({
   sessions,
   addedToCart: converted * 3,
   reachedCheckout: converted * 2,
   converted,
   conversionRate: converted / sessions,
+  revenue: { amount: (converted * 5_000).toFixed(2), currencyCode: 'PKR' },
+  revenuePerSession: { amount: ((converted * 5_000) / sessions).toFixed(2), currencyCode: 'PKR' },
 });
 
 describe('Theme experiments (OS-22, ADR-866)', () => {
@@ -45,6 +48,7 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
         live: arm(1_000, 40),
         draft: arm(1_000, 15),
         verdict: 'b_worse',
+        revenueVerdict: 'b_worse',
         countedAt: EARLIER,
       },
     ];
@@ -76,6 +80,7 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
             live: arm(400, 8),
             draft: arm(100, 4),
             verdict: 'too_early',
+            revenueVerdict: 'too_early',
             countedAt: null,
           };
           experiments = [started, ...experiments];
@@ -100,7 +105,13 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
     expect(
       await section.findByText(/Hatti ended it on .*: the draft sold clearly worse\./),
     ).toBeTruthy();
-    expect(section.getByText('1000 visits · 45 carts · 15 orders · 1.5% ordered')).toBeTruthy();
+    // With money a visit, and what that says (ADR-921).
+    expect(
+      section.getByText('1000 visits · 45 carts · 15 orders · 1.5% ordered · Rs 75 a visit'),
+    ).toBeTruthy();
+    expect(
+      section.getByText('The draft brings in less money a visit than your live theme.'),
+    ).toBeTruthy();
 
     type('What you’re trying', 'Eid banner');
     type('Shoppers shown the draft (%)', '25');

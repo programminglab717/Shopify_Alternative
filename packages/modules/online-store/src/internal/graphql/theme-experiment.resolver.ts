@@ -1,4 +1,5 @@
-import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import { CurrentTenant, Money, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import { money, type CurrencyCode } from '@hatti/money';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import {
   Args,
@@ -16,6 +17,7 @@ import {
 import {
   EXPERIMENT_LIMITS,
   ThemeExperimentService,
+  revenueVerdictOf,
   verdictOf,
   type ArmCounts,
   type ThemeExperimentRecord,
@@ -39,6 +41,14 @@ export class ThemeExperimentArm {
 
   @Field(() => Float, { description: 'The share of its sessions that ordered, from 0 to 1.' })
   conversionRate!: number;
+
+  @Field(() => Money, {
+    description: "What its sessions' orders placed at checkout came to (ADR-921).",
+  })
+  revenue!: Money;
+
+  @Field(() => Money, { description: 'Its revenue over its sessions.' })
+  revenuePerSession!: Money;
 }
 
 @ObjectType({
@@ -90,6 +100,13 @@ export class ThemeExperiment {
   })
   verdict!: string;
 
+  @Field({
+    description:
+      'As `verdict`, of each arm’s revenue a session (ADR-921): b_better or b_worse where the ' +
+      'draft brings more or less money a session, at 95% confidence.',
+  })
+  revenueVerdict!: string;
+
   @Field(() => GraphQLISODateTime, { nullable: true, description: 'When its counts were taken.' })
   countedAt!: Date | null;
 }
@@ -118,16 +135,23 @@ export class ThemeExperimentPayload {
   userErrors!: UserError[];
 }
 
-const toArm = (counts: ArmCounts) =>
+const toArm = (counts: ArmCounts, currency: CurrencyCode) =>
   Object.assign(new ThemeExperimentArm(), {
     sessions: counts.sessions,
     addedToCart: counts.added_to_cart,
     reachedCheckout: counts.reached_checkout,
     converted: counts.converted,
     conversionRate: counts.sessions === 0 ? 0 : counts.converted / counts.sessions,
+    revenue: Money.from(money(BigInt(Math.round(counts.revenue)), currency)),
+    revenuePerSession: Money.from(
+      money(
+        BigInt(counts.sessions === 0 ? 0 : Math.round(counts.revenue / counts.sessions)),
+        currency,
+      ),
+    ),
   });
 
-const toExperiment = (record: ThemeExperimentRecord) =>
+const toExperiment = (record: ThemeExperimentRecord, currency: CurrencyCode) =>
   Object.assign(new ThemeExperiment(), {
     id: toPublicId('themeExperiment', record.id),
     name: record.name,
@@ -137,15 +161,19 @@ const toExperiment = (record: ThemeExperimentRecord) =>
     endsAt: record.endsAt,
     endedAt: record.endedAt,
     endedReason: record.endedReason,
-    live: toArm(record.results.a),
-    draft: toArm(record.results.b),
+    live: toArm(record.results.a, currency),
+    draft: toArm(record.results.b, currency),
     verdict: verdictOf(record.results),
+    revenueVerdict: revenueVerdictOf(record.results),
     countedAt: record.countedAt,
   });
 
-const payload = (result: Awaited<ReturnType<ThemeExperimentService['start']>>) =>
+const payload = (
+  result: Awaited<ReturnType<ThemeExperimentService['start']>>,
+  currency: CurrencyCode,
+) =>
   Object.assign(new ThemeExperimentPayload(), {
-    themeExperiment: result.ok ? toExperiment(result.value) : null,
+    themeExperiment: result.ok ? toExperiment(result.value, currency) : null,
     userErrors: result.ok ? [] : UserError.list(result.errors),
   });
 
@@ -168,7 +196,7 @@ export class ThemeExperimentResolver {
   })
   @RequireScopes('read_themes')
   async themeExperiments(@CurrentTenant() tenant: TenantContext): Promise<ThemeExperiment[]> {
-    return (await this.experiments.list(tenant)).map(toExperiment);
+    return (await this.experiments.list(tenant)).map((each) => toExperiment(each, tenant.currency));
   }
 
   @Mutation(() => ThemeExperimentPayload, {
@@ -190,6 +218,7 @@ export class ThemeExperimentResolver {
         share: input.share,
         days: input.days,
       }),
+      tenant.currency,
     );
   }
 
@@ -203,6 +232,6 @@ export class ThemeExperimentResolver {
   ): Promise<ThemeExperimentPayload> {
     const uuid = tryFromPublicId(id, 'themeExperiment');
     if (!uuid) return notFound('id');
-    return payload(await this.experiments.end(tenant, uuid));
+    return payload(await this.experiments.end(tenant, uuid), tenant.currency);
   }
 }

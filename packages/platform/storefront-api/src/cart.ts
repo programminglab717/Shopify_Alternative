@@ -156,8 +156,12 @@ export interface CheckoutStartResponse {
  * `redirect`: where to send the shopper with a 303, the shop's payment gateway (ADR-152).
  */
 export type CheckoutPageResponse =
-  /** With `proof`, once its number was proved by a code: for the browser's cookie (ADR-199). */
-  | { placed: true; proof?: string }
+  /**
+   * With `proof`, once its number was proved by a code: for the browser's cookie (ADR-199); and
+   * `sale`, the order placed and its total in minor units of the shop's currency, for the shop's
+   * theme experiment to count (ADR-921).
+   */
+  | { placed: true; proof?: string; sale?: { orderId: string; amount: string } }
   | { placed: false; redirect: string }
   | { placed: false; status: number; headers: Record<string, string>; html: string };
 

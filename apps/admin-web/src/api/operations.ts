@@ -13220,6 +13220,12 @@ const THEME_EXPERIMENT = /* GraphQL */ `
       reachedCheckout
       converted
       conversionRate
+      revenue {
+        ...Money
+      }
+      revenuePerSession {
+        ...Money
+      }
     }
     draft {
       sessions
@@ -13227,10 +13233,18 @@ const THEME_EXPERIMENT = /* GraphQL */ `
       reachedCheckout
       converted
       conversionRate
+      revenue {
+        ...Money
+      }
+      revenuePerSession {
+        ...Money
+      }
     }
     verdict
+    revenueVerdict
     countedAt
   }
+  ${MONEY}
 `;
 
 /** The shop's theme experiments (OS-22, ADR-866). */

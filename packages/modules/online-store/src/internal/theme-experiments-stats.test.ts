@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { guardrailTripped, verdictOf, zScoreOf, type ArmCounts } from './theme-experiments.js';
+import {
+  guardrailTripped,
+  revenueVerdictOf,
+  revenueZScoreOf,
+  verdictOf,
+  zScoreOf,
+  type ArmCounts,
+} from './theme-experiments.js';
 
-const arm = (sessions: number, converted: number): ArmCounts => ({
+/** An arm whose `converted` sessions each placed an order of `order`, in paisa: Rs 5,000. */
+const arm = (sessions: number, converted: number, order = 500_000): ArmCounts => ({
   sessions,
   added_to_cart: converted * 3,
   reached_checkout: converted * 2,
   converted,
+  revenue: converted * order,
+  revenue_squares: converted * order * order,
 });
 
 describe('What a theme experiment says of its draft (OS-22, ADR-866)', () => {
@@ -27,5 +37,21 @@ describe('What a theme experiment says of its draft (OS-22, ADR-866)', () => {
     // Clearly worse, but too few sessions.
     expect(guardrailTripped({ a: arm(400, 40), b: arm(400, 4) })).toBe(false);
     expect(guardrailTripped({ a: arm(1_000, 15), b: arm(1_000, 40) })).toBe(false);
+  });
+
+  it('tells whether the draft brings more or less money a session, by Welch’s test (ADR-921)', () => {
+    expect(revenueVerdictOf({ a: arm(150, 3), b: arm(150, 12) })).toBe('too_early');
+    expect(revenueZScoreOf({ a: arm(1, 0), b: arm(10, 1) })).toBeNull();
+    // Nobody ordered: no spread to tell by.
+    expect(revenueZScoreOf({ a: arm(500, 0), b: arm(500, 0) })).toBeNull();
+    // Twice the orders of the same size: more a session, z ≈ 2.62.
+    expect(revenueZScoreOf({ a: arm(1_000, 20), b: arm(1_000, 40) })).toBeCloseTo(2.62, 2);
+    // As many orders, three times the size: no different by orders, more by money.
+    const larger = { a: arm(1_000, 20), b: arm(1_000, 20, 1_500_000) };
+    expect(verdictOf(larger)).toBe('no_difference');
+    expect(revenueZScoreOf(larger)).toBeCloseTo(2.86, 2);
+    expect(revenueVerdictOf(larger)).toBe('b_better');
+    expect(revenueVerdictOf({ a: arm(1_000, 20, 1_500_000), b: arm(1_000, 20) })).toBe('b_worse');
+    expect(revenueVerdictOf({ a: arm(1_000, 20), b: arm(1_000, 22) })).toBe('no_difference');
   });
 });

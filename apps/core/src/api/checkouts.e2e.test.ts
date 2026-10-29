@@ -362,8 +362,14 @@ describe.skipIf(!server)('Checkouts', () => {
     const stale = await client.checkoutPage(shopA, secret, { ...FORM, shown: 'x'.repeat(22) });
     expect(stale).toMatchObject({ placed: false, status: 409 });
     const shown = shownIn(page.html);
-    expect(await client.checkoutPage(shopA, secret, { ...FORM, shown })).toEqual({ placed: true });
+    // With the order and its total, for the shop's theme experiment to count (ADR-921).
+    const placed = await client.checkoutPage(shopA, secret, { ...FORM, shown });
+    expect(placed).toEqual({
+      placed: true,
+      sale: { orderId: expect.any(String), amount: expect.stringMatching(/^[1-9][0-9]*$/) },
+    });
     expect(await orders()).toHaveLength(1);
+    expect('sale' in placed && placed.sale?.amount).toBe((await orders())[0]!.total);
     expect(await client.startCheckout(shopA, await cart())).toMatchObject({
       ok: true,
       path: expect.stringMatching(/^\/checkouts\//),
@@ -576,7 +582,7 @@ describe.skipIf(!server)('Checkouts', () => {
       },
       payload: { ...FORM, shown: shownIn(page.html) },
     });
-    expect(placed.json()).toEqual({ placed: true });
+    expect(placed.json()).toMatchObject({ placed: true });
     // With the IDs the shop's pixels gave the browser, those in their format (ADR-144, ADR-543).
     const { rows: browsers } = await admin.query<{ browser_ids: unknown }>(
       'SELECT browser_ids FROM orders.orders WHERE shop_id = $1',
@@ -644,7 +650,7 @@ describe.skipIf(!server)('Checkouts', () => {
         headers: asStorefront,
         payload: { ...FORM, shown: shownIn(page.html) },
       });
-      expect(placed.json()).toEqual({ placed: true });
+      expect(placed.json()).toMatchObject({ placed: true });
     };
     const landingPage =
       'https://zari.pk/products/kurta?utm_source=facebook&utm_medium=paid_social' +
@@ -770,7 +776,7 @@ describe.skipIf(!server)('Checkouts', () => {
         },
         payload: { ...FORM, shown: shownIn(opened.html) },
       });
-      expect(relayed.json()).toEqual({ placed: true });
+      expect(relayed.json()).toMatchObject({ placed: true });
       expect(await orders()).toHaveLength(3);
       expect((await code()).code).toBe(sent.code);
     } finally {
@@ -797,7 +803,7 @@ describe.skipIf(!server)('Checkouts', () => {
       return placed.json() as CheckoutPageResponse;
     };
     for (const ip of ['203.0.113.1', '203.0.113.2', '203.0.113.3']) {
-      expect(await placeFrom(ip)).toEqual({ placed: true });
+      expect(await placeFrom(ip)).toMatchObject({ placed: true });
     }
     const fourth = await placeFrom('203.0.113.4');
     expect(fourth).toMatchObject({ placed: false, status: 429 });

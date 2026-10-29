@@ -1007,6 +1007,33 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
 
   /**
+   * An order placed at checkout, counted in the arm of the shop's theme experiment the session's
+   * cookie keeps, with what it came to (ADR-921). As `counted`: not a robot's or a preview's, and
+   * never failing the request.
+   */
+  const sold = async (
+    request: FastifyRequest,
+    found: Found,
+    sale: { orderId: string; amount: string },
+  ): Promise<void> => {
+    if (!activity || found.preview || !(found.store instanceof RedisStore)) return;
+    if (isRobot(request.headers['user-agent'])) return;
+    try {
+      const arm = experimentArm(
+        (await found.store.shop()).experiment,
+        found.experimentCookie,
+        false,
+      );
+      const amount = Number(sale.amount);
+      if (arm && !arm.assigned && Number.isSafeInteger(amount) && amount > 0) {
+        await activity.experimentSold(found.shopId, arm.id, arm.arm, sale.orderId, amount);
+      }
+    } catch {
+      // A sale missed is no reason to fail a shopper.
+    }
+  };
+
+  /**
    * Where a session came from, the page it landed on and its device, as its first page's script
    * says (ADR-884): counted once a session. Not a robot's, staff's previews or the sample shop's,
    * and never failing the request.
@@ -2245,6 +2272,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       }
       if (page.placed) {
         await counted(request, found, 'converted');
+        if (page.sale) await sold(request, found, page.sale);
         // The shopper's own cart: emptied by the order, unless a permalink's cart was ordered.
         const own = cookieOf(request.headers.cookie, CART_COOKIE);
         // The order is placed whatever the count says: a cart not read counts none.

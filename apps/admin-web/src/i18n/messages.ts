@@ -4926,6 +4926,11 @@ const en = {
   'experiments.verdict.no_difference': 'No clear difference in orders so far.',
   'experiments.verdict.b_better': 'The draft sells better. You can publish it.',
   'experiments.verdict.b_worse': 'The draft sells worse than your live theme.',
+  'experiments.revenue': '{amount} a visit',
+  'experiments.revenueVerdict.no_difference': 'No clear difference in money a visit so far.',
+  'experiments.revenueVerdict.b_better': 'The draft brings in more money a visit.',
+  'experiments.revenueVerdict.b_worse':
+    'The draft brings in less money a visit than your live theme.',
   'settings.currencies': 'Currencies',
   'settings.currenciesHint': 'Prices in dirhams, riyals, pounds and dollars for shoppers abroad',
   'currencies.hint':
@@ -12122,6 +12127,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experiments.verdict.no_difference': 'اب تک آرڈرز میں واضح فرق نہیں۔',
   'experiments.verdict.b_better': 'ڈرافٹ زیادہ بکتی ہے۔ آپ اسے شائع کر سکتے ہیں۔',
   'experiments.verdict.b_worse': 'ڈرافٹ آپ کی لائیو تھیم سے کم بکتی ہے۔',
+  'experiments.revenue': 'فی وزٹ {amount}',
+  'experiments.revenueVerdict.no_difference': 'اب تک فی وزٹ رقم میں واضح فرق نہیں۔',
+  'experiments.revenueVerdict.b_better': 'ڈرافٹ فی وزٹ زیادہ رقم لاتی ہے۔',
+  'experiments.revenueVerdict.b_worse': 'ڈرافٹ آپ کی لائیو تھیم سے فی وزٹ کم رقم لاتی ہے۔',
   'settings.currencies': 'کرنسیاں',
   'settings.currenciesHint': 'بیرونِ ملک خریداروں کے لیے درہم، ریال، پاؤنڈ اور ڈالر میں قیمتیں',
   'currencies.hint':

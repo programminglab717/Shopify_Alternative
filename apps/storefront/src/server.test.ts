@@ -7052,7 +7052,8 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
         },
       });
     });
-    const app = server();
+    const core = new FakeCore();
+    const app = server(core);
     const shopper = {
       host: 'trial.localhost',
       'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36',
@@ -7096,8 +7097,28 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       },
     });
     expect(seen.statusCode).toBe(204);
+    // Its order, with what it came to, is counted in its arm once, however often told (ADR-921).
+    core.page = { placed: true, sale: { orderId: 'order-1', amount: '500000' } };
+    for (let time = 0; time < 2; time += 1) {
+      const placed = await app.inject({
+        method: 'POST',
+        url: '/checkouts/c-secret',
+        headers: {
+          ...shopper,
+          cookie: 'hatti_ab=texp_draft.b; hatti_session=AbCdEfGhIjKlMnOpQrStUv',
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        payload: 'name=Ayesha',
+      });
+      expect(placed.statusCode).toBe(303);
+    }
     const counts = await new StorefrontActivity(redis, keys).experimentCounts(shopId, 'texp_draft');
-    expect([counts.a.sessions, counts.b.sessions]).toEqual([0, 1]);
+    expect([counts.a.sessions, counts.b.sessions, counts.b.converted]).toEqual([0, 1, 1]);
+    expect([counts.a.revenue, counts.b.revenue, counts.b.revenue_squares]).toEqual([
+      0,
+      500_000,
+      500_000 ** 2,
+    ]);
     await app.close();
   });
 

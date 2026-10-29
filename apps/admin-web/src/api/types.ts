@@ -6555,6 +6555,9 @@ export interface ThemeExperimentArm {
   reachedCheckout: number;
   converted: number;
   conversionRate: number;
+  /** What its sessions' orders came to, and that over its sessions (ADR-921). */
+  revenue: MoneyValue;
+  revenuePerSession: MoneyValue;
 }
 
 /** A draft theme shown a share of the shop's shoppers (OS-22, ADR-866). */
@@ -6570,6 +6573,8 @@ export interface ThemeExperiment {
   live: ThemeExperimentArm;
   draft: ThemeExperimentArm;
   verdict: 'too_early' | 'no_difference' | 'b_better' | 'b_worse';
+  /** As `verdict`, of each arm's revenue a session (ADR-921). */
+  revenueVerdict: 'too_early' | 'no_difference' | 'b_better' | 'b_worse';
   countedAt: string | null;
 }
 

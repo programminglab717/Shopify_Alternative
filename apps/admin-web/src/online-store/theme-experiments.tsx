@@ -14,7 +14,7 @@ import type {
   ThemeExperimentsData,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
-import { formatDate } from '../i18n/format';
+import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { problemText } from '../products/product-form';
@@ -171,6 +171,13 @@ function Results({ experiment, draftName }: { experiment: ThemeExperiment; draft
           orders: counts.converted,
           rate: percent(counts.conversionRate),
         })}
+        {' · '}
+        {t('experiments.revenue', {
+          amount: formatMoney(
+            counts.revenuePerSession.amount,
+            counts.revenuePerSession.currencyCode,
+          ),
+        })}
       </span>
     </li>
   );
@@ -196,6 +203,12 @@ function Results({ experiment, draftName }: { experiment: ThemeExperiment; draft
       <Alert tone={experiment.verdict === 'b_worse' ? 'warning' : 'info'}>
         {t(`experiments.verdict.${experiment.verdict}` as MessageKey)}
       </Alert>
+      {/* Of money a visit, once there are visits enough to tell (ADR-921). */}
+      {experiment.revenueVerdict !== 'too_early' && (
+        <Alert tone={experiment.revenueVerdict === 'b_worse' ? 'warning' : 'info'}>
+          {t(`experiments.revenueVerdict.${experiment.revenueVerdict}` as MessageKey)}
+        </Alert>
+      )}
     </div>
   );
 }

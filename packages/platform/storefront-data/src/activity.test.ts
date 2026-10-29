@@ -28,6 +28,35 @@ describe.skipIf(!redisUrl)('What shoppers do on a storefront, in Valkey (ADR-180
     redis.disconnect();
   });
 
+  it("counts a theme experiment's arms, their steps and their orders' revenue, each order once (ADR-921)", async () => {
+    const shopId = randomUUID();
+    await activity.experimented(shopId, 'texp_1', 'a', 'session-a');
+    await activity.experimented(shopId, 'texp_1', 'b', 'session-b', 'converted');
+    await activity.experimented(shopId, 'texp_1', 'b', 'session-c', 'converted');
+    // Rs 5,000 and Rs 1,500 in the draft's arm; the first told twice counts once.
+    await activity.experimentSold(shopId, 'texp_1', 'b', 'order-1', 500_000);
+    await activity.experimentSold(shopId, 'texp_1', 'b', 'order-1', 500_000);
+    await activity.experimentSold(shopId, 'texp_1', 'b', 'order-2', 150_000);
+    expect(await activity.experimentCounts(shopId, 'texp_1')).toEqual({
+      a: {
+        sessions: 1,
+        added_to_cart: 0,
+        reached_checkout: 0,
+        converted: 0,
+        revenue: 0,
+        revenue_squares: 0,
+      },
+      b: {
+        sessions: 2,
+        added_to_cart: 0,
+        reached_checkout: 0,
+        converted: 2,
+        revenue: 650_000,
+        revenue_squares: 500_000 ** 2 + 150_000 ** 2,
+      },
+    });
+  });
+
   it("counts a day's sessions once each, in the shop's time zone, and those that took each step", async () => {
     const shopId = randomUUID();
     // 23:30 on 4 October in Karachi, and 00:10 on the 5th.

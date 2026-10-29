@@ -21,6 +21,12 @@ export const ACTIVITY = {
 /** A day's sessions, and those of them that took each step. */
 export type ActivityCounts = Record<ActivityStep, number>;
 
+/**
+ * A theme experiment's arm: its sessions and their steps, and what their orders came to, in minor
+ * units, with the sum of each order's square (ADR-866, ADR-921).
+ */
+export type ExperimentArmCounts = ActivityCounts & { revenue: number; revenue_squares: number };
+
 /** How long a session lasts after its last page, as its cookie does (ADR-180). */
 const SESSION_SECONDS = 30 * 60;
 
@@ -177,23 +183,61 @@ export class StorefrontActivity {
     await exec(pipeline);
   }
 
-  /** A theme experiment's counts so far, each arm's sessions and their steps. */
+  /**
+   * Order `orderId`, of `amount` in minor units, placed at checkout by a session in arm `arm` of
+   * the shop's theme experiment `experimentId` (ADR-921): added to the arm's revenue once,
+   * however often it is told.
+   */
+  async experimentSold(
+    shopId: string,
+    experimentId: string,
+    arm: 'a' | 'b',
+    orderId: string,
+    amount: number,
+  ): Promise<void> {
+    const seconds = ACTIVITY.experimentDays * 24 * 60 * 60;
+    const first = await this.redis.set(
+      this.keys.experimentOrder(shopId, experimentId, orderId),
+      '1',
+      'EX',
+      seconds,
+      'NX',
+    );
+    if (first !== 'OK') return;
+    const key = this.keys.experimentRevenue(shopId, experimentId, arm);
+    await exec(
+      this.redis
+        .pipeline()
+        .hincrby(key, 'revenue', amount)
+        .hincrbyfloat(key, 'squares', amount * amount)
+        .expire(key, seconds),
+    );
+  }
+
+  /** A theme experiment's counts so far, each arm's sessions, their steps and their revenue. */
   async experimentCounts(
     shopId: string,
     experimentId: string,
-  ): Promise<Record<'a' | 'b', ActivityCounts>> {
+  ): Promise<Record<'a' | 'b', ExperimentArmCounts>> {
     const pipeline = this.redis.pipeline();
     for (const arm of ['a', 'b'] as const) {
       for (const step of ACTIVITY_STEPS) {
         pipeline.pfcount(this.keys.experiment(shopId, experimentId, arm, step));
       }
+      pipeline.hgetall(this.keys.experimentRevenue(shopId, experimentId, arm));
     }
     const results = await exec(pipeline);
-    const arm = (offset: number) =>
-      Object.fromEntries(
-        ACTIVITY_STEPS.map((step, index) => [step, Number(results[offset + index] ?? 0)]),
-      ) as ActivityCounts;
-    return { a: arm(0), b: arm(ACTIVITY_STEPS.length) };
+    const arm = (offset: number): ExperimentArmCounts => {
+      const revenue = (results[offset + ACTIVITY_STEPS.length] ?? {}) as Record<string, string>;
+      return {
+        ...(Object.fromEntries(
+          ACTIVITY_STEPS.map((step, index) => [step, Number(results[offset + index] ?? 0)]),
+        ) as ActivityCounts),
+        revenue: Number(revenue.revenue ?? 0),
+        revenue_squares: Number(revenue.squares ?? 0),
+      };
+    };
+    return { a: arm(0), b: arm(ACTIVITY_STEPS.length + 1) };
   }
 
   /** How many sessions saw a page in the five minutes to `at`. */

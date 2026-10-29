@@ -21890,6 +21890,11 @@ type ThemeExperiment {
   live: ThemeExperimentArm!
   name: String!
 
+  """
+  As `verdict`, of each arm’s revenue a session (ADR-921): b_better or b_worse where the draft brings more or less money a session, at 95% confidence.
+  """
+  revenueVerdict: String!
+
   """The percent of shoppers shown the draft."""
   share: Int!
   startedAt: DateTime!
@@ -21911,6 +21916,12 @@ type ThemeExperimentArm {
   conversionRate: Float!
   converted: Int!
   reachedCheckout: Int!
+
+  """What its sessions' orders placed at checkout came to (ADR-921)."""
+  revenue: Money!
+
+  """Its revenue over its sessions."""
+  revenuePerSession: Money!
   sessions: Int!
 }
 

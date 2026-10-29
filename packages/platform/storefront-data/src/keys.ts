@@ -138,6 +138,19 @@ export class StorefrontKeys {
   }
 
   /**
+   * What the orders a theme experiment's arm placed came to, and the sum of their squares
+   * (ADR-921): a hash of `revenue` and `squares`, in minor units.
+   */
+  experimentRevenue(shopId: string, experimentId: string, arm: 'a' | 'b'): string {
+    return `${this.prefix}:{${shopId}}:ab:${experimentId}:${arm}:revenue`;
+  }
+
+  /** That a theme experiment counted an order's revenue, so that it counts it once (ADR-921). */
+  experimentOrder(shopId: string, experimentId: string, orderId: string): string {
+    return `${this.prefix}:{${shopId}}:ab:${experimentId}:order:${orderId}`;
+  }
+
+  /**
    * A day's measurements of how fast the shop's storefront was for its shoppers, in its time
    * zone: a hash of histograms' buckets and page views (ADR-485).
    */

@@ -17,6 +17,8 @@ import { OnlineStoreEvents } from './events.js';
 // them that added to the cart, reached checkout and ordered, as its analytics count a day's
 // (ADR-180); the worker keeps the counts here, says which theme sells better once it can tell,
 // and ends an experiment whose draft sells clearly worse, so a shop never loses much to one.
+// Each arm's revenue is counted too, from the orders its sessions placed at checkout (ADR-921),
+// for a second verdict: whether the draft brings more or less money a session.
 
 export const EXPERIMENT_LIMITS = {
   name: 100,
@@ -41,6 +43,12 @@ export interface ArmCounts {
   added_to_cart: number;
   reached_checkout: number;
   converted: number;
+  /**
+   * What its sessions' orders placed at checkout came to, in minor units of the shop's currency,
+   * and the sum of each order's square, for the spread of revenue a session (ADR-921).
+   */
+  revenue: number;
+  revenue_squares: number;
 }
 
 export interface ExperimentResults {
@@ -71,7 +79,14 @@ export interface ThemeExperimentInput {
   days: number;
 }
 
-const NO_COUNTS: ArmCounts = { sessions: 0, added_to_cart: 0, reached_checkout: 0, converted: 0 };
+const NO_COUNTS: ArmCounts = {
+  sessions: 0,
+  added_to_cart: 0,
+  reached_checkout: 0,
+  converted: 0,
+  revenue: 0,
+  revenue_squares: 0,
+};
 
 type ExperimentRow = {
   id: string;
@@ -119,6 +134,39 @@ export function zScoreOf(results: ExperimentResults): number | null {
 /** What the experiment says of its draft, once each arm has sessions enough. */
 export function verdictOf(results: ExperimentResults): ExperimentVerdict {
   const z = zScoreOf(results);
+  if (
+    z === null ||
+    results.a.sessions < EXPERIMENT_LIMITS.sessions ||
+    results.b.sessions < EXPERIMENT_LIMITS.sessions
+  ) {
+    return 'too_early';
+  }
+  if (z >= SURE) return 'b_better';
+  if (z <= -SURE) return 'b_worse';
+  return 'no_difference';
+}
+
+/**
+ * The draft's revenue a session against the live theme's (ADR-921), as Welch's t score, taken as
+ * a z score with so many sessions: positive where it brings more. Each order counts as its
+ * session's revenue, sessions without one as nothing. Null until each arm has two sessions and
+ * its revenue some spread.
+ */
+export function revenueZScoreOf(results: ExperimentResults): number | null {
+  const spreadOf = (arm: ArmCounts) => {
+    const mean = arm.revenue / arm.sessions;
+    return Math.max(0, (arm.revenue_squares - arm.sessions * mean * mean) / (arm.sessions - 1));
+  };
+  const { a, b } = results;
+  if (a.sessions < 2 || b.sessions < 2) return null;
+  const spread = Math.sqrt(spreadOf(a) / a.sessions + spreadOf(b) / b.sessions);
+  if (!(spread > 0)) return null;
+  return (b.revenue / b.sessions - a.revenue / a.sessions) / spread;
+}
+
+/** What the experiment says of its draft's revenue a session, once each arm has sessions enough. */
+export function revenueVerdictOf(results: ExperimentResults): ExperimentVerdict {
+  const z = revenueZScoreOf(results);
   if (
     z === null ||
     results.a.sessions < EXPERIMENT_LIMITS.sessions ||

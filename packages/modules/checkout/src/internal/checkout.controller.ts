@@ -430,7 +430,11 @@ function responseOf(view: CheckoutView | { url: string }, posted: boolean): Chec
   if ('url' in view) return { placed: false, redirect: view.url };
   // The thank-you page with the gateway's form is the answer itself (ADR-163).
   if (posted && view.kind === 'placed' && !view.gatewayForm) {
-    return { placed: true, ...(view.proof && { proof: view.proof }) };
+    return {
+      placed: true,
+      ...(view.proof && { proof: view.proof }),
+      sale: { orderId: view.order.id, amount: view.order.total.toString() },
+    };
   }
   const page = checkoutPage(view);
   return {

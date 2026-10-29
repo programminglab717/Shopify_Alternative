@@ -42,6 +42,7 @@ export {
   endExperimentIn,
   guardrailTripped,
   recordExperimentResultsIn,
+  revenueVerdictOf,
   runningExperimentIn,
   verdictOf,
   zScoreOf,

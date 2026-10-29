@@ -868,9 +868,18 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).experiment?.version).toBe(draft.version + 1);
 
     // Its draft selling clearly worse ends it, and every shopper sees the live theme again.
+    /** An arm's counts, its orders Rs 5,000 each. */
+    const arm = (sessions: number, added: number, reached: number, converted: number) => ({
+      sessions,
+      added_to_cart: added,
+      reached_checkout: reached,
+      converted,
+      revenue: converted * 500_000,
+      revenue_squares: converted * 500_000 ** 2,
+    });
     let counts = {
-      a: { sessions: 1_000, added_to_cart: 120, reached_checkout: 80, converted: 40 },
-      b: { sessions: 1_000, added_to_cart: 90, reached_checkout: 40, converted: 15 },
+      a: { ...arm(1_000, 120, 80, 40) },
+      b: { ...arm(1_000, 90, 40, 15) },
     };
     const sweeps = new ThemeExperiments(database, { experimentCounts: async () => counts });
     expect(await sweeps.sweep()).toEqual([{ id: running.id, reason: 'guardrail' }]);
@@ -878,12 +887,17 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).experiment).toBeUndefined();
     expect(await store().experimentTheme()).toBeNull();
     const [ended] = await experiments.list(tenant);
-    expect([ended!.endedReason, ended!.results.b.converted]).toEqual(['guardrail', 15]);
+    // With what each arm's orders came to, Rs 5,000 each (ADR-921).
+    expect([ended!.endedReason, ended!.results.b.converted, ended!.results.b.revenue]).toEqual([
+      'guardrail',
+      15,
+      15 * 500_000,
+    ]);
 
     // One runs to its last day; another ends when a theme is published.
     counts = {
-      a: { sessions: 50, added_to_cart: 5, reached_checkout: 3, converted: 1 },
-      b: { sessions: 50, added_to_cart: 5, reached_checkout: 3, converted: 2 },
+      a: { ...arm(50, 5, 3, 1) },
+      b: { ...arm(50, 5, 3, 2) },
     };
     const timed = unwrap(await start(draft.id));
     expect(await sweeps.sweep()).toEqual([]);

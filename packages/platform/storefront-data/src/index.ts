@@ -50,7 +50,13 @@ export {
   type ProductDropDoc,
 } from './documents.js';
 export { TranslatedStore, translated, translatedProduct } from './translations.js';
-export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';
+export {
+  ACTIVITY,
+  StorefrontActivity,
+  localDay,
+  type ActivityCounts,
+  type ExperimentArmCounts,
+} from './activity.js';
 export {
   SESSION_DIMENSIONS,
   SESSION_SOURCE_LIMITS,
