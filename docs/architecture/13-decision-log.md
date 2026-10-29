@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-904 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-905 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -912,6 +912,7 @@
 | 902 | A combined listing's option and values have the shop's Urdu, kept with the listing and shown on Urdu pages, and the store's export holds the listings | Accepted |
 | 903 | The Storefront API answers in Urdu where a query asks with @inContext, its pages at their Urdu addresses, and gives the metafields the shop shows | Accepted |
 | 904 | A workflow may hold an order for review, as one is held for its risk, until staff confirm it: an open order not yet handed on, its timeline naming the workflow | Accepted |
+| 905 | Workflows start on a variant's stock running low or out, once a spell as the shop's low-stock alert tells, reading its product, variant, SKU, units left and the line | Accepted |
 
 ---
 
@@ -29947,3 +29948,23 @@
   * With a wait and a check (ADR-886), "a day later, if still unconfirmed, hold it" is a workflow.
   * Cancelling an order from a workflow, a WhatsApp message to the customer (approved templates,
     OWN-23), and scheduled and stock triggers are still not done.
+
+## ADR-905 · Workflows start on a variant's stock running low or out, once a spell as the shop's low-stock alert tells, reading its product, variant, SKU, units left and the line
+
+* **Context:** ADR-861 and ADR-886 left triggers on stock for later. Shops ask for "when a
+  bestseller runs low, tell the buyer and the app that orders from my supplier".
+* **Decision:**
+  * **The low-stock alert records `stock.alerted`** (ADR-157) where it tells the shop: once
+    when a variant falls to the shop's low-stock line, and once more if it runs out, in that
+    spell.
+  * **Two triggers, `STOCK_LOW` and `STOCK_OUT`,** run the shop's workflows on it (migration
+    0401). They are about no order or customer, so their actions are telling staff, an app's
+    action, a wait and a check. Tags and holds are refused.
+  * **What they tell** are facts as an app's trigger's are: `trigger.product`,
+    `trigger.variant`, `trigger.sku`, `trigger.available` and `trigger.threshold`. Conditions
+    check them and templates fill them in, read as they were at the alert, also after a wait.
+  * **The admin's editor** offers both triggers and their facts.
+* **Consequences:**
+  * A shop tells its staff, or its supplier through an app, when stock runs low, with its own
+    conditions such as "lawn" in the product's name.
+  * Scheduled triggers are still not done.
