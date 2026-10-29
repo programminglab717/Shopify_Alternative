@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-915 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-916 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -923,6 +923,7 @@
 | 913 | Expansion stores kept in step: products copied as they change, once left alone ten minutes and at most hourly, as the owner of both, failures kept with why | Accepted |
 | 914 | An app is told of its own charges as they are declined or paid, through the APP_PURCHASES_ONE_TIME_UPDATE webhook, as Shopify's apps are | Accepted |
 | 915 | A shop may have each customer's transfer receipt read by the AI as it arrives, a credit each, rather than when staff ask | Accepted |
+| 916 | A shopper's account lists their subscriptions, each managed from its latest order's page | Accepted |
 
 ---
 
@@ -30233,3 +30234,23 @@
 * **Consequences:**
   * Staff see what each receipt says, and what doesn't match, when they open the order.
   * Telling staff of a mismatch on WhatsApp (ADR-247) is still not done.
+
+## ADR-916 · A shopper's account lists their subscriptions, each managed from its latest order's page
+
+* **Context:** ADR-862 lets a customer skip, pause, resume or cancel a subscription from any of
+  its orders' pages. It left out a page of their own listing all their subscriptions. A shopper
+  with two subscriptions had to find an order of each.
+* **Decision:**
+  * **The account's JSON** carries `subscriptions`: those not cancelled, the newest first, at most
+    20. Each gives:
+    * its plan's name as it was then, how often, and its discount;
+    * the day its next order is placed, or that it is paused;
+    * how many orders it placed;
+    * what each order holds, by product and variant (one the shop removed is left out);
+    * its latest order, or the one it was made with if none came since.
+  * **The account page** (Hatti's theme, `customers/account`) lists them above the orders. Each
+    links "Skip, pause or cancel" to `/account/orders/{id}` of its latest order, which opens that
+    order's page, where it is managed as before. The page is in English and Urdu.
+  * Nothing changes how a subscription is managed: still from its orders' pages alone.
+* **Consequences:**
+  * A shopper sees everything they are subscribed to, and when it next comes, in one place.
