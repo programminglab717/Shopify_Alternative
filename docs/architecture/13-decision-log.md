@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-944 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-945 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -952,6 +952,7 @@
 | 942 | hatti function init begins a function in Rust, built with Cargo for WASI | Accepted |
 | 943 | Shoppers sign in through the Storefront API with a code sent to their number, and its customer access token reads their orders and store credit | Accepted |
 | 944 | The headless starter signs shoppers in with a code sent to their number, and shows their orders to buy again and their store credit | Accepted |
+| 945 | Customers owing on payment terms are reminded before the due date and once past it, on WhatsApp and by email, with what is left and the order's page | Accepted |
 
 ---
 
@@ -30927,3 +30928,30 @@
   * A shop's own headless site has accounts as its Hatti storefront does.
   * Not yet: addresses, wishlists and data requests on the starter's account page; a package of
     components.
+
+## ADR-945 · Customers owing on payment terms are reminded before the due date and once past it, on WhatsApp and by email, with what is left and the order's page
+
+* **Context:** ADR-888's orders on payment terms ship without waiting for the money, and the shop
+  sees who owes and what is overdue. The customer heard nothing of the date: ADR-888 left
+  reminders for later.
+* **Decision:**
+  * **A sweep** finds the shops with an order on terms still owed, due within three days or past
+    due, with the system role, and reminds each shop's in its own transaction. It runs as often
+    as the worker's other sweeps.
+  * **Before the date:** once, three days before it at most and halfway from the order to it at
+    least, so that an order on two days' terms isn't reminded the moment it is placed.
+  * **Past the date:** once, a day past it, the day's grace for a transfer on its way. An order
+    first found already past its date is reminded once, as overdue.
+  * **Migration 0421** counts the reminders on the order (`terms_reminded`, 0 to 2), with a
+    partial index for the sweep. An order paid in full or cancelled is never reminded, and one
+    paid meanwhile hears nothing.
+  * **What the customer hears:** an event, `order.payment_terms_reminded`, has the notifications
+    worker send `payment_terms_due` or `payment_terms_overdue` on WhatsApp, or SMS, and by email
+    where the order has one. Each says what is left to pay, the date in the shop's time, and the
+    order's page, which says how to pay. Each is sent once per order.
+  * **Both kinds are the shop's to turn off** on its messages page, with the order's other news.
+  * Their WhatsApp templates, `hatti_payment_terms_due` and `hatti_payment_terms_overdue`, are
+    added to OWN-23 for Meta's approval.
+* **Consequences:**
+  * A wholesaler's resellers are told when to pay, and the shop chases fewer of them by hand.
+  * Not yet: reminders repeated weekly while overdue; the shop choosing how many days before.
