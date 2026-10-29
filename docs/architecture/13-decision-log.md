@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-951 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-952 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -959,6 +959,7 @@
 | 949 | Buy buttons may lay a product out across, its photo beside it, and a collection as a list or a carousel | Accepted |
 | 950 | hatti function run --order tries a function on one of the shop's own orders, made into the input checkout would give it | Accepted |
 | 951 | The Storefront API keeps a signed-in shopper's wishlist, the products the shop still sells, as their account on the shop's own pages does | Accepted |
+| 952 | A theme experiment's drafts may each have a share of their own, the live theme shown to no fewer shoppers than any | Accepted |
 
 ---
 
@@ -31090,3 +31091,28 @@
 * **Consequences:**
   * A headless site keeps a shopper's wishlist across their devices and the shop's own pages.
   * Not yet: the headless starter's wishlist page; data requests through the API.
+
+## ADR-952 · A theme experiment's drafts may each have a share of their own, the live theme shown to no fewer shoppers than any
+
+* **Context:** ADR-931 shows an experiment's two or three drafts each the same share of shoppers.
+  A shop trying a bold redesign beside a small change wants more shoppers on the one it believes
+  in. ADR-939 left shares that differ by draft for later.
+* **Decision:**
+  * **`share` stays the first draft's.** `otherShares` gives each other draft its own, in the
+    order of `otherThemeIds`, 1 to 50; a draft without one has the first's (migration 0423,
+    `other_shares`).
+  * **The live theme is shown to no fewer shoppers than any draft.** 40% and 10% may run
+    together, which one share for both could not; 45% and 15% may not, as the live theme would
+    have 40%.
+  * **The old database check of one share for all is dropped**; what the shares may be is
+    checked as an experiment starts.
+  * **The storefront draws each new shopper's arm by the drafts' shares in turn.** The document
+    carries `shares` only where they differ, so the storefronts before it go on as they were. A
+    stopped draft's share is the live theme's (ADR-939).
+  * **The statistics are as before**: each draft is compared with the live theme by its own
+    sessions, so unequal arms change only how soon each has enough.
+  * **Admin:** beside each other draft, "Its shoppers (%)", blank for the same as the first. A
+    running experiment of uneven shares says each draft's.
+* **Consequences:**
+  * A shop puts more of its shoppers on the draft it is surest of, and fewer on a riskier one.
+  * Not yet: changing the shares of a running experiment.
