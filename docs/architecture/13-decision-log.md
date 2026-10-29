@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-906 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-907 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -914,6 +914,7 @@
 | 904 | A workflow may hold an order for review, as one is held for its risk, until staff confirm it: an open order not yet handed on, its timeline naming the workflow | Accepted |
 | 905 | Workflows start on a variant's stock running low or out, once a spell as the shop's low-stock alert tells, reading its product, variant, SKU, units left and the line | Accepted |
 | 906 | Workflows run on a schedule: days of the week at an hour of the shop's own time, each slot once, their run telling the shop's queues then | Accepted |
+| 907 | A wholesale customer's credit limit on payment terms: an order on terms that would take what they owe past it is refused, saying what they would owe | Accepted |
 
 ---
 
@@ -29993,3 +29994,27 @@
   * A schedule is of days and an hour, not of minutes or dates.
   * Cancelling an order from a workflow, and a WhatsApp message to the customer (approved
     templates, OWN-23), are still not done.
+
+## ADR-907 · A wholesale customer's credit limit on payment terms: an order on terms that would take what they owe past it is refused, saying what they would owe
+
+* **Context:** ADR-888 left credit limits per customer for later. A wholesaler gives a reseller
+  credit up to an amount, "up to two lakh", and stops shipping on terms past it until they pay.
+* **Decision:**
+  * **A customer's credit limit** is the most they may owe on orders on payment terms, in the
+    shop's currency (migration 0403, `orders.credit_limits`). It is kept by the orders module
+    beside the terms, as a customer's, and set or cleared with `customerCreditLimitSet`.
+    `customerCredit` reads it with what they owe on terms now and what of it is overdue.
+  * **An order on terms that would take what they owe past it is refused.** This holds for
+    `orderCreate` and a draft completed. The message says what they would owe and their limit.
+    * The check is made before its stock is taken. The customer is found by the order's number
+      without locking them, so two orders at the same moment may both pass.
+    * Orders not on terms, and those already placed, are not checked.
+  * **Customers' data:** a merge keeps the kept customer's limit, or takes the other's where they
+    had none. Erasure takes it.
+  * **The admin's customer page** shows what they owe on terms and what is overdue, to owners,
+    managers and accountants. Owners and managers set the limit; empty is no limit.
+* **Consequences:**
+  * A wholesaler stops shipping on credit to a reseller who owes too much, without watching the
+    register.
+  * Reminders before and after the due date still need Meta's templates (OWN-23). The
+    storefront's order page saying the terms is still not done.
