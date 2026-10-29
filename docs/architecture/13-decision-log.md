@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-943 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-944 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -951,6 +951,7 @@
 | 941 | The AI support agent reads a customer's photo into searches of the shop's products, and answers with what they find | Accepted |
 | 942 | hatti function init begins a function in Rust, built with Cargo for WASI | Accepted |
 | 943 | Shoppers sign in through the Storefront API with a code sent to their number, and its customer access token reads their orders and store credit | Accepted |
+| 944 | The headless starter signs shoppers in with a code sent to their number, and shows their orders to buy again and their store credit | Accepted |
 
 ---
 
@@ -30901,3 +30902,28 @@
     they fit.
   * Not yet: the headless starter's account pages; addresses, wishlists and data requests through
     the API; a cart tied to the signed-in shopper.
+
+## ADR-944 · The headless starter signs shoppers in with a code sent to their number, and shows their orders to buy again and their store credit
+
+* **Context:** ADR-943 gives the Storefront API shoppers' sign-in and accounts. The Next.js
+  starter (ADR-869, ADR-926) has no account: ADR-926 left it for later.
+* **Decision:**
+  * **`/account/login`** asks for the shopper's mobile number and whether the code goes on
+    WhatsApp or by SMS, then for the code. The code's message is in the shopper's language. The
+    number waits in an httpOnly cookie for ten minutes, as long as a code lasts. A wrong code is
+    asked again; an expired one needs the number again.
+  * **`/account`** shows the shopper's orders, with their statuses, totals and lines, each line
+    still for sale with "Buy again" into the starter's cart, and their store credit. It is read
+    with the customer access token, kept in an httpOnly cookie until it expires, and never kept.
+  * **Signing out** ends the token at the shop as well as here. The header links to the account,
+    or to sign in.
+  * **With `HATTI_STOREFRONT_PRIVATE_TOKEN` set**, sign-ins go with the private token and name the
+    shopper's address from `x-forwarded-for`, so that each shopper is counted alone. Without it,
+    every sign-in counts as the site's server.
+  * **Kept working:** the four new queries are checked against the schema and run in the
+    storefront's tests, the cart made from a line to buy again included. The starter was built
+    with Next.js 15.5 for this change, as ADR-869 asks.
+* **Consequences:**
+  * A shop's own headless site has accounts as its Hatti storefront does.
+  * Not yet: addresses, wishlists and data requests on the starter's account page; a package of
+    components.
