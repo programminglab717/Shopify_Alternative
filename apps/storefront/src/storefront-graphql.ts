@@ -7,6 +7,7 @@ import {
   type CollectionDoc,
   type ImageDoc,
   type MenuLinkDoc,
+  type MetafieldsDoc,
   type PageDoc,
   type ProductDoc,
   type SeoDoc,
@@ -19,6 +20,7 @@ import {
   Kind,
   buildSchema,
   execute,
+  getDirectiveValues,
   parse,
   validate,
   type DocumentNode,
@@ -52,10 +54,93 @@ export const STOREFRONT_TOKEN_HEADERS = {
 
 const SDL = /* GraphQL */ `
   """
+  The language and country a query is answered in (ADR-903), as Shopify's: in UR, the shop's
+  Urdu words where it gave them, and its pages' Urdu addresses; any other language, its own words.
+  The country is taken and changes nothing: prices are in the shop's currency.
+  """
+  directive @inContext(country: CountryCode, language: LanguageCode) on QUERY | MUTATION
+
+  """
+  Languages a query may ask for: the shop's own, English, and Urdu; the others are answered in
+  English.
+  """
+  enum LanguageCode {
+    EN
+    UR
+    AR
+    HI
+    PA
+  }
+
+  """
+  Countries a query may name, Pakistan's and those of its shoppers abroad.
+  """
+  enum CountryCode {
+    PK
+    AE
+    SA
+    QA
+    OM
+    KW
+    BH
+    GB
+    US
+    CA
+    AU
+    NZ
+    IE
+    DE
+    FR
+    IT
+    ES
+    NL
+    NO
+    SE
+    DK
+    MY
+    SG
+    IN
+    BD
+    CN
+    JP
+    TR
+    ZA
+  }
+
+  type Language {
+    isoCode: LanguageCode!
+    """
+    Its name in English: "Urdu".
+    """
+    name: String!
+    """
+    Its name in itself: "اردو".
+    """
+    endonymName: String!
+  }
+
+  type Country {
+    isoCode: CountryCode!
+  }
+
+  """
+  The language and country a query is answered in, and the languages the shop's storefront offers.
+  """
+  type Localization {
+    language: Language!
+    availableLanguages: [Language!]!
+    country: Country!
+  }
+
+  """
   A shop's Storefront API (ADR-848): its catalog as its pages show it, and carts its checkout takes.
   """
   type Query {
     shop: Shop!
+    """
+    The language and country the query is answered in (ADR-903).
+    """
+    localization: Localization!
     product(id: ID, handle: String): Product
     """
     The shop's products: those a search finds, the likeliest first, where query is given.
@@ -302,6 +387,32 @@ const SDL = /* GraphQL */ `
     images(first: Int, after: String): ImageConnection!
     variants(first: Int, after: String): ProductVariantConnection!
     variantBySelectedOptions(selectedOptions: [SelectedOptionInput!]!): ProductVariant
+    """
+    A metafield the shop shows on its storefront (ADR-903), by its namespace and key; null where
+    it has none by them.
+    """
+    metafield(namespace: String, key: String!): Metafield
+    """
+    The metafields named, in their order, each null where it has none by it.
+    """
+    metafields(identifiers: [HasMetafieldsIdentifier!]!): [Metafield]!
+  }
+
+  """
+  A metafield the shop shows on its storefront (ADR-489), as Shopify's: its value as text, a list
+  or reference as JSON.
+  """
+  type Metafield {
+    id: ID!
+    namespace: String!
+    key: String!
+    type: String!
+    value: String!
+  }
+
+  input HasMetafieldsIdentifier {
+    namespace: String!
+    key: String!
   }
 
   type ProductVariant {
@@ -315,6 +426,15 @@ const SDL = /* GraphQL */ `
     selectedOptions: [SelectedOption!]!
     image: Image
     product: Product!
+    """
+    A metafield the shop shows on its storefront (ADR-903), by its namespace and key; null where
+    it has none by them.
+    """
+    metafield(namespace: String, key: String!): Metafield
+    """
+    The metafields named, in their order, each null where it has none by it.
+    """
+    metafields(identifiers: [HasMetafieldsIdentifier!]!): [Metafield]!
   }
 
   type Collection {
@@ -326,6 +446,15 @@ const SDL = /* GraphQL */ `
     image: Image
     onlineStoreUrl: String
     products(first: Int, after: String): ProductConnection!
+    """
+    A metafield the shop shows on its storefront (ADR-903), by its namespace and key; null where
+    it has none by them.
+    """
+    metafield(namespace: String, key: String!): Metafield
+    """
+    The metafields named, in their order, each null where it has none by it.
+    """
+    metafields(identifiers: [HasMetafieldsIdentifier!]!): [Metafield]!
   }
 
   type ProductEdge {
@@ -514,6 +643,55 @@ export interface StorefrontApiShop {
   /** Where the shop answers: "https://zari.hatti.pk". */
   origin: string;
   currency: string;
+  /**
+   * The shop's documents as its pages in `locale` show them (ADR-903): its Urdu words in "ur".
+   * Without it, every language is answered in the shop's own words.
+   */
+  inLanguage?: (locale: string) => StorefrontApiShop['store'];
+  /** The language the answer is in: "en", the shop's own, unless a query asks for "ur". */
+  locale?: string;
+  /** What the answer's page addresses start with after the origin: "/ur" in Urdu, else "". */
+  prefix?: string;
+  /** The country a query named, as given; Pakistan where it named none. */
+  country?: string;
+}
+
+/** The languages the Storefront API answers in, as Shopify's Language (ADR-903). */
+const LANGUAGES = {
+  EN: { isoCode: 'EN', name: 'English', endonymName: 'English' },
+  UR: { isoCode: 'UR', name: 'Urdu', endonymName: 'اردو' },
+} as const;
+
+/**
+ * The `metafield` and `metafields` fields of a resource whose document holds `fields` (ADR-903),
+ * Shopify's namespace "custom" where a query names none.
+ */
+function metafieldsOf(owner: string, fields: MetafieldsDoc | undefined) {
+  const one = (namespace: unknown, key: unknown) => {
+    const space = typeof namespace === 'string' && namespace !== '' ? namespace : 'custom';
+    const name = String(key);
+    const field = fields?.[space]?.[name];
+    if (!field) return null;
+    return {
+      id: gid('Metafield', `${owner}/${space}.${name}`),
+      namespace: space,
+      key: name,
+      type: field.type,
+      value: field.value,
+    };
+  };
+  return {
+    metafield: (args: { namespace?: string | null; key: string }) => one(args.namespace, args.key),
+    metafields: (args: { identifiers: { namespace: string; key: string }[] }) =>
+      args.identifiers
+        .slice(0, STOREFRONT_API_LIMITS.first)
+        .map((each) => one(each.namespace, each.key)),
+  };
+}
+
+/** A page of the shop at `path`, in the answer's language. */
+function pageUrl(api: StorefrontApiShop, path: string): string {
+  return `${api.origin}${api.prefix ?? ''}${path}`;
 }
 
 /**
@@ -620,7 +798,7 @@ function productOf(doc: ProductDoc, api: StorefrontApiShop): Record<string, unkn
     productType: doc.productType,
     tags: doc.tags,
     availableForSale: doc.variants.some((variant) => variant.available),
-    onlineStoreUrl: `${api.origin}/products/${encodeURIComponent(doc.handle)}`,
+    onlineStoreUrl: pageUrl(api, `/products/${encodeURIComponent(doc.handle)}`),
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
     options: (args: { first?: number | null }) =>
@@ -653,6 +831,7 @@ function productOf(doc: ProductDoc, api: StorefrontApiShop): Record<string, unkn
       );
       return variant ? variantOf(doc, variant, api) : null;
     },
+    ...metafieldsOf(`Product/${doc.id}`, doc.metafields),
   };
 }
 
@@ -675,6 +854,7 @@ function variantOf(doc: ProductDoc, variant: VariantDoc, api: StorefrontApiShop)
     })),
     image: imageOf(variant.image !== null ? doc.images[variant.image] : doc.images[0], api.origin),
     product: () => productOf(doc, api),
+    ...metafieldsOf(`ProductVariant/${variant.id}`, variant.metafields),
   };
 }
 
@@ -696,7 +876,7 @@ function menuItemOf(link: MenuLinkDoc, key: string, api: StorefrontApiShop): unk
     id: gid('MenuItem', key),
     title: link.title,
     // A path on the storefront made absolute, for an app that is not on it.
-    url: link.url.startsWith('/') ? `${api.origin}${link.url}` : link.url,
+    url: link.url.startsWith('/') ? pageUrl(api, link.url) : link.url,
     type: types[link.type] ?? 'HTTP',
     items: link.links.map((each, index) => menuItemOf(each, `${key}-${index}`, api)),
   };
@@ -714,7 +894,7 @@ function pageOf(doc: PageDoc, api: StorefrontApiShop) {
     bodySummary: plainOf(doc.bodyHtml).slice(0, 150),
     createdAt: doc.publishedAt,
     updatedAt: doc.updatedAt ?? doc.publishedAt,
-    onlineStoreUrl: `${api.origin}/pages/${encodeURIComponent(doc.handle)}`,
+    onlineStoreUrl: pageUrl(api, `/pages/${encodeURIComponent(doc.handle)}`),
     seo: seoOf(doc.seo),
   };
 }
@@ -724,7 +904,7 @@ function blogOf(doc: BlogDoc, api: StorefrontApiShop): Record<string, unknown> {
     id: gid('Blog', doc.id),
     handle: doc.handle,
     title: doc.title,
-    onlineStoreUrl: `${api.origin}/blogs/${encodeURIComponent(doc.handle)}`,
+    onlineStoreUrl: pageUrl(api, `/blogs/${encodeURIComponent(doc.handle)}`),
     seo: seoOf(doc.seo),
     articles: async (args: { first?: number; after?: string }) => {
       const page = connection(doc.articles, args);
@@ -757,7 +937,7 @@ function articleOf(doc: ArticleDoc, blog: BlogDoc, api: StorefrontApiShop) {
     publishedAt: doc.publishedAt,
     image: imageOf(doc.image, api.origin),
     onlineStoreUrl:
-      `${api.origin}/blogs/${encodeURIComponent(blog.handle)}/` + encodeURIComponent(doc.handle),
+      pageUrl(api, `/blogs/${encodeURIComponent(blog.handle)}/`) + encodeURIComponent(doc.handle),
     seo: seoOf(doc.seo),
     blog: () => blogOf(blog, api),
   };
@@ -772,9 +952,9 @@ async function policyOf(type: string, api: StorefrontApiShop) {
   return {
     id: gid('ShopPolicy', kind.handle),
     handle: kind.handle,
-    title: policyTitle(kind, 'en'),
+    title: policyTitle(kind, api.locale ?? 'en'),
     body,
-    url: `${api.origin}/policies/${kind.handle}`,
+    url: pageUrl(api, `/policies/${kind.handle}`),
   };
 }
 
@@ -800,8 +980,9 @@ function collectionOf(doc: CollectionDoc, api: StorefrontApiShop) {
     description: plainOf(doc.descriptionHtml),
     descriptionHtml: doc.descriptionHtml,
     image: imageOf(doc.image, api.origin),
-    onlineStoreUrl: `${api.origin}/collections/${encodeURIComponent(doc.handle)}`,
+    onlineStoreUrl: pageUrl(api, `/collections/${encodeURIComponent(doc.handle)}`),
     products: (args: { first?: number; after?: string }) => productPage(doc.productIds, args, api),
+    ...metafieldsOf(`Collection/${doc.id}`, doc.metafields),
   };
 }
 
@@ -930,6 +1111,12 @@ function itemOf(line: {
 }
 
 function rootOf(api: StorefrontApiShop) {
+  const languages = api.inLanguage ? [LANGUAGES.EN, LANGUAGES.UR] : [LANGUAGES.EN];
+  const localization = () => ({
+    language: api.locale === 'ur' ? LANGUAGES.UR : LANGUAGES.EN,
+    availableLanguages: languages,
+    country: { isoCode: api.country ?? 'PK' },
+  });
   const carts = () => {
     if (!api.carts) throw new GraphQLError('This storefront keeps no carts');
     return api.carts;
@@ -963,6 +1150,7 @@ function rootOf(api: StorefrontApiShop) {
   });
 
   return {
+    localization,
     shop: () => ({
       name: api.shop.name,
       primaryDomain: { host: new URL(api.origin).host, url: api.origin },
@@ -1280,11 +1468,46 @@ export async function storefrontApiAnswer(
     typeof request.variables === 'object' && request.variables !== null
       ? (request.variables as Record<string, unknown>)
       : undefined;
+  const operationName =
+    typeof request.operationName === 'string' ? request.operationName : undefined;
   return execute({
     schema: SCHEMA,
     document,
-    rootValue: rootOf(api),
+    rootValue: rootOf(inContext(api, document, operationName, variables)),
     variableValues: variables,
-    operationName: typeof request.operationName === 'string' ? request.operationName : undefined,
+    operationName,
   });
+}
+
+/**
+ * `api` as the operation run asks for it with `@inContext` (ADR-903): in Urdu, the shop's Urdu
+ * words and its pages' Urdu addresses; in any other language, its own.
+ */
+function inContext(
+  api: StorefrontApiShop,
+  document: DocumentNode,
+  operationName: string | undefined,
+  variables: Record<string, unknown> | undefined,
+): StorefrontApiShop {
+  const operations = document.definitions.filter(
+    (definition) => definition.kind === Kind.OPERATION_DEFINITION,
+  );
+  const operation = operationName
+    ? operations.find((each) => each.name?.value === operationName)
+    : operations.length === 1
+      ? operations[0]
+      : undefined;
+  const directive = SCHEMA.getDirective('inContext')!;
+  let asked: { language?: unknown; country?: unknown } | undefined;
+  try {
+    asked = operation && getDirectiveValues(directive, operation, variables);
+  } catch {
+    // A variable of the wrong kind: execution says so.
+    asked = undefined;
+  }
+  const country = typeof asked?.country === 'string' ? asked.country : 'PK';
+  if (asked?.language === 'UR' && api.inLanguage) {
+    return { ...api, store: api.inLanguage('ur'), locale: 'ur', prefix: '/ur', country };
+  }
+  return { ...api, locale: 'en', prefix: '', country };
 }

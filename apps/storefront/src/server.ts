@@ -2534,6 +2534,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
           : null,
         origin: await originOf(request, found),
         currency: 'PKR',
+        // In Urdu where a query asks for it with @inContext (ADR-903).
+        inLanguage: (locale) => new TranslatedStore(found.store, locale),
       });
       return await reply.type('application/json; charset=utf-8').send(JSON.stringify(answer));
     } catch (error) {

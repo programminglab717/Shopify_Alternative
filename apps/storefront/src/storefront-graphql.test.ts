@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parse, validate } from 'graphql';
 import type { CartActionResult, CartJson } from '@hatti/storefront-api';
-import { MemoryStore } from '@hatti/storefront-data';
+import { MemoryStore, TranslatedStore } from '@hatti/storefront-data';
 import { describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import {
@@ -483,6 +483,97 @@ describe("The Storefront API's menus, pages, blogs and policies (ADR-890)", () =
         url: 'https://zari.hatti.pk/policies/privacy-policy',
       },
       refundPolicy: null,
+    });
+  });
+});
+
+describe('The Storefront API in Urdu, and its metafields (ADR-903)', () => {
+  const store = new MemoryStore({
+    ...sample,
+    products: sample.products.map((product) =>
+      product.id === lawn.id
+        ? {
+            ...product,
+            translations: { ur: { title: 'لان سوٹ' } },
+            metafields: { custom: { fabric: { type: 'single_line_text_field', value: 'Lawn' } } },
+            variants: product.variants.map((variant, index) =>
+              index === 0
+                ? {
+                    ...variant,
+                    metafields: { custom: { pieces: { type: 'number_integer', value: '3' } } },
+                  }
+                : variant,
+            ),
+          }
+        : product,
+    ),
+  });
+  const urdu = (): ReturnType<typeof api> => ({
+    ...api(),
+    store,
+    inLanguage: (locale) => new TranslatedStore(store, locale),
+  });
+  const PRODUCT = `product(handle: "${lawn.handle}") { title onlineStoreUrl }`;
+
+  it('answers in Urdu where a query asks for it, its pages at their Urdu addresses', async () => {
+    const asked = await ask(
+      `query Shop($language: LanguageCode) @inContext(language: $language, country: AE) {
+        localization { language { isoCode endonymName } availableLanguages { isoCode } country { isoCode } }
+        ${PRODUCT}
+      }`,
+      { language: 'UR' },
+      urdu(),
+    );
+    expect(asked.errors).toBeUndefined();
+    expect(asked.data).toEqual({
+      localization: {
+        language: { isoCode: 'UR', endonymName: 'اردو' },
+        availableLanguages: [{ isoCode: 'EN' }, { isoCode: 'UR' }],
+        country: { isoCode: 'AE' },
+      },
+      product: {
+        title: 'لان سوٹ',
+        onlineStoreUrl: `https://zari.hatti.pk/ur/products/${lawn.handle}`,
+      },
+    });
+    // In English, or a language the shop's storefront has not, its own words.
+    for (const language of ['EN', 'AR']) {
+      const own = await ask(
+        `query @inContext(language: ${language}) { ${PRODUCT} }`,
+        undefined,
+        urdu(),
+      );
+      expect(own.data.product).toEqual({
+        title: lawn.title,
+        onlineStoreUrl: `https://zari.hatti.pk/products/${lawn.handle}`,
+      });
+    }
+    const plain = await ask(`{ localization { language { isoCode } country { isoCode } } }`);
+    expect(plain.data.localization).toEqual({
+      language: { isoCode: 'EN' },
+      country: { isoCode: 'PK' },
+    });
+  });
+
+  it('gives the metafields the shop shows, by namespace and key, null for those it has not', async () => {
+    const { data, errors } = await ask(
+      `{
+        product(handle: "${lawn.handle}") {
+          fabric: metafield(key: "fabric") { namespace key type value }
+          missing: metafield(namespace: "custom", key: "care") { value }
+          metafields(identifiers: [{ namespace: "custom", key: "fabric" }, { namespace: "other", key: "x" }]) { key }
+          variants(first: 1) { edges { node { metafield(key: "pieces") { type value } } } }
+        }
+      }`,
+      undefined,
+      urdu(),
+    );
+    expect(errors).toBeUndefined();
+    expect(data.product).toEqual({
+      fabric: { namespace: 'custom', key: 'fabric', type: 'single_line_text_field', value: 'Lawn' },
+      missing: null,
+      metafields: [{ key: 'fabric' }, null],
+      variants: { edges: [{ node: { metafield: { type: 'number_integer', value: '3' } } }] },
     });
   });
 });
