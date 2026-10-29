@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Overdue payment terms reminded weekly
+### 6a4ecbc · Overdue payment terms reminded weekly
 
 * **An order on payment terms still owed past its date is reminded again each week**, four times
   past the date at most ([ADR-954](../architecture/13-decision-log.md#adr-954--overdue-payment-terms-are-reminded-again-each-week-four-times-past-the-date-at-most)).
