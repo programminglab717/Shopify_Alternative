@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-946 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-947 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -954,6 +954,7 @@
 | 944 | The headless starter signs shoppers in with a code sent to their number, and shows their orders to buy again and their store credit | Accepted |
 | 945 | Customers owing on payment terms are reminded before the due date and once past it, on WhatsApp and by email, with what is left and the order's page | Accepted |
 | 946 | The Storefront API keeps a signed-in shopper's address book, as Shopify's does, through the core's: in Pakistan alone, a landmark besides | Accepted |
+| 947 | The headless starter keeps the shopper's address book: each address to change, deliver to first or take out, and one to add | Accepted |
 
 ---
 
@@ -30979,3 +30980,24 @@
 * **Consequences:**
   * A headless site keeps a shopper's addresses as the shop's own pages do, with Shopify's names.
   * Not yet: the headless starter's address page; wishlists and data requests through the API.
+
+## ADR-947 · The headless starter keeps the shopper's address book: each address to change, deliver to first or take out, and one to add
+
+* **Context:** ADR-946 gives the Storefront API the shopper's address book. The starter's account
+  page (ADR-944) shows orders and store credit alone.
+* **Decision:**
+  * **`/account/addresses`** lists each address as its label shows it, the one delivered to first
+    marked. Each can be changed in the page's form, delivered to first, or taken out. The same
+    form adds one, Pakistan's provinces in a list. The account page links to it.
+  * **Server actions** change the book with the customer access token the shopper's cookie
+    keeps. The form sends a blank field as null, which clears it.
+  * **What the API refuses** comes back to the page by the field it names, which the page names
+    in the shopper's language, English or Urdu. A token that is no one's sends them to sign in.
+  * **A fix to ADR-946:** an update now clears a field given as null, as Shopify's does, rather
+    than keeping it, so that a blank city is refused, not kept. A field left out is still kept.
+  * **Kept working:** the five new queries are checked against the schema and run in the
+    storefront's tests, with the page's own form values. The starter was built with Next.js 15.5
+    for this change.
+* **Consequences:**
+  * A headless site's shoppers keep their addresses as on the shop's own pages.
+  * Not yet: wishlists and data requests on the starter's account page; a package of components.
