@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The Ajax cart in the shopper's currency
+### 26a7f66 · The Ajax cart in the shopper's currency
 
 * **`/cart.js` and the cart's other Ajax answers** give their amounts in the currency the shopper
   picked, with what checkout charges in rupees besides ([ADR-924](../architecture/13-decision-log.md#adr-924--the-ajax-cart-gives-scripts-its-amounts-in-the-currency-the-shopper-picked-as-the-money-filter-shows-prices-with-what-checkout-charges-in-rupees-besides)).
