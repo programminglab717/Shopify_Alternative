@@ -8,8 +8,10 @@ import {
   CUSTOMER_ACCESS_TOKEN_CREATE_MUTATION,
   CUSTOMER_ACCESS_TOKEN_DELETE_MUTATION,
   CUSTOMER_LOGIN_CODE_SEND_MUTATION,
+  CUSTOMER_WISHLIST_ADD_MUTATION,
 } from '@/lib/queries';
 import type { CustomerUserError } from '@/lib/types';
+import { guestWishlist, keepGuestWishlist } from '@/lib/wishlist';
 
 // Shoppers' sign-in (ADR-944), as the shop's own pages sign them in: their mobile number, then
 // the code the Storefront API sent it (ADR-943). The number waits in a cookie only this server
@@ -104,6 +106,16 @@ export async function verifyCode(form: FormData): Promise<void> {
     expires: new Date(signed.customerAccessToken.expiresAt),
     path: '/',
   });
+  // What they kept before signing in joins their account's wishlist (ADR-957), the newest first.
+  const kept = await guestWishlist();
+  if (kept.length > 0) {
+    await storefront(
+      CUSTOMER_WISHLIST_ADD_MUTATION,
+      { customerAccessToken: signed.customerAccessToken.accessToken, productIds: kept },
+      { cache: 'none' },
+    );
+    await keepGuestWishlist([]);
+  }
   redirect('/account');
 }
 

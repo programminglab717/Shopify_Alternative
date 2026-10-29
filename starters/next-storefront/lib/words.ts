@@ -74,6 +74,7 @@ const WORDS = {
     wishlist: 'Wishlist',
     wishlistEmpty: 'Nothing kept for later yet.',
     saveForLater: 'Save for later',
+    wishlistHere: 'Kept on this device. Sign in to keep it with your account, on every device.',
   },
   ur: {
     cart: 'کارٹ',
@@ -145,6 +146,8 @@ const WORDS = {
     wishlist: 'پسندیدہ',
     wishlistEmpty: 'ابھی بعد کے لیے کچھ نہیں رکھا۔',
     saveForLater: 'بعد کے لیے رکھیں',
+    wishlistHere:
+      'اس ڈیوائس پر رکھا ہے۔ اسے اپنے اکاؤنٹ کے ساتھ ہر ڈیوائس پر رکھنے کے لیے سائن ان کریں۔',
   },
 } as const satisfies Record<Language, Record<string, string>>;
 

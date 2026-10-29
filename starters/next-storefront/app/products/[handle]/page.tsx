@@ -60,7 +60,7 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
             {product.availableForSale ? words.addToCart : words.soldOut}
           </button>
         </form>
-        {/* Kept for later with the shopper's account (ADR-953); signing in first if need be. */}
+        {/* Kept for later with the shopper's account (ADR-953), or on this device before (ADR-957). */}
         <form action={saveForLater}>
           <input type="hidden" name="productId" value={product.id} />
           <button type="submit" className="quiet">

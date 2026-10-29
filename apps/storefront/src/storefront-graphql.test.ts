@@ -406,6 +406,7 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
       'CUSTOMER_WISHLIST_ADD_MUTATION',
       'CUSTOMER_WISHLIST_QUERY',
       'CUSTOMER_WISHLIST_REMOVE_MUTATION',
+      'PRODUCTS_BY_ID_QUERY',
       'PRODUCTS_QUERY',
       'PRODUCT_QUERY',
       'SHOP_QUERY',
@@ -430,6 +431,11 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
     const product = (await ask(q.PRODUCT_QUERY!, { handle: lawn.handle }, at)).data.product;
     expect(product.title).toBe(lawn.title);
     const variant = product.variants.nodes[0].id as string;
+    // A wishlist kept before signing in, by its products' IDs (ADR-957).
+    const kept = (
+      await ask(q.PRODUCTS_BY_ID_QUERY!, { ids: [product.id, 'gid://hatti/Product/gone'] }, at)
+    ).data.nodes;
+    expect(kept).toEqual([expect.objectContaining({ handle: lawn.handle }), null]);
 
     const made = (
       await ask(q.CART_CREATE_MUTATION!, { lines: [{ merchandiseId: variant, quantity: 2 }] }, at)

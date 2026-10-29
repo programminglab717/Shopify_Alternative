@@ -424,3 +424,30 @@ export const CUSTOMER_WISHLIST_REMOVE_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// A wishlist kept before signing in (ADR-957): its products by their IDs, as cards.
+
+export const PRODUCTS_BY_ID_QUERY = /* GraphQL */ `
+  query ProductsById($ids: [ID!]!, $language: LanguageCode = EN) @inContext(language: $language) {
+    nodes(ids: $ids) {
+      ... on Product {
+        id
+        handle
+        title
+        availableForSale
+        featuredImage {
+          url(transform: { maxWidth: 600 })
+          altText
+          width
+          height
+        }
+        priceRange {
+          minVariantPrice {
+            amount
+            currencyCode
+          }
+        }
+      }
+    }
+  }
+`;
