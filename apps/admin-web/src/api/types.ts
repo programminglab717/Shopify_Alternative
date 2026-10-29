@@ -4901,6 +4901,10 @@ export interface ExpansionStorePayloadData {
     expansionStore: ExpansionStore | null;
     userErrors: UserError[];
   };
+  expansionStoreProductMarginsSet?: {
+    expansionStore: ExpansionStore | null;
+    userErrors: UserError[];
+  };
   expansionStoreRemove?: { userErrors: UserError[] };
 }
 
