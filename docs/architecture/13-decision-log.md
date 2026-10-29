@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-916 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-917 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -924,6 +924,7 @@
 | 914 | An app is told of its own charges as they are declined or paid, through the APP_PURCHASES_ONE_TIME_UPDATE webhook, as Shopify's apps are | Accepted |
 | 915 | A shop may have each customer's transfer receipt read by the AI as it arrives, a credit each, rather than when staff ask | Accepted |
 | 916 | A shopper's account lists their subscriptions, each managed from its latest order's page | Accepted |
+| 917 | A shop that gave an expert access, having hired them, rates them out of five and says how the work went; shops see experts' ratings and reviews, and experts their own | Accepted |
 
 ---
 
@@ -30254,3 +30255,29 @@
   * Nothing changes how a subscription is managed: still from its orders' pages alone.
 * **Consequences:**
   * A shopper sees everything they are subscribed to, and when it next comes, in one place.
+
+## ADR-917 · A shop that gave an expert access, having hired them, rates them out of five and says how the work went; shops see experts' ratings and reviews, and experts their own
+
+* **Context:** ADR-855 lists experts for shops to hire, but a shop choosing between two
+  photographers had nothing but their own words. It left reviews by the shops that hired them
+  for later.
+* **Decision:**
+  * **Who reviews:** a shop that gave the expert access to it (ADR-488) has hired them; its owner
+    or a manager reviews the expert for it. An expert never reviews themselves through a shop of
+    theirs.
+  * **A review** (migration 0410) is a rating from 1 to 5 and, if they wish, up to 1,000
+    characters on how the work went. There is one a shop: written again, it changes. It is kept
+    with who last wrote it, and goes when the expert's partner account does.
+  * **Shops see:**
+    * each expert's average rating, to one place, and how many shops rated them, in the
+      directory;
+    * the latest 20 reviews, with each shop's name, behind "Reviews of …";
+    * their own review there to write or change, where they hired the expert.
+  * **The expert** sees what the shops said on their partner page.
+  * **API:** `GET /auth/experts/<id>/reviews?shopId` and `POST /auth/experts/<id>/reviews`
+    `{ shopId, rating, body? }`. The directory's experts carry `rating`.
+* **Consequences:**
+  * Merchants choose experts by what other shops found, and good work brings experts more of it.
+  * How a review that breaks the rules is taken down is the owner's to decide with complaints
+    about experts (OWN-49). Paying an expert through Hatti, and a public directory, are still not
+    done.
