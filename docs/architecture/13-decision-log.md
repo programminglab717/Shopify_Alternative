@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-932 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-933 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -940,6 +940,7 @@
 | 930 | A selling plan may be for chosen variants alone, rather than a tag's products or all of them: the product page shows it on those, checkout prices it there alone | Accepted |
 | 931 | A theme experiment may show up to three drafts, each its own share of shoppers, each compared with the live theme at a confidence split among them | Accepted |
 | 932 | One page of what the owner's shop and each of its expansion stores sold, each in its own currency and in the shop's at the day's rate | Accepted |
+| 933 | An expansion store's copied prices may be a percent over its rate and rounded as prices abroad are, its costs copied at the rate alone | Accepted |
 
 ---
 
@@ -30648,3 +30649,26 @@
   * The day's rate is today's, not each order's day's: a page of the year in rupees is the
     year's sales at today's rate.
   * Not yet: the stores' sales by day on one chart, and the same page in the sales report.
+
+## ADR-933 · An expansion store's copied prices may be a percent over its rate and rounded as prices abroad are, its costs copied at the rate alone
+
+* **Context:** ADR-859's expansion stores price their copies at the rate alone, and ADR-929's
+  follow the day's. A Lahore shop selling in Dubai pays more to sell there, for freight, duties
+  and returns, and Dubai's shoppers expect AED 129, not AED 127.43. Shopify's markets put a
+  percent over the rate and round prices. ADR-929 left a margin and rounding for later.
+* **Decision:**
+  * **A margin** (migration 0417, `margin_percent`, 0 to 100; `expansionStorePricingSet`): its
+    copied prices and compare-at prices are the rate, the day's or one given by hand, that much
+    more. A link's rate stays what it is: following the day's rate goes on as before.
+  * **Rounding** (`rounding`): exact, to a whole unit, or up to the next .99, as the storefront
+    rounds prices abroad (ADR-865), with the money package's same `roundedPrice`; a price of
+    something is never rounded to nothing.
+  * **Costs are copied at the rate alone, exact**, so the expansion store's profit says what its
+    margin brings.
+  * **Changing either** marks the link's rate changed, so copying as products change copies again
+    within the hour (ADR-913).
+  * **The owner alone**, of both shops, having signed in lately, as the rate.
+  * **Admin:** each store has "Margin over the rate (%)" and "Rounding", and saves them.
+* **Consequences:**
+  * Prices abroad pay for selling abroad, and look as the shop's prices there would.
+  * Not yet: a margin by product or collection.
