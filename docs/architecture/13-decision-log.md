@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-902 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-903 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -910,6 +910,7 @@
 | 900 | Spin to win: a wheel of 2 to 8 offers on the theme's sign-up pop-up, a shopper's number signing them up and spinning once, the slice chosen by weight on the platform and given as a single-use code of their own | Accepted |
 | 901 | A combined listing the shop chooses is one card in collections: the first of its products in each collection's order stands for the rest, its card naming their values | Accepted |
 | 902 | A combined listing's option and values have the shop's Urdu, kept with the listing and shown on Urdu pages, and the store's export holds the listings | Accepted |
+| 903 | The Storefront API answers in Urdu where a query asks with @inContext, its pages at their Urdu addresses, and gives the metafields the shop shows | Accepted |
 
 ---
 
@@ -29902,3 +29903,27 @@
   * A store moved out keeps its listings, though no import takes the file back yet.
   * Apps that translate through `translationsRegister` do not reach these words. They set them
     with the listing.
+
+## ADR-903 · The Storefront API answers in Urdu where a query asks with @inContext, its pages at their Urdu addresses, and gives the metafields the shop shows
+
+* **Context:** ADR-848 and ADR-890 left `@inContext` for Urdu and metafields out of the
+  Storefront API. A headless storefront could not show a shop's Urdu, or the fields the shop adds
+  to its products, such as fabric or care.
+* **Decision:**
+  * **`@inContext(language:, country:)`** on a query or mutation, as Shopify's.
+    * With `language: UR`, the answer comes from the shop's documents in Urdu, as its Urdu pages
+      show them (ADR-238), and its pages' addresses are under `/ur`.
+    * Any other language (`EN`, and `AR`, `HI` and `PA`, which the storefront has not) is
+      answered in the shop's own words.
+    * The country is taken from a list of Pakistan's and its shoppers' countries abroad, and
+      changes nothing: prices stay in the shop's currency (ADR-865).
+  * **`Query.localization`** gives the language and country the query is answered in, and the
+    languages the storefront offers.
+  * **`metafield(namespace, key)` and `metafields(identifiers)`** on products, variants and
+    collections give the metafields the shop shows on its storefront (ADR-489), as Shopify's
+    `Metafield`. The namespace is `custom` where a query names none.
+* **Consequences:**
+  * A headless storefront has the shop's Urdu, and its own fields to show.
+  * Hydrogen's localization query asks for more than this, such as markets and available
+    countries, and is refused until it is cut to this subset.
+  * Customer accounts and cost-based limits on the Storefront API are still not done.
