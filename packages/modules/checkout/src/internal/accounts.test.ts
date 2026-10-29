@@ -184,6 +184,7 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
       pastOrders: [],
       storeCredit: { balance: 0, currency: 'PKR', expiring: null, history: [] },
       dataRequests: { available: false, erasureWaitDays: 10, export: null, erasure: null },
+      subscriptions: [],
       referral: null,
     });
     // Not in another shop.
@@ -497,6 +498,64 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
         lines: [{ title: 'Lawn suit', variantTitle: 'M', quantity: 2 }],
       },
     ]);
+  });
+
+  it('lists their subscriptions, each to manage from its latest order, none cancelled (ADR-916)', async () => {
+    const first = await order('0300 1234567');
+    const latest = await order('0300 1234567');
+    /** A subscription of the customer's, as checkout makes them. */
+    const subscribe = async (status: string, placed: string | null, made: string) => {
+      const { rows } = await f.admin.query<{ id: string }>(
+        `INSERT INTO orders.subscriptions
+                (shop_id, customer_id, origin_order_id, plan_id, plan_name, interval_unit,
+                 interval_count, discount_percent, lines, shipping_address, payment_method, source,
+                 shipping, status, next_order_on, orders_placed, last_order_id, created_at)
+         VALUES ($1, $2, $3, $4, 'Subscribe & save', 'week', 2, 10, $5, '{}', 'cash_on_delivery',
+                 'online_store', 0, $6, '2026-11-12', 2, $7, $8)
+         RETURNING id`,
+        [
+          f.a.shopId,
+          first.customerId,
+          first.id,
+          newId(),
+          JSON.stringify([{ variantId: kurta, quantity: 2, properties: {} }]),
+          status,
+          placed,
+          made,
+        ],
+      );
+      return rows[0]!.id;
+    };
+    const active = await subscribe('active', latest.id, '2026-10-01T00:00:00Z');
+    const paused = await subscribe('paused', null, '2026-10-02T00:00:00Z');
+    await subscribe('cancelled', null, '2026-10-03T00:00:00Z');
+
+    const token = await signIn(JAZZ);
+    const { subscriptions } = (await f.accounts.account(f.a.shopId, token))!;
+    const line = { productTitle: 'Kurta', variantTitle: null, quantity: 2 };
+    expect(subscriptions).toEqual([
+      {
+        id: toPublicId('orderSubscription', paused),
+        status: 'paused',
+        planName: 'Subscribe & save',
+        interval: { unit: 'week', count: 2 },
+        discountPercent: 10,
+        nextOrderOn: '2026-11-12',
+        ordersPlaced: 2,
+        lines: [line],
+        // Placed nothing since: managed from the order it was made with.
+        orderId: toPublicId('order', first.id),
+      },
+      expect.objectContaining({
+        id: toPublicId('orderSubscription', active),
+        status: 'active',
+        orderId: toPublicId('order', latest.id),
+      }),
+    ]);
+    // Another shop's account of the same number has none of them.
+    expect((await f.accounts.account(f.b.shopId, await signIn(JAZZ, f.b)))!.subscriptions).toEqual(
+      [],
+    );
   });
 
   it('offers what each order sold again, saying what the cart would take now (ADR-574)', async () => {

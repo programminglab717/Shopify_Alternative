@@ -304,6 +304,26 @@ export interface AccountReferralJson {
   currency: string;
 }
 
+/**
+ * A subscription of the shopper's (CAT-16, ADR-916): what its orders hold and how often, and its
+ * latest order, whose page skips its next order, pauses, resumes or cancels it.
+ */
+export interface AccountSubscriptionJson {
+  id: string;
+  status: 'active' | 'paused';
+  /** As the shop named its plan then: "Subscribe & save". */
+  planName: string;
+  interval: { unit: 'week' | 'month'; count: number };
+  /** Off each order's items, in percent. */
+  discountPercent: number;
+  /** YYYY-MM-DD in Pakistan's time: when its next order is placed, while it is active. */
+  nextOrderOn: string;
+  ordersPlaced: number;
+  lines: { productTitle: string; variantTitle: string | null; quantity: number }[];
+  /** Its latest order, which `…/account/orders/{id}` opens to manage it. */
+  orderId: string;
+}
+
 /** A shopper's account with the shop. */
 export interface AccountJson {
   /** E.164: the number they signed in with, whole, as it is theirs. */
@@ -337,6 +357,8 @@ export interface AccountJson {
    * for a number no customer has; absent from older cores.
    */
   referral?: AccountReferralJson | null;
+  /** Their subscriptions not cancelled, the newest first, at most 20 (ADR-916); absent from older cores. */
+  subscriptions?: AccountSubscriptionJson[];
 }
 
 /** GET `…/account`: the account, or null when the session is none. */

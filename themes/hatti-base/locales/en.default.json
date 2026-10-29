@@ -393,6 +393,19 @@
       "store_credit_expired": "Expired",
       "store_credit_expires": "expires on {{ date }}",
       "orders": "Your orders",
+      "subscriptions": "Your subscriptions",
+      "every_week": {
+        "one": "Every week",
+        "other": "Every {{ count }} weeks"
+      },
+      "every_month": {
+        "one": "Every month",
+        "other": "Every {{ count }} months"
+      },
+      "subscription_next": "Next order on {{ date }}",
+      "subscription_paused": "Paused",
+      "subscription_items": "What each order of {{ name }} holds",
+      "manage_subscription": "Skip, pause or cancel",
       "past_orders": "From our old store",
       "past_orders_hint": "Your orders before we moved here, to look back on.",
       "no_orders": "You haven't placed an order with us yet.",

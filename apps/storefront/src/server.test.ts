@@ -4564,6 +4564,31 @@ const ORDERED = sampleStore().products.map((product) => product.variants[0]!.id)
 const ACCOUNT: AccountJson = {
   phone: '+923217654321',
   name: 'Ayesha Khan',
+  // A subscription to a kurta every two weeks (ADR-916), and one paused.
+  subscriptions: [
+    {
+      id: 'osub_01jb7k2m3n4p5q6r7s8t9v0w1x',
+      status: 'active',
+      planName: 'Subscribe & save',
+      interval: { unit: 'week', count: 2 },
+      discountPercent: 10,
+      nextOrderOn: '2026-11-12',
+      ordersPlaced: 3,
+      lines: [{ productTitle: 'Kurta', variantTitle: 'M', quantity: 2 }],
+      orderId: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1x',
+    },
+    {
+      id: 'osub_01jb7k2m3n4p5q6r7s8t9v0w1y',
+      status: 'paused',
+      planName: 'Monthly tea',
+      interval: { unit: 'month', count: 1 },
+      discountPercent: 5,
+      nextOrderOn: '2026-12-01',
+      ordersPlaced: 1,
+      lines: [{ productTitle: 'Chai', variantTitle: null, quantity: 1 }],
+      orderId: 'ord_01jb7k2m3n4p5q6r7s8t9v0w1z',
+    },
+  ],
   // One from the store the shop moved from (ADR-786).
   pastOrders: [
     {
@@ -5058,6 +5083,19 @@ describe("Shoppers' accounts (ADR-571)", () => {
     expect(past).toContain('<dd>Paid</dd>');
     expect(past).toContain('<dd>Rs 9,250</dd>');
     expect(past).toContain('<span dir="auto">Lawn suit</span>');
+    // Above their orders, their subscriptions, each managed from its latest order's page.
+    const subscriptions = html.slice(
+      html.indexOf('<section class="account__subscriptions"'),
+      html.indexOf('</section>', html.indexOf('<section class="account__subscriptions"')),
+    );
+    expect(subscriptions).toContain('<h2 id="subscriptions-title">Your subscriptions</h2>');
+    expect(subscriptions).toContain('Every 2 weeks');
+    expect(subscriptions).toContain('Next order on 12 November 2026');
+    expect(subscriptions).toContain('Every month');
+    expect(subscriptions).toContain('Paused');
+    expect(subscriptions).toContain(
+      '<a class="button button--secondary" href="/account/orders/ord_01jb7k2m3n4p5q6r7s8t9v0w1x">Skip, pause or cancel</a>',
+    );
 
     // In Urdu, the words and the statuses are Urdu, and the links stay in it.
     const urdu = await app.inject({

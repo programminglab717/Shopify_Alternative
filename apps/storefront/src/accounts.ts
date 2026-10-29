@@ -575,6 +575,23 @@ export function customerObject(
           friend_credit: account.referral.friendCredit,
         }
       : null,
+    // Hatti's: their subscriptions (ADR-916), each managed from its latest order's page.
+    subscriptions: (account.subscriptions ?? []).map((each) => ({
+      id: each.id,
+      paused: each.status === 'paused',
+      plan_name: each.planName,
+      interval_unit: each.interval.unit,
+      interval_count: each.interval.count,
+      discount_percent: each.discountPercent,
+      next_order_on: each.nextOrderOn,
+      orders_placed: each.ordersPlaced,
+      line_items: each.lines.map((line) => ({
+        title: line.productTitle,
+        variant_title: line.variantTitle,
+        quantity: line.quantity,
+      })),
+      url: `${options.prefix}/account/orders/${encodeURIComponent(each.orderId)}`,
+    })),
     store_credit_account: {
       balance: credit.balance,
       currency: { iso_code: credit.currency },

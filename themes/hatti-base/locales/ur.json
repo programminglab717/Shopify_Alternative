@@ -393,6 +393,19 @@
       "store_credit_expired": "میعاد ختم ہو گئی",
       "store_credit_expires": "میعاد {{ date }} کو ختم ہو گی",
       "orders": "آپ کے آرڈرز",
+      "subscriptions": "آپ کی سبسکرپشنز",
+      "every_week": {
+        "one": "ہر ہفتے",
+        "other": "ہر {{ count }} ہفتے"
+      },
+      "every_month": {
+        "one": "ہر مہینے",
+        "other": "ہر {{ count }} مہینے"
+      },
+      "subscription_next": "اگلا آرڈر {{ date }} کو",
+      "subscription_paused": "رکی ہوئی",
+      "subscription_items": "{{ name }} کے ہر آرڈر میں کیا ہے",
+      "manage_subscription": "چھوڑیں، روکیں یا ختم کریں",
       "past_orders": "ہمارے پرانے اسٹور سے",
       "past_orders_hint": "یہاں آنے سے پہلے کے آپ کے آرڈرز، دیکھنے کے لیے۔",
       "no_orders": "آپ نے ابھی تک ہم سے کوئی آرڈر نہیں دیا۔",

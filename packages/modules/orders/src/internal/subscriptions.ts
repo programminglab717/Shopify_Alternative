@@ -175,6 +175,24 @@ export async function subscriptionOfOrderIn(
 }
 
 /**
+ * The customer's subscriptions not cancelled, in the caller's `tx`, the newest first, at most
+ * `limit`: what their own account lists (ADR-916).
+ */
+export async function subscriptionsOfCustomerIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  limit: number,
+): Promise<SubscriptionRecord[]> {
+  const { rows } = await tx.execute<SubscriptionRow>(sql`
+    SELECT ${COLUMNS} FROM orders.subscriptions
+     WHERE shop_id = ${shopId} AND customer_id = ${customerId} AND status <> 'cancelled'
+     ORDER BY created_at DESC, id DESC
+     LIMIT ${limit}`);
+  return rows.map(toRecord);
+}
+
+/**
  * Skips its next order, pauses, resumes or cancels a subscription, in the caller's `tx`, by
  * `actor` or its customer through an order's page: the order its timeline tells of. Resumed, its
  * next order is placed on the day it was due, or tomorrow if that day passed. Null when done; why

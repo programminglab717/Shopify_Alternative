@@ -4,6 +4,7 @@ import {
   bundlesContainingIn,
   bundlesOfProductsIn,
   giftCardProductIdsIn,
+  variantNamesIn,
   type BundleRecord,
 } from '@hatti/catalog/public';
 import {
@@ -31,6 +32,7 @@ import {
   accountOrderLinkIn,
   accountOrdersIn,
   pastOrdersOfCustomerIn,
+  subscriptionsOfCustomerIn,
   type AccountOrderItemFacts,
 } from '@hatti/orders/public';
 import { maskPkMobile, parsePkMobile } from '@hatti/pk';
@@ -292,6 +294,15 @@ export class AccountService {
       const erasure = session.customerId
         ? await this.data.ownErasureIn(tx, shopId, session.customerId)
         : null;
+      // Their subscriptions, each managed from its latest order's page (ADR-916).
+      const subscriptions = session.customerId
+        ? await subscriptionsOfCustomerIn(tx, shopId, session.customerId, ACCOUNT_SESSION.orders)
+        : [];
+      const names = await variantNamesIn(
+        tx,
+        shopId,
+        subscriptions.flatMap((each) => each.lines.map((line) => line.variantId)),
+      );
       // Their code to bring friends, while the shop's referral programme is on (ADR-809).
       const program = session.customerId ? await referralProgramIn(tx, shopId) : null;
       const code =
@@ -352,6 +363,29 @@ export class AccountService {
           })),
         },
         dataRequests,
+        subscriptions: subscriptions.map((each) => ({
+          id: toPublicId('orderSubscription', each.id),
+          status: each.status === 'paused' ? 'paused' : 'active',
+          planName: each.planName,
+          interval: { unit: each.intervalUnit, count: each.intervalCount },
+          discountPercent: each.discountPercent,
+          nextOrderOn: each.nextOrderOn,
+          ordersPlaced: each.ordersPlaced,
+          // A variant the shop has since removed is left out, as nothing of it is known.
+          lines: each.lines.flatMap((line) => {
+            const name = names.get(line.variantId);
+            return name
+              ? [
+                  {
+                    productTitle: name.productTitle,
+                    variantTitle: name.variantTitle,
+                    quantity: line.quantity,
+                  },
+                ]
+              : [];
+          }),
+          orderId: toPublicId('order', each.lastOrderId ?? each.originOrderId),
+        })),
         referral:
           program && code
             ? {

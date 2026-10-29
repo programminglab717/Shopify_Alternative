@@ -133,6 +133,49 @@
       </div>
     {%- endif -%}
 
+    {%- comment -%} Their subscriptions, each managed from its latest order's page (ADR-916). {%- endcomment -%}
+    {%- if customer.subscriptions.size > 0 -%}
+      <section class="account__subscriptions" aria-labelledby="subscriptions-title">
+        <h2 id="subscriptions-title">{{ 'customer.account.subscriptions' | t }}</h2>
+        <ul class="account__orders" role="list">
+          {%- for subscription in customer.subscriptions -%}
+            <li class="account__order">
+              <div class="account__order-head">
+                <span dir="auto">{{ subscription.plan_name | escape }}</span>
+                <span class="account__muted">
+                  {%- if subscription.interval_unit == 'week' -%}
+                    {{- 'customer.account.every_week' | t: count: subscription.interval_count -}}
+                  {%- else -%}
+                    {{- 'customer.account.every_month' | t: count: subscription.interval_count -}}
+                  {%- endif -%}
+                </span>
+              </div>
+              <p>
+                {%- if subscription.paused -%}
+                  {{- 'customer.account.subscription_paused' | t -}}
+                {%- else -%}
+                  {%- assign next_on = subscription.next_order_on | date: format: 'day_month_year' -%}
+                  {{- 'customer.account.subscription_next' | t: date: next_on -}}
+                {%- endif -%}
+              </p>
+              {%- if subscription.line_items.size > 0 -%}
+                <ul class="account__order-items" role="list" aria-label="{{ 'customer.account.subscription_items' | t: name: subscription.plan_name }}">
+                  {%- for item in subscription.line_items -%}
+                    <li>
+                      <span dir="auto">{{ item.title | escape }}</span>
+                      {%- if item.variant_title %} <span class="account__muted" dir="auto">{{ item.variant_title | escape }}</span>{% endif %}
+                      <bdi>× {{ item.quantity }}</bdi>
+                    </li>
+                  {%- endfor -%}
+                </ul>
+              {%- endif -%}
+              <a class="button button--secondary" href="{{ subscription.url }}">{{ 'customer.account.manage_subscription' | t }}</a>
+            </li>
+          {%- endfor -%}
+        </ul>
+      </section>
+    {%- endif -%}
+
     <h2>{{ 'customer.account.orders' | t }}</h2>
     {%- if customer.orders_count == 0 -%}
       <p>{{ 'customer.account.no_orders' | t }}</p>

@@ -502,6 +502,7 @@ export {
   changeSubscriptionIn,
   nextOrderDay,
   subscriptionOfOrderIn,
+  subscriptionsOfCustomerIn,
   type SubscriptionRecord,
   type SubscriptionStatus,
 } from '../internal/subscriptions.js';
