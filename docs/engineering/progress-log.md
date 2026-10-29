@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Functions run locally
+### 56cc73b · Functions run locally
 
 * **`hatti function run`** runs an app's function on a sample input in Hatti's own worker, and
   `build` checks it with Hatti's own code, both now in `@hatti/functions` ([ADR-927](../architecture/13-decision-log.md#adr-927--the-command-line-checks-and-runs-an-apps-function-with-hattis-own-code-moved-to-a-package-of-its-own-so-that-a-function-behaves-on-the-developers-machine-as-at-checkout)).
