@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The address book through the Storefront API
+### 0282e93 · The address book through the Storefront API
 
 * **A headless site keeps the signed-in shopper's address book** with Shopify's address
   mutations, through the core's book ([ADR-946](../architecture/13-decision-log.md#adr-946--the-storefront-api-keeps-a-signed-in-shoppers-address-book-as-shopifys-does-through-the-cores-in-pakistan-alone-a-landmark-besides)).
