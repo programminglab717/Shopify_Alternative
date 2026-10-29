@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Receipts read as they arrive
+### b871e12 · Receipts read as they arrive
 
 * **A shop may have each transfer receipt read by the AI as it arrives,** a credit each, rather
   than when staff ask ([ADR-915](../architecture/13-decision-log.md#adr-915--a-shop-may-have-each-customers-transfer-receipt-read-by-the-ai-as-it-arrives-a-credit-each-rather-than-when-staff-ask)).
