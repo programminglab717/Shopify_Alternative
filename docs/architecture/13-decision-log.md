@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-912 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-913 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -920,6 +920,7 @@
 | 910 | A custom report may be of stock: each tracked variant's stock now and what sold of it over the period, as the inventory report has them | Accepted |
 | 911 | The AI answering customers answers from the shop's own answers to common questions, and from the products a customer asks of: their prices and whether each can be bought now | Accepted |
 | 912 | App Bridge: an app inside the admin asks it, over postMessage, for a fresh session token, a toast, a page of the admin or the save bar, and each answers the other alone | Accepted |
+| 913 | Expansion stores kept in step: products copied as they change, once left alone ten minutes and at most hourly, as the owner of both, failures kept with why | Accepted |
 
 ---
 
@@ -30156,3 +30157,34 @@
   * An embedded app keeps working past the first minute and feels part of the admin.
   * Extensions of admin pages, such as an order's, and app blocks in themes' sections are still
     not done.
+
+## ADR-913 · Expansion stores kept in step: products copied as they change, once left alone ten minutes and at most hourly, as the owner of both, failures kept with why
+
+* **Context:** ADR-859 copies a shop's products to an expansion store only when the owner asks.
+  Copying as products change was left for later. An owner who changes a price, or adds a
+  product, forgets the international store, which then sells at yesterday's price.
+* **Decision:**
+  * **The owner turns it on for each expansion store** (`expansionStoreAutoCopySet`, migration
+    0408), the owner alone of both shops, having signed in lately. The admin's expansion store
+    card has "Copy to … as products change, within the hour".
+  * **The worker's sweep copies a link when:**
+    * the shop's products or variants changed since the last copy;
+    * none changed in the last ten minutes, so a bulk edit is copied whole;
+    * neither a copy nor a failure happened in the last hour.
+    A sweep takes 20 links at most, the longest uncopied first.
+  * **A copy is the same as one asked for.** It runs as the shop's owner, who must still own the
+    expansion store, and is kept as begun at the sweep's time, so a change made during it is
+    copied next time. The copy moves from the resolver into `ExpansionCopier`, which the admin
+    and the worker share. It reads a shop's owner through `identity.staff_phones`, which the
+    worker's login can call; the staff service needs the identity login.
+  * **A copy that fails** is kept with why ("The same person no longer owns both shops", say),
+    shown on the card, and tried again an hour on. A copy that succeeds clears it.
+  * **No loops:** turning it on is refused where products copied there, through copies of
+    copies, would come back to this shop. Two stores would otherwise copy each other's copies
+    for ever.
+* **Consequences:**
+  * An international store keeps its products and prices in step, within the hour, without the
+    owner thinking of it.
+  * Products removed here stay there, as with a copy asked for. So do collections and
+    metafields, which the product file doesn't carry. Rates from a currency feed, and one page of
+    the stores' sales, are still not done.
