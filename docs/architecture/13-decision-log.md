@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-927 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-928 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -935,6 +935,7 @@
 | 925 | Buy buttons embed a collection as a grid of its first twelve products, each with its own buttons, and take the shop's colour | Accepted |
 | 926 | The headless starter shows its pages in Urdu, right to left, as the shopper picks: the catalog and cart asked for in Urdu through @inContext, its own words in Urdu too | Accepted |
 | 927 | The command line checks and runs an app's function with Hatti's own code, moved to a package of its own, so that a function behaves on the developer's machine as at checkout | Accepted |
+| 928 | A selling plan may ask for up to twelve orders before its subscribers cancel themselves: until then their order's page offers skip and pause alone, staff cancelling whenever they must | Accepted |
 
 ---
 
@@ -30516,3 +30517,25 @@
 * **Consequences:**
   * A developer sees what checkout will see before deploying, in CI as on their machine.
   * Not yet: scaffolding a new function (`app init`), and an input made from a shop's real cart.
+
+## ADR-928 · A selling plan may ask for up to twelve orders before its subscribers cancel themselves: until then their order's page offers skip and pause alone, staff cancelling whenever they must
+
+* **Context:** ADR-862's subscriptions may be cancelled by their customer from any of their
+  orders' pages at once. A shop giving 15% off a weekly tea order gives it for the habit, and a
+  shopper who takes the first order at the discount and cancels costs it the discount. Shopify's
+  plans can ask for a minimum number of orders. ADR-862 left a minimum number of orders for later.
+* **Decision:**
+  * **A plan's minimum** (migration 0413, `minimumOrders`, 0 to 12; 0 for none, as before): the
+    orders its subscribers take before they may cancel themselves, the first counting.
+  * **The subscription keeps it**, as it keeps the plan's other terms: changing the plan later
+    changes no subscription made.
+  * **On the order's page**, until the subscription has placed that many: "Your plan asks for 2
+    more orders before you can cancel it. You can still skip or pause." There is no cancel button,
+    and a cancel posted anyway is refused with the same words and the shop's chat.
+  * **Staff cancel whenever they must** (Settings › Subscriptions, or `orderSubscriptionChange`),
+    as do the first order's cancelling and the customer's erasure.
+  * **The product page** says it beside the plan: "At least 3 orders before you cancel", in Urdu
+    too; themes read `selling_plan.minimum_orders`, Hatti's own.
+* **Consequences:**
+  * A shop's discount for subscribing pays for itself across the orders it asked for.
+  * Not yet: plans for single variants.
