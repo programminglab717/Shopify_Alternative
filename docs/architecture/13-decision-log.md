@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-929 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-930 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -937,6 +937,7 @@
 | 927 | The command line checks and runs an app's function with Hatti's own code, moved to a package of its own, so that a function behaves on the developer's machine as at checkout | Accepted |
 | 928 | A selling plan may ask for up to twelve orders before its subscribers cancel themselves: until then their order's page offers skip and pause alone, staff cancelling whenever they must | Accepted |
 | 929 | An expansion store's price rate may follow the day's rate between the shops' currencies, from the currency feed, products copied as they change being copied again at each new rate | Accepted |
+| 930 | A selling plan may be for chosen variants alone, rather than a tag's products or all of them: the product page shows it on those, checkout prices it there alone | Accepted |
 
 ---
 
@@ -30562,3 +30563,29 @@
   * An international store's prices keep up with the rupee without the owner's arithmetic.
   * A sudden move larger than a quarter is held back by ADR-865's check, as for the storefront.
   * Not yet: a margin over the day's rate, and rounding the copied prices to a shop's own steps.
+
+## ADR-930 · A selling plan may be for chosen variants alone, rather than a tag's products or all of them: the product page shows it on those, checkout prices it there alone
+
+* **Context:** ADR-862's selling plans are for a tag's products or all of them. A tea shop sells
+  its large tin by subscription, not its sample of the same tea; a plan for the product would
+  offer both. Shopify's selling plan groups take products or single variants. ADR-862 left plans
+  for single variants for later, and ADR-928 kept that.
+* **Decision:**
+  * **A plan may name its variants** (migration 0415, `variant_ids`, `variantIds` on
+    `SellingPlanInput`, fifty at most): for those alone, rather than a tag's products or all of
+    them. Both a tag and variants are refused: "A plan is for a tag's products or for chosen
+    variants, not both"; another shop's variant is "No variant of the shop has one of these IDs".
+  * **`SellingPlan.variants`** gives each chosen variant's ID and title, "Green tea · Tin", a
+    variant deleted since being left out.
+  * **Checkout prices a line on the plan where its variant is one**; on another variant the line
+    is bought once, as a line naming a plan its product isn't sold on is (ADR-862), and its
+    order's subscription leaves it out.
+  * **The storefront**: a product with one of the variants has the plan in its
+    `selling_plan_groups`; each variant has Shopify's `selling_plan_allocations`, its plans and
+    its price on each. Hatti's theme shows the plan on those variants alone, the product's script
+    showing and hiding it as another is picked, a hidden plan picked going back to buying once.
+  * **Admin:** Settings › Subscriptions has "Only these variants", chosen through the product
+    finder drafts use; the tag is not asked while variants are chosen.
+* **Consequences:**
+  * A shop subscribes the size it means to, at its discount, without a tag for each.
+  * Not yet: changing a plan's variants from the admin, beyond deleting and adding it.
