@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./app-bridge": {
+      "types": "./dist/app-bridge.d.ts",
+      "default": "./dist/app-bridge.js"
     }
   },
   "files": [

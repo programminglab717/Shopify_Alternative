@@ -5163,6 +5163,10 @@ const en = {
   'appFrame.missing': 'This app is not installed on the shop.',
   'appFrame.title': '{name}, inside Hatti',
   'appFrame.back': 'Back to apps',
+  'appFrame.saveBar': "The app's unsaved changes",
+  'appFrame.unsaved': 'Unsaved changes',
+  'appFrame.save': 'Save',
+  'appFrame.discard': 'Discard',
   'appEmbeds.title': "Apps' storefront scripts",
   'appEmbeds.hint':
     'Scripts your apps offer your online store, such as a reviews widget. Each loads on your pages only once you turn it on.',
@@ -12329,6 +12333,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'appFrame.missing': 'یہ ایپ دکان پر انسٹال نہیں۔',
   'appFrame.title': '{name}، Hatti کے اندر',
   'appFrame.back': 'ایپس پر واپس',
+  'appFrame.saveBar': 'ایپ کی غیر محفوظ تبدیلیاں',
+  'appFrame.unsaved': 'تبدیلیاں محفوظ نہیں ہوئیں',
+  'appFrame.save': 'محفوظ کریں',
+  'appFrame.discard': 'رد کریں',
   'appEmbeds.title': 'ایپس کی اسٹور فرنٹ اسکرپٹس',
   'appEmbeds.hint':
     'وہ اسکرپٹس جو آپ کی ایپس آپ کے آن لائن اسٹور کو دیتی ہیں، جیسے ریویوز ویجٹ۔ ہر ایک آپ کے صفحات پر تبھی لوڈ ہوتی ہے جب آپ اسے آن کریں۔',

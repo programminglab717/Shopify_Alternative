@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   confirmIdentity,
@@ -74,6 +74,7 @@ const RETRYING = {
 
 function core() {
   let confirmed = false;
+  let sessions = 0;
   let apps: Record<string, unknown>[] = [SHEET, OLD];
   let storefrontTokens: Record<string, unknown>[] = [
     {
@@ -282,11 +283,15 @@ function core() {
             },
           };
         case 'AppSession':
+          sessions += 1;
           return variables.id === 'tok_9'
             ? {
                 appSession: {
                   name: 'Reviews Pro',
-                  url: 'https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=jwt',
+                  // A fresh token each time it is asked.
+                  url: `https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=${
+                    sessions === 1 ? 'jwt' : `jwt${sessions}`
+                  }`,
                   expiresAt: LATER,
                 },
               }
@@ -552,8 +557,73 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
     const installed = await screen.findByRole('region', { name: 'Installed apps' });
     fireEvent.click(await within(installed).findByRole('link', { name: 'Open Reviews Pro' }));
     const frame = (await screen.findByTitle('Reviews Pro, inside Hatti')) as HTMLIFrameElement;
-    expect(frame.src).toBe('https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=jwt');
+    // Its address names the admin, for the app's App Bridge to answer it alone (ADR-912).
+    expect(frame.src).toBe(
+      'https://reviews.example.pk/admin?shop=shop_1&embedded=1&id_token=jwt' +
+        `&host=${encodeURIComponent(window.location.origin)}`,
+    );
     expect(sentOf(fake, 'AppSession')).toEqual([{ id: 'tok_9' }]);
+  });
+
+  it("answers the app's App Bridge from its own frame alone (DEV-06, ADR-912)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/apps/tok_9');
+    const frame = (await screen.findByTitle('Reviews Pro, inside Hatti')) as HTMLIFrameElement;
+    const app = frame.contentWindow!;
+    const told = vi.spyOn(app, 'postMessage');
+    const ask = (
+      message: unknown,
+      id?: string,
+      origin = 'https://reviews.example.pk',
+      source: unknown = app,
+    ) =>
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: { bridge: 'hatti-app-bridge', version: 1, ...(id ? { id } : {}), message },
+            origin,
+            source: source as Window,
+          }),
+        );
+      });
+
+    // From another site, or another frame: nothing.
+    ask({ type: 'toast', message: 'Phished' }, undefined, 'https://evil.example');
+    ask({ type: 'toast', message: 'Phished' }, undefined, 'https://reviews.example.pk', window);
+    ask({ type: 'toast', message: 'Reviews imported' });
+    expect(await screen.findByText('Reviews imported')).toBeTruthy();
+    expect(screen.queryByText('Phished')).toBeNull();
+
+    // A fresh session token, sent to the app's origin alone.
+    ask({ type: 'id_token' }, 't1');
+    await waitFor(() =>
+      expect(told).toHaveBeenCalledWith(
+        {
+          bridge: 'hatti-app-bridge',
+          version: 1,
+          id: 't1',
+          message: { type: 'id_token', token: 'jwt2' },
+        },
+        'https://reviews.example.pk',
+      ),
+    );
+
+    // The save bar, its buttons told of.
+    ask({ type: 'save_bar', visible: true });
+    const bar = await screen.findByRole('region', { name: "The app's unsaved changes" });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    expect(told).toHaveBeenCalledWith(
+      { bridge: 'hatti-app-bridge', version: 1, message: { type: 'save' } },
+      'https://reviews.example.pk',
+    );
+    ask({ type: 'save_bar', visible: false });
+    expect(screen.queryByRole('region', { name: "The app's unsaved changes" })).toBeNull();
+
+    // A page of the shop's admin, never another site.
+    ask({ type: 'navigate', path: '//evil.example' });
+    ask({ type: 'navigate', path: '/settings/apps' });
+    expect(await screen.findByRole('region', { name: 'Installed apps' })).toBeTruthy();
   });
 
   it("turns apps' checkout functions on with their settings, and says when one failed (DEV-07)", async () => {

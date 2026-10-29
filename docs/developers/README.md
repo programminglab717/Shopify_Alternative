@@ -148,6 +148,20 @@ the shop paid, less the sales tax.
   // claims.dest is the shop, claims.sub the member of staff looking.
   ```
 
+* **App Bridge:** from inside the frame, an app asks the admin for a fresh session token, a
+  toast, a page of the admin to go to, or the save bar (ADR-912). It answers only the admin
+  named by the `host` the frame's address carries:
+
+  ```ts
+  import { createAppBridge } from '@hatti/admin-client/app-bridge';
+
+  const bridge = createAppBridge();
+  const token = await bridge.idToken(); // send it to your server with each request
+  bridge.toast('Reviews imported');
+  bridge.saveBar.show({ onSave: save, onDiscard: reset });
+  bridge.navigate('/orders');
+  ```
+
 * **App embeds:** an app with `write_themes` offers the storefront a script of its own, which
   loads on every page once the shop turns it on:
 
