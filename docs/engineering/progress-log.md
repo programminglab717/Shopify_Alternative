@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The support agent's name and tone
+### dd98611 · The support agent's name and tone
 
 * **A shop names its AI assistant and sets its tone**, warm or formal; the name is given the
   model as the shop's words, the tone as one of Hatti's own instructions ([ADR-923](../architecture/13-decision-log.md#adr-923--a-shop-names-the-ai-assistant-that-answers-its-customers-and-sets-its-tone-warm-or-formal-the-name-given-the-model-as-the-shops-words-the-tone-as-one-of-hattis-own-instructions)).
