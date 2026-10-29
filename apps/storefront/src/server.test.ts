@@ -7103,6 +7103,8 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       const placed = await app.inject({
         method: 'POST',
         url: '/checkouts/c-secret',
+        // From an address of its own: its checkouts count against no other test's limit.
+        remoteAddress: '203.0.113.187',
         headers: {
           ...shopper,
           cookie: 'hatti_ab=texp_draft.b; hatti_session=AbCdEfGhIjKlMnOpQrStUv',
