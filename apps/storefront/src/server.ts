@@ -1018,9 +1018,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       await (step === 'visited'
         ? activity.visited(found.shopId, timezone, session)
         : activity.reached(found.shopId, timezone, session, step));
-      // Counted in the arm of the shop's theme experiment its cookie keeps, too (ADR-866).
+      // Counted in the arm of the shop's theme experiment its cookie keeps, too (ADR-866); in
+      // none where Hatti stopped its draft (ADR-939).
       const arm = experimentArm(doc.experiment, found.experimentCookie, false);
-      if (arm && !arm.assigned) {
+      if (arm && !arm.assigned && !arm.uncounted) {
         await activity.experimented(
           found.shopId,
           arm.id,
@@ -1053,7 +1054,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         false,
       );
       const amount = Number(sale.amount);
-      if (arm && !arm.assigned && Number.isSafeInteger(amount) && amount > 0) {
+      if (arm && !arm.assigned && !arm.uncounted && Number.isSafeInteger(amount) && amount > 0) {
         await activity.experimentSold(found.shopId, arm.id, arm.arm, sale.orderId, amount);
       }
     } catch {

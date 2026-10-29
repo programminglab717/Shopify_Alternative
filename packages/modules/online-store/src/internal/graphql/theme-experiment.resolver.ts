@@ -69,6 +69,13 @@ export class ThemeExperimentDraft {
 
   @Field({ description: 'As the experiment’s `revenueVerdict`, of this draft.' })
   revenueVerdict!: string;
+
+  @Field({
+    description:
+      'Whether Hatti stopped this draft as it sold clearly worse, its shoppers shown the live ' +
+      'theme since and its counts kept as they were, the other drafts going on (ADR-939).',
+  })
+  stopped!: boolean;
 }
 
 @ObjectType({
@@ -204,6 +211,7 @@ const toExperiment = (record: ThemeExperimentRecord, currency: CurrencyCode) =>
         arm: toArm(record.results[arm]!, currency),
         verdict: verdictOf(record.results, arm),
         revenueVerdict: revenueVerdictOf(record.results, arm),
+        stopped: record.stoppedArms.includes(arm),
       }),
     ),
     verdict: verdictOf(record.results),

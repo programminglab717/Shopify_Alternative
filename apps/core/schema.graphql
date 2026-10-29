@@ -22041,6 +22041,11 @@ type ThemeExperimentDraft {
 
   """As the experiment’s `revenueVerdict`, of this draft."""
   revenueVerdict: String!
+
+  """
+  Whether Hatti stopped this draft as it sold clearly worse, its shoppers shown the live theme since and its counts kept as they were, the other drafts going on (ADR-939).
+  """
+  stopped: Boolean!
   themeId: ID!
 
   """As the experiment’s `verdict`, of this draft."""

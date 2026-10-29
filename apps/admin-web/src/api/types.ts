@@ -6629,6 +6629,8 @@ export interface ThemeExperimentDraft {
   arm: ThemeExperimentArm;
   verdict: ThemeExperiment['verdict'];
   revenueVerdict: ThemeExperiment['revenueVerdict'];
+  /** Hatti stopped it as it sold clearly worse, the others going on (ADR-939). */
+  stopped?: boolean;
 }
 
 export interface ThemeExperimentsData {

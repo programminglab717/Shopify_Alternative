@@ -10,7 +10,8 @@ import {
 // in a cookie for the experiment's life, so each sees one theme throughout; robots are always
 // shown the live theme, as search engines must be. Pages of the draft are the shopper's own,
 // never kept at the edge. An experiment of several drafts gives each its share in turn, arms b, c
-// and d, the rest the live theme's (ADR-931).
+// and d, the rest the live theme's (ADR-931). A draft Hatti stopped shows its shoppers the live
+// theme, counting them in no arm, and its share of new shoppers goes to the live theme (ADR-939).
 
 export const EXPERIMENT_COOKIE = 'hatti_ab';
 
@@ -22,6 +23,8 @@ export interface ExperimentArm {
   arm: ArmName;
   /** Put in the arm by this request: its answer keeps the arm in the cookie. */
   assigned: boolean;
+  /** In a stopped draft's arm: shown the live theme, and counted in none (ADR-939). */
+  uncounted?: true;
 }
 
 /** The arms of `experiment`: the live theme's, and one for each of its drafts. */
@@ -43,12 +46,18 @@ export function experimentArm(
   if (!experiment) return null;
   if (robot) return { id: experiment.id, arm: 'a', assigned: false };
   const arms = armsOf(experiment);
+  const stopped = (arm: ArmName) => (experiment.stopped as ArmName[] | undefined)?.includes(arm);
   const [id, kept] = (cookie ?? '').split('.');
   const arm = arms.find((each) => each === kept);
-  if (id === experiment.id && arm) return { id, arm, assigned: false };
-  // 0 to 99: below one share the first draft's, below two the second's, and so on.
-  const drawn = Math.floor(draw(100) / experiment.share);
-  return { id: experiment.id, arm: arms[drawn + 1] ?? 'a', assigned: true };
+  if (id === experiment.id && arm) {
+    return stopped(arm)
+      ? { id, arm: 'a', assigned: false, uncounted: true }
+      : { id, arm, assigned: false };
+  }
+  // 0 to 99: below one share the first draft's, below two the second's, and so on; a stopped
+  // draft's share the live theme's.
+  const drawn = arms[Math.floor(draw(100) / experiment.share) + 1] ?? 'a';
+  return { id: experiment.id, arm: stopped(drawn) ? 'a' : drawn, assigned: true };
 }
 
 /** The cookie keeping the shopper's arm of an experiment. */

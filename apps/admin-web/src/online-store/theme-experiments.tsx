@@ -273,6 +273,12 @@ function Results({
             : words;
         return (
           <Fragment key={draft.themeId}>
+            {/* Stopped alone, the others going on (ADR-939). */}
+            {draft.stopped && (
+              <Alert tone="warning">
+                {t('experiments.draftStopped', { name: themeName(draft.themeId) })}
+              </Alert>
+            )}
             <Alert tone={draft.verdict === 'b_worse' ? 'warning' : 'info'}>
               {said(t(`experiments.verdict.${draft.verdict}` as MessageKey))}
             </Alert>

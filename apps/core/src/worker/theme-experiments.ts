@@ -3,8 +3,10 @@ import { toPublicId } from '@hatti/ids';
 import type { Logger } from '@hatti/logger';
 import {
   endExperimentIn,
-  guardrailTripped,
+  guardrailArmsOf,
   recordExperimentResultsIn,
+  stopExperimentArmsIn,
+  type DraftArmName,
 } from '@hatti/online-store/public';
 import type { StorefrontActivity } from '@hatti/storefront-data';
 import { sql } from 'drizzle-orm';
@@ -12,8 +14,9 @@ import { repeat } from './repeat.js';
 
 /**
  * Shops' running theme experiments (OS-22, ADR-866): each arm's counts taken from the
- * storefronts' and kept, and an experiment ended on its last day, or as soon as a draft of it
- * sells clearly worse than the live theme (ADR-931), so a shop never loses much to one.
+ * storefronts' and kept, and an experiment ended on its last day. A draft that sells clearly worse
+ * than the live theme is stopped as soon as it does, alone where others go on (ADR-939), and the
+ * experiment ends once none does (ADR-931), so a shop never loses much to one.
  */
 export class ThemeExperiments {
   constructor(
@@ -25,8 +28,15 @@ export class ThemeExperiments {
   /** One sweep at `at`: the experiments ended, and why. */
   async sweep(at: Date = new Date()): Promise<{ id: string; reason: 'time' | 'guardrail' }[]> {
     const { rows } = await this.database.system((tx) =>
-      tx.execute<{ shop_id: string; id: string; ends_at: Date | string; drafts: number }>(sql`
-        SELECT shop_id, id, ends_at, 1 + cardinality(other_theme_ids) AS drafts
+      tx.execute<{
+        shop_id: string;
+        id: string;
+        ends_at: Date | string;
+        drafts: number;
+        stopped: DraftArmName[];
+      }>(sql`
+        SELECT shop_id, id, ends_at, 1 + cardinality(other_theme_ids) AS drafts,
+               stopped_arms AS stopped
           FROM online_store.theme_experiments
          WHERE ended_at IS NULL ORDER BY started_at`),
     );
@@ -38,15 +48,26 @@ export class ThemeExperiments {
           toPublicId('themeExperiment', row.id),
           Number(row.drafts),
         );
-        const reason = guardrailTripped(results)
-          ? ('guardrail' as const)
-          : new Date(row.ends_at) <= at
-            ? ('time' as const)
-            : null;
+        // Each draft selling clearly worse stopped; none left going, the experiment ended.
+        const worse = guardrailArmsOf(results, row.stopped);
+        const going = Number(row.drafts) - row.stopped.length - worse.length;
+        const reason =
+          worse.length > 0 && going <= 0
+            ? ('guardrail' as const)
+            : new Date(row.ends_at) <= at
+              ? ('time' as const)
+              : null;
         await this.database.tenant(row.shop_id, async (tx) => {
           await recordExperimentResultsIn(tx, row.shop_id, row.id, results);
           if (reason) await endExperimentIn(tx, row.shop_id, reason, { id: row.id });
+          else await stopExperimentArmsIn(tx, row.shop_id, row.id, worse);
         });
+        if (!reason && worse.length > 0) {
+          this.logger?.info(
+            { shopId: row.shop_id, experimentId: row.id, stopped: worse },
+            'theme experiment draft stopped',
+          );
+        }
         if (reason) {
           ended.push({ id: row.id, reason });
           this.logger?.info(

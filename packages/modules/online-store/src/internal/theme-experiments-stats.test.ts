@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  guardrailArmsOf,
   guardrailTripped,
   revenueVerdictOf,
   revenueZScoreOf,
@@ -76,5 +77,17 @@ describe('What a theme experiment says of its draft (OS-22, ADR-866)', () => {
     expect(guardrailTripped({ a: arm(1_000, 40), b: arm(1_000, 40), c: arm(1_000, 38) })).toBe(
       false,
     );
+  });
+
+  it('names each draft that sells clearly worse, one stopped already left out (ADR-939)', () => {
+    const results = {
+      a: arm(1_000, 40),
+      b: arm(1_000, 10),
+      c: arm(1_000, 41),
+      d: arm(1_000, 9),
+    };
+    expect(guardrailArmsOf(results)).toEqual(['b', 'd']);
+    expect(guardrailArmsOf(results, ['b'])).toEqual(['d']);
+    expect(guardrailArmsOf({ a: arm(1_000, 40), b: arm(1_000, 39) })).toEqual([]);
   });
 });

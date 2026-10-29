@@ -163,6 +163,8 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
             arm: arm(1_000, converted),
             verdict,
             revenueVerdict: verdict,
+            // The last stopped alone as it sold clearly worse (ADR-939).
+            stopped: verdict === 'b_worse',
           });
           const started = {
             id: 'texp_2',
@@ -178,7 +180,7 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
             drafts: [
               draft('th_2', 20, 'no_difference'),
               draft('th_3', 45, 'b_better'),
-              draft('th_4', 21, 'no_difference'),
+              draft('th_4', 8, 'b_worse'),
             ],
             countedAt: EARLIER,
           };
@@ -221,6 +223,10 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
     expect(
       section.getByText('Bigger photos: The draft sells better. You can publish it.'),
     ).toBeTruthy();
-    expect(section.getByText('Urdu first: No clear difference in orders so far.')).toBeTruthy();
+    expect(
+      section.getByText(
+        'Hatti stopped Urdu first: it sold clearly worse. Its shoppers see your live theme; the other drafts go on.',
+      ),
+    ).toBeTruthy();
   });
 });

@@ -61,4 +61,27 @@ describe("A shopper's arm of a theme experiment (OS-22, ADR-866)", () => {
       assigned: true,
     });
   });
+
+  it("shows a stopped draft's shoppers the live theme, counted in no arm, its share the live theme's (ADR-939)", () => {
+    const stopped = {
+      ...experiment,
+      share: 25,
+      others: [{ themeId: 'thm-c', version: 1 }],
+      stopped: ['b' as const],
+    };
+    expect(experimentArm(stopped, 'texp_1.b', false, () => 0)).toEqual({
+      id: 'texp_1',
+      arm: 'a',
+      assigned: false,
+      uncounted: true,
+    });
+    expect(experimentArm(stopped, 'texp_1.c', false, () => 0)?.arm).toBe('c');
+    // A new shopper drawn in its share is the live theme's, and counted there.
+    expect(experimentArm(stopped, null, false, () => 10)).toEqual({
+      id: 'texp_1',
+      arm: 'a',
+      assigned: true,
+    });
+    expect(experimentArm(stopped, null, false, () => 30)?.arm).toBe('c');
+  });
 });

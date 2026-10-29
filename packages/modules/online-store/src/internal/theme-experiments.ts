@@ -20,7 +20,9 @@ import { OnlineStoreEvents } from './events.js';
 // Each arm's revenue is counted too, from the orders its sessions placed at checkout (ADR-921),
 // for a second verdict: whether the draft brings more or less money a session. An experiment may
 // show up to three drafts, each its own share, arms b, c and d, each compared with the live
-// theme's at a confidence kept as sure however many there are (ADR-931).
+// theme's at a confidence kept as sure however many there are (ADR-931). A draft of several that
+// sells clearly worse is stopped alone, its shoppers shown the live theme, the others going on
+// (ADR-939).
 
 export const EXPERIMENT_LIMITS = {
   name: 100,
@@ -87,6 +89,8 @@ export interface ThemeExperimentRecord {
   themeId: string;
   /** Every draft, arms b, c and d in turn (ADR-931): the first is `themeId`. */
   themeIds: string[];
+  /** The drafts' arms Hatti stopped as they sold clearly worse, the others going on (ADR-939). */
+  stoppedArms: DraftArmName[];
   share: number;
   startedAt: Date;
   endsAt: Date;
@@ -119,6 +123,7 @@ type ExperimentRow = {
   name: string;
   theme_id: string;
   other_theme_ids: string[] | null;
+  stopped_arms: DraftArmName[] | null;
   share: number;
   started_at: Date | string;
   ends_at: Date | string;
@@ -138,6 +143,7 @@ const toRecord = (row: ExperimentRow): ThemeExperimentRecord => {
     name: row.name,
     themeId: row.theme_id,
     themeIds,
+    stoppedArms: row.stopped_arms ?? [],
     share: row.share,
     startedAt: toDate(row.started_at),
     endsAt: toDate(row.ends_at),
@@ -149,8 +155,8 @@ const toRecord = (row: ExperimentRow): ThemeExperimentRecord => {
 };
 
 const COLUMNS = sql.raw(
-  'id, name, theme_id, other_theme_ids::text[] AS other_theme_ids, share, started_at, ends_at, ' +
-    'ended_at, ended_reason, results, counted_at',
+  'id, name, theme_id, other_theme_ids::text[] AS other_theme_ids, stopped_arms, share, ' +
+    'started_at, ends_at, ended_at, ended_reason, results, counted_at',
 );
 
 /** The drafts' arms `results` has: b, and c and d where it shows them. */
@@ -235,13 +241,17 @@ export function revenueVerdictOf(
 }
 
 /**
- * Whether a draft sells so clearly worse the worker ends the experiment: any of them, so a shop
- * never loses much to one (ADR-931).
+ * The drafts' arms that sell so clearly worse the worker stops them, so a shop never loses much
+ * to one (ADR-931, ADR-939): those of `results` not in `stopped` already.
  */
-export function guardrailTripped(results: ExperimentResults): boolean {
+export function guardrailArmsOf(
+  results: ExperimentResults,
+  stopped: readonly DraftArmName[] = [],
+): DraftArmName[] {
   const arms = draftArmsOf(results);
   const limit = GUARDRAIL[arms.length] ?? GUARDRAIL[1]!;
-  return arms.some((arm) => {
+  return arms.filter((arm) => {
+    if (stopped.includes(arm)) return false;
     const z = zScoreOf(results, arm);
     return (
       z !== null &&
@@ -249,6 +259,35 @@ export function guardrailTripped(results: ExperimentResults): boolean {
       results.a.sessions >= EXPERIMENT_LIMITS.guardrailSessions &&
       results[arm]!.sessions >= EXPERIMENT_LIMITS.guardrailSessions
     );
+  });
+}
+
+/** Whether a draft sells so clearly worse the worker stops it, or ends an experiment of one. */
+export function guardrailTripped(results: ExperimentResults): boolean {
+  return guardrailArmsOf(results).length > 0;
+}
+
+/**
+ * Stops the experiment `id`'s drafts in `arms`, in the caller's transaction `tx` (ADR-939): their
+ * shoppers are shown the live theme from then, the experiment's other drafts going on.
+ */
+export async function stopExperimentArmsIn(
+  tx: Tx,
+  shopId: string,
+  id: string,
+  arms: readonly DraftArmName[],
+): Promise<void> {
+  if (arms.length === 0) return;
+  await tx.execute(sql`
+    UPDATE online_store.theme_experiments
+       SET stopped_arms = ARRAY(SELECT DISTINCT unnest(stopped_arms || ${sql.param([...arms])}::text[])
+                                 ORDER BY 1)
+     WHERE shop_id = ${shopId} AND id = ${id} AND ended_at IS NULL`);
+  await appendEvent(tx, shopId, {
+    type: OnlineStoreEvents.ThemeExperimentUpdated,
+    aggregateType: 'theme_experiment',
+    aggregateId: id,
+    payload: { stopped: [...arms] },
   });
 }
 

@@ -200,6 +200,11 @@ export interface ExperimentDoc {
   share: number;
   /** Its other drafts, arms c and d (ADR-931); absent for none, as before. */
   others?: { themeId: string; version: number }[];
+  /**
+   * Its drafts' arms Hatti stopped as they sold clearly worse (ADR-939): their shoppers are shown
+   * the live theme, and counted in no arm. Absent for none.
+   */
+  stopped?: DraftArm[];
 }
 
 /**

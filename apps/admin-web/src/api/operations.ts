@@ -13366,6 +13366,7 @@ const THEME_EXPERIMENT = /* GraphQL */ `
       }
       verdict
       revenueVerdict
+      stopped
     }
     countedAt
   }

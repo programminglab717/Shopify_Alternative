@@ -959,7 +959,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await deliver()).toEqual(['theme.updated']);
     expect((await store().shop()).experiment?.others?.[1]?.version).toBe(drafts[2]!.version + 1);
 
-    // One draft selling clearly worse ends it all.
+    // A draft selling clearly worse is stopped alone, the others going on (ADR-939).
     const arm = (sessions: number, converted: number) => ({
       sessions,
       added_to_cart: converted * 3,
@@ -969,14 +969,25 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       revenue_squares: converted * 500_000 ** 2,
     });
     const asked: number[] = [];
+    let counts = { a: arm(1_000, 40), b: arm(1_000, 41), c: arm(1_000, 10), d: arm(1_000, 39) };
     const sweeps = new ThemeExperiments(database, {
       experimentCounts: async (_shop, _id, many = 1) => {
         asked.push(many);
-        return { a: arm(1_000, 40), b: arm(1_000, 41), c: arm(1_000, 10), d: arm(1_000, 39) };
+        return counts;
       },
     });
-    expect(await sweeps.sweep()).toEqual([{ id: running.id, reason: 'guardrail' }]);
+    expect(await sweeps.sweep()).toEqual([]);
     expect(asked).toEqual([3]);
+    expect(await deliver()).toEqual(['theme_experiment.updated']);
+    expect((await store().shop()).experiment?.stopped).toEqual(['c']);
+    const [stopped] = await experiments.list(tenant);
+    expect([stopped!.endedAt, stopped!.stoppedArms]).toEqual([null, ['c']]);
+    // Swept again, nothing more to stop.
+    expect(await sweeps.sweep()).toEqual([]);
+    expect(await deliver()).toEqual([]);
+    // The others selling clearly worse too, none goes on: it ends.
+    counts = { a: arm(1_000, 40), b: arm(1_000, 12), c: arm(1_000, 10), d: arm(1_000, 11) };
+    expect(await sweeps.sweep()).toEqual([{ id: running.id, reason: 'guardrail' }]);
     await deliver();
     expect((await store().shop()).experiment).toBeUndefined();
     expect(await store().experimentTheme('c')).toBeNull();

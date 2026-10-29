@@ -1132,6 +1132,8 @@ export class StorefrontPublisher {
                 each ? [{ themeId: each.id, version: each.version }] : [],
               ),
             }),
+            // Drafts Hatti stopped, their shoppers shown the live theme (ADR-939).
+            ...(running.stoppedArms.length > 0 && { stopped: running.stoppedArms }),
           }
         : null,
     );
