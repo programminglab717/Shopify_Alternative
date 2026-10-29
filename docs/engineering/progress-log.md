@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Credit limits on payment terms
+### 56e6c69 · Credit limits on payment terms
 
 * **A wholesale customer's credit limit:** an order on terms that would take what they owe past
   it is refused, saying what they would owe ([ADR-907](../architecture/13-decision-log.md#adr-907--a-wholesale-customers-credit-limit-on-payment-terms-an-order-on-terms-that-would-take-what-they-owe-past-it-is-refused-saying-what-they-would-owe)).
