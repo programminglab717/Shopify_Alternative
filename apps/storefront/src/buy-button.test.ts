@@ -188,4 +188,64 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     ]);
     await window.happyDOM.close();
   });
+
+  it('shows a collection twelve products at a time, Show more giving the next (ADR-937)', async () => {
+    const product = (handle: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `https://zari.hatti.pk/products/${handle}`,
+      image: null,
+      currency: 'PKR',
+      variants: [
+        {
+          id: `v-${handle}`,
+          title: 'Default',
+          available: true,
+          price: '1500.00',
+          compareAtPrice: null,
+        },
+      ],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    document.body.innerHTML = '<div data-hatti-buy-collection="eid-edit" data-language="ur"></div>';
+    const asked: string[] = [];
+    window.fetch = (async (url: string) => {
+      asked.push(url);
+      const second = url.endsWith('?page=2');
+      return {
+        ok: true,
+        json: async () => ({
+          handle: 'eid-edit',
+          title: 'Eid edit',
+          url: 'https://zari.hatti.pk/collections/eid-edit',
+          products: second ? [product('shawl')] : [product('kurta'), product('dupatta')],
+          next: second ? null : 2,
+        }),
+      };
+    }) as never;
+    const script = document.createElement('script');
+    script.setAttribute('src', 'https://zari.hatti.pk/buy-button.js');
+    Object.defineProperty(document, 'currentScript', { value: script });
+    window.eval(BUY_BUTTON_SCRIPT);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const grid = document.querySelector('[data-hatti-buy-collection]')!.shadowRoot!;
+    const cards = () => grid.querySelectorAll('.grid > div').length;
+    expect(cards()).toBe(2);
+    const more = grid.querySelector('.more') as unknown as {
+      textContent: string;
+      click: () => void;
+    };
+    expect(more.textContent).toBe('مزید دیکھیں');
+    more.click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(asked).toEqual([
+      'https://zari.hatti.pk/buy-button/collections/eid-edit',
+      'https://zari.hatti.pk/buy-button/collections/eid-edit?page=2',
+    ]);
+    // Its last page: three in all, and no more to show.
+    expect(cards()).toBe(3);
+    expect(grid.querySelector('.more')).toBeNull();
+    await window.happyDOM.close();
+  });
 });

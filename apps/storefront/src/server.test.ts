@@ -2943,6 +2943,22 @@ describe('Carts', () => {
     expect(shown.products.map((each) => each.handle)).toEqual(
       collection.productIds.slice(0, 12).map((id) => handles.get(id)),
     );
+    // Its next page, and the page after its last empty (ADR-937).
+    const page = async (asked: string) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/buy-button/collections/${collection.handle}?page=${asked}`,
+          headers: { host: 'localhost' },
+        })
+      ).json() as { products: { handle: string }[]; next: number | null };
+    const pages = Math.ceil(collection.productIds.length / 12);
+    expect((await page('1')).next).toBe(pages > 1 ? 2 : null);
+    expect((await page(String(pages + 1))).products).toEqual([]);
+    // A page that is no page is the first.
+    expect((await page('nope')).products.map((each) => each.handle)).toEqual(
+      shown.products.map((each) => each.handle),
+    );
     expect(
       (
         await app.inject({

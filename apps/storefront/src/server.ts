@@ -111,6 +111,7 @@ import {
   BUY_BUTTON_PATHS,
   BUY_BUTTON_SCRIPT,
   buyButtonCollection,
+  buyButtonPage,
   buyButtonProduct,
 } from './buy-button.js';
 import {
@@ -2544,32 +2545,48 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       throw error;
     }
   });
-  // A collection's embed (ADR-925): its first products, as public as its page.
-  app.get<{ Params: { handle: string } }>(BUY_BUTTON_PATHS.collection, async (request, reply) => {
-    reply.header('access-control-allow-origin', '*');
-    const found = await shopFor(request, reply);
-    if (!found) return notFound(reply, 'No shop answers at this address.');
-    try {
-      if (await lockOf(request, found)) return await notFound(reply, 'This shop is not open yet.');
-      const collection = await found.store.collectionByHandle(request.params.handle.slice(0, 255));
-      if (!collection) return await notFound(reply, 'The shop has no such collection.');
-      const products = await found.store.products(
-        collection.productIds.slice(0, BUY_BUTTON_COLLECTION.products),
-      );
-      return await reply
-        .header('cache-control', PAGE_CACHE)
-        .header('cache-tag', shopTag(found.shopId))
-        .type('application/json; charset=utf-8')
-        .send(
-          JSON.stringify(
-            buyButtonCollection(collection, products, await originOf(request, found), 'PKR'),
-          ),
+  // A collection's embed (ADR-925): a page of its products, `?page=2` the next (ADR-937), as
+  // public as its page.
+  app.get<{ Params: { handle: string }; Querystring: { page?: string } }>(
+    BUY_BUTTON_PATHS.collection,
+    async (request, reply) => {
+      reply.header('access-control-allow-origin', '*');
+      const found = await shopFor(request, reply);
+      if (!found) return notFound(reply, 'No shop answers at this address.');
+      try {
+        if (await lockOf(request, found))
+          return await notFound(reply, 'This shop is not open yet.');
+        const collection = await found.store.collectionByHandle(
+          request.params.handle.slice(0, 255),
         );
-    } catch (error) {
-      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
-      throw error;
-    }
-  });
+        if (!collection) return await notFound(reply, 'The shop has no such collection.');
+        const page = buyButtonPage(request.query.page);
+        const size = BUY_BUTTON_COLLECTION.products;
+        const products = await found.store.products(
+          collection.productIds.slice((page - 1) * size, page * size),
+        );
+        return await reply
+          .header('cache-control', PAGE_CACHE)
+          .header('cache-tag', shopTag(found.shopId))
+          .type('application/json; charset=utf-8')
+          .send(
+            JSON.stringify(
+              buyButtonCollection(
+                collection,
+                products,
+                await originOf(request, found),
+                'PKR',
+                page,
+              ),
+            ),
+          );
+      } catch (error) {
+        if (error instanceof StoreMissingError)
+          return notFound(reply, 'This shop is not open yet.');
+        throw error;
+      }
+    },
+  );
   /**
    * The Storefront API (DEV-02, ADR-848), as Shopify's at /api/<version>/graphql.json: answered
    * with one of the shop's tokens, public from browsers, private from a server; a cart it makes

@@ -8,7 +8,8 @@ import { imageAddress } from './liquid.js';
 // Buy now opens the shop's checkout holding it, through a cart permalink (ADR-709). Add to cart
 // keeps it in a cart of the page's own, across the shop's buttons there, its bar opening the
 // checkout holding all of it (ADR-918). A collection is embedded as a grid of its products, each
-// with its buttons; and the buttons take the shop's colour (ADR-925).
+// with its buttons, twelve at a time, Show more giving the next (ADR-937); and the buttons take the
+// shop's colour (ADR-925).
 
 /** A buy button's cart (ADR-918): its lines at most, and as many of each. */
 export const BUY_BUTTON_CART = { lines: 20, quantity: 10 } as const;
@@ -19,8 +20,11 @@ export const BUY_BUTTON_PATHS = {
   collection: '/buy-button/collections/:handle',
 } as const;
 
-/** How many of a collection's products its embed shows, the first in its order (ADR-925). */
-export const BUY_BUTTON_COLLECTION = { products: 12 } as const;
+/**
+ * How many of a collection's products its embed shows at a time, in its order (ADR-925): a page
+ * of them, and pages up to the hundredth (ADR-937).
+ */
+export const BUY_BUTTON_COLLECTION = { products: 12, pages: 100 } as const;
 
 /** A colour for the buttons, as the snippet gives it: "#0f766e". */
 const COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -70,24 +74,36 @@ export function buyButtonProduct(
   };
 }
 
-/** A collection as its embed shows it (ADR-925): its title, address and first products. */
+/** A collection as its embed shows it (ADR-925): its title, address and a page of its products. */
 export interface BuyButtonCollection {
   handle: string;
   title: string;
   url: string;
   products: BuyButtonProduct[];
+  /** The page after this one, where it has more products (ADR-937); null at its last. */
+  next: number | null;
+}
+
+/** The page of a collection's embed `asked` names, 1 unless it names another it may have. */
+export function buyButtonPage(asked: unknown): number {
+  const page = Number(asked);
+  return Number.isInteger(page) && page >= 1 && page <= BUY_BUTTON_COLLECTION.pages ? page : 1;
 }
 
 /**
- * The collection's embed: `products` are its first, in its order, as the storefront shows them,
- * those with nothing to sell left out.
+ * The collection's embed: `products` are its page `page`'s, in its order, as the storefront shows
+ * them, those with nothing to sell left out.
  */
 export function buyButtonCollection(
   collection: CollectionDoc,
   products: readonly (ProductDoc | null)[],
   origin: string,
   currency: string,
+  page = 1,
 ): BuyButtonCollection {
+  const more =
+    collection.productIds.length > page * BUY_BUTTON_COLLECTION.products &&
+    page < BUY_BUTTON_COLLECTION.pages;
   return {
     handle: collection.handle,
     title: collection.title,
@@ -95,6 +111,7 @@ export function buyButtonCollection(
     products: products
       .filter((product): product is ProductDoc => product !== null && product.variants.length > 0)
       .map((product) => buyButtonProduct(product, origin, currency)),
+    next: more ? page + 1 : null,
   };
 }
 
@@ -110,9 +127,9 @@ export const BUY_BUTTON_SCRIPT = `(function () {
   var origin = new URL(script.src).origin;
   var WORDS = {
     en: { buy: 'Buy now', soldOut: 'Sold out', option: 'Choose', add: 'Add to cart',
-          checkout: 'Checkout', items: ' in your cart', empty: 'Empty the cart' },
+          checkout: 'Checkout', items: ' in your cart', empty: 'Empty the cart', more: 'Show more' },
     ur: { buy: 'ابھی خریدیں', soldOut: 'ختم ہو گیا', option: 'منتخب کریں', add: 'کارٹ میں ڈالیں',
-          checkout: 'چیک آؤٹ', items: ' آپ کی کارٹ میں', empty: 'کارٹ خالی کریں' }
+          checkout: 'چیک آؤٹ', items: ' آپ کی کارٹ میں', empty: 'کارٹ خالی کریں', more: 'مزید دیکھیں' }
   };
   // The page's cart of the shop's things (ADR-918): kept by this site's browser storage, as
   // [{ id, quantity }], ${BUY_BUTTON_CART.lines} lines and ${BUY_BUTTON_CART.quantity} of each at most.
@@ -247,18 +264,37 @@ export const BUY_BUTTON_SCRIPT = `(function () {
   var GRID_STYLE =
     ':host{all:initial;display:block;font:15px/1.4 system-ui,sans-serif;color:#1c1917}' +
     '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:1rem}' +
-    '.heading{grid-column:1/-1;font-weight:700;font-size:1.2em;color:inherit;text-decoration:none}';
-  // A collection (ADR-925): its title, then each of its products as a button of its own.
+    '.heading{grid-column:1/-1;font-weight:700;font-size:1.2em;color:inherit;text-decoration:none}' +
+    '.more{grid-column:1/-1;justify-self:center;padding:.6rem 1.2rem;border:1px solid var(--hatti-color,#0f766e);border-radius:8px;background:#fff;color:var(--hatti-color,#0f766e);font:inherit;font-weight:600;cursor:pointer}';
+  // A collection (ADR-925): its title, then each of its products as a button of its own, a page
+  // at a time, Show more giving the next (ADR-937).
   function drawCollection(host, collection, lang) {
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     root.appendChild(el('style', {}, GRID_STYLE));
     var grid = el('div', { class: 'grid', lang: lang, dir: lang === 'ur' ? 'rtl' : 'ltr' });
     grid.appendChild(el('a', { class: 'heading', href: collection.url, target: '_blank', rel: 'noopener' }, collection.title));
-    collection.products.forEach(function (product) {
-      var cell = el('div', {});
-      grid.appendChild(cell);
-      draw(cell, product, lang);
-    });
+    function add(page) {
+      page.products.forEach(function (product) {
+        var cell = el('div', {});
+        grid.appendChild(cell);
+        draw(cell, product, lang);
+      });
+      if (!page.next) return;
+      var more = el('button', { class: 'more', type: 'button' }, WORDS[lang].more);
+      more.addEventListener('click', function () {
+        more.disabled = true;
+        fetch(origin + '/buy-button/collections/' + encodeURIComponent(collection.handle) + '?page=' + page.next)
+          .then(function (answer) { return answer.ok ? answer.json() : null; })
+          .then(function (found) {
+            if (!found) { more.disabled = false; return; }
+            grid.removeChild(more);
+            add(found);
+          })
+          .catch(function () { more.disabled = false; });
+      });
+      grid.appendChild(more);
+    }
+    add(collection);
     root.appendChild(grid);
   }
   // The shop's colour for the buttons, as the snippet says it; the platform's teal otherwise.
