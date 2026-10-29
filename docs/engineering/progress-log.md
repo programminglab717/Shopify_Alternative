@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### An expansion store's margin and rounding
+### ffd04a4 · An expansion store's margin and rounding
 
 * **An expansion store's copied prices may be a percent over its rate**, and rounded to a whole
   unit or up to .99; its costs are copied at the rate alone ([ADR-933](../architecture/13-decision-log.md#adr-933--an-expansion-stores-copied-prices-may-be-a-percent-over-its-rate-and-rounded-as-prices-abroad-are-its-costs-copied-at-the-rate-alone)).
