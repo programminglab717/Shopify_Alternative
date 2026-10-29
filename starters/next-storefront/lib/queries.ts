@@ -374,3 +374,53 @@ export const CUSTOMER_DEFAULT_ADDRESS_UPDATE_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// The shopper's wishlist (ADR-951, ADR-953): products kept for later, as cards.
+
+export const CUSTOMER_WISHLIST_QUERY = /* GraphQL */ `
+  query CustomerWishlist($customerAccessToken: String!, $language: LanguageCode = EN)
+  @inContext(language: $language) {
+    customer(customerAccessToken: $customerAccessToken) {
+      wishlist(first: 50) {
+        nodes {
+          id
+          handle
+          title
+          availableForSale
+          featuredImage {
+            url(transform: { maxWidth: 600 })
+            altText
+            width
+            height
+          }
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_WISHLIST_ADD_MUTATION = /* GraphQL */ `
+  mutation CustomerWishlistAdd($customerAccessToken: String!, $productIds: [ID!]!) {
+    customerWishlistAdd(customerAccessToken: $customerAccessToken, productIds: $productIds) {
+      customerUserErrors {
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_WISHLIST_REMOVE_MUTATION = /* GraphQL */ `
+  mutation CustomerWishlistRemove($customerAccessToken: String!, $productId: ID!) {
+    customerWishlistRemove(customerAccessToken: $customerAccessToken, productId: $productId) {
+      customerUserErrors {
+        code
+      }
+    }
+  }
+`;

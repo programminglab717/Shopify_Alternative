@@ -77,7 +77,8 @@ export default async function AccountPage() {
         </ul>
       )}
       <p>
-        <Link href="/account/addresses">{words.addresses}</Link>
+        <Link href="/account/addresses">{words.addresses}</Link> ·{' '}
+        <Link href="/account/wishlist">{words.wishlist}</Link>
       </p>
       <form action={signOut}>
         <button type="submit">{words.signOut}</button>

@@ -71,6 +71,9 @@ const WORDS = {
     zip: 'Postal code',
     addressProblem: "That address won't do. Check this:",
     backToAccount: 'Back to your account',
+    wishlist: 'Wishlist',
+    wishlistEmpty: 'Nothing kept for later yet.',
+    saveForLater: 'Save for later',
   },
   ur: {
     cart: 'کارٹ',
@@ -139,6 +142,9 @@ const WORDS = {
     zip: 'پوسٹل کوڈ',
     addressProblem: 'یہ پتہ درست نہیں۔ یہ دیکھیں:',
     backToAccount: 'اپنے اکاؤنٹ پر واپس جائیں',
+    wishlist: 'پسندیدہ',
+    wishlistEmpty: 'ابھی بعد کے لیے کچھ نہیں رکھا۔',
+    saveForLater: 'بعد کے لیے رکھیں',
   },
 } as const satisfies Record<Language, Record<string, string>>;
 

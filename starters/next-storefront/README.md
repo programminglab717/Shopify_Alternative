@@ -6,7 +6,7 @@ of their own design while Hatti keeps the catalog, carts, checkout and orders (O
 It shows the shop's products, a search, collections and product pages, and keeps a cart with the
 Storefront API. Shoppers sign in with a code sent to their mobile number, on WhatsApp or by SMS,
 and see their orders, buy their items again, and their store credit (ADR-944), and keep their
-addresses (ADR-947). **Checkout is the shop's own**, at the cart's `checkoutUrl`: the address, delivery,
+addresses (ADR-947) and a wishlist, "Save for later" on each product's page (ADR-953). **Checkout is the shop's own**, at the cart's `checkoutUrl`: the address, delivery,
 cash on delivery or paying online, and the order, as on the shop's Hatti storefront.
 
 ## Start
@@ -40,8 +40,9 @@ a server of your own. Set the same variables there.
 - `lib/queries.ts`: every query the site asks, whole. Hatti's tests check them against the
   Storefront API's schema, so they keep working as the API changes.
 - `app/actions.ts`: the cart, its ID kept in an httpOnly cookie, changed by server actions.
-- `app/account/`: sign-in, the number then the code (`login`), the account page, and the address
-  book (`addresses`), where addresses are added, changed, delivered to first or taken out. The customer
+- `app/account/`: sign-in, the number then the code (`login`), the account page, the address
+  book (`addresses`), where addresses are added, changed, delivered to first or taken out, and
+  the wishlist (`wishlist`). The customer
   access token is kept in an httpOnly cookie until it expires; signing out ends it at the shop
   too.
 - `app/`: the pages: home and search, `products/[handle]`, `collections/[handle]`, `cart`,

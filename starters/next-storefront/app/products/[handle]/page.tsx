@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { addToCart } from '@/app/actions';
+import { saveForLater } from '@/app/account/wishlist/actions';
 import { storefront } from '@/lib/hatti';
 import { languageCode, languageOf } from '@/lib/language';
 import { formatMoney } from '@/lib/money';
@@ -57,6 +58,13 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
           </label>
           <button type="submit" disabled={!product.availableForSale}>
             {product.availableForSale ? words.addToCart : words.soldOut}
+          </button>
+        </form>
+        {/* Kept for later with the shopper's account (ADR-953); signing in first if need be. */}
+        <form action={saveForLater}>
+          <input type="hidden" name="productId" value={product.id} />
+          <button type="submit" className="quiet">
+            {words.saveForLater}
           </button>
         </form>
         <div dir="auto" dangerouslySetInnerHTML={{ __html: product.descriptionHtml }} />

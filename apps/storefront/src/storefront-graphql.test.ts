@@ -363,6 +363,9 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
       'CUSTOMER_DEFAULT_ADDRESS_UPDATE_MUTATION',
       'CUSTOMER_LOGIN_CODE_SEND_MUTATION',
       'CUSTOMER_QUERY',
+      'CUSTOMER_WISHLIST_ADD_MUTATION',
+      'CUSTOMER_WISHLIST_QUERY',
+      'CUSTOMER_WISHLIST_REMOVE_MUTATION',
       'PRODUCTS_QUERY',
       'PRODUCT_QUERY',
       'SHOP_QUERY',
@@ -1166,5 +1169,24 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     expect((await book()).defaultAddress.id).toBe(id);
     await ask(q.CUSTOMER_ADDRESS_DELETE_MUTATION!, { ...token, id }, at);
     expect((await book()).addresses.nodes.map((address: Json) => address.city)).toEqual(['Lahore']);
+  });
+
+  it("keeps the wishlist as the headless starter's page does (ADR-953)", async () => {
+    const q = starterQueries();
+    const at = { ...api(), accounts: accounts().kept };
+    const token = { customerAccessToken: TOKEN };
+    await ask(
+      q.CUSTOMER_WISHLIST_ADD_MUTATION!,
+      { ...token, productIds: [`gid://hatti/Product/${lawn.id}`] },
+      at,
+    );
+    const kept = (await ask(q.CUSTOMER_WISHLIST_QUERY!, { ...token, language: 'EN' }, at)).data
+      .customer.wishlist.nodes;
+    expect(kept.map((product: Json) => product.handle)).toEqual([lawn.handle]);
+    expect(kept[0].priceRange.minVariantPrice.currencyCode).toBe('PKR');
+    await ask(q.CUSTOMER_WISHLIST_REMOVE_MUTATION!, { ...token, productId: kept[0].id }, at);
+    expect((await ask(q.CUSTOMER_WISHLIST_QUERY!, token, at)).data.customer.wishlist.nodes).toEqual(
+      [],
+    );
   });
 });
