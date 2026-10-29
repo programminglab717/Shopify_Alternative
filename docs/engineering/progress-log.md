@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### A single product's margin abroad
+### baaa9bf · A single product's margin abroad
 
 * **An expansion store's copied price may take a margin of its own for a single product**,
   before its collections' ([ADR-960](../architecture/13-decision-log.md#adr-960--an-expansion-stores-copied-price-may-take-a-margin-of-its-own-for-a-single-product-before-its-collections)).
