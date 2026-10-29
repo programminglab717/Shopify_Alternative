@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-942 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-943 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -950,6 +950,7 @@
 | 940 | The AI support agent hears a customer's voice note and answers its words, and hands a picture, a video or a file without words to staff | Accepted |
 | 941 | The AI support agent reads a customer's photo into searches of the shop's products, and answers with what they find | Accepted |
 | 942 | hatti function init begins a function in Rust, built with Cargo for WASI | Accepted |
+| 943 | Shoppers sign in through the Storefront API with a code sent to their number, and its customer access token reads their orders and store credit | Accepted |
 
 ---
 
@@ -30871,3 +30872,32 @@
   * A function can begin in the language most of Shopify's are written in.
   * Not yet: a TinyGo starter. Running TinyGo's downloaded compiler in this environment was refused,
     and a starter that couldn't be built here would not be shipped.
+
+## ADR-943 · Shoppers sign in through the Storefront API with a code sent to their number, and its customer access token reads their orders and store credit
+
+* **Context:** The Storefront API (ADR-848) gives a headless site the catalogue and carts, but no
+  shopper can sign in through it: ADR-869 and ADR-926 left accounts for later. Shopify's API signs
+  customers in with an email and a password. Hatti's shoppers sign in with a code sent to their
+  mobile number (ADR-570), and its storefront keeps no passwords.
+* **Decision:**
+  * **`customerLoginCodeSend(phone, channel)`** has the core send a code, on WhatsApp unless SMS is
+    asked, in the language the query is asked in. Its answer is the same whether or not the number
+    shops there: the masked number it went to, or why not.
+  * **`customerAccessTokenCreateWithCode(phone, code)`** checks the code. Right, it gives a customer
+    access token, the core's session secret, and when it expires. Wrong, expired or tried too
+    often, it says which, as `CODE_WRONG` or `CODE_EXPIRED`.
+  * **`customer(customerAccessToken)`** gives the shopper as Shopify's Customer: their name and
+    number, store credit, and orders a page at a time. Each order has its statuses, total and
+    line items, each line with the variant to buy again with `cartLinesAdd`. Its ID is a digest,
+    not the number.
+  * **`customerAccessTokenDelete`** signs them out. A token not of the core's shape is no one,
+    without asking the core.
+  * **Sign-ins are counted per buyer**, 20 a minute, as on the shop's own pages. The buyer is the
+    caller, or, with a private token, the address its server names in Shopify's
+    `Shopify-Storefront-Buyer-IP`, so that a site's shoppers aren't counted as its server. The core
+    still limits the codes a number or an address is sent.
+* **Consequences:**
+  * A headless site has accounts as the shop's Hatti storefront has, with Shopify's names where
+    they fit.
+  * Not yet: the headless starter's account pages; addresses, wishlists and data requests through
+    the API; a cart tied to the signed-in shopper.
