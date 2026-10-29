@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-955 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-956 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -963,6 +963,7 @@
 | 953 | The headless starter keeps the shopper's wishlist: Save for later on each product's page, and a page of what was kept | Accepted |
 | 954 | Overdue payment terms are reminded again each week, four times past the date at most | Accepted |
 | 955 | Every store's sales by day on one chart: each store's part of each day's bar, in this shop's currency at the day's rate | Accepted |
+| 956 | The Storefront API gives products and collections by their IDs at once, as Shopify's nodes | Accepted |
 
 ---
 
@@ -31182,3 +31183,20 @@
 * **Consequences:**
   * An owner sees a store abroad's sales grow, or not, beside their own, on one chart.
   * Not yet: the same chart in the sales report; each day at that day's rate.
+
+## ADR-956 · The Storefront API gives products and collections by their IDs at once, as Shopify's nodes
+
+* **Context:** The Storefront API (ADR-848) gives one product by its ID or handle, and pages of
+  them. A headless site that keeps a list of products' IDs (a wishlist kept before the shopper
+  signs in, recently viewed products) asks once per product. Shopify's Storefront API has
+  `nodes(ids:)` for that.
+* **Decision:**
+  * **`nodes(ids: [ID!]!): [Node]!`**: the products and collections with these IDs, in their
+    order, null for an ID the shop doesn't sell or of another kind. `Product` and `Collection`
+    implement `Node`, so a query asks their fields with `... on Product`.
+  * **250 IDs at most**, as Shopify's; more is refused with an error.
+  * **Products are read at once** from the storefront's documents; collections by handle, as
+    `collection(id:)` reads them.
+* **Consequences:**
+  * The headless starter shows a wishlist kept on the device in one request (ADR-957).
+  * Not yet: pages, blogs, articles and variants by `nodes`.
