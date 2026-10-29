@@ -12080,6 +12080,11 @@ type Mutation {
   themeExperimentEnd(id: ID!): ThemeExperimentPayload!
 
   """
+  Changes each draft's share of a running experiment (ADR-958), in the order of its drafts, as at its start: the shoppers already shown a theme keep it, those to come are drawn by the new shares. A draft Hatti stopped keeps its own.
+  """
+  themeExperimentSharesSet(id: ID!, shares: [Int!]!): ThemeExperimentPayload!
+
+  """
   Starts showing up to three draft themes, each to a share of shoppers, the rest the live theme, for up to 30 days: one experiment at a time.
   """
   themeExperimentStart(input: ThemeExperimentInput!): ThemeExperimentPayload!

@@ -6655,6 +6655,10 @@ export interface ThemeExperimentsData {
 export interface ThemeExperimentPayloadData {
   themeExperimentStart?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
   themeExperimentEnd?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
+  themeExperimentSharesSet?: {
+    themeExperiment: ThemeExperiment | null;
+    userErrors: UserError[];
+  };
 }
 
 /** A function an app gives the shop's checkout (DEV-07, ADR-868). */

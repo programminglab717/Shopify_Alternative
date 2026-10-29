@@ -13429,6 +13429,22 @@ export const ThemeExperimentStartMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Each draft's share of a running experiment, changed (ADR-958). */
+export const ThemeExperimentSharesSetMutation = /* GraphQL */ `
+  mutation ThemeExperimentSharesSet($id: ID!, $shares: [Int!]!) {
+    themeExperimentSharesSet(id: $id, shares: $shares) {
+      themeExperiment {
+        ...ThemeExperimentFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME_EXPERIMENT}
+  ${USER_ERRORS}
+`;
+
 export const ThemeExperimentEndMutation = /* GraphQL */ `
   mutation ThemeExperimentEnd($id: ID!) {
     themeExperimentEnd(id: $id) {

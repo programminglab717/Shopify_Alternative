@@ -489,6 +489,79 @@ export class ThemeExperimentService {
     });
   }
 
+  /**
+   * Changes each draft's share of a running experiment (ADR-958), `shares` in the order of its
+   * drafts, as at its start: the shoppers already shown a theme keep it, those still to come are
+   * drawn by the new shares. A draft Hatti stopped (ADR-939) keeps its own.
+   */
+  async setShares(
+    tenant: TenantContext,
+    id: string,
+    shares: readonly number[],
+  ): Promise<MutationResult<ThemeExperimentRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<ExperimentRow>(sql`
+        SELECT ${COLUMNS} FROM online_store.theme_experiments
+         WHERE shop_id = ${tenant.shopId} AND id = ${id} AND ended_at IS NULL
+         FOR UPDATE`);
+      if (!rows[0]) return failOne(['id'], 'NOT_FOUND', NOT_FOUND);
+      const before = toRecord(rows[0]);
+      const { share } = EXPERIMENT_LIMITS;
+      const check = new InputChecker();
+      if (shares.length !== before.themeIds.length) {
+        check.addMessage(['shares'], 'INVALID', 'Give a share for each draft');
+      } else {
+        const stopped = draftArmsOf(before.results).flatMap((arm, at) =>
+          before.stoppedArms.includes(arm) ? [at] : [],
+        );
+        shares.forEach((value, at) => {
+          if (!Number.isInteger(value) || value < share.min || value > share.max) {
+            check.add(
+              ['shares', String(at)],
+              'INVALID',
+              `must be a whole percent from ${share.min} to ${share.max}`,
+            );
+          } else if (stopped.includes(at) && value !== before.shares[at]) {
+            check.addMessage(
+              ['shares', String(at)],
+              'INVALID',
+              'Hatti stopped this draft: its shoppers see your live theme, and its share stays',
+            );
+          }
+        });
+        if (check.ok && 100 - shares.reduce((sum, each) => sum + each, 0) < Math.max(...shares)) {
+          check.addMessage(
+            ['shares'],
+            'INVALID',
+            'The live theme is shown to no fewer shoppers than any draft: give the drafts less',
+          );
+        }
+      }
+      if (!check.ok) return { ok: false, errors: check.errors };
+      const { rows: changed } = await tx.execute<ExperimentRow>(sql`
+        UPDATE online_store.theme_experiments
+           SET share = ${shares[0]!},
+               other_shares = ${sql.param(shares.slice(1))}::smallint[]
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}
+        RETURNING ${COLUMNS}`);
+      const record = toRecord(changed[0]!);
+      await appendEvent(tx, tenant.shopId, {
+        type: OnlineStoreEvents.ThemeExperimentUpdated,
+        aggregateType: 'theme_experiment',
+        aggregateId: record.id,
+        payload: {},
+      });
+      await recordAudit(tx, tenant.shopId, {
+        action: 'theme_experiment.shares_changed',
+        subjectType: 'theme',
+        subjectId: record.themeId,
+        ...actorColumnsOf(tenant.actor),
+        details: { name: record.name, from: before.shares, to: record.shares },
+      });
+      return { ok: true, value: record };
+    });
+  }
+
   /** Ends a running experiment: every shopper sees the live theme again. */
   async end(tenant: TenantContext, id: string): Promise<MutationResult<ThemeExperimentRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {

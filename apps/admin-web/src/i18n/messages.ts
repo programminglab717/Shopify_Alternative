@@ -4968,6 +4968,10 @@ const en = {
   'experiments.runningUneven': 'Shoppers see the drafts {shares} of the time, until {date}.',
   'experiments.otherShare': 'Its shoppers (%)',
   'experiments.otherShareHint': 'Blank for the same as the first.',
+  'experiments.draftShare': 'Shoppers shown {name} (%)',
+  'experiments.changeShares': 'Change shares',
+  'experiments.sharesHint':
+    'Shoppers already shown a theme keep it; the new shares are for those still to come.',
   'experiments.draftVerdict': '{name}: {verdict}',
   'experiments.draftStopped':
     'Hatti stopped {name}: it sold clearly worse. Its shoppers see your live theme; the other drafts go on.',
@@ -12246,6 +12250,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experiments.runningUneven': 'خریدار ڈرافٹس {shares} وقت دیکھ رہے ہیں، {date} تک۔',
   'experiments.otherShare': 'اس کے خریدار (%)',
   'experiments.otherShareHint': 'خالی چھوڑیں تو پہلے جتنا۔',
+  'experiments.draftShare': '{name} دیکھنے والے خریدار (%)',
+  'experiments.changeShares': 'حصے بدلیں',
+  'experiments.sharesHint':
+    'جو خریدار کوئی تھیم دیکھ چکے وہ وہی دیکھتے رہیں گے؛ نئے حصے آنے والوں کے لیے ہیں۔',
   'experiments.draftVerdict': '{name}: {verdict}',
   'experiments.draftStopped':
     'ہٹی نے {name} روک دی: اس کی فروخت واضح طور پر کم تھی۔ اس کے خریدار آپ کی لائیو تھیم دیکھتے ہیں؛ باقی ڈرافٹس جاری ہیں۔',

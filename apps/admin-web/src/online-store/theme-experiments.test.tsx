@@ -313,4 +313,89 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
       await section.findByText(/Shoppers see the drafts 40% · 10% of the time, until/),
     ).toBeTruthy();
   });
+
+  it('changes the shares of a running experiment, asking none of a stopped draft (ADR-958)', async () => {
+    signedIn();
+    const draft = (themeId: string, share: number, stopped = false) => ({
+      themeId,
+      share,
+      arm: arm(300, 6),
+      verdict: stopped ? 'b_worse' : 'no_difference',
+      revenueVerdict: 'no_difference',
+      stopped,
+    });
+    let running: Record<string, unknown> = {
+      id: 'texp_4',
+      name: 'Three banners',
+      themeId: 'th_2',
+      share: 30,
+      startedAt: EARLIER,
+      endsAt: LATER,
+      endedAt: null,
+      endedReason: null,
+      live: arm(300, 6),
+      draft: arm(300, 6),
+      verdict: 'no_difference',
+      revenueVerdict: 'no_difference',
+      drafts: [draft('th_2', 30), draft('th_3', 10), draft('th_4', 10, true)],
+      countedAt: EARLIER,
+    };
+    const fake = fakeCore('owner', (operation, variables) => {
+      switch (operation) {
+        case 'Themes':
+          return {
+            themes: {
+              nodes: [
+                theme('th_1', 'Hatti Base', 'MAIN'),
+                theme('th_2', 'Loud', 'UNPUBLISHED'),
+                theme('th_3', 'Quiet', 'UNPUBLISHED'),
+                theme('th_4', 'Urdu first', 'UNPUBLISHED'),
+              ],
+            },
+            platformThemes: [],
+          };
+        case 'ThemeStore':
+          return { themeStore: [] };
+        case 'ThemeExperiments':
+          return { themeExperiments: [running] };
+        case 'ThemeExperimentSharesSet': {
+          const shares = variables.shares as number[];
+          running = {
+            ...running,
+            share: shares[0],
+            drafts: [
+              draft('th_2', shares[0]!),
+              draft('th_3', shares[1]!),
+              draft('th_4', shares[2]!, true),
+            ],
+          };
+          return { themeExperimentSharesSet: { themeExperiment: running, userErrors: [] } };
+        }
+        default:
+          return undefined;
+      }
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=themes');
+    const section = within(
+      (await screen.findByRole('heading', { name: 'Experiments' })).closest('section')!,
+    );
+    await section.findByLabelText('Shoppers shown Quiet (%)');
+    // The stopped draft keeps its share, and isn't asked.
+    expect(section.queryByLabelText('Shoppers shown Urdu first (%)')).toBeNull();
+    const save = section.getByRole('button', { name: 'Change shares' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(section.getByLabelText('Shoppers shown Quiet (%)'), {
+      target: { value: '20' },
+    });
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(
+        fake.sent.filter((each) => each.operation === 'ThemeExperimentSharesSet').at(-1)?.variables,
+      ).toEqual({ id: 'texp_4', shares: [30, 20, 10] }),
+    );
+    expect(
+      await section.findByText(/Shoppers see the drafts 30% · 20% · 10% of the time, until/),
+    ).toBeTruthy();
+  });
 });

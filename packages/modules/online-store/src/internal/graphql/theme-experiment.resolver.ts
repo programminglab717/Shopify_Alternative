@@ -291,6 +291,23 @@ export class ThemeExperimentResolver {
   }
 
   @Mutation(() => ThemeExperimentPayload, {
+    description:
+      "Changes each draft's share of a running experiment (ADR-958), in the order of its drafts, " +
+      'as at its start: the shoppers already shown a theme keep it, those to come are drawn by ' +
+      'the new shares. A draft Hatti stopped keeps its own.',
+  })
+  @RequireScopes('write_themes')
+  async themeExperimentSharesSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('shares', { type: () => [Int] }) shares: number[],
+  ): Promise<ThemeExperimentPayload> {
+    const uuid = tryFromPublicId(id, 'themeExperiment');
+    if (!uuid) return notFound('id');
+    return payload(await this.experiments.setShares(tenant, uuid, shares), tenant.currency);
+  }
+
+  @Mutation(() => ThemeExperimentPayload, {
     description: 'Ends a running experiment: every shopper sees the live theme again.',
   })
   @RequireScopes('write_themes')

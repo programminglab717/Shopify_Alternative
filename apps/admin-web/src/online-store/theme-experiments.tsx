@@ -3,6 +3,7 @@ import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   ThemeExperimentEndMutation,
+  ThemeExperimentSharesSetMutation,
   ThemeExperimentStartMutation,
   ThemeExperimentsQuery,
 } from '../api/operations';
@@ -118,6 +119,7 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
         ) : running ? (
           <>
             <Results experiment={running} themeName={themeName} />
+            <ChangeShares experiment={running} themeName={themeName} />
             <Button
               variant="danger"
               className="self-start"
@@ -209,6 +211,79 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
         )}
       </Card>
     </section>
+  );
+}
+
+/**
+ * Each draft's share of the running experiment, changed (ADR-958): those already shown a theme
+ * keep it. A draft Hatti stopped keeps its share, and isn't asked.
+ */
+function ChangeShares({
+  experiment,
+  themeName,
+}: {
+  experiment: ThemeExperiment;
+  themeName: (id: string) => string;
+}) {
+  const { t } = useLocale();
+  const set = useAdminMutation<ThemeExperimentPayloadData, { id: string; shares: number[] }>(
+    ThemeExperimentSharesSetMutation,
+  );
+  const drafts = experiment.drafts?.length
+    ? experiment.drafts
+    : [{ themeId: experiment.themeId, share: experiment.share, stopped: false }];
+  const kept = drafts.map((draft) => String(draft.share ?? experiment.share));
+  const [shares, setShares] = useState(kept);
+  const [problem, setProblem] = useState<string | null>(null);
+  const changed = shares.some((each, at) => each.trim() !== kept[at]);
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    try {
+      const done = await set.mutateAsync({
+        id: experiment.id,
+        shares: shares.map((each) => Number(each.trim())),
+      });
+      const error = done.themeExperimentSharesSet?.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-2">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {drafts.map((draft, at) =>
+          draft.stopped ? null : (
+            <TextField
+              key={draft.themeId}
+              label={t('experiments.draftShare', { name: themeName(draft.themeId) })}
+              inputMode="numeric"
+              value={shares[at] ?? ''}
+              onChange={(event) => {
+                const value = event.target.value;
+                setShares((now) => now.map((each, index) => (index === at ? value : each)));
+              }}
+            />
+          ),
+        )}
+      </div>
+      <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+        {t('experiments.sharesHint')}
+      </p>
+      <Button
+        type="submit"
+        variant="secondary"
+        className="self-start"
+        busy={set.isPending}
+        disabled={!changed}
+      >
+        {t('experiments.changeShares')}
+      </Button>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </form>
   );
 }
 

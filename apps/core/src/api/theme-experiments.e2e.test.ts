@@ -172,4 +172,63 @@ describe.skipIf(!server)('Admin GraphQL API: theme experiments of several drafts
       userErrors: [],
     });
   });
+
+  it("changes each draft's share of a running experiment, as at its start (ADR-958)", async () => {
+    // The one the test before left running: 40% and 10%.
+    const running = (
+      (await data(`{ themeExperiments { id endedAt } }`)) as { id: string; endedAt: null }[]
+    ).find((each) => each.endedAt === null)!;
+    const SET = `mutation ($id: ID!, $shares: [Int!]!) {
+      themeExperimentSharesSet(id: $id, shares: $shares) {
+        themeExperiment { share drafts { share } }
+        userErrors { field message }
+      }
+    }`;
+    expect((await data(SET, { id: running.id, shares: [30] })).userErrors).toEqual([
+      { field: ['shares'], message: 'Give a share for each draft' },
+    ]);
+    expect((await data(SET, { id: running.id, shares: [45, 15] })).userErrors).toEqual([
+      {
+        field: ['shares'],
+        message:
+          'The live theme is shown to no fewer shoppers than any draft: give the drafts less',
+      },
+    ]);
+    expect(await data(SET, { id: running.id, shares: [20, 30] })).toEqual({
+      themeExperiment: { share: 20, drafts: [{ share: 20 }, { share: 30 }] },
+      userErrors: [],
+    });
+    // A draft Hatti stopped keeps its share.
+    await admin.query(
+      `UPDATE online_store.theme_experiments SET stopped_arms = '{c}' WHERE ended_at IS NULL`,
+    );
+    expect((await data(SET, { id: running.id, shares: [20, 10] })).userErrors).toEqual([
+      {
+        field: ['shares', '1'],
+        message: 'Hatti stopped this draft: its shoppers see your live theme, and its share stays',
+      },
+    ]);
+    expect((await data(SET, { id: running.id, shares: [25, 30] })).userErrors).toEqual([]);
+    // Recorded, and none once it has ended.
+    const { rows } = await admin.query<{ details: { from: number[]; to: number[] } }>(
+      `SELECT details FROM platform.audit_log WHERE action = 'theme_experiment.shares_changed'
+        ORDER BY occurred_at`,
+    );
+    expect(rows.map((row) => [row.details.from, row.details.to])).toEqual([
+      [
+        [40, 10],
+        [20, 30],
+      ],
+      [
+        [20, 30],
+        [25, 30],
+      ],
+    ]);
+    await data(`mutation ($id: ID!) { themeExperimentEnd(id: $id) { userErrors { field } } }`, {
+      id: running.id,
+    });
+    expect((await data(SET, { id: running.id, shares: [10, 10] })).userErrors).toEqual([
+      { field: ['id'], message: 'No experiment of the shop has this ID' },
+    ]);
+  });
 });
