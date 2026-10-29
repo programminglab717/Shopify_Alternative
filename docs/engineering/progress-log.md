@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Experiment drafts' own shares
+### 97e56d5 · Experiment drafts' own shares
 
 * **A theme experiment's drafts may each have a share of their own**, the live theme shown to
   no fewer shoppers than any ([ADR-952](../architecture/13-decision-log.md#adr-952--a-theme-experiments-drafts-may-each-have-a-share-of-their-own-the-live-theme-shown-to-no-fewer-shoppers-than-any)).
