@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### A shop told when its single sign-on domain's record goes
+### 837f020 · A shop told when its single sign-on domain's record goes
 
 * **A shop hears on WhatsApp and by email the first time its single sign-on domain's record is
   found gone**, with the day the domain stops being proved its ([ADR-938](../architecture/13-decision-log.md#adr-938--a-shop-hears-on-whatsapp-and-by-email-the-first-time-its-single-sign-on-domains-record-is-found-gone-with-the-day-the-domain-stops-being-proved-its)). Its WhatsApp template is
