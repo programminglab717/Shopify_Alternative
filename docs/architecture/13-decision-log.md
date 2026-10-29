@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-961 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-962 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -969,6 +969,7 @@
 | 959 | The Storefront API's nodes gives pages, blogs and articles by their IDs too | Accepted |
 | 960 | An expansion store's copied price may take a margin of its own for a single product, before its collections' | Accepted |
 | 961 | The headless starter shows the products viewed before, on each product's page and the home page, kept by the shopper's browser alone | Accepted |
+| 962 | Shoppers download, or ask to erase, their own data through the Storefront API, as their account page lets them | Accepted |
 
 ---
 
@@ -31305,3 +31306,25 @@
 * **Consequences:**
   * A shopper finds again what they looked at, as on the shop's own pages.
   * Not yet: recently viewed kept with the shopper's account, across devices.
+
+## ADR-962 · Shoppers download, or ask to erase, their own data through the Storefront API, as their account page lets them
+
+* **Context:** A shopper signed in on the shop's own pages can download the file of their own
+  data, or ask for its erasure (ADR-572). A headless site signs them in through the Storefront
+  API (ADR-943), and had no way to offer either: the law gives them both wherever they shop.
+  ADR-943 left data requests through the API for later.
+* **Decision:**
+  * **`customerDataExport(customerAccessToken)`** makes the file of the shopper's own data, or
+    gives the one kept for the day again, with when it was made, when it is let go, and a link
+    that downloads it for a few minutes; ask again for another. Null where the shop keeps
+    nothing of them.
+  * **`customerDataErase(customerAccessToken, confirm)`** asks for their erasure, as the shop's
+    staff would for them, once `confirm` says they understand; refused without it. It answers
+    how it waits: `WAITING` until the soonest it happens, `HELD` while an order of theirs is
+    under way or the shop owes them store credit.
+  * **As the shop's own pages count them:** ten requests a minute at most from a buyer's
+    address, the buyer's as a private token says it (ADR-943); more are refused with
+    `TOO_MANY_REQUESTS`. A token that is no one's is refused as for the other account calls.
+* **Consequences:**
+  * A headless shop gives its shoppers their data rights as Hatti's own pages do.
+  * Not yet: the starter's account page offering them.
