@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-939 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-940 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -947,6 +947,7 @@
 | 937 | A buy button's collection shows twelve products at a time, Show more giving the next page, past its first twelve | Accepted |
 | 938 | A shop hears on WhatsApp and by email the first time its single sign-on domain's record is found gone, with the day the domain stops being proved its | Accepted |
 | 939 | A theme experiment's draft that sells clearly worse is stopped alone, its shoppers shown the live theme, the other drafts going on | Accepted |
+| 940 | The AI support agent hears a customer's voice note and answers its words, and hands a picture, a video or a file without words to staff | Accepted |
 
 ---
 
@@ -30803,3 +30804,24 @@
 * **Consequences:**
   * A poor draft costs a shop little, and the others still get their answer.
   * Not yet: shares that differ by draft.
+
+## ADR-940 · The AI support agent hears a customer's voice note and answers its words, and hands a picture, a video or a file without words to staff
+
+* **Context:** ADR-849's AI support agent reads a conversation's words. Pakistani shoppers send
+  voice notes on WhatsApp as often as they type, and pictures of what they want; a message without
+  words left the agent answering what came before it. ADR-871 hears voice notes for shops taking
+  orders by them; ADR-923 left the rest to staff for later.
+* **Decision:**
+  * **A voice note without words** (where the shop doesn't take orders by voice notes, which
+    ADR-871 answers) is fetched from WhatsApp and heard by Hatti's own speech-to-text server in
+    Urdu, as voice orders are; its words are kept on the message for staff to read, and the AI
+    answers them as the customer's, spending one credit, as for any reply.
+  * **Earlier voice notes' words join the conversation the AI reads**, so it follows what was
+    said aloud.
+  * **Not heard** (too long, the server failing, or no speech-to-text set up), the conversation
+    is handed to staff.
+  * **A picture, a video or a file without words** is handed to staff at once: the AI is asked
+    nothing, and nothing is spent.
+* **Consequences:**
+  * Customers who speak are answered as those who type.
+  * Not yet: pictures read by the AI, as visual search reads a shopper's photo (ADR-870).
