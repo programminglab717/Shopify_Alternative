@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Pages, blogs and articles by nodes
+### 3f3b6fb · Pages, blogs and articles by nodes
 
 * **The Storefront API's `nodes` gives pages, blogs and articles by their IDs too** ([ADR-959](../architecture/13-decision-log.md#adr-959--the-storefront-apis-nodes-gives-pages-blogs-and-articles-by-their-ids-too)).
 * 5015 tests (1 new).
