@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### SSO domains proved through DNS
+### e48aa8e · SSO domains proved through DNS
 
 * **A shop's SSO email domains are proved** by a TXT record of its token; a proved domain is
   one shop's alone and takes its sign-ins ([ADR-919](../architecture/13-decision-log.md#adr-919--a-shops-sso-email-domains-are-proved-its-through-a-txt-record-of-its-token-a-proved-domain-one-shops-alone-taking-every-sign-in-by-email-of-it)).
