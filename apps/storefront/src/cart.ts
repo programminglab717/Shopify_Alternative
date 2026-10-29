@@ -9,7 +9,9 @@ import type {
   CartLineJson,
   LineRef,
 } from '@hatti/storefront-api';
+import { presentFromRupees } from '@hatti/money';
 import type { ProductDoc } from '@hatti/storefront-data';
+import type { ShownCurrency } from './liquid.js';
 
 // The storefront's side of carts (ADR-042): Shopify's cart forms and Ajax cart, turned into the
 // core's actions, and the core's carts turned back into what themes and their scripts expect.
@@ -352,30 +354,50 @@ export async function cartProducts(
 }
 
 /**
+ * An amount in paisa as a cart's scripts are given it: in the shopper's `currency` where they
+ * picked one, its minor units as the `money` filter shows them (ADR-924); paisa for rupees.
+ */
+export function shownAmountOf(currency: ShownCurrency | null): (paisa: number) => number {
+  return (paisa) =>
+    currency
+      ? Number(
+          presentFromRupees(BigInt(paisa), currency.code, currency.rate, currency.rounding).amount,
+        )
+      : paisa;
+}
+
+/**
  * A cart as Shopify's `/cart.js` gives it to scripts. Its discount code takes its part off the
  * whole cart, not off lines: `total_price` is what the items come to after it. At `/ur/cart.js`,
- * `prefix` is `/ur` and `products` are as Urdu pages show them (ADR-625).
+ * `prefix` is `/ur` and `products` are as Urdu pages show them (ADR-625). In the shopper's
+ * `currency`, where they picked one, its amounts are in it, as Shopify's are in the presentment
+ * currency, with what checkout charges in rupees besides (ADR-924).
  */
 export function ajaxCart(
   cart: CartJson | null,
   products: ReadonlyMap<string, ProductDoc>,
   prefix = '',
+  currency: ShownCurrency | null = null,
 ): Record<string, unknown> {
   const items = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
   const discount = cart?.discount ?? null;
+  const shown = shownAmountOf(currency);
   return {
     note: cart?.note ?? '',
     attributes: cart?.attributes ?? {},
-    original_total_price: subtotal,
-    total_price: subtotal - (cart?.totalDiscount ?? 0),
-    total_discount: cart?.totalDiscount ?? 0,
+    original_total_price: shown(subtotal),
+    total_price: shown(subtotal - (cart?.totalDiscount ?? 0)),
+    total_discount: shown(cart?.totalDiscount ?? 0),
     total_weight: cart?.totalWeightGrams ?? 0,
     item_count: cart?.itemCount ?? 0,
-    items: items.map((item) => ajaxLineItem(item, products.get(item.productId), prefix)),
+    items: items.map((item) => ajaxLineItem(item, products.get(item.productId), prefix, currency)),
     requires_shipping: items.length > 0,
-    currency: 'PKR',
-    items_subtotal_price: subtotal,
+    currency: currency?.code ?? 'PKR',
+    // What checkout charges, as it charges rupees whatever the shopper sees (ADR-865).
+    hatti_checkout_currency: 'PKR',
+    hatti_checkout_total_price: subtotal - (cart?.totalDiscount ?? 0),
+    items_subtotal_price: shown(subtotal),
     cart_level_discount_applications: [
       // The shop's automatic discounts off the items (ADR-515), then the code's.
       ...(cart?.automaticDiscounts ?? [])
@@ -384,12 +406,14 @@ export function ajaxCart(
           type: 'automatic',
           title: automatic.title,
           description: null,
-          value: decimal(automatic.kind === 'percentage' ? automatic.value : automatic.value / 100),
+          value: decimal(
+            automatic.kind === 'percentage' ? automatic.value : shown(automatic.value) / 100,
+          ),
           value_type: automatic.kind === 'percentage' ? 'percentage' : 'fixed_amount',
           allocation_method: 'across',
           target_selection: 'all',
           target_type: 'line_item',
-          total_allocated_amount: automatic.amount,
+          total_allocated_amount: shown(automatic.amount),
         })),
       ...(itemsDiscounted(discount)
         ? [
@@ -399,13 +423,13 @@ export function ajaxCart(
               description: null,
               // As Shopify's scripts get it: "10.0" percent, or rupees.
               value: decimal(
-                discount.kind === 'percentage' ? discount.value : discount.value / 100,
+                discount.kind === 'percentage' ? discount.value : shown(discount.value) / 100,
               ),
               value_type: discount.kind === 'percentage' ? 'percentage' : 'fixed_amount',
               allocation_method: 'across',
               target_selection: 'all',
               target_type: 'line_item',
-              total_allocated_amount: discount.amount,
+              total_allocated_amount: shown(discount.amount),
             },
           ]
         : []),
@@ -440,7 +464,9 @@ export function ajaxLineItem(
   item: CartLineJson,
   product: ProductDoc | undefined,
   prefix = '',
+  currency: ShownCurrency | null = null,
 ): Record<string, unknown> {
+  const shown = shownAmountOf(currency);
   const variant = product?.variants.find((each) => each.id === item.variantId);
   const onlyDefault = !product || isOnlyDefault(product);
   // In a language of the page's, its words as its pages show them, where its product is
@@ -478,18 +504,18 @@ export function ajaxLineItem(
               { position: 1, value_type: 'percentage', value: item.sellingPlan.discountPercent },
             ],
           },
-          price: item.price,
-          compare_at_price: item.sellingPlan.compareAtPrice,
-          per_delivery_price: item.price,
+          price: shown(item.price),
+          compare_at_price: shown(item.sellingPlan.compareAtPrice),
+          per_delivery_price: shown(item.price),
         }
       : null,
-    price: item.price,
-    original_price: item.price,
-    discounted_price: item.price,
-    final_price: item.price,
-    line_price: item.linePrice,
-    original_line_price: item.linePrice,
-    final_line_price: item.linePrice,
+    price: shown(item.price),
+    original_price: shown(item.price),
+    discounted_price: shown(item.price),
+    final_price: shown(item.price),
+    line_price: shown(item.linePrice),
+    original_line_price: shown(item.linePrice),
+    final_line_price: shown(item.linePrice),
     total_discount: 0,
     discounts: [],
     line_level_discount_allocations: [],

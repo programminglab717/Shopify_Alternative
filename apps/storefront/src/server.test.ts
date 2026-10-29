@@ -1007,6 +1007,51 @@ describe('Carts', () => {
   const form = (fields: Record<string, string>) => new URLSearchParams(fields).toString();
   const FORM = { host: 'localhost', 'content-type': 'application/x-www-form-urlencoded' };
 
+  it("gives scripts the cart in the shopper's currency, with what checkout charges in rupees (ADR-924)", async () => {
+    const shop = sampleStore();
+    const app = server({
+      sample: new MemoryStore({
+        ...shop,
+        shop: {
+          ...shop.shop,
+          currencies: [{ currency: 'AED', rate: '76.4521', rounding: 'exact' }],
+        },
+      }),
+    });
+    core.kept.set('secret-aed', cartOf(2));
+    const read = async (cookie: string) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/cart.js',
+          headers: { host: 'localhost', cookie: `cart=secret-aed; ${cookie}` },
+        })
+      ).json() as Record<string, unknown> & { items: Record<string, unknown>[] };
+    // Paisa over the rate, in fils: Rs 1 = 100 paisa is 100 / 76.4521 fils.
+    const aed = (paisa: number) => Math.round(paisa / 76.4521);
+    const inAed = await read('currency=AED');
+    expect(inAed).toMatchObject({
+      currency: 'AED',
+      total_price: aed(variant.price * 2),
+      items_subtotal_price: aed(variant.price * 2),
+      hatti_checkout_currency: 'PKR',
+      hatti_checkout_total_price: variant.price * 2,
+    });
+    expect(inAed.items[0]).toMatchObject({
+      price: aed(variant.price),
+      final_line_price: aed(variant.price * 2),
+    });
+    // In rupees without a currency, or with one the shop doesn't show.
+    for (const cookie of ['', 'currency=GBP']) {
+      expect(await read(cookie)).toMatchObject({
+        currency: 'PKR',
+        total_price: variant.price * 2,
+        hatti_checkout_total_price: variant.price * 2,
+      });
+    }
+    await app.close();
+  });
+
   it("adds to the cart from a product page's form, keeping the cart's secret in a cookie", async () => {
     const app = server();
     core.answer = () => ({ ok: true, cart: cartOf(2), token: 'secret-1', added: [line(2).key] });

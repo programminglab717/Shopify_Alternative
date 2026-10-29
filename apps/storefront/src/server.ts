@@ -118,7 +118,12 @@ import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from '.
 import { browserIdsOf } from './pixels.js';
 import { layoutStyles, translation } from './liquid.js';
 import type { SearchFound } from './objects.js';
-import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
+import {
+  shownCurrencyOf,
+  type NamedDocument,
+  type PageRenderer,
+  type PageRequest,
+} from './render.js';
 import {
   SITEMAP_KINDS,
   inSitemapOrder,
@@ -2071,7 +2076,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
             : null;
         if (core) keep(shown ? token : null, shown);
         if (asksForSections(url)) return await sendSections(reply, found, url, shown);
-        if (json) return await reply.send(await ajax(shown, found.store, urdu));
+        if (json) return await reply.send(await ajax(shown, found.store, urdu, found.currency));
         // What came of buying an order again (ADR-574), as its address says.
         const reorder = reorderNoticeOf(url.searchParams.get('reorder'));
         const cartError = reorder && reorderNoticeMessage(reorder, words);
@@ -2124,13 +2129,18 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
               sections: await sectionsOf(found, sectionsPage(params, request), asked, result.cart),
             };
       if (action !== 'add') {
-        return await reply.send(await withSections(await ajax(result.cart, found.store, urdu)));
+        return await reply.send(
+          await withSections(await ajax(result.cart, found.store, urdu, found.currency)),
+        );
       }
       const store = urdu ? new TranslatedStore(found.store, 'ur') : found.store;
       const products = await cartProducts(result.cart, (ids) => store.products(ids));
+      const currency = shownCurrencyOf((await found.store.shop()).currencies, found.currency);
       const added = result.added.flatMap((key) => {
         const line = result.cart.items.find((item) => item.key === key);
-        return line ? [ajaxLineItem(line, products.get(line.productId), urdu ? '/ur' : '')] : [];
+        return line
+          ? [ajaxLineItem(line, products.get(line.productId), urdu ? '/ur' : '', currency)]
+          : [];
       });
       return await reply.send(await withSections(single ? (added[0] ?? {}) : { items: added }));
     } catch (error) {
@@ -4355,15 +4365,23 @@ function contentTypes(types: readonly string[]): ContentType[] {
 
 /**
  * The cart as `/cart.js` gives it, with its lines' products; at `/ur/cart.js`, in Urdu as its
- * pages are (ADR-625).
+ * pages are (ADR-625); in the currency the shopper picked, `asked`, where the shop shows its
+ * prices in it (ADR-924).
  */
 async function ajax(
   cart: CartJson | null,
   store: StoreData,
   urdu = false,
+  asked: string | null = null,
 ): Promise<Record<string, unknown>> {
   const shown = urdu ? new TranslatedStore(store, 'ur') : store;
-  return ajaxCart(cart, await cartProducts(cart, (ids) => shown.products(ids)), urdu ? '/ur' : '');
+  const currency = asked ? shownCurrencyOf((await store.shop()).currencies, asked) : null;
+  return ajaxCart(
+    cart,
+    await cartProducts(cart, (ids) => shown.products(ids)),
+    urdu ? '/ur' : '',
+    currency,
+  );
 }
 
 /** Shopify's Ajax cart error. */

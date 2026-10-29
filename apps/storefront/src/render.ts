@@ -1443,7 +1443,7 @@ export function poweredByLink(platformUrl: string, locale: string): string {
 }
 
 /** The shopper's currency, as `asked` names it, where the shop shows its prices in it (ADR-865). */
-function shownCurrencyOf(
+export function shownCurrencyOf(
   currencies: readonly CurrencyDoc[] | undefined,
   asked: string | null | undefined,
 ): ShownCurrency | null {
