@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-954 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-955 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -962,6 +962,7 @@
 | 952 | A theme experiment's drafts may each have a share of their own, the live theme shown to no fewer shoppers than any | Accepted |
 | 953 | The headless starter keeps the shopper's wishlist: Save for later on each product's page, and a page of what was kept | Accepted |
 | 954 | Overdue payment terms are reminded again each week, four times past the date at most | Accepted |
+| 955 | Every store's sales by day on one chart: each store's part of each day's bar, in this shop's currency at the day's rate | Accepted |
 
 ---
 
@@ -31156,3 +31157,28 @@
 * **Consequences:**
   * A late reseller is reminded about weekly for a month, without the shop's hand.
   * Not yet: the shop choosing how often, or how many times.
+
+## ADR-955 · Every store's sales by day on one chart: each store's part of each day's bar, in this shop's currency at the day's rate
+
+* **Context:** ADR-932's page says what this shop and each of its expansion stores sold in a
+  period, as one figure each. An owner who opened a Dubai store last month can't see whether its
+  sales grow day by day, or how they set beside the Lahore shop's. ADR-932 left a chart of the
+  stores' sales by day for later.
+* **Decision:**
+  * **`expansionStoreSales` takes an `interval`**: DAY by default, or WEEK or MONTH, as the sales
+    report's. Each store's row gets `periods`, each with its start, orders and total sales, in
+    the store's currency and in this shop's at the day's rate. The figures of ADR-932 are the sum
+    of its periods.
+  * **This shop's days for every store:** each store's periods start at midnight in this shop's
+    time zone, whatever the store's own, so that the bars line up. The orders package's sales
+    report gets `periodsOf(shop, period, timezone)` for it.
+  * **The day's rate is today's, as in ADR-932:** a converted day is that day's sales at today's
+    rate, each day converted alone, so the days may differ from the total by a paisa.
+  * **Admin:** Settings › Expansion stores draws, under "Sales across your stores", one bar per
+    day, each store's part of it in a colour of its own, with a key; over 90 days, a bar per week.
+    Its period is now whole days in the shop's time, today's included. A store without a day's
+    rate is left out of the chart, as out of the total. Each bar tells a screen reader its day
+    and what all the stores sold.
+* **Consequences:**
+  * An owner sees a store abroad's sales grow, or not, beside their own, on one chart.
+  * Not yet: the same chart in the sales report; each day at that day's rate.
