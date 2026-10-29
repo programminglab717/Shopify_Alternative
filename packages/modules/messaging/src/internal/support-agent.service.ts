@@ -68,7 +68,12 @@ export interface SupportAgentTask {
    * be heard before it is answered.
    */
   listen?: { mediaId: string; viaPhoneNumberId: string | null };
-  /** The message to answer is a picture, a video or a file without words: staff's to see. */
+  /**
+   * The message to answer is a photo without words (ADR-941): where WhatsApp keeps it, to be read
+   * into searches of the shop's products before it is answered.
+   */
+  look?: { mediaId: string; viaPhoneNumberId: string | null };
+  /** The message to answer is a video or a file without words: staff's to see. */
   unreadable?: string;
   /** The shop's answers to common questions (ADR-911). */
   faqs: SupportFaq[];
@@ -284,12 +289,15 @@ export class SupportAgentService {
           from: row.direction === 'inbound' ? ('customer' as const) : ('shop' as const),
           text: (row.body ?? row.transcript)!,
         }));
-      // Without words, a voice note is heard first, and anything else is staff's (ADR-940).
+      // Without words, a voice note is heard first (ADR-940), a photo read (ADR-941), and anything
+      // else is staff's.
       const wordless = !latest.body && !latest.transcript && latest.media_kind;
-      const listen =
-        wordless && latest.media_kind === 'audio' && latest.media_id
-          ? { mediaId: latest.media_id, viaPhoneNumberId: conversation.via_phone_number_id }
-          : null;
+      const where = latest.media_id
+        ? { mediaId: latest.media_id, viaPhoneNumberId: conversation.via_phone_number_id }
+        : null;
+      const listen = wordless && latest.media_kind === 'audio' ? where : null;
+      // A photo is read into searches of the shop's products (ADR-941).
+      const look = wordless && latest.media_kind === 'image' ? where : null;
       return {
         conversationId,
         messageId,
@@ -297,7 +305,8 @@ export class SupportAgentService {
         customerPhone: conversation.customer_phone,
         history,
         ...(listen && { listen }),
-        ...(wordless && !listen && { unreadable: latest.media_kind! }),
+        ...(look && { look }),
+        ...(wordless && !listen && !look && { unreadable: latest.media_kind! }),
         faqs: await faqsIn(tx, shopId),
         voice: await voiceIn(tx, shopId),
       };

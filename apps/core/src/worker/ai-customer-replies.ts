@@ -1,4 +1,12 @@
-import { SPEECH_LIMITS, draftSupportReply, type AiGateway, type SpeechToText } from '@hatti/ai';
+import {
+  AI_IMAGE_LIMITS,
+  SPEECH_LIMITS,
+  draftSupportReply,
+  readPhotoForSearch,
+  type AiGateway,
+  type AiImage,
+  type SpeechToText,
+} from '@hatti/ai';
 import { shopProfile, type AiCredits, type TenantContext } from '@hatti/api';
 import { askedProductsIn } from '@hatti/catalog/public';
 import type { Database, Tx } from '@hatti/db';
@@ -40,6 +48,9 @@ const textOf = (html: string) =>
     .replace(/ ([,.;:!?])/g, '$1')
     .trim();
 
+/** The kinds of picture the AI reads, as WhatsApp names them. */
+const PHOTO_TYPES: readonly string[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
 /** The order numbers a shopper wrote in the web chat, as "#1023" or "order 1023". */
 export function orderNumbersIn(history: SupportAgentTask['history']): number[] {
   const numbers = history
@@ -57,8 +68,10 @@ export function orderNumbersIn(history: SupportAgentTask['history']): number[] {
  * given; in the web chat the number was typed, so only orders they name by number, placed from it.
  * The reply is sent as the shop's, marked as the AI's; handed to staff, the conversation waits for
  * them. Each reply spends a credit; what came of each message is kept. A voice note is heard by
- * Hatti's speech-to-text and answered as its words, kept for staff to read; a picture, a video or
- * a file without words is handed to staff, the AI asked nothing (ADR-940).
+ * Hatti's speech-to-text and answered as its words, kept for staff to read (ADR-940); a photo is
+ * read by the AI into searches of the shop's products, as visual search reads a shopper's (ADR-870),
+ * and answered with what they find (ADR-941); a video or a file without words is handed to staff,
+ * the AI asked nothing.
  */
 export class AiCustomerReplies {
   /** The events {@link handle} reads. */
@@ -93,9 +106,18 @@ export class AiCustomerReplies {
       if (!heard) return this.#handOff(shopId, task, now);
       task.history.push({ from: 'customer', text: heard });
     }
+    let seen: string[] | null = null;
+    if (task.look) {
+      seen = await this.#seen(shopId, task.look, now);
+      if (!seen) return this.#handOff(shopId, task, now);
+      task.history.push({ from: 'customer', text: `(A photo of what looks like: ${seen[0]})` });
+    }
     const { name, facts } = await this.database.tenant(shopId, async (tx) => {
       const profile = await shopProfile(tx, shopId);
-      return { name: profile.name, facts: await factsIn(tx, shopId, task, profile.currency) };
+      return {
+        name: profile.name,
+        facts: await factsIn(tx, shopId, task, profile.currency, seen),
+      };
     });
     const result = await draftSupportReply(this.ai, {
       shopName: name,
@@ -158,6 +180,32 @@ export class AiCustomerReplies {
     await this.database.tenant(shopId, (tx) => keepTranscriptIn(tx, shopId, messageId, heard.text));
     return heard.text;
   }
+
+  /**
+   * The searches a photo is read into (ADR-941), the most particular first, as visual search reads
+   * a shopper's (ADR-870), spending a credit of its own; null where it could not be fetched or
+   * read, or shows nothing a shop sells.
+   */
+  async #seen(
+    shopId: string,
+    look: NonNullable<SupportAgentTask['look']>,
+    now: Date,
+  ): Promise<string[] | null> {
+    const photo = await this.conversations.mediaOf(
+      shopId,
+      look.viaPhoneNumberId,
+      look.mediaId,
+      AI_IMAGE_LIMITS.bytes,
+    );
+    if (!photo.ok || !PHOTO_TYPES.includes(photo.mediaType)) return null;
+    const read = await readPhotoForSearch(this.ai, {
+      mediaType: photo.mediaType as AiImage['mediaType'],
+      data: photo.data,
+    });
+    if (!read.ok) return null;
+    await this.credits?.spend(shopId, 'visual_search', now);
+    return read.value.product ? read.value.searches : null;
+  }
 }
 
 /** What the customer's last two messages may be asking of the shop's products. */
@@ -172,12 +220,16 @@ export async function productFactsIn(
   shopId: string,
   history: SupportAgentTask['history'],
   currency: string,
+  /** What a photo the customer sent was read into (ADR-941): what is asked of, where given. */
+  seen: readonly string[] | null = null,
 ): Promise<string[]> {
-  const asked = history
-    .filter((turn) => turn.from === 'customer')
-    .slice(-ASKED_TURNS)
-    .map((turn) => turn.text)
-    .join(' ');
+  const asked =
+    seen?.join(' ') ??
+    history
+      .filter((turn) => turn.from === 'customer')
+      .slice(-ASKED_TURNS)
+      .map((turn) => turn.text)
+      .join(' ');
   const products = await askedProductsIn(tx, shopId, asked);
   const sellable = await sellableIn(
     tx,
@@ -210,6 +262,7 @@ async function factsIn(
   shopId: string,
   task: SupportAgentTask,
   currency: string,
+  seen: readonly string[] | null,
 ): Promise<string> {
   const policies = (await shopPoliciesOf(tx, shopId))
     .filter((policy) => (POLICY_FACTS as readonly string[]).includes(policy.type))
@@ -224,7 +277,7 @@ async function factsIn(
     task.channel === 'web' ? orderNumbersIn(task.history) : undefined,
   );
   const faqs = task.faqs.map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`);
-  const products = await productFactsIn(tx, shopId, task.history, currency);
+  const products = await productFactsIn(tx, shopId, task.history, currency, seen);
   // The customer's own orders and the products asked of first: what is cut, should the facts
   // run long, is the end of what the shop wrote.
   return [

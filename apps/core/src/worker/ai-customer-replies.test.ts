@@ -89,6 +89,9 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
   /** What the AI answers next, and each prompt it was given. */
   let answer: unknown = { reply: 'Ji, aap ka order raaste mein hai.', hand_off: false };
   const prompts: string[] = [];
+  /** What a photo is read into, and how many were read (ADR-941). */
+  let photoAnswer: unknown = { product: false };
+  let photosRead = 0;
   const credits = new Credits();
   let replies: AiCustomerReplies;
 
@@ -96,11 +99,19 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
     apiKey: 'sk-test',
     model: 'model',
     fetch: (async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      prompts.push(body.messages[0]!.content);
+      const body = JSON.parse(init.body as string) as { messages: { content: unknown }[] };
+      const content = body.messages[0]!.content;
+      // A photo comes as blocks, the AI asked to read it into searches.
+      const photo = Array.isArray(content);
+      if (photo) photosRead++;
+      else prompts.push(content as string);
       return new Response(
         JSON.stringify({
-          content: [{ type: 'tool_use', name: 'give_reply', input: answer }],
+          content: [
+            photo
+              ? { type: 'tool_use', name: 'give_searches', input: photoAnswer }
+              : { type: 'tool_use', name: 'give_reply', input: answer },
+          ],
           stop_reason: 'tool_use',
           usage: { input_tokens: 800, output_tokens: 50 },
         }),
@@ -357,7 +368,7 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
     credits.left = 10;
   });
 
-  it('hears a voice note and answers its words, and hands a picture to staff (ADR-940)', async () => {
+  it('hears a voice note, reads a photo, and hands a video to staff (ADR-940, ADR-941)', async () => {
     const heard: string[] = [];
     // Sent on WhatsApp as the shop's, which this test's shop has no number for: what was sent.
     const said: { conversationId: string; body: string }[] = [];
@@ -371,7 +382,9 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
         },
         mediaOf: async (_shop: string, _via: string | null, mediaId: string) => {
           heard.push(mediaId);
-          return { ok: true as const, data: Buffer.from('OggS'), mediaType: 'audio/ogg' };
+          return mediaId === 'media-image'
+            ? { ok: true as const, data: Buffer.from('ffd8ffe0', 'hex'), mediaType: 'image/jpeg' }
+            : { ok: true as const, data: Buffer.from('OggS'), mediaType: 'audio/ogg' };
         },
       },
       gateway,
@@ -423,15 +436,37 @@ describe.skipIf(!server)('Customers answered by the AI (MSG-07, ADR-849)', () =>
     expect(rows).toEqual([{ transcript: 'mera kurta kab tak aaye ga?' }]);
     expect(credits.spent.length).toBe(spent + 1);
 
-    // A picture: staff's, the AI asked nothing and nothing spent.
+    // A video: staff's, the AI asked nothing and nothing spent.
     const asked = prompts.length;
-    const picture = await sent('image', '+923005556691');
-    expect(await listening.handle(picture.event)).toBe('handed_off');
+    const video = await sent('video', '+923005556691');
+    expect(await listening.handle(video.event)).toBe('handed_off');
     expect(prompts.length).toBe(asked);
     expect(said).toHaveLength(1);
     expect(credits.spent.length).toBe(spent + 1);
     // Without speech-to-text, a voice note is staff's too.
     const unheard = await sent('audio', '+923005556692');
     expect(await replies.handle(unheard.event)).toBe('handed_off');
+
+    // A photo is read into searches of the shop's products, and answered with what they find
+    // (ADR-941): a credit for reading it, another for the reply.
+    photoAnswer = { product: true, searches: ['white cotton kurta', 'kurta'] };
+    answer = { reply: 'Ji, yeh kurta Rs 2,000 ka hai.', hand_off: false };
+    const photo = await sent('image', '+923005556693');
+    expect(await listening.handle(photo.event)).toBe('replied');
+    expect(heard).toEqual(['media-audio', 'media-image']);
+    expect(photosRead).toBe(1);
+    expect(prompts.at(-1)).toContain('(A photo of what looks like: white cotton kurta)');
+    expect(prompts.at(-1)).toContain('Kurta: Rs 2,000, in stock');
+    expect(said.at(-1)).toEqual({
+      conversationId: photo.conversationId,
+      body: 'Ji, yeh kurta Rs 2,000 ka hai.',
+    });
+    expect(credits.spent.slice(spent + 1)).toEqual(['visual_search', 'support_reply']);
+    // A photo of nothing a shop sells is staff's, the AI asked no reply.
+    photoAnswer = { product: false };
+    const selfie = await sent('image', '+923005556694');
+    expect(await listening.handle(selfie.event)).toBe('handed_off');
+    expect(photosRead).toBe(2);
+    expect(said).toHaveLength(2);
   });
 });
