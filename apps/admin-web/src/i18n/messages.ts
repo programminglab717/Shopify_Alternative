@@ -2396,6 +2396,17 @@ const en = {
   'linkPage.removed': 'A link since taken off',
   'linkPage.already':
     '{title} is on the page already: choose one of its variants there, then add it again for another.',
+  'termsCredit.title': 'Credit on payment terms',
+  'termsCredit.hint':
+    'What this customer owes on orders on payment terms, and the most they may owe: an order on terms past it is refused.',
+  'termsCredit.owed': 'Owed on terms',
+  'termsCredit.overdue': 'Overdue',
+  'termsCredit.limit': 'Credit limit (Rs)',
+  'termsCredit.limitHint': 'Leave empty for no limit.',
+  'termsCredit.limitIs': 'Credit limit: {limit}',
+  'termsCredit.none': 'No credit limit.',
+  'termsCredit.save': 'Save credit limit',
+  'termsCredit.saved': 'Saved.',
   'credit.title': 'Store credit',
   'credit.hint':
     'What the shop owes them to spend on later orders: refunds given as credit, and credit given by hand.',
@@ -9542,6 +9553,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'linkPage.removed': 'ایک لنک جو ہٹا دیا گیا',
   'linkPage.already':
     '{title} پہلے سے پیج پر ہے: وہاں اس کی کوئی قسم چنیں، پھر دوسری قسم کے لیے اسے دوبارہ شامل کریں۔',
+  'termsCredit.title': 'ادائیگی کی شرائط پر کریڈٹ',
+  'termsCredit.hint':
+    'ادائیگی کی شرائط والے آرڈرز پر یہ گاہک کتنا مقروض ہے، اور زیادہ سے زیادہ کتنا ہو سکتا ہے: اس سے آگے شرائط پر آرڈر رد ہو جاتا ہے۔',
+  'termsCredit.owed': 'شرائط پر واجب',
+  'termsCredit.overdue': 'تاریخ گزر چکی',
+  'termsCredit.limit': 'کریڈٹ کی حد (روپے)',
+  'termsCredit.limitHint': 'کوئی حد نہ ہو تو خالی چھوڑیں۔',
+  'termsCredit.limitIs': 'کریڈٹ کی حد: {limit}',
+  'termsCredit.none': 'کوئی کریڈٹ حد نہیں۔',
+  'termsCredit.save': 'کریڈٹ کی حد محفوظ کریں',
+  'termsCredit.saved': 'محفوظ ہو گیا۔',
   'credit.title': 'اسٹور کریڈٹ',
   'credit.hint':
     'جو دکان نے انہیں بعد کے آرڈرز پر خرچ کرنے کو دینا ہے: کریڈٹ کی صورت میں ریفنڈ، اور ہاتھ سے دیا گیا کریڈٹ۔',

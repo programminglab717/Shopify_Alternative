@@ -1,4 +1,4 @@
-import { Money } from '@hatti/api';
+import { Money, UserError } from '@hatti/api';
 import { Field, GraphQLISODateTime, ID, Int, ObjectType } from '@nestjs/graphql';
 
 @ObjectType({ description: 'A wholesale customer who owes on payment terms (ADR-888).' })
@@ -36,4 +36,29 @@ export class PaymentTermsOwed {
 
   @Field(() => [PaymentTermsCustomer])
   customers!: PaymentTermsCustomer[];
+}
+
+@ObjectType({
+  description:
+    "A customer's credit on payment terms (CUS-06, ADR-907): what they may owe at most, and what " +
+    'they owe now. An order on terms that would take what they owe past the limit is refused.',
+})
+export class CustomerCredit {
+  @Field(() => Money, { nullable: true, description: 'Null for no limit.' })
+  creditLimit!: Money | null;
+
+  @Field(() => Money)
+  owed!: Money;
+
+  @Field(() => Money)
+  overdue!: Money;
+}
+
+@ObjectType()
+export class CustomerCreditPayload {
+  @Field(() => CustomerCredit, { nullable: true })
+  credit!: CustomerCredit | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }

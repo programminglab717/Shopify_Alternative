@@ -74,6 +74,15 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       UPDATE orders.subscriptions SET customer_id = ${intoId}, updated_at = now()
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
+    // The kept customer's credit limit stays; where they had none, the other's is theirs
+    // (ADR-907).
+    await tx.execute(sql`
+      INSERT INTO orders.credit_limits (shop_id, customer_id, credit_limit)
+      SELECT shop_id, ${intoId}, credit_limit FROM orders.credit_limits
+       WHERE shop_id = ${shopId} AND customer_id = ${fromId}
+      ON CONFLICT (shop_id, customer_id) DO NOTHING`);
+    await tx.execute(sql`
+      DELETE FROM orders.credit_limits WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
   },
 
   async erase(tx, shopId, customer, actor) {
@@ -84,6 +93,9 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
     // Their subscriptions hold their address and number (ADR-862): no more orders are placed.
     await tx.execute(sql`
       DELETE FROM orders.subscriptions WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
+    // And their credit limit (ADR-907).
+    await tx.execute(sql`
+      DELETE FROM orders.credit_limits WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
     // Drafts name no customer, and a completed one holds its order's address: they go first.
     await tx.execute(sql`
       DELETE FROM orders.draft_orders d

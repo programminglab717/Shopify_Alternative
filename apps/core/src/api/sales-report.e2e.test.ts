@@ -720,5 +720,43 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     expect(owed?.orders.nodes).toEqual([{ id: placed.order.id }]);
     const denied = await gql(tokens.products, '{ paymentTermsOwed { owed { amount } } }');
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+
+    // A credit limit (ADR-907): Rs 20,000 leaves no room for another bale on terms.
+    const customerId = (
+      await gql(tokens.owner, '{ paymentTermsOwed { customers { customerId } } }')
+    ).data?.paymentTermsOwed.customers[0].customerId;
+    const SET = `mutation ($customerId: ID!, $creditLimit: String) {
+      customerCreditLimitSet(customerId: $customerId, creditLimit: $creditLimit) {
+        credit { creditLimit { amount } owed { amount } overdue { amount } }
+        userErrors { field code message }
+      }
+    }`;
+    const set = await gql(tokens.owner, SET, { customerId, creditLimit: '20,000' });
+    expect(set.data?.customerCreditLimitSet).toEqual({
+      credit: {
+        creditLimit: { amount: '20000.00' },
+        owed: { amount: '12000.00' },
+        overdue: { amount: '0.00' },
+      },
+      userErrors: [],
+    });
+    expect((await place(30)).data?.orderCreate.userErrors).toEqual([
+      {
+        field: ['input', 'paymentTermsDays'],
+        code: 'INVALID',
+        message:
+          'On terms this would take what the customer owes to Rs 24,000, past their credit ' +
+          'limit of Rs 20,000',
+      },
+    ]);
+    const read = await gql(
+      tokens.owner,
+      'query ($id: ID!) { customerCredit(customerId: $id) { creditLimit { amount } } }',
+      { id: customerId },
+    );
+    expect(read.data?.customerCredit).toEqual({ creditLimit: { amount: '20000.00' } });
+    const cleared = await gql(tokens.owner, SET, { customerId, creditLimit: null });
+    expect(cleared.data?.customerCreditLimitSet.credit.creditLimit).toBeNull();
+    expect((await place(30)).data?.orderCreate.userErrors).toEqual([]);
   });
 });

@@ -46,7 +46,7 @@ describe.skipIf(!server)('Orders on payment terms (CUS-06, ADR-888)', () => {
 
   beforeAll(async () => {
     f = await ordersFixture(server!);
-    terms = new PaymentTermsService(f.db);
+    terms = new PaymentTermsService(f.db, f.customers);
   });
 
   afterAll(async () => {
@@ -93,6 +93,46 @@ describe.skipIf(!server)('Orders on payment terms (CUS-06, ADR-888)', () => {
       });
       expect(errorsOf(refused)).toEqual([[`input.${field}`, 'INVALID']]);
     }
+  });
+
+  it("refuses an order on terms past the customer's credit limit, set and cleared (ADR-907)", async () => {
+    const first = await onTerms('0300-1111111', 30);
+    const customerId = first.customerId!;
+    expect(await terms.credit(f.a, customerId)).toEqual({
+      creditLimit: null,
+      owed: first.total,
+      overdue: 0n,
+    });
+    expect(errorsOf(await terms.setCreditLimit(f.a, customerId, '0'))).toEqual([
+      ['creditLimit', 'INVALID'],
+    ]);
+    expect(errorsOf(await terms.setCreditLimit(f.a, first.id, '1,000'))).toEqual([
+      ['customerId', 'NOT_FOUND'],
+    ]);
+    // Room for one more order of the same, not two.
+    const limit = (first.total * 2n) / 100n;
+    expect(unwrap(await terms.setCreditLimit(f.a, customerId, String(limit)))).toEqual({
+      creditLimit: first.total * 2n,
+      owed: first.total,
+      overdue: 0n,
+    });
+    await onTerms('0300-1111111', 30);
+    const refused = await f.orders.create(f.a, {
+      lineItems: [{ variantId: kurta, quantity: 2 }],
+      shippingAddress: { ...ADDRESS, phone: '0300-1111111' },
+      paymentMethod: 'bank_transfer',
+      paymentTermsDays: 30,
+    });
+    expect(errorsOf(refused)).toEqual([['input.paymentTermsDays', 'INVALID']]);
+    expect(refused.ok ? null : refused.errors[0]!.message).toMatch(
+      /^On terms this would take what the customer owes to Rs [\d,]+, past their credit limit of Rs [\d,]+$/,
+    );
+    // Its stock is not taken, and without terms, or paid, it is no matter.
+    expect((await onTerms('0300-1111111', null)).stage).toBe('awaiting_payment');
+    // Another customer's limit is their own; cleared, the customer orders on terms again.
+    expect((await onTerms('0300-2222222', 30)).paymentTermsDays).toBe(30);
+    expect(unwrap(await terms.setCreditLimit(f.a, customerId, null)).creditLimit).toBeNull();
+    expect((await onTerms('0300-1111111', 30)).paymentTermsDays).toBe(30);
   });
 
   it('lists who owes, the most overdue first, and finds the orders owed or overdue', async () => {

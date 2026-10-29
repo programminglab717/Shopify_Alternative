@@ -1,9 +1,21 @@
-import { CurrentTenant, Money, RequireScopes, type TenantContext } from '@hatti/api';
-import { toPublicId } from '@hatti/ids';
-import { money } from '@hatti/money';
-import { Args, Int, Query, Resolver } from '@nestjs/graphql';
-import { PaymentTermsService } from '../payment-terms.service.js';
-import { PaymentTermsCustomer, PaymentTermsOwed } from './payment-terms.types.js';
+import {
+  CurrentTenant,
+  Money,
+  RequireScopes,
+  UserError,
+  badUserInput,
+  type TenantContext,
+} from '@hatti/api';
+import { toPublicId, tryFromPublicId } from '@hatti/ids';
+import { money, type CurrencyCode } from '@hatti/money';
+import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { PaymentTermsService, type CustomerCredit as Credit } from '../payment-terms.service.js';
+import {
+  CustomerCredit,
+  CustomerCreditPayload,
+  PaymentTermsCustomer,
+  PaymentTermsOwed,
+} from './payment-terms.types.js';
 
 @Resolver()
 export class PaymentTermsResolver {
@@ -39,4 +51,50 @@ export class PaymentTermsResolver {
       ),
     });
   }
+
+  @Query(() => CustomerCredit, {
+    description:
+      "A customer's credit limit on payment terms and what they owe on terms now (ADR-907).",
+  })
+  @RequireScopes('read_orders')
+  async customerCredit(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('customerId', { type: () => ID }) customerId: string,
+  ): Promise<CustomerCredit> {
+    return toCredit(await this.terms.credit(tenant, customerUuid(customerId)), tenant.currency);
+  }
+
+  @Mutation(() => CustomerCreditPayload, {
+    description:
+      'Sets what a customer may owe on payment terms at most, in major units, "200,000"; null ' +
+      'or blank for no limit (ADR-907). Orders already placed stay as they are.',
+  })
+  @RequireScopes('write_orders')
+  async customerCreditLimitSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('customerId', { type: () => ID }) customerId: string,
+    @Args('creditLimit', { type: () => String, nullable: true }) creditLimit: string | null,
+  ): Promise<CustomerCreditPayload> {
+    const result = await this.terms.setCreditLimit(tenant, customerUuid(customerId), creditLimit);
+    return Object.assign(new CustomerCreditPayload(), {
+      credit: result.ok ? toCredit(result.value, tenant.currency) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+}
+
+/** The UUID behind a customer's public ID, or a BAD_USER_INPUT error. */
+function customerUuid(id: string): string {
+  const uuid = tryFromPublicId(id, 'customer');
+  if (!uuid) throw badUserInput(`Invalid customer id: ${id.slice(0, 64)}`);
+  return uuid;
+}
+
+function toCredit(credit: Credit, currency: CurrencyCode): CustomerCredit {
+  const amount = (minor: bigint) => Money.from(money(minor, currency));
+  return Object.assign(new CustomerCredit(), {
+    creditLimit: credit.creditLimit === null ? null : amount(credit.creditLimit),
+    owed: amount(credit.owed),
+    overdue: amount(credit.overdue),
+  });
 }

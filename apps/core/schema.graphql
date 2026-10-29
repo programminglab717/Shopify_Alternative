@@ -4819,6 +4819,21 @@ type CustomerCreatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+A customer's credit on payment terms (CUS-06, ADR-907): what they may owe at most, and what they owe now. An order on terms that would take what they owe past the limit is refused.
+"""
+type CustomerCredit {
+  """Null for no limit."""
+  creditLimit: Money
+  overdue: Money!
+  owed: Money!
+}
+
+type CustomerCreditPayload {
+  credit: CustomerCredit
+  userErrors: [UserError!]!
+}
+
 type CustomerDataExportPayload {
   """What to call the file: "customer-cus_….json"."""
   fileName: String
@@ -10358,6 +10373,11 @@ type Mutation {
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
   """
   customerCreate(input: CustomerCreateInput!): CustomerCreatePayload!
+
+  """
+  Sets what a customer may owe on payment terms at most, in major units, "200,000"; null or blank for no limit (ADR-907). Orders already placed stay as they are.
+  """
+  customerCreditLimitSet(creditLimit: String, customerId: ID!): CustomerCreditPayload!
 
   """
   Everything the shop keeps of a customer, as a file to give them at their request: their profile, numbers, marketing consent and its history, orders and draft orders whole, and uses of discount codes. The shop's blocklist and orders' risk scores stay out. Owners and managers only; every export is recorded. Staff confirm who they are first when they signed in over 15 minutes ago.
@@ -17272,6 +17292,11 @@ type Query {
     """How many months, 1 to 24; 12 when left out."""
     months: Int
   ): [CustomerCohort!]!
+
+  """
+  A customer's credit limit on payment terms and what they owe on terms now (ADR-907).
+  """
+  customerCredit(customerId: ID!): CustomerCredit!
 
   """
   Customers' erasures waiting to happen, the soonest first: who will be erased, and when, unless customerErasureCancel stops it (ADR-116).

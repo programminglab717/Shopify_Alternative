@@ -1,5 +1,7 @@
-import { type TenantContext } from '@hatti/api';
-import { Database } from '@hatti/db';
+import { InputChecker, fail, type MutationResult, type TenantContext } from '@hatti/api';
+import { Database, type Tx } from '@hatti/db';
+import { CustomerService } from '@hatti/customers/public';
+import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
@@ -28,6 +30,14 @@ export interface TermsOwed {
   customers: CustomerOwed[];
 }
 
+/** A customer's credit on payment terms (ADR-907): their limit, and what they owe now. */
+export interface CustomerCredit {
+  /** In minor units; null for none. */
+  creditLimit: bigint | null;
+  owed: bigint;
+  overdue: bigint;
+}
+
 interface OwedRow extends Record<string, unknown> {
   customer_id: string;
   name: string | null;
@@ -39,7 +49,47 @@ interface OwedRow extends Record<string, unknown> {
 
 @Injectable()
 export class PaymentTermsService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly customers: CustomerService,
+  ) {}
+
+  /** A customer's credit limit and what they owe on terms now (ADR-907). */
+  async credit(tenant: TenantContext, customerId: string): Promise<CustomerCredit> {
+    return this.db.tenant(tenant.shopId, (tx) => creditIn(tx, tenant.shopId, customerId));
+  }
+
+  /**
+   * Sets what the customer may owe on payment terms at most, in major units, "200,000"; null or
+   * blank for no limit. Orders on terms already placed stay as they are.
+   */
+  async setCreditLimit(
+    tenant: TenantContext,
+    customerId: string,
+    limit: string | null,
+  ): Promise<MutationResult<CustomerCredit>> {
+    const check = new InputChecker();
+    const minor = check.price(['creditLimit'], limit, tenant.currency);
+    if (minor === 0n) check.add(['creditLimit'], 'INVALID', 'must be more than zero');
+    if (!check.ok) return fail(check.errors);
+    if (!(await this.customers.get(tenant, customerId))) {
+      return fail([{ field: ['customerId'], code: 'NOT_FOUND', message: 'Customer not found' }]);
+    }
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      if (minor === null) {
+        await tx.execute(sql`
+          DELETE FROM orders.credit_limits
+           WHERE shop_id = ${tenant.shopId} AND customer_id = ${customerId}`);
+      } else {
+        await tx.execute(sql`
+          INSERT INTO orders.credit_limits (shop_id, customer_id, credit_limit)
+          VALUES (${tenant.shopId}, ${customerId}, ${minor})
+          ON CONFLICT (shop_id, customer_id) DO UPDATE
+             SET credit_limit = EXCLUDED.credit_limit, updated_at = now()`);
+      }
+      return { ok: true, value: await creditIn(tx, tenant.shopId, customerId) };
+    });
+  }
 
   /** The customers who owe on payment terms, `first` at most, and what all of them owe. */
   async owed(tenant: TenantContext, input: { first: number }): Promise<TermsOwed> {
@@ -83,4 +133,47 @@ export class PaymentTermsService {
       };
     });
   }
+}
+
+/** A customer's credit limit and what they owe on terms now, in the caller's transaction. */
+export async function creditIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+): Promise<CustomerCredit> {
+  const { rows } = await tx.execute<{ limit: string | null; owed: string; overdue: string }>(sql`
+    SELECT (SELECT credit_limit::text FROM orders.credit_limits
+             WHERE shop_id = ${shopId} AND customer_id = ${customerId}) AS limit,
+           coalesce(sum(o.total - o.amount_paid), 0)::text AS owed,
+           coalesce(sum(o.total - o.amount_paid) FILTER (WHERE o.payment_due_at < now()), 0)::text
+             AS overdue
+      FROM orders.orders o
+     WHERE o.shop_id = ${shopId} AND o.customer_id = ${customerId}
+       AND o.payment_due_at IS NOT NULL AND o.status <> 'cancelled' AND o.amount_paid < o.total`);
+  const row = rows[0]!;
+  return {
+    creditLimit: row.limit === null ? null : BigInt(row.limit),
+    owed: BigInt(row.owed),
+    overdue: BigInt(row.overdue),
+  };
+}
+
+/**
+ * Why an order of `total` on payment terms for `customerId` is refused (ADR-907): what they owe
+ * on terms would go past their credit limit. Null where it would not, or they have none.
+ */
+export async function overCreditIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  total: bigint,
+  currency: CurrencyCode,
+): Promise<string | null> {
+  const credit = await creditIn(tx, shopId, customerId);
+  if (credit.creditLimit === null || credit.owed + total <= credit.creditLimit) return null;
+  const rs = (minor: bigint) => formatMoney(money(minor, currency));
+  return (
+    `On terms this would take what the customer owes to ${rs(credit.owed + total)}, past their ` +
+    `credit limit of ${rs(credit.creditLimit)}`
+  );
 }

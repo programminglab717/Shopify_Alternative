@@ -13703,3 +13703,37 @@ export const DarazDisconnectMutation = /* GraphQL */ `
     darazDisconnect
   }
 `;
+
+/** A customer's credit on payment terms (ADR-907). */
+export const CustomerCreditQuery = /* GraphQL */ `
+  query CustomerCredit($customerId: ID!) {
+    customerCredit(customerId: $customerId) {
+      creditLimit {
+        amount
+      }
+      owed {
+        amount
+      }
+      overdue {
+        amount
+      }
+    }
+  }
+`;
+
+export const CustomerCreditLimitSetMutation = /* GraphQL */ `
+  mutation CustomerCreditLimitSet($customerId: ID!, $creditLimit: String) {
+    customerCreditLimitSet(customerId: $customerId, creditLimit: $creditLimit) {
+      credit {
+        creditLimit {
+          amount
+        }
+      }
+      userErrors {
+        field
+        code
+        message
+      }
+    }
+  }
+`;

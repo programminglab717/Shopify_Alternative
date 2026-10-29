@@ -136,6 +136,7 @@ import {
   type StoredAddressValue,
 } from './schema.js';
 import { shareBundlePrice } from './bundle-lines.js';
+import { overCreditIn } from './payment-terms.service.js';
 import { stitchedShipsOn } from './stitched.js';
 
 export interface OrderLineInput {
@@ -721,6 +722,14 @@ export class OrderService {
         'INVALID',
         "Asking for an advance needs the shop's bank account, which its customer pays it into",
       );
+    }
+
+    // On terms, what its customer owes may not go past their credit limit (ADR-907): read
+    // before its stock is taken, the customer found without locking them.
+    if (termsDays !== null) {
+      const known = await this.customers.idOf(tx, shopId, address.phone);
+      const over = known && (await overCreditIn(tx, shopId, known, total, currency));
+      if (over) return failOne([...order.field, 'paymentTermsDays'], 'INVALID', over);
     }
 
     // Where no one location has it all, its lines split among those that do, as the shop

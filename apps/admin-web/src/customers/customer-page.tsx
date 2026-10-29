@@ -33,6 +33,7 @@ import { TextField } from '../ui/field';
 import { useWide } from '../ui/wide';
 import { REVEALS_NUMBERS, shownPhone } from './customers-page';
 import { CustomerCare, MarketingConsent } from './care';
+import { CreditLimit, READS_TERMS_CREDIT } from './credit-limit';
 import { READS_CREDIT, StoreCredit } from './store-credit';
 import { SeenAt } from '../offline/seen-at';
 import { TillSales } from '../pos/till-sales';
@@ -530,6 +531,7 @@ export function CustomerPage() {
           {wide && <Contact customer={customer} />}
           <NoteAndTags customer={customer} edits={edits} />
           {permits(shop, READS_CREDIT) && <StoreCredit customerId={customer.id} />}
+          {permits(shop, READS_TERMS_CREDIT) && <CreditLimit customerId={customer.id} />}
           {edits && <Blocklist customer={customer} timezone={details.timezone} />}
           {edits && <MarketingConsent customer={customer} />}
           {edits && <CustomerCare customer={customer} />}

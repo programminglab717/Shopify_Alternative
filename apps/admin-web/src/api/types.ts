@@ -6770,3 +6770,19 @@ export interface PaymentTermsOwedData {
     }[];
   };
 }
+
+/** A customer's credit on payment terms (ADR-907). */
+export interface CustomerCreditData {
+  customerCredit: {
+    creditLimit: { amount: string } | null;
+    owed: { amount: string };
+    overdue: { amount: string };
+  };
+}
+
+export interface CustomerCreditLimitSetData {
+  customerCreditLimitSet: {
+    credit: { creditLimit: { amount: string } | null } | null;
+    userErrors: UserError[];
+  };
+}
