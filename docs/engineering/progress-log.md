@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The Storefront API in Urdu, and its metafields
+### 4fbb696 · The Storefront API in Urdu, and its metafields
 
 * **`@inContext(language: UR)`** answers from the shop's Urdu words, its pages at their Urdu
   addresses, and `localization` says which language and country ([ADR-903](../architecture/13-decision-log.md#adr-903--the-storefront-api-answers-in-urdu-where-a-query-asks-with-incontext-its-pages-at-their-urdu-addresses-and-gives-the-metafields-the-shop-shows)).
