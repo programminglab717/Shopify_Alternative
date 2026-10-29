@@ -80,6 +80,17 @@ function core(role: StaffRole = 'owner') {
             ],
           },
         };
+      case 'SellingPlanUpdate': {
+        const titles: Record<string, string> = { var_1: 'Lawn suit · Small' };
+        const { variantIds, ...rest } = variables.input as { variantIds: string[] | null };
+        const changed = {
+          ...rest,
+          id: variables.id,
+          variants: variantIds && variantIds.map((id) => ({ id, title: titles[id] })),
+        };
+        plans = plans.map((each) => (each.id === variables.id ? changed : each));
+        return { sellingPlanUpdate: { sellingPlan: changed, userErrors: [] } };
+      }
       case 'SellingPlanDelete':
         plans = [];
         return { sellingPlanDelete: { deletedSellingPlanId: variables.id, userErrors: [] } };
@@ -194,5 +205,46 @@ describe('Subscriptions (CAT-16, ADR-862)', () => {
     expect(await screen.findByText('Ayesha Khan, Lahore')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Add plan' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
+  });
+
+  it("changes a plan, its variants among the rest, from the plan's own form (ADR-936)", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/subscriptions');
+    expect(await screen.findByText(/No selling plans yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose variants' }));
+    type('Find products by name or SKU', 'lawn');
+    fireEvent.click(screen.getByRole('button', { name: 'Find' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Lawn suit · Large' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add plan' }));
+    expect(await screen.findByText('For Lawn suit · Large')).toBeTruthy();
+
+    // Changed: the form takes the plan as it is, and saves it with another variant.
+    fireEvent.click(screen.getByRole('button', { name: 'Change Every month' }));
+    expect((screen.getByLabelText('Discount (%)') as HTMLInputElement).value).toBe('10');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Lawn suit · Large' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose variants' }));
+    type('Find products by name or SKU', 'lawn');
+    fireEvent.click(screen.getByRole('button', { name: 'Find' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Lawn suit · Small' }));
+    type('Discount (%)', '15');
+    fireEvent.click(screen.getByRole('button', { name: 'Save plan' }));
+    expect(await screen.findByText('For Lawn suit · Small')).toBeTruthy();
+    expect(sentOf(fake, 'SellingPlanUpdate')).toEqual([
+      {
+        id: 'slpl_1',
+        input: {
+          name: 'Every month',
+          intervalUnit: 'MONTH',
+          intervalCount: 1,
+          discountPercent: 15,
+          productTag: null,
+          minimumOrders: 0,
+          variantIds: ['var_1'],
+        },
+      },
+    ]);
+    // The form adds a new plan again.
+    expect(screen.getByRole('button', { name: 'Add plan' })).toBeTruthy();
   });
 });

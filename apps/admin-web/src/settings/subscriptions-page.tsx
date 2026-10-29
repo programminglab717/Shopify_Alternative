@@ -1,16 +1,18 @@
 import { Link } from '@tanstack/react-router';
-import { ListPlus, Repeat, Trash2 } from 'lucide-react';
+import { ListPlus, Pencil, Repeat, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   OrderSubscriptionChangeMutation,
   SellingPlanCreateMutation,
   SellingPlanDeleteMutation,
+  SellingPlanUpdateMutation,
   SubscriptionsQuery,
 } from '../api/operations';
 import type {
   OrderSubscription,
   OrderSubscriptionChangeData,
+  SellingPlan,
   SellingPlanInput,
   SellingPlanPayloadData,
   SubscriptionsData,
@@ -44,6 +46,9 @@ export function SubscriptionsPage() {
   const create = useAdminMutation<SellingPlanPayloadData, { input: SellingPlanInput }>(
     SellingPlanCreateMutation,
   );
+  const update = useAdminMutation<SellingPlanPayloadData, { id: string; input: SellingPlanInput }>(
+    SellingPlanUpdateMutation,
+  );
   const remove = useAdminMutation<SellingPlanPayloadData, { id: string }>(
     SellingPlanDeleteMutation,
   );
@@ -58,6 +63,8 @@ export function SubscriptionsPage() {
   const [minimum, setMinimum] = useState('0');
   const [variants, setVariants] = useState<{ id: string; title: string }[]>([]);
   const [picking, setPicking] = useState(false);
+  // The plan the form changes (ADR-936); null while it adds one.
+  const [editing, setEditing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const writes = can(shop, 'write_products');
@@ -76,26 +83,36 @@ export function SubscriptionsPage() {
     }
   };
 
+  /** The form as it starts, or as `plan` has it to change it. */
+  const fill = (plan: SellingPlan | null) => {
+    setEditing(plan?.id ?? null);
+    setName(plan?.name ?? 'Every month');
+    setUnit(plan?.intervalUnit ?? 'MONTH');
+    setCount(String(plan?.intervalCount ?? 1));
+    setDiscount(String(plan?.discountPercent ?? 10));
+    setTag(plan?.productTag ?? '');
+    setMinimum(String(plan?.minimumOrders ?? 0));
+    setVariants(plan?.variants ?? []);
+    setPicking(false);
+  };
+
   const onCreate = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     await run(async () => {
-      const done = await create.mutateAsync({
-        input: {
-          name,
-          intervalUnit: unit,
-          intervalCount: Number(count),
-          discountPercent: Number(discount),
-          productTag: variants.length > 0 ? null : tag.trim() || null,
-          minimumOrders: Number(minimum) || 0,
-          variantIds: variants.length > 0 ? variants.map((each) => each.id) : null,
-        },
-      });
-      if (show(done.sellingPlanCreate!.userErrors)) {
-        setTag('');
-        setVariants([]);
-        setPicking(false);
-      }
+      const input: SellingPlanInput = {
+        name,
+        intervalUnit: unit,
+        intervalCount: Number(count),
+        discountPercent: Number(discount),
+        productTag: variants.length > 0 ? null : tag.trim() || null,
+        minimumOrders: Number(minimum) || 0,
+        variantIds: variants.length > 0 ? variants.map((each) => each.id) : null,
+      };
+      const errors = editing
+        ? (await update.mutateAsync({ id: editing, input })).sellingPlanUpdate!.userErrors
+        : (await create.mutateAsync({ input })).sellingPlanCreate!.userErrors;
+      if (show(errors)) fill(null);
     });
     setBusy(false);
   };
@@ -144,19 +161,27 @@ export function SubscriptionsPage() {
                     </span>
                   </span>
                   {writes && (
-                    <Button
-                      variant="danger"
-                      icon={<Trash2 aria-hidden className="size-5" />}
-                      aria-label={t('subscriptions.deletePlan', { name: plan.name })}
-                      onClick={() =>
-                        void run(async () => {
-                          show(
-                            (await remove.mutateAsync({ id: plan.id })).sellingPlanDelete!
-                              .userErrors,
-                          );
-                        })
-                      }
-                    />
+                    <span className="flex gap-1">
+                      <Button
+                        variant="tertiary"
+                        icon={<Pencil aria-hidden className="size-5" />}
+                        aria-label={t('subscriptions.editPlan', { name: plan.name })}
+                        onClick={() => fill(plan)}
+                      />
+                      <Button
+                        variant="danger"
+                        icon={<Trash2 aria-hidden className="size-5" />}
+                        aria-label={t('subscriptions.deletePlan', { name: plan.name })}
+                        onClick={() =>
+                          void run(async () => {
+                            show(
+                              (await remove.mutateAsync({ id: plan.id })).sellingPlanDelete!
+                                .userErrors,
+                            );
+                          })
+                        }
+                      />
+                    </span>
                   )}
                 </li>
               ))}
@@ -253,9 +278,16 @@ export function SubscriptionsPage() {
                 value={minimum}
                 onChange={(event) => setMinimum(event.target.value)}
               />
-              <Button type="submit" className="self-start" busy={busy}>
-                {t('subscriptions.addPlan')}
-              </Button>
+              <span className="flex gap-2">
+                <Button type="submit" busy={busy}>
+                  {t(editing ? 'subscriptions.savePlan' : 'subscriptions.addPlan')}
+                </Button>
+                {editing && (
+                  <Button variant="secondary" onClick={() => fill(null)}>
+                    {t('subscriptions.cancelEdit')}
+                  </Button>
+                )}
+              </span>
             </form>
           )}
         </Card>

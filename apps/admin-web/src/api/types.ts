@@ -6502,6 +6502,7 @@ export interface SubscriptionsData {
 
 export interface SellingPlanPayloadData {
   sellingPlanCreate?: { sellingPlan: SellingPlan | null; userErrors: UserError[] };
+  sellingPlanUpdate?: { sellingPlan: SellingPlan | null; userErrors: UserError[] };
   sellingPlanDelete?: { deletedSellingPlanId: string | null; userErrors: UserError[] };
 }
 

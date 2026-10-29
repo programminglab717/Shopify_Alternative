@@ -13164,6 +13164,22 @@ export const SellingPlanCreateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Changes a plan, its variants among the rest; subscriptions made keep it as it was. */
+export const SellingPlanUpdateMutation = /* GraphQL */ `
+  mutation SellingPlanUpdate($id: ID!, $input: SellingPlanInput!) {
+    sellingPlanUpdate(id: $id, input: $input) {
+      sellingPlan {
+        ...SellingPlanFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SELLING_PLAN}
+  ${USER_ERRORS}
+`;
+
 export const SellingPlanDeleteMutation = /* GraphQL */ `
   mutation SellingPlanDelete($id: ID!) {
     sellingPlanDelete(id: $id) {
