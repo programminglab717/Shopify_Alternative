@@ -1787,13 +1787,18 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect(await sweep(new Date(dueAt.getTime() - day))).toBe(0);
     await dispatch(2);
     const due = shopTime('Asia/Karachi', dueAt);
-    expect(await reminders()).toEqual(
-      [owing, paying].map((order) => ({
-        kind: 'payment_terms_due',
-        orderId: order.id,
-        amount: 'Rs 5,250',
-        date: due,
-      })),
+    // Both sent at once, in either order.
+    const byOrder = (a: { orderId: string | null }, b: { orderId: string | null }) =>
+      a.orderId!.localeCompare(b.orderId!);
+    expect((await reminders()).sort(byOrder)).toEqual(
+      [owing, paying]
+        .map((order) => ({
+          kind: 'payment_terms_due',
+          orderId: order.id,
+          amount: 'Rs 5,250',
+          date: due,
+        }))
+        .sort(byOrder),
     );
     // Paid in part, then past its date: what is left; the one paid in full is told nothing more.
     unwrap(await service.markAsPaid(tenant, paying.id));
