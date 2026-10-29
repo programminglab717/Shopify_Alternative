@@ -76,6 +76,9 @@ export class ThemeExperimentDraft {
       'theme since and its counts kept as they were, the other drafts going on (ADR-939).',
   })
   stopped!: boolean;
+
+  @Field(() => Int, { description: 'The percent of shoppers shown it (ADR-952).' })
+  share!: number;
 }
 
 @ObjectType({
@@ -94,7 +97,7 @@ export class ThemeExperiment {
   @Field(() => ID, { description: 'The draft theme shown in the second arm: the first draft.' })
   themeId!: string;
 
-  @Field(() => Int, { description: 'The percent of shoppers shown each draft.' })
+  @Field(() => Int, { description: 'The percent of shoppers shown the first draft.' })
   share!: number;
 
   @Field(() => GraphQLISODateTime)
@@ -160,9 +163,18 @@ export class ThemeExperimentInput {
 
   @Field(() => Int, {
     description:
-      'The percent of shoppers shown each draft: 1 to 50 for one, to 33 for two, to 25 for three.',
+      'The percent of shoppers shown the first draft, and each other one where otherShares ' +
+      'gives none: 1 to 50 for one draft, to 33 for two, to 25 for three.',
   })
   share!: number;
+
+  @Field(() => [Int], {
+    nullable: true,
+    description:
+      'Each other draft’s own percent of shoppers, in the order of otherThemeIds (ADR-952), 1 ' +
+      'to 50: the live theme is shown to no fewer than any draft.',
+  })
+  otherShares?: number[] | null;
 
   @Field(() => Int, { description: 'How many days it runs, 1 to 30.' })
   days!: number;
@@ -212,6 +224,7 @@ const toExperiment = (record: ThemeExperimentRecord, currency: CurrencyCode) =>
         verdict: verdictOf(record.results, arm),
         revenueVerdict: revenueVerdictOf(record.results, arm),
         stopped: record.stoppedArms.includes(arm),
+        share: record.shares[index]!,
       }),
     ),
     verdict: verdictOf(record.results),
@@ -270,6 +283,7 @@ export class ThemeExperimentResolver {
         themeId,
         otherThemeIds: others as string[],
         share: input.share,
+        otherShares: input.otherShares ?? null,
         days: input.days,
       }),
       tenant.currency,

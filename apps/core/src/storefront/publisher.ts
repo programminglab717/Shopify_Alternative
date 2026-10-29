@@ -1127,6 +1127,10 @@ export class StorefrontPublisher {
             themeId: experiment.id,
             version: experiment.version,
             share: running.share,
+            // Each draft's own share, where they differ (ADR-952).
+            ...(running.shares.some((each) => each !== running.share) && {
+              shares: running.shares,
+            }),
             ...(running.themeIds.length > 1 && {
               others: others.flatMap((each) =>
                 each ? [{ themeId: each.id, version: each.version }] : [],

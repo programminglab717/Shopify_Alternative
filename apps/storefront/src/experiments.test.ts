@@ -62,6 +62,17 @@ describe("A shopper's arm of a theme experiment (OS-22, ADR-866)", () => {
     });
   });
 
+  it('gives each draft its own share where they differ, the rest the live theme (ADR-952)', () => {
+    const uneven = {
+      ...experiment,
+      share: 30,
+      shares: [30, 10],
+      others: [{ themeId: 'thm-c', version: 1 }],
+    };
+    const drawn = (value: number) => experimentArm(uneven, null, false, () => value)?.arm;
+    expect([0, 29, 30, 39, 40, 99].map(drawn)).toEqual(['b', 'b', 'c', 'c', 'a', 'a']);
+  });
+
   it("shows a stopped draft's shoppers the live theme, counted in no arm, its share the live theme's (ADR-939)", () => {
     const stopped = {
       ...experiment,

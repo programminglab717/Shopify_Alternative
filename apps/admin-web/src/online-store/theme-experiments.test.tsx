@@ -229,4 +229,88 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
       ),
     ).toBeTruthy();
   });
+
+  it('gives another draft a share of its own, and says each draft’s (ADR-952)', async () => {
+    signedIn();
+    let experiments: Record<string, unknown>[] = [];
+    const fake = fakeCore('owner', (operation, variables) => {
+      switch (operation) {
+        case 'Themes':
+          return {
+            themes: {
+              nodes: [
+                theme('th_1', 'Hatti Base', 'MAIN'),
+                theme('th_2', 'Loud', 'UNPUBLISHED'),
+                theme('th_3', 'Quiet', 'UNPUBLISHED'),
+              ],
+            },
+            platformThemes: [],
+          };
+        case 'ThemeStore':
+          return { themeStore: [] };
+        case 'ThemeExperiments':
+          return { themeExperiments: experiments };
+        case 'ThemeExperimentStart': {
+          const input = variables.input as Record<string, unknown>;
+          const draft = (themeId: string, share: number) => ({
+            themeId,
+            share,
+            arm: arm(100, 2),
+            verdict: 'too_early',
+            revenueVerdict: 'too_early',
+            stopped: false,
+          });
+          const started = {
+            id: 'texp_3',
+            ...input,
+            startedAt: EARLIER,
+            endsAt: LATER,
+            endedAt: null,
+            endedReason: null,
+            live: arm(100, 2),
+            draft: arm(100, 2),
+            verdict: 'too_early',
+            revenueVerdict: 'too_early',
+            drafts: [draft('th_2', 40), draft('th_3', 10)],
+            countedAt: EARLIER,
+          };
+          experiments = [started];
+          return { themeExperimentStart: { themeExperiment: started, userErrors: [] } };
+        }
+        default:
+          return undefined;
+      }
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=themes');
+    const section = within(
+      (await screen.findByRole('heading', { name: 'Experiments' })).closest('section')!,
+    );
+    await section.findByLabelText('What you’re trying');
+    type('What you’re trying', 'Loud or quiet');
+    const [second] = section.getAllByLabelText('Another draft (optional)') as HTMLSelectElement[];
+    fireEvent.change(second!, { target: { value: 'th_3' } });
+    fireEvent.change(section.getByLabelText('Shoppers shown the draft (%)'), {
+      target: { value: '40' },
+    });
+    fireEvent.change(section.getByLabelText('Its shoppers (%)'), { target: { value: '10' } });
+    fireEvent.click(section.getByRole('button', { name: 'Start experiment' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.filter((each) => each.operation === 'ThemeExperimentStart').at(-1)?.variables,
+      ).toEqual({
+        input: {
+          name: 'Loud or quiet',
+          themeId: 'th_2',
+          otherThemeIds: ['th_3'],
+          share: 40,
+          otherShares: [10],
+          days: 14,
+        },
+      }),
+    );
+    expect(
+      await section.findByText(/Shoppers see the drafts 40% · 10% of the time, until/),
+    ).toBeTruthy();
+  });
 });

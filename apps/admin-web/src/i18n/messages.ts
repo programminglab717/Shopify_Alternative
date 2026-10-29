@@ -4965,6 +4965,9 @@ const en = {
   'experiments.none': 'None',
   'experiments.shareHintMany': '1 to {most}, for each of {count} drafts.',
   'experiments.runningMany': '{share}% of shoppers see each of {count} drafts, until {date}.',
+  'experiments.runningUneven': 'Shoppers see the drafts {shares} of the time, until {date}.',
+  'experiments.otherShare': 'Its shoppers (%)',
+  'experiments.otherShareHint': 'Blank for the same as the first.',
   'experiments.draftVerdict': '{name}: {verdict}',
   'experiments.draftStopped':
     'Hatti stopped {name}: it sold clearly worse. Its shoppers see your live theme; the other drafts go on.',
@@ -12237,6 +12240,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experiments.shareHintMany': '{count} ڈرافٹس میں سے ہر ایک کے لیے 1 سے {most}۔',
   'experiments.runningMany':
     '{count} ڈرافٹس میں سے ہر ایک کو {share}% خریدار دیکھ رہے ہیں، {date} تک۔',
+  'experiments.runningUneven': 'خریدار ڈرافٹس {shares} وقت دیکھ رہے ہیں، {date} تک۔',
+  'experiments.otherShare': 'اس کے خریدار (%)',
+  'experiments.otherShareHint': 'خالی چھوڑیں تو پہلے جتنا۔',
   'experiments.draftVerdict': '{name}: {verdict}',
   'experiments.draftStopped':
     'ہٹی نے {name} روک دی: اس کی فروخت واضح طور پر کم تھی۔ اس کے خریدار آپ کی لائیو تھیم دیکھتے ہیں؛ باقی ڈرافٹس جاری ہیں۔',

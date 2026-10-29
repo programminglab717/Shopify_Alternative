@@ -44,6 +44,7 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
         themeId: string;
         otherThemeIds: string[];
         share: number;
+        otherShares?: number[];
         days: number;
       };
     }
@@ -56,6 +57,8 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
   const [themeId, setThemeId] = useState('');
   // Up to two drafts more, each its own share (ADR-931); '' for none.
   const [others, setOthers] = useState<[string, string]>(['', '']);
+  // Each other draft's own share (ADR-952); '' for the first's.
+  const [otherShares, setOtherShares] = useState<[string, string]>(['', '']);
   const [share, setShare] = useState('20');
   const [days, setDays] = useState('14');
   const [problem, setProblem] = useState<string | null>(null);
@@ -78,6 +81,8 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
   const first = themeId || drafts[0]?.id || '';
   const chosen = [...new Set(others.filter((id) => id !== '' && id !== first))];
   const most = Math.floor(100 / (chosen.length + 2));
+  const sharesOf = chosen.map((id) => otherShares[others.indexOf(id)]?.trim() ?? '');
+  const uneven = sharesOf.some((each) => each !== '');
 
   const onStart = (event: FormEvent) => {
     event.preventDefault();
@@ -88,6 +93,7 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
           themeId: first,
           otherThemeIds: chosen,
           share: Number(share),
+          ...(uneven && { otherShares: sharesOf.map((each) => Number(each || share)) }),
           days: Number(days),
         },
       }),
@@ -139,20 +145,33 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
             />
             {drafts.length > 1 &&
               ([0, 1] as const).map((index) => (
-                <SelectField
-                  key={index}
-                  label={t('experiments.another')}
-                  value={others[index]}
-                  options={[
-                    { value: '', label: t('experiments.none') },
-                    ...drafts
-                      .filter((theme) => theme.id !== first)
-                      .map((theme) => ({ value: theme.id, label: theme.name })),
-                  ]}
-                  onChange={(value) =>
-                    setOthers((now) => (index === 0 ? [value, now[1]] : [now[0], value]))
-                  }
-                />
+                <div key={index} className="grid grid-cols-[2fr_1fr] items-end gap-3">
+                  <SelectField
+                    label={t('experiments.another')}
+                    value={others[index]}
+                    options={[
+                      { value: '', label: t('experiments.none') },
+                      ...drafts
+                        .filter((theme) => theme.id !== first)
+                        .map((theme) => ({ value: theme.id, label: theme.name })),
+                    ]}
+                    onChange={(value) =>
+                      setOthers((now) => (index === 0 ? [value, now[1]] : [now[0], value]))
+                    }
+                  />
+                  {others[index] !== '' && others[index] !== first && (
+                    <TextField
+                      label={t('experiments.otherShare')}
+                      hint={t('experiments.otherShareHint')}
+                      inputMode="numeric"
+                      value={otherShares[index]}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setOtherShares((now) => (index === 0 ? [value, now[1]] : [now[0], value]));
+                      }}
+                    />
+                  )}
+                </div>
               ))}
             <div className="grid grid-cols-2 gap-3">
               <TextField
@@ -246,16 +265,21 @@ function Results({
           ? t(`experiments.ended.${experiment.endedReason ?? 'staff'}` as MessageKey, {
               date: formatDate(experiment.endedAt, timezone, locale),
             })
-          : many
-            ? t('experiments.runningMany', {
-                share: experiment.share,
-                count: drafts.length,
+          : many && drafts.some((draft) => (draft.share ?? experiment.share) !== experiment.share)
+            ? t('experiments.runningUneven', {
+                shares: drafts.map((draft) => `${draft.share ?? experiment.share}%`).join(' · '),
                 date: formatDate(experiment.endsAt, timezone, locale),
               })
-            : t('experiments.running', {
-                share: experiment.share,
-                date: formatDate(experiment.endsAt, timezone, locale),
-              })}
+            : many
+              ? t('experiments.runningMany', {
+                  share: experiment.share,
+                  count: drafts.length,
+                  date: formatDate(experiment.endsAt, timezone, locale),
+                })
+              : t('experiments.running', {
+                  share: experiment.share,
+                  date: formatDate(experiment.endsAt, timezone, locale),
+                })}
       </p>
       <ul className="flex flex-col gap-1">
         {arm(t('experiments.live'), experiment.live)}

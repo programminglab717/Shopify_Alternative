@@ -13375,6 +13375,7 @@ const THEME_EXPERIMENT = /* GraphQL */ `
     revenueVerdict
     drafts {
       themeId
+      share
       arm {
         sessions
         addedToCart

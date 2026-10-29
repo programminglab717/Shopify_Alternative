@@ -91,7 +91,10 @@ export interface ThemeExperimentRecord {
   themeIds: string[];
   /** The drafts' arms Hatti stopped as they sold clearly worse, the others going on (ADR-939). */
   stoppedArms: DraftArmName[];
+  /** The first draft's percent of shoppers. */
   share: number;
+  /** Each draft's percent of shoppers, in the order of `themeIds` (ADR-952). */
+  shares: number[];
   startedAt: Date;
   endsAt: Date;
   endedAt: Date | null;
@@ -106,6 +109,8 @@ export interface ThemeExperimentInput {
   /** Up to two drafts more, arms c and d (ADR-931). */
   otherThemeIds?: readonly string[];
   share: number;
+  /** The other drafts' shares, in their order (ADR-952); each the first's where not given. */
+  otherShares?: readonly number[] | null;
   days: number;
 }
 
@@ -125,6 +130,7 @@ type ExperimentRow = {
   other_theme_ids: string[] | null;
   stopped_arms: DraftArmName[] | null;
   share: number;
+  other_shares: number[] | null;
   started_at: Date | string;
   ends_at: Date | string;
   ended_at: Date | string | null;
@@ -145,6 +151,9 @@ const toRecord = (row: ExperimentRow): ThemeExperimentRecord => {
     themeIds,
     stoppedArms: row.stopped_arms ?? [],
     share: row.share,
+    shares: themeIds.map((_, at) =>
+      at === 0 ? row.share : (row.other_shares?.[at - 1] ?? row.share),
+    ),
     startedAt: toDate(row.started_at),
     endsAt: toDate(row.ends_at),
     endedAt: row.ended_at === null ? null : toDate(row.ended_at),
@@ -156,6 +165,7 @@ const toRecord = (row: ExperimentRow): ThemeExperimentRecord => {
 
 const COLUMNS = sql.raw(
   'id, name, theme_id, other_theme_ids::text[] AS other_theme_ids, stopped_arms, share, ' +
+    'other_shares, ' +
     'started_at, ends_at, ended_at, ended_reason, results, counted_at',
 );
 
@@ -378,9 +388,36 @@ export class ThemeExperimentService {
     });
     const { share, days } = EXPERIMENT_LIMITS;
     const drafts = [input.themeId, ...(input.otherThemeIds ?? [])];
-    // Each draft its share, the live theme never less than any (ADR-931): 50% for one, 33% each
-    // for two, 25% each for three.
+    // Each draft its own share (ADR-952), the first's where not given; the live theme shown to no
+    // fewer shoppers than any draft (ADR-931): 50% for one, 33% each for two the same.
+    const others = input.otherShares ?? null;
+    const shares = [input.share, ...drafts.slice(1).map((_, at) => others?.[at] ?? input.share)];
+    const whole = (value: number) =>
+      Number.isInteger(value) && value >= share.min && value <= share.max;
     const most = Math.min(share.max, Math.floor(100 / (drafts.length + 1)));
+    if (others && others.length !== drafts.length - 1) {
+      check.addMessage(['input', 'otherShares'], 'INVALID', 'Give a share for each draft more');
+    } else if (others) {
+      others.forEach((value, at) => {
+        if (!whole(value)) {
+          check.add(
+            ['input', 'otherShares', String(at)],
+            'INVALID',
+            `must be a whole percent from ${share.min} to ${share.max}`,
+          );
+        }
+      });
+      if (
+        shares.every(whole) &&
+        100 - shares.reduce((sum, each) => sum + each, 0) < Math.max(...shares)
+      ) {
+        check.addMessage(
+          ['input', 'otherShares'],
+          'INVALID',
+          'The live theme is shown to no fewer shoppers than any draft: give the drafts less',
+        );
+      }
+    }
     if (drafts.length > EXPERIMENT_LIMITS.drafts) {
       check.addMessage(
         ['input', 'otherThemeIds'],
@@ -390,7 +427,7 @@ export class ThemeExperimentService {
     } else if (new Set(drafts).size < drafts.length) {
       check.addMessage(['input', 'otherThemeIds'], 'INVALID', 'Each draft is shown once');
     }
-    if (!Number.isInteger(input.share) || input.share < share.min || input.share > most) {
+    if (!whole(input.share) || (!others && input.share > most)) {
       check.add(
         ['input', 'share'],
         'INVALID',
@@ -428,9 +465,10 @@ export class ThemeExperimentService {
       }
       const { rows } = await tx.execute<ExperimentRow>(sql`
         INSERT INTO online_store.theme_experiments
-               (shop_id, name, theme_id, other_theme_ids, share, ends_at)
+               (shop_id, name, theme_id, other_theme_ids, share, other_shares, ends_at)
         VALUES (${tenant.shopId}, ${name}, ${input.themeId},
                 ${sql.param(drafts.slice(1))}::uuid[], ${input.share},
+                ${sql.param(others ? [...others] : [])}::smallint[],
                 now() + make_interval(days => ${input.days}))
         RETURNING ${COLUMNS}`);
       const record = toRecord(rows[0]!);
@@ -445,7 +483,7 @@ export class ThemeExperimentService {
         subjectType: 'theme',
         subjectId: input.themeId,
         ...actorColumnsOf(tenant.actor),
-        details: { name, share: input.share, days: input.days, drafts: drafts.length },
+        details: { name, share: input.share, shares, days: input.days, drafts: drafts.length },
       });
       return { ok: true, value: record };
     });

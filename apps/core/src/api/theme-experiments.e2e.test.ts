@@ -130,4 +130,46 @@ describe.skipIf(!server)('Admin GraphQL API: theme experiments of several drafts
     );
     expect(rows).toEqual([{ ended_reason: 'theme_changed' }]);
   });
+
+  it('gives each draft its own share, the live theme shown to no fewer than any (ADR-952)', async () => {
+    const theme = async (name: string) =>
+      (
+        await data(`mutation ($name: String!) { themeCreate(name: $name) { theme { id } } }`, {
+          name,
+        })
+      ).theme.id as string;
+    const [b, c] = [await theme('Big sale banner'), await theme('Quiet banner')];
+    const SHARED = `mutation ($input: ThemeExperimentInput!) {
+      themeExperimentStart(input: $input) {
+        themeExperiment { share drafts { themeId share } }
+        userErrors { field message }
+      }
+    }`;
+    const input = { name: 'Banners', themeId: b, otherThemeIds: [c], days: 7 };
+    // The live theme's 40% fewer than the first draft's 45%; a share for no draft.
+    expect(
+      (await data(SHARED, { input: { ...input, share: 45, otherShares: [15] } })).userErrors,
+    ).toEqual([
+      {
+        field: ['input', 'otherShares'],
+        message:
+          'The live theme is shown to no fewer shoppers than any draft: give the drafts less',
+      },
+    ]);
+    expect(
+      (await data(SHARED, { input: { ...input, share: 10, otherShares: [10, 10] } })).userErrors,
+    ).toEqual([{ field: ['input', 'otherShares'], message: 'Give a share for each draft more' }]);
+    // 40% and 10%: more than a third for one draft, as one share for all could not be.
+    const started = await data(SHARED, { input: { ...input, share: 40, otherShares: [10] } });
+    expect(started).toEqual({
+      themeExperiment: {
+        share: 40,
+        drafts: [
+          { themeId: b, share: 40 },
+          { themeId: c, share: 10 },
+        ],
+      },
+      userErrors: [],
+    });
+  });
 });

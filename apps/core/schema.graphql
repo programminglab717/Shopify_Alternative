@@ -22044,7 +22044,7 @@ type ThemeExperiment {
   """
   revenueVerdict: String!
 
-  """The percent of shoppers shown each draft."""
+  """The percent of shoppers shown the first draft."""
   share: Int!
   startedAt: DateTime!
 
@@ -22083,6 +22083,9 @@ type ThemeExperimentDraft {
   """As the experiment’s `revenueVerdict`, of this draft."""
   revenueVerdict: String!
 
+  """The percent of shoppers shown it (ADR-952)."""
+  share: Int!
+
   """
   Whether Hatti stopped this draft as it sold clearly worse, its shoppers shown the live theme since and its counts kept as they were, the other drafts going on (ADR-939).
   """
@@ -22098,11 +22101,16 @@ input ThemeExperimentInput {
   days: Int!
   name: String!
 
+  """
+  Each other draft’s own percent of shoppers, in the order of otherThemeIds (ADR-952), 1 to 50: the live theme is shown to no fewer than any draft.
+  """
+  otherShares: [Int!]
+
   """Up to two drafts more, each shown its own share (ADR-931)."""
   otherThemeIds: [ID!]
 
   """
-  The percent of shoppers shown each draft: 1 to 50 for one, to 33 for two, to 25 for three.
+  The percent of shoppers shown the first draft, and each other one where otherShares gives none: 1 to 50 for one draft, to 33 for two, to 25 for three.
   """
   share: Int!
   themeId: ID!

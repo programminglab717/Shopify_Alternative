@@ -198,6 +198,11 @@ export interface ExperimentDoc {
   version: number;
   /** The percent of shoppers shown each of the experiment's drafts, 1 to 50. */
   share: number;
+  /**
+   * Each draft's own percent, arms b, c and d in turn, where they differ (ADR-952); absent for
+   * each the same, `share`.
+   */
+  shares?: number[];
   /** Its other drafts, arms c and d (ADR-931); absent for none, as before. */
   others?: { themeId: string; version: number }[];
   /**

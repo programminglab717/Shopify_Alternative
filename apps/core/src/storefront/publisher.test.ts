@@ -995,6 +995,27 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await experiments.list(tenant))[0]!.results.c?.converted).toBe(10);
   });
 
+  it("publishes each draft's own share where they differ (ADR-952)", async () => {
+    const experiments = new ThemeExperimentService(database);
+    const main = await themes.main(tenant);
+    const b = unwrap(await themes.create(tenant, { name: 'Loud', copyFrom: main.id })).id;
+    const c = unwrap(await themes.create(tenant, { name: 'Quiet', copyFrom: main.id })).id;
+    await deliver();
+    unwrap(
+      await experiments.start(tenant, {
+        name: 'Loud or quiet',
+        themeId: b,
+        otherThemeIds: [c],
+        share: 40,
+        otherShares: [10],
+        days: 7,
+      }),
+    );
+    await deliver();
+    const doc = (await store().shop()).experiment;
+    expect([doc?.share, doc?.shares]).toEqual([40, [40, 10]]);
+  });
+
   it('names what each picture its theme shows holds, so a file replaced is fetched afresh (ADR-670)', async () => {
     const insert = (id: string, folder: string, type = 'image/jpeg') =>
       admin.query(

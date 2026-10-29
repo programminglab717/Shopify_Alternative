@@ -6632,6 +6632,8 @@ export interface ThemeExperiment {
 /** A draft of a theme experiment, and what it says of it against the live theme (ADR-931). */
 export interface ThemeExperimentDraft {
   themeId: string;
+  /** Its own percent of shoppers (ADR-952); absent from older answers. */
+  share?: number;
   arm: ThemeExperimentArm;
   verdict: ThemeExperiment['verdict'];
   revenueVerdict: ThemeExperiment['revenueVerdict'];

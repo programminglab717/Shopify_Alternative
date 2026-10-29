@@ -54,9 +54,13 @@ export function experimentArm(
       ? { id, arm: 'a', assigned: false, uncounted: true }
       : { id, arm, assigned: false };
   }
-  // 0 to 99: below one share the first draft's, below two the second's, and so on; a stopped
-  // draft's share the live theme's.
-  const drawn = arms[Math.floor(draw(100) / experiment.share) + 1] ?? 'a';
+  // 0 to 99: below the first draft's share its, below that and the second's the second's, and so
+  // on, each draft its own share (ADR-952); a stopped draft's share the live theme's.
+  const shares = experiment.shares ?? arms.slice(1).map(() => experiment.share);
+  const point = draw(100);
+  let below = 0;
+  const at = shares.findIndex((share) => point < (below += share));
+  const drawn = at >= 0 ? (arms[at + 1] ?? 'a') : 'a';
   return { id: experiment.id, arm: stopped(drawn) ? 'a' : drawn, assigned: true };
 }
 
