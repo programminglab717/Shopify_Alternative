@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Reviews of experts
+### 12b43c0 · Reviews of experts
 
 * **A shop that hired an expert rates and reviews them;** shops see experts' ratings and
   reviews, and experts their own ([ADR-917](../architecture/13-decision-log.md#adr-917--a-shop-that-gave-an-expert-access-having-hired-them-rates-them-out-of-five-and-says-how-the-work-went-shops-see-experts-ratings-and-reviews-and-experts-their-own)).
