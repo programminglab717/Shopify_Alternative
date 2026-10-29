@@ -2829,6 +2829,11 @@ type CombinedListing {
   """What its products differ by, as its pages name the option: "Colour"."""
   optionName: String!
 
+  """
+  The option's name in Urdu (ADR-902), which Urdu pages show; null for none.
+  """
+  optionNameUr: String
+
   """In the order its pages show them."""
   products: [CombinedListingProduct!]!
   updatedAt: DateTime!
@@ -2847,6 +2852,9 @@ input CombinedListingInput {
 
   """Up to 255 characters."""
   optionName: String!
+
+  """The option's name in Urdu; left out, as it was; null or blank, none."""
+  optionNameUr: String
 
   """
   2 to 100 products, in the order its pages show them, each in no other listing.
@@ -2869,6 +2877,9 @@ type CombinedListingProduct {
 
   """Its value of the option: "Maroon"."""
   value: String!
+
+  """Its value in Urdu (ADR-902), which Urdu pages show; null for none."""
+  valueUr: String
 }
 
 input CombinedListingProductInput {
@@ -2876,6 +2887,11 @@ input CombinedListingProductInput {
 
   """Up to 255 characters, none of the others'."""
   value: String!
+
+  """
+  Its value in Urdu; left out, as it was for the product; null or blank, none.
+  """
+  valueUr: String
 }
 
 """

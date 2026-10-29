@@ -31,10 +31,12 @@ function toCombinedListing(record: CombinedListingRecord): CombinedListing {
   return Object.assign(new CombinedListing(), {
     id: toPublicId('combinedListing', record.id),
     optionName: record.optionName,
+    optionNameUr: record.optionNameUr,
     products: record.products.map((product) =>
       Object.assign(new CombinedListingProduct(), {
         productId: toPublicId('product', product.productId),
         value: product.value,
+        valueUr: product.valueUr,
       }),
     ),
     oneCard: record.oneCard,
@@ -107,9 +109,11 @@ export class CombinedListingResolver {
     return payload(
       await this.service.set(tenant, listingId, {
         optionName: input.optionName,
+        optionNameUr: input.optionNameUr,
         products: input.products.map((product) => ({
           productId: tryFromPublicId(product.productId, 'product') ?? NO_PRODUCT,
           value: product.value,
+          valueUr: product.valueUr,
         })),
         oneCard: input.oneCard,
       }),

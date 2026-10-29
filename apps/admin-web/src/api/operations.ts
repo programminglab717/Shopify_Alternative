@@ -1117,10 +1117,12 @@ const PRODUCT = /* GraphQL */ `
     combinedListing {
       id
       optionName
+      optionNameUr
       oneCard
       products {
         productId
         value
+        valueUr
         product {
           title
         }
@@ -10339,10 +10341,12 @@ export const CombinedListingSetMutation = /* GraphQL */ `
       combinedListing {
         id
         optionName
+        optionNameUr
         oneCard
         products {
           productId
           value
+          valueUr
           product {
             title
           }

@@ -313,7 +313,10 @@ export interface StitchingDoc {
 export interface CombinedListingDoc {
   /** "Colour". */
   optionName: string;
-  products: { id: string; value: string }[];
+  /** The option's name in Urdu (ADR-902), which Urdu pages show; absent for none. */
+  optionNameUr?: string;
+  /** Each with its value in Urdu where the shop gave one (ADR-902). */
+  products: { id: string; value: string; valueUr?: string }[];
   /**
    * Whether collections show the listing as one card (ADR-901), this product standing for the
    * others where it comes first; absent where not.

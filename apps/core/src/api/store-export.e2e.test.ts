@@ -188,6 +188,33 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
       { article: { blogId: blog.blog.id, title: 'Eid lawn is here', body: '<p>New prints.</p>' } },
     );
 
+    // And a combined listing of it and another, in English and Urdu (ADR-902).
+    const teal = await data(
+      app,
+      `mutation ($input: ProductCreateInput!) {
+        productCreate(input: $input) { product { id } }
+      }`,
+      { input: { title: 'Lawn suit, teal', status: 'ACTIVE', variants: [{ price: '4,500' }] } },
+    );
+    const combined = await data(
+      app,
+      `mutation ($input: CombinedListingInput!) {
+        combinedListingSet(input: $input) { userErrors { field code } }
+      }`,
+      {
+        input: {
+          optionName: 'Colour',
+          optionNameUr: 'رنگ',
+          oneCard: true,
+          products: [
+            { productId: product.product.id, value: 'Maroon', valueUr: 'مرون' },
+            { productId: teal.product.id, value: 'Teal' },
+          ],
+        },
+      },
+    );
+    expect(combined.userErrors).toEqual([]);
+
     owner = await member('owner');
     expect(await data(owner.token, EXPORTS)).toEqual([]);
     const asked = await data(owner.token, CREATE);
@@ -220,9 +247,11 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
       'collections.json',
       'pages.json',
       'blogs.json',
+      'combined-listings.json',
     ]);
     expect(files.get('README.txt')).toContain(`by ${toPublicId('user', owner.id)}`);
-    expect(files.get('README.txt')).toContain('products.csv: 1 product,');
+    expect(files.get('README.txt')).toContain('products.csv: 2 products,');
+    expect(files.get('README.txt')).toContain('combined-listings.json: 1 combined listing,');
     expect(files.get('README.txt')).toContain('orders.csv: 1 order,');
     expect(files.get('products.csv')).toContain('lawn-suit,Lawn suit');
     expect(files.get('customers.csv')).toContain('Ayesha Khan');
@@ -230,6 +259,17 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
     expect(files.get('order-line-items.csv')).toContain('Lawn suit');
     expect(JSON.parse(files.get('collections.json')!)).toEqual([
       expect.objectContaining({ handle: 'eid-edit', rules: null, products: ['lawn-suit'] }),
+    ]);
+    expect(JSON.parse(files.get('combined-listings.json')!)).toEqual([
+      {
+        optionName: 'Colour',
+        optionNameUr: 'رنگ',
+        oneCard: true,
+        products: [
+          { handle: 'lawn-suit', value: 'Maroon', valueUr: 'مرون' },
+          { handle: 'lawn-suit-teal', value: 'Teal', valueUr: null },
+        ],
+      },
     ]);
     expect(JSON.parse(files.get('pages.json')!)).toEqual([
       expect.objectContaining({ handle: 'about-us', body: '<p>Since 1998.</p>' }),

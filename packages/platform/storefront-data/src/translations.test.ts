@@ -48,4 +48,27 @@ describe('A product on a page in another language', () => {
     // In its own language, as it is.
     expect(translatedProduct(KURTA, 'en')).toBe(KURTA);
   });
+
+  it("names its combined listing's option and values in the shop's Urdu where it gave them (ADR-902)", () => {
+    const listed: ProductDoc = {
+      ...KURTA,
+      combinedListing: {
+        optionName: 'Colour',
+        optionNameUr: 'رنگ',
+        products: [
+          { id: KURTA.id, value: 'Maroon', valueUr: 'مرون' },
+          { id: 'other', value: 'Teal' },
+        ],
+      },
+    };
+    expect(translatedProduct(listed, 'ur').combinedListing).toEqual({
+      optionName: 'رنگ',
+      optionNameUr: 'رنگ',
+      products: [
+        { id: KURTA.id, value: 'مرون', valueUr: 'مرون' },
+        { id: 'other', value: 'Teal' },
+      ],
+    });
+    expect(translatedProduct(listed, 'en').combinedListing?.optionName).toBe('Colour');
+  });
 });

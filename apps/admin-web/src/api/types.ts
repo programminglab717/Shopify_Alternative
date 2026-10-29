@@ -5099,9 +5099,16 @@ export interface ProductSchedulePublishData {
 export interface CombinedListing {
   id: string;
   optionName: string;
+  /** Its option and values in Urdu (ADR-902). */
+  optionNameUr: string | null;
   /** Whether collections show it as one card (ADR-901). */
   oneCard: boolean;
-  products: { productId: string; value: string; product: { title: string } | null }[];
+  products: {
+    productId: string;
+    value: string;
+    valueUr: string | null;
+    product: { title: string } | null;
+  }[];
 }
 
 export interface CombinedListingSetData {

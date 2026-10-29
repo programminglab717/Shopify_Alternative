@@ -58,7 +58,8 @@ function core(role: StaffRole, listing: CombinedListing | null) {
       case 'CombinedListingSet': {
         const input = variables.input as {
           optionName: string;
-          products: { productId: string; value: string }[];
+          optionNameUr: string | null;
+          products: { productId: string; value: string; valueUr: string | null }[];
           oneCard: boolean;
         };
         if (input.products.some((each) => each.value === 'Teal' && each.productId === 'prod_3')) {
@@ -83,6 +84,7 @@ function core(role: StaffRole, listing: CombinedListing | null) {
         current = {
           id: 'cmbl_1',
           optionName: input.optionName,
+          optionNameUr: input.optionNameUr,
           oneCard: input.oneCard,
           products: input.products.map((each) => ({
             ...each,
@@ -156,6 +158,13 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
     });
     // Teal before mustard.
     fireEvent.click(screen.getByRole('button', { name: 'Move Lawn suit, teal up the listing' }));
+    // In Urdu too (ADR-902).
+    fireEvent.change(screen.getByLabelText('What they differ by, in Urdu'), {
+      target: { value: ' رنگ ' },
+    });
+    fireEvent.change(screen.getByLabelText('Its value for Lawn suit, teal, in Urdu'), {
+      target: { value: 'فیروزی' },
+    });
     // One card in collections (ADR-901).
     fireEvent.click(screen.getByRole('checkbox', { name: /Show as one card in collections/ }));
     fireEvent.click(save());
@@ -164,10 +173,11 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
       id: null,
       input: {
         optionName: 'Colour',
+        optionNameUr: 'رنگ',
         products: [
-          { productId: 'prod_1', value: 'Maroon' },
-          { productId: 'prod_2', value: 'Teal' },
-          { productId: 'prod_3', value: 'Mustard' },
+          { productId: 'prod_1', value: 'Maroon', valueUr: null },
+          { productId: 'prod_2', value: 'Teal', valueUr: 'فیروزی' },
+          { productId: 'prod_3', value: 'Mustard', valueUr: null },
         ],
         oneCard: true,
       },
@@ -189,10 +199,21 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
     const listing: CombinedListing = {
       id: 'cmbl_1',
       optionName: 'Colour',
+      optionNameUr: 'رنگ',
       oneCard: true,
       products: [
-        { productId: 'prod_2', value: 'Teal', product: { title: 'Lawn suit, teal' } },
-        { productId: 'prod_1', value: 'Maroon', product: { title: 'Lawn suit, maroon' } },
+        {
+          productId: 'prod_2',
+          value: 'Teal',
+          valueUr: 'فیروزی',
+          product: { title: 'Lawn suit, teal' },
+        },
+        {
+          productId: 'prod_1',
+          value: 'Maroon',
+          valueUr: null,
+          product: { title: 'Lawn suit, maroon' },
+        },
       ],
     };
     const fake = core('manager', listing);
@@ -204,6 +225,9 @@ describe("A product's combined listing, on its page (CAT-23, ADR-799)", () => {
     expect(
       (screen.getByRole('checkbox', { name: /Show as one card/ }) as HTMLInputElement).checked,
     ).toBe(true);
+    expect(
+      (screen.getByLabelText('Its value for Lawn suit, teal, in Urdu') as HTMLInputElement).value,
+    ).toBe('فیروزی');
     fireEvent.click(screen.getByRole('button', { name: 'Stop combining them' }));
     expect(await screen.findByText('They are shown on their own again')).toBeTruthy();
     expect(sentOf(fake, 'CombinedListingDelete')).toEqual([{ id: 'cmbl_1' }]);

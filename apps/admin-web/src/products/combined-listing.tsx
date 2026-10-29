@@ -27,6 +27,7 @@ interface Member {
   productId: string;
   title: string;
   value: string;
+  valueUr: string;
 }
 
 const membersOf = (listing: CombinedListing | null | undefined): Member[] =>
@@ -34,6 +35,7 @@ const membersOf = (listing: CombinedListing | null | undefined): Member[] =>
     productId: each.productId,
     title: each.product?.title ?? '',
     value: each.value,
+    valueUr: each.valueUr ?? '',
   }));
 
 /** The core's words for a product's problem, the product named where it is one. */
@@ -60,8 +62,9 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
   );
   const [listingId, setListingId] = useState(product.combinedListing?.id ?? null);
   const [optionName, setOptionName] = useState(product.combinedListing?.optionName ?? '');
+  const [optionNameUr, setOptionNameUr] = useState(product.combinedListing?.optionNameUr ?? '');
   const [oneCard, setOneCard] = useState(product.combinedListing?.oneCard ?? false);
-  const own: Member = { productId: product.id, title: product.title, value: '' };
+  const own: Member = { productId: product.id, title: product.title, value: '', valueUr: '' };
   const [members, setMembers] = useState<Member[]>(() => {
     const kept = membersOf(product.combinedListing);
     return kept.length > 0 ? kept : [own];
@@ -78,8 +81,8 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
     setMembers(next);
   };
 
-  const change = (index: number, value: string) =>
-    setMembers(members.map((each, at) => (at === index ? { ...each, value } : each)));
+  const change = (index: number, words: Partial<Pick<Member, 'value' | 'valueUr'>>) =>
+    setMembers(members.map((each, at) => (at === index ? { ...each, ...words } : each)));
 
   const onAdd = (productId: string, title: string) => {
     if (members.some((each) => each.productId === productId)) {
@@ -88,7 +91,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
       setNote(t('combined.most', { most: MOST_COMBINED }));
     } else {
       setNote(null);
-      setMembers([...members, { productId, title, value: '' }]);
+      setMembers([...members, { productId, title, value: '', valueUr: '' }]);
     }
   };
 
@@ -105,9 +108,11 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
         id: listingId,
         input: {
           optionName: optionName.trim(),
+          optionNameUr: optionNameUr.trim() || null,
           products: members.map((each) => ({
             productId: each.productId,
             value: each.value.trim(),
+            valueUr: each.valueUr.trim() || null,
           })),
           oneCard,
         },
@@ -120,6 +125,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
       const saved = combinedListingSet.combinedListing;
       setListingId(saved.id);
       setOptionName(saved.optionName);
+      setOptionNameUr(saved.optionNameUr ?? '');
       setOneCard(saved.oneCard);
       setMembers(membersOf(saved));
       setDone(t('combined.saved'));
@@ -141,6 +147,7 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
       }
       setListingId(null);
       setOptionName('');
+      setOptionNameUr('');
       setOneCard(false);
       setMembers([own]);
       setDone(t('combined.deleted'));
@@ -162,10 +169,19 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
           value={optionName}
           onChange={(event) => setOptionName(event.target.value)}
         />
+        <TextField
+          label={t('combined.optionUr')}
+          hint={t('combined.urHint')}
+          dir="rtl"
+          lang="ur"
+          maxLength={255}
+          value={optionNameUr}
+          onChange={(event) => setOptionNameUr(event.target.value)}
+        />
         <ol className="flex flex-col divide-y divide-line rounded-control border border-line">
           {members.map((each, index) => (
             <li key={each.productId} className="flex flex-wrap items-end gap-2 px-3 py-2">
-              <div className="min-w-48 flex-1">
+              <div className="flex min-w-48 flex-1 flex-col gap-2">
                 <TextField
                   label={t('combined.value', { title: each.title })}
                   hint={each.productId === product.id ? t('combined.this') : undefined}
@@ -173,7 +189,15 @@ export function ProductCombinedListingCard({ product }: { product: ProductDetail
                   maxLength={255}
                   required
                   value={each.value}
-                  onChange={(event) => change(index, event.target.value)}
+                  onChange={(event) => change(index, { value: event.target.value })}
+                />
+                <TextField
+                  label={t('combined.valueUr', { title: each.title })}
+                  dir="rtl"
+                  lang="ur"
+                  maxLength={255}
+                  value={each.valueUr}
+                  onChange={(event) => change(index, { valueUr: event.target.value })}
                 />
               </div>
               <Button

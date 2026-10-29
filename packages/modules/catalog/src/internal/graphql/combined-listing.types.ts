@@ -11,6 +11,12 @@ export class CombinedListingProduct {
 
   @Field({ description: 'Its value of the option: "Maroon".' })
   value!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Its value in Urdu (ADR-902), which Urdu pages show; null for none.',
+  })
+  valueUr!: string | null;
 }
 
 @ObjectType({
@@ -25,6 +31,12 @@ export class CombinedListing {
 
   @Field({ description: 'What its products differ by, as its pages name the option: "Colour".' })
   optionName!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The option's name in Urdu (ADR-902), which Urdu pages show; null for none.",
+  })
+  optionNameUr!: string | null;
 
   @Field(() => [CombinedListingProduct], { description: 'In the order its pages show them.' })
   products!: CombinedListingProduct[];
@@ -50,12 +62,24 @@ export class CombinedListingProductInput {
 
   @Field({ description: `Up to ${COMBINED_LISTING_LIMITS.value} characters, none of the others'.` })
   value!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Its value in Urdu; left out, as it was for the product; null or blank, none.',
+  })
+  valueUr?: string | null;
 }
 
 @InputType()
 export class CombinedListingInput {
   @Field({ description: `Up to ${COMBINED_LISTING_LIMITS.optionName} characters.` })
   optionName!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The option's name in Urdu; left out, as it was; null or blank, none.",
+  })
+  optionNameUr?: string | null;
 
   @Field(() => [CombinedListingProductInput], {
     description:

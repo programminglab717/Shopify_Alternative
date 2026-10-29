@@ -1,6 +1,7 @@
 import { PublicSite, type TenantContext } from '@hatti/api';
 import {
   CollectionService,
+  CombinedListingService,
   ProductExportService,
   StockFileService,
   VariantService,
@@ -56,6 +57,7 @@ export interface StoreExportSources {
   customers: CustomerTransferService;
   orders: OrderExportService;
   redirects: UrlRedirectService;
+  combinedListings: CombinedListingService;
   collections: CollectionService;
   pages: PageService;
   blogs: BlogService;
@@ -69,7 +71,8 @@ const PAGE = 250;
  * The whole store as files (ADM-10, ADR-415, ADR-417), each in the format its own export writes,
  * so that each goes back in where an import takes it: Shopify's product and inventory CSVs, the
  * customers' CSV, the orders a row each and their line items a row each, and Shopify's redirects
- * CSV; the online store's collections, pages and blogs as JSON; and a README saying what each is.
+ * CSV; the online store's collections, pages and blogs, and the combined listings (ADR-902), as
+ * JSON; and a README saying what each is.
  * Made as `tenant`, an owner: each export's audit and watermarks name them.
  */
 export class StoreExportBuilder {
@@ -111,6 +114,7 @@ export class StoreExportBuilder {
     );
     const redirectFile = await redirects.export(tenant);
     const content = await this.#content(tenant);
+    const listings = await this.#combinedListings(tenant);
 
     const exporter =
       tenant.actor.kind === 'staff' ? toPublicId('user', tenant.actor.userId) : 'Hatti';
@@ -132,6 +136,8 @@ export class StoreExportBuilder {
         "rules of automated ones and the products' handles of manual ones.",
       `pages.json: ${count(content.pages.length, 'page')} of the online store.`,
       `blogs.json: ${count(content.blogs.length, 'blog')}, each with its articles.`,
+      `combined-listings.json: ${count(listings.length, 'combined listing')}, each with its ` +
+        "option and its products' handles and values, in English and Urdu.",
       '',
       "Customers' numbers and addresses are personal data: keep this file safe, and delete it " +
         'once it is no longer needed.',
@@ -148,7 +154,31 @@ export class StoreExportBuilder {
       { path: 'collections.json', data: json(content.collections) },
       { path: 'pages.json', data: json(content.pages) },
       { path: 'blogs.json', data: json(content.blogs) },
+      { path: 'combined-listings.json', data: json(listings) },
     ];
+  }
+
+  /**
+   * The shop's combined listings (ADR-902), the oldest first, each its option, whether it is one
+   * card in collections, and its products by handle with their values, in English and Urdu.
+   */
+  async #combinedListings(tenant: TenantContext) {
+    const { combinedListings } = this.sources;
+    const listings = (await combinedListings.list(tenant)).reverse();
+    const products = await combinedListings.productsOf(
+      tenant,
+      listings.flatMap((listing) => listing.products.map((product) => product.productId)),
+    );
+    return listings.map((listing) => ({
+      optionName: listing.optionName,
+      optionNameUr: listing.optionNameUr,
+      oneCard: listing.oneCard,
+      products: listing.products.map((product) => ({
+        handle: products.get(product.productId)?.handle ?? null,
+        value: product.value,
+        valueUr: product.valueUr,
+      })),
+    }));
   }
 
   /**
@@ -239,6 +269,7 @@ export function storeExportBuilder(database: Database, site: PublicSite): StoreE
     ),
     orders: new OrderExportService(database),
     redirects: new UrlRedirectService(database),
+    combinedListings: new CombinedListingService(database),
     collections: new CollectionService(database),
     pages: new PageService(database),
     blogs: new BlogService(database),

@@ -70,10 +70,28 @@ export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
   };
 }
 
-/** A product's eastern-wear attributes in Urdu words on Urdu pages (ADR-477). */
+/**
+ * A product's eastern-wear attributes in Urdu words on Urdu pages (ADR-477), and its combined
+ * listing's option and values in the shop's Urdu where it gave them (ADR-902).
+ */
 function urduWords(doc: ProductDoc, locale: string): ProductDoc {
+  if (locale !== 'ur') return doc;
+  const listing = doc.combinedListing;
+  if (listing) {
+    doc = {
+      ...doc,
+      combinedListing: {
+        ...listing,
+        optionName: listing.optionNameUr ?? listing.optionName,
+        products: listing.products.map((product) => ({
+          ...product,
+          value: product.valueUr ?? product.value,
+        })),
+      },
+    };
+  }
   const wear = doc.easternWear;
-  if (locale !== 'ur' || !wear) return doc;
+  if (!wear) return doc;
   const inUrdu = (word: AttributeWordDoc | undefined) => word && { ...word, label: word.ur };
   return {
     ...doc,

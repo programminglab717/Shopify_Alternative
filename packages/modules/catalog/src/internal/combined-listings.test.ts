@@ -80,7 +80,7 @@ describe.skipIf(!server)('Combined listings (CAT-23, ADR-799)', () => {
     // A product taken off sale stays, said to be off sale.
     unwrap(await f.products.update(f.a, { id: teal, status: 'draft' }));
     expect((await listings.get(f.a, made.id))!.products).toEqual([
-      { productId: teal, value: 'Teal', active: false },
+      { productId: teal, value: 'Teal', valueUr: null, active: false },
     ]);
     expect(unwrap(await listings.delete(f.a, made.id))).toBe(made.id);
     expect(await listings.get(f.a, made.id)).toBeNull();
@@ -110,6 +110,62 @@ describe.skipIf(!server)('Combined listings (CAT-23, ADR-799)', () => {
       unwrap(await listings.set(f.a, made.id, { optionName: 'Colour', products, oneCard: false }))
         .oneCard,
     ).toBe(false);
+  });
+
+  it('keeps its option and values in Urdu, as they were where a change leaves them out (ADR-902)', async () => {
+    const maroon = await product('Urdu maroon');
+    const teal = await product('Urdu teal');
+    const made = unwrap(
+      await listings.set(f.a, null, {
+        optionName: 'Colour',
+        optionNameUr: ' رنگ ',
+        products: [
+          { productId: maroon, value: 'Maroon', valueUr: 'مرون' },
+          { productId: teal, value: 'Teal', valueUr: ' ' },
+        ],
+      }),
+    );
+    expect(made.optionNameUr).toBe('رنگ');
+    expect(made.products.map((each) => each.valueUr)).toEqual(['مرون', null]);
+    // Left out: kept, for each product whatever its place; null clears.
+    const kept = unwrap(
+      await listings.set(f.a, made.id, {
+        optionName: 'Colour',
+        products: [
+          { productId: teal, value: 'Teal', valueUr: 'فیروزی' },
+          { productId: maroon, value: 'Maroon' },
+        ],
+      }),
+    );
+    expect(kept.optionNameUr).toBe('رنگ');
+    expect(kept.products.map((each) => each.valueUr)).toEqual(['فیروزی', 'مرون']);
+    const cleared = unwrap(
+      await listings.set(f.a, made.id, {
+        optionName: 'Colour',
+        optionNameUr: null,
+        products: [
+          { productId: teal, value: 'Teal', valueUr: null },
+          { productId: maroon, value: 'Maroon' },
+        ],
+      }),
+    );
+    expect(cleared.optionNameUr).toBeNull();
+    expect(cleared.products.map((each) => each.valueUr)).toEqual([null, 'مرون']);
+    expect(
+      errorsOf(
+        await listings.set(f.a, made.id, {
+          optionName: 'Colour',
+          optionNameUr: 'ر'.repeat(256),
+          products: [
+            { productId: teal, value: 'Teal', valueUr: 'ف'.repeat(256) },
+            { productId: maroon, value: 'Maroon' },
+          ],
+        }),
+      ),
+    ).toEqual([
+      ['input.optionNameUr', 'TOO_LONG'],
+      ['input.products.0.valueUr', 'TOO_LONG'],
+    ]);
   });
 
   it("refuses too few products, one named twice, a value twice, another listing's, and another shop's", async () => {

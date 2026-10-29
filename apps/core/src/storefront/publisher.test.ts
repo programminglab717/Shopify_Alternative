@@ -1724,7 +1724,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(
       await listings.set(tenant, listing.id, {
         optionName: 'Colour',
-        products: members,
+        optionNameUr: 'رنگ',
+        products: [{ ...members[0]!, valueUr: 'مرون' }, members[1]!],
         oneCard: true,
       }),
     );
@@ -1733,7 +1734,16 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await held()).toEqual([teal.id, plain.id]);
     const all = (await store().collectionByHandle('all'))!.productIds;
     expect(all.filter((id) => id === maroon.id || id === teal.id)).toHaveLength(1);
-    expect((await store().productByHandle(teal.handle))?.combinedListing?.oneCard).toBe(true);
+    // With its Urdu words, for Urdu pages (ADR-902).
+    expect((await store().productByHandle(teal.handle))?.combinedListing).toEqual({
+      optionName: 'Colour',
+      optionNameUr: 'رنگ',
+      oneCard: true,
+      products: [
+        { id: maroon.id, value: 'Maroon', valueUr: 'مرون' },
+        { id: teal.id, value: 'Teal' },
+      ],
+    });
     // Taken off sale, the next stands for it.
     unwrap(await products.update(tenant, { id: teal.id, status: 'draft' }));
     await deliver();

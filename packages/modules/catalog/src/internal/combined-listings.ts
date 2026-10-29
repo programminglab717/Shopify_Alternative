@@ -32,10 +32,16 @@ export const COMBINED_LISTING_LIMITS = {
 export interface CombinedListingProduct {
   productId: string;
   value: string;
+  /**
+   * Its value in Urdu (ADR-902), for the storefront's Urdu pages; null for none. Left out of a
+   * change, as it was for the product.
+   */
+  valueUr?: string | null;
 }
 
 /** A product of a listing as kept: whether it is on sale, for the storefront to show it. */
 export interface CombinedListingMember extends CombinedListingProduct {
+  valueUr: string | null;
   active: boolean;
 }
 
@@ -43,6 +49,8 @@ export interface CombinedListingRecord {
   id: string;
   /** What its products differ by: "Colour". */
   optionName: string;
+  /** The option's name in Urdu (ADR-902); null for none. */
+  optionNameUr: string | null;
   /** In the order its pages show them. */
   products: CombinedListingMember[];
   /**
@@ -56,6 +64,8 @@ export interface CombinedListingRecord {
 
 export interface CombinedListingInput {
   optionName: string;
+  /** Left out, as it was; null for none. */
+  optionNameUr?: string | null;
   products: readonly CombinedListingProduct[];
   /** Left out, as it was; false for a new listing. */
   oneCard?: boolean | null;
@@ -64,6 +74,7 @@ export interface CombinedListingInput {
 type ListingRow = {
   id: string;
   option_name: string;
+  option_name_ur: string | null;
   one_card: boolean;
   created_at: Date;
   updated_at: Date;
@@ -73,8 +84,9 @@ type ListingRow = {
 /** The listings `where` picks, each with its products in order, in the caller's transaction. */
 async function listingsWhere(tx: Tx, shopId: string, where: SQL): Promise<CombinedListingRecord[]> {
   const { rows } = await tx.execute<ListingRow>(sql`
-    SELECT l.id, l.option_name, l.one_card, l.created_at, l.updated_at,
+    SELECT l.id, l.option_name, l.option_name_ur, l.one_card, l.created_at, l.updated_at,
            coalesce((SELECT json_agg(json_build_object('productId', m.product_id, 'value', m.value,
+                                                       'valueUr', m.value_ur,
                                                        'active', p.status = 'active')
                                      ORDER BY m.position)
                        FROM catalog.combined_listing_products m
@@ -86,6 +98,7 @@ async function listingsWhere(tx: Tx, shopId: string, where: SQL): Promise<Combin
   return rows.map((row) => ({
     id: row.id,
     optionName: row.option_name,
+    optionNameUr: row.option_name_ur,
     products: row.products,
     oneCard: row.one_card,
     createdAt: new Date(row.created_at),
@@ -173,6 +186,17 @@ export class CombinedListingService {
     const errors: FieldError[] = [];
     const optionName = input.optionName.trim();
     const oneCard = input.oneCard ?? null;
+    // Urdu words: left out, as they were; blank, none (ADR-902).
+    const urdu = (text: string | null | undefined) =>
+      text === undefined ? undefined : text === null ? null : text.trim() || null;
+    const optionNameUr = urdu(input.optionNameUr);
+    if (optionNameUr && optionNameUr.length > COMBINED_LISTING_LIMITS.optionName) {
+      errors.push({
+        field: ['input', 'optionNameUr'],
+        code: 'TOO_LONG',
+        message: `Give the option's name in Urdu in up to ${COMBINED_LISTING_LIMITS.optionName} characters`,
+      });
+    }
     if (optionName.length < 1 || optionName.length > COMBINED_LISTING_LIMITS.optionName) {
       errors.push({
         field: ['input', 'optionName'],
@@ -191,6 +215,7 @@ export class CombinedListingService {
     const products = input.products.map((product) => ({
       productId: product.productId,
       value: product.value.trim(),
+      valueUr: urdu(product.valueUr),
     }));
     const ids = new Set<string>();
     const values = new Set<string>();
@@ -218,21 +243,33 @@ export class CombinedListingService {
         });
       }
       values.add(product.value.toLowerCase());
+      if (product.valueUr && product.valueUr.length > COMBINED_LISTING_LIMITS.value) {
+        errors.push({
+          field: [...field, 'valueUr'],
+          code: 'TOO_LONG',
+          message: `Give its value in Urdu in up to ${COMBINED_LISTING_LIMITS.value} characters`,
+        });
+      }
     });
     if (errors.length > 0) return { ok: false, errors };
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { shopId } = tenant;
       let before: string[] = [];
+      const urduBefore = new Map<string, string | null>();
       if (id) {
         const { rows } = await tx.execute<{ id: string }>(sql`
           SELECT id FROM catalog.combined_listings WHERE shop_id = ${shopId} AND id = ${id}
              FOR UPDATE`);
         if (!rows[0]) return failOne(['id'], 'NOT_FOUND', 'Combined listing not found');
-        const { rows: members } = await tx.execute<{ product_id: string }>(sql`
-          SELECT product_id FROM catalog.combined_listing_products
+        const { rows: members } = await tx.execute<{
+          product_id: string;
+          value_ur: string | null;
+        }>(sql`
+          SELECT product_id, value_ur FROM catalog.combined_listing_products
            WHERE shop_id = ${shopId} AND listing_id = ${id}`);
         before = members.map((row) => row.product_id);
+        for (const row of members) urduBefore.set(row.product_id, row.value_ur);
       }
       const asked = sql.param(products.map((product) => product.productId));
       const { rows: found } = await tx.execute<{ id: string; listing_id: string | null }>(sql`
@@ -263,6 +300,8 @@ export class CombinedListingService {
         await tx.execute(sql`
           UPDATE catalog.combined_listings
              SET option_name = ${optionName}, one_card = coalesce(${oneCard}, one_card),
+                 option_name_ur = CASE WHEN ${optionNameUr === undefined} THEN option_name_ur
+                                       ELSE ${optionNameUr ?? null}::text END,
                  updated_at = now()
            WHERE shop_id = ${shopId} AND id = ${listingId}`);
         await tx.execute(sql`
@@ -270,16 +309,23 @@ export class CombinedListingService {
            WHERE shop_id = ${shopId} AND listing_id = ${listingId}`);
       } else {
         const { rows } = await tx.execute<{ id: string }>(sql`
-          INSERT INTO catalog.combined_listings (shop_id, option_name, one_card)
-          VALUES (${shopId}, ${optionName}, ${oneCard ?? false}) RETURNING id`);
+          INSERT INTO catalog.combined_listings (shop_id, option_name, one_card, option_name_ur)
+          VALUES (${shopId}, ${optionName}, ${oneCard ?? false}, ${optionNameUr ?? null})
+          RETURNING id`);
         listingId = rows[0]!.id;
       }
+      const valuesUr = products.map((product) =>
+        product.valueUr === undefined
+          ? (urduBefore.get(product.productId) ?? null)
+          : product.valueUr,
+      );
       await tx.execute(sql`
         INSERT INTO catalog.combined_listing_products
-               (shop_id, listing_id, product_id, value, position)
-        SELECT ${shopId}, ${listingId}, u.product_id, u.value, u.position - 1
-          FROM unnest(${asked}::uuid[], ${sql.param(products.map((product) => product.value))}::text[])
-               WITH ORDINALITY AS u(product_id, value, position)`);
+               (shop_id, listing_id, product_id, value, value_ur, position)
+        SELECT ${shopId}, ${listingId}, u.product_id, u.value, u.value_ur, u.position - 1
+          FROM unnest(${asked}::uuid[], ${sql.param(products.map((product) => product.value))}::text[],
+                      ${sql.param(valuesUr)}::text[])
+               WITH ORDINALITY AS u(product_id, value, value_ur, position)`);
       await appendEvent<CombinedListingUpdatedPayload>(tx, shopId, {
         type: CombinedListingEvents.Updated,
         aggregateType: 'combined_listing',

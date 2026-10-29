@@ -273,11 +273,16 @@ function combinedListingDoc(
   if (!listing) return {};
   const products = listing.products
     .filter((product) => product.active || product.productId === productId)
-    .map((product) => ({ id: product.productId, value: product.value }));
+    .map((product) => ({
+      id: product.productId,
+      value: product.value,
+      ...(product.valueUr && { valueUr: product.valueUr }),
+    }));
   if (products.length < 2) return {};
   return {
     combinedListing: {
       optionName: listing.optionName,
+      ...(listing.optionNameUr && { optionNameUr: listing.optionNameUr }),
       products,
       ...(listing.oneCard && { oneCard: true as const }),
     },
