@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-921 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-922 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -929,6 +929,7 @@
 | 919 | A shop's SSO email domains are proved its through a TXT record of its token, a proved domain one shop's alone, taking every sign-in by email of it | Accepted |
 | 920 | An order on payment terms tells its customer, on its page, what they owe by transfer and by which day, or that it was due, and takes their receipt, shipped or not | Accepted |
 | 921 | Theme experiments count each arm's revenue from the orders its sessions place at checkout, once an order, and say by Welch's test whether the draft brings more or less money a session | Accepted |
+| 922 | The command line builds an app's checkout functions with the developer's own tool and deploys them by their handle, from a directory's hatti.function.json | Accepted |
 
 ---
 
@@ -30379,3 +30380,29 @@
   * Orders paid online whose thank-you page carries the gateway's form are counted neither as
     conversions nor as revenue, as before.
   * Not yet: more than two arms, tests of a section alone, price tests (OWN-56).
+
+## ADR-922 · The command line builds an app's checkout functions with the developer's own tool and deploys them by their handle, from a directory's hatti.function.json
+
+* **Context:** ADR-868's functions are given through `appFunctionSet`, the module base64 in the
+  request. A developer built with Javy, TinyGo or Rust, encoded the file and wrote the mutation by
+  hand. ADR-868 left the CLI building and deploying them for later; Shopify's CLI does both.
+* **Decision:**
+  * **A function's directory** says what it is in `hatti.function.json`: its handle, title,
+    target (`payment_customization` or `cart_validation`), its module's path within the
+    directory, and the command that builds it, if any.
+  * **`hatti function build`** runs that command in the directory, its output shown line by line,
+    then checks the module as the API will: WebAssembly, 256 KiB at most. It needs no token: it
+    runs on the developer's machine alone.
+  * **`hatti function deploy`** builds it (`--no-build` sends the module as it is) and gives it to
+    the shop by `appFunctionSet` with the app's token (`write_settings`). A new version runs as the
+    last did; one the shop hasn't turned on says it is off until it is turned on in
+    Settings › Apps. The API's refusals are said as it words them.
+  * **`hatti function list`** shows the app's functions in the shop, on or off, with their last
+    failure.
+  * The build command is the developer's own, run as they would run it; Hatti installs no
+    compiler.
+* **Consequences:**
+  * An app's function goes from source to the shop's checkout in one command, and into CI the same
+    way.
+  * Not yet: running a function locally on a sample input (`function run`), and scaffolding a new
+    one (`app init`).
