@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-945 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-946 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -953,6 +953,7 @@
 | 943 | Shoppers sign in through the Storefront API with a code sent to their number, and its customer access token reads their orders and store credit | Accepted |
 | 944 | The headless starter signs shoppers in with a code sent to their number, and shows their orders to buy again and their store credit | Accepted |
 | 945 | Customers owing on payment terms are reminded before the due date and once past it, on WhatsApp and by email, with what is left and the order's page | Accepted |
+| 946 | The Storefront API keeps a signed-in shopper's address book, as Shopify's does, through the core's: in Pakistan alone, a landmark besides | Accepted |
 
 ---
 
@@ -30955,3 +30956,26 @@
 * **Consequences:**
   * A wholesaler's resellers are told when to pay, and the shop chases fewer of them by hand.
   * Not yet: reminders repeated weekly while overdue; the shop choosing how many days before.
+
+## ADR-946 · The Storefront API keeps a signed-in shopper's address book, as Shopify's does, through the core's: in Pakistan alone, a landmark besides
+
+* **Context:** ADR-943 signs shoppers in through the Storefront API and reads their orders, but
+  not their address book, which the shop's own account pages keep (ADR-583). ADR-943 left the
+  address book for later.
+* **Decision:**
+  * **`Customer.addresses` and `defaultAddress`** give the book as Shopify's `MailingAddress`:
+    the default first, the name split into first and last, Pakistan as the country, the lines a
+    label shows in `formatted`, and the landmark Hatti's checkout asks for.
+  * **The mutations are Shopify's:** `customerAddressCreate`, `customerAddressUpdate`,
+    `customerAddressDelete` and `customerDefaultAddressUpdate`, each with the customer access
+    token. They go through the core's address book, which checks an address as checkout does
+    and keeps 20 at most. Its refusals come back by field.
+  * **An update changes only what it gives.** The rest is kept from the address as it was, and
+    the default stays the default.
+  * **Another country is refused** before the core is asked. An address not in the shopper's
+    book is `NOT_FOUND`, and a token that is no one's is `UNIDENTIFIED_CUSTOMER`.
+  * **`MailingAddressInput` takes a `landmark`** besides Shopify's fields. Its `province` is a
+    name or a code.
+* **Consequences:**
+  * A headless site keeps a shopper's addresses as the shop's own pages do, with Shopify's names.
+  * Not yet: the headless starter's address page; wishlists and data requests through the API.
