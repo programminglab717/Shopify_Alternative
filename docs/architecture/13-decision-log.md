@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-960 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-961 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -968,6 +968,7 @@
 | 958 | A running theme experiment's shares may be changed, the shoppers already shown a theme keeping it | Accepted |
 | 959 | The Storefront API's nodes gives pages, blogs and articles by their IDs too | Accepted |
 | 960 | An expansion store's copied price may take a margin of its own for a single product, before its collections' | Accepted |
+| 961 | The headless starter shows the products viewed before, on each product's page and the home page, kept by the shopper's browser alone | Accepted |
 
 ---
 
@@ -31285,3 +31286,22 @@
 * **Consequences:**
   * The few products dearer to ship are priced for it, without a collection of their own.
   * Not yet: a margin by product type or vendor.
+
+## ADR-961 · The headless starter shows the products viewed before, on each product's page and the home page, kept by the shopper's browser alone
+
+* **Context:** A shopper comparing kurtas goes back and forth between them. The shop's own pages
+  keep what was viewed; the Next.js starter (ADR-869) kept nothing. ADR-957 left recently viewed
+  products for later.
+* **Decision:**
+  * **Kept by the browser alone:** each product's page puts its product's ID first in the
+    browser's local storage (`hatti_viewed`), nine at most. Nothing is sent to Hatti or kept by
+    the site; a browser that keeps nothing shows nothing.
+  * **Shown under the product:** the eight viewed before it, as cards, "Recently viewed", read by
+    a server action through `nodes(ids:)` (ADR-956) in one request, in the shopper's language,
+    those the shop no longer sells left out. Only product IDs are asked for.
+  * **On the home page too**, all of them, on its first page, not while searching.
+  * The pages themselves stay as cacheable as before: the list is drawn in the browser once they
+    have loaded.
+* **Consequences:**
+  * A shopper finds again what they looked at, as on the shop's own pages.
+  * Not yet: recently viewed kept with the shopper's account, across devices.
