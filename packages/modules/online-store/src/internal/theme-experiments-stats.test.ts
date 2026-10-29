@@ -54,4 +54,27 @@ describe('What a theme experiment says of its draft (OS-22, ADR-866)', () => {
     expect(revenueVerdictOf({ a: arm(1_000, 20, 1_500_000), b: arm(1_000, 20) })).toBe('b_worse');
     expect(revenueVerdictOf({ a: arm(1_000, 20), b: arm(1_000, 22) })).toBe('no_difference');
   });
+
+  it('asks more of each draft as there are more of them, so none is found better by chance (ADR-931)', () => {
+    // 2% against 3.6% of 1,000 sessions each, z ≈ 2.17: better alone, not among two drafts.
+    const one = { a: arm(1_000, 20), b: arm(1_000, 36) };
+    expect(zScoreOf(one)).toBeCloseTo(2.17, 2);
+    expect(verdictOf(one)).toBe('b_better');
+    const two = { ...one, c: arm(1_000, 20) };
+    expect(verdictOf(two)).toBe('no_difference');
+    expect(verdictOf(two, 'c')).toBe('no_difference');
+    // Each draft is told of by its own arm.
+    const three = { a: arm(1_000, 20), b: arm(1_000, 20), c: arm(1_000, 45), d: arm(150, 1) };
+    expect(verdictOf(three, 'c')).toBe('b_better');
+    expect(verdictOf(three, 'd')).toBe('too_early');
+    expect(zScoreOf({ a: arm(1_000, 20), b: arm(1_000, 20) }, 'c')).toBeNull();
+    expect(revenueVerdictOf(three, 'c')).toBe('b_better');
+    // Any draft clearly worse ends it.
+    expect(guardrailTripped({ a: arm(1_000, 40), b: arm(1_000, 40), c: arm(1_000, 12) })).toBe(
+      true,
+    );
+    expect(guardrailTripped({ a: arm(1_000, 40), b: arm(1_000, 40), c: arm(1_000, 38) })).toBe(
+      false,
+    );
+  });
 });

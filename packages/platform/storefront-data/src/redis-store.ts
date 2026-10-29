@@ -13,7 +13,7 @@ import {
   type StoreData,
   type ThemeDoc,
 } from './documents.js';
-import { StorefrontKeys, type HandledKind } from './keys.js';
+import { StorefrontKeys, type DraftArm, type HandledKind } from './keys.js';
 import { scripted, type ScriptedRedis } from './scripts.js';
 
 /** A shop whose documents were never written: its storefront is not published. */
@@ -119,8 +119,8 @@ export class RedisStore implements StoreData {
     return parse(await this.#get(this.keys.theme(this.shopId)));
   }
 
-  async experimentTheme(): Promise<ThemeDoc | null> {
-    return parse(await this.#get(this.keys.experimentTheme(this.shopId)));
+  async experimentTheme(arm: DraftArm = 'b'): Promise<ThemeDoc | null> {
+    return parse(await this.#get(this.keys.experimentTheme(this.shopId, arm)));
   }
 
   async handles(kind: HandledKind): Promise<string[]> {

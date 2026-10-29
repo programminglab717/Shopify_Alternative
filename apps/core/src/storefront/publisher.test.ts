@@ -914,6 +914,76 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
   });
 
+  it('publishes each draft of an experiment of several, in its own arm, until one sells clearly worse (ADR-931)', async () => {
+    const experiments = new ThemeExperimentService(database);
+    const main = await themes.main(tenant);
+    const drafts = [];
+    for (const name of ['Bigger photos', 'Eid banner', 'Urdu first']) {
+      drafts.push(unwrap(await themes.create(tenant, { name, copyFrom: main.id })));
+    }
+    await deliver();
+    const [b, c, d] = drafts.map((each) => each.id) as [string, string, string];
+    const start = (otherThemeIds: string[], share = 25) =>
+      experiments.start(tenant, { name: 'Three ways', themeId: b, otherThemeIds, share, days: 14 });
+    const codes = (result: Awaited<ReturnType<typeof start>>) =>
+      result.ok ? [] : result.errors.map((each) => [each.field.join('.'), each.code]);
+    // Each draft its share, the live theme never fewer: 25% each for three.
+    expect(codes(await start([c, d], 30))).toEqual([['input.share', 'INVALID']]);
+    expect(codes(await start([c, c]))).toEqual([['input.otherThemeIds', 'INVALID']]);
+    expect(codes(await start([c, d, main.id], 20))).toEqual([['input.otherThemeIds', 'TOO_MANY']]);
+    expect(codes(await start([main.id]))).toEqual([['input.otherThemeIds', 'INVALID']]);
+
+    const running = unwrap(await start([c, d]));
+    expect(running.themeIds).toEqual([b, c, d]);
+    expect(Object.keys(running.results)).toEqual(['a', 'b', 'c', 'd']);
+    expect(await deliver()).toEqual(['theme_experiment.updated']);
+    expect((await store().shop()).experiment).toEqual({
+      id: toPublicId('themeExperiment', running.id),
+      themeId: b,
+      version: drafts[0]!.version,
+      share: 25,
+      others: [
+        { themeId: c, version: drafts[1]!.version },
+        { themeId: d, version: drafts[2]!.version },
+      ],
+    });
+    expect((await store().experimentTheme())?.id).toBe(b);
+    expect((await store().experimentTheme('c'))?.id).toBe(c);
+    expect((await store().experimentTheme('d'))?.id).toBe(d);
+    // The last draft followed as it changes.
+    unwrap(
+      await themes.upsertFiles(tenant, d, [
+        { filename: 'config/settings_data.json', body: '{"current":{}}' },
+      ]),
+    );
+    expect(await deliver()).toEqual(['theme.updated']);
+    expect((await store().shop()).experiment?.others?.[1]?.version).toBe(drafts[2]!.version + 1);
+
+    // One draft selling clearly worse ends it all.
+    const arm = (sessions: number, converted: number) => ({
+      sessions,
+      added_to_cart: converted * 3,
+      reached_checkout: converted * 2,
+      converted,
+      revenue: converted * 500_000,
+      revenue_squares: converted * 500_000 ** 2,
+    });
+    const asked: number[] = [];
+    const sweeps = new ThemeExperiments(database, {
+      experimentCounts: async (_shop, _id, many = 1) => {
+        asked.push(many);
+        return { a: arm(1_000, 40), b: arm(1_000, 41), c: arm(1_000, 10), d: arm(1_000, 39) };
+      },
+    });
+    expect(await sweeps.sweep()).toEqual([{ id: running.id, reason: 'guardrail' }]);
+    expect(asked).toEqual([3]);
+    await deliver();
+    expect((await store().shop()).experiment).toBeUndefined();
+    expect(await store().experimentTheme('c')).toBeNull();
+    expect(await store().experimentTheme('d')).toBeNull();
+    expect((await experiments.list(tenant))[0]!.results.c?.converted).toBe(10);
+  });
+
   it('names what each picture its theme shows holds, so a file replaced is fetched afresh (ADR-670)', async () => {
     const insert = (id: string, folder: string, type = 'image/jpeg') =>
       admin.query(

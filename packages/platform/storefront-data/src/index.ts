@@ -101,9 +101,12 @@ export { handleTag, imageTag, pathTag, shopTag } from './cache-tags.js';
 export { ShopDirectory } from './directory.js';
 export {
   ACTIVITY_STEPS,
+  EXPERIMENT_ARMS,
   StorefrontKeys,
   redirectKey,
   type ActivityStep,
+  type DraftArm,
+  type ExperimentArm,
   type HandledKind,
 } from './keys.js';
 export { BuildQueue, type Batch, type BuildQueueOptions } from './queue.js';

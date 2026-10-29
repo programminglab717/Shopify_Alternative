@@ -32,4 +32,33 @@ describe("A shopper's arm of a theme experiment (OS-22, ADR-866)", () => {
       'hatti_ab=texp_1.b; Max-Age=2678400; Path=/; SameSite=Lax; Secure',
     );
   });
+
+  it('gives each of several drafts its share in turn, the rest the live theme (ADR-931)', () => {
+    const three = {
+      ...experiment,
+      share: 25,
+      others: [
+        { themeId: 'thm-c', version: 1 },
+        { themeId: 'thm-d', version: 2 },
+      ],
+    };
+    const drawn = (value: number) => experimentArm(three, null, false, () => value)?.arm;
+    expect([0, 24, 25, 49, 50, 74, 75, 99].map(drawn)).toEqual([
+      'b',
+      'b',
+      'c',
+      'c',
+      'd',
+      'd',
+      'a',
+      'a',
+    ]);
+    // A returning shopper keeps a draft's arm the experiment has; another is drawn again.
+    expect(experimentArm(three, 'texp_1.d', false, () => 99)?.arm).toBe('d');
+    expect(experimentArm(experiment, 'texp_1.d', false, () => 99)).toEqual({
+      id: 'texp_1',
+      arm: 'a',
+      assigned: true,
+    });
+  });
 });

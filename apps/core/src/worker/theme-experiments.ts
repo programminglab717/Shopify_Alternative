@@ -12,8 +12,8 @@ import { repeat } from './repeat.js';
 
 /**
  * Shops' running theme experiments (OS-22, ADR-866): each arm's counts taken from the
- * storefronts' and kept, and an experiment ended on its last day, or as soon as its draft sells
- * clearly worse than the live theme, so a shop never loses much to one.
+ * storefronts' and kept, and an experiment ended on its last day, or as soon as a draft of it
+ * sells clearly worse than the live theme (ADR-931), so a shop never loses much to one.
  */
 export class ThemeExperiments {
   constructor(
@@ -25,21 +25,19 @@ export class ThemeExperiments {
   /** One sweep at `at`: the experiments ended, and why. */
   async sweep(at: Date = new Date()): Promise<{ id: string; reason: 'time' | 'guardrail' }[]> {
     const { rows } = await this.database.system((tx) =>
-      tx.execute<{ shop_id: string; id: string; ends_at: Date | string }>(sql`
-        SELECT shop_id, id, ends_at FROM online_store.theme_experiments
+      tx.execute<{ shop_id: string; id: string; ends_at: Date | string; drafts: number }>(sql`
+        SELECT shop_id, id, ends_at, 1 + cardinality(other_theme_ids) AS drafts
+          FROM online_store.theme_experiments
          WHERE ended_at IS NULL ORDER BY started_at`),
     );
     const ended: { id: string; reason: 'time' | 'guardrail' }[] = [];
     for (const row of rows) {
       try {
-        const counts = await this.activity.experimentCounts(
+        const results = await this.activity.experimentCounts(
           row.shop_id,
           toPublicId('themeExperiment', row.id),
+          Number(row.drafts),
         );
-        const results = {
-          a: { ...counts.a },
-          b: { ...counts.b },
-        };
         const reason = guardrailTripped(results)
           ? ('guardrail' as const)
           : new Date(row.ends_at) <= at

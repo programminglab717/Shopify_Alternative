@@ -57,6 +57,19 @@ describe.skipIf(!redisUrl)('What shoppers do on a storefront, in Valkey (ADR-180
     });
   });
 
+  it('counts each arm of an experiment with three drafts (ADR-931)', async () => {
+    const shopId = randomUUID();
+    await activity.experimented(shopId, 'texp_2', 'c', 'session-c', 'added_to_cart');
+    await activity.experimented(shopId, 'texp_2', 'd', 'session-d');
+    await activity.experimentSold(shopId, 'texp_2', 'd', 'order-3', 200_000);
+    const counts = await activity.experimentCounts(shopId, 'texp_2', 3);
+    expect(Object.keys(counts)).toEqual(['a', 'b', 'c', 'd']);
+    expect(counts.c).toMatchObject({ sessions: 1, added_to_cart: 1, revenue: 0 });
+    expect(counts.d).toMatchObject({ sessions: 1, revenue: 200_000 });
+    // Asked of its first draft alone, as before.
+    expect(Object.keys(await activity.experimentCounts(shopId, 'texp_2'))).toEqual(['a', 'b']);
+  });
+
   it("counts a day's sessions once each, in the shop's time zone, and those that took each step", async () => {
     const shopId = randomUUID();
     // 23:30 on 4 October in Karachi, and 00:10 on the 5th.

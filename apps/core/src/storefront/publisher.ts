@@ -1032,13 +1032,19 @@ export class StorefrontPublisher {
     const theme = main ? themeDoc(main) : null;
     if (theme) await writer.putTheme(theme);
     else await writer.dropTheme();
-    // The draft a running experiment shows some shoppers (ADR-866), written before the document
-    // naming it, as the main theme is.
+    // The drafts a running experiment shows some shoppers (ADR-866, ADR-931), written before the
+    // document naming them, as the main theme is: the first in arm b, the others in c and d.
     const running = await runningExperimentIn(tx, shopId);
-    const draft = running ? await this.services.themes.themeOf(tx, shopId, running.themeId) : null;
-    const experiment = running && draft ? themeDoc(draft) : null;
-    if (experiment) await writer.putExperimentTheme(experiment);
-    else await writer.dropExperimentTheme();
+    const drafts: (ThemeDoc | null)[] = [];
+    for (const arm of ['b', 'c', 'd'] as const) {
+      const id = running?.themeIds[drafts.length];
+      const draft = id ? await this.services.themes.themeOf(tx, shopId, id) : null;
+      const shown = draft ? themeDoc(draft) : null;
+      if (shown) await writer.putExperimentTheme(shown, arm);
+      else await writer.dropExperimentTheme(arm);
+      drafts.push(shown);
+    }
+    const [experiment, ...others] = drafts;
     const stored = await this.redis.get(this.#keys.shop(shopId));
     const before = stored ? (JSON.parse(stored) as ShopDoc) : null;
     const previous = before?.handle ?? null;
@@ -1121,6 +1127,11 @@ export class StorefrontPublisher {
             themeId: experiment.id,
             version: experiment.version,
             share: running.share,
+            ...(running.themeIds.length > 1 && {
+              others: others.flatMap((each) =>
+                each ? [{ themeId: each.id, version: each.version }] : [],
+              ),
+            }),
           }
         : null,
     );

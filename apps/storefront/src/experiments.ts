@@ -1,11 +1,16 @@
 import { randomInt } from 'node:crypto';
-import type { ExperimentDoc } from '@hatti/storefront-data';
+import {
+  EXPERIMENT_ARMS,
+  type ExperimentArm as ArmName,
+  type ExperimentDoc,
+} from '@hatti/storefront-data';
 
 // Theme experiments (OS-22, ADR-866): a shop's running experiment shows a share of its shoppers
 // a draft of its theme. A shopper is put in an arm on the first page they're shown, and keeps it
 // in a cookie for the experiment's life, so each sees one theme throughout; robots are always
 // shown the live theme, as search engines must be. Pages of the draft are the shopper's own,
-// never kept at the edge.
+// never kept at the edge. An experiment of several drafts gives each its share in turn, arms b, c
+// and d, the rest the live theme's (ADR-931).
 
 export const EXPERIMENT_COOKIE = 'hatti_ab';
 
@@ -14,15 +19,20 @@ const EXPERIMENT_COOKIE_SECONDS = 31 * 86_400;
 
 export interface ExperimentArm {
   id: string;
-  arm: 'a' | 'b';
+  arm: ArmName;
   /** Put in the arm by this request: its answer keeps the arm in the cookie. */
   assigned: boolean;
 }
 
+/** The arms of `experiment`: the live theme's, and one for each of its drafts. */
+export function armsOf(experiment: ExperimentDoc): ArmName[] {
+  return EXPERIMENT_ARMS.slice(0, 2 + Math.min(experiment.others?.length ?? 0, 2));
+}
+
 /**
  * The arm of the running experiment `experiment` a shopper is in: as their cookie keeps it, for
- * this experiment, or drawn now by its share; the live theme's for a robot. Null for no
- * experiment.
+ * this experiment, or drawn now by its share, each draft's in turn; the live theme's for a robot.
+ * Null for no experiment.
  */
 export function experimentArm(
   experiment: ExperimentDoc | undefined,
@@ -32,11 +42,13 @@ export function experimentArm(
 ): ExperimentArm | null {
   if (!experiment) return null;
   if (robot) return { id: experiment.id, arm: 'a', assigned: false };
-  const [id, arm] = (cookie ?? '').split('.');
-  if (id === experiment.id && (arm === 'a' || arm === 'b')) {
-    return { id, arm, assigned: false };
-  }
-  return { id: experiment.id, arm: draw(100) < experiment.share ? 'b' : 'a', assigned: true };
+  const arms = armsOf(experiment);
+  const [id, kept] = (cookie ?? '').split('.');
+  const arm = arms.find((each) => each === kept);
+  if (id === experiment.id && arm) return { id, arm, assigned: false };
+  // 0 to 99: below one share the first draft's, below two the second's, and so on.
+  const drawn = Math.floor(draw(100) / experiment.share);
+  return { id: experiment.id, arm: arms[drawn + 1] ?? 'a', assigned: true };
 }
 
 /** The cookie keeping the shopper's arm of an experiment. */

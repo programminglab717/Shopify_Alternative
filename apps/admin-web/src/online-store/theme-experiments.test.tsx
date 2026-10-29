@@ -120,7 +120,7 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
       expect(
         fake.sent.filter((each) => each.operation === 'ThemeExperimentStart').at(-1)?.variables,
       ).toEqual({
-        input: { name: 'Eid banner', themeId: 'th_2', share: 25, days: 14 },
+        input: { name: 'Eid banner', themeId: 'th_2', otherThemeIds: [], share: 25, days: 14 },
       }),
     );
     expect(await section.findByText(/25% of shoppers see the draft, until/)).toBeTruthy();
@@ -133,5 +133,94 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
         id: 'texp_1',
       }),
     );
+  });
+
+  it('tries several drafts at once, each its share, and says of each how it sells (ADR-931)', async () => {
+    signedIn();
+    let experiments: Record<string, unknown>[] = [];
+    const fake = fakeCore('owner', (operation, variables) => {
+      switch (operation) {
+        case 'Themes':
+          return {
+            themes: {
+              nodes: [
+                theme('th_1', 'Hatti Base', 'MAIN'),
+                theme('th_2', 'Eid offer', 'UNPUBLISHED'),
+                theme('th_3', 'Bigger photos', 'UNPUBLISHED'),
+                theme('th_4', 'Urdu first', 'UNPUBLISHED'),
+              ],
+            },
+            platformThemes: [],
+          };
+        case 'ThemeStore':
+          return { themeStore: [] };
+        case 'ThemeExperiments':
+          return { themeExperiments: experiments };
+        case 'ThemeExperimentStart': {
+          const input = variables.input as { otherThemeIds: string[] } & Record<string, unknown>;
+          const draft = (themeId: string, converted: number, verdict: string) => ({
+            themeId,
+            arm: arm(1_000, converted),
+            verdict,
+            revenueVerdict: verdict,
+          });
+          const started = {
+            id: 'texp_2',
+            ...input,
+            startedAt: EARLIER,
+            endsAt: LATER,
+            endedAt: null,
+            endedReason: null,
+            live: arm(1_000, 20),
+            draft: arm(1_000, 20),
+            verdict: 'no_difference',
+            revenueVerdict: 'no_difference',
+            drafts: [
+              draft('th_2', 20, 'no_difference'),
+              draft('th_3', 45, 'b_better'),
+              draft('th_4', 21, 'no_difference'),
+            ],
+            countedAt: EARLIER,
+          };
+          experiments = [started];
+          return { themeExperimentStart: { themeExperiment: started, userErrors: [] } };
+        }
+        default:
+          return undefined;
+      }
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=themes');
+    const section = within(
+      (await screen.findByRole('heading', { name: 'Experiments' })).closest('section')!,
+    );
+    await section.findByLabelText('What you’re trying');
+    type('What you’re trying', 'Three ways');
+    const [second, third] = section.getAllByLabelText(
+      'Another draft (optional)',
+    ) as HTMLSelectElement[];
+    fireEvent.change(second!, { target: { value: 'th_3' } });
+    fireEvent.change(third!, { target: { value: 'th_4' } });
+    expect(section.getByText('1 to 25, for each of 3 drafts.')).toBeTruthy();
+    fireEvent.click(section.getByRole('button', { name: 'Start experiment' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.filter((each) => each.operation === 'ThemeExperimentStart').at(-1)?.variables,
+      ).toEqual({
+        input: {
+          name: 'Three ways',
+          themeId: 'th_2',
+          otherThemeIds: ['th_3', 'th_4'],
+          share: 20,
+          days: 14,
+        },
+      }),
+    );
+    expect(await section.findByText(/20% of shoppers see each of 3 drafts, until/)).toBeTruthy();
+    expect(section.getByText('Draft: Urdu first')).toBeTruthy();
+    expect(
+      section.getByText('Bigger photos: The draft sells better. You can publish it.'),
+    ).toBeTruthy();
+    expect(section.getByText('Urdu first: No clear difference in orders so far.')).toBeTruthy();
   });
 });

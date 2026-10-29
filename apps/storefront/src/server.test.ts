@@ -7195,6 +7195,86 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     await app.close();
   });
 
+  it("shows a shopper in a later draft's arm that draft, and counts it in its own arm (ADR-931)", async () => {
+    const shopId = randomUUID();
+    const sample = sampleStore();
+    const experiment = {
+      id: 'texp_three',
+      themeId: 'thm-b',
+      version: 1,
+      share: 25,
+      others: [
+        { themeId: 'thm-c', version: 1 },
+        { themeId: 'thm-d', version: 1 },
+      ],
+    };
+    await publish(shopId, 'three', { ...sample, shop: { ...sample.shop, experiment } });
+    const announcing = (id: string, text: string) => ({
+      id,
+      version: 1,
+      base: 'hatti-base',
+      files: {
+        'sections/header-group.json': JSON.stringify({
+          type: 'header',
+          name: 'Header group',
+          sections: {
+            announcement: { type: 'announcement-bar', settings: { text } },
+            header: { type: 'header', settings: { menu: 'main-menu' } },
+          },
+          order: ['announcement', 'header'],
+        }),
+      },
+    });
+    await queue.add(shopId, ['sample']);
+    await queue.drain(shopId, async ({ writer }) => {
+      await writer.putExperimentTheme(announcing('thm-b', 'Draft B speaking'));
+      await writer.putExperimentTheme(announcing('thm-c', 'Draft C speaking'), 'c');
+      await writer.putExperimentTheme(announcing('thm-d', 'Draft D speaking'), 'd');
+    });
+    const app = server(new FakeCore());
+    const shopper = {
+      host: 'three.localhost',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36',
+    };
+    const page = (arm: string) =>
+      app.inject({
+        method: 'GET',
+        url: '/',
+        headers: {
+          ...shopper,
+          cookie: `hatti_ab=texp_three.${arm}; hatti_session=CcDdEeFfGgHhIiJjKkLlMm`,
+        },
+      });
+    for (const [arm, words] of [
+      ['b', 'Draft B speaking'],
+      ['c', 'Draft C speaking'],
+      ['d', 'Draft D speaking'],
+    ] as const) {
+      const shown = await page(arm);
+      expect(shown.body).toContain(words);
+      expect(shown.headers['cache-control']).toBe('private, no-store');
+    }
+    expect((await page('a')).body).not.toContain('speaking');
+    const seen = await app.inject({
+      method: 'POST',
+      url: '/.hatti/visit',
+      headers: {
+        ...shopper,
+        cookie: 'hatti_ab=texp_three.d; hatti_session=CcDdEeFfGgHhIiJjKkLlMm',
+      },
+    });
+    expect(seen.statusCode).toBe(204);
+    const counts = await new StorefrontActivity(redis, keys).experimentCounts(
+      shopId,
+      'texp_three',
+      3,
+    );
+    expect([counts.a.sessions, counts.b.sessions, counts.c?.sessions, counts.d?.sessions]).toEqual([
+      0, 0, 0, 1,
+    ]);
+    await app.close();
+  });
+
   it('keeps the currency a shopper picks, their pages theirs alone, and suggests one abroad (ADR-865)', async () => {
     const shopId = randomUUID();
     const sample = sampleStore();

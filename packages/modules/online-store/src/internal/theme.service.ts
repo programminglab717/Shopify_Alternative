@@ -710,7 +710,7 @@ export class ThemeService {
         changed: [...changed].sort(),
         role: updated!.role,
         version: updated!.version,
-        ...(running?.themeId === theme.id && { experiment: true as const }),
+        ...(running?.themeIds.includes(theme.id) && { experiment: true as const }),
       },
     });
     return toThemeRecord(updated!);

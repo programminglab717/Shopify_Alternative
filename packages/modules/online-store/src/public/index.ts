@@ -37,8 +37,11 @@ export {
   type PresentmentCurrencyRecord,
 } from '../internal/presentment-currencies.js';
 export {
+  EXPERIMENT_ARMS,
   EXPERIMENT_LIMITS,
   ThemeExperimentService,
+  armsOf,
+  draftArmsOf,
   endExperimentIn,
   guardrailTripped,
   recordExperimentResultsIn,
@@ -46,6 +49,8 @@ export {
   runningExperimentIn,
   verdictOf,
   zScoreOf,
+  type DraftArmName,
+  type ExperimentArmName,
   type ExperimentResults,
   type ThemeExperimentRecord,
 } from '../internal/theme-experiments.js';

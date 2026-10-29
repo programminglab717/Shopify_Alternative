@@ -10,7 +10,7 @@ import {
   type ShopDoc,
   type ThemeDoc,
 } from './documents.js';
-import type { HandledKind, StorefrontKeys } from './keys.js';
+import type { DraftArm, HandledKind, StorefrontKeys } from './keys.js';
 import type { ScriptedRedis } from './scripts.js';
 
 /** The shop's build lock went to another publisher: this one must stop writing. */
@@ -132,14 +132,17 @@ export class ShopWriter {
     return this.#set([[this.keys.theme(this.shopId), doc]]);
   }
 
-  /** The theme a running experiment shows some of the shop's shoppers (ADR-866). */
-  putExperimentTheme(doc: ThemeDoc): Promise<void> {
-    return this.#set([[this.keys.experimentTheme(this.shopId), doc]]);
+  /**
+   * A draft a running experiment shows some of the shop's shoppers (ADR-866): its first, unless
+   * `arm` names another (ADR-931).
+   */
+  putExperimentTheme(doc: ThemeDoc, arm: DraftArm = 'b'): Promise<void> {
+    return this.#set([[this.keys.experimentTheme(this.shopId, arm), doc]]);
   }
 
-  /** The shop runs no experiment. */
-  async dropExperimentTheme(): Promise<void> {
-    const keys = [this.keys.lock(this.shopId), this.keys.experimentTheme(this.shopId)];
+  /** The shop runs no experiment, or none with a draft in `arm`. */
+  async dropExperimentTheme(arm: DraftArm = 'b'): Promise<void> {
+    const keys = [this.keys.lock(this.shopId), this.keys.experimentTheme(this.shopId, arm)];
     this.#check(await this.redis.sfDel(keys.length, ...keys, this.token, this.lockMs));
   }
 

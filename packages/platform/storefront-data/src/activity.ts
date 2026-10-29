@@ -1,5 +1,11 @@
 import type { Redis } from 'ioredis';
-import { ACTIVITY_STEPS, StorefrontKeys, type ActivityStep } from './keys.js';
+import {
+  ACTIVITY_STEPS,
+  EXPERIMENT_ARMS,
+  StorefrontKeys,
+  type ActivityStep,
+  type ExperimentArm,
+} from './keys.js';
 import { SESSION_DIMENSIONS, type SessionDimension, type SessionOrigin } from './sources.js';
 
 // What shoppers do on a shop's storefront, counted as Shopify's analytics count it (ANL-02,
@@ -171,7 +177,7 @@ export class StorefrontActivity {
   async experimented(
     shopId: string,
     experimentId: string,
-    arm: 'a' | 'b',
+    arm: ExperimentArm,
     session: string,
     step?: Exclude<ActivityStep, 'sessions'>,
   ): Promise<void> {
@@ -191,7 +197,7 @@ export class StorefrontActivity {
   async experimentSold(
     shopId: string,
     experimentId: string,
-    arm: 'a' | 'b',
+    arm: ExperimentArm,
     orderId: string,
     amount: number,
   ): Promise<void> {
@@ -214,13 +220,20 @@ export class StorefrontActivity {
     );
   }
 
-  /** A theme experiment's counts so far, each arm's sessions, their steps and their revenue. */
+  /**
+   * A theme experiment's counts so far, each arm's sessions, their steps and their revenue: the
+   * live theme's and the first draft's, and as many arms more as `drafts` says (ADR-931).
+   */
   async experimentCounts(
     shopId: string,
     experimentId: string,
-  ): Promise<Record<'a' | 'b', ExperimentArmCounts>> {
+    drafts = 1,
+  ): Promise<
+    Record<'a' | 'b', ExperimentArmCounts> & Partial<Record<'c' | 'd', ExperimentArmCounts>>
+  > {
+    const arms = EXPERIMENT_ARMS.slice(0, Math.min(drafts, EXPERIMENT_ARMS.length - 1) + 1);
     const pipeline = this.redis.pipeline();
-    for (const arm of ['a', 'b'] as const) {
+    for (const arm of arms) {
       for (const step of ACTIVITY_STEPS) {
         pipeline.pfcount(this.keys.experiment(shopId, experimentId, arm, step));
       }
@@ -237,7 +250,9 @@ export class StorefrontActivity {
         revenue_squares: Number(revenue.squares ?? 0),
       };
     };
-    return { a: arm(0), b: arm(ACTIVITY_STEPS.length + 1) };
+    return Object.fromEntries(
+      arms.map((name, index) => [name, arm(index * (ACTIVITY_STEPS.length + 1))]),
+    ) as Record<'a' | 'b', ExperimentArmCounts> & Partial<Record<'c' | 'd', ExperimentArmCounts>>;
   }
 
   /** How many sessions saw a page in the five minutes to `at`. */

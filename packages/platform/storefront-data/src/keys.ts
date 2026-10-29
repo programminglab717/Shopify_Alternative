@@ -41,9 +41,12 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:theme`;
   }
 
-  /** The files of the theme a running experiment shows some of the shop's shoppers (ADR-866). */
-  experimentTheme(shopId: string): string {
-    return `${this.#base(shopId)}:theme-b`;
+  /**
+   * The files of a draft a running experiment shows some of the shop's shoppers (ADR-866): its
+   * first, arm b, unless `arm` names another (ADR-931).
+   */
+  experimentTheme(shopId: string, arm: DraftArm = 'b'): string {
+    return `${this.#base(shopId)}:theme-${arm}`;
   }
 
   /** The shop's menus, a hash by handle, written whole. */
@@ -133,7 +136,7 @@ export class StorefrontKeys {
    * The sessions a theme experiment showed one of its arms, or those of them that took `step`
    * (ADR-866): a HyperLogLog of their IDs, as a day's are.
    */
-  experiment(shopId: string, experimentId: string, arm: 'a' | 'b', step: ActivityStep): string {
+  experiment(shopId: string, experimentId: string, arm: ExperimentArm, step: ActivityStep): string {
     return `${this.prefix}:{${shopId}}:ab:${experimentId}:${arm}:${step}`;
   }
 
@@ -141,7 +144,7 @@ export class StorefrontKeys {
    * What the orders a theme experiment's arm placed came to, and the sum of their squares
    * (ADR-921): a hash of `revenue` and `squares`, in minor units.
    */
-  experimentRevenue(shopId: string, experimentId: string, arm: 'a' | 'b'): string {
+  experimentRevenue(shopId: string, experimentId: string, arm: ExperimentArm): string {
     return `${this.prefix}:{${shopId}}:ab:${experimentId}:${arm}:revenue`;
   }
 
@@ -205,6 +208,12 @@ export const ACTIVITY_STEPS = [
   'converted',
 ] as const;
 export type ActivityStep = (typeof ACTIVITY_STEPS)[number];
+
+/** A theme experiment's arms: the live theme's, and each draft's in turn (ADR-866, ADR-931). */
+export const EXPERIMENT_ARMS = ['a', 'b', 'c', 'd'] as const;
+export type ExperimentArm = (typeof EXPERIMENT_ARMS)[number];
+/** A draft's arm. */
+export type DraftArm = Exclude<ExperimentArm, 'a'>;
 
 /**
  * A path as a shop's URL redirects are kept by (ADR-052), from the path a shopper asked for, less

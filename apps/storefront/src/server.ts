@@ -163,7 +163,12 @@ import {
 } from './report-page.js';
 import { StorefrontLogs } from './error-logs.js';
 import { VISIT_BODY_MAX, VISIT_PATH, isRobot, sessionOf } from './sessions.js';
-import { EXPERIMENT_COOKIE, experimentArm, experimentCookie } from './experiments.js';
+import {
+  EXPERIMENT_COOKIE,
+  experimentArm,
+  experimentCookie,
+  type ExperimentArm,
+} from './experiments.js';
 import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { SEARCH_REPORT_BODY_MAX, SEARCH_REPORT_PATH, searchReportBodyOf } from './searches.js';
 import {
@@ -565,7 +570,7 @@ interface Found {
    * asked: as their cookie keeps it, or as they were put in now, for the answer to keep. Null
    * until asked, or with no experiment.
    */
-  experiment: { id: string; arm: 'a' | 'b'; assigned: boolean } | null;
+  experiment: ExperimentArm | null;
   /** The experiment cookie the request came with. */
   experimentCookie: string | null;
   /** Whether a robot asked, which always sees the live theme. */
@@ -669,10 +674,21 @@ export class ShopThemes {
 
   /**
    * The theme `shop`'s pages are rendered with: its own, or the platform theme; or, for a shopper
-   * in the second arm of its running experiment (ADR-866), the experiment's draft.
+   * in a draft's arm of its running experiment (ADR-866, ADR-931), that draft.
    */
-  async for(shopId: string, shop: ShopDoc, store: StoreData, arm: 'a' | 'b' = 'a'): Promise<Theme> {
-    const draft = arm === 'b' && shop.experiment ? shop.experiment : null;
+  async for(
+    shopId: string,
+    shop: ShopDoc,
+    store: StoreData,
+    arm: ExperimentArm['arm'] = 'a',
+  ): Promise<Theme> {
+    const experiment = shop.experiment;
+    const draft =
+      !experiment || arm === 'a'
+        ? null
+        : arm === 'b'
+          ? { themeId: experiment.themeId, version: experiment.version }
+          : (experiment.others?.[arm === 'c' ? 0 : 1] ?? null);
     // Documents written before shops had themes have none.
     const wanted = draft ? { id: draft.themeId, version: draft.version } : (shop.theme ?? null);
     if (!wanted) return this.base;
@@ -681,7 +697,7 @@ export class ShopThemes {
     if (kept) return kept;
     let loading = this.#loading.get(key);
     if (!loading) {
-      loading = this.#load(shopId, wanted, store, key, Boolean(draft)).finally(() =>
+      loading = this.#load(shopId, wanted, store, key, draft ? arm : null).finally(() =>
         this.#loading.delete(key),
       );
       this.#loading.set(key, loading);
@@ -694,9 +710,9 @@ export class ShopThemes {
     wanted: { id: string; version: number },
     store: StoreData,
     key: string,
-    draft = false,
+    draft: ExperimentArm['arm'] | null = null,
   ): Promise<Theme> {
-    const doc = await (draft ? store.experimentTheme() : store.theme());
+    const doc = await (draft && draft !== 'a' ? store.experimentTheme(draft) : store.theme());
     if (!doc) return this.base;
     // Written since the shop's document was read, or not yet: shown, but not kept as the version
     // the shop's document names.
@@ -857,7 +873,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         ]);
       }
       if (
-        found.experiment.arm === 'b' &&
+        found.experiment.arm !== 'a' &&
         /^public/.test(String(reply.getHeader('cache-control')))
       ) {
         reply.header('cache-control', 'private, no-store').removeHeader('cache-tag');
@@ -1401,7 +1417,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
 
   /**
    * The theme the shop's pages are rendered in: the one previewed, else its main theme, or the
-   * draft of its running experiment for a shopper in its second arm (ADR-866).
+   * draft of its running experiment for a shopper in a draft's arm (ADR-866, ADR-931).
    */
   const themeFor =
     (shop: Found) =>

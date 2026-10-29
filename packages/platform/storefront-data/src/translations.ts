@@ -12,7 +12,7 @@ import type {
   StoreData,
   ThemeDoc,
 } from './documents.js';
-import type { HandledKind } from './keys.js';
+import type { DraftArm, HandledKind } from './keys.js';
 
 /** What a document translated may hold: some of its own fields, and of its SEO. */
 interface Translatable {
@@ -176,8 +176,8 @@ export class TranslatedStore implements StoreData {
     return this.store.theme();
   }
 
-  experimentTheme(): Promise<ThemeDoc | null> {
-    return this.store.experimentTheme();
+  experimentTheme(arm?: DraftArm): Promise<ThemeDoc | null> {
+    return this.store.experimentTheme(arm);
   }
 
   handles(kind: HandledKind): Promise<string[]> {

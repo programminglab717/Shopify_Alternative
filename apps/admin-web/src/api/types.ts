@@ -6594,7 +6594,17 @@ export interface ThemeExperiment {
   verdict: 'too_early' | 'no_difference' | 'b_better' | 'b_worse';
   /** As `verdict`, of each arm's revenue a session (ADR-921). */
   revenueVerdict: 'too_early' | 'no_difference' | 'b_better' | 'b_worse';
+  /** Each draft it shows, the first one first, and what it says of each (ADR-931). */
+  drafts: ThemeExperimentDraft[];
   countedAt: string | null;
+}
+
+/** A draft of a theme experiment, and what it says of it against the live theme (ADR-931). */
+export interface ThemeExperimentDraft {
+  themeId: string;
+  arm: ThemeExperimentArm;
+  verdict: ThemeExperiment['verdict'];
+  revenueVerdict: ThemeExperiment['revenueVerdict'];
 }
 
 export interface ThemeExperimentsData {

@@ -17,6 +17,7 @@ import {
 import {
   EXPERIMENT_LIMITS,
   ThemeExperimentService,
+  draftArmsOf,
   revenueVerdictOf,
   verdictOf,
   type ArmCounts,
@@ -53,8 +54,28 @@ export class ThemeExperimentArm {
 
 @ObjectType({
   description:
-    'A theme experiment (OS-22, ADR-866): a draft of the shop’s theme shown a share of its ' +
-    'shoppers, the rest shown the live one, each keeping the theme first shown them.',
+    'A draft a theme experiment shows (ADR-931): its arm, and what the experiment says of it ' +
+    'against the live theme.',
+})
+export class ThemeExperimentDraft {
+  @Field(() => ID)
+  themeId!: string;
+
+  @Field(() => ThemeExperimentArm)
+  arm!: ThemeExperimentArm;
+
+  @Field({ description: 'As the experiment’s `verdict`, of this draft.' })
+  verdict!: string;
+
+  @Field({ description: 'As the experiment’s `revenueVerdict`, of this draft.' })
+  revenueVerdict!: string;
+}
+
+@ObjectType({
+  description:
+    'A theme experiment (OS-22, ADR-866): up to three drafts of the shop’s theme, each shown a ' +
+    'share of its shoppers (ADR-931), the rest shown the live one, each keeping the theme first ' +
+    'shown them.',
 })
 export class ThemeExperiment {
   @Field(() => ID)
@@ -63,10 +84,10 @@ export class ThemeExperiment {
   @Field()
   name!: string;
 
-  @Field(() => ID, { description: 'The draft theme shown in the second arm.' })
+  @Field(() => ID, { description: 'The draft theme shown in the second arm: the first draft.' })
   themeId!: string;
 
-  @Field(() => Int, { description: 'The percent of shoppers shown the draft.' })
+  @Field(() => Int, { description: 'The percent of shoppers shown each draft.' })
   share!: number;
 
   @Field(() => GraphQLISODateTime)
@@ -89,14 +110,19 @@ export class ThemeExperiment {
   @Field(() => ThemeExperimentArm, { description: 'The live theme’s arm.' })
   live!: ThemeExperimentArm;
 
-  @Field(() => ThemeExperimentArm, { description: 'The draft’s arm.' })
+  @Field(() => ThemeExperimentArm, { description: 'The first draft’s arm.' })
   draft!: ThemeExperimentArm;
+
+  @Field(() => [ThemeExperimentDraft], {
+    description: 'Each draft it shows, the first one first, and what it says of each (ADR-931).',
+  })
+  drafts!: ThemeExperimentDraft[];
 
   @Field({
     description:
       `too_early, until each arm has ${EXPERIMENT_LIMITS.sessions} sessions; then b_better or ` +
-      'b_worse where the draft’s share of sessions that ordered differs, at 95% confidence, and ' +
-      'no_difference where it doesn’t.',
+      'b_worse where the first draft’s share of sessions that ordered differs, at 95% ' +
+      'confidence split among its drafts, and no_difference where it doesn’t.',
   })
   verdict!: string;
 
@@ -119,7 +145,16 @@ export class ThemeExperimentInput {
   @Field(() => ID)
   themeId!: string;
 
-  @Field(() => Int, { description: 'The percent of shoppers shown the draft, 1 to 50.' })
+  @Field(() => [ID], {
+    nullable: true,
+    description: 'Up to two drafts more, each shown its own share (ADR-931).',
+  })
+  otherThemeIds?: string[] | null;
+
+  @Field(() => Int, {
+    description:
+      'The percent of shoppers shown each draft: 1 to 50 for one, to 33 for two, to 25 for three.',
+  })
   share!: number;
 
   @Field(() => Int, { description: 'How many days it runs, 1 to 30.' })
@@ -163,6 +198,14 @@ const toExperiment = (record: ThemeExperimentRecord, currency: CurrencyCode) =>
     endedReason: record.endedReason,
     live: toArm(record.results.a, currency),
     draft: toArm(record.results.b, currency),
+    drafts: draftArmsOf(record.results).map((arm, index) =>
+      Object.assign(new ThemeExperimentDraft(), {
+        themeId: toPublicId('theme', record.themeIds[index]!),
+        arm: toArm(record.results[arm]!, currency),
+        verdict: verdictOf(record.results, arm),
+        revenueVerdict: revenueVerdictOf(record.results, arm),
+      }),
+    ),
     verdict: verdictOf(record.results),
     revenueVerdict: revenueVerdictOf(record.results),
     countedAt: record.countedAt,
@@ -201,8 +244,8 @@ export class ThemeExperimentResolver {
 
   @Mutation(() => ThemeExperimentPayload, {
     description:
-      'Starts showing a draft theme to a share of shoppers, the rest the live theme, for up to 30 ' +
-      'days: one experiment at a time.',
+      'Starts showing up to three draft themes, each to a share of shoppers, the rest the live ' +
+      'theme, for up to 30 days: one experiment at a time.',
   })
   @RequireScopes('write_themes')
   async themeExperimentStart(
@@ -211,10 +254,13 @@ export class ThemeExperimentResolver {
   ): Promise<ThemeExperimentPayload> {
     const themeId = tryFromPublicId(input.themeId, 'theme');
     if (!themeId) return notFound('themeId');
+    const others = (input.otherThemeIds ?? []).map((id) => tryFromPublicId(id, 'theme'));
+    if (others.some((id) => id === null)) return notFound('otherThemeIds');
     return payload(
       await this.experiments.start(tenant, {
         name: input.name,
         themeId,
+        otherThemeIds: others as string[],
         share: input.share,
         days: input.days,
       }),

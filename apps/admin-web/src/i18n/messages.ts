@@ -4949,6 +4949,11 @@ const en = {
   'experiments.revenueVerdict.b_better': 'The draft brings in more money a visit.',
   'experiments.revenueVerdict.b_worse':
     'The draft brings in less money a visit than your live theme.',
+  'experiments.another': 'Another draft (optional)',
+  'experiments.none': 'None',
+  'experiments.shareHintMany': '1 to {most}, for each of {count} drafts.',
+  'experiments.runningMany': '{share}% of shoppers see each of {count} drafts, until {date}.',
+  'experiments.draftVerdict': '{name}: {verdict}',
   'settings.currencies': 'Currencies',
   'settings.currenciesHint': 'Prices in dirhams, riyals, pounds and dollars for shoppers abroad',
   'currencies.hint':
@@ -12173,6 +12178,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experiments.revenueVerdict.no_difference': 'اب تک فی وزٹ رقم میں واضح فرق نہیں۔',
   'experiments.revenueVerdict.b_better': 'ڈرافٹ فی وزٹ زیادہ رقم لاتی ہے۔',
   'experiments.revenueVerdict.b_worse': 'ڈرافٹ آپ کی لائیو تھیم سے فی وزٹ کم رقم لاتی ہے۔',
+  'experiments.another': 'ایک اور ڈرافٹ (اختیاری)',
+  'experiments.none': 'کوئی نہیں',
+  'experiments.shareHintMany': '{count} ڈرافٹس میں سے ہر ایک کے لیے 1 سے {most}۔',
+  'experiments.runningMany':
+    '{count} ڈرافٹس میں سے ہر ایک کو {share}% خریدار دیکھ رہے ہیں، {date} تک۔',
+  'experiments.draftVerdict': '{name}: {verdict}',
   'settings.currencies': 'کرنسیاں',
   'settings.currenciesHint': 'بیرونِ ملک خریداروں کے لیے درہم، ریال، پاؤنڈ اور ڈالر میں قیمتیں',
   'currencies.hint':

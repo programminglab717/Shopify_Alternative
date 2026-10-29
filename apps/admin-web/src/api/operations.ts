@@ -13294,6 +13294,24 @@ const THEME_EXPERIMENT = /* GraphQL */ `
     }
     verdict
     revenueVerdict
+    drafts {
+      themeId
+      arm {
+        sessions
+        addedToCart
+        reachedCheckout
+        converted
+        conversionRate
+        revenue {
+          ...Money
+        }
+        revenuePerSession {
+          ...Money
+        }
+      }
+      verdict
+      revenueVerdict
+    }
     countedAt
   }
   ${MONEY}

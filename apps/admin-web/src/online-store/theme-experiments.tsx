@@ -1,5 +1,5 @@
 import { FlaskConical } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   ThemeExperimentEndMutation,
@@ -10,6 +10,7 @@ import type {
   OnlineStoreTheme,
   ThemeExperiment,
   ThemeExperimentArm,
+  ThemeExperimentDraft,
   ThemeExperimentPayloadData,
   ThemeExperimentsData,
 } from '../api/types';
@@ -27,17 +28,25 @@ import { TextField } from '../ui/field';
 const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
 /**
- * Theme experiments (OS-22, ADR-866): a draft of the shop's theme shown a share of its shoppers,
- * the rest the live theme, for up to 30 days; each arm's sessions, carts, checkouts and orders,
- * and once each has sessions enough, whether the draft sells better or worse. Hatti ends one
- * whose draft sells clearly worse.
+ * Theme experiments (OS-22, ADR-866): up to three drafts of the shop's theme (ADR-931), each
+ * shown a share of its shoppers, the rest the live theme, for up to 30 days; each arm's sessions,
+ * carts, checkouts and orders, and once each has sessions enough, whether each draft sells better
+ * or worse. Hatti ends one with a draft that sells clearly worse.
  */
 export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme[] }) {
   const { t } = useLocale();
   const query = useAdminQuery<ThemeExperimentsData>(['themeExperiments'], ThemeExperimentsQuery);
   const start = useAdminMutation<
     ThemeExperimentPayloadData,
-    { input: { name: string; themeId: string; share: number; days: number } }
+    {
+      input: {
+        name: string;
+        themeId: string;
+        otherThemeIds: string[];
+        share: number;
+        days: number;
+      };
+    }
   >(ThemeExperimentStartMutation);
   const end = useAdminMutation<ThemeExperimentPayloadData, { id: string }>(
     ThemeExperimentEndMutation,
@@ -45,6 +54,8 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
   const drafts = themes.filter((theme) => theme.role === 'UNPUBLISHED');
   const [name, setName] = useState('');
   const [themeId, setThemeId] = useState('');
+  // Up to two drafts more, each its own share (ADR-931); '' for none.
+  const [others, setOthers] = useState<[string, string]>(['', '']);
   const [share, setShare] = useState('20');
   const [days, setDays] = useState('14');
   const [problem, setProblem] = useState<string | null>(null);
@@ -64,13 +75,18 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
     setBusy(false);
   };
 
+  const first = themeId || drafts[0]?.id || '';
+  const chosen = [...new Set(others.filter((id) => id !== '' && id !== first))];
+  const most = Math.floor(100 / (chosen.length + 2));
+
   const onStart = (event: FormEvent) => {
     event.preventDefault();
     void run(() =>
       start.mutateAsync({
         input: {
           name: name.trim(),
-          themeId: themeId || drafts[0]!.id,
+          themeId: first,
+          otherThemeIds: chosen,
           share: Number(share),
           days: Number(days),
         },
@@ -95,7 +111,7 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
           <Loading label={t('state.loading')} />
         ) : running ? (
           <>
-            <Results experiment={running} draftName={themeName(running.themeId)} />
+            <Results experiment={running} themeName={themeName} />
             <Button
               variant="danger"
               className="self-start"
@@ -117,14 +133,35 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
             />
             <SelectField
               label={t('experiments.draft')}
-              value={themeId || drafts[0]!.id}
+              value={first}
               options={drafts.map((theme) => ({ value: theme.id, label: theme.name }))}
               onChange={setThemeId}
             />
+            {drafts.length > 1 &&
+              ([0, 1] as const).map((index) => (
+                <SelectField
+                  key={index}
+                  label={t('experiments.another')}
+                  value={others[index]}
+                  options={[
+                    { value: '', label: t('experiments.none') },
+                    ...drafts
+                      .filter((theme) => theme.id !== first)
+                      .map((theme) => ({ value: theme.id, label: theme.name })),
+                  ]}
+                  onChange={(value) =>
+                    setOthers((now) => (index === 0 ? [value, now[1]] : [now[0], value]))
+                  }
+                />
+              ))}
             <div className="grid grid-cols-2 gap-3">
               <TextField
                 label={t('experiments.share')}
-                hint={t('experiments.shareHint')}
+                hint={
+                  chosen.length > 0
+                    ? t('experiments.shareHintMany', { most, count: chosen.length + 1 })
+                    : t('experiments.shareHint')
+                }
                 inputMode="numeric"
                 value={share}
                 onChange={(event) => setShare(event.target.value)}
@@ -146,7 +183,7 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
           <ul className="divide-y divide-line" aria-label={t('experiments.past')}>
             {past.map((experiment) => (
               <li key={experiment.id} className="py-2">
-                <Results experiment={experiment} draftName={themeName(experiment.themeId)} />
+                <Results experiment={experiment} themeName={themeName} />
               </li>
             ))}
           </ul>
@@ -156,9 +193,27 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
   );
 }
 
-function Results({ experiment, draftName }: { experiment: ThemeExperiment; draftName: string }) {
+function Results({
+  experiment,
+  themeName,
+}: {
+  experiment: ThemeExperiment;
+  themeName: (id: string) => string;
+}) {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
+  // Experiments before several drafts list none: their one draft is `draft` (ADR-931).
+  const drafts: ThemeExperimentDraft[] = experiment.drafts?.length
+    ? experiment.drafts
+    : [
+        {
+          themeId: experiment.themeId,
+          arm: experiment.draft,
+          verdict: experiment.verdict,
+          revenueVerdict: experiment.revenueVerdict,
+        },
+      ];
+  const many = drafts.length > 1;
   const arm = (label: string, counts: ThemeExperimentArm) => (
     <li className="flex flex-wrap justify-between gap-2">
       <span className="font-medium" dir="auto">
@@ -191,24 +246,45 @@ function Results({ experiment, draftName }: { experiment: ThemeExperiment; draft
           ? t(`experiments.ended.${experiment.endedReason ?? 'staff'}` as MessageKey, {
               date: formatDate(experiment.endedAt, timezone, locale),
             })
-          : t('experiments.running', {
-              share: experiment.share,
-              date: formatDate(experiment.endsAt, timezone, locale),
-            })}
+          : many
+            ? t('experiments.runningMany', {
+                share: experiment.share,
+                count: drafts.length,
+                date: formatDate(experiment.endsAt, timezone, locale),
+              })
+            : t('experiments.running', {
+                share: experiment.share,
+                date: formatDate(experiment.endsAt, timezone, locale),
+              })}
       </p>
       <ul className="flex flex-col gap-1">
         {arm(t('experiments.live'), experiment.live)}
-        {arm(t('experiments.draftArm', { name: draftName }), experiment.draft)}
+        {drafts.map((draft) => (
+          <Fragment key={draft.themeId}>
+            {arm(t('experiments.draftArm', { name: themeName(draft.themeId) }), draft.arm)}
+          </Fragment>
+        ))}
       </ul>
-      <Alert tone={experiment.verdict === 'b_worse' ? 'warning' : 'info'}>
-        {t(`experiments.verdict.${experiment.verdict}` as MessageKey)}
-      </Alert>
-      {/* Of money a visit, once there are visits enough to tell (ADR-921). */}
-      {experiment.revenueVerdict !== 'too_early' && (
-        <Alert tone={experiment.revenueVerdict === 'b_worse' ? 'warning' : 'info'}>
-          {t(`experiments.revenueVerdict.${experiment.revenueVerdict}` as MessageKey)}
-        </Alert>
-      )}
+      {drafts.map((draft) => {
+        // With several drafts, each verdict names its draft (ADR-931).
+        const said = (words: string) =>
+          many
+            ? t('experiments.draftVerdict', { name: themeName(draft.themeId), verdict: words })
+            : words;
+        return (
+          <Fragment key={draft.themeId}>
+            <Alert tone={draft.verdict === 'b_worse' ? 'warning' : 'info'}>
+              {said(t(`experiments.verdict.${draft.verdict}` as MessageKey))}
+            </Alert>
+            {/* Of money a visit, once there are visits enough to tell (ADR-921). */}
+            {draft.revenueVerdict !== 'too_early' && (
+              <Alert tone={draft.revenueVerdict === 'b_worse' ? 'warning' : 'info'}>
+                {said(t(`experiments.revenueVerdict.${draft.revenueVerdict}` as MessageKey))}
+              </Alert>
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

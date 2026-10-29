@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { HandledKind } from './keys.js';
+import type { DraftArm, HandledKind } from './keys.js';
 
 // The read models a storefront renders from, as the core writes them to Valkey on catalog and
 // stock events (03 §8): one JSON document per product, collection, menu, page, blog, article and
@@ -193,10 +193,13 @@ export interface SellingPlanDoc {
 /** A shop's running theme experiment, as its storefront splits its shoppers (ADR-866). */
 export interface ExperimentDoc {
   id: string;
+  /** The first draft, arm b. */
   themeId: string;
   version: number;
-  /** The percent of shoppers shown the experiment's theme, 1 to 50. */
+  /** The percent of shoppers shown each of the experiment's drafts, 1 to 50. */
   share: number;
+  /** Its other drafts, arms c and d (ADR-931); absent for none, as before. */
+  others?: { themeId: string; version: number }[];
 }
 
 /**
@@ -976,8 +979,11 @@ export interface StoreData {
   policy(type: string, locale?: string): Promise<string | null>;
   /** The shop's theme files, fetched when the shop's document names a version not yet at hand. */
   theme(): Promise<ThemeDoc | null>;
-  /** The theme a running experiment shows some of its shoppers (OS-22, ADR-866); null for none. */
-  experimentTheme(): Promise<ThemeDoc | null>;
+  /**
+   * The draft a running experiment shows some of its shoppers (OS-22, ADR-866): its first, unless
+   * `arm` names another (ADR-931); null for none.
+   */
+  experimentTheme(arm?: DraftArm): Promise<ThemeDoc | null>;
   /**
    * The handle of every product, collection, page, blog or article the storefront shows, for its
    * sitemaps, an article's with its blog's: in no order, in one round trip.
@@ -1004,6 +1010,8 @@ export interface StoreDocuments {
   theme?: ThemeDoc;
   /** The theme a running experiment shows some of its shoppers (ADR-866). */
   experimentTheme?: ThemeDoc;
+  /** Its other drafts, by arm (ADR-931). */
+  experimentThemes?: Partial<Record<'c' | 'd', ThemeDoc>>;
   /** Targets by path. */
   redirects?: Record<string, string>;
   /** Policies' bodies by type, and in other languages by {@link policyField}. */
@@ -1110,8 +1118,11 @@ export class MemoryStore implements StoreData {
     return this.#answer(this.documents.theme ?? null);
   }
 
-  experimentTheme(): Promise<ThemeDoc | null> {
-    return this.#answer(this.documents.experimentTheme ?? null);
+  experimentTheme(arm: DraftArm = 'b'): Promise<ThemeDoc | null> {
+    return this.#answer(
+      (arm === 'b' ? this.documents.experimentTheme : this.documents.experimentThemes?.[arm]) ??
+        null,
+    );
   }
 
   handles(kind: HandledKind): Promise<string[]> {
