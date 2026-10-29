@@ -60,3 +60,34 @@ export interface Cart {
   cost: { subtotalAmount: Money; totalAmount: Money };
   lines: { nodes: CartLine[] };
 }
+
+export interface OrderLine {
+  title: string;
+  variantTitle: string | null;
+  quantity: number;
+  merchandiseId: string | null;
+  availableForSale: boolean;
+}
+
+export interface Order {
+  id: string;
+  name: string;
+  processedAt: string;
+  status: 'OPEN' | 'CLOSED' | 'CANCELLED';
+  financialStatus: string | null;
+  fulfillmentStatus: string;
+  totalPrice: Money;
+  lineItems: { nodes: OrderLine[] };
+}
+
+export interface Customer {
+  displayName: string;
+  phone: string;
+  storeCredit: Money;
+  orders: { nodes: Order[] };
+}
+
+export interface CustomerUserError {
+  message: string;
+  code: 'INVALID' | 'CODE_WRONG' | 'CODE_EXPIRED' | 'TOO_MANY_REQUESTS' | null;
+}

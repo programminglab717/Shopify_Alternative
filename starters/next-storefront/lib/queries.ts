@@ -213,3 +213,82 @@ export const CART_LINES_REMOVE_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// Shoppers' accounts (ADR-943, ADR-944): a code sent to their mobile number signs them in, and
+// the customer access token it gives reads their orders.
+
+export const CUSTOMER_LOGIN_CODE_SEND_MUTATION = /* GraphQL */ `
+  mutation CustomerLoginCodeSend(
+    $phone: String!
+    $channel: CustomerLoginCodeChannel
+    $language: LanguageCode = EN
+  ) @inContext(language: $language) {
+    customerLoginCodeSend(phone: $phone, channel: $channel) {
+      sentTo
+      channel
+      customerUserErrors {
+        message
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_ACCESS_TOKEN_CREATE_MUTATION = /* GraphQL */ `
+  mutation CustomerAccessTokenCreateWithCode($phone: String!, $code: String!) {
+    customerAccessTokenCreateWithCode(phone: $phone, code: $code) {
+      customerAccessToken {
+        accessToken
+        expiresAt
+      }
+      customerUserErrors {
+        message
+        code
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_ACCESS_TOKEN_DELETE_MUTATION = /* GraphQL */ `
+  mutation CustomerAccessTokenDelete($customerAccessToken: String!) {
+    customerAccessTokenDelete(customerAccessToken: $customerAccessToken) {
+      deletedAccessToken
+    }
+  }
+`;
+
+export const CUSTOMER_QUERY = /* GraphQL */ `
+  query Customer($customerAccessToken: String!) {
+    customer(customerAccessToken: $customerAccessToken) {
+      displayName
+      phone
+      storeCredit {
+        amount
+        currencyCode
+      }
+      orders(first: 20) {
+        nodes {
+          id
+          name
+          processedAt
+          status
+          financialStatus
+          fulfillmentStatus
+          totalPrice {
+            amount
+            currencyCode
+          }
+          lineItems(first: 20) {
+            nodes {
+              title
+              variantTitle
+              quantity
+              merchandiseId
+              availableForSale
+            }
+          }
+        }
+      }
+    }
+  }
+`;

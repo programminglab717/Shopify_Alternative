@@ -349,6 +349,10 @@ describe('The headless starter on the Storefront API (OS-19, ADR-869)', () => {
       'CART_LINES_UPDATE_MUTATION',
       'CART_QUERY',
       'COLLECTION_QUERY',
+      'CUSTOMER_ACCESS_TOKEN_CREATE_MUTATION',
+      'CUSTOMER_ACCESS_TOKEN_DELETE_MUTATION',
+      'CUSTOMER_LOGIN_CODE_SEND_MUTATION',
+      'CUSTOMER_QUERY',
       'PRODUCTS_QUERY',
       'PRODUCT_QUERY',
       'SHOP_QUERY',
@@ -825,5 +829,47 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     expect((await ask(query, { token: TOKEN })).errors?.[0]?.message).toBe(
       'This storefront keeps no accounts',
     );
+  });
+
+  it('signs in and reads the account as the headless starter does (ADR-944)', async () => {
+    const q = starterQueries();
+    const core = accounts();
+    const at = { ...api(), accounts: core.kept, inLanguage: () => api().store };
+    // The code's message in the shopper's language.
+    const sent = (
+      await ask(
+        q.CUSTOMER_LOGIN_CODE_SEND_MUTATION!,
+        { phone: '0321 7654321', channel: 'WHATSAPP', language: 'UR' },
+        at,
+      )
+    ).data.customerLoginCodeSend;
+    expect(sent).toEqual({ sentTo: '0321 ••••321', channel: 'WHATSAPP', customerUserErrors: [] });
+    expect(core.asked.at(-1)).toMatchObject({ locale: 'ur' });
+    const signed = (
+      await ask(
+        q.CUSTOMER_ACCESS_TOKEN_CREATE_MUTATION!,
+        { phone: '0321 7654321', code: '123456' },
+        at,
+      )
+    ).data.customerAccessTokenCreateWithCode;
+    const token = signed.customerAccessToken.accessToken as string;
+    const customer = (await ask(q.CUSTOMER_QUERY!, { customerAccessToken: token }, at)).data
+      .customer;
+    expect(customer.displayName).toBe('Ayesha Khan');
+    expect(customer.orders.nodes.map((order: Json) => order.status)).toEqual(['OPEN', 'CANCELLED']);
+    // A line to buy again is a variant the starter's cart takes.
+    const again = customer.orders.nodes[0].lineItems.nodes[0];
+    const made = (
+      await ask(
+        q.CART_CREATE_MUTATION!,
+        { lines: [{ merchandiseId: again.merchandiseId, quantity: again.quantity }] },
+        at,
+      )
+    ).data.cartCreate;
+    expect(made.userErrors).toEqual([]);
+    await ask(q.CUSTOMER_ACCESS_TOKEN_DELETE_MUTATION!, { customerAccessToken: token }, at);
+    expect(
+      (await ask(q.CUSTOMER_QUERY!, { customerAccessToken: token }, at)).data.customer,
+    ).toBeNull();
   });
 });

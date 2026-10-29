@@ -145,3 +145,37 @@ button:disabled {
 .total {
   font-size: 1.25rem;
 }
+.sign-in form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 24rem;
+}
+.sign-in label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.sign-in fieldset label {
+  flex-direction: row;
+  align-items: center;
+}
+.sign-in input:not([type='radio']) {
+  padding: 0.5rem;
+  font: inherit;
+}
+.problem {
+  color: #b42318;
+}
+.orders {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.order-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}

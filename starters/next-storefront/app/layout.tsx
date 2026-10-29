@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { customerToken } from '@/app/account/actions';
 import { switchLanguage } from '@/app/actions';
 import { storefront } from '@/lib/hatti';
 import { languageOf } from '@/lib/language';
@@ -20,6 +21,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
   const { shop } = await storefront<{ shop: { name: string } }>(SHOP_QUERY);
   const language = await languageOf();
   const words = wordsOf(language);
+  const signedIn = (await customerToken()) !== null;
   return (
     // In Urdu, right to left (ADR-926).
     <html lang={language} dir={language === 'ur' ? 'rtl' : 'ltr'}>
@@ -35,6 +37,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
                 {words.switchTo}
               </button>
             </form>
+            <Link href="/account">{signedIn ? words.account : words.signIn}</Link>
             <Link href="/cart">{words.cart}</Link>
           </nav>
         </header>
