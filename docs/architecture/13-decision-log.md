@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-930 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-931 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -938,6 +938,7 @@
 | 928 | A selling plan may ask for up to twelve orders before its subscribers cancel themselves: until then their order's page offers skip and pause alone, staff cancelling whenever they must | Accepted |
 | 929 | An expansion store's price rate may follow the day's rate between the shops' currencies, from the currency feed, products copied as they change being copied again at each new rate | Accepted |
 | 930 | A selling plan may be for chosen variants alone, rather than a tag's products or all of them: the product page shows it on those, checkout prices it there alone | Accepted |
+| 931 | A theme experiment may show up to three drafts, each its own share of shoppers, each compared with the live theme at a confidence split among them | Accepted |
 
 ---
 
@@ -30589,3 +30590,35 @@
 * **Consequences:**
   * A shop subscribes the size it means to, at its discount, without a tag for each.
   * Not yet: changing a plan's variants from the admin, beyond deleting and adding it.
+
+## ADR-931 · A theme experiment may show up to three drafts, each its own share of shoppers, each compared with the live theme at a confidence split among them
+
+* **Context:** ADR-866's experiments show one draft against the live theme. A shop that wants to
+  try three banners, or three home pages, runs three experiments one after another, a month or
+  more, each against a different season's shoppers. Shopify's own theme tests are A/B only;
+  testing apps offer several arms. ADR-866 and ADR-921 left more than two arms for later.
+* **Decision:**
+  * **Up to three drafts** (migration 0416, `other_theme_ids`; `otherThemeIds` on
+    `ThemeExperimentInput`): the first stays `themeId`, arm b; the others are arms c and d.
+    Drafts are each shown once, and none is the live theme.
+  * **Each draft has the experiment's share**, the live theme never fewer shoppers than any:
+    up to 50% for one draft, 33% each for two, 25% each for three ("Share must be a whole
+    percent from 1 to 25 with 3 drafts"). A new shopper is drawn into each draft's share in turn,
+    the rest into the live theme, and keeps their arm in its cookie as before.
+  * **Each draft is compared with the live theme** by orders and by money a session, as before,
+    at 95% split among the drafts (Bonferroni: z of 1.96, 2.24 and 2.39), so three drafts are no
+    likelier to find a winner by chance. The guardrail likewise asks 99.5% split among them, and
+    **any draft selling clearly worse ends the experiment**. So does publishing a theme or
+    deleting any of its drafts.
+  * **`ThemeExperiment.drafts`** lists each draft, its arm and both verdicts; `draft`, `verdict`
+    and `revenueVerdict` stay the first draft's.
+  * **Storefront:** each draft is written in its own document (`theme-b`, `theme-c`, `theme-d`),
+    and a shopper in its arm is shown it, never kept at the edge; each arm is counted apart.
+  * **Admin:** Online Store › Themes › Experiments offers up to two drafts more, says the share
+    each can have, and names the draft each verdict is of.
+* **Consequences:**
+  * A shop tries several ideas at once, against the same shoppers, and still learns of the best
+    with the confidence one comparison had.
+  * Each draft gets fewer shoppers, so an experiment of three needs longer to say anything.
+  * Not yet: stopping only the draft that sells clearly worse, the others going on; shares that
+    differ by draft; price tests (OWN-56).
