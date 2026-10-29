@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The headless starter's wishlist
+### d3c9af6 · The headless starter's wishlist
 
 * **The Next.js starter keeps the shopper's wishlist**: Save for later on each product's page,
   and a page of what was kept ([ADR-953](../architecture/13-decision-log.md#adr-953--the-headless-starter-keeps-the-shoppers-wishlist-save-for-later-on-each-products-page-and-a-page-of-what-was-kept)).
