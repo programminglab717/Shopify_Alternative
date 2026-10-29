@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The AI agent hears voice notes
+### a38b846 · The AI agent hears voice notes
 
 * **The AI support agent hears a customer's voice note and answers its words**, and hands a
   picture, a video or a file without words to staff ([ADR-940](../architecture/13-decision-log.md#adr-940--the-ai-support-agent-hears-a-customers-voice-note-and-answers-its-words-and-hands-a-picture-a-video-or-a-file-without-words-to-staff)).
