@@ -59,6 +59,7 @@ export enum MessageKind {
   TRANSFER_CONFIRMED = 'TRANSFER_CONFIRMED',
   TRANSFER_REFUSED = 'TRANSFER_REFUSED',
   DOMAIN_UNPOINTED = 'DOMAIN_UNPOINTED',
+  SSO_DOMAIN_MISSING = 'SSO_DOMAIN_MISSING',
   ORDERS_LIMIT_NEAR = 'ORDERS_LIMIT_NEAR',
   ORDERS_LIMIT_REACHED = 'ORDERS_LIMIT_REACHED',
   STORE_EXPORT_READY = 'STORE_EXPORT_READY',
@@ -315,6 +316,12 @@ registerEnumType(MessageKind, {
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         'DNS points a domain of its own elsewhere, which is disconnected three days on unless it ' +
         'points back (ADR-262).',
+    },
+    SSO_DOMAIN_MISSING: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        "the TXT record proving a single sign-on domain the shop's is gone from DNS, and the day " +
+        'the domain is no longer proved its unless it comes back (ADR-938).',
     },
     ORDERS_LIMIT_NEAR: {
       description:

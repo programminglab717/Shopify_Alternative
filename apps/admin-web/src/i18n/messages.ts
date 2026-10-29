@@ -2917,6 +2917,7 @@ const en = {
   'messages.kind.TRANSFER_CONFIRMED': 'Transfer found',
   'messages.kind.TRANSFER_REFUSED': 'Transfer not found',
   'messages.kind.DOMAIN_UNPOINTED': 'Domain points elsewhere',
+  'messages.kind.SSO_DOMAIN_MISSING': 'Single sign-on domain record gone',
   'messages.kind.ORDERS_LIMIT_NEAR': "Near the plan's orders",
   'messages.kind.ORDERS_LIMIT_REACHED': "Plan's orders reached",
   'messages.hint.ORDER_CONFIRMATION':
@@ -10178,6 +10179,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.TRANSFER_CONFIRMED': 'ٹرانسفر مل گیا',
   'messages.kind.TRANSFER_REFUSED': 'ٹرانسفر نہیں ملا',
   'messages.kind.DOMAIN_UNPOINTED': 'ڈومین کہیں اور اشارہ کر رہا ہے',
+  'messages.kind.SSO_DOMAIN_MISSING': 'سنگل سائن آن ڈومین کا ریکارڈ ہٹ گیا',
   'messages.kind.ORDERS_LIMIT_NEAR': 'پلان کے آرڈرز قریب',
   'messages.kind.ORDERS_LIMIT_REACHED': 'پلان کے آرڈرز پورے',
   'messages.hint.ORDER_CONFIRMATION':

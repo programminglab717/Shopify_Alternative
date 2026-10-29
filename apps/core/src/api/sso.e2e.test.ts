@@ -9,7 +9,8 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TestDns, startTestApi, type TestApi } from '../testing/api.js';
 import { fakeOidcProvider } from '../testing/oidc-provider.js';
-import { SsoDomainChecks } from '../worker/sso-domain-checks.js';
+import { MessagesService } from '@hatti/messaging/public';
+import { SsoDomainChecks, ssoDomainMissingNotice } from '../worker/sso-domain-checks.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
 const server = testDatabaseServer();
@@ -336,7 +337,25 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
       applicationName: 'sso-domain-checks-test',
     });
     try {
-      const checks = new SsoDomainChecks(database.app, (host) => dns.texts(host));
+      // Its shop told the first time its record is gone (ADR-938), at its alerts number.
+      await admin.query(
+        `INSERT INTO messaging.settings (shop_id, alerts_phone) VALUES ($1, '+923335550031')
+         ON CONFLICT (shop_id) DO UPDATE SET alerts_phone = excluded.alerts_phone`,
+        [shop],
+      );
+      const checks = new SsoDomainChecks(
+        database.app,
+        (host) => dns.texts(host),
+        undefined,
+        ssoDomainMissingNotice(database, new MessagesService(database)),
+      );
+      const told = async () =>
+        (
+          await admin.query<{ channel: string; variables: Record<string, string> }>(
+            `SELECT channel, variables FROM messaging.messages
+              WHERE kind = 'sso_domain_missing' ORDER BY created_at, id`,
+          )
+        ).rows;
       const day = 86_400_000;
       const at = Date.now() + 2 * day;
       const swept = (offset: number, by = checks) => by.sweep(new Date(at + offset));
@@ -356,11 +375,20 @@ describe.skipIf(!server)('Single sign-on for staff (ADM-09, ADR-864)', () => {
         false,
         new Date(at + day + 1_000).toISOString(),
       ]);
+      // On WhatsApp, the day it stops being proved Zari's in Zari's time.
+      expect(await told()).toEqual([
+        {
+          channel: 'whatsapp',
+          variables: { shop: 'Zari', domain: 'zari.com.pk', date: expect.any(String) },
+        },
+      ]);
       // DNS failing changes nothing.
       const failing = new SsoDomainChecks(database.app, async () => {
         throw new Error('SERVFAIL');
       });
       expect((await swept(2 * day + 2_000, failing)).unanswered).toBe(1);
+      // Still missing, it is not told again.
+      expect(await told()).toHaveLength(1);
       // Three days missing: no longer proved Zari's.
       expect((await swept(4 * day + 3_000)).unproved).toBe(1);
       expect((await gql(zari, SSO)).data.shopSso.domains).toEqual([

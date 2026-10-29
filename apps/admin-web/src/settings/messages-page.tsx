@@ -98,6 +98,7 @@ const ALWAYS_SENT = [
   'TRANSFER_CONFIRMED',
   'TRANSFER_REFUSED',
   'DOMAIN_UNPOINTED',
+  'SSO_DOMAIN_MISSING',
   'ORDERS_LIMIT_NEAR',
   'ORDERS_LIMIT_REACHED',
   // Turned on and off with the reviews page's own setting (ADR-400).

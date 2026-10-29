@@ -9486,6 +9486,11 @@ enum MessageKind {
   SMS_SENDER_REVOKED
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: the TXT record proving a single sign-on domain the shop's is gone from DNS, and the day the domain is no longer proved its unless it comes back (ADR-938).
+  """
+  SSO_DOMAIN_MISSING
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number: an outage of Hatti's begun, or maintenance putting a part out of service set, and its ending (ADR-544).
   """
   STATUS_UPDATE

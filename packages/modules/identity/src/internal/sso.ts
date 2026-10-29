@@ -61,6 +61,9 @@ export type SsoDomainCheck = 'proved' | 'missing' | 'unproved' | 'unanswered';
 export interface SsoDomainDue {
   domain: string;
   proofToken: string;
+  /** The shop it is proved for, and since when its record is gone, if it is (ADR-938). */
+  shopId: string;
+  missingSince: Date | null;
 }
 
 /**
@@ -73,9 +76,20 @@ export async function ssoDomainsToRecheck(
   limit: number,
 ): Promise<SsoDomainDue[]> {
   const due = new Date(at.getTime() - SSO_PROOF.recheckMs).toISOString();
-  const { rows } = await db.execute<{ domain: string; proof_token: string }>(sql`
-    SELECT domain, proof_token FROM identity.sso_domains_due(${due}::timestamptz, ${limit})`);
-  return rows.map((row) => ({ domain: row.domain, proofToken: row.proof_token }));
+  const { rows } = await db.execute<{
+    domain: string;
+    proof_token: string;
+    shop_id: string;
+    missing_since: Date | string | null;
+  }>(sql`
+    SELECT domain, proof_token, shop_id, missing_since
+      FROM identity.sso_domains_due(${due}::timestamptz, ${limit})`);
+  return rows.map((row) => ({
+    domain: row.domain,
+    proofToken: row.proof_token,
+    shopId: row.shop_id,
+    missingSince: row.missing_since === null ? null : new Date(row.missing_since),
+  }));
 }
 
 /**

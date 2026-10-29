@@ -530,6 +530,19 @@ describe("Messages' words", () => {
       '10 Oct, 3:00 pm',
     ]);
     expect(messageText('domain_unpointed', 'ur', unpointed)).toContain('www.zari.pk');
+    // A single sign-on domain's record gone from DNS (ADR-938).
+    const missing = { shop: 'Zari Fashions', domain: 'zari.pk', date: '1 Nov, 3:00 pm' };
+    expect(messageText('sso_domain_missing', 'en', missing)).toBe(
+      "Hatti: the record that proves zari.pk is Zari Fashions's is gone from DNS, so its staff's " +
+        'sign-ins may stop going to Zari Fashions. Put the TXT record back at _hatti-sso.zari.pk ' +
+        "by 1 Nov, 3:00 pm, or the domain is no longer proved Zari Fashions's.",
+    );
+    expect(templateParameters('sso_domain_missing', missing)).toEqual([
+      'Zari Fashions',
+      'zari.pk',
+      '1 Nov, 3:00 pm',
+    ]);
+    expect(messageText('sso_domain_missing', 'ur', missing)).toContain('_hatti-sso.zari.pk');
     // The whole store's export, made (ADR-417).
     const exported = { shop: 'Zari Fashions', date: '20 Oct, 3:00 pm' };
     expect(messageText('store_export_ready', 'en', exported)).toBe(
@@ -607,6 +620,7 @@ describe("Messages' words", () => {
       'transfer_confirmed',
       'transfer_refused',
       'domain_unpointed',
+      'sso_domain_missing',
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',
@@ -693,6 +707,7 @@ describe("Messages' words", () => {
       'transfer_confirmed',
       'transfer_refused',
       'domain_unpointed',
+      'sso_domain_missing',
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',
@@ -915,6 +930,7 @@ describe("Messages' words", () => {
       'transfer_confirmed',
       'transfer_refused',
       'domain_unpointed',
+      'sso_domain_missing',
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',

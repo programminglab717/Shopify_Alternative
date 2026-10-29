@@ -61,6 +61,7 @@ export const MESSAGE_KINDS = [
   'transfer_confirmed',
   'transfer_refused',
   'domain_unpointed',
+  'sso_domain_missing',
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
@@ -145,6 +146,7 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'transfer_confirmed',
   'transfer_refused',
   'domain_unpointed',
+  'sso_domain_missing',
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
@@ -202,6 +204,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'transfer_confirmed',
   'transfer_refused',
   'domain_unpointed',
+  'sso_domain_missing',
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
@@ -1157,6 +1160,21 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s domain {domain} no longer points at Hatti",
       ur: '{shop} کا ڈومین {domain} اب ہٹی کی طرف نہیں جاتا',
+    },
+  },
+  // A single sign-on domain's record gone from DNS (ADR-938): the day it stops being the shop's.
+  sso_domain_missing: {
+    whatsapp: 'hatti_sso_domain_missing',
+    category: 'utility',
+    parameters: ['shop', 'domain', 'date'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: the record that proves {domain} is {shop}'s is gone from DNS, so its staff's sign-ins may stop going to {shop}. Put the TXT record back at _hatti-sso.{domain} by {date}, or the domain is no longer proved {shop}'s.",
+      ur: 'ہٹی: وہ ریکارڈ جو ثابت کرتا ہے کہ {domain} {shop} کا ہے، DNS سے ہٹ گیا ہے، اس لیے اس کے عملے کے سائن اِن {shop} تک پہنچنا بند ہو سکتے ہیں۔ {date} تک _hatti-sso.{domain} پر TXT ریکارڈ دوبارہ لگائیں، ورنہ ڈومین {shop} کا ثابت شدہ نہیں رہے گا۔',
+    },
+    subject: {
+      en: "{domain}'s single sign-on record is gone from DNS",
+      ur: '{domain} کا سنگل سائن آن ریکارڈ DNS سے ہٹ گیا ہے',
     },
   },
   orders_limit_near: {
