@@ -53,6 +53,8 @@ export class BankTransferResolver {
       ...(input.enabled !== undefined && input.enabled !== null && { enabled: input.enabled }),
       ...(input.account !== undefined && { account: input.account }),
       ...(input.discount !== undefined && { discount: input.discount }),
+      ...(input.readReceipts !== undefined &&
+        input.readReceipts !== null && { readReceipts: input.readReceipts }),
     });
     return Object.assign(new BankTransferSettingsUpdatePayload(), {
       bankTransferSettings: result.ok
@@ -71,6 +73,7 @@ function toBankTransferSettings(
     enabled: record.enabled,
     account: record.account && toBankAccount(record.account),
     discount: record.discount && toTransferDiscount(record.discount, currency),
+    readReceipts: record.readReceipts,
     updatedAt: record.updatedAt,
   });
 }

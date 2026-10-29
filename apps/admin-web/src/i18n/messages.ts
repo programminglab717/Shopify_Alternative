@@ -773,6 +773,9 @@ const en = {
   'transfer.enabled': 'Offer bank transfer at checkout',
   'transfer.enabledHint':
     'Beside cash on delivery, and alone where cash on delivery is not offered.',
+  'transfer.readReceipts': 'Read each receipt with AI as it arrives',
+  'transfer.readReceiptsHint':
+    'Customers’ receipts are read as they send them, an AI credit each, so the order shows what each says at once. Check your bank before you mark the order paid.',
   'transfer.discount': 'Something off for paying by transfer',
   'transfer.discount.NONE': 'Nothing off',
   'transfer.discount.PERCENTAGE': 'A percentage off',
@@ -7954,6 +7957,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'transfer.checkout': 'چیک آؤٹ پر',
   'transfer.enabled': 'چیک آؤٹ پر بینک ٹرانسفر پیش کریں',
   'transfer.enabledHint': 'کیش آن ڈیلیوری کے ساتھ، اور اکیلا جہاں کیش آن ڈیلیوری پیش نہ ہو۔',
+  'transfer.readReceipts': 'ہر رسید آتے ہی AI سے پڑھیں',
+  'transfer.readReceiptsHint':
+    'گاہکوں کی رسیدیں بھیجتے ہی پڑھی جاتی ہیں، ہر ایک پر ایک AI کریڈٹ، تاکہ آرڈر پر فوراً دکھے کہ ہر ایک میں کیا لکھا ہے۔ آرڈر کو ادا شدہ کرنے سے پہلے اپنا بینک دیکھیں۔',
   'transfer.discount': 'ٹرانسفر سے ادائیگی پر رعایت',
   'transfer.discount.NONE': 'کوئی رعایت نہیں',
   'transfer.discount.PERCENTAGE': 'فیصد رعایت',

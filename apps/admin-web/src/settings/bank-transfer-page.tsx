@@ -27,6 +27,7 @@ import { BackToSettings } from './settings-page';
 
 interface TransferState extends PrepaidDiscountState {
   enabled: boolean;
+  readReceipts: boolean;
   bankName: string;
   title: string;
   iban: string;
@@ -38,6 +39,7 @@ function stateOf(settings: BankTransferSettingsValue): TransferState {
   const { account } = settings;
   return {
     enabled: settings.enabled,
+    readReceipts: settings.readReceipts,
     bankName: account?.bankName ?? '',
     title: account?.title ?? '',
     // Spaced in fours, as banking apps and cheques show an IBAN.
@@ -62,6 +64,7 @@ function inputOf(state: TransferState) {
         }
       : null,
     discount: prepaidDiscountInput(state),
+    readReceipts: state.readReceipts,
   };
 }
 
@@ -165,6 +168,12 @@ function BankTransferForm({ settings }: { settings: BankTransferSettingsValue })
             onChange={(enabled) => set({ enabled })}
           />
           <PrepaidDiscountFields label={t('transfer.discount')} state={state} onChange={set} />
+          <CheckField
+            label={t('transfer.readReceipts')}
+            hint={t('transfer.readReceiptsHint')}
+            checked={state.readReceipts}
+            onChange={(readReceipts) => set({ readReceipts })}
+          />
         </FormSection>
         <Problems problems={problems} />
         {saved && <Alert tone="success">{t('settings.saved')}</Alert>}

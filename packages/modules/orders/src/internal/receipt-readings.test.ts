@@ -242,4 +242,33 @@ describe.skipIf(!server)('Receipts for transfers, read by the AI (PAY-08, ADR-84
     expect(errorsOf(await readings.read(f.b, receiptId))).toEqual([['id', 'NOT_FOUND']]);
     expect(sent).toEqual([]);
   });
+
+  it('gives the receipts to read as they arrive, where the shop has them read so (ADR-915)', async () => {
+    const { order, receiptId } = await withReceipt(PIXEL);
+    const { gateway } = gatewayAnswering([{ receipt: false }]);
+    const readings = new ReceiptReadingService(f.db, f.storage, gateway, new Credits());
+    // Off until the shop turns it on; and never without the AI.
+    expect(await readings.arrivedUnread(f.a.shopId, order.id)).toEqual([]);
+    const settings = unwrap(await f.bankTransfer.update(f.a, { readReceipts: true }));
+    expect(settings).toMatchObject({ enabled: true, readReceipts: true });
+    expect(await readings.arrivedUnread(f.a.shopId, order.id)).toEqual([receiptId]);
+    expect(
+      await new ReceiptReadingService(f.db, f.storage).arrivedUnread(f.a.shopId, order.id),
+    ).toEqual([]);
+    expect(await readings.arrivedUnread(f.b.shopId, order.id)).toEqual([]);
+    // Read once, it is not given again.
+    unwrap(await readings.read(f.a, receiptId));
+    expect(await readings.arrivedUnread(f.a.shopId, order.id)).toEqual([]);
+    // The switch is audited with the shop's other transfer settings.
+    const { rows } = await f.admin.query<{ details: Record<string, unknown> }>(
+      `SELECT details FROM platform.audit_log
+        WHERE shop_id = $1 AND action = 'bank_transfer_settings.updated'
+        ORDER BY occurred_at DESC LIMIT 1`,
+      [f.a.shopId],
+    );
+    expect(rows[0]!.details).toMatchObject({
+      readReceipts: true,
+      before: { readReceipts: false },
+    });
+  });
 });

@@ -2825,6 +2825,7 @@ const BANK_TRANSFER_SETTINGS = /* GraphQL */ `
         ...Money
       }
     }
+    readReceipts
     updatedAt
   }
 `;

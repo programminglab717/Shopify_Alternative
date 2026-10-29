@@ -106,6 +106,7 @@ import {
   ORDER_LINK_PATH,
   ORDER_SEGMENT_FACTS,
   OrderExportService,
+  ReceiptReadingService,
   SalesReportService,
   SubscriptionService,
 } from '@hatti/orders/public';
@@ -187,6 +188,7 @@ import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 import { ScheduledExports } from './scheduled-exports.js';
 import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
+import { ArrivingReceipts } from './arriving-receipts.js';
 import { ExpansionAutoCopy } from './expansion-auto-copy.js';
 import { ExpansionCopier } from '../expansion-copier.js';
 import { SupportAlerts } from './support-alerts.js';
@@ -227,6 +229,7 @@ export interface EventConsumers {
   storeOpen?: StoreOpenNotices;
   codPrepaid?: CodPrepaidOffers;
   aiReplies?: AiCustomerReplies;
+  arrivingReceipts?: ArrivingReceipts;
   whatsappCarts?: WhatsAppCarts;
   voiceOrders?: VoiceOrders;
   parcelSteps?: ParcelSteps;
@@ -263,6 +266,7 @@ export function eventHandlers(
     storeOpen,
     codPrepaid,
     aiReplies,
+    arrivingReceipts,
     whatsappCarts,
     voiceOrders,
     parcelSteps,
@@ -360,6 +364,13 @@ export function eventHandlers(
     for (const type of AiCustomerReplies.EVENTS) {
       registry.on(type, async (event) => {
         await aiReplies.handle(event);
+      });
+    }
+  }
+  if (arrivingReceipts) {
+    for (const type of ArrivingReceipts.EVENTS) {
+      registry.on(type, async (event) => {
+        await arrivingReceipts.handle(event);
       });
     }
   }
@@ -565,6 +576,23 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
                 ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
               }),
               new AiCreditsService(database),
+            ),
+          }),
+        // Receipts read by the AI as they arrive, where the shop has them so (ADR-915).
+        ...(config.AI_API_KEY &&
+          config.AI_MODEL && {
+            arrivingReceipts: new ArrivingReceipts(
+              new ReceiptReadingService(
+                database,
+                workerStorage(config),
+                new AiGateway({
+                  apiKey: config.AI_API_KEY,
+                  model: config.AI_MODEL,
+                  ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
+                }),
+                new AiCreditsService(database),
+              ),
+              logger,
             ),
           }),
         // Carts from shops' WhatsApp catalogues, answered with their checkout (ADR-856): they

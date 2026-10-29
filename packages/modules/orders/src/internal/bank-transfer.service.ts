@@ -31,6 +31,8 @@ export interface BankTransferSettingsRecord {
   account: BankAccountValue | null;
   /** What checkout takes off orders paid by transfer (CHK-08, ADR-077); null for nothing. */
   discount: PrepaidDiscountValue | null;
+  /** Whether each receipt customers send is read by the AI as it arrives (ADR-915). */
+  readReceipts: boolean;
   /** Null while the shop has never set them. */
   updatedAt: Date | null;
 }
@@ -53,6 +55,7 @@ export interface BankTransferSettingsInput {
   account?: BankAccountInput | null;
   /** Replaces what checkout takes off orders paid by transfer; null takes it away. */
   discount?: PrepaidDiscountInput | null;
+  readReceipts?: boolean;
 }
 
 /** Bank transfer as checkout offers it: the account to pay into, and what paying so takes off. */
@@ -65,6 +68,7 @@ const NONE: BankTransferSettingsRecord = {
   enabled: false,
   account: null,
   discount: null,
+  readReceipts: false,
   updatedAt: null,
 };
 
@@ -84,10 +88,11 @@ export async function bankTransferSettingsIn(
     discount_bps: number | null;
     discount_cap: string | null;
     discount_amount: string | null;
+    read_receipts: boolean;
     updated_at: string;
   }>(sql`
     SELECT enabled, account_title, bank_name, iban, instructions, raast_id, discount_bps,
-           discount_cap, discount_amount, updated_at
+           discount_cap, discount_amount, read_receipts, updated_at
       FROM orders.bank_transfer_settings
      WHERE shop_id = ${shopId}
      ${options.lock ? sql`FOR UPDATE` : sql``}`);
@@ -115,6 +120,7 @@ export async function bankTransferSettingsIn(
         : row.discount_amount !== null
           ? { kind: 'fixed_amount', amount: BigInt(row.discount_amount) }
           : null,
+    readReceipts: row.read_receipts,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
@@ -175,6 +181,7 @@ export class BankTransferService {
         enabled: input.enabled ?? current.enabled,
         account: account === undefined ? current.account : account,
         discount: discount === undefined ? current.discount : discount,
+        readReceipts: input.readReceipts ?? current.readReceipts,
       };
       if (next.enabled && !next.account) {
         return failOne(
@@ -191,11 +198,11 @@ export class BankTransferService {
       await tx.execute(sql`
         INSERT INTO orders.bank_transfer_settings
                (shop_id, enabled, account_title, bank_name, iban, instructions, raast_id,
-                discount_bps, discount_cap, discount_amount)
+                discount_bps, discount_cap, discount_amount, read_receipts)
         VALUES (${tenant.shopId}, ${next.enabled}, ${a?.title ?? null}, ${a?.bankName ?? null},
                 ${a?.iban ?? null}, ${a?.instructions ?? ''}, ${a?.raastId ?? null},
                 ${percentage?.percentageBps ?? null}, ${percentage?.cap ?? null},
-                ${d?.kind === 'fixed_amount' ? d.amount : null})
+                ${d?.kind === 'fixed_amount' ? d.amount : null}, ${next.readReceipts})
             ON CONFLICT (shop_id) DO UPDATE
                    SET enabled = excluded.enabled, account_title = excluded.account_title,
                        bank_name = excluded.bank_name, iban = excluded.iban,
@@ -203,6 +210,7 @@ export class BankTransferService {
                        discount_bps = excluded.discount_bps,
                        discount_cap = excluded.discount_cap,
                        discount_amount = excluded.discount_amount,
+                       read_receipts = excluded.read_receipts,
                        version = orders.bank_transfer_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<BankTransferSettingsUpdatedPayload>(tx, tenant.shopId, {
@@ -225,10 +233,12 @@ export class BankTransferService {
           enabled: next.enabled,
           account: auditedAccount(next.account),
           discount: auditedPrepaidDiscount(next.discount, tenant.currency),
+          readReceipts: next.readReceipts,
           before: {
             enabled: current.enabled,
             account: auditedAccount(current.account),
             discount: auditedPrepaidDiscount(current.discount, tenant.currency),
+            readReceipts: current.readReceipts,
           },
         },
       });
@@ -305,8 +315,8 @@ function checkIban(check: InputChecker, field: string[], input: string): string 
  * Raast ID), "instructions" and "discount".
  */
 function changesOf(
-  current: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount'>,
-  next: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount'>,
+  current: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount' | 'readReceipts'>,
+  next: Pick<BankTransferSettingsRecord, 'enabled' | 'account' | 'discount' | 'readReceipts'>,
 ): string[] {
   const before = current.account;
   const after = next.account;
@@ -322,6 +332,7 @@ function changesOf(
   }
   if ((before?.instructions ?? '') !== (after?.instructions ?? '')) changed.push('instructions');
   if (!samePrepaidDiscount(current.discount, next.discount)) changed.push('discount');
+  if (current.readReceipts !== next.readReceipts) changed.push('readReceipts');
   return changed;
 }
 

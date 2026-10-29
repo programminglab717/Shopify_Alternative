@@ -439,6 +439,7 @@ describe('Delivery and payment settings in the admin', () => {
               enabled: false,
               account: null,
               discount: null,
+              readReceipts: false,
               updatedAt: null,
             },
           };
@@ -486,6 +487,8 @@ describe('Delivery and payment settings in the admin', () => {
     });
     type('Percentage off', '5');
     type('At most', '500');
+    // Receipts read as they arrive (ADR-915).
+    fireEvent.click(screen.getByRole('checkbox', { name: /Read each receipt with AI/ }));
     await press('Save');
 
     await confirmIdentity('Password', 'owner-password');
@@ -508,6 +511,7 @@ describe('Delivery and payment settings in the admin', () => {
           instructions: '',
         },
         discount: { percentage: 5, cap: '500' },
+        readReceipts: true,
       },
     });
   });

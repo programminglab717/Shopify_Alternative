@@ -1349,6 +1349,8 @@ export type TransferDiscountKind = 'FIXED_AMOUNT' | 'PERCENTAGE';
 
 export interface BankTransferSettingsValue {
   enabled: boolean;
+  /** Each receipt read by the AI as it arrives (ADR-915). */
+  readReceipts: boolean;
   account: {
     bankName: string;
     title: string;

@@ -232,6 +232,8 @@ export {
 } from '../internal/return-request.service.js';
 export { ORDER_CUSTOMER_DATA } from '../internal/order-customer-data.js';
 export { transferDetails, transferWords } from '../internal/transfer-details.js';
+// Receipts read by the AI (ADR-845), as they arrive where the shop has them so (ADR-915).
+export { ReceiptReadingService } from '../internal/receipt-readings.js';
 export {
   RECEIPT_LIMITS,
   RECEIPT_TYPES,

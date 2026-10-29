@@ -17,6 +17,7 @@ import { receiptImage } from '@hatti/images';
 import { ObjectStorage } from '@hatti/storage';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { transferOwed } from './rules.js';
 import type { BankAccountValue, PaymentMethodValue } from './schema.js';
 
@@ -245,6 +246,23 @@ export class ReceiptReadingService {
     }
     await this.credits?.spend(tenant.shopId, 'transfer_receipt', now);
     return { ok: true, value: (await this.readingsOf(tenant, [receiptId])).get(receiptId)! };
+  }
+
+  /**
+   * The receipts of order `orderId` not yet read, where the shop has them read as they arrive
+   * (ADR-915); none where it doesn't, or the AI isn't set up. One whose reading failed is left
+   * for staff to ask again.
+   */
+  async arrivedUnread(shopId: string, orderId: string): Promise<string[]> {
+    if (!this.ai) return [];
+    return this.db.tenant(shopId, async (tx) => {
+      if (!(await bankTransferSettingsIn(tx, shopId)).readReceipts) return [];
+      const { rows } = await tx.execute<{ id: string }>(sql`
+        SELECT id FROM orders.transfer_receipts
+         WHERE shop_id = ${shopId} AND order_id = ${orderId} AND read_outcome IS NULL
+         ORDER BY created_at, id`);
+      return rows.map((row) => row.id);
+    });
   }
 
   /** The receipt's file as the AI is given it; null where storage lost it or it doesn't open. */

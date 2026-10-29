@@ -105,6 +105,13 @@ export class BankTransferSettings {
   })
   discount!: TransferDiscount | null;
 
+  @Field({
+    description:
+      'Whether each receipt customers send for their transfers is read by the AI as it arrives, ' +
+      'an AI credit each, rather than when staff ask (ADR-915).',
+  })
+  readReceipts!: boolean;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it never has.',
@@ -186,6 +193,9 @@ export class BankTransferSettingsInput {
       'orders placed before keep theirs.',
   })
   discount?: TransferDiscountInput | null;
+
+  @Field(() => Boolean, { nullable: true })
+  readReceipts?: boolean | null;
 }
 
 @ObjectType()

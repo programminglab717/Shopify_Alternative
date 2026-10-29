@@ -984,6 +984,11 @@ type BankTransferSettings {
   """
   enabled: Boolean!
 
+  """
+  Whether each receipt customers send for their transfers is read by the AI as it arrives, an AI credit each, rather than when staff ask (ADR-915).
+  """
+  readReceipts: Boolean!
+
   """When the shop last changed them; none while it never has."""
   updatedAt: DateTime
 }
@@ -999,6 +1004,7 @@ input BankTransferSettingsInput {
   """
   discount: TransferDiscountInput
   enabled: Boolean
+  readReceipts: Boolean
 }
 
 type BankTransferSettingsUpdatePayload {
