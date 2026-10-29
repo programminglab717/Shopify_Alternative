@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Shoppers' data requests through the Storefront API
+### 998782a · Shoppers' data requests through the Storefront API
 
 * **Shoppers download, or ask to erase, their own data through the Storefront API**, as their
   account page lets them ([ADR-962](../architecture/13-decision-log.md#adr-962--shoppers-download-or-ask-to-erase-their-own-data-through-the-storefront-api-as-their-account-page-lets-them)).
