@@ -130,9 +130,10 @@ mutation {
 ```
 
 Send the shop's owner to `confirmationUrl`. They approve it and pay it as an invoice of Hatti's;
-then they come back to `returnUrl`, and `appPurchaseOneTime(id)` says `PAID`. On a development
-store the charge is a test, paid once approved with no money moving. Hatti pays you 80% of what
-the shop paid, less the sales tax.
+then they come back to `returnUrl`, and `appPurchaseOneTime(id)` says `PAID`. Subscribe to
+`APP_PURCHASES_ONE_TIME_UPDATE` to be told as each of your charges is declined or paid, with its
+ID and status, rather than asking (ADR-914). On a development store the charge is a test, paid
+once approved with no money moving. Hatti pays you 80% of what the shop paid, less the sales tax.
 
 ## Inside the admin, and on the storefront
 

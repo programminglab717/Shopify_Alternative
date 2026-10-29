@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { StaffRole } from '@hatti/api';
+import { WebhookService } from '@hatti/apps/public';
 import { base32Decode, totp } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -265,6 +266,54 @@ describe.skipIf(!server)("Apps' one-time charges in rupees (DEV-05)", () => {
       occurredAt: new Date(paid.occurred_at).toISOString(),
     } as DomainEvent);
     expect(await data(appToken, zari, STATUS, { id: charge.id })).toEqual({ status: 'PAID' });
+
+    // The app, subscribed to its charges, is told it was paid; no other app is (ADR-914).
+    const subscribed = await data(
+      appToken,
+      zari,
+      `mutation { webhookSubscriptionCreate(topic: APP_PURCHASES_ONE_TIME_UPDATE,
+         webhookSubscription: { callbackUrl: "https://reviews.example.pk/hooks" }) {
+         webhookSubscription { topic } userErrors { message } } }`,
+    );
+    expect(subscribed).toEqual({
+      webhookSubscription: { topic: 'APP_PURCHASES_ONE_TIME_UPDATE' },
+      userErrors: [],
+    });
+    const { rows: updates } = await admin.query<{
+      id: string;
+      aggregate_id: string;
+      payload: Record<string, unknown>;
+      occurred_at: Date;
+    }>(
+      `SELECT id, aggregate_id, payload, occurred_at FROM platform.outbox_events
+        WHERE event_type = 'app_charge.updated' AND shop_id = $1`,
+      [zari],
+    );
+    expect(updates.map((each) => each.payload)).toEqual([
+      { status: 'paid', appId: expect.any(String) },
+    ]);
+    const webhooks = api.app.get(WebhookService, { strict: false });
+    for (const update of updates) {
+      await webhooks.fanOut({
+        id: update.id,
+        type: 'app_charge.updated',
+        shopId: zari,
+        aggregateType: 'app_charge',
+        aggregateId: update.aggregate_id,
+        payload: update.payload,
+        occurredAt: new Date(update.occurred_at).toISOString(),
+      } as DomainEvent);
+    }
+    const { rows: told } = await admin.query<{ topic: string; body: { data: unknown } }>(
+      `SELECT topic, body FROM apps.webhook_deliveries WHERE shop_id = $1`,
+      [zari],
+    );
+    expect(told).toEqual([
+      {
+        topic: 'app_purchases_one_time/update',
+        body: expect.objectContaining({ data: { id: charge.id, status: 'PAID' } }),
+      },
+    ]);
     const { rows: earned } = await admin.query(
       `SELECT partner_id, plan, invoice_amount::text, amount::text FROM identity.partner_earnings`,
     );

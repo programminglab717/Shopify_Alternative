@@ -433,6 +433,33 @@ describe.skipIf(!server)('Webhooks: subscriptions and deliveries (DEV-03, ADR-39
     expect(JSON.parse(received[0]!.body).data).toEqual({ id: toPublicId('accessToken', sheet.id) });
   });
 
+  it('tells an app of its own charges alone, as they are answered and paid (ADR-914)', async () => {
+    const reviews = await app(['read_products']);
+    const other = await app(['read_products']);
+    await subscribedHere(reviews.id, 'app_purchases_one_time/update');
+    await subscribedHere(other.id, 'app_purchases_one_time/update');
+    const charge = newId();
+    const paid = event(shopA, 'app_charge.updated', 'app_charge', {
+      aggregateId: charge,
+      payload: { status: 'paid', appId: reviews.id },
+    });
+    expect(await webhooks.fanOut(paid)).toBe(1);
+    // A charge's event naming no app tells none.
+    expect(
+      await webhooks.fanOut(
+        event(shopA, 'app_charge.updated', 'app_charge', { payload: { status: 'paid' } }),
+      ),
+    ).toBe(0);
+    expect(await webhooks.deliverDue(sender)).toEqual({ delivered: 1, retrying: 0, failed: 0 });
+    expect(received[0]!.headers['x-hatti-hmac-sha256']).toBe(
+      signWebhook(reviews.secret, received[0]!.body),
+    );
+    expect(JSON.parse(received[0]!.body)).toMatchObject({
+      topic: 'app_purchases_one_time/update',
+      data: { id: toPublicId('appCharge', charge), status: 'PAID' },
+    });
+  });
+
   it('refuses addresses on private networks when it posts', async () => {
     const strict = new HttpWebhookSender({ protocols: ['http:', 'https:'] });
     expect(await strict.send({ url: hookUrl, body: '{}', headers: {} })).toEqual({

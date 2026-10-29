@@ -19,6 +19,7 @@ import {
   WEBHOOK_LIMITS,
   isWebhookTopic,
   retryDelayMs,
+  ownAppOf,
   scopesFor,
   signWebhook,
   topicsOf,
@@ -326,8 +327,9 @@ export class WebhookService {
 
   /**
    * Makes a delivery of `event` for each subscription to a topic it makes, once however often it
-   * comes: those of apps that may read what it names, and for an app removed, its own
-   * subscriptions to `app/uninstalled` alone. How many it made.
+   * comes: those of apps that may read what it names, and for a topic of an app's own, that app's
+   * alone: `app/uninstalled` for the app removed, and a charge's updates for the app that asked
+   * it (ADR-914). How many it made.
    */
   async fanOut(event: DomainEvent): Promise<number> {
     let made = 0;
@@ -335,7 +337,8 @@ export class WebhookService {
       const body = webhookBody(topic, event);
       if (!body) continue;
       const needs = scopesFor(topic);
-      const own = topic === 'app/uninstalled';
+      const own = ownAppOf(topic, event);
+      if (own === null) continue;
       const { rows } = await this.db.tenant(event.shopId, (tx) =>
         tx.execute<{ id: string }>(sql`
           INSERT INTO apps.webhook_deliveries (shop_id, subscription_id, event_id, topic, body)
@@ -344,11 +347,13 @@ export class WebhookService {
             JOIN apps.access_tokens t ON t.shop_id = s.shop_id AND t.id = s.app_id
            WHERE s.shop_id = ${event.shopId} AND s.topic = ${topic}
              ${
-               own
-                 ? sql`AND s.app_id = ${event.aggregateId}`
-                 : sql`AND t.revoked_at IS NULL
+               own === undefined
+                 ? sql`AND t.revoked_at IS NULL
                        AND (t.expires_at IS NULL OR t.expires_at > now())
                        AND t.scopes && ${sql.param(needs)}::text[]`
+                 : topic === 'app/uninstalled'
+                   ? sql`AND s.app_id = ${own}`
+                   : sql`AND s.app_id = ${own} AND t.revoked_at IS NULL`
              }
           ON CONFLICT (shop_id, subscription_id, event_id) DO NOTHING
           RETURNING id`),

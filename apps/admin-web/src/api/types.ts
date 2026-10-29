@@ -4945,7 +4945,9 @@ export type WebhookTopic =
   | 'INVENTORY_LEVELS_UPDATE'
   | 'CUSTOMERS_CREATE'
   | 'CUSTOMERS_UPDATE'
-  | 'APP_UNINSTALLED';
+  | 'APP_UNINSTALLED'
+  // A public app's own charges (ADR-914); custom apps charge nothing.
+  | 'APP_PURCHASES_ONE_TIME_UPDATE';
 
 /** One event's post to an app (ADR-397). */
 export interface WebhookDelivery {

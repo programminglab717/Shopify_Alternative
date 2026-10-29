@@ -178,7 +178,7 @@ export class AppChargeService {
       await tx.execute(sql`
         UPDATE apps.app_charges SET status = ${status}, invoice_id = ${invoiceId}, updated_at = now()
          WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
-      if (status !== 'accepted') await this.#answered(tx, tenant.shopId, id, status);
+      if (status !== 'accepted') await this.#answered(tx, tenant.shopId, id, charge.appId, status);
       return { ok: true, value: { ...charge, status, invoiceId } };
     });
   }
@@ -189,9 +189,10 @@ export class AppChargeService {
       const { rows } = await tx.execute(sql`
         UPDATE apps.app_charges SET status = 'paid', updated_at = now()
          WHERE shop_id = ${shopId} AND id = ${id} AND status = 'accepted'
-        RETURNING id`);
-      if (rows.length === 0) return false;
-      await this.#answered(tx, shopId, id, 'paid');
+        RETURNING token_id`);
+      const charged = rows[0] as { token_id: string } | undefined;
+      if (!charged) return false;
+      await this.#answered(tx, shopId, id, charged.token_id, 'paid');
       return true;
     });
   }
@@ -205,12 +206,19 @@ export class AppChargeService {
     return rows[0] ? toRecord(rows[0]) : null;
   }
 
-  async #answered(tx: Tx, shopId: string, id: string, status: AppChargeStatus): Promise<void> {
+  /** The charge answered or paid, for the app that asked it to hear (ADR-914). */
+  async #answered(
+    tx: Tx,
+    shopId: string,
+    id: string,
+    appId: string,
+    status: AppChargeStatus,
+  ): Promise<void> {
     await appendEvent(tx, shopId, {
       type: AppEvents.ChargeUpdated,
       aggregateType: 'app_charge',
       aggregateId: id,
-      payload: { status },
+      payload: { status, appId },
     });
   }
 }

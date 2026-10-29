@@ -31,6 +31,8 @@ export const WEBHOOK_TOPICS = {
   'customers/create': { reads: 'customers', events: ['customer.created'] },
   'customers/update': { reads: 'customers', events: ['customer.updated'] },
   'app/uninstalled': { reads: null, events: ['app.deleted'] },
+  // The app's own charges, as they are answered and paid (ADR-914).
+  'app_purchases_one_time/update': { reads: null, events: ['app_charge.updated'] },
 } as const satisfies Record<string, { reads: string | null; events: readonly string[] }>;
 
 export type WebhookTopic = keyof typeof WEBHOOK_TOPICS;
@@ -51,6 +53,20 @@ export function topicsOf(eventType: string): WebhookTopic[] {
   return WEBHOOK_TOPIC_NAMES.filter((topic) =>
     (WEBHOOK_TOPICS[topic].events as readonly string[]).includes(eventType),
   );
+}
+
+/**
+ * The one app an event of its own tells, for the topics that tell an app of itself alone: the app
+ * removed, or the app whose charge it is. Undefined for the topics any app that may read them
+ * hears; null where the event names no app.
+ */
+export function ownAppOf(topic: WebhookTopic, event: DomainEvent): string | null | undefined {
+  if (topic === 'app/uninstalled') return event.aggregateId;
+  if (topic === 'app_purchases_one_time/update') {
+    const appId = (event.payload as { appId?: unknown }).appId;
+    return typeof appId === 'string' ? appId : null;
+  }
+  return undefined;
 }
 
 /** The scopes either of which lets an app subscribe to `topic`; none for the app's own. */
@@ -111,6 +127,11 @@ function dataOf(event: DomainEvent): Record<string, unknown> | null {
       };
     case 'app':
       return { id: toPublicId('accessToken', event.aggregateId) };
+    case 'app_charge':
+      return {
+        id: toPublicId('appCharge', event.aggregateId),
+        ...(typeof payload.status === 'string' && { status: payload.status.toUpperCase() }),
+      };
     default:
       return null;
   }

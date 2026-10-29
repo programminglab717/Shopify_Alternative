@@ -5297,6 +5297,7 @@ const en = {
   'webhooks.topic.CUSTOMERS_CREATE': 'A customer is added',
   'webhooks.topic.CUSTOMERS_UPDATE': 'A customer changes',
   'webhooks.topic.APP_UNINSTALLED': 'This app is removed',
+  'webhooks.topic.APP_PURCHASES_ONE_TIME_UPDATE': "This app's charge is answered or paid",
   'activity.subject.webhook_subscription': 'Webhook',
   'reviews.title': 'Reviews',
   'reviews.intro':
@@ -12472,6 +12473,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'webhooks.topic.CUSTOMERS_CREATE': 'گاہک شامل ہو',
   'webhooks.topic.CUSTOMERS_UPDATE': 'گاہک بدلے',
   'webhooks.topic.APP_UNINSTALLED': 'یہ ایپ ہٹائی جائے',
+  'webhooks.topic.APP_PURCHASES_ONE_TIME_UPDATE': 'اس ایپ کے چارج کا جواب یا ادائیگی ہو',
   'activity.subject.webhook_subscription': 'ویب ہک',
   'reviews.title': 'ریویوز',
   'reviews.intro':

@@ -8,6 +8,7 @@ import {
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
+import { WEBHOOK_TOPIC_NAMES } from '../webhooks.js';
 
 /** The topics, as Shopify's WebhookSubscriptionTopic names them. */
 export enum WebhookSubscriptionTopic {
@@ -24,6 +25,7 @@ export enum WebhookSubscriptionTopic {
   CUSTOMERS_CREATE = 'CUSTOMERS_CREATE',
   CUSTOMERS_UPDATE = 'CUSTOMERS_UPDATE',
   APP_UNINSTALLED = 'APP_UNINSTALLED',
+  APP_PURCHASES_ONE_TIME_UPDATE = 'APP_PURCHASES_ONE_TIME_UPDATE',
 }
 
 registerEnumType(WebhookSubscriptionTopic, {
@@ -32,7 +34,8 @@ registerEnumType(WebhookSubscriptionTopic, {
     'What an app is told of (DEV-03, ADR-397): ORDERS_CREATE is "orders/create", as its ' +
     'X-Hatti-Topic header says. Orders, fulfillments and refunds need read_orders; products ' +
     'read_products; stock levels read_inventory; customers read_customers. APP_UNINSTALLED tells ' +
-    'an app it was removed.',
+    'an app it was removed, and APP_PURCHASES_ONE_TIME_UPDATE of its own charges as they are ' +
+    'answered and paid (ADR-914).',
 });
 
 /** "orders/create" as the API names it, and back. */
@@ -41,11 +44,7 @@ export function topicEnumOf(topic: string): WebhookSubscriptionTopic {
 }
 
 export function topicOf(value: WebhookSubscriptionTopic): string {
-  const [first, ...rest] = value.toLowerCase().split('_');
-  // Every topic's resource is one word, or "inventory_levels".
-  return first === 'inventory'
-    ? `inventory_levels/${rest.slice(1).join('_')}`
-    : `${first}/${rest.join('_')}`;
+  return WEBHOOK_TOPIC_NAMES.find((topic) => topicEnumOf(topic) === value) ?? value.toLowerCase();
 }
 
 export enum WebhookDeliveryStatus {
