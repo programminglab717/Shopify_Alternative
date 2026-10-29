@@ -1800,17 +1800,24 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     unwrap(await service.recordPayment(tenant, owing.id, { amount: '2,000' }));
     expect(await sweep(new Date(dueAt.getTime() + day / 2))).toBe(0);
     expect(await sweep(new Date(dueAt.getTime() + 2 * day))).toBe(1);
-    expect(await sweep(new Date(dueAt.getTime() + 9 * day))).toBe(0);
+    expect(await sweep(new Date(dueAt.getTime() + 8 * day))).toBe(0);
     await dispatch(2);
     expect((await reminders()).slice(2)).toEqual([
       { kind: 'payment_terms_overdue', orderId: owing.id, amount: 'Rs 3,250', date: due },
+    ]);
+    // A week on, still owed, it is told again: its own message (ADR-954).
+    expect(await sweep(new Date(dueAt.getTime() + 9 * day))).toBe(1);
+    await dispatch(2);
+    expect((await reminders()).slice(2).map((each) => each.kind)).toEqual([
+      'payment_terms_overdue',
+      'payment_terms_overdue',
     ]);
     // Each with the order's page, which says how to pay.
     const pages = (await queued())
       .filter((message) => message.kind.startsWith('payment_terms_'))
       .map((message) => message.variables.url);
     expect(pages).toEqual(
-      Array(3).fill(expect.stringMatching(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/)),
+      Array(4).fill(expect.stringMatching(/^https:\/\/hatti\.pk\/o\/[\w-]{22}$/)),
     );
   });
 

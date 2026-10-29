@@ -19,6 +19,10 @@ export const PAYMENT_TERMS_REMINDERS = {
   beforeMs: 3 * 86_400_000,
   /** The reminder after it: this long past it, the day's grace for a transfer on its way. */
   afterMs: 86_400_000,
+  /** Past it, reminded again this often while owed (ADR-954)... */
+  againMs: 7 * 86_400_000,
+  /** ...this many times past it in all. */
+  overdue: 4,
   /** Orders one sweep of a shop reminds at most, the earliest due first. */
   batch: 200,
 } as const;
@@ -26,15 +30,19 @@ export const PAYMENT_TERMS_REMINDERS = {
 /**
  * Reminds the customers of the shop's orders on payment terms still owed (ADR-945), in the
  * caller's transaction: once before the due date, {@link PAYMENT_TERMS_REMINDERS.beforeMs} before
- * it and no sooner than halfway from the order to it; and once
- * {@link PAYMENT_TERMS_REMINDERS.afterMs} past it. One already past its date when first found is
- * reminded once, as overdue. An event says which, for the worker to tell the customer. How many
- * it reminded.
+ * it and no sooner than halfway from the order to it; and
+ * {@link PAYMENT_TERMS_REMINDERS.afterMs} past it, then each
+ * {@link PAYMENT_TERMS_REMINDERS.againMs} while still owed, {@link PAYMENT_TERMS_REMINDERS.overdue}
+ * times past it in all (ADR-954). One already past its date when first found is reminded first as
+ * overdue. An event says which, for the worker to tell the customer. How many it reminded.
  */
 export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Promise<number> {
   const now = at.toISOString();
   const soon = new Date(at.getTime() + PAYMENT_TERMS_REMINDERS.beforeMs).toISOString();
   const late = new Date(at.getTime() - PAYMENT_TERMS_REMINDERS.afterMs).toISOString();
+  const again = new Date(at.getTime() - PAYMENT_TERMS_REMINDERS.againMs).toISOString();
+  // 0 none, 1 the reminder before, 2 on the reminders past the date.
+  const most = 1 + PAYMENT_TERMS_REMINDERS.overdue;
   const { rows } = await tx.execute<{
     id: string;
     stage: OrderPaymentTermsRemindedPayload['stage'];
@@ -43,13 +51,16 @@ export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Pr
     terms_reminded: number;
   }>(sql`
     UPDATE orders.orders o
-       SET terms_reminded = CASE WHEN o.payment_due_at <= ${late}::timestamptz THEN 2 ELSE 1 END
+       SET terms_reminded = CASE WHEN o.terms_reminded >= 2 THEN o.terms_reminded + 1
+                                 WHEN o.payment_due_at <= ${late}::timestamptz THEN 2 ELSE 1 END,
+           terms_reminded_at = ${now}::timestamptz
      WHERE o.shop_id = ${shopId}
        AND o.id IN (
          SELECT id FROM orders.orders
-          WHERE shop_id = ${shopId} AND payment_due_at IS NOT NULL AND terms_reminded < 2
+          WHERE shop_id = ${shopId} AND payment_due_at IS NOT NULL AND terms_reminded < ${most}
             AND status <> 'cancelled' AND amount_paid < total
-            AND ((payment_due_at <= ${late}::timestamptz)
+            AND ((terms_reminded < 2 AND payment_due_at <= ${late}::timestamptz)
+              OR (terms_reminded >= 2 AND terms_reminded_at <= ${again}::timestamptz)
               OR (terms_reminded = 0 AND payment_due_at > ${now}::timestamptz
                   AND payment_due_at <= ${soon}::timestamptz
                   AND created_at + (payment_due_at - created_at) / 2 <= ${now}::timestamptz))
@@ -66,7 +77,8 @@ export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Pr
         stage: row.stage,
         version: row.version,
         dueAt: new Date(row.payment_due_at).toISOString(),
-        overdue: row.terms_reminded === 2,
+        overdue: row.terms_reminded >= 2,
+        ...(row.terms_reminded > 2 && { reminder: row.terms_reminded - 1 }),
       },
     });
   }

@@ -21,7 +21,8 @@ export class PaymentTermsReminders {
     const { rows: shops } = await this.database.system((tx) =>
       tx.execute<{ shop_id: string }>(sql`
         SELECT DISTINCT shop_id FROM orders.orders
-         WHERE payment_due_at IS NOT NULL AND terms_reminded < 2
+         WHERE payment_due_at IS NOT NULL
+           AND terms_reminded < ${1 + PAYMENT_TERMS_REMINDERS.overdue}
            AND payment_due_at <= ${soon}::timestamptz
            AND status <> 'cancelled' AND amount_paid < total`),
     );

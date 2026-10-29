@@ -149,6 +149,8 @@ export interface OrderPaymentTermsRemindedPayload extends OrderState {
   dueAt: string;
   /** Whether that is past: the reminder after it, rather than before. */
   overdue: boolean;
+  /** Which of the reminders past it, the second on, as they come weekly (ADR-954). */
+  reminder?: number;
 }
 
 /** An order given to a member of staff to see through (ORD-10, ADR-191). */

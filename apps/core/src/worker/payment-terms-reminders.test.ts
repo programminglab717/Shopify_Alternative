@@ -27,7 +27,7 @@ function tenant(shopId: string): TenantContext {
   };
 }
 
-describe.skipIf(!server)('Customers on payment terms reminded (ADR-945)', () => {
+describe.skipIf(!server)('Customers on payment terms reminded (ADR-945, ADR-954)', () => {
   let testDb: TestDatabase;
   let database: Database;
   let admin: pg.Client;
@@ -150,5 +150,29 @@ describe.skipIf(!server)('Customers on payment terms reminded (ADR-945)', () => 
         [near, true],
       ].sort(),
     );
+
+    // Still owed, each is reminded again weekly, four times past its date in all (ADR-954).
+    const day = 86_400_000;
+    const weeks = [8, 15, 22, 29, 36].map((days) => new Date(Date.now() + days * day));
+    const counts: number[][] = [];
+    for (const at of weeks) {
+      await sweeps.sweep(at);
+      counts.push(await Promise.all([near, late].map(reminded)));
+    }
+    // The late one a week after its last, then weekly; the near one a week after its first past due.
+    expect(counts).toEqual([
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [5, 5],
+      [5, 5],
+    ]);
+    const { rows: weekly } = await admin.query<{ payload: { reminder?: number } }>(
+      `SELECT payload FROM platform.outbox_events
+        WHERE event_type = 'order.payment_terms_reminded' AND aggregate_id = $1
+        ORDER BY occurred_at, id`,
+      [late],
+    );
+    expect(weekly.map((row) => row.payload.reminder ?? 1)).toEqual([1, 2, 3, 4]);
   });
 });

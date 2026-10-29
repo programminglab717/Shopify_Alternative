@@ -144,9 +144,16 @@ export class OrderNotifications {
         return;
       }
       case OrderEvents.OrderPaymentTermsReminded: {
-        const { dueAt, overdue } = event.payload as Partial<OrderPaymentTermsRemindedPayload>;
+        const { dueAt, overdue, reminder } =
+          event.payload as Partial<OrderPaymentTermsRemindedPayload>;
         if (dueAt) {
-          await this.#termsOwed(event.shopId, event.aggregateId, new Date(dueAt), overdue === true);
+          await this.#termsOwed(
+            event.shopId,
+            event.aggregateId,
+            new Date(dueAt),
+            overdue === true,
+            reminder ?? 1,
+          );
         }
         return;
       }
@@ -365,9 +372,15 @@ export class OrderNotifications {
   /**
    * An order on payment terms still owes (ADR-945): its customer is told what, and by when it is
    * due, or since when it was, in the shop's time, with its page, which says how to pay. Nothing
-   * for one paid or cancelled meanwhile.
+   * for one paid or cancelled meanwhile. Each weekly reminder past the date is its own (ADR-954).
    */
-  async #termsOwed(shopId: string, orderId: string, dueAt: Date, overdue: boolean): Promise<void> {
+  async #termsOwed(
+    shopId: string,
+    orderId: string,
+    dueAt: Date,
+    overdue: boolean,
+    reminder: number,
+  ): Promise<void> {
     await this.database.tenant(shopId, async (tx) => {
       const order = await orderNotificationFactsIn(tx, shopId, orderId);
       const owed = order ? order.total - order.amountPaid : 0n;
@@ -380,7 +393,7 @@ export class OrderNotifications {
         email: order.email,
         orderId,
         customerId: order.customerId,
-        dedupeKey: `${kind}:${orderId}`,
+        dedupeKey: reminder > 1 ? `${kind}:${orderId}:${reminder}` : `${kind}:${orderId}`,
         variables: {
           ...(await this.#variables(tx, shopId, order)),
           amount: formatMoney(money(owed, order.currency as CurrencyCode)),
