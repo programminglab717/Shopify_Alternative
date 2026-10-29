@@ -7,7 +7,7 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; combined listings as one card in collections, in Urdu and in the store's export (CAT-23) are built; the Storefront API's `@inContext` for Urdu and metafields (DEV-02) are built; workflows that hold an order for review, run on stock and run on a schedule (MKT-04) are built; wholesale customers' credit limits (CUS-06) are built; the store MCP's policies and delivery tools and a switch to keep agents out (OS-23), and reports by customer and by city (ANL-06, ANL-08), are built; next, the decisions' own gaps that need no partner: custom reports of stock (ANL-06); the support agent answering from the shop's FAQs and products' sizes and stock (MSG-07); embedded apps' App Bridge (DEV-06); expansion stores kept in step (CH-11). Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; combined listings as one card in collections, in Urdu and in the store's export (CAT-23) are built; the Storefront API's `@inContext` for Urdu and metafields (DEV-02) are built; workflows that hold an order for review, run on stock and run on a schedule (MKT-04) are built; wholesale customers' credit limits (CUS-06) are built; the store MCP's policies and delivery tools and a switch to keep agents out (OS-23), reports by customer and by city (ANL-06, ANL-08) and custom reports of stock (ANL-06) are built; next, the decisions' own gaps that need no partner: the support agent answering from the shop's FAQs and products' sizes and stock (MSG-07); embedded apps' App Bridge (DEV-06); expansion stores kept in step (CH-11). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,12 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-29
+
+### Custom reports of stock
+
+* **A custom report may be of stock:** each tracked variant's stock, and what sold of it over the
+  period ([ADR-910](../architecture/13-decision-log.md#adr-910--a-custom-report-may-be-of-stock-each-tracked-variants-stock-now-and-what-sold-of-it-over-the-period-as-the-inventory-report-has-them)).
+* 4912 tests (3 new).
 
 ### 0a44737 · Reports by customer and by city
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-909 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-910 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -917,6 +917,7 @@
 | 907 | A wholesale customer's credit limit on payment terms: an order on terms that would take what they owe past it is refused, saying what they would owe | Accepted |
 | 908 | A shop keeps AI shopping agents out, its UCP profile and store MCP answering none, and the store MCP tells agents its policies and delivery to a city with cash on delivery | Accepted |
 | 909 | Sales and custom reports break sales down by customer and by city, and the AI question box reads questions of them | Accepted |
+| 910 | A custom report may be of stock: each tracked variant's stock now and what sold of it over the period, as the inventory report has them | Accepted |
 
 ---
 
@@ -30068,3 +30069,26 @@
 * **Consequences:**
   * Owners see who buys most and where, and can save, schedule and ask about it.
   * Reports of stock (ANL-06) are still not done.
+
+## ADR-910 · A custom report may be of stock: each tracked variant's stock now and what sold of it over the period, as the inventory report has them
+
+* **Context:** Custom reports (ADR-817) are all of sales. Owners also keep and send reports of
+  their stock: what is on hand, what it is worth, and what sells. The inventory report (ADR-455)
+  already works this out, but over fixed periods, and it can't be saved or scheduled.
+* **Decision:**
+  * **A `stock` breakdown** (migration 0406) has rows of the 250 tracked variants with the most
+    on hand. Its own columns are:
+    * on hand and available;
+    * units sold, sell-through, days since last sale, days out of stock and times it ran out;
+    * unit cost and stock value, which is on hand times cost and none without a cost.
+  * **Stock is as of when the report is run.** What sold is counted from the period's start to its
+    end, or to the moment it is run if that is sooner. The inventory report adds a `stock` sort,
+    every variant with the most on hand first.
+  * **Its total line** gives on hand, units sold, sell-through and stock value for all of them.
+    The other columns have no total.
+  * **The AI question box and copilot** choose among stock's own columns for it, as they do for
+    products'. Schedules send it as a workbook headed "Variant", like any other report.
+  * **In the admin,** "Each variant's stock" starts from on hand, units sold and stock value.
+* **Consequences:**
+  * A shop can save, schedule and ask about its stock as it does its sales.
+  * Stock at a moment in the past is not reported: the ledger would have to be replayed for it.
