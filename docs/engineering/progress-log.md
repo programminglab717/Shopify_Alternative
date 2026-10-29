@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Expansion stores kept in step
+### bb9f5df · Expansion stores kept in step
 
 * **Expansion stores** copy products as they change, once left alone ten minutes and at most
   hourly, as the owner of both; failures are kept with why ([ADR-913](../architecture/13-decision-log.md#adr-913--expansion-stores-kept-in-step-products-copied-as-they-change-once-left-alone-ten-minutes-and-at-most-hourly-as-the-owner-of-both-failures-kept-with-why)).
