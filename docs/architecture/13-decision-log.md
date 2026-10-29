@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-917 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-918 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -925,6 +925,7 @@
 | 915 | A shop may have each customer's transfer receipt read by the AI as it arrives, a credit each, rather than when staff ask | Accepted |
 | 916 | A shopper's account lists their subscriptions, each managed from its latest order's page | Accepted |
 | 917 | A shop that gave an expert access, having hired them, rates them out of five and says how the work went; shops see experts' ratings and reviews, and experts their own | Accepted |
+| 918 | Buy buttons keep a cart of the page's own across the shop's buttons there, kept by that site's browser, its bar checking all of it out through one permalink | Accepted |
 
 ---
 
@@ -30281,3 +30282,25 @@
   * How a review that breaks the rules is taken down is the owner's to decide with complaints
     about experts (OWN-49). Paying an expert through Hatti, and a public directory, are still not
     done.
+
+## ADR-918 · Buy buttons keep a cart of the page's own across the shop's buttons there, kept by that site's browser, its bar checking all of it out through one permalink
+
+* **Context:** ADR-860's buy buttons buy one product at a time: Buy now opens the checkout holding
+  it. A blog post showing a kurta, a dupatta and a pair of khussas makes a shopper check out three
+  times. ADR-860 left a cart across products for later.
+* **Decision:**
+  * **Add to cart** sits beside Buy now on each button, for a variant that can be had. It keeps
+    the variant in a cart of the page's own, one more each time, ten at most, and 20 lines at
+    most.
+  * **The cart** is kept by the browser's storage of the site the buttons are on, under the shop's
+    address. Every button of that shop on that site shares it, and it is there on the next visit.
+    It never reaches Hatti until checkout.
+  * **The bar** shows at the bottom of the page in a shadow root of its own, saying how many are
+    in the cart, in the button's language. Its Checkout opens the shop's checkout through one
+    cart permalink holding them all (`/cart/{variant}:{quantity},…`, ADR-709), and empties the
+    cart. "Empty the cart" empties it.
+  * The snippet is unchanged: shops' buttons already pasted get the cart as the script is served
+    anew.
+* **Consequences:**
+  * A shopper buys several of a shop's products from a blog or a link page in one checkout.
+  * Collections as embeds, and a choice of colours and layout, are still not done.
