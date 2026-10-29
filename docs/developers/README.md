@@ -91,13 +91,16 @@ An app's functions (ADR-868) are built and deployed the same way, from a directo
 ```sh
 export HATTI_ACCESS_TOKEN=…   # the app's token, with write_settings
 
-hatti function build    # run its build, and check its module is WebAssembly of 256 KiB at most
+hatti function build    # run its build, and check its module as Hatti will
+hatti function run --input cart.json   # build it, then run it on that input as checkout does
 hatti function deploy   # build it, then give it to the shop as the app's new version
 hatti function list     # the app's functions in the shop, on or off, and their last failure
 ```
 
 `build` is the developer's own tool: Javy, TinyGo or Rust's `wasm32-wasi`. A new version runs as
-the last did; a function the shop hasn't turned on stays off (ADR-922).
+the last did; a function the shop hasn't turned on stays off (ADR-922). `build` and `run` need no
+token: they check and run the module with Hatti's own code, its memory capped and its time limited
+to 50 ms as at checkout, and `run` prints its answer and how long it took (ADR-927).
 
 ## Public apps
 

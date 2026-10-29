@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HattiAdminClient } from '@hatti/admin-client';
+import { answering, echoing, spinning } from '@hatti/functions/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   FUNCTION_CONFIG,
@@ -14,8 +15,10 @@ import { run } from './main.js';
 
 type Asked = { query: string; variables: Record<string, unknown> };
 
-/** WebAssembly's header, then `size` bytes in all. */
-const wasm = (size = 16) =>
+/** A function that answers with its input, as Hatti's tests build one. */
+const wasm = () => Buffer.from(echoing());
+/** WebAssembly's header, then `size` bytes in all: no module that compiles. */
+const header = (size: number) =>
   Buffer.concat([
     Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]),
     Buffer.alloc(size - 8),
@@ -34,7 +37,7 @@ const DEPLOYED = {
   title: CONFIG.title,
   target: 'payment_customization',
   enabled: false,
-  bytes: 16,
+  bytes: wasm().length,
   lastError: null,
 };
 
@@ -104,16 +107,18 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
 
   it('builds it with its own command, then checks the module as the API will', async () => {
     const config = { ...CONFIG, build: builds(wasm()) };
-    expect((await buildFunction(dir, config, out)).length).toBe(16);
+    expect((await buildFunction(dir, config, out)).equals(wasm())).toBe(true);
     expect(lines).toEqual([`Building: ${config.build}`, 'compiling']);
     // Not WebAssembly, too large, or a build that fails: refused before anything is sent.
     await expect(
       buildFunction(dir, { ...CONFIG, build: builds(Buffer.from('not wasm at all')) }, out),
-    ).rejects.toThrow('dist/function.wasm is not a WebAssembly module');
+    ).rejects.toThrow(
+      'dist/function.wasm: Not a WebAssembly module: it starts with neither its magic nor version 1',
+    );
     // Written by hand, with no build.
-    await writeFile(join(dir, 'dist', 'function.wasm'), wasm(300 * 1024));
+    await writeFile(join(dir, 'dist', 'function.wasm'), header(300 * 1024));
     await expect(buildFunction(dir, CONFIG, out)).rejects.toThrow(
-      'dist/function.wasm is 300 KiB: functions are 256 KiB at most',
+      'dist/function.wasm: It is 307200 bytes: functions are 256 KiB at most',
     );
     await expect(buildFunction(dir, { ...CONFIG, build: 'exit 3' }, out)).rejects.toThrow(
       new FunctionError('The build failed, with code 3'),
@@ -123,7 +128,7 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
   it('runs as `hatti function …`: built without a token, deployed and listed with one', async () => {
     await configure({ ...CONFIG, build: builds(wasm()) });
     expect(await run(['function', 'build', '--dir', dir], {}, out)).toBe(0);
-    expect(lines.at(-1)).toBe('Built cod-above-limit: dist/function.wasm, 16 bytes');
+    expect(lines.at(-1)).toBe(`Built cod-above-limit: dist/function.wasm, ${wasm().length} bytes`);
     expect(await run(['function', 'deploy', '--dir', dir], {}, out)).toBe(1);
     expect(lines.at(-1)).toMatch(/^! Set HATTI_ACCESS_TOKEN .* with write_settings\.$/);
 
@@ -138,7 +143,7 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
       },
     });
     expect(lines.slice(-2)).toEqual([
-      'Deployed cod-above-limit, 16 bytes as it runs',
+      `Deployed cod-above-limit, ${wasm().length} bytes as it runs`,
       'It is off until the shop turns it on in Settings › Apps.',
     ]);
     // Without its build, the module as it is.
@@ -155,5 +160,33 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
     const refusing = api([{ field: ['input', 'wasm'], message: 'Its module imports env.fetch' }]);
     expect(await run(['function', 'deploy', '--dir', dir], {}, out, refusing.client)).toBe(1);
     expect(lines.at(-1)).toBe('! Its module imports env.fetch');
+  });
+
+  it('runs it on an input as checkout runs it, saying how long it took (ADR-927)', async () => {
+    const input = { cart: { subtotal: 1_250_000, lines: [] }, configuration: {} };
+    await writeFile(join(dir, 'input.json'), JSON.stringify(input));
+    const runs = async (module: Uint8Array) => {
+      await configure({ ...CONFIG, build: builds(Buffer.from(module)) });
+      lines.length = 0;
+      return run(['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')], {}, out);
+    };
+    // Its answer, without a token: it runs on this machine alone.
+    expect(await runs(echoing())).toBe(0);
+    expect(JSON.parse(lines.at(-2)!)).toEqual(input);
+    expect(lines.at(-1)).toMatch(/^Ran in \d+\.\d ms of the 50 ms Hatti allows$/);
+    const hide = { operations: [{ hide: { paymentMethod: 'cash_on_delivery' } }] };
+    expect(await runs(answering(hide))).toBe(0);
+    expect(JSON.parse(lines.at(-2)!)).toEqual(hide);
+    // One that runs past its time is stopped, as checkout stops it.
+    expect(await runs(spinning())).toBe(1);
+    expect(lines.at(-2)).toBe('! It gave no answer (timeout): It ran past 50 ms');
+    // It needs an input, of JSON.
+    expect(await run(['function', 'run', '--dir', dir], {}, out)).toBe(1);
+    expect(lines.at(-1)).toBe('! Say what it runs on: --input <file.json>');
+    await writeFile(join(dir, 'input.json'), '{');
+    expect(
+      await run(['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')], {}, out),
+    ).toBe(1);
+    expect(lines.at(-1)).toBe(`! ${join(dir, 'input.json')} is not JSON`);
   });
 });

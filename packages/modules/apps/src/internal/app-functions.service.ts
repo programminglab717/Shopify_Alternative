@@ -11,7 +11,7 @@ import { Database, toDate, type Tx } from '@hatti/db';
 import { recordAudit } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { WasmError, capWasm } from './wasm.js';
+import { WasmError, takeWasm } from '@hatti/functions';
 
 // Apps' functions (DEV-07, CHK-20, ADR-868): WebAssembly modules an app, custom or public, gives
 // the shop for checkout to run on what it is about to offer, as Shopify's functions are. A
@@ -103,12 +103,6 @@ const toRecord = (row: FunctionRow): AppFunctionRecord => ({
 });
 
 const HANDLE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-/** Node's WebAssembly, which this package's types don't declare: compiling a module, or failing. */
-const compileWasm = (bytes: Uint8Array): Promise<unknown> =>
-  (
-    globalThis as unknown as { WebAssembly: { compile(bytes: Uint8Array): Promise<unknown> } }
-  ).WebAssembly.compile(bytes);
 
 /** Of the shop's apps' functions, those an app still installed gives. */
 const LIVE = sql`JOIN apps.access_tokens t ON t.shop_id = f.shop_id AND t.id = f.token_id
@@ -241,14 +235,10 @@ export class AppFunctionService {
     }
     let wasm: Uint8Array;
     try {
-      wasm = capWasm(Buffer.from(input.wasm, 'base64'));
-      await compileWasm(wasm);
+      wasm = await takeWasm(Buffer.from(input.wasm, 'base64'));
     } catch (error) {
-      return failOne(
-        ['input', 'wasm'],
-        'INVALID',
-        error instanceof WasmError ? error.message : 'It is not a WebAssembly module that compiles',
-      );
+      if (!(error instanceof WasmError)) throw error;
+      return failOne(['input', 'wasm'], 'INVALID', error.message);
     }
     const digest = createHash('sha256').update(wasm).digest();
     return this.db.tenant(tenant.shopId, async (tx) => {

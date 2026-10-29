@@ -1,4 +1,4 @@
-import { u32 } from './wasm.js';
+import { u32 } from '../wasm.js';
 
 // WebAssembly functions for tests (ADR-868), assembled byte by byte: one that answers a fixed
 // JSON, one that answers its input, one that never ends, and one that grows its memory, each a

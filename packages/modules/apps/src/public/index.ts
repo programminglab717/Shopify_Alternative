@@ -95,5 +95,12 @@ export {
   type PaymentMethodName,
   type RunnableFunction,
 } from '../internal/app-functions.service.js';
-export { FunctionRunner, RUN_LIMITS, type RunResult } from '../internal/function-runner.js';
-export { WASM_LIMITS, WasmError, capWasm } from '../internal/wasm.js';
+export {
+  FunctionRunner,
+  RUN_LIMITS,
+  WASM_LIMITS,
+  WasmError,
+  capWasm,
+  takeWasm,
+  type RunResult,
+} from '@hatti/functions';

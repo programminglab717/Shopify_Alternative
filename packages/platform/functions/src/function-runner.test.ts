@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { FunctionRunner } from './function-runner.js';
-import { answering, echoing, growing, spinning } from './test-wasm.js';
+import { answering, echoing, growing, spinning } from './testing/wasm-modules.js';
 import { WasmError, capWasm } from './wasm.js';
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');

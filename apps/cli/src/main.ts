@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 import { watch } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { HattiAdminApiError, HattiAdminClient } from '@hatti/admin-client';
 import {
   FUNCTION_CONFIG,
   FunctionError,
+  RUN_LIMITS,
   buildFunction,
   deployFunction,
   functionConfigIn,
   listFunctions,
+  runFunction,
 } from './function.js';
 import {
   ThemePushError,
@@ -36,6 +39,7 @@ Theme commands:
 
 Function commands, for the function ${FUNCTION_CONFIG} describes:
   build                        Run its build, and check its module as Hatti will
+  run --input <file.json>      Build it, then run it on that input as checkout runs it
   deploy                       Build it, then give it to the shop as the app's new version
   list                         The app's functions in the shop, and whether each is on
 
@@ -66,6 +70,7 @@ export async function run(
       dir: { type: 'string' },
       'allow-live': { type: 'boolean' },
       'no-build': { type: 'boolean' },
+      input: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -75,13 +80,21 @@ export async function run(
     return values.help ? 0 : 1;
   }
   const dir = resolve(typeof values.dir === 'string' ? values.dir : '.');
-  // Built on this machine alone: no token needed.
-  if (area === 'function' && command === 'build') {
+  // Built and run on this machine alone: no token needed.
+  if (area === 'function' && (command === 'build' || command === 'run')) {
     try {
       const config = await functionConfigIn(dir);
-      const module = await buildFunction(dir, config, out);
-      out.log(`Built ${config.handle}: ${config.module}, ${module.length} bytes`);
-      return 0;
+      const noBuild = values['no-build'] === true;
+      const module = await buildFunction(
+        dir,
+        noBuild ? { ...config, build: undefined } : config,
+        out,
+      );
+      if (command === 'build') {
+        out.log(`Built ${config.handle}: ${config.module}, ${module.length} bytes`);
+        return 0;
+      }
+      return await runLocally(module, typeof values.input === 'string' ? values.input : null, out);
     } catch (error) {
       if (error instanceof FunctionError) {
         out.error(error.message);
@@ -147,6 +160,36 @@ export async function run(
     }
     throw error;
   }
+}
+
+/**
+ * `hatti function run`: the module on the input file's JSON, as checkout runs it (ADR-927), its
+ * answer printed with how long it took against Hatti's limit; its exit code.
+ */
+async function runLocally(
+  module: Uint8Array,
+  inputPath: string | null,
+  out: { log: (line: string) => void; error: (line: string) => void },
+): Promise<number> {
+  if (!inputPath) throw new FunctionError('Say what it runs on: --input <file.json>');
+  const text = await readFile(resolve(inputPath), 'utf8').catch(() => null);
+  if (text === null) throw new FunctionError(`No input at ${inputPath}`);
+  let input: unknown;
+  try {
+    input = JSON.parse(text);
+  } catch {
+    throw new FunctionError(`${inputPath} is not JSON`);
+  }
+  const result = await runFunction(module, input);
+  const took = `${result.ms.toFixed(1)} ms of the ${RUN_LIMITS.timeMs} ms Hatti allows`;
+  if (!result.ok) {
+    out.error(`It gave no answer (${result.error}): ${result.detail}`);
+    out.error(`Ran ${took}`);
+    return 1;
+  }
+  out.log(JSON.stringify(result.output, null, 2));
+  out.log(`Ran in ${took}`);
+  return 0;
 }
 
 /** `hatti function deploy` or `list`, through the API: its exit code. */

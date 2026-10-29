@@ -16,7 +16,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hatti/admin-client": "workspace:*"
+    "@hatti/admin-client": "workspace:*",
+    "@hatti/functions": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

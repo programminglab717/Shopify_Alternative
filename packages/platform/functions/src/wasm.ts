@@ -128,3 +128,24 @@ export function capWasm(bytes: Uint8Array): Uint8Array {
   }
   return Uint8Array.from(out);
 }
+
+/** Node's WebAssembly, which these types don't declare: compiling a module, or failing. */
+const compile = (bytes: Uint8Array): Promise<unknown> =>
+  (
+    globalThis as unknown as { WebAssembly: { compile(bytes: Uint8Array): Promise<unknown> } }
+  ).WebAssembly.compile(bytes);
+
+/**
+ * `bytes` as Hatti takes a function's module, through the Admin API and the command line alike
+ * (ADR-927): capped by {@link capWasm}, then compiled. Refused with a {@link WasmError} saying why.
+ */
+export async function takeWasm(bytes: Uint8Array): Promise<Uint8Array> {
+  try {
+    const capped = capWasm(bytes);
+    await compile(capped);
+    return capped;
+  } catch (error) {
+    if (error instanceof WasmError) throw error;
+    throw new WasmError('It is not a WebAssembly module that compiles');
+  }
+}

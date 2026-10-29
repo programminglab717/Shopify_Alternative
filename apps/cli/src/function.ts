@@ -1,22 +1,20 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 import type { HattiAdminClient } from '@hatti/admin-client';
+import { FunctionRunner, RUN_LIMITS, WasmError, takeWasm, type RunResult } from '@hatti/functions';
 
 // An app's functions from the command line (DEV-07, ADR-922): built with the tool the developer
 // chose, Javy, TinyGo or Rust's wasm32-wasi, and deployed to the shop through the Admin API's
 // `appFunctionSet` (ADR-868), as Shopify's CLI deploys its functions. A function's directory says
-// what it is in `hatti.function.json`.
+// what it is in `hatti.function.json`. Its module is checked, and run on a sample input, with
+// Hatti's own code, as checkout runs it (ADR-927).
 
 export const FUNCTION_CONFIG = 'hatti.function.json';
 
-/** As the Admin API takes them (ADR-868). */
-export const FUNCTION_LIMITS = { moduleBytes: 256 * 1024 } as const;
-
 const TARGETS = ['payment_customization', 'cart_validation'] as const;
 const HANDLE = /^[a-z0-9][a-z0-9-]{0,62}$/;
-/** WebAssembly's magic number and version 1. */
-const WASM_HEADER = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
 
 /** What `hatti.function.json` says of the function in its directory. */
 export interface FunctionConfig {
@@ -122,8 +120,8 @@ function insideOf(dir: string, path: string): boolean {
 
 /**
  * Builds the function in `dir`, with its build command where it has one, its output to `out`:
- * its module, checked as the Admin API checks it before sending, a WebAssembly module of 256 KiB
- * at most.
+ * its module, checked as the Admin API checks it, with Hatti's own code (ADR-927): a WebAssembly
+ * module of 256 KiB at most that compiles, its memory its own.
  */
 export async function buildFunction(
   dir: string,
@@ -137,16 +135,31 @@ export async function buildFunction(
   }
   const module = await readFile(join(dir, config.module)).catch(() => null);
   if (!module) throw new FunctionError(`No module at ${config.module}: build it first`);
-  if (module.length < WASM_HEADER.length || !module.subarray(0, 8).equals(WASM_HEADER)) {
-    throw new FunctionError(`${config.module} is not a WebAssembly module`);
-  }
-  if (module.length > FUNCTION_LIMITS.moduleBytes) {
-    throw new FunctionError(
-      `${config.module} is ${Math.ceil(module.length / 1024)} KiB: functions are 256 KiB at most`,
-    );
+  try {
+    await takeWasm(module);
+  } catch (error) {
+    if (error instanceof WasmError) throw new FunctionError(`${config.module}: ${error.message}`);
+    throw error;
   }
   return module;
 }
+
+/**
+ * Runs `module` on `input` as checkout runs it (ADR-927): capped, in a worker of Hatti's own with
+ * its input on standard input alone, stopped past {@link RUN_LIMITS.timeMs}. Its answer, or why
+ * there is none, and how long it took.
+ */
+export async function runFunction(module: Uint8Array, input: unknown): Promise<RunResult> {
+  const capped = await takeWasm(module);
+  const runner = new FunctionRunner();
+  try {
+    return await runner.run(createHash('sha256').update(capped).digest('hex'), capped, input);
+  } finally {
+    await runner.close();
+  }
+}
+
+export { RUN_LIMITS };
 
 /** Runs `command` in a shell in `dir`, its output line by line to `out`: its exit code. */
 function runCommand(

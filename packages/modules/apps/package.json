@@ -27,6 +27,7 @@
     "@hatti/crypto": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
+    "@hatti/functions": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "drizzle-orm": "catalog:"

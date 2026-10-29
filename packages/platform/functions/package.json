@@ -1,0 +1,30 @@
+{
+  "name": "@hatti/functions",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Apps' checkout functions: WebAssembly modules checked and their memory capped as Hatti takes them, and run in a worker as checkout runs them, for the apps module and the developer's command line alike.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
