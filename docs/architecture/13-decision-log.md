@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-938 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-939 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -946,6 +946,7 @@
 | 936 | A selling plan is changed from the admin as it was made, its chosen variants among the rest | Accepted |
 | 937 | A buy button's collection shows twelve products at a time, Show more giving the next page, past its first twelve | Accepted |
 | 938 | A shop hears on WhatsApp and by email the first time its single sign-on domain's record is found gone, with the day the domain stops being proved its | Accepted |
+| 939 | A theme experiment's draft that sells clearly worse is stopped alone, its shoppers shown the live theme, the other drafts going on | Accepted |
 
 ---
 
@@ -30780,3 +30781,25 @@
   * An owner has three days, and word of them, to put a record back.
   * Its WhatsApp template waits for Meta's approval with Hatti's others (OWN-23); the email goes
     meanwhile.
+
+## ADR-939 · A theme experiment's draft that sells clearly worse is stopped alone, its shoppers shown the live theme, the other drafts going on
+
+* **Context:** ADR-931's experiments of up to three drafts end as soon as any draft sells clearly
+  worse: one poor draft cut short the two that might have won. ADR-931 left stopping only that
+  draft for later.
+* **Decision:**
+  * **Each draft selling clearly worse is stopped alone** (migration 0420, `stopped_arms`), at
+    the guardrail's same confidence split among the drafts (ADR-931); the experiment ends with
+    `guardrail` once no draft goes on, and on its last day as before. An experiment of one draft
+    ends as before.
+  * **A stopped draft's shoppers are shown the live theme** from then, as their cookie keeps
+    their arm, and **counted in no arm**: they saw the draft before, so they would bias the live
+    theme's counts. Its share of new shoppers goes to the live theme, counted there.
+  * **Its counts stay as they were** when stopped, and its verdicts with them; the storefront's
+    document names the stopped arms (`ExperimentDoc.stopped`), and `ThemeExperimentDraft.stopped`
+    says it.
+  * **Admin:** the draft's results say "Hatti stopped Urdu first: it sold clearly worse. Its
+    shoppers see your live theme; the other drafts go on."
+* **Consequences:**
+  * A poor draft costs a shop little, and the others still get their answer.
+  * Not yet: shares that differ by draft.
