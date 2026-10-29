@@ -5,7 +5,12 @@ import { imageAddress } from './liquid.js';
 // puts them. The page pastes a snippet: an element naming a product by its handle, and this
 // script, served by the shop's own storefront. The script reads the product from the storefront,
 // public as its pages are, and shows its photo, title, price and variants, in English or Urdu;
-// Buy now opens the shop's checkout holding it, through a cart permalink (ADR-709).
+// Buy now opens the shop's checkout holding it, through a cart permalink (ADR-709). Add to cart
+// keeps it in a cart of the page's own, across the shop's buttons there, its bar opening the
+// checkout holding all of it (ADR-918).
+
+/** A buy button's cart (ADR-918): its lines at most, and as many of each. */
+export const BUY_BUTTON_CART = { lines: 20, quantity: 10 } as const;
 
 export const BUY_BUTTON_PATHS = {
   script: '/buy-button.js',
@@ -68,9 +73,61 @@ export const BUY_BUTTON_SCRIPT = `(function () {
   if (!script) return;
   var origin = new URL(script.src).origin;
   var WORDS = {
-    en: { buy: 'Buy now', soldOut: 'Sold out', option: 'Choose' },
-    ur: { buy: 'ابھی خریدیں', soldOut: 'ختم ہو گیا', option: 'منتخب کریں' }
+    en: { buy: 'Buy now', soldOut: 'Sold out', option: 'Choose', add: 'Add to cart',
+          checkout: 'Checkout', items: ' in your cart', empty: 'Empty the cart' },
+    ur: { buy: 'ابھی خریدیں', soldOut: 'ختم ہو گیا', option: 'منتخب کریں', add: 'کارٹ میں ڈالیں',
+          checkout: 'چیک آؤٹ', items: ' آپ کی کارٹ میں', empty: 'کارٹ خالی کریں' }
   };
+  // The page's cart of the shop's things (ADR-918): kept by this site's browser storage, as
+  // [{ id, quantity }], ${BUY_BUTTON_CART.lines} lines and ${BUY_BUTTON_CART.quantity} of each at most.
+  var KEY = 'hatti-buy-button-cart:' + origin;
+  function load() {
+    try {
+      var kept = JSON.parse(window.localStorage.getItem(KEY) || '[]');
+      return Array.isArray(kept) ? kept.filter(function (line) {
+        return line && typeof line.id === 'string' && line.quantity > 0;
+      }).slice(0, ${BUY_BUTTON_CART.lines}) : [];
+    } catch (error) { return []; }
+  }
+  function keep(lines) {
+    try { window.localStorage.setItem(KEY, JSON.stringify(lines)); } catch (error) {}
+  }
+  var bar = null;
+  function drawBar(lang) {
+    var words = WORDS[lang] || WORDS.en;
+    var lines = load();
+    if (!bar) {
+      var host = el('div', { 'data-hatti-buy-button-cart': '' });
+      document.body.appendChild(host);
+      var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+      root.appendChild(el('style', {}, BAR_STYLE));
+      var box = el('div', { class: 'bar', role: 'region', lang: lang, dir: lang === 'ur' ? 'rtl' : 'ltr' });
+      var count = el('span', { class: 'count', 'aria-live': 'polite' });
+      var go = el('a', { class: 'go', target: '_blank', rel: 'noopener' }, words.checkout);
+      var empty = el('button', { class: 'empty', type: 'button' }, words.empty);
+      go.addEventListener('click', function () { keep([]); drawBar(lang); });
+      empty.addEventListener('click', function () { keep([]); drawBar(lang); });
+      box.appendChild(count);
+      box.appendChild(go);
+      box.appendChild(empty);
+      root.appendChild(box);
+      bar = { host: host, count: count, go: go, words: words };
+    }
+    var units = lines.reduce(function (sum, line) { return sum + line.quantity; }, 0);
+    bar.host.hidden = units === 0;
+    bar.count.textContent = units + bar.words.items;
+    bar.go.setAttribute('href', origin + '/cart/' + lines.map(function (line) {
+      return encodeURIComponent(line.id) + ':' + line.quantity;
+    }).join(','));
+  }
+  function add(variant, lang) {
+    var lines = load();
+    var line = lines.filter(function (each) { return each.id === variant.id; })[0];
+    if (line) line.quantity = Math.min(line.quantity + 1, ${BUY_BUTTON_CART.quantity});
+    else if (lines.length < ${BUY_BUTTON_CART.lines}) lines.push({ id: variant.id, quantity: 1 });
+    keep(lines);
+    drawBar(lang);
+  }
   function money(amount, currency) {
     var value = Number(amount);
     var shown = value.toLocaleString('en', {
@@ -94,7 +151,16 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     '.price s{color:#78716c;margin-inline-start:.4rem}' +
     'select{font:inherit;padding:.4rem;border:1px solid #d6d3d1;border-radius:8px}' +
     '.buy{display:block;text-align:center;padding:.6rem;border-radius:8px;background:#0f766e;color:#fff;font-weight:600;text-decoration:none}' +
-    '.buy[aria-disabled=true]{background:#a8a29e;pointer-events:none}';
+    '.buy[aria-disabled=true]{background:#a8a29e;pointer-events:none}' +
+    '.add{font:inherit;padding:.55rem;border:1px solid #0f766e;border-radius:8px;background:#fff;color:#0f766e;font-weight:600;cursor:pointer}' +
+    '.add[disabled]{border-color:#a8a29e;color:#a8a29e;cursor:default}';
+  var BAR_STYLE =
+    ':host{all:initial;position:fixed;inset-inline:1rem;bottom:1rem;z-index:2147483000;font:15px/1.4 system-ui,sans-serif}' +
+    ':host([hidden]){display:none}' +
+    '.bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;max-width:28rem;margin:auto;padding:.6rem .9rem;border-radius:12px;background:#1c1917;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25)}' +
+    '.count{flex:1}' +
+    '.go{padding:.45rem .9rem;border-radius:8px;background:#0f766e;color:#fff;font-weight:600;text-decoration:none}' +
+    '.empty{font:inherit;background:none;border:0;color:#d6d3d1;text-decoration:underline;cursor:pointer}';
   function draw(host, product, lang) {
     var words = WORDS[lang] || WORDS.en;
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
@@ -105,8 +171,14 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     var title = el('a', { class: 'title', href: product.url, target: '_blank', rel: 'noopener' }, product.title);
     var price = el('div', { class: 'price' });
     var buy = el('a', { class: 'buy', target: '_blank', rel: 'noopener' });
+    var put = el('button', { class: 'add', type: 'button' }, words.add);
+    var chosen = null;
+    put.addEventListener('click', function () { if (chosen && chosen.available) add(chosen, lang); });
     var choose = null;
     function show(variant) {
+      chosen = variant;
+      if (variant.available) put.removeAttribute('disabled');
+      else put.setAttribute('disabled', '');
       price.textContent = money(variant.price, product.currency);
       if (variant.compareAtPrice) price.appendChild(el('s', {}, money(variant.compareAtPrice, product.currency)));
       buy.textContent = variant.available ? words.buy : words.soldOut;
@@ -126,6 +198,7 @@ export const BUY_BUTTON_SCRIPT = `(function () {
       body.appendChild(choose);
     }
     body.appendChild(buy);
+    body.appendChild(put);
     card.appendChild(body);
     root.appendChild(card);
     var first = product.variants.filter(function (variant) { return variant.available; })[0] || product.variants[0];
@@ -133,6 +206,10 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     show(first);
   }
   var hosts = document.querySelectorAll('[data-hatti-buy-button]');
+  // A cart kept from an earlier visit shows at once.
+  if (hosts.length && load().length) {
+    drawBar(hosts[0].getAttribute('data-language') === 'ur' ? 'ur' : 'en');
+  }
   Array.prototype.forEach.call(hosts, function (host) {
     if (host.getAttribute('data-hatti-drawn')) return;
     host.setAttribute('data-hatti-drawn', '1');

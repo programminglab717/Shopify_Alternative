@@ -73,4 +73,60 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     expect(buy.getAttribute('aria-disabled')).toBe('true');
     await window.happyDOM.close();
   });
+
+  it("keeps a cart of the page's own across the shop's buttons, its bar checking all of it out (ADR-918)", async () => {
+    const product = (handle: string, id: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `https://zari.hatti.pk/products/${handle}`,
+      image: null,
+      currency: 'PKR',
+      variants: [{ id, title: 'Default', available: true, price: '1000.00', compareAtPrice: null }],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    document.body.innerHTML =
+      '<div data-hatti-buy-button="kurta"></div><div data-hatti-buy-button="shawl"></div>';
+    window.fetch = (async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.endsWith('/kurta') ? product('kurta', 'v-kurta') : product('shawl', 'v-shawl'),
+    })) as never;
+    const run = async () => {
+      const script = document.createElement('script');
+      script.setAttribute('src', 'https://zari.hatti.pk/buy-button.js');
+      Object.defineProperty(document, 'currentScript', { value: script, configurable: true });
+      window.eval(BUY_BUTTON_SCRIPT);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    };
+    await run();
+    const [kurta, shawl] = [...document.querySelectorAll('[data-hatti-buy-button]')].map(
+      (host) => host.shadowRoot!,
+    );
+    const press = (root: typeof kurta) =>
+      (root!.querySelector('.add') as unknown as { click: () => void }).click();
+    // No cart yet: no bar.
+    const barHost = () => document.querySelector('[data-hatti-buy-button-cart]');
+    expect(barHost()).toBeNull();
+    press(kurta);
+    press(kurta);
+    press(shawl);
+    const bar = barHost()!.shadowRoot!;
+    expect(bar.querySelector('.count')!.textContent).toBe('3 in your cart');
+    expect(bar.querySelector('.go')!.getAttribute('href')).toBe(
+      'https://zari.hatti.pk/cart/v-kurta:2,v-shawl:1',
+    );
+    // Kept by the page's browser, for the shop: on the next visit it is there.
+    expect(
+      JSON.parse(window.localStorage.getItem('hatti-buy-button-cart:https://zari.hatti.pk')!),
+    ).toEqual([
+      { id: 'v-kurta', quantity: 2 },
+      { id: 'v-shawl', quantity: 1 },
+    ]);
+    // Emptied, the bar hides.
+    (bar.querySelector('.empty') as unknown as { click: () => void }).click();
+    expect((barHost() as unknown as { hidden: boolean }).hidden).toBe(true);
+    expect(window.localStorage.getItem('hatti-buy-button-cart:https://zari.hatti.pk')).toBe('[]');
+    await window.happyDOM.close();
+  });
 });

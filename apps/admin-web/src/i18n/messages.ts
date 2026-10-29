@@ -6175,7 +6175,7 @@ const en = {
   'experts.service.content': 'Writing',
   'buyButton.title': 'Buy button',
   'buyButton.hint':
-    'Paste this into a blog, another website or a link page: it shows this product with its photo, price and sizes, and Buy now opens your checkout.',
+    'Paste this into a blog, another website or a link page: it shows this product with its photo, price and sizes. Buy now opens your checkout; Add to cart keeps it with your other buttons there, all checked out together.',
   'buyButton.language': 'Language of the button',
   'buyButton.copy': 'Copy the code',
   'certification.title': 'Hatti certification',
@@ -13364,7 +13364,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experts.service.content': 'تحریر',
   'buyButton.title': 'خریدنے کا بٹن',
   'buyButton.hint':
-    'یہ کسی بلاگ، دوسری ویب سائٹ یا لنک پیج میں لگائیں: یہ اس پراڈکٹ کو تصویر، قیمت اور سائز کے ساتھ دکھاتا ہے، اور ابھی خریدیں آپ کا چیک آؤٹ کھولتا ہے۔',
+    'یہ کسی بلاگ، دوسری ویب سائٹ یا لنک پیج میں لگائیں: یہ اس پراڈکٹ کو تصویر، قیمت اور سائز کے ساتھ دکھاتا ہے۔ ابھی خریدیں آپ کا چیک آؤٹ کھولتا ہے؛ کارٹ میں ڈالیں اسے وہاں آپ کے دوسرے بٹنوں کے ساتھ رکھتا ہے، سب ایک ساتھ چیک آؤٹ۔',
   'buyButton.language': 'بٹن کی زبان',
   'buyButton.copy': 'کوڈ کاپی کریں',
   'certification.title': 'Hatti سرٹیفکیشن',
