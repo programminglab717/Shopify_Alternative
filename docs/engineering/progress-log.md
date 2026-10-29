@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Functions begun from the command line
+### e2a6404 · Functions begun from the command line
 
 * **`hatti function init` begins an app's function** from its target's starter, in JavaScript
   built with Javy, with a sample cart to run it on ([ADR-935](../architecture/13-decision-log.md#adr-935--hatti-function-init-begins-an-apps-function-from-its-targets-starter-in-javascript-built-with-javy-with-a-sample-cart-to-run-it-on)).
