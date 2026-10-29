@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-901 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-902 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -909,6 +909,7 @@
 | 899 | An affiliate sees their own figures at a secret link the shop sends them: their link, code and share, what their orders came to and earned, and their latest orders, nothing of their customers | Accepted |
 | 900 | Spin to win: a wheel of 2 to 8 offers on the theme's sign-up pop-up, a shopper's number signing them up and spinning once, the slice chosen by weight on the platform and given as a single-use code of their own | Accepted |
 | 901 | A combined listing the shop chooses is one card in collections: the first of its products in each collection's order stands for the rest, its card naming their values | Accepted |
+| 902 | A combined listing's option and values have the shop's Urdu, kept with the listing and shown on Urdu pages, and the store's export holds the listings | Accepted |
 
 ---
 
@@ -29879,3 +29880,25 @@
   * Search still finds each product, as each has its own title and page.
   * The listing's option and values in Urdu, and the store's export holding listings, are still
     left for later.
+
+## ADR-902 · A combined listing's option and values have the shop's Urdu, kept with the listing and shown on Urdu pages, and the store's export holds the listings
+
+* **Context:** ADR-799 and ADR-901 left a combined listing's words in Urdu, and the store's export
+  holding listings (ADR-415), for later. Urdu pages showed the swatches' English words.
+* **Decision:**
+  * **The Urdu words are kept with the listing**, not as translatable resources (ADR-238):
+    `optionNameUr` on the listing and `valueUr` on each product, through `combinedListingSet`
+    and the admin's combined listing card (migration 0400).
+    * Listings follow no Shopify API (ADR-799), and a value belongs to a product only while it
+      is in the listing.
+    * Left out of a change, each stays as it was, a product's value with the product wherever it
+      now comes. Null or blank clears it.
+  * **Product documents carry them,** and the storefront's Urdu pages show the listing's option
+    and values in them, the English words where the shop gave none.
+  * **The store's export** (ADR-415) adds `combined-listings.json`. Each listing has its option,
+    whether it is one card, and its products by handle with their values, in English and Urdu.
+* **Consequences:**
+  * Swatches on Urdu pages read in Urdu.
+  * A store moved out keeps its listings, though no import takes the file back yet.
+  * Apps that translate through `translationsRegister` do not reach these words. They set them
+    with the listing.

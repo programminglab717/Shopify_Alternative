@@ -7,12 +7,21 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows are
-built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; combined listings as one card in collections (CAT-23) are built; next, the rest of combined listings: their option and values in Urdu, and the store's export holding them (CAT-23). Urdu handles wait, as decided.
+built; its Growth rows that need no partner come next: accounting exports (ANL-10) are built; workflows wait and check (MKT-04); customers by how recently and often they buy (ANL-04); payment terms for wholesale customers (CUS-06); an age gate for the online store (OS-15); the Storefront API's menus, pages, blogs and policies (DEV-02); the demand forecast's other seasons (INV-08); suppliers' lead times (INV-08); a forecast by week (INV-08) are built; the merchant copilot's discount codes, segments, broadcasts and reports (AI-01); FBR's unit of measure and SRO on items (CAT-19); bulk mutations from a JSONL file (DEV-10); orders paid on delivery split among locations (INV-10, SHP-09) are built; a file as a personalisation answer (CAT-15) waits until shops ask; affiliates' own figures (MKT-08) and spin to win on the sign-up pop-up (OS-08) are built; combined listings as one card in collections, in Urdu and in the store's export (CAT-23) are built; next, the decisions' own gaps that need no partner: the Storefront API's `@inContext` for Urdu, metafields and customer accounts (DEV-02); then workflows that hold or cancel an order and run on a schedule or on stock (MKT-04); wholesale customers' credit limits (CUS-06); the store MCP's tools for policies and delivery by city, and a switch to keep agents out (OS-23). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
+
+## 2026-10-29
+
+### Combined listings in Urdu and in the export
+
+* **A combined listing's option and values in Urdu,** kept with the listing and shown on Urdu
+  pages ([ADR-902](../architecture/13-decision-log.md#adr-902--a-combined-listings-option-and-values-have-the-shops-urdu-kept-with-the-listing-and-shown-on-urdu-pages-and-the-stores-export-holds-the-listings)).
+* **The store's export** holds the listings as `combined-listings.json`.
+* 4889 tests (2 new).
 
 ## 2026-10-28
 
