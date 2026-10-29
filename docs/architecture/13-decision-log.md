@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-934 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-935 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -942,6 +942,7 @@
 | 932 | One page of what the owner's shop and each of its expansion stores sold, each in its own currency and in the shop's at the day's rate | Accepted |
 | 933 | An expansion store's copied prices may be a percent over its rate and rounded as prices abroad are, its costs copied at the rate alone | Accepted |
 | 934 | A shop's single sign-on domains are looked up in DNS again each day, and one whose record has been gone three days is no longer proved the shop's | Accepted |
+| 935 | `hatti function init` begins an app's function from its target's starter, in JavaScript built with Javy, with a sample cart to run it on | Accepted |
 
 ---
 
@@ -30697,3 +30698,28 @@
   * A domain stays a shop's only while its DNS says so.
   * Not yet: telling the owner by email when a domain goes missing; SAML, and SCIM, as ADR-864
     left them.
+
+## ADR-935 · `hatti function init` begins an app's function from its target's starter, in JavaScript built with Javy, with a sample cart to run it on
+
+* **Context:** ADR-922's command line builds, runs and deploys a function from a directory with a
+  `hatti.function.json`, but a developer starts from an empty one, reading ADR-868 for the input
+  and output each target takes. Shopify's CLI generates a function extension from a template.
+  ADR-922 and ADR-927 left scaffolding a new function for later.
+* **Decision:**
+  * **`hatti function init <handle> --target <target> [--title …] [--dir …]`** writes three files:
+    the `hatti.function.json`, its build `javy build src/index.js -o dist/function.wasm`; a
+    starter `src/index.js`; and `input.json`, a cart as checkout gives a function, to run it on
+    with `hatti function run --input input.json` (ADR-927).
+  * **JavaScript with Javy**, the Bytecode Alliance's open-source compiler: the starter reads its
+    input from standard input and writes its answer to standard output through `Javy.IO`, as
+    every Hatti function does.
+  * **Each target's own starter:** a payment customisation hides cash on delivery above a limit,
+    Rs 10,000 unless its configuration says `limit`; a cart validation refuses more than a few of
+    an item, 5 unless it says `maxQuantity`, three messages at most.
+  * **Never over a function there already**, nor of a handle or target Hatti doesn't take; on this
+    machine alone, no token needed.
+  * **The developers' guide** says it.
+* **Consequences:**
+  * A developer has a function that builds, runs and deploys in a minute, and changes it from
+    there.
+  * Not yet: starters in Rust and TinyGo, and an input made from a shop's real cart.
