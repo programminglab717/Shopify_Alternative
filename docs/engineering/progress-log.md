@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Shoppers' data requests on the headless starter
+### 6c5e06c · Shoppers' data requests on the headless starter
 
 * **The Next.js starter's account page lets shoppers download or ask to erase their own data**
   ([ADR-963](../architecture/13-decision-log.md#adr-963--the-headless-starters-account-page-lets-shoppers-download-or-ask-to-erase-their-own-data)).
