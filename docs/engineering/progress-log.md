@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### Selling plans for chosen variants
+### 5f5e8d4 · Selling plans for chosen variants
 
 * **A selling plan may be for chosen variants alone**: the product page shows it on those, and
   checkout prices it there alone ([ADR-930](../architecture/13-decision-log.md#adr-930--a-selling-plan-may-be-for-chosen-variants-alone-rather-than-a-tags-products-or-all-of-them-the-product-page-shows-it-on-those-checkout-prices-it-there-alone)). This was ADR-862's last "not yet" but charging a card
