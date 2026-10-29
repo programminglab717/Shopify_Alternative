@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-919 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-920 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -927,6 +927,7 @@
 | 917 | A shop that gave an expert access, having hired them, rates them out of five and says how the work went; shops see experts' ratings and reviews, and experts their own | Accepted |
 | 918 | Buy buttons keep a cart of the page's own across the shop's buttons there, kept by that site's browser, its bar checking all of it out through one permalink | Accepted |
 | 919 | A shop's SSO email domains are proved its through a TXT record of its token, a proved domain one shop's alone, taking every sign-in by email of it | Accepted |
+| 920 | An order on payment terms tells its customer, on its page, what they owe by transfer and by which day, or that it was due, and takes their receipt, shipped or not | Accepted |
 
 ---
 
@@ -30331,3 +30332,23 @@
   * Not yet:
     * proofs checked again over time, to notice a record taken down;
     * SAML, and SCIM, as ADR-864 left them.
+
+## ADR-920 · An order on payment terms tells its customer, on its page, what they owe by transfer and by which day, or that it was due, and takes their receipt, shipped or not
+
+* **Context:** ADR-888's orders on payment terms ship without waiting for the money, so they never
+  stop at awaiting payment. Their page (`/o/<secret>`) showed the account and took receipts only
+  there, so a reseller on 30 days' terms was told nothing of what they owed. ADR-888 and ADR-907
+  left the storefront's order page saying the terms for later.
+* **Decision:**
+  * **While an order on terms owes something**, and is not cancelled, its page says, in English
+    and Urdu:
+    * "Your order is on 30 days' terms: pay Rs 12,000 by bank transfer by 28 November 2026", the
+      day in the shop's time zone;
+    * past that day, in red, that the amount "was due by" it, to pay now.
+  * **Beside it**, whatever the order's stage: the shop's account, the amount and the order's name
+    as reference (as ADR-074's page shows them), and the form for the receipt (ADR-080).
+  * **Receipts** are taken for an order on terms while it owes something, shipped or delivered,
+    as the shop sees them with the order. Paid in full, the page says nothing of terms.
+* **Consequences:**
+  * A wholesale customer sees what they owe and where to pay it from the link they already have.
+  * Reminders before and after the due day still wait for WhatsApp templates Meta approves.
