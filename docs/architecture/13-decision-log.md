@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-941 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-942 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -949,6 +949,7 @@
 | 939 | A theme experiment's draft that sells clearly worse is stopped alone, its shoppers shown the live theme, the other drafts going on | Accepted |
 | 940 | The AI support agent hears a customer's voice note and answers its words, and hands a picture, a video or a file without words to staff | Accepted |
 | 941 | The AI support agent reads a customer's photo into searches of the shop's products, and answers with what they find | Accepted |
+| 942 | hatti function init begins a function in Rust, built with Cargo for WASI | Accepted |
 
 ---
 
@@ -30847,3 +30848,26 @@
 * **Consequences:**
   * "Yeh hai aap ke paas?" with a picture is answered with the shop's own products, prices and stock.
   * The photo is read and forgotten; what is kept is the reply and its outcome.
+
+## ADR-942 · hatti function init begins a function in Rust, built with Cargo for WASI
+
+* **Context:** ADR-935's `hatti function init` begins a function in JavaScript, built with Javy.
+  Shopify's functions are mostly written in Rust, so the developers who know them know Rust.
+  ADR-935 left Rust and TinyGo starters for later.
+* **Decision:**
+  * **`--lang rust`** writes a Cargo crate instead of `src/index.js`: `Cargo.toml` with
+    `serde_json`, `src/main.rs`, a `.gitignore` for `target` and `dist`, and the same sample cart.
+  * **Its release profile makes the module as small as Rust can** (opt-level z, LTO, one codegen
+    unit, abort on panic, stripped): about 90 KB, well within a function's 256 KiB.
+  * **The build is `cargo build --release --target wasm32-wasip1`**, with the module copied to
+    `dist/function.wasm`. It reads standard input and writes standard output through Rust's
+    standard library, which Hatti's WASI shim gives (ADR-927).
+  * Each target's Rust starter does what its JavaScript one does.
+  * **Where the machine builds Rust for WASI, the test builds both starters** and runs them in
+    Hatti's runner on the sample cart. Elsewhere, CI included, that test is skipped; the files and
+    the build command are always checked.
+  * JavaScript stays the default.
+* **Consequences:**
+  * A function can begin in the language most of Shopify's are written in.
+  * Not yet: a TinyGo starter. Running TinyGo's downloaded compiler in this environment was refused,
+    and a starter that couldn't be built here would not be shipped.
