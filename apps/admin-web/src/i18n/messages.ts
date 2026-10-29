@@ -4634,6 +4634,10 @@ const en = {
   'subscriptions.discount': 'Discount (%)',
   'subscriptions.tag': 'Product tag',
   'subscriptions.tagHint': 'Leave it blank to offer the plan on all products.',
+  'subscriptions.minimum': 'Orders before customers can cancel',
+  'subscriptions.minimumHint':
+    'They can still skip or pause; you can cancel for them whenever you must. 0 for none, 12 at most.',
+  'subscriptions.minimumLine': 'at least {count} orders',
   'subscriptions.addPlan': 'Add plan',
   'subscriptions.customers': "Customers' subscriptions",
   'subscriptions.none': 'No one has subscribed yet.',
@@ -11851,6 +11855,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'subscriptions.discount': 'رعایت (%)',
   'subscriptions.tag': 'پروڈکٹ ٹیگ',
   'subscriptions.tagHint': 'تمام مصنوعات پر پلان پیش کرنے کے لیے خالی چھوڑ دیں۔',
+  'subscriptions.minimum': 'گاہک کے منسوخ کرنے سے پہلے آرڈر',
+  'subscriptions.minimumHint':
+    'وہ اب بھی چھوڑ یا روک سکتے ہیں؛ ضرورت ہو تو آپ ان کی طرف سے کبھی بھی منسوخ کر سکتے ہیں۔ کوئی نہیں تو 0، زیادہ سے زیادہ 12۔',
+  'subscriptions.minimumLine': 'کم از کم {count} آرڈر',
   'subscriptions.addPlan': 'پلان شامل کریں',
   'subscriptions.customers': 'گاہکوں کی سبسکرپشنز',
   'subscriptions.none': 'ابھی کسی نے سبسکرائب نہیں کیا۔',

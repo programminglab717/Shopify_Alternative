@@ -178,6 +178,11 @@ export interface SellingPlanDoc {
   discountPercent: number;
   /** The tag of the products it is for, ignoring case; null for all of them. */
   productTag: string | null;
+  /**
+   * The orders a subscriber takes before they may cancel themselves (ADR-928); absent, as in
+   * documents written before, for none.
+   */
+  minimumOrders?: number;
 }
 
 /** A shop's running theme experiment, as its storefront splits its shoppers (ADR-866). */

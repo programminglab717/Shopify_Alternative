@@ -50,6 +50,13 @@ export class SellingPlan {
   })
   productTag!: string | null;
 
+  @Field(() => Int, {
+    description:
+      'How many orders a subscriber takes before they may cancel themselves, 0 to 12; 0 for ' +
+      'none (ADR-928). Staff cancel whenever they must.',
+  })
+  minimumOrders!: number;
+
   @Field(() => GraphQLISODateTime)
   updatedAt!: Date;
 }
@@ -70,6 +77,9 @@ export class SellingPlanInput {
 
   @Field(() => String, { nullable: true })
   productTag?: string | null;
+
+  @Field(() => Int, { nullable: true, description: '0 to 12; 0 for none, unless given.' })
+  minimumOrders?: number | null;
 }
 
 @ObjectType()

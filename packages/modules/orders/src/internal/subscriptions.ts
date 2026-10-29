@@ -69,6 +69,8 @@ export interface SubscriptionRecord {
   /** The day its next order is placed, YYYY-MM-DD in Pakistan's time. */
   nextOrderOn: string;
   ordersPlaced: number;
+  /** The orders it takes before its customer may cancel it themselves; 0 for none (ADR-928). */
+  minimumOrders: number;
   lastOrderId: string | null;
   lastError: string | null;
   createdAt: Date;
@@ -93,6 +95,7 @@ type SubscriptionRow = {
   status: SubscriptionStatus;
   next_order_on: string;
   orders_placed: number;
+  minimum_orders: number;
   last_order_id: string | null;
   last_error: string | null;
   failed_tries: number;
@@ -104,7 +107,8 @@ const COLUMNS = sql.raw(
   'id, customer_id, origin_order_id, plan_name, interval_unit, interval_count, ' +
     'discount_percent, lines, shipping_address, email, payment_method, source, ' +
     'shipping::text AS shipping, cod_fee::text AS cod_fee, status, ' +
-    "to_char(next_order_on, 'YYYY-MM-DD') AS next_order_on, orders_placed, last_order_id, " +
+    "to_char(next_order_on, 'YYYY-MM-DD') AS next_order_on, orders_placed, minimum_orders, " +
+    'last_order_id, ' +
     'last_error, failed_tries, created_at, cancelled_at',
 );
 
@@ -122,6 +126,7 @@ const toRecord = (row: SubscriptionRow): SubscriptionRecord => ({
   status: row.status,
   nextOrderOn: row.next_order_on,
   ordersPlaced: row.orders_placed,
+  minimumOrders: row.minimum_orders,
   lastOrderId: row.last_order_id,
   lastError: row.last_error,
   createdAt: toDate(row.created_at),
@@ -203,15 +208,26 @@ export async function changeSubscriptionIn(
   shopId: string,
   id: string,
   change: SubscriptionChange,
-  by: { actor: Actor | 'system'; orderId: string | null; who: string; why?: string },
+  by: {
+    actor: Actor | 'system';
+    orderId: string | null;
+    who: string;
+    why?: string;
+    /** The customer, from their order's page: held to the plan's minimum orders (ADR-928). */
+    customer?: boolean;
+  },
   at: Date = new Date(),
-): Promise<'not_found' | 'cancelled' | null> {
+): Promise<'not_found' | 'cancelled' | 'committed' | null> {
   const { rows } = await tx.execute<SubscriptionRow>(sql`
     SELECT ${COLUMNS} FROM orders.subscriptions
      WHERE shop_id = ${shopId} AND id = ${id} FOR UPDATE`);
   const current = rows[0];
   if (!current) return 'not_found';
   if (current.status === 'cancelled') return 'cancelled';
+  // The customer cancels once they took the orders the plan asked for; staff, whenever they must.
+  if (change === 'cancel' && by.customer && current.orders_placed < current.minimum_orders) {
+    return 'committed';
+  }
   const today = pkDayOf(at);
   let message: string;
   switch (change) {
@@ -378,14 +394,15 @@ export class SubscriptionService {
           INSERT INTO orders.subscriptions
                  (shop_id, customer_id, origin_order_id, plan_id, plan_name, interval_unit,
                   interval_count, discount_percent, lines, shipping_address, email,
-                  payment_method, source, shipping, cod_fee, next_order_on, last_order_id)
+                  payment_method, source, shipping, cod_fee, next_order_on, last_order_id,
+                  minimum_orders)
           VALUES (${shopId}, ${order.customerId}, ${order.id}, ${plan.id}, ${plan.name},
                   ${plan.intervalUnit}, ${plan.intervalCount}, ${plan.discountPercent},
                   ${JSON.stringify(lines)}::jsonb, ${JSON.stringify(order.shippingAddress)}::jsonb,
                   ${order.email}, ${payment}, ${order.source},
                   ${made === 0 ? order.shipping : 0n},
                   ${payment === 'cash_on_delivery' && made === 0 ? order.codFee : 0n},
-                  ${next}, ${order.id})
+                  ${next}, ${order.id}, ${plan.minimumOrders})
           ON CONFLICT (shop_id, origin_order_id, plan_id) DO NOTHING
           RETURNING id`);
         if (!rows[0]) continue;

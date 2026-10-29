@@ -191,6 +191,8 @@ export interface SubscriptionLinkView {
   status: 'active' | 'paused' | 'cancelled';
   /** YYYY-MM-DD. */
   nextOrderOn: string;
+  /** How many more orders before the customer may cancel it themselves (ADR-928); 0 for none. */
+  ordersBeforeCancel: number;
 }
 
 /**
@@ -248,7 +250,9 @@ export class OrderLinkService {
         actor: 'system',
         orderId: order.id,
         who: 'The customer',
+        customer: true,
       });
+      if (why === 'committed') return { kind: 'subscription', reason: 'committed' };
       return why ? { kind: 'too_late', action: 'subscription' } : null;
     });
   }
@@ -644,6 +648,7 @@ async function subscriptionViewIn(
       discountPercent: subscription.discountPercent,
       status: subscription.status,
       nextOrderOn: subscription.nextOrderOn,
+      ordersBeforeCancel: Math.max(0, subscription.minimumOrders - subscription.ordersPlaced),
     }
   );
 }

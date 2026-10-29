@@ -13056,6 +13056,7 @@ const SELLING_PLAN = /* GraphQL */ `
     intervalCount
     discountPercent
     productTag
+    minimumOrders
   }
 `;
 

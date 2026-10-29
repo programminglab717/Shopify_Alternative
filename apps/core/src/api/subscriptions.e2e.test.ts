@@ -74,8 +74,11 @@ describe.skipIf(!server)('Subscriptions: selling plans and orders placed again (
     });
   const shownIn = (html: string) => /name="shown" value="([\w-]{22})"/.exec(html)![1]!;
 
-  /** Places an order through checkout of `items`: its ID. */
-  async function checkout(items: object[]): Promise<{ id: string; cart: CartChangeResponse }> {
+  /** Places an order through checkout of `items`, by `phone` where given: its ID. */
+  async function checkout(
+    items: object[],
+    phone = FORM.phone,
+  ): Promise<{ id: string; cart: CartChangeResponse }> {
     const added = await app.inject({
       method: 'POST',
       url: cartPath(shop, 'add'),
@@ -90,7 +93,7 @@ describe.skipIf(!server)('Subscriptions: selling plans and orders placed again (
     });
     const { path } = started.json() as CheckoutStartResponse;
     const page = await app.inject({ method: 'GET', url: path });
-    const placed = await post(path, { ...FORM, shown: shownIn(page.body) });
+    const placed = await post(path, { ...FORM, phone, shown: shownIn(page.body) });
     expect(placed.statusCode).toBe(303);
     const { rows } = await admin.query<{ id: string }>(
       'SELECT id FROM orders.orders ORDER BY number DESC LIMIT 1',
@@ -309,6 +312,75 @@ describe.skipIf(!server)('Subscriptions: selling plans and orders placed again (
       'The customer paused the subscription',
       expect.stringMatching(/^The customer resumed the subscription: its next order is placed on /),
       'The customer cancelled the subscription',
+    ]);
+  });
+
+  it("holds its customer to the plan's minimum orders, staff cancelling whenever they must (ADR-928)", async () => {
+    const made = await data(
+      `mutation ($input: SellingPlanInput!) {
+        sellingPlanCreate(input: $input) { sellingPlan { ${PLAN} minimumOrders } userErrors { message } } }`,
+      {
+        input: {
+          name: 'Every week, 3 at least',
+          intervalUnit: 'WEEK',
+          intervalCount: 1,
+          discountPercent: 15,
+          productTag: 'subscribe',
+          minimumOrders: 3,
+        },
+      },
+    );
+    expect(made.sellingPlan.minimumOrders).toBe(3);
+    const { rows } = await admin.query<{ id: string }>(
+      `SELECT v.id FROM catalog.variants v JOIN catalog.products p ON p.id = v.product_id
+        WHERE p.title = 'Kashmiri chai'`,
+    );
+    // Another customer, whose orders count against no other test's daily limit.
+    const { id: order } = await checkout(
+      [{ variantId: rows[0]!.id, quantity: 1, properties: { _selling_plan: made.sellingPlan.id } }],
+      '0300 7654321',
+    );
+    await hear('order.created', order);
+    const subscription = (await data(SUBSCRIPTIONS)).find(
+      (each: Json) => each.originOrderId === toPublicId('order', order),
+    );
+    expect(subscription).toMatchObject({ status: 'ACTIVE', ordersPlaced: 1 });
+
+    // Its page says how many more orders, and offers no cancel; a cancel posted is refused.
+    const link = await data(
+      `mutation ($id: ID!) { orderLinkCreate(id: $id) { url userErrors { message } } }`,
+      { id: toPublicId('order', order) },
+    );
+    const path = new URL(link.url).pathname;
+    const confirming = await app.inject({ method: 'GET', url: path });
+    await post(path, { action: 'confirm', shown: shownIn(confirming.body) });
+    const page = await app.inject({ method: 'GET', url: path });
+    expect(page.body).toContain(
+      'Your plan asks for 2 more orders before you can cancel it. You can still skip or pause.',
+    );
+    expect(page.body).not.toContain('Cancel the subscription');
+    const refused = await post(path, { action: 'subscription_cancel' });
+    expect(refused.body).toContain('Your plan asks for more orders before you can cancel it.');
+    expect(
+      (await data(SUBSCRIPTIONS)).find((each: Json) => each.id === subscription.id).status,
+    ).toBe('ACTIVE');
+    // Pausing it is still theirs.
+    await post(path, { action: 'subscription_pause' });
+    expect(
+      (await data(SUBSCRIPTIONS)).find((each: Json) => each.id === subscription.id).status,
+    ).toBe('PAUSED');
+    // Staff cancel it whenever they must.
+    const staff = await data(
+      `mutation ($id: ID!) {
+        orderSubscriptionChange(id: $id, change: CANCEL) { subscription { status } userErrors { message } } }`,
+      { id: subscription.id },
+    );
+    expect(staff).toEqual({ subscription: { status: 'CANCELLED' }, userErrors: [] });
+    await data(`mutation ($id: ID!) { sellingPlanDelete(id: $id) { userErrors { message } } }`, {
+      id: made.sellingPlan.id,
+    });
+    await admin.query('DELETE FROM orders.subscriptions WHERE id = $1', [
+      fromPublicId(subscription.id, 'orderSubscription'),
     ]);
   });
 

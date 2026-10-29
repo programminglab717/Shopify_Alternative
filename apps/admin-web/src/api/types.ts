@@ -6446,6 +6446,8 @@ export interface SellingPlan {
   intervalCount: number;
   discountPercent: number;
   productTag: string | null;
+  /** The orders a subscriber takes before cancelling themselves; 0 for none (ADR-928). */
+  minimumOrders: number;
 }
 
 export interface OrderSubscription {

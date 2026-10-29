@@ -31,6 +31,8 @@ export const SELLING_PLAN_LIMITS = {
   tag: 255,
   intervalCount: { min: 1, max: 12 },
   discountPercent: { min: 0, max: 50 },
+  /** How many orders a subscriber takes before cancelling themselves; 0 for none (ADR-928). */
+  minimumOrders: { min: 0, max: 12 },
 } as const;
 
 export type SellingPlanInterval = 'week' | 'month';
@@ -43,6 +45,8 @@ export interface SellingPlanRecord {
   discountPercent: number;
   /** The tag of the products it is for; null for all of them. */
   productTag: string | null;
+  /** The orders a subscriber takes before they may cancel themselves; 0 for none (ADR-928). */
+  minimumOrders: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +57,7 @@ export interface SellingPlanInput {
   intervalCount: number;
   discountPercent: number;
   productTag?: string | null;
+  minimumOrders?: number | null;
 }
 
 type PlanRow = {
@@ -62,6 +67,7 @@ type PlanRow = {
   interval_count: number;
   discount_percent: number;
   product_tag: string | null;
+  minimum_orders: number;
   created_at: Date | string;
   updated_at: Date | string;
 };
@@ -73,12 +79,14 @@ const toRecord = (row: PlanRow): SellingPlanRecord => ({
   intervalCount: row.interval_count,
   discountPercent: row.discount_percent,
   productTag: row.product_tag,
+  minimumOrders: row.minimum_orders,
   createdAt: toDate(row.created_at),
   updatedAt: toDate(row.updated_at),
 });
 
 const COLUMNS = sql.raw(
-  'id, name, interval_unit, interval_count, discount_percent, product_tag, created_at, updated_at',
+  'id, name, interval_unit, interval_count, discount_percent, product_tag, minimum_orders, ' +
+    'created_at, updated_at',
 );
 
 /** A unit's price on the plan: `price` less its discount, to the nearest minor unit. */
@@ -116,7 +124,7 @@ export async function sellingPlansForIn(
   if (productIds.length === 0) return new Map();
   const { rows } = await tx.execute<PlanRow & { product_id: string }>(sql`
     SELECT p.id AS product_id, s.id, s.name, s.interval_unit, s.interval_count,
-           s.discount_percent, s.product_tag, s.created_at, s.updated_at
+           s.discount_percent, s.product_tag, s.minimum_orders, s.created_at, s.updated_at
       FROM catalog.products p
       JOIN catalog.selling_plans s ON s.shop_id = p.shop_id
      WHERE p.shop_id = ${shopId} AND p.id = ANY (${sql.param([...productIds])}::uuid[])
@@ -168,9 +176,10 @@ export class SellingPlanService {
       const plan = checked.value;
       const { rows } = await tx.execute<PlanRow>(sql`
         INSERT INTO catalog.selling_plans
-               (shop_id, name, interval_unit, interval_count, discount_percent, product_tag)
+               (shop_id, name, interval_unit, interval_count, discount_percent, product_tag,
+                minimum_orders)
         VALUES (${tenant.shopId}, ${plan.name}, ${plan.intervalUnit}, ${plan.intervalCount},
-                ${plan.discountPercent}, ${plan.productTag})
+                ${plan.discountPercent}, ${plan.productTag}, ${plan.minimumOrders})
         RETURNING ${COLUMNS}`);
       const record = toRecord(rows[0]!);
       await this.#changed(tx, tenant, record, 'selling_plan.created');
@@ -192,7 +201,8 @@ export class SellingPlanService {
         UPDATE catalog.selling_plans
            SET name = ${plan.name}, interval_unit = ${plan.intervalUnit},
                interval_count = ${plan.intervalCount}, discount_percent = ${plan.discountPercent},
-               product_tag = ${plan.productTag}, updated_at = now()
+               product_tag = ${plan.productTag}, minimum_orders = ${plan.minimumOrders},
+               updated_at = now()
          WHERE shop_id = ${tenant.shopId} AND id = ${id}
         RETURNING ${COLUMNS}`);
       if (!rows[0]) return failOne<SellingPlanRecord>(['id'], 'NOT_FOUND', NOT_FOUND);
@@ -240,6 +250,7 @@ function checkInput(input: SellingPlanInput): MutationResult<
   Omit<SellingPlanInput, 'intervalUnit'> & {
     intervalUnit: SellingPlanInterval;
     productTag: string | null;
+    minimumOrders: number;
   }
 > {
   const check = new InputChecker();
@@ -263,6 +274,11 @@ function checkInput(input: SellingPlanInput): MutationResult<
   const productTag = check.text(['input', 'productTag'], input.productTag, {
     max: SELLING_PLAN_LIMITS.tag,
   });
+  const minimumOrders = check.integer(
+    ['input', 'minimumOrders'],
+    input.minimumOrders ?? 0,
+    SELLING_PLAN_LIMITS.minimumOrders,
+  );
   if (!check.ok) return { ok: false, errors: check.errors };
   return {
     ok: true,
@@ -272,6 +288,7 @@ function checkInput(input: SellingPlanInput): MutationResult<
       intervalCount: intervalCount!,
       discountPercent: discountPercent!,
       productTag,
+      minimumOrders: minimumOrders!,
     },
   };
 }

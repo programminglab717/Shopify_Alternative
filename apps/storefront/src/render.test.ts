@@ -2021,6 +2021,7 @@ describe('Storefront rendering', () => {
             intervalCount: 1,
             discountPercent: 10,
             productTag: 'subscribe',
+            minimumOrders: 3,
           },
           {
             id: 'slpl_tea',
@@ -2044,6 +2045,8 @@ describe('Storefront rendering', () => {
     expect(flat).toContain(
       `Subscribe: Every month, Rs ${(off / 100).toLocaleString('en', { maximumFractionDigits: 2 })} (10% off)`,
     );
+    // Its minimum orders, where it asks for some (ADR-928).
+    expect(flat).toContain('At least 3 orders before you cancel');
     // Only the plans of its tags, or of all products.
     expect(flat).not.toContain('slpl_tea');
     const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());

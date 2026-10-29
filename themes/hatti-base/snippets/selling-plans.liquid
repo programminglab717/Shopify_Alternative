@@ -2,6 +2,7 @@
   Subscribe and save (CAT-16, ADR-862): bought once, or on one of the shop's selling plans, each
   delivery at the plan's price. The product form's `selling_plan` names the plan; empty, the line
   is bought once. Each order of the subscription is confirmed as any other, and paid at the door.
+  A plan asking for a number of orders at least says so (ADR-928).
   Accepts: product.
 {%- endcomment -%}
 {%- assign group = product.selling_plan_groups | first -%}
@@ -21,6 +22,11 @@
       <label class="pill">
         <input type="radio" name="selling_plan" value="{{ plan.id }}">
         <span>{{ 'products.product.selling_plans.plan' | t: name: plan.name, price: plan_price, percent: off }}</span>
+        {%- if plan.minimum_orders > 0 -%}
+          <small class="product__selling-plans-minimum">
+            {{- 'products.product.selling_plans.minimum' | t: count: plan.minimum_orders -}}
+          </small>
+        {%- endif -%}
       </label>
     {%- endfor -%}
     <p class="product__selling-plans-note">{{ 'products.product.selling_plans.note' | t }}</p>

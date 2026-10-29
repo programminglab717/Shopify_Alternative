@@ -107,6 +107,8 @@ export type LinkProblem =
   | { kind: 'return'; reason: 'none' | 'reason' | 'preference' | 'waiting' }
   /** A review form posted with no stars given (ADR-399). */
   | { kind: 'review'; reason: 'none' }
+  /** A subscription the customer may not cancel yet: its plan asks for more orders (ADR-928). */
+  | { kind: 'subscription'; reason: 'committed' }
   /**
    * Paying online (ADR-151) did not start, as the shop's gateway could not be reached or refused
    * it; the customer came back before the gateway said the payment is in; or what they paid was a

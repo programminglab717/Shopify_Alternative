@@ -456,6 +456,7 @@ describe('cart lines', () => {
       intervalCount: 1,
       discountPercent: 10,
       productTag: null,
+      minimumOrders: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

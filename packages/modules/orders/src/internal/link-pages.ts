@@ -1632,6 +1632,11 @@ function savedNotice(): Html {
 
 function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
   switch (problem.kind) {
+    case 'subscription':
+      return {
+        en: "Your plan asks for more orders before you can cancel it. Ask the shop in your chat if you can't wait.",
+        ur: 'آپ کا پلان منسوخ کرنے سے پہلے مزید آرڈر مانگتا ہے۔ انتظار نہ ہو سکے تو اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
     case 'changed':
       // A draft's page also names the shop's policies, which may have changed instead.
       return shown.terms.length > 0
@@ -1719,10 +1724,33 @@ function subscriptionSection(subscription: SubscriptionLinkView): Html {
               ${button('subscription_pause', LABELS.pauseSubscription, 'secondary')}`
             : button('subscription_resume', LABELS.resumeSubscription)
         }
-        ${button('subscription_cancel', LABELS.cancelSubscription, 'danger')}
+        ${
+          // Its plan asks for so many orders before the customer cancels it (ADR-928).
+          subscription.ordersBeforeCancel === 0 &&
+          button('subscription_cancel', LABELS.cancelSubscription, 'danger')
+        }
       </form>`
     }
+    ${
+      subscription.status !== 'cancelled' &&
+      subscription.ordersBeforeCancel > 0 &&
+      paragraphs(committedWords(subscription.ordersBeforeCancel), 'center small muted')
+    }
   </section>`;
+}
+
+/** How many more orders the customer takes before they may cancel (ADR-928). */
+function committedWords(orders: number): Sentence {
+  return orders === 1
+    ? {
+        en: 'Your plan asks for 1 more order before you can cancel it. You can still skip or pause.',
+        ur: 'آپ کا پلان منسوخ کرنے سے پہلے 1 مزید آرڈر مانگتا ہے۔ آپ اب بھی چھوڑ یا روک سکتے ہیں۔',
+      }
+    : {
+        en: `Your plan asks for ${orders} more orders before you can cancel it. You can still skip or pause.`,
+        ur: html`آپ کا پلان منسوخ کرنے سے پہلے ${ltr(String(orders))} مزید آرڈر مانگتا ہے۔ آپ اب بھی
+        چھوڑ یا روک سکتے ہیں۔`,
+      };
 }
 
 /** Why the customer can no longer do `action` here, and whom to ask instead. */

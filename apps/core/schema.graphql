@@ -19753,6 +19753,11 @@ type SellingPlan {
   """Every this many weeks or months: 1 to 12."""
   intervalCount: Int!
   intervalUnit: SellingPlanInterval!
+
+  """
+  How many orders a subscriber takes before they may cancel themselves, 0 to 12; 0 for none (ADR-928). Staff cancel whenever they must.
+  """
+  minimumOrders: Int!
   name: String!
 
   """
@@ -19771,6 +19776,9 @@ input SellingPlanInput {
   discountPercent: Int!
   intervalCount: Int!
   intervalUnit: SellingPlanInterval!
+
+  """0 to 12; 0 for none, unless given."""
+  minimumOrders: Int
   name: String!
   productTag: String
 }

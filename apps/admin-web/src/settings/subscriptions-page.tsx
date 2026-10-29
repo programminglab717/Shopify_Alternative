@@ -54,6 +54,7 @@ export function SubscriptionsPage() {
   const [count, setCount] = useState('1');
   const [discount, setDiscount] = useState('10');
   const [tag, setTag] = useState('');
+  const [minimum, setMinimum] = useState('0');
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const writes = can(shop, 'write_products');
@@ -83,6 +84,7 @@ export function SubscriptionsPage() {
           intervalCount: Number(count),
           discountPercent: Number(discount),
           productTag: tag.trim() || null,
+          minimumOrders: Number(minimum) || 0,
         },
       });
       if (show(done.sellingPlanCreate!.userErrors)) setTag('');
@@ -125,6 +127,8 @@ export function SubscriptionsPage() {
                       {plan.productTag
                         ? t('subscriptions.forTag', { tag: plan.productTag })
                         : t('subscriptions.forAll')}
+                      {plan.minimumOrders > 0 &&
+                        ` · ${t('subscriptions.minimumLine', { count: plan.minimumOrders })}`}
                     </span>
                   </span>
                   {writes && (
@@ -182,6 +186,13 @@ export function SubscriptionsPage() {
                 hint={t('subscriptions.tagHint')}
                 value={tag}
                 onChange={(event) => setTag(event.target.value)}
+              />
+              <TextField
+                label={t('subscriptions.minimum')}
+                hint={t('subscriptions.minimumHint')}
+                inputMode="numeric"
+                value={minimum}
+                onChange={(event) => setMinimum(event.target.value)}
               />
               <Button type="submit" className="self-start" busy={busy}>
                 {t('subscriptions.addPlan')}

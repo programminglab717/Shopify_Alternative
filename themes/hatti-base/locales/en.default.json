@@ -161,7 +161,11 @@
         "title": "Purchase options",
         "once": "Buy once ({{ price }})",
         "plan": "Subscribe: {{ name }}, {{ price }} ({{ percent }}% off)",
-        "note": "Each delivery is a new order, confirmed with you and paid at the door. Skip, pause or cancel from your order's page."
+        "note": "Each delivery is a new order, confirmed with you and paid at the door. Skip, pause or cancel from your order's page.",
+        "minimum": {
+          "one": "At least 1 order before you cancel",
+          "other": "At least {{ count }} orders before you cancel"
+        }
       }
     },
     "wishlist": {

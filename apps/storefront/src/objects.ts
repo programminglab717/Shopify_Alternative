@@ -182,9 +182,10 @@ export function sellingPlanGroups(
         recurring_deliveries: true,
         options: [{ name: option, position: 1, value: plan.name }],
         price_adjustments: [{ position: 1, value_type: 'percentage', value: plan.discountPercent }],
-        // Hatti's own: how often, for the theme's words.
+        // Hatti's own: how often, and how many orders at least (ADR-928), for the theme's words.
         interval_unit: plan.intervalUnit,
         interval_count: plan.intervalCount,
+        minimum_orders: plan.minimumOrders ?? 0,
       })),
     },
   ];

@@ -85,9 +85,11 @@ describe('Subscriptions (CAT-16, ADR-862)', () => {
     expect(await screen.findByText(/must be a whole number from 0 to 50/)).toBeTruthy();
     type('Discount (%)', '10');
     type('Product tag', 'chai');
+    // At least three orders before customers can cancel (ADR-928).
+    type('Orders before customers can cancel', '3');
     fireEvent.click(screen.getByRole('button', { name: 'Add plan' }));
     expect(await screen.findByText('Every month, 10% off')).toBeTruthy();
-    expect(screen.getByText('For products tagged chai')).toBeTruthy();
+    expect(screen.getByText('For products tagged chai · at least 3 orders')).toBeTruthy();
     expect(sentOf(fake, 'SellingPlanCreate').at(-1)).toEqual({
       input: {
         name: 'Every month',
@@ -95,6 +97,7 @@ describe('Subscriptions (CAT-16, ADR-862)', () => {
         intervalCount: 1,
         discountPercent: 10,
         productTag: 'chai',
+        minimumOrders: 3,
       },
     });
 
