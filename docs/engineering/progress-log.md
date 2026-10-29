@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-29
 
-### The Storefront API's nodes
+### 7b6276a · The Storefront API's nodes
 
 * **The Storefront API gives products and collections by their IDs at once**, in their order,
   as Shopify's `nodes` ([ADR-956](../architecture/13-decision-log.md#adr-956--the-storefront-api-gives-products-and-collections-by-their-ids-at-once-as-shopifys-nodes)).
