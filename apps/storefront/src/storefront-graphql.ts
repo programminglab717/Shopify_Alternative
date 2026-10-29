@@ -1449,19 +1449,21 @@ function addressRequestOf(
 ): AccountAddressRequest | 'not_pakistan' {
   const country = input.country?.trim().toLowerCase();
   if (country && !['pakistan', 'pk', 'pak'].includes(country)) return 'not_pakistan';
-  const given = (key: string) => (input[key] === undefined ? undefined : (input[key] ?? null));
+  // A field left out keeps what it was; one given as null is cleared, as Shopify's are.
+  const field = (key: string, was: string | null | undefined) =>
+    input[key] === undefined ? (was ?? null) : (input[key] ?? null);
   const keptName = kept?.name.trim().split(/\s+/) ?? [];
-  const first = given('firstName') ?? keptName[0] ?? '';
-  const last = given('lastName') ?? keptName.slice(1).join(' ');
+  const first = field('firstName', keptName[0]);
+  const last = field('lastName', keptName.slice(1).join(' '));
   return {
     name: [first, last].filter(Boolean).join(' '),
-    phone: given('phone') ?? kept?.phone ?? '',
-    address1: given('address1') ?? kept?.address1 ?? '',
-    address2: given('address2') !== undefined ? given('address2') : (kept?.address2 ?? null),
-    landmark: given('landmark') !== undefined ? given('landmark') : (kept?.landmark ?? null),
-    city: given('city') ?? kept?.city ?? '',
-    province: given('province') !== undefined ? given('province') : (kept?.provinceCode ?? null),
-    zip: given('zip') !== undefined ? given('zip') : (kept?.zip ?? null),
+    phone: field('phone', kept?.phone) ?? '',
+    address1: field('address1', kept?.address1) ?? '',
+    address2: field('address2', kept?.address2),
+    landmark: field('landmark', kept?.landmark),
+    city: field('city', kept?.city) ?? '',
+    province: field('province', kept?.provinceCode),
+    zip: field('zip', kept?.zip),
     ...(kept?.default && { default: true }),
   };
 }
