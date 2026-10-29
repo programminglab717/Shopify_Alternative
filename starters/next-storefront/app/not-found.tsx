@@ -1,11 +1,14 @@
 import Link from 'next/link';
+import { languageOf } from '@/lib/language';
+import { wordsOf } from '@/lib/words';
 
-export default function NotFound() {
+export default async function NotFound() {
+  const words = wordsOf(await languageOf());
   return (
     <>
-      <h1>Not found</h1>
+      <h1>{words.notFound}</h1>
       <p>
-        This page isn&apos;t here. <Link href="/">Back to the shop</Link>
+        {words.notHere} <Link href="/">{words.back}</Link>
       </p>
     </>
   );

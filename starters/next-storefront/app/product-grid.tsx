@@ -2,10 +2,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import type { ProductCard } from '@/lib/types';
+import type { Words } from '@/lib/words';
 
 /** Products as cards: picture, title and the lowest price, each to its page. */
-export function ProductGrid({ products }: { products: ProductCard[] }) {
-  if (products.length === 0) return <p>Nothing here yet.</p>;
+export function ProductGrid({ products, words }: { products: ProductCard[]; words: Words }) {
+  if (products.length === 0) return <p>{words.nothing}</p>;
   return (
     <ul className="grid">
       {products.map((product) => (
@@ -22,7 +23,7 @@ export function ProductGrid({ products }: { products: ProductCard[] }) {
             )}
             <span dir="auto">{product.title}</span>
             <strong>{formatMoney(product.priceRange.minVariantPrice)}</strong>
-            {!product.availableForSale && <em>Sold out</em>}
+            {!product.availableForSale && <em>{words.soldOut}</em>}
           </Link>
         </li>
       ))}

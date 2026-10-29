@@ -1,5 +1,6 @@
 // What the storefront asks of the shop's Storefront API. Each query is whole, without
-// interpolation, so Hatti's tests check it against the API's schema (ADR-869).
+// interpolation, so Hatti's tests check it against the API's schema (ADR-869). The catalog's and
+// the cart's are asked in the shopper's language, English unless they chose Urdu (ADR-926).
 
 export const SHOP_QUERY = /* GraphQL */ `
   query Shop {
@@ -13,7 +14,8 @@ export const SHOP_QUERY = /* GraphQL */ `
 `;
 
 export const PRODUCTS_QUERY = /* GraphQL */ `
-  query Products($first: Int!, $after: String, $query: String) {
+  query Products($first: Int!, $after: String, $query: String, $language: LanguageCode = EN)
+  @inContext(language: $language) {
     products(first: $first, after: $after, query: $query) {
       nodes {
         id
@@ -42,7 +44,7 @@ export const PRODUCTS_QUERY = /* GraphQL */ `
 `;
 
 export const PRODUCT_QUERY = /* GraphQL */ `
-  query Product($handle: String!) {
+  query Product($handle: String!, $language: LanguageCode = EN) @inContext(language: $language) {
     product(handle: $handle) {
       id
       handle
@@ -85,7 +87,8 @@ export const PRODUCT_QUERY = /* GraphQL */ `
 `;
 
 export const COLLECTION_QUERY = /* GraphQL */ `
-  query Collection($handle: String!, $first: Int!) {
+  query Collection($handle: String!, $first: Int!, $language: LanguageCode = EN)
+  @inContext(language: $language) {
     collection(handle: $handle) {
       title
       descriptionHtml
@@ -114,7 +117,7 @@ export const COLLECTION_QUERY = /* GraphQL */ `
 `;
 
 export const CART_QUERY = /* GraphQL */ `
-  query Cart($id: ID!) {
+  query Cart($id: ID!, $language: LanguageCode = EN) @inContext(language: $language) {
     cart(id: $id) {
       id
       checkoutUrl

@@ -515,6 +515,22 @@ describe('The Storefront API in Urdu, and its metafields (ADR-903)', () => {
   });
   const PRODUCT = `product(handle: "${lawn.handle}") { title onlineStoreUrl }`;
 
+  it("answers the headless starter's queries in the shopper's language (ADR-926)", async () => {
+    const q = starterQueries();
+    const at = urdu();
+    const product = async (language?: string) =>
+      (await ask(q.PRODUCT_QUERY!, { handle: lawn.handle, ...(language && { language }) }, at)).data
+        .product.title;
+    expect(await product('UR')).toBe('لان سوٹ');
+    // English as asked, or unless asked.
+    expect(await product('EN')).toBe(lawn.title);
+    expect(await product()).toBe(lawn.title);
+    const listed = await ask(q.PRODUCTS_QUERY!, { first: 24, language: 'UR' }, at);
+    expect(listed.data.products.nodes.map((each: { title: string }) => each.title)).toContain(
+      'لان سوٹ',
+    );
+  });
+
   it('answers in Urdu where a query asks for it, its pages at their Urdu addresses', async () => {
     const asked = await ask(
       `query Shop($language: LanguageCode) @inContext(language: $language, country: AE) {

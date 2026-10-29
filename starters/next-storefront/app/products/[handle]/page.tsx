@@ -2,13 +2,20 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { addToCart } from '@/app/actions';
 import { storefront } from '@/lib/hatti';
+import { languageCode, languageOf } from '@/lib/language';
 import { formatMoney } from '@/lib/money';
 import { PRODUCT_QUERY } from '@/lib/queries';
 import type { Product } from '@/lib/types';
+import { wordsOf } from '@/lib/words';
 
 export default async function ProductPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
-  const { product } = await storefront<{ product: Product | null }>(PRODUCT_QUERY, { handle });
+  const language = await languageOf();
+  const words = wordsOf(language);
+  const { product } = await storefront<{ product: Product | null }>(PRODUCT_QUERY, {
+    handle,
+    language: languageCode(language),
+  });
   if (!product) notFound();
   const variants = product.variants.nodes;
   const first = variants.find((variant) => variant.availableForSale) ?? variants[0];
@@ -32,12 +39,12 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
         <form action={addToCart} className="buy">
           {variants.length > 1 && (
             <label>
-              Choose
+              {words.choose}
               <select name="variantId" defaultValue={first?.id}>
                 {variants.map((variant) => (
                   <option key={variant.id} value={variant.id} disabled={!variant.availableForSale}>
                     {variant.title} · {formatMoney(variant.price)}
-                    {variant.availableForSale ? '' : ' (sold out)'}
+                    {variant.availableForSale ? '' : words.soldOutOption}
                   </option>
                 ))}
               </select>
@@ -45,11 +52,11 @@ export default async function ProductPage({ params }: { params: Promise<{ handle
           )}
           {variants.length === 1 && <input type="hidden" name="variantId" value={first?.id} />}
           <label>
-            Quantity
+            {words.quantity}
             <input name="quantity" type="number" min={1} defaultValue={1} inputMode="numeric" />
           </label>
           <button type="submit" disabled={!product.availableForSale}>
-            {product.availableForSale ? 'Add to cart' : 'Sold out'}
+            {product.availableForSale ? words.addToCart : words.soldOut}
           </button>
         </form>
         <div dir="auto" dangerouslySetInnerHTML={{ __html: product.descriptionHtml }} />

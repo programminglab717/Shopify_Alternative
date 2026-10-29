@@ -21,6 +21,25 @@ a {
   font-size: 1.25rem;
   text-decoration: none;
 }
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.language {
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+}
+/* Urdu reads more easily a little larger and looser (ADR-926). */
+[dir='rtl'] body {
+  font-size: 1.05rem;
+  line-height: 1.9;
+}
 .page {
   max-width: 72rem;
   margin: 0 auto;

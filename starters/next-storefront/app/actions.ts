@@ -1,8 +1,9 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { storefront } from '@/lib/hatti';
+import { LANGUAGE_COOKIE } from '@/lib/language';
 import {
   CART_CREATE_MUTATION,
   CART_LINES_ADD_MUTATION,
@@ -80,4 +81,29 @@ export async function updateLine(form: FormData): Promise<void> {
     await keep(cartLinesUpdate);
   }
   redirect('/cart');
+}
+
+/**
+ * Shows the site in the language the header's switch names (ADR-926), kept a year, then the page
+ * the shopper was on: its path on this site alone.
+ */
+export async function switchLanguage(form: FormData): Promise<void> {
+  const to = form.get('to') === 'ur' ? 'ur' : 'en';
+  (await cookies()).set(LANGUAGE_COOKIE, to, {
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 365,
+    path: '/',
+  });
+  const from = (await headers()).get('referer');
+  let back = '/';
+  try {
+    if (from) {
+      const url = new URL(from);
+      back = `${url.pathname}${url.search}`;
+    }
+  } catch {
+    back = '/';
+  }
+  redirect(back.startsWith('/') && !back.startsWith('//') ? back : '/');
 }
