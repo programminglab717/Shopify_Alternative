@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### A running experiment's drafts added and taken out
+### 4ad6d0e · A running experiment's drafts added and taken out
 
 * **A running theme experiment takes a draft more as its next arm, or has one taken out**, the
   others going on, from the admin ([ADR-970](../architecture/13-decision-log.md#adr-970--a-running-theme-experiment-takes-a-draft-more-as-its-next-arm-or-has-one-taken-out)).
