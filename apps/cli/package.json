@@ -2,7 +2,7 @@
   "name": "@hatti/cli",
   "version": "0.0.0",
   "private": true,
-  "description": "Hatti's command line for developers (DEV-08): a shop's themes listed, their files pulled to a directory and pushed back, and pushed as they are saved while a preview shows them; and an app's checkout functions built and deployed (DEV-07); through the Admin API with a custom app's token.",
+  "description": "Hatti's command line for developers (DEV-08): a shop's themes listed, their files pulled to a directory and pushed back, pushed as they are saved while a preview shows them, and their pages checked for accessibility; and an app's checkout functions built and deployed (DEV-07); through the Admin API with a custom app's token.",
   "type": "module",
   "bin": {
     "hatti": "./dist/main.js"
@@ -17,7 +17,9 @@
   },
   "dependencies": {
     "@hatti/admin-client": "workspace:*",
-    "@hatti/functions": "workspace:*"
+    "@hatti/functions": "workspace:*",
+    "axe-core": "4.14.0",
+    "happy-dom": "20.14.5"
   },
   "devDependencies": {
     "@types/node": "catalog:",

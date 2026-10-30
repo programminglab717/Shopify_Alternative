@@ -121,6 +121,10 @@ export function PartnersPage() {
               Preview it on its development store {theme.preview.shopId}, theme{' '}
               {theme.preview.themeId}
             </p>
+            <p className="text-secondary">
+              Read its pages for accessibility problems (ADR-968):{' '}
+              <code>hatti theme check --url &lt;its preview link&gt;</code>
+            </p>
             <Review
               path={`/partner-themes/${theme.id}`}
               listed={theme.listed}

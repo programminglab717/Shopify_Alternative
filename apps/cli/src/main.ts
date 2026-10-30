@@ -18,6 +18,7 @@ import {
   orderInput,
   runFunction,
 } from './function.js';
+import { ThemeCheckError, checkTheme } from './check.js';
 import {
   ThemePushError,
   listThemes,
@@ -40,6 +41,8 @@ Theme commands:
   pull --theme <id>            Write the theme's files into the directory
   push --theme <id>            Save the directory's theme files to the theme
   dev --theme <id>             Push each file as it is saved, with the theme's preview
+  check --theme <id>           Read its pages through its preview for accessibility problems
+        --url <preview link>   ...or a preview link's, with no token needed
 
 Function commands, for the function ${FUNCTION_CONFIG} describes:
   init <handle> --target <t>   Begin one in the directory: ${TARGETS.join(' or ')};
@@ -74,6 +77,7 @@ export async function run(
     strict: false,
     options: {
       theme: { type: 'string' },
+      url: { type: 'string' },
       dir: { type: 'string' },
       'allow-live': { type: 'boolean' },
       'no-build': { type: 'boolean' },
@@ -151,6 +155,10 @@ export async function run(
       throw error;
     }
   }
+  // A preview link's pages read from here: a reviewer's link needs no token (ADR-968).
+  if (area === 'theme' && command === 'check' && typeof values.url === 'string') {
+    return checkCommand(values.url, out);
+  }
   const api = client ?? clientOf(env);
   if (!api) {
     out.error(
@@ -190,6 +198,10 @@ export async function run(
         await devLoop(api, theme, dir, live, out);
         return 0;
       }
+      case 'check': {
+        if (!theme) throw new ThemePushError('Say which theme: --theme <id>, or --url <preview>');
+        return await checkCommand(await previewOf(api, theme), out);
+      }
       default:
         out.log(USAGE);
         return 1;
@@ -222,6 +234,32 @@ async function runLocally(
     throw new FunctionError(`${inputPath} is not JSON`);
   }
   return runOn(module, input, out);
+}
+
+/** `hatti theme check`: the preview's pages read by axe, each problem said; its exit code. */
+async function checkCommand(
+  previewUrl: string,
+  out: { log: (line: string) => void; error: (line: string) => void },
+): Promise<number> {
+  try {
+    const { pages, problems } = await checkTheme(previewUrl, { log: out.log });
+    for (const problem of problems) {
+      out.error(`${problem.page}: ${problem.rule} (${problem.impact}): ${problem.help}`);
+      for (const element of problem.elements) out.error(`    ${element}`);
+    }
+    if (problems.length > 0) {
+      out.error(`${problems.length} accessibility problems on ${pages} pages.`);
+      return 1;
+    }
+    out.log(`No accessibility problems on ${pages} pages.`);
+    return 0;
+  } catch (error) {
+    if (error instanceof ThemeCheckError) {
+      out.error(error.message);
+      return 1;
+    }
+    throw error;
+  }
 }
 
 /** The module run on `input`, its answer printed with how long it took: its exit code. */

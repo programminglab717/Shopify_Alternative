@@ -7,7 +7,8 @@ import { loadPartnerPayoutsConfig } from './config.js';
 // Hatti's review of designers' themes for the theme store (OS-20, ADR-853): for Hatti's own people,
 // by whoever runs Hatti, never through the Admin API. `list` shows each theme, those waiting
 // first; `list-theme` puts it in the store for every shop, once checked against the review list in
-// docs/developers/README.md; `unlist` takes it out, the shops that bought it keeping it.
+// docs/developers/README.md, `hatti theme check --url <its preview link>` among it (ADR-968);
+// `unlist` takes it out, the shops that bought it keeping it.
 //
 //   pnpm --filter @hatti/core partner-themes list
 //   pnpm --filter @hatti/core partner-themes list-theme <thls_…>

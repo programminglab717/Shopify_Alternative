@@ -70,10 +70,17 @@ hatti theme list
 hatti theme pull --theme thm_… --dir my-theme
 hatti theme push --theme thm_… --dir my-theme
 hatti theme dev  --theme thm_… --dir my-theme   # push each file as it is saved, with its preview
+hatti theme check --theme thm_…                 # its pages read for accessibility problems
 ```
 
 The theme shoppers see is changed only with `--allow-live`. The token is read from the
 environment and never written to disk.
+
+`hatti theme check` (ADR-968) reads the theme's home page, catalogue, first product, cart and
+search through its preview, in English and in Urdu, with [axe](https://github.com/dequelabs/axe-core),
+as Hatti's own themes are checked, and says each rule a page breaks; it exits 1 if any is broken.
+`--url` checks a preview link instead, with no token. Colour contrast is left to the shop's own
+colours.
 
 An app's functions (ADR-868) are built and deployed the same way, from a directory with a
 `hatti.function.json`. `hatti function init` begins one (ADR-935): its `hatti.function.json`, a
@@ -265,7 +272,8 @@ partner page, free or for Rs 1,000 to Rs 100,000 (ADR-853). Hatti looks at it on
 before listing it, and again each time it is offered anew. Shops install free themes at once
 and buy paid ones once; the designer earns 80% of each sale, paid out with partners' other
 earnings. A theme's own files are JSON over one of Hatti's themes, so `hatti theme pull` and
-`push` work on it like any other.
+`push` work on it like any other. Run `hatti theme check` on it before offering it: Hatti's
+review runs it too.
 
 ## Workflows
 
@@ -309,7 +317,7 @@ for:
   more; an https address and redirect URLs on the partner's own domain; a privacy policy saying
   what it keeps of shoppers.
 * **Themes:** a preview on the development store that works on a phone, in Urdu and English;
-  no images of others' work; a description that says what it is for; a price in range.
+  `hatti theme check --url <its preview link>` finding no problems; no images of others' work; a description that says what it is for; a price in range.
 * **Experts:** a real business, with past work to see; services they offer, in the cities they
   name; no phone numbers or links in the profile to take shops off Hatti.
 
