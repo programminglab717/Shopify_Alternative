@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Partners' themes checked for accessibility
+### 41c7ac9 · Partners' themes checked for accessibility
 
 * **`hatti theme check`** reads a theme's pages through its preview with axe, in English and
   Urdu, for a designer before they offer it and for Hatti's review before it is listed ([ADR-968](../architecture/13-decision-log.md#adr-968--hatti-theme-check-reads-a-themes-pages-through-its-preview-with-axe)).
