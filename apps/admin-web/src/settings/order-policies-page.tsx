@@ -61,6 +61,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   returnWindowDays: 'orderPolicies.returnWindow',
   termsReminderDays: 'orderPolicies.termsDays',
   termsOverdueReminders: 'orderPolicies.termsTimes',
+  termsBeforeDays: 'orderPolicies.termsBefore',
 };
 
 /** A number of whole units as typed, or blank for none; what is not one stays NaN. */
@@ -87,6 +88,7 @@ function orderInputOf(state: {
   staffDiscount: string;
   termsDays: string;
   termsTimes: string;
+  termsBefore: string;
 }) {
   return {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
@@ -106,6 +108,7 @@ function orderInputOf(state: {
     staffDiscountPercent: wholeOrNone(state.staffDiscount),
     termsReminderDays: wholeOrNone(state.termsDays),
     termsOverdueReminders: wholeOrNone(state.termsTimes),
+    termsBeforeDays: wholeOrNone(state.termsBefore),
   };
 }
 
@@ -143,6 +146,8 @@ function stateOf(settings: OrderSettings) {
     // A week and four times unless the shop chose otherwise (ADR-964).
     termsDays: String(settings.termsReminderDays ?? 7),
     termsTimes: String(settings.termsOverdueReminders ?? 4),
+    // Three days before the date unless the shop chose otherwise (ADR-965).
+    termsBefore: String(settings.termsBeforeDays ?? 3),
   };
 }
 
@@ -380,6 +385,14 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
       </FormSection>
 
       <FormSection title={t('orderPolicies.terms')} hint={t('orderPolicies.termsHint')}>
+        <TextField
+          label={t('orderPolicies.termsBefore')}
+          hint={t('orderPolicies.termsBeforeHint')}
+          inputMode="numeric"
+          ltr
+          value={state.termsBefore}
+          onChange={(event) => set({ termsBefore: event.target.value })}
+        />
         <Pair>
           <TextField
             label={t('orderPolicies.termsDays')}

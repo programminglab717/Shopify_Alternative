@@ -8046,6 +8046,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     shareNewOrders
     termsReminderDays
     termsOverdueReminders
+    termsBeforeDays
     updatedAt
   }
 `;

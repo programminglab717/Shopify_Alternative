@@ -17,7 +17,7 @@ export class PaymentTermsReminders {
 
   /** One sweep of every shop with an order to remind: how many orders it reminded. */
   async sweep(at: Date = new Date()): Promise<number> {
-    const soon = new Date(at.getTime() + PAYMENT_TERMS_REMINDERS.beforeMs).toISOString();
+    const now = at.toISOString();
     const { rows: shops } = await this.database.system((tx) =>
       tx.execute<{ shop_id: string }>(sql`
         SELECT DISTINCT o.shop_id FROM orders.orders o
@@ -27,7 +27,10 @@ export class PaymentTermsReminders {
            AND o.terms_reminded < 1 + LEAST(coalesce(s.terms_overdue_reminders,
                                                      ${PAYMENT_TERMS_REMINDERS.overdue}),
                                             ${PAYMENT_TERMS_REMINDERS.overdue})
-           AND o.payment_due_at <= ${soon}::timestamptz
+           -- Due within as many days as the shop reminds before the date (ADR-965), or past it.
+           AND o.payment_due_at <= ${now}::timestamptz
+                 + make_interval(days => coalesce(s.terms_before_days,
+                                                  ${PAYMENT_TERMS_REMINDERS.beforeMs / 86_400_000}))
            AND o.status <> 'cancelled' AND o.amount_paid < o.total`),
     );
     let reminded = 0;

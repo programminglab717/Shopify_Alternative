@@ -3036,6 +3036,8 @@ const en = {
   'orderPolicies.terms': 'Payment terms reminders',
   'orderPolicies.termsHint':
     'A customer still owing on an order on payment terms past its date is reminded again on WhatsApp and by email.',
+  'orderPolicies.termsBefore': 'Days before the due date to remind',
+  'orderPolicies.termsBeforeHint': '0 to 7; 0 to remind only once it is past.',
   'orderPolicies.termsDays': 'Days between reminders',
   'orderPolicies.termsTimes': 'Reminders past the date',
   'orderPolicies.termsTimesHint': '1 to 4. Then the rest is yours to chase.',
@@ -10344,6 +10346,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.terms': 'ادائیگی کی مدت کی یاد دہانیاں',
   'orderPolicies.termsHint':
     'مدت والے آرڈر پر تاریخ گزرنے کے بعد بھی جس گاہک کی رقم باقی ہو اسے واٹس ایپ اور ای میل پر دوبارہ یاد دلایا جاتا ہے۔',
+  'orderPolicies.termsBefore': 'مقررہ تاریخ سے کتنے دن پہلے یاد دلائیں',
+  'orderPolicies.termsBeforeHint': '0 سے 7؛ 0 ہو تو صرف تاریخ گزرنے کے بعد۔',
   'orderPolicies.termsDays': 'یاد دہانیوں کے درمیان دن',
   'orderPolicies.termsTimes': 'تاریخ کے بعد یاد دہانیاں',
   'orderPolicies.termsTimesHint': '1 سے 4۔ اس کے بعد وصولی آپ کے ذمے۔',

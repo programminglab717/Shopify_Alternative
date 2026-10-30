@@ -342,6 +342,8 @@ export interface OrderSettingsUpdatedPayload {
   /** The days between overdue reminders of payment terms, and how many past the date (ADR-964). */
   termsReminderDays: number;
   termsOverdueReminders: number;
+  /** The days before the date its customer is first reminded, 0 for none (ADR-965). */
+  termsBeforeDays: number;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

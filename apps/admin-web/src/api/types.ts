@@ -4086,6 +4086,8 @@ export interface OrderSettings {
    */
   termsReminderDays?: number;
   termsOverdueReminders?: number;
+  /** The days before the date its customer is first reminded, 0 for none (ADR-965). */
+  termsBeforeDays?: number;
   /**
    * Whether new orders that need a call go to the agents on duty at the desk (ADR-654); absent
    * where a fake core leaves it out.

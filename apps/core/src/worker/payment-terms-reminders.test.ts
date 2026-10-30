@@ -197,4 +197,19 @@ describe.skipIf(!server)('Customers on payment terms reminded (ADR-945, ADR-954)
       (await new OrderSettingsService(database).update(a, { termsOverdueReminders: 5 })).ok,
     ).toBe(false);
   });
+
+  it('reminds before the date as long before it as the shop chose, or not at all (ADR-965)', async () => {
+    const settings = new OrderSettingsService(database);
+    // b's: none before the date. Due in two days, its customer hears nothing yet.
+    unwrap(await settings.update(b, { termsBeforeDays: 0 }));
+    const soon = await onTerms(b, 8);
+    await sweeps.sweep();
+    expect(await reminded(soon)).toBe(0);
+    // A week before it: due in six days, halfway from the order, it is reminded.
+    unwrap(await settings.update(b, { termsBeforeDays: 7 }));
+    const later = await onTerms(b, 14, 20);
+    await sweeps.sweep();
+    expect(await Promise.all([soon, later].map(reminded))).toEqual([1, 1]);
+    expect((await settings.update(b, { termsBeforeDays: 8 })).ok).toBe(false);
+  });
 });

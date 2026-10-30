@@ -13869,6 +13869,11 @@ type OrderSettings {
   staffDiscountPercent: Int
 
   """
+  The days before an order on payment terms falls due that its customer is first reminded, 0 for no reminder before it (ADR-965): 3 unless the shop chose otherwise.
+  """
+  termsBeforeDays: Int!
+
+  """
   How many reminders an order on payment terms still owed is sent past its date, 1 to 4 (ADR-964): 4 unless the shop chose otherwise.
   """
   termsOverdueReminders: Int!
@@ -13915,6 +13920,9 @@ input OrderSettingsInput {
 
   """0 to 100; null for no limit."""
   staffDiscountPercent: Int
+
+  """0 to 7; 0 for no reminder before the date."""
+  termsBeforeDays: Int
 
   """1 to 4."""
   termsOverdueReminders: Int

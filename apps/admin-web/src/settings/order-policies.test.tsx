@@ -220,10 +220,15 @@ describe('Order policies', () => {
     expect((screen.getByLabelText('Reminders past the date') as HTMLInputElement).value).toBe('4');
     type('Days between reminders', '3');
     type('Reminders past the date', '2');
+    // And none before the date (ADR-965), three unless the shop chose otherwise.
+    expect(
+      (screen.getByLabelText('Days before the due date to remind') as HTMLInputElement).value,
+    ).toBe('3');
+    type('Days before the due date to remind', '0');
     fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
     expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
     expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([
-      { input: { termsReminderDays: 3, termsOverdueReminders: 2 } },
+      { input: { termsReminderDays: 3, termsOverdueReminders: 2, termsBeforeDays: 0 } },
     ]);
   });
 

@@ -109,6 +109,7 @@ describe.skipIf(!server)('Order links', () => {
       shareNewOrders: false,
       termsReminderDays: 7,
       termsOverdueReminders: 4,
+      termsBeforeDays: 3,
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -144,6 +145,7 @@ describe.skipIf(!server)('Order links', () => {
           shareNewOrders: false,
           termsReminderDays: 7,
           termsOverdueReminders: 4,
+          termsBeforeDays: 3,
           actorKind: 'app',
           actorId: appId,
         },
@@ -172,6 +174,7 @@ describe.skipIf(!server)('Order links', () => {
           shareNewOrders: false,
           termsReminderDays: 7,
           termsOverdueReminders: 4,
+          termsBeforeDays: 3,
         },
       },
     ]);

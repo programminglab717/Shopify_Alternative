@@ -16,8 +16,13 @@ import { orderSettingsIn } from './order-settings.service.js';
 export const TERMS_OWED_LIMITS = { first: 100 } as const;
 
 export const PAYMENT_TERMS_REMINDERS = {
-  /** The reminder before the due date: this long before it at most, and halfway there at least. */
+  /**
+   * The reminder before the due date: this long before it at most, and halfway there at least;
+   * a shop's own, in days, takes its place, or none (ADR-965).
+   */
   beforeMs: 3 * 86_400_000,
+  /** The most days before the date a shop may have it. */
+  mostBeforeDays: 7,
   /** The reminder after it: this long past it, the day's grace for a transfer on its way. */
   afterMs: 86_400_000,
   /**
@@ -42,10 +47,11 @@ export const PAYMENT_TERMS_REMINDERS = {
  */
 export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Promise<number> {
   const now = at.toISOString();
-  const soon = new Date(at.getTime() + PAYMENT_TERMS_REMINDERS.beforeMs).toISOString();
   const late = new Date(at.getTime() - PAYMENT_TERMS_REMINDERS.afterMs).toISOString();
-  // As often, and as many times, as the shop chose (ADR-964).
+  // As often, and as many times, as the shop chose (ADR-964), and as long before the date
+  // (ADR-965): with none before it, `soon` is now, which no order due later is at or before.
   const settings = await orderSettingsIn(tx, shopId);
+  const soon = new Date(at.getTime() + settings.termsBeforeDays * 86_400_000).toISOString();
   const again = new Date(at.getTime() - settings.termsReminderDays * 86_400_000).toISOString();
   // 0 none, 1 the reminder before, 2 on the reminders past the date.
   const most = 1 + Math.min(settings.termsOverdueReminders, PAYMENT_TERMS_REMINDERS.overdue);

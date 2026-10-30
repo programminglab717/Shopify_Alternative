@@ -183,6 +183,13 @@ export class OrderSettings {
   })
   termsOverdueReminders!: number;
 
+  @Field(() => Int, {
+    description:
+      'The days before an order on payment terms falls due that its customer is first reminded, ' +
+      '0 for no reminder before it (ADR-965): 3 unless the shop chose otherwise.',
+  })
+  termsBeforeDays!: number;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -248,6 +255,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '1 to 4.' })
   termsOverdueReminders?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '0 to 7; 0 for no reminder before the date.' })
+  termsBeforeDays?: number | null;
 }
 
 @ObjectType()

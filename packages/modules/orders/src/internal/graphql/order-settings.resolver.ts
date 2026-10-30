@@ -76,6 +76,7 @@ export class OrderSettingsResolver {
       ...(typeof input.termsOverdueReminders === 'number' && {
         termsOverdueReminders: input.termsOverdueReminders,
       }),
+      ...(typeof input.termsBeforeDays === 'number' && { termsBeforeDays: input.termsBeforeDays }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -107,6 +108,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     shareNewOrders: record.shareNewOrders,
     termsReminderDays: record.termsReminderDays,
     termsOverdueReminders: record.termsOverdueReminders,
+    termsBeforeDays: record.termsBeforeDays,
     updatedAt: record.updatedAt,
   });
 }
