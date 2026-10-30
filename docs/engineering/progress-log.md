@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
+### Shoppers' pages checked a page a test
+
+* **The platform themes' axe check is a test a page** (ADR-967): a theme's fourteen pages in one
+  test ran past its 30 seconds on CI's busy runner. axe now leaves out what passes, most of its
+  time, in the themes' check and in `hatti theme check`.
+* 5115 tests (78 more, the same pages).
+
 ### 41c7ac9 · Partners' themes checked for accessibility
 
 * **`hatti theme check`** reads a theme's pages through its preview with axe, in English and

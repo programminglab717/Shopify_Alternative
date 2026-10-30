@@ -116,6 +116,8 @@ async function violationsOf(html: string): Promise<Omit<ThemeCheckProblem, 'page
     const { violations } = await inside.run(window.document as unknown as axe.ElementContext, {
       rules: NOT_JUDGED,
       iframes: false,
+      // What passes is not needed, and is most of axe's time.
+      resultTypes: ['violations'],
     });
     return violations.map((each) => ({
       rule: each.id,

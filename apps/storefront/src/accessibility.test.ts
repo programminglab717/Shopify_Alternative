@@ -2,13 +2,14 @@ import axe from 'axe-core';
 import { Window } from 'happy-dom';
 import { MemoryStore } from '@hatti/storefront-data';
 import { platformTheme, platformThemes } from '@hatti/themes';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import { PageRenderer, type PageRequest } from './render.js';
 
 // Shoppers' pages checked for accessibility (design §8), as the admin's screens are (ADR-966):
 // each platform theme's pages, as a shop's sample catalogue renders them, read by axe, in English
-// and in Urdu, right to left.
+// and in Urdu, right to left. Each page is a test of its own: axe takes a second or so on one, and
+// a theme's fourteen together ran past a test's time on a busy machine.
 
 /** Rules a page without its stylesheet cannot be judged by, as the admin's tests leave them. */
 const NOT_JUDGED = {
@@ -45,6 +46,8 @@ async function problemsOf(html: string): Promise<string[]> {
   const { violations } = await inside.run(window.document as unknown as axe.ElementContext, {
     rules: NOT_JUDGED,
     iframes: false,
+    // What passes is not needed, and is most of axe's time.
+    resultTypes: ['violations'],
   });
   await window.happyDOM.close();
   return violations.map(
@@ -64,22 +67,23 @@ describe("Shoppers' pages, accessible in every platform theme (ADR-967)", async 
   });
 
   for (const handle of themes) {
-    it(`renders ${handle}'s pages, in English and in Urdu, breaking no rule`, async () => {
-      const renderer = new PageRenderer(await platformTheme(handle), {
-        limits: { timeMs: 10_000 },
-      });
+    describe(handle, () => {
+      let renderer: PageRenderer;
       const store = new MemoryStore(sampleStore());
-      const found: string[] = [];
+
+      beforeAll(async () => {
+        renderer = new PageRenderer(await platformTheme(handle), { limits: { timeMs: 10_000 } });
+      });
+
       for (const locale of ['en', 'ur'] as const) {
         for (const request of PAGES) {
-          const page = await renderer.render({ ...request, locale }, store.fresh(0));
-          expect(page.status, `${locale} ${request.path}`).toBe(200);
-          for (const problem of await problemsOf(page.html)) {
-            found.push(`${locale} ${request.path}: ${problem}`);
-          }
+          it(`renders ${locale} ${request.path} breaking no rule`, async () => {
+            const page = await renderer.render({ ...request, locale }, store.fresh(0));
+            expect(page.status).toBe(200);
+            expect(await problemsOf(page.html)).toEqual([]);
+          });
         }
       }
-      expect(found).toEqual([]);
     });
   }
 });
