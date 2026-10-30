@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-969 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-970 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -977,6 +977,7 @@
 | 967 | Shoppers' pages in every platform theme, and checkout, are checked with axe | Accepted |
 | 968 | hatti theme check reads a theme's pages through its preview with axe | Accepted |
 | 969 | A shop keeps a wholesale customer it knows well out of payment terms reminders | Accepted |
+| 970 | A running theme experiment takes a draft more as its next arm, or has one taken out | Accepted |
 
 ---
 
@@ -31256,7 +31257,7 @@
     Quiet (%)", and Change shares, with a line saying those already shown a theme keep it.
 * **Consequences:**
   * A shop can lean into a draft that is doing well, or ease off one, without starting over.
-  * Not yet: a draft added to, or taken out of, a running experiment.
+  * Not yet: a draft added to, or taken out of, a running experiment (built, ADR-970).
 
 ## ADR-959 · The Storefront API's nodes gives pages, blogs and articles by their IDs too
 
@@ -31498,3 +31499,30 @@
   * A shop keeps reminders for those who need them.
   * Not yet: reminders by customer at other intervals, and a customer's own choice from their
     order page.
+
+## ADR-970 · A running theme experiment takes a draft more as its next arm, or has one taken out
+
+* **Context:** a theme experiment's drafts (ADR-931) were fixed at its start; its shares could
+  change (ADR-958), but a shop with a new idea had to end it, losing its counts, and one that
+  saw a draft it no longer wanted could only wait for Hatti to stop it if it sold clearly worse
+  (ADR-939). ADR-958 left both as not yet.
+* **Decision:**
+  * **`themeExperimentDraftAdd(id, themeId, share)`** adds a draft as the experiment's next
+    arm, c or d, shown `share` percent of the shoppers still to come: three drafts at most, not
+    the live theme nor one it shows already, the live theme shown to no fewer shoppers than any
+    draft, as at its start. Its counts begin at none; the confidence each verdict needs is split
+    among the drafts it now shows, as ADR-931 does.
+  * **`themeExperimentDraftTakeOut(id, themeId)`** stops the draft's arm as Hatti stops one that
+    sells clearly worse (ADR-939): its shoppers see the live theme from then, counted in no arm,
+    its counts kept as they were, the others going on. `taken_out_arms` (migration 0429) names
+    the arms the shop took out, so the admin and `ThemeExperimentDraft.takenOut` say so;
+    `stopped` stays Hatti's own. With no draft left showing, the experiment ends as the shop
+    ending it does.
+  * Arms keep their letters, so the shoppers' cookies and each arm's counts stay as they were.
+  * **The admin's running experiment** has "Take … out" for each draft still showing, and "Add a
+    draft" with its share while it shows fewer than three; both are in the shop's activity log.
+* **Consequences:**
+  * A shop tries a new idea without starting over.
+  * A draft added late is compared with the live theme's sessions since the experiment began,
+    not only since it joined; the admin says it needs time to catch up.
+  * Not yet: a draft taken out let back in.
