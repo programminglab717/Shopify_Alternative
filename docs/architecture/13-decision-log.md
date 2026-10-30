@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-963 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-964 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -971,6 +971,7 @@
 | 961 | The headless starter shows the products viewed before, on each product's page and the home page, kept by the shopper's browser alone | Accepted |
 | 962 | Shoppers download, or ask to erase, their own data through the Storefront API, as their account page lets them | Accepted |
 | 963 | The headless starter's account page lets shoppers download or ask to erase their own data | Accepted |
+| 964 | A shop chooses how often, and how many times, overdue payment terms are reminded | Accepted |
 
 ---
 
@@ -31348,3 +31349,26 @@
 * **Consequences:**
   * A headless shop built on the starter offers its shoppers their data rights from the start.
   * Not yet: the file's link shown on the page, rather than followed at once.
+
+## ADR-964 · A shop chooses how often, and how many times, overdue payment terms are reminded
+
+* **Context:** ADR-954 reminds a customer still owing on payment terms past the date every week,
+  four times at most. A shop whose resellers pay within days wants them reminded sooner; one
+  that phones its customers itself after the first wants one reminder alone. ADR-954 left the
+  choice to the shop for later.
+* **Decision:**
+  * **Migration 0426** adds two order settings: the days between reminders past the date, 1 to
+    30, a week by default; and how many are sent past it, 1 to 4, four by default, as ADR-954
+    had them.
+  * **The sweep reads them per shop**, in the shop's own transaction: each order is reminded
+    again once that many days have passed since its last, until it has had that many past its
+    date. The worker leaves out a shop whose orders have all had theirs, so a shop with fewer
+    is not swept for nothing.
+  * **`orderSettings` and `orderSettingsUpdate`** give and take `termsReminderDays` and
+    `termsOverdueReminders`; the change is recorded as the other order settings are.
+  * **Admin:** Settings › Order policies has "Payment terms reminders": the days between them,
+    and how many past the date.
+  * The reminder before the date stays three days before it at most.
+* **Consequences:**
+  * Each shop chases its late payers as its trade does, without staff doing it by hand.
+  * Not yet: the days before the date chosen by the shop.
