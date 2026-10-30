@@ -627,8 +627,8 @@ function ProductMargins({
 }
 
 /**
- * Margins by product type or vendor (ADR-971), after a product's own and its collection's, a
- * type's before a vendor's: twenty at most.
+ * Margins by product type, vendor (ADR-971) or tag (ADR-976), after a product's own and its
+ * collection's, a type's before a vendor's and a vendor's before a tag's: twenty at most.
  */
 function GroupMargins({
   store,
@@ -649,7 +649,7 @@ function GroupMargins({
   );
   const change = (at: number, row: Partial<(typeof rows)[number]>) =>
     setRows(rows.map((each, index) => (index === at ? { ...each, ...row } : each)));
-  const kinds = (['PRODUCT_TYPE', 'VENDOR'] as const).map((value) => ({
+  const kinds = (['PRODUCT_TYPE', 'VENDOR', 'TAG'] as const).map((value) => ({
     value,
     label: t(`expansion.groupBy.${value}`),
   }));

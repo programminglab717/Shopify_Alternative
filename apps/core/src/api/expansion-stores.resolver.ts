@@ -95,14 +95,17 @@ export class ExpansionProductMargin {
 
 @ObjectType({
   description:
-    "A product type's or a vendor's products put a margin of their own over an expansion store's " +
-    "rate, after a product's own and its collections', before the store's (ADR-971).",
+    "A product type's, vendor's or tag's products put a margin of their own over an expansion " +
+    "store's rate, after a product's own and its collections', before the store's (ADR-971, " +
+    'ADR-976).',
 })
 export class ExpansionGroupMargin {
-  @Field({ description: 'PRODUCT_TYPE or VENDOR.' })
+  @Field({ description: 'PRODUCT_TYPE, VENDOR or TAG (ADR-976).' })
   by!: string;
 
-  @Field({ description: 'The product type or vendor, as products give it, letter case aside.' })
+  @Field({
+    description: 'The product type, vendor or tag, as products give it, letter case aside.',
+  })
   value!: string;
 
   @Field(() => Int)
@@ -111,10 +114,10 @@ export class ExpansionGroupMargin {
 
 @InputType()
 export class ExpansionGroupMarginInput {
-  @Field({ description: 'PRODUCT_TYPE or VENDOR.' })
+  @Field({ description: 'PRODUCT_TYPE, VENDOR or TAG (ADR-976).' })
   by!: string;
 
-  @Field({ description: 'The product type or vendor.' })
+  @Field({ description: 'The product type, vendor or tag.' })
   value!: string;
 
   @Field(() => Int, { description: 'A whole percent, 0 to 100.' })
@@ -202,8 +205,9 @@ export class ExpansionStore {
 
   @Field(() => [ExpansionGroupMargin], {
     description:
-      'Product types and vendors whose products are put a margin of their own over its rate, ' +
-      "after a product's own and its collections', a type's before a vendor's (ADR-971).",
+      'Product types, vendors and tags whose products are put a margin of their own over its ' +
+      "rate, after a product's own and its collections', a type's before a vendor's and a " +
+      "vendor's before a tag's (ADR-971, ADR-976).",
   })
   groupMargins!: ExpansionGroupMargin[];
 
@@ -674,9 +678,11 @@ export class ExpansionStoreResolver {
 
   @Mutation(() => ExpansionStorePayload, {
     description:
-      "Gives this shop's products of each product type or vendor listed a margin of their own " +
+      "Gives this shop's products of each product type, vendor or tag (ADR-976) listed a margin of " +
+      'their own ' +
       "over the expansion store's rate (ADR-971), after a product's own and its collections', " +
-      "before the store's; a product's type's before its vendor's. Twenty at most; none takes " +
+      "before the store's; a product's type's before its vendor's, its vendor's before its tags'. " +
+      'Twenty at most; none takes ' +
       'them away. Copying as products change copies them again. The owner alone, of both shops, ' +
       'having signed in lately.',
   })

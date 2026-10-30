@@ -302,26 +302,32 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
     expect(sentOf(fake, 'Products')[0]).toEqual({ first: 10, query: 'sofa' });
   });
 
-  it('gives a product type and a vendor a margin of their own (ADR-971)', async () => {
+  it('gives a product type, a vendor and a tag a margin of their own (ADR-971, ADR-976)', async () => {
     const fake = core();
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/settings/expansion-stores');
     await screen.findByLabelText('Price rate');
     type('Price rate', '0.0036');
     fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
-    const add = await screen.findByRole('button', { name: 'Add a product type or vendor' });
+    const add = await screen.findByRole('button', { name: 'Add a product type, vendor or tag' });
     fireEvent.click(add);
     fireEvent.click(add);
-    const [, vendor] = screen.getAllByLabelText('Of') as HTMLSelectElement[];
+    fireEvent.click(add);
+    const [, vendor, tag] = screen.getAllByLabelText('Of') as HTMLSelectElement[];
     fireEvent.change(vendor!, { target: { value: 'VENDOR' } });
-    const [furniture, gul] = screen.getAllByLabelText('Product type or vendor');
+    fireEvent.change(tag!, { target: { value: 'TAG' } });
+    const [furniture, gul, bridal] = screen.getAllByLabelText('Product type, vendor or tag');
     fireEvent.change(furniture!, { target: { value: ' Furniture ' } });
     fireEvent.change(gul!, { target: { value: 'Gul Ahmed' } });
-    const [first, second] = screen.getAllByLabelText('Margin (%)');
+    fireEvent.change(bridal!, { target: { value: 'bridal' } });
+    const [first, second, third] = screen.getAllByLabelText('Margin (%)');
     fireEvent.change(first!, { target: { value: '40' } });
     fireEvent.change(second!, { target: { value: '15' } });
+    fireEvent.change(third!, { target: { value: '25' } });
     fireEvent.click(
-      screen.getByRole('button', { name: "Save Zari Abroad's margins by product type and vendor" }),
+      screen.getByRole('button', {
+        name: "Save Zari Abroad's margins by product type, vendor and tag",
+      }),
     );
     await waitFor(() =>
       expect(sentOf(fake, 'ExpansionStoreGroupMarginsSet')).toEqual([
@@ -330,12 +336,13 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
           margins: [
             { by: 'PRODUCT_TYPE', value: 'Furniture', marginPercent: 40 },
             { by: 'VENDOR', value: 'Gul Ahmed', marginPercent: 15 },
+            { by: 'TAG', value: 'bridal', marginPercent: 25 },
           ],
         },
       ]),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Remove the margin of Gul Ahmed' }));
-    expect(screen.getAllByLabelText('Product type or vendor')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Product type, vendor or tag')).toHaveLength(2);
   });
 
   it("shows each store's sales on one page, and all of them together in rupees (ADR-932)", async () => {

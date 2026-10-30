@@ -288,7 +288,7 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
         await value(
           owner.token,
           zari,
-          'mutation ($id: ID!) { productUpdate(input: { id: $id, productType: "Kurtas", vendor: "Zari" }) { userErrors { message } } }',
+          'mutation ($id: ID!) { productUpdate(input: { id: $id, productType: "Kurtas", vendor: "Zari", tags: ["Eid", "Lawn"] }) { userErrors { message } } }',
           { id: kurta },
         )
       ).userErrors,
@@ -304,7 +304,7 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       });
     expect(
       (await groupMargins([{ by: 'COLOUR', value: 'Red', marginPercent: 5 }])).userErrors,
-    ).toEqual([{ field: ['margins', '0', 'by'], message: 'Choose a product type or vendor' }]);
+    ).toEqual([{ field: ['margins', '0', 'by'], message: 'Choose a product type, vendor or tag' }]);
     expect(
       (
         await groupMargins([
@@ -312,7 +312,9 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
           { by: 'VENDOR', value: ' zari ', marginPercent: 10 },
         ])
       ).userErrors,
-    ).toEqual([{ field: ['margins'], message: 'Give each product type and vendor one margin' }]);
+    ).toEqual([
+      { field: ['margins'], message: 'Give each product type, vendor and tag one margin' },
+    ]);
     expect(
       (
         await groupMargins([
@@ -341,6 +343,16 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
     expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
       { price: { amount: '14.99', currencyCode: 'USD' } },
+    ]);
+    // Its tag's after its vendor's (ADR-976), the first in the list it has: 60%, $16.99.
+    await groupMargins([
+      { by: 'TAG', value: 'winter', marginPercent: 90 },
+      { by: 'TAG', value: 'lawn', marginPercent: 60 },
+      { by: 'TAG', value: 'EID', marginPercent: 70 },
+    ]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '16.99', currencyCode: 'USD' } },
     ]);
     await groupMargins([]);
     // None: the store's own margin again.

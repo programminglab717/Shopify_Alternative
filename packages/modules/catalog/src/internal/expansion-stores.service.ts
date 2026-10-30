@@ -16,9 +16,9 @@ export const EXPANSION_STORE_LIMITS = {
   collectionMargins: 10,
   /** Products given a margin of their own (ADR-960). */
   productMargins: 25,
-  /** Product types and vendors given a margin of their own (ADR-971). */
+  /** Product types, vendors and tags given a margin of their own (ADR-971, ADR-976). */
   groupMargins: 20,
-  /** The longest product type or vendor, as products keep them. */
+  /** The longest product type, vendor or tag, as products keep them. */
   groupName: 255,
 } as const;
 
@@ -34,8 +34,8 @@ export interface ExpansionProductMargin {
   marginPercent: number;
 }
 
-/** What a margin by product type or vendor matches (ADR-971). */
-export const EXPANSION_GROUP_KINDS = ['product_type', 'vendor'] as const;
+/** What a margin by product type, vendor (ADR-971) or tag (ADR-976) matches. */
+export const EXPANSION_GROUP_KINDS = ['product_type', 'vendor', 'tag'] as const;
 export type ExpansionGroupKind = (typeof EXPANSION_GROUP_KINDS)[number];
 
 /**
@@ -432,8 +432,9 @@ export class ExpansionStoreService {
   /**
    * Gives the shop's products of each product type or vendor of `margins` a margin of their own
    * over `targetShopId`'s rate (ADR-971), after a product's own and its collections', before the
-   * store's: a product of a type given one takes its type's before its vendor's. Twenty at most,
-   * each type or vendor once, letter case aside; none takes them all away. A type or vendor no
+   * store's: a product of a type given one takes its type's before its vendor's, and its vendor's
+   * before its tags' (ADR-976), the first tag in the list it has. Twenty at most, each type,
+   * vendor or tag once, letter case aside; none takes them all away. A type or vendor no
    * product has yet is kept, for the products to come.
    */
   async setGroupMargins(
@@ -446,20 +447,24 @@ export class ExpansionStoreService {
       return failOne(
         ['margins'],
         'INVALID',
-        `${most.groupMargins} product types and vendors at most have a margin of their own`,
+        `${most.groupMargins} product types, vendors and tags at most have a margin of their own`,
       );
     }
     const kept: ExpansionGroupMargin[] = [];
     for (const [at, margin] of margins.entries()) {
       const value = margin.value.trim();
       if (!EXPANSION_GROUP_KINDS.includes(margin.by)) {
-        return failOne(['margins', String(at), 'by'], 'INVALID', 'Choose a product type or vendor');
+        return failOne(
+          ['margins', String(at), 'by'],
+          'INVALID',
+          'Choose a product type, vendor or tag',
+        );
       }
       if (value === '' || value.length > most.groupName) {
         return failOne(
           ['margins', String(at), 'value'],
           'INVALID',
-          `Name the product type or vendor, ${most.groupName} characters at most`,
+          `Name the product type, vendor or tag, ${most.groupName} characters at most`,
         );
       }
       const percent = margin.marginPercent;
@@ -475,7 +480,7 @@ export class ExpansionStoreService {
           (each) => each.by === margin.by && each.value.toLowerCase() === value.toLowerCase(),
         )
       ) {
-        return failOne(['margins'], 'INVALID', 'Give each product type and vendor one margin');
+        return failOne(['margins'], 'INVALID', 'Give each product type, vendor and tag one margin');
       }
       kept.push({ by: margin.by, value, marginPercent: percent });
     }
@@ -658,8 +663,9 @@ export class ExpansionStoreService {
 }
 
 /**
- * The margin of each product of the shop's whose type or vendor `margins` give one (ADR-971), by
- * its handle, in the caller's transaction: its type's before its vendor's, letter case aside.
+ * The margin of each product of the shop's whose type, vendor (ADR-971) or tags (ADR-976)
+ * `margins` give one, by its handle, in the caller's transaction: its type's before its vendor's,
+ * its vendor's before its tags', the first of its tags in `margins`' order; letter case aside.
  */
 async function groupMarginsByHandleIn(
   tx: Tx,
@@ -674,20 +680,27 @@ async function groupMarginsByHandleIn(
     );
   const types = of('product_type');
   const vendors = of('vendor');
+  const tags = of('tag');
   const { rows } = await tx.execute<{
     handle: string;
     product_type: string | null;
     vendor: string | null;
+    tags: string[];
   }>(sql`
-    SELECT handle, product_type, vendor FROM catalog.products
+    SELECT handle, product_type, vendor, tags FROM catalog.products
      WHERE shop_id = ${shopId}
        AND (lower(btrim(product_type)) = ANY(${sql.param([...types.keys()])}::text[])
-            OR lower(btrim(vendor)) = ANY(${sql.param([...vendors.keys()])}::text[]))`);
+            OR lower(btrim(vendor)) = ANY(${sql.param([...vendors.keys()])}::text[])
+            OR EXISTS (SELECT 1 FROM unnest(tags) AS tag
+                        WHERE lower(btrim(tag)) = ANY(${sql.param([...tags.keys()])}::text[])))`);
   const chosen = new Map<string, number>();
   for (const row of rows) {
+    const own = new Set(row.tags.map((tag) => tag.trim().toLowerCase()));
+    const tagged = [...tags].find(([tag]) => own.has(tag))?.[1];
     const percent =
       types.get(row.product_type?.trim().toLowerCase() ?? '') ??
-      vendors.get(row.vendor?.trim().toLowerCase() ?? '');
+      vendors.get(row.vendor?.trim().toLowerCase() ?? '') ??
+      tagged;
     if (percent !== undefined) chosen.set(row.handle, percent);
   }
   return chosen;

@@ -4869,13 +4869,13 @@ export interface ExpansionStore {
   collectionMargins: { collectionId: string; collectionTitle: string; marginPercent: number }[];
   /** Products with a margin of their own, before their collections' (ADR-960). */
   productMargins: { productId: string; productTitle: string; marginPercent: number }[];
-  /** Product types and vendors with a margin of their own, after collections' (ADR-971). */
+  /** Product types, vendors and tags with a margin of their own, after collections' (ADR-971). */
   groupMargins: ExpansionGroupMargin[];
 }
 
-/** A product type's or vendor's margin over an expansion store's rate (ADR-971). */
+/** A product type's, vendor's or tag's margin over an expansion store's rate (ADR-971, ADR-976). */
 export interface ExpansionGroupMargin {
-  by: 'PRODUCT_TYPE' | 'VENDOR';
+  by: 'PRODUCT_TYPE' | 'VENDOR' | 'TAG';
   value: string;
   marginPercent: number;
 }
