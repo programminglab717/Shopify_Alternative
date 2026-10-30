@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Margins abroad by product type and vendor
+### d682b9f · Margins abroad by product type and vendor
 
 * **An expansion store's margin by product type or vendor**, after a product's own and its
   collection's, from the admin ([ADR-971](../architecture/13-decision-log.md#adr-971--an-expansion-stores-margin-by-product-type-or-vendor)).
