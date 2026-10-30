@@ -6330,7 +6330,7 @@ type ExpansionStoreSales {
   totalSales: Money!
 
   """
-  Its total sales in this shop's currency at the day's rate from the currency feed; null where the feed has no rate for its currency.
+  Its total sales in this shop's currency: its periods', each at its first day's rate from the currency feed (ADR-974); null where the feed has no rate for its currency.
   """
   totalSalesHere: Money
 }
@@ -6349,7 +6349,7 @@ type ExpansionStoreSalesPeriod {
   totalSales: Money!
 
   """
-  Its total sales in this shop's currency at the day's rate, as the store's; null where the feed has no rate for its currency.
+  Its total sales in this shop's currency at its first day's rate (ADR-974), the last the feed gave on or before it; null where the feed has no rate for its currency.
   """
   totalSalesHere: Money
 }
@@ -17693,7 +17693,7 @@ type Query {
   drops: [Drop!]!
 
   """
-  What this shop and each of its expansion stores sold in a period, on one page (ADR-932): each in its own currency and in this shop's at the day's rate, this shop first, then the stores the owner still owns, oldest first, each by day, week or month in this shop’s time (ADR-955). 366 days at most. The owner alone.
+  What this shop and each of its expansion stores sold in a period, on one page (ADR-932): each in its own currency and in this shop's, each period at its first day's rate (ADR-974), this shop first, then the stores the owner still owns, oldest first, each by day, week or month in this shop’s time (ADR-955). 366 days at most. The owner alone.
   """
   expansionStoreSales(
     """How `periods` divide the period."""

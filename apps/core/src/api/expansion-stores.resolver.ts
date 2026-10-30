@@ -29,7 +29,12 @@ import {
   type SalesIntervalValue,
 } from '@hatti/orders/public';
 import { ExpansionCopier } from '../expansion-copier.js';
-import { convertBetween, dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
+import {
+  convertBetween,
+  dayRateBetween,
+  rupeeRatesByDayIn,
+  rupeeRatesIn,
+} from '../expansion-rates.js';
 import {
   Args,
   Field,
@@ -230,8 +235,8 @@ export class ExpansionStoreSalesPeriod {
   @Field(() => Money, {
     nullable: true,
     description:
-      "Its total sales in this shop's currency at the day's rate, as the store's; null where " +
-      'the feed has no rate for its currency.',
+      "Its total sales in this shop's currency at its first day's rate (ADR-974), the last the " +
+      'feed gave on or before it; null where the feed has no rate for its currency.',
   })
   totalSalesHere!: Money | null;
 }
@@ -266,8 +271,8 @@ export class ExpansionStoreSales {
   @Field(() => Money, {
     nullable: true,
     description:
-      "Its total sales in this shop's currency at the day's rate from the currency feed; null " +
-      'where the feed has no rate for its currency.',
+      "Its total sales in this shop's currency: its periods', each at its first day's rate from " +
+      'the currency feed (ADR-974); null where the feed has no rate for its currency.',
   })
   totalSalesHere!: Money | null;
 
@@ -316,7 +321,8 @@ export class ExpansionStoreResolver {
   @Query(() => [ExpansionStoreSales], {
     description:
       'What this shop and each of its expansion stores sold in a period, on one page (ADR-932): ' +
-      "each in its own currency and in this shop's at the day's rate, this shop first, then the " +
+      "each in its own currency and in this shop's, each period at its first day's rate " +
+      '(ADR-974), this shop first, then the ' +
       'stores the owner still owns, oldest first, each by day, week or month in this shop’s time ' +
       '(ADR-955). 366 days at most. The owner alone.',
   })
@@ -339,11 +345,19 @@ export class ExpansionStoreResolver {
       if (await this.copier.owns(actor.userId, record.targetShopId))
         shops.push(record.targetShopId);
     }
-    const [rates, { timezone }] = await this.db.tenant(tenant.shopId, async (tx) => [
-      await rupeeRatesIn(tx),
-      await shopProfile(tx, tenant.shopId),
-    ]);
+    const { timezone } = await this.db.tenant(tenant.shopId, (tx) =>
+      shopProfile(tx, tenant.shopId),
+    );
+    // Each period at the rate of its first day, in this shop's time (ADR-974).
+    const dayOf = (at: Date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(at);
     const rows: ExpansionStoreSales[] = [];
+    let ratesOn: ((day: string) => Map<string, bigint>) | null = null;
     for (const shopId of shops) {
       // Each store's days are this shop's, for one chart of them all.
       const periods = await this.#sales.periodsOf(
@@ -358,12 +372,25 @@ export class ExpansionStoreResolver {
       if (!periods.ok) throw badUserInput(periods.errors[0]!.message);
       const profile = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
       const currency = isCurrencyCode(profile.currency) ? profile.currency : 'PKR';
+      // Every store's periods are the same: their days' rates are read once.
+      ratesOn ??= await this.db.tenant(tenant.shopId, (tx) =>
+        rupeeRatesByDayIn(
+          tx,
+          periods.value.map((period) => dayOf(period.start)),
+        ),
+      );
+      const rates = ratesOn;
       const totals = tallyOf(periods.value);
       const total = totalSales(totals);
-      const hereOf = (amount: bigint) => {
-        const converted = convertBetween(rates, amount, currency, tenant.currency);
-        return converted === null ? null : Money.from(money(converted, tenant.currency));
-      };
+      const convertedOf = (amount: bigint, start: Date) =>
+        convertBetween(rates(dayOf(start)), amount, currency, tenant.currency);
+      const heres = periods.value.map((period) => convertedOf(totalSales(period), period.start));
+      const here = (amount: bigint | null) =>
+        amount === null ? null : Money.from(money(amount, tenant.currency));
+      // The whole period's is its periods', each at its own day's rate.
+      const totalHere = heres.some((each) => each === null)
+        ? null
+        : heres.reduce<bigint>((sum, each) => sum + each!, 0n);
       rows.push(
         Object.assign(new ExpansionStoreSales(), {
           shopId: toPublicId('shop', shopId),
@@ -373,13 +400,13 @@ export class ExpansionStoreResolver {
           orders: totals.orders,
           netSales: Money.from(money(netSales(totals), currency)),
           totalSales: Money.from(money(total, currency)),
-          totalSalesHere: hereOf(total),
-          periods: periods.value.map((period) =>
+          totalSalesHere: here(totalHere),
+          periods: periods.value.map((period, at) =>
             Object.assign(new ExpansionStoreSalesPeriod(), {
               start: period.start,
               orders: period.orders,
               totalSales: Money.from(money(totalSales(period), currency)),
-              totalSalesHere: hereOf(totalSales(period)),
+              totalSalesHere: here(heres[at]!),
             }),
           ),
         }),

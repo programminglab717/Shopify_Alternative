@@ -19,6 +19,39 @@ export async function rupeeRatesIn(tx: Tx): Promise<Map<string, bigint>> {
 }
 
 /**
+ * Rupees for one unit of each currency on each of `days` (ADR-974), as `YYYY-MM-DD`: the rate
+ * the feed gave that day, or the last before it; today's, from {@link rupeeRatesIn}, for a
+ * currency whose history begins after it. One read, however many days.
+ */
+export async function rupeeRatesByDayIn(
+  tx: Tx,
+  days: readonly string[],
+): Promise<(day: string) => Map<string, bigint>> {
+  const today = await rupeeRatesIn(tx);
+  if (days.length === 0) return () => today;
+  const last = [...days].sort().at(-1)!;
+  const { rows } = await tx.execute<{ currency: string; rate_date: string; rate: string }>(sql`
+    SELECT currency, rate_date::text AS rate_date, rate::text AS rate
+      FROM platform.currency_rate_history
+     WHERE rate_date <= ${last}::date
+     ORDER BY currency, rate_date`);
+  const byDay = new Map<string, Map<string, bigint>>();
+  return (day) => {
+    let rates = byDay.get(day);
+    if (!rates) {
+      rates = new Map(today);
+      // Ordered by currency, then day: each currency's last on or before `day` is kept.
+      for (const row of rows) {
+        const rate = row.rate_date <= day ? parseRate(row.rate) : null;
+        if (rate) rates.set(row.currency, rate);
+      }
+      byDay.set(day, rates);
+    }
+    return rates;
+  };
+}
+
+/**
  * The day's rate from `from` to `to`, as an expansion store's rate is written, six decimals at
  * most: "0.01308" from rupees to dirhams; null where the feed gives no rate for either, or it
  * comes to nothing.

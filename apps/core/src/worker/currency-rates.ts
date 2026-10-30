@@ -74,6 +74,13 @@ export class CurrencyRates {
              SET rate = excluded.rate, rate_date = excluded.rate_date,
                  fetched_at = excluded.fetched_at`),
       );
+      // Kept by its day too, for sales of that day put in another currency (ADR-974).
+      await this.database.system((tx) =>
+        tx.execute(sql`
+          INSERT INTO platform.currency_rate_history (currency, rate_date, rate)
+          VALUES (${currency}, ${day}::date, ${formatRate(rate)}::numeric)
+          ON CONFLICT (currency, rate_date) DO UPDATE SET rate = excluded.rate`),
+      );
       changed.push(currency);
     }
     if (changed.length === 0) return changed;

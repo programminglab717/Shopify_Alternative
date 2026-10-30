@@ -543,20 +543,32 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
        VALUES ('AED', 76.4521, current_date, now())
        ON CONFLICT (currency) DO UPDATE SET rate = excluded.rate`,
     );
-    /** An order of `total` minor units in `shop`'s currency, placed now. */
-    const order = async (shop: string, currency: string, total: number) => {
+    // As the feed keeps it by its day too (ADR-974), the rates before forgotten.
+    await admin.query(`DELETE FROM platform.currency_rate_history WHERE currency = 'AED'`);
+    await admin.query(
+      `INSERT INTO platform.currency_rate_history (currency, rate_date, rate)
+       VALUES ('AED', current_date, 76.4521)`,
+    );
+    /** An order of `total` minor units in `shop`'s currency, placed now, each its own number. */
+    let number = 1001;
+    const order = async (
+      shop: string,
+      currency: string,
+      total: number,
+      phone = '+923001234567',
+    ) => {
       const customer = newId();
       const id = newId();
       // A customer and their number at once, as each must name the other.
       await admin.query('BEGIN');
       await admin.query(
-        `INSERT INTO customers.customers (shop_id, id, phone) VALUES ($1, $2, '+923001234567')`,
-        [shop, customer],
+        `INSERT INTO customers.customers (shop_id, id, phone) VALUES ($1, $2, $3)`,
+        [shop, customer, phone],
       );
       await admin.query(
         `INSERT INTO customers.customer_phones (shop_id, phone, customer_id)
-         VALUES ($1, '+923001234567', $2)`,
-        [shop, customer],
+         VALUES ($1, $3, $2)`,
+        [shop, customer, phone],
       );
       await admin.query('COMMIT');
       await admin.query(
@@ -564,9 +576,9 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
            (shop_id, id, number, source, confirmation_status, financial_status, stage,
             payment_method, currency, subtotal, discount, shipping, total, amount_paid, cod_amount,
             phone, shipping_address, location_id, customer_id)
-         VALUES ($1, $2, 1001, 'online_store', 'pending', 'pending', 'needs_confirmation',
-                 'cash_on_delivery', $3, $4, 0, 0, $4, 0, $4, '+923001234567', '{}', $5, $6)`,
-        [shop, id, currency, total, newId(), customer],
+         VALUES ($1, $2, $8, 'online_store', 'pending', 'pending', 'needs_confirmation',
+                 'cash_on_delivery', $3, $4, 0, 0, $4, 0, $4, $7, '{}', $5, $6)`,
+        [shop, id, currency, total, newId(), customer, phone, number++],
       );
       await admin.query(
         `INSERT INTO orders.lines
@@ -655,6 +667,38 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
         totalSalesHere: { amount: '100.00', currencyCode: 'AED' },
       }),
     ]);
+    // Each day at its own rate (ADR-974): yesterday's dirham was Rs 75, so an order of AED 10
+    // yesterday is Rs 750, and the period's total is its days', each at its rate.
+    const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(
+      new Date(today - day),
+    );
+    await admin.query(
+      `INSERT INTO platform.currency_rate_history (currency, rate_date, rate)
+       VALUES ('AED', $1::date, 75.0000), ('AED', current_date, 76.4521)
+       ON CONFLICT (currency, rate_date) DO UPDATE SET rate = excluded.rate`,
+      [yesterday],
+    );
+    await order(dubai, 'AED', 1_000, '+923001234568');
+    await admin.query(
+      `UPDATE orders.orders SET created_at = $2 WHERE shop_id = $1 AND total = 1000`,
+      [dubai, new Date(today - day / 2).toISOString()],
+    );
+    const TOTALS = `query ($from: DateTime!, $before: DateTime!) {
+      expansionStoreSales(placedFrom: $from, placedBefore: $before, interval: DAY) {
+        name totalSalesHere { amount } periods { totalSalesHere { amount } } } }`;
+    const [, dubaiDays] = (await value(owner.token, lahore, TOTALS, {
+      from: new Date(today - day).toISOString(),
+      before: new Date(today + day).toISOString(),
+    })) as {
+      totalSalesHere: { amount: string };
+      periods: { totalSalesHere: { amount: string } }[];
+    }[];
+    expect(dubaiDays!.periods.map((each) => each.totalSalesHere.amount)).toEqual([
+      '750.00',
+      '7645.21',
+    ]);
+    expect(dubaiDays!.totalSalesHere.amount).toBe('8395.21');
+
     // Staff but the owner see none of it.
     const manager = await account([[lahore, 'manager']]);
     const refused = await data(manager.token, lahore, SALES, period);
