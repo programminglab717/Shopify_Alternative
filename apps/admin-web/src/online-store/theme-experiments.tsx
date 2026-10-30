@@ -2,6 +2,8 @@ import { FlaskConical } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  ThemeExperimentDraftAddMutation,
+  ThemeExperimentDraftTakeOutMutation,
   ThemeExperimentEndMutation,
   ThemeExperimentSharesSetMutation,
   ThemeExperimentStartMutation,
@@ -119,7 +121,12 @@ export function ThemeExperiments({ themes }: { themes: readonly OnlineStoreTheme
         ) : running ? (
           <>
             <Results experiment={running} themeName={themeName} />
-            <ChangeShares experiment={running} themeName={themeName} />
+            <ChangeShares
+              key={(running.drafts ?? []).map((draft) => draft.themeId).join()}
+              experiment={running}
+              themeName={themeName}
+            />
+            <ChangeDrafts experiment={running} themes={drafts} themeName={themeName} />
             <Button
               variant="danger"
               className="self-start"
@@ -231,7 +238,7 @@ function ChangeShares({
   );
   const drafts = experiment.drafts?.length
     ? experiment.drafts
-    : [{ themeId: experiment.themeId, share: experiment.share, stopped: false }];
+    : [{ themeId: experiment.themeId, share: experiment.share, stopped: false, takenOut: false }];
   const kept = drafts.map((draft) => String(draft.share ?? experiment.share));
   const [shares, setShares] = useState(kept);
   const [problem, setProblem] = useState<string | null>(null);
@@ -256,7 +263,7 @@ function ChangeShares({
     <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-2">
       <div className="grid gap-3 sm:grid-cols-3">
         {drafts.map((draft, at) =>
-          draft.stopped ? null : (
+          draft.stopped || draft.takenOut ? null : (
             <TextField
               key={draft.themeId}
               label={t('experiments.draftShare', { name: themeName(draft.themeId) })}
@@ -284,6 +291,104 @@ function ChangeShares({
       </Button>
       {problem && <Alert tone="danger">{problem}</Alert>}
     </form>
+  );
+}
+
+/**
+ * Drafts added to the running experiment, as its next arm, or taken out of it, the others going
+ * on (ADR-970). Three drafts at most; with none left showing, it ends.
+ */
+function ChangeDrafts({
+  experiment,
+  themes,
+  themeName,
+}: {
+  experiment: ThemeExperiment;
+  themes: readonly OnlineStoreTheme[];
+  themeName: (id: string) => string;
+}) {
+  const { t } = useLocale();
+  const add = useAdminMutation<
+    ThemeExperimentPayloadData,
+    { id: string; themeId: string; share: number }
+  >(ThemeExperimentDraftAddMutation);
+  const takeOut = useAdminMutation<ThemeExperimentPayloadData, { id: string; themeId: string }>(
+    ThemeExperimentDraftTakeOutMutation,
+  );
+  const shown = experiment.drafts?.length
+    ? experiment.drafts
+    : [{ themeId: experiment.themeId, stopped: false, takenOut: false }];
+  const others = themes.filter((theme) => !shown.some((draft) => draft.themeId === theme.id));
+  const [themeId, setThemeId] = useState('');
+  const [share, setShare] = useState('10');
+  const [problem, setProblem] = useState<string | null>(null);
+  const chosen = themeId || others[0]?.id || '';
+
+  const run = async (work: () => Promise<ThemeExperimentPayloadData>) => {
+    setProblem(null);
+    try {
+      const done = await work();
+      const error = (done.themeExperimentDraftAdd ?? done.themeExperimentDraftTakeOut)
+        ?.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else setThemeId('');
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        {shown.map((draft) =>
+          draft.stopped || draft.takenOut ? null : (
+            <Button
+              key={draft.themeId}
+              variant="secondary"
+              busy={takeOut.isPending}
+              onClick={() =>
+                void run(() => takeOut.mutateAsync({ id: experiment.id, themeId: draft.themeId }))
+              }
+            >
+              {t('experiments.takeOut', { name: themeName(draft.themeId) })}
+            </Button>
+          ),
+        )}
+      </div>
+      {shown.length < 3 && others.length > 0 && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void run(() =>
+              add.mutateAsync({ id: experiment.id, themeId: chosen, share: Number(share) }),
+            );
+          }}
+          className="flex flex-col gap-2"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SelectField
+              label={t('experiments.addDraft')}
+              value={chosen}
+              options={others.map((theme) => ({ value: theme.id, label: theme.name }))}
+              onChange={setThemeId}
+            />
+            <TextField
+              label={t('experiments.addShare')}
+              inputMode="numeric"
+              value={share}
+              onChange={(event) => setShare(event.target.value)}
+            />
+          </div>
+          <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+            {t('experiments.addHint')}
+          </p>
+          <Button type="submit" variant="secondary" className="self-start" busy={add.isPending}>
+            {t('experiments.add')}
+          </Button>
+        </form>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
   );
 }
 
@@ -376,6 +481,12 @@ function Results({
             {draft.stopped && (
               <Alert tone="warning">
                 {t('experiments.draftStopped', { name: themeName(draft.themeId) })}
+              </Alert>
+            )}
+            {/* Taken out by the shop, the others going on (ADR-970). */}
+            {draft.takenOut && (
+              <Alert tone="info">
+                {t('experiments.draftTakenOut', { name: themeName(draft.themeId) })}
               </Alert>
             )}
             <Alert tone={draft.verdict === 'b_worse' ? 'warning' : 'info'}>

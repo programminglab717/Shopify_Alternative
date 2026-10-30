@@ -6660,6 +6660,8 @@ export interface ThemeExperimentDraft {
   revenueVerdict: ThemeExperiment['revenueVerdict'];
   /** Hatti stopped it as it sold clearly worse, the others going on (ADR-939). */
   stopped?: boolean;
+  /** The shop took it out, the others going on (ADR-970). */
+  takenOut?: boolean;
 }
 
 export interface ThemeExperimentsData {
@@ -6670,6 +6672,14 @@ export interface ThemeExperimentPayloadData {
   themeExperimentStart?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
   themeExperimentEnd?: { themeExperiment: ThemeExperiment | null; userErrors: UserError[] };
   themeExperimentSharesSet?: {
+    themeExperiment: ThemeExperiment | null;
+    userErrors: UserError[];
+  };
+  themeExperimentDraftAdd?: {
+    themeExperiment: ThemeExperiment | null;
+    userErrors: UserError[];
+  };
+  themeExperimentDraftTakeOut?: {
     themeExperiment: ThemeExperiment | null;
     userErrors: UserError[];
   };

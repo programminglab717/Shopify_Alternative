@@ -13425,6 +13425,7 @@ const THEME_EXPERIMENT = /* GraphQL */ `
       verdict
       revenueVerdict
       stopped
+      takenOut
     }
     countedAt
   }
@@ -13460,6 +13461,38 @@ export const ThemeExperimentStartMutation = /* GraphQL */ `
 export const ThemeExperimentSharesSetMutation = /* GraphQL */ `
   mutation ThemeExperimentSharesSet($id: ID!, $shares: [Int!]!) {
     themeExperimentSharesSet(id: $id, shares: $shares) {
+      themeExperiment {
+        ...ThemeExperimentFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME_EXPERIMENT}
+  ${USER_ERRORS}
+`;
+
+/** A draft added to a running experiment, as its next arm (ADR-970). */
+export const ThemeExperimentDraftAddMutation = /* GraphQL */ `
+  mutation ThemeExperimentDraftAdd($id: ID!, $themeId: ID!, $share: Int!) {
+    themeExperimentDraftAdd(id: $id, themeId: $themeId, share: $share) {
+      themeExperiment {
+        ...ThemeExperimentFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME_EXPERIMENT}
+  ${USER_ERRORS}
+`;
+
+/** A draft taken out of a running experiment, the others going on (ADR-970). */
+export const ThemeExperimentDraftTakeOutMutation = /* GraphQL */ `
+  mutation ThemeExperimentDraftTakeOut($id: ID!, $themeId: ID!) {
+    themeExperimentDraftTakeOut(id: $id, themeId: $themeId) {
       themeExperiment {
         ...ThemeExperimentFields
       }

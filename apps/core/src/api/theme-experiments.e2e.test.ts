@@ -231,4 +231,96 @@ describe.skipIf(!server)('Admin GraphQL API: theme experiments of several drafts
       { field: ['id'], message: 'No experiment of the shop has this ID' },
     ]);
   });
+
+  it('adds a draft to a running experiment, and takes one out, the others going on (ADR-970)', async () => {
+    const theme = async (name: string) =>
+      (
+        await data(`mutation ($name: String!) { themeCreate(name: $name) { theme { id } } }`, {
+          name,
+        })
+      ).theme.id as string;
+    const [b, c, d, e] = [
+      await theme('Ramadan'),
+      await theme('Big buttons'),
+      await theme('Dark'),
+      await theme('Fourth'),
+    ];
+    const started = await data(START, {
+      input: { name: 'Ramadan', themeId: b, share: 20, days: 14 },
+    });
+    const id = (await data(`{ themeExperiments { id endedAt } }`)).find(
+      (each: Json) => each.endedAt === null,
+    ).id as string;
+    expect(started.userErrors).toEqual([]);
+    const ADD = `mutation ($id: ID!, $themeId: ID!, $share: Int!) {
+      themeExperimentDraftAdd(id: $id, themeId: $themeId, share: $share) {
+        themeExperiment { endedAt drafts { themeId share stopped takenOut arm { sessions } } }
+        userErrors { field message }
+      }
+    }`;
+    const OUT = `mutation ($id: ID!, $themeId: ID!) {
+      themeExperimentDraftTakeOut(id: $id, themeId: $themeId) {
+        themeExperiment { endedAt endedReason drafts { themeId stopped takenOut } }
+        userErrors { field message }
+      }
+    }`;
+    expect((await data(ADD, { id, themeId: b, share: 10 })).userErrors).toEqual([
+      { field: ['themeId'], message: 'The experiment shows this draft already' },
+    ]);
+    expect((await data(ADD, { id, themeId: c, share: 45 })).userErrors).toEqual([
+      {
+        field: ['share'],
+        message:
+          'The live theme is shown to no fewer shoppers than any draft: give the drafts less',
+      },
+    ]);
+    // As the next arm, its counts beginning at none.
+    expect(await data(ADD, { id, themeId: c, share: 30 })).toEqual({
+      themeExperiment: {
+        endedAt: null,
+        drafts: [
+          { themeId: b, share: 20, stopped: false, takenOut: false, arm: { sessions: 0 } },
+          { themeId: c, share: 30, stopped: false, takenOut: false, arm: { sessions: 0 } },
+        ],
+      },
+      userErrors: [],
+    });
+    expect((await data(ADD, { id, themeId: d, share: 10 })).userErrors).toEqual([]);
+    expect((await data(ADD, { id, themeId: e, share: 5 })).userErrors).toEqual([
+      { field: ['themeId'], message: 'An experiment shows 3 drafts at most' },
+    ]);
+    // Taken out: its shoppers see the live theme, the others going on.
+    const out = await data(OUT, { id, themeId: c });
+    expect(out.themeExperiment.drafts).toEqual([
+      { themeId: b, stopped: false, takenOut: false },
+      { themeId: c, stopped: false, takenOut: true },
+      { themeId: d, stopped: false, takenOut: false },
+    ]);
+    const { rows: arms } = await admin.query<{ stopped_arms: string[]; taken_out_arms: string[] }>(
+      `SELECT stopped_arms, taken_out_arms FROM online_store.theme_experiments
+        WHERE ended_at IS NULL`,
+    );
+    expect(arms).toEqual([{ stopped_arms: ['c'], taken_out_arms: ['c'] }]);
+    expect((await data(OUT, { id, themeId: c })).userErrors).toEqual([
+      { field: ['themeId'], message: 'This draft is shown to no shoppers already' },
+    ]);
+    expect((await data(OUT, { id, themeId: e })).userErrors).toEqual([
+      { field: ['themeId'], message: 'The experiment shows no such draft' },
+    ]);
+    // The last of them taken out, it ends.
+    expect((await data(OUT, { id, themeId: b })).themeExperiment.endedAt).toBeNull();
+    const last = await data(OUT, { id, themeId: d });
+    expect(last.themeExperiment.endedReason).toBe('staff');
+    const { rows } = await admin.query<{ action: string }>(
+      `SELECT action FROM platform.audit_log WHERE action LIKE 'theme_experiment.draft_%'
+        ORDER BY occurred_at, action`,
+    );
+    expect(rows.map((row) => row.action)).toEqual([
+      'theme_experiment.draft_added',
+      'theme_experiment.draft_added',
+      'theme_experiment.draft_taken_out',
+      'theme_experiment.draft_taken_out',
+      'theme_experiment.draft_taken_out',
+    ]);
+  });
 });

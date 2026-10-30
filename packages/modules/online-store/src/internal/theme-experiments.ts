@@ -22,7 +22,8 @@ import { OnlineStoreEvents } from './events.js';
 // show up to three drafts, each its own share, arms b, c and d, each compared with the live
 // theme's at a confidence kept as sure however many there are (ADR-931). A draft of several that
 // sells clearly worse is stopped alone, its shoppers shown the live theme, the others going on
-// (ADR-939).
+// (ADR-939). A running experiment takes a draft more as its next arm, or has one taken out, its
+// arm stopped as Hatti stops one (ADR-970).
 
 export const EXPERIMENT_LIMITS = {
   name: 100,
@@ -89,8 +90,13 @@ export interface ThemeExperimentRecord {
   themeId: string;
   /** Every draft, arms b, c and d in turn (ADR-931): the first is `themeId`. */
   themeIds: string[];
-  /** The drafts' arms Hatti stopped as they sold clearly worse, the others going on (ADR-939). */
+  /**
+   * The drafts' arms stopped, the others going on: as they sold clearly worse (ADR-939), or as
+   * the shop took them out (ADR-970).
+   */
   stoppedArms: DraftArmName[];
+  /** Of `stoppedArms`, those the shop took out (ADR-970). */
+  takenOutArms: DraftArmName[];
   /** The first draft's percent of shoppers. */
   share: number;
   /** Each draft's percent of shoppers, in the order of `themeIds` (ADR-952). */
@@ -129,6 +135,7 @@ type ExperimentRow = {
   theme_id: string;
   other_theme_ids: string[] | null;
   stopped_arms: DraftArmName[] | null;
+  taken_out_arms: DraftArmName[] | null;
   share: number;
   other_shares: number[] | null;
   started_at: Date | string;
@@ -150,6 +157,7 @@ const toRecord = (row: ExperimentRow): ThemeExperimentRecord => {
     themeId: row.theme_id,
     themeIds,
     stoppedArms: row.stopped_arms ?? [],
+    takenOutArms: row.taken_out_arms ?? [],
     share: row.share,
     shares: themeIds.map((_, at) =>
       at === 0 ? row.share : (row.other_shares?.[at - 1] ?? row.share),
@@ -164,7 +172,8 @@ const toRecord = (row: ExperimentRow): ThemeExperimentRecord => {
 };
 
 const COLUMNS = sql.raw(
-  'id, name, theme_id, other_theme_ids::text[] AS other_theme_ids, stopped_arms, share, ' +
+  'id, name, theme_id, other_theme_ids::text[] AS other_theme_ids, stopped_arms, ' +
+    'taken_out_arms, share, ' +
     'other_shares, ' +
     'started_at, ends_at, ended_at, ended_reason, results, counted_at',
 );
@@ -525,7 +534,9 @@ export class ThemeExperimentService {
             check.addMessage(
               ['shares', String(at)],
               'INVALID',
-              'Hatti stopped this draft: its shoppers see your live theme, and its share stays',
+              before.takenOutArms.includes(EXPERIMENT_ARMS[at + 1] as DraftArmName)
+                ? 'This draft was taken out: its shoppers see your live theme, and its share stays'
+                : 'Hatti stopped this draft: its shoppers see your live theme, and its share stays',
             );
           }
         });
@@ -560,6 +571,138 @@ export class ThemeExperimentService {
       });
       return { ok: true, value: record };
     });
+  }
+
+  /**
+   * Adds a draft to a running experiment (ADR-970), shown `share` percent of the shoppers still
+   * to come, as its next arm: those already shown a theme keep it, and its counts begin at none.
+   * Three drafts at most, as at its start.
+   */
+  async addDraft(
+    tenant: TenantContext,
+    id: string,
+    themeId: string,
+    share: number,
+  ): Promise<MutationResult<ThemeExperimentRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const before = await this.lockRunning(tx, tenant.shopId, id);
+      if (!before) return failOne(['id'], 'NOT_FOUND', NOT_FOUND);
+      const limits = EXPERIMENT_LIMITS.share;
+      if (before.themeIds.length >= EXPERIMENT_LIMITS.drafts) {
+        return failOne(
+          ['themeId'],
+          'TOO_MANY',
+          `An experiment shows ${EXPERIMENT_LIMITS.drafts} drafts at most`,
+        );
+      }
+      if (before.themeIds.includes(themeId)) {
+        return failOne(['themeId'], 'INVALID', 'The experiment shows this draft already');
+      }
+      if (!Number.isInteger(share) || share < limits.min || share > limits.max) {
+        return failOne(
+          ['share'],
+          'INVALID',
+          `Share must be a whole percent from ${limits.min} to ${limits.max}`,
+        );
+      }
+      const shares = [...before.shares, share];
+      if (100 - shares.reduce((sum, each) => sum + each, 0) < Math.max(...shares)) {
+        return failOne(
+          ['share'],
+          'INVALID',
+          'The live theme is shown to no fewer shoppers than any draft: give the drafts less',
+        );
+      }
+      const { rows: themes } = await tx.execute<{ role: string }>(sql`
+        SELECT role FROM online_store.themes
+         WHERE shop_id = ${tenant.shopId} AND id = ${themeId}`);
+      if (!themes[0]) return failOne(['themeId'], 'NOT_FOUND', 'Theme not found');
+      if (themes[0].role === 'main') {
+        return failOne(
+          ['themeId'],
+          'INVALID',
+          'The live theme is the one the experiment compares a draft with: pick a draft',
+        );
+      }
+      const { rows } = await tx.execute<ExperimentRow>(sql`
+        UPDATE online_store.theme_experiments
+           SET other_theme_ids = other_theme_ids || ${themeId}::uuid,
+               other_shares = ${sql.param(shares.slice(1))}::smallint[]
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}
+        RETURNING ${COLUMNS}`);
+      const record = toRecord(rows[0]!);
+      await appendEvent(tx, tenant.shopId, {
+        type: OnlineStoreEvents.ThemeExperimentUpdated,
+        aggregateType: 'theme_experiment',
+        aggregateId: record.id,
+        payload: {},
+      });
+      await recordAudit(tx, tenant.shopId, {
+        action: 'theme_experiment.draft_added',
+        subjectType: 'theme',
+        subjectId: themeId,
+        ...actorColumnsOf(tenant.actor),
+        details: { name: record.name, share, drafts: record.themeIds.length },
+      });
+      return { ok: true, value: record };
+    });
+  }
+
+  /**
+   * Takes a draft out of a running experiment (ADR-970): its arm is stopped as Hatti stops one
+   * that sells clearly worse (ADR-939), its shoppers shown the live theme from then and its counts
+   * kept as they were, the other drafts going on. With none left showing, the experiment ends.
+   */
+  async takeOutDraft(
+    tenant: TenantContext,
+    id: string,
+    themeId: string,
+  ): Promise<MutationResult<ThemeExperimentRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const before = await this.lockRunning(tx, tenant.shopId, id);
+      if (!before) return failOne(['id'], 'NOT_FOUND', NOT_FOUND);
+      const at = before.themeIds.indexOf(themeId);
+      if (at < 0) return failOne(['themeId'], 'NOT_FOUND', 'The experiment shows no such draft');
+      const arm = EXPERIMENT_ARMS[at + 1] as DraftArmName;
+      if (before.stoppedArms.includes(arm)) {
+        return failOne(['themeId'], 'INVALID', 'This draft is shown to no shoppers already');
+      }
+      await stopExperimentArmsIn(tx, tenant.shopId, id, [arm]);
+      await tx.execute(sql`
+        UPDATE online_store.theme_experiments
+           SET taken_out_arms = ARRAY(SELECT DISTINCT unnest(taken_out_arms || ${arm}::text)
+                                       ORDER BY 1)
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
+      const left = draftArmsOf(before.results).filter(
+        (each) => each !== arm && !before.stoppedArms.includes(each),
+      );
+      if (left.length === 0) await endExperimentIn(tx, tenant.shopId, 'staff', { id });
+      const { rows } = await tx.execute<ExperimentRow>(sql`
+        SELECT ${COLUMNS} FROM online_store.theme_experiments
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
+      const record = toRecord(rows[0]!);
+      await recordAudit(tx, tenant.shopId, {
+        action: 'theme_experiment.draft_taken_out',
+        subjectType: 'theme',
+        subjectId: themeId,
+        ...actorColumnsOf(tenant.actor),
+        details: { name: record.name, ended: left.length === 0 },
+      });
+      return { ok: true, value: record };
+    });
+  }
+
+  /** The shop's running experiment `id`, locked for the caller's change; null for none. */
+  private async lockRunning(
+    tx: Tx,
+    shopId: string,
+    id: string,
+  ): Promise<ThemeExperimentRecord | null> {
+    const { rows } = await tx.execute<ExperimentRow>(sql`
+      SELECT ${COLUMNS} FROM online_store.theme_experiments
+       WHERE shop_id = ${shopId} AND id = ${id} AND ended_at IS NULL
+       FOR UPDATE`);
+    return rows[0] ? toRecord(rows[0]) : null;
   }
 
   /** Ends a running experiment: every shopper sees the live theme again. */

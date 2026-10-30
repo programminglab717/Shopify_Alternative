@@ -77,6 +77,13 @@ export class ThemeExperimentDraft {
   })
   stopped!: boolean;
 
+  @Field({
+    description:
+      'Whether the shop took this draft out (ADR-970), its shoppers shown the live theme since ' +
+      'and its counts kept as they were, the other drafts going on.',
+  })
+  takenOut!: boolean;
+
   @Field(() => Int, { description: 'The percent of shoppers shown it (ADR-952).' })
   share!: number;
 }
@@ -223,7 +230,8 @@ const toExperiment = (record: ThemeExperimentRecord, currency: CurrencyCode) =>
         arm: toArm(record.results[arm]!, currency),
         verdict: verdictOf(record.results, arm),
         revenueVerdict: revenueVerdictOf(record.results, arm),
-        stopped: record.stoppedArms.includes(arm),
+        stopped: record.stoppedArms.includes(arm) && !record.takenOutArms.includes(arm),
+        takenOut: record.takenOutArms.includes(arm),
         share: record.shares[index]!,
       }),
     ),
@@ -305,6 +313,44 @@ export class ThemeExperimentResolver {
     const uuid = tryFromPublicId(id, 'themeExperiment');
     if (!uuid) return notFound('id');
     return payload(await this.experiments.setShares(tenant, uuid, shares), tenant.currency);
+  }
+
+  @Mutation(() => ThemeExperimentPayload, {
+    description:
+      'Adds a draft to a running experiment (ADR-970), shown `share` percent of the shoppers ' +
+      'still to come, as its next arm: those already shown a theme keep it, and its counts begin ' +
+      'at none. Three drafts at most.',
+  })
+  @RequireScopes('write_themes')
+  async themeExperimentDraftAdd(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('themeId', { type: () => ID }) themeId: string,
+    @Args('share', { type: () => Int }) share: number,
+  ): Promise<ThemeExperimentPayload> {
+    const uuid = tryFromPublicId(id, 'themeExperiment');
+    if (!uuid) return notFound('id');
+    const theme = tryFromPublicId(themeId, 'theme');
+    if (!theme) return notFound('themeId');
+    return payload(await this.experiments.addDraft(tenant, uuid, theme, share), tenant.currency);
+  }
+
+  @Mutation(() => ThemeExperimentPayload, {
+    description:
+      'Takes a draft out of a running experiment (ADR-970): its shoppers see the live theme from ' +
+      'then, its counts kept as they were, the other drafts going on. With none left, it ends.',
+  })
+  @RequireScopes('write_themes')
+  async themeExperimentDraftTakeOut(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('themeId', { type: () => ID }) themeId: string,
+  ): Promise<ThemeExperimentPayload> {
+    const uuid = tryFromPublicId(id, 'themeExperiment');
+    if (!uuid) return notFound('id');
+    const theme = tryFromPublicId(themeId, 'theme');
+    if (!theme) return notFound('themeId');
+    return payload(await this.experiments.takeOutDraft(tenant, uuid, theme), tenant.currency);
   }
 
   @Mutation(() => ThemeExperimentPayload, {

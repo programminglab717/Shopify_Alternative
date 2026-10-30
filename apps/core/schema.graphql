@@ -12111,6 +12111,16 @@ type Mutation {
   """Deletes a theme other than the main one."""
   themeDelete(id: ID!): ThemeDeletePayload!
 
+  """
+  Adds a draft to a running experiment (ADR-970), shown `share` percent of the shoppers still to come, as its next arm: those already shown a theme keep it, and its counts begin at none. Three drafts at most.
+  """
+  themeExperimentDraftAdd(id: ID!, share: Int!, themeId: ID!): ThemeExperimentPayload!
+
+  """
+  Takes a draft out of a running experiment (ADR-970): its shoppers see the live theme from then, its counts kept as they were, the other drafts going on. With none left, it ends.
+  """
+  themeExperimentDraftTakeOut(id: ID!, themeId: ID!): ThemeExperimentPayload!
+
   """Ends a running experiment: every shopper sees the live theme again."""
   themeExperimentEnd(id: ID!): ThemeExperimentPayload!
 
@@ -22183,6 +22193,11 @@ type ThemeExperimentDraft {
   Whether Hatti stopped this draft as it sold clearly worse, its shoppers shown the live theme since and its counts kept as they were, the other drafts going on (ADR-939).
   """
   stopped: Boolean!
+
+  """
+  Whether the shop took this draft out (ADR-970), its shoppers shown the live theme since and its counts kept as they were, the other drafts going on.
+  """
+  takenOut: Boolean!
   themeId: ID!
 
   """As the experiment’s `verdict`, of this draft."""

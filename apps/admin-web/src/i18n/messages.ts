@@ -4987,6 +4987,14 @@ const en = {
   'experiments.draftVerdict': '{name}: {verdict}',
   'experiments.draftStopped':
     'Hatti stopped {name}: it sold clearly worse. Its shoppers see your live theme; the other drafts go on.',
+  'experiments.draftTakenOut':
+    'You took {name} out. Its shoppers see your live theme; the other drafts go on.',
+  'experiments.takeOut': 'Take {name} out',
+  'experiments.addDraft': 'Add a draft',
+  'experiments.addShare': 'Its share (%)',
+  'experiments.add': 'Add draft',
+  'experiments.addHint':
+    'It is shown to shoppers still to come; its counts begin now, so it needs time to catch up.',
   'settings.currencies': 'Currencies',
   'settings.currenciesHint': 'Prices in dirhams, riyals, pounds and dollars for shoppers abroad',
   'currencies.hint':
@@ -12290,6 +12298,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experiments.draftVerdict': '{name}: {verdict}',
   'experiments.draftStopped':
     'ہٹی نے {name} روک دی: اس کی فروخت واضح طور پر کم تھی۔ اس کے خریدار آپ کی لائیو تھیم دیکھتے ہیں؛ باقی ڈرافٹس جاری ہیں۔',
+  'experiments.draftTakenOut':
+    'آپ نے {name} نکال دی۔ اس کے خریدار آپ کی لائیو تھیم دیکھتے ہیں؛ باقی ڈرافٹس جاری ہیں۔',
+  'experiments.takeOut': '{name} نکالیں',
+  'experiments.addDraft': 'ڈرافٹ شامل کریں',
+  'experiments.addShare': 'اس کا حصہ (%)',
+  'experiments.add': 'ڈرافٹ شامل کریں',
+  'experiments.addHint':
+    'یہ آنے والے خریداروں کو دکھایا جائے گا؛ اس کی گنتی اب شروع ہوتی ہے، اس لیے اسے برابر آنے میں وقت لگے گا۔',
   'settings.currencies': 'کرنسیاں',
   'settings.currenciesHint': 'بیرونِ ملک خریداروں کے لیے درہم، ریال، پاؤنڈ اور ڈالر میں قیمتیں',
   'currencies.hint':

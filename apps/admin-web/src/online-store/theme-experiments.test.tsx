@@ -398,4 +398,94 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
       await section.findByText(/Shoppers see the drafts 30% · 20% · 10% of the time, until/),
     ).toBeTruthy();
   });
+
+  it('adds a draft to a running experiment, and takes one out (ADR-970)', async () => {
+    signedIn();
+    const draft = (themeId: string, share: number, takenOut = false) => ({
+      themeId,
+      share,
+      arm: arm(300, 6),
+      verdict: 'no_difference',
+      revenueVerdict: 'no_difference',
+      stopped: false,
+      takenOut,
+    });
+    let running: Record<string, unknown> = {
+      id: 'texp_5',
+      name: 'Ramadan',
+      themeId: 'th_2',
+      share: 20,
+      startedAt: EARLIER,
+      endsAt: LATER,
+      endedAt: null,
+      endedReason: null,
+      live: arm(300, 6),
+      draft: arm(300, 6),
+      verdict: 'no_difference',
+      revenueVerdict: 'no_difference',
+      drafts: [draft('th_2', 20)],
+      countedAt: EARLIER,
+    };
+    const fake = fakeCore('owner', (operation, variables) => {
+      switch (operation) {
+        case 'Themes':
+          return {
+            themes: {
+              nodes: [
+                theme('th_1', 'Hatti Base', 'MAIN'),
+                theme('th_2', 'Loud', 'UNPUBLISHED'),
+                theme('th_3', 'Quiet', 'UNPUBLISHED'),
+              ],
+            },
+            platformThemes: [],
+          };
+        case 'ThemeStore':
+          return { themeStore: [] };
+        case 'ThemeExperiments':
+          return { themeExperiments: [running] };
+        case 'ThemeExperimentDraftAdd':
+          running = {
+            ...running,
+            drafts: [
+              draft('th_2', 20),
+              draft(variables.themeId as string, variables.share as number),
+            ],
+          };
+          return { themeExperimentDraftAdd: { themeExperiment: running, userErrors: [] } };
+        case 'ThemeExperimentDraftTakeOut':
+          running = { ...running, drafts: [draft('th_2', 20, true), draft('th_3', 15)] };
+          return { themeExperimentDraftTakeOut: { themeExperiment: running, userErrors: [] } };
+        default:
+          return undefined;
+      }
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=themes');
+    const section = within(
+      (await screen.findByRole('heading', { name: 'Experiments' })).closest('section')!,
+    );
+    // Only the drafts it doesn't show are offered.
+    const select = (await section.findByLabelText('Add a draft')) as HTMLSelectElement;
+    expect([...select.options].map((option) => option.text)).toEqual(['Quiet']);
+    fireEvent.change(section.getByLabelText('Its share (%)'), { target: { value: '15' } });
+    fireEvent.click(section.getByRole('button', { name: 'Add draft' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'ThemeExperimentDraftAdd')?.variables,
+      ).toEqual({ id: 'texp_5', themeId: 'th_3', share: 15 }),
+    );
+    await section.findByLabelText('Shoppers shown Quiet (%)');
+    fireEvent.click(await section.findByRole('button', { name: 'Take Loud out' }));
+    expect(
+      await section.findByText(
+        'You took Loud out. Its shoppers see your live theme; the other drafts go on.',
+      ),
+    ).toBeTruthy();
+    expect(
+      fake.sent.find((each) => each.operation === 'ThemeExperimentDraftTakeOut')?.variables,
+    ).toEqual({ id: 'texp_5', themeId: 'th_2' });
+    // Taken out, it isn't asked its share, nor offered to take out again.
+    expect(section.queryByLabelText('Shoppers shown Loud (%)')).toBeNull();
+    expect(section.queryByRole('button', { name: 'Take Loud out' })).toBeNull();
+  });
 });
