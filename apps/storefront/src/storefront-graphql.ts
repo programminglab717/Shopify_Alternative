@@ -249,6 +249,14 @@ const SDL = /* GraphQL */ `
     customerWishlistAdd(customerAccessToken: String!, productIds: [ID!]!): CustomerWishlistPayload
     customerWishlistRemove(customerAccessToken: String!, productId: ID!): CustomerWishlistPayload
     """
+    Products the signed-in shopper viewed, the latest first (ADR-978), kept with their account so
+    that they follow them to any device: viewed again, one moves to the top; 20 kept.
+    """
+    customerRecentlyViewedAdd(
+      customerAccessToken: String!
+      productIds: [ID!]!
+    ): CustomerRecentlyViewedPayload
+    """
     The file of the signed-in shopper's own data (ADR-962), as their account on the shop's own
     pages makes it (ADR-572): made, or the one kept for the day given again, with a link that
     downloads it for a few minutes. None where the shop keeps nothing of them.
@@ -780,9 +788,18 @@ const SDL = /* GraphQL */ `
     The products they keep to buy later, the newest first, those the shop still sells (ADR-951).
     """
     wishlist(first: Int, after: String): ProductConnection!
+    """
+    The products they viewed, the latest first, those the shop still sells (ADR-978).
+    """
+    recentlyViewed(first: Int, after: String): ProductConnection!
   }
 
   type CustomerWishlistPayload {
+    customer: Customer
+    customerUserErrors: [CustomerUserError!]!
+  }
+
+  type CustomerRecentlyViewedPayload {
     customer: Customer
     customerUserErrors: [CustomerUserError!]!
   }
@@ -1030,6 +1047,9 @@ export interface StorefrontApiAccounts {
   wishlist(token: string): Promise<string[] | null>;
   wishlistAdd(token: string, productIds: readonly string[]): Promise<string[] | null>;
   wishlistRemove(token: string, productId: string): Promise<string[] | null>;
+  /** The products the account viewed, the latest first (ADR-978); null without one. */
+  viewed(token: string): Promise<string[] | null>;
+  viewedAdd(token: string, productIds: readonly string[]): Promise<string[] | null>;
   /**
    * The file of the shopper's own data, made or kept (ADR-962); `too_many_requests` where the
    * buyer asked too many of late; null without a session.
@@ -1582,6 +1602,7 @@ function customerOf(
   api: StorefrontApiShop,
   book: () => Promise<AccountAddress[]> = async () => [],
   wishlist: () => Promise<string[]> = async () => [],
+  viewed: () => Promise<string[]> = async () => [],
 ) {
   const [firstName, ...rest] = (account.name ?? '').trim().split(/\s+/);
   const orders = account.orders.map(orderOf);
@@ -1602,6 +1623,8 @@ function customerOf(
     },
     wishlist: async (args: { first?: number; after?: string }) =>
       productPage(await wishlist(), args, api),
+    recentlyViewed: async (args: { first?: number; after?: string }) =>
+      productPage(await viewed(), args, api),
   };
 }
 
@@ -1725,13 +1748,21 @@ function rootOf(api: StorefrontApiShop) {
         .wishlist(token)
         .then((ids) => ids ?? []));
   };
+  /** The products the shopper `token` signed in viewed, read once (ADR-978). */
+  const viewedOf = (token: string) => {
+    let read: Promise<string[]> | null = null;
+    return () =>
+      (read ??= accounts()
+        .viewed(token)
+        .then((ids) => ids ?? []));
+  };
   /** The wishlist after `change`, as a mutation's payload. */
   const wished = async (token: string, change: () => Promise<string[] | null>) => {
     const ids = CUSTOMER_TOKEN.test(token) ? await change() : null;
     const account = ids ? await accounts().account(token) : null;
     if (!ids || !account) return { customer: null, customerUserErrors: [unidentified] };
     return {
-      customer: customerOf(account, api, bookOf(token), async () => ids),
+      customer: customerOf(account, api, bookOf(token), async () => ids, viewedOf(token)),
       customerUserErrors: [],
     };
   };
@@ -1865,8 +1896,26 @@ function rootOf(api: StorefrontApiShop) {
             api,
             bookOf(args.customerAccessToken),
             wishOf(args.customerAccessToken),
+            viewedOf(args.customerAccessToken),
           )
         : null;
+    },
+    customerRecentlyViewedAdd: async (args: {
+      customerAccessToken: string;
+      productIds: string[];
+    }) => {
+      const token = args.customerAccessToken;
+      const ids = args.productIds
+        .slice(0, STOREFRONT_API_LIMITS.first)
+        .map((id) => idOf('Product', id))
+        .filter((id): id is string => id !== null);
+      const viewed = CUSTOMER_TOKEN.test(token) ? await accounts().viewedAdd(token, ids) : null;
+      const account = viewed ? await accounts().account(token) : null;
+      if (!viewed || !account) return { customer: null, customerUserErrors: [unidentified] };
+      return {
+        customer: customerOf(account, api, bookOf(token), wishOf(token), async () => viewed),
+        customerUserErrors: [],
+      };
     },
     customerWishlistAdd: (args: { customerAccessToken: string; productIds: string[] }) => {
       const ids = args.productIds
@@ -1967,7 +2016,9 @@ function rootOf(api: StorefrontApiShop) {
       await accounts().saveAddress(token, { ...request, default: true }, kept.id);
       const account = await accounts().account(token);
       return {
-        customer: account ? customerOf(account, api, bookOf(token), wishOf(token)) : null,
+        customer: account
+          ? customerOf(account, api, bookOf(token), wishOf(token), viewedOf(token))
+          : null,
         customerUserErrors: account ? [] : [unidentified],
       };
     },

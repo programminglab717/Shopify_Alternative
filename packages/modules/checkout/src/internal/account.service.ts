@@ -66,6 +66,7 @@ import {
   removeFromWishlistIn,
   wishlistIn,
   wishlistOwnerIn,
+  type AccountList,
   type WishlistOwner,
 } from './account-wishlist.js';
 import { CartService } from './cart.service.js';
@@ -529,6 +530,32 @@ export class AccountService {
   }
 
   /**
+   * The products the account the session `token` names viewed (ADR-978), the latest first, those
+   * the shop no longer has left out. Null without a session.
+   */
+  async recentlyViewed(shopId: string, token: string): Promise<string[] | null> {
+    return this.#wishlist(shopId, token, async () => undefined, 'viewed');
+  }
+
+  /**
+   * Adds `productIds`, the latest first, to the products the account the session `token` names
+   * viewed (ADR-978): those the shop has, those viewed before moving to the top, the newest twenty
+   * kept. The list as it is now; null without a session.
+   */
+  async addToRecentlyViewed(
+    shopId: string,
+    token: string,
+    productIds: readonly string[],
+  ): Promise<string[] | null> {
+    return this.#wishlist(
+      shopId,
+      token,
+      (tx, owner) => addToWishlistIn(tx, shopId, owner, productIds, 'viewed'),
+      'viewed',
+    );
+  }
+
+  /**
    * Takes the product `productId` off the wishlist of the account the session `token` names
    * (ADR-575): the wishlist as it is now; null without a session.
    */
@@ -656,11 +683,15 @@ export class AccountService {
     });
   }
 
-  /** The wishlist of the session `token` names once `change` changed it; null without one. */
+  /**
+   * The wishlist of the session `token` names once `change` changed it, or its products viewed
+   * where `list` says so (ADR-978); null without one.
+   */
   async #wishlist(
     shopId: string,
     token: string,
     change: (tx: Tx, owner: WishlistOwner) => Promise<void>,
+    list: AccountList = 'wishlist',
   ): Promise<string[] | null> {
     if (!TOKEN.test(token)) return null;
     return this.db.tenant(shopId, async (tx) => {
@@ -668,7 +699,7 @@ export class AccountService {
       if (!session) return null;
       const owner = await wishlistOwnerIn(tx, shopId, session);
       await change(tx, owner);
-      return wishlistIn(tx, shopId, owner);
+      return wishlistIn(tx, shopId, owner, list);
     });
   }
 

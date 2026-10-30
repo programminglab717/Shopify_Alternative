@@ -2,6 +2,7 @@ export {
   ACCOUNT_COOKIE,
   ACCOUNT_TOKEN_HEADER,
   ACCOUNT_ADDRESSES_MAX,
+  ACCOUNT_VIEWED_MAX,
   ACCOUNT_WISHLIST_MAX,
   accountCookie,
   accountCookieCleared,

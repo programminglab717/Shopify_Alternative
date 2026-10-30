@@ -6,9 +6,9 @@ import { recentProducts } from '@/app/recent/actions';
 import type { ProductCard } from '@/lib/types';
 import type { Words } from '@/lib/words';
 
-// Products the shopper viewed lately (ADR-961), kept in their browser alone: on a product's page,
-// it put first and the others shown under it; on the home page, all of them. A browser that keeps
-// nothing shows nothing.
+// Products the shopper viewed lately (ADR-961), kept in their browser: on a product's page, it put
+// first and the others shown under it; on the home page, all of them. Signed in, they are kept
+// with their account too (ADR-978), and those viewed on their other devices are shown as well.
 
 const VIEWED_KEY = 'hatti_viewed';
 /** This product, and the eight before it. */
@@ -45,12 +45,11 @@ export function RecentlyViewed({
       }
     }
     let shown = true;
-    if (others.length > 0) {
-      void recentProducts(others.slice(0, KEPT - 1)).then(
-        (cards) => shown && setProducts(cards),
-        () => undefined,
-      );
-    }
+    // Asked even with none kept here: a signed-in shopper's account may have some.
+    void recentProducts(others.slice(0, KEPT - 1), productId).then(
+      (cards) => shown && setProducts(cards),
+      () => undefined,
+    );
     return () => {
       shown = false;
     };

@@ -400,10 +400,24 @@ describe.skipIf(!server)("Storefront API: shoppers' accounts, signed in to by a 
     });
     expect([removed.statusCode, removed.json()]).toEqual([200, { productIds: [] }]);
 
+    // The products viewed, a list of their own (ADR-978): viewed again, one moves to the top.
+    expect(await client.accountViewed(shop, session)).toEqual([]);
+    expect(await client.accountViewedAdd(shop, session, [kurta, shawl])).toEqual([kurta, shawl]);
+    expect(await client.accountViewedAdd(shop, session, [shawl])).toEqual([shawl, kurta]);
+    expect(await client.accountWishlist(shop, session)).toEqual([]);
+    const tooMany = await app.inject({
+      method: 'POST',
+      url: accountPath(shop, 'viewed'),
+      headers,
+      payload: { productIds: Array(21).fill(kurta) },
+    });
+    expect(tooMany.statusCode).toBe(422);
+
     // Signed out, nothing.
     await client.accountLogout(shop, session);
     expect(await client.accountWishlistAdd(shop, session, [kurta])).toBeNull();
     expect(await client.accountWishlistRemove(shop, session, kurta)).toBeNull();
+    expect(await client.accountViewed(shop, session)).toBeNull();
   });
 
   it("keeps the shopper's address book with their account, checked as checkout's (ADR-583)", async () => {

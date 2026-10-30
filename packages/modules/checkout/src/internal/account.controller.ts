@@ -2,6 +2,7 @@ import type { FieldError } from '@hatti/api';
 import {
   ACCOUNT_PRICES_MAX,
   ACCOUNT_TOKEN_HEADER,
+  ACCOUNT_VIEWED_MAX,
   ACCOUNT_WISHLIST_MAX,
   CLIENT_IP_HEADER,
   accountPath,
@@ -50,7 +51,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
  * gives the one kept, and `GET` a new link to it; `POST …/account/data/erase` asks for their
  * erasure. Their wishlist (ADR-575): `GET …/account/wishlist` reads it, `POST` with `productIds`
  * adds to it, and `DELETE …/account/wishlist/{productId}` takes one off, each answering it as it
- * is then; IDs that name no product of the shop's are left out. Their address book (ADR-583):
+ * is then; IDs that name no product of the shop's are left out. The products they viewed
+ * (ADR-978): `GET …/account/viewed` reads them, `POST` with `productIds` adds to them, likewise.
+ * Their address book (ADR-583):
  * `GET …/account/addresses` reads it, `POST` adds an address to it, `PUT …/account/addresses/{id}`
  * changes one and `DELETE` takes one out, each answering the book as it is then. Their prices
  * (ADR-781): `GET …/account/prices?variants=…`, at most {@link ACCOUNT_PRICES_MAX} variants' IDs
@@ -257,6 +260,53 @@ export class StorefrontAccountController {
     // An ID that could not be a product's names none the shop has, and is left out as those are.
     const wanted = (asked as string[]).filter((id) => UUID.test(id));
     const productIds = token ? await this.accounts.addToWishlist(shopId, token, wanted) : null;
+    if (!productIds) throw new NotFoundException();
+    return { productIds };
+  }
+
+  @Get('viewed')
+  @Header('cache-control', 'no-store')
+  async recentlyViewed(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountWishlistResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const productIds = token ? await this.accounts.recentlyViewed(shopId, token) : null;
+    if (!productIds) throw new NotFoundException();
+    return { productIds };
+  }
+
+  @Post('viewed')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async addToRecentlyViewed(
+    @Param('shopId') shopId: string,
+    @Body() body: unknown,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountWishlistResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const asked =
+      typeof body === 'object' && body !== null
+        ? (body as Record<string, unknown>).productIds
+        : undefined;
+    if (
+      !Array.isArray(asked) ||
+      asked.length > ACCOUNT_VIEWED_MAX ||
+      !asked.every((id) => typeof id === 'string')
+    ) {
+      throw new UnprocessableEntityException({
+        errors: [
+          {
+            field: 'productIds',
+            message: `Send a list of at most ${ACCOUNT_VIEWED_MAX} products' IDs`,
+          },
+        ],
+      } satisfies AccountErrorResponse);
+    }
+    const wanted = (asked as string[]).filter((id) => UUID.test(id));
+    const productIds = token
+      ? await this.accounts.addToRecentlyViewed(shopId, token, wanted)
+      : null;
     if (!productIds) throw new NotFoundException();
     return { productIds };
   }

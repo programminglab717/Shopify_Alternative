@@ -862,6 +862,25 @@ class FakeCore {
     return this.wishlists.get(token)!;
   }
 
+  /** Products viewed, kept with accounts (ADR-978), by the session's secret, the latest first. */
+  readonly viewedLists = new Map<string, string[]>();
+
+  async accountViewed(_shopId: string, token: string | null): Promise<string[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    return this.viewedLists.get(token) ?? [];
+  }
+
+  async accountViewedAdd(
+    _shopId: string,
+    token: string | null,
+    productIds: readonly string[],
+  ): Promise<string[] | null> {
+    if (!token || !this.accounts.has(token)) return null;
+    const kept = (this.viewedLists.get(token) ?? []).filter((id) => !productIds.includes(id));
+    this.viewedLists.set(token, [...productIds, ...kept].slice(0, 20));
+    return this.viewedLists.get(token)!;
+  }
+
   /**
    * Address books kept with accounts (ADR-584), by the session's secret, the default first, as
    * the core keeps them, checking a city and a number as it does; and what was saved.

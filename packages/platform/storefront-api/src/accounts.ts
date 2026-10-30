@@ -42,6 +42,7 @@ export type AccountRoute =
   | 'data/export'
   | 'data/erase'
   | 'wishlist'
+  | 'viewed'
   | 'addresses'
   | 'prices';
 
@@ -85,6 +86,12 @@ export const ACCOUNT_ADDRESSES_MAX = 20;
  * as many as one request may add.
  */
 export const ACCOUNT_WISHLIST_MAX = 100;
+
+/**
+ * The most products an account's recently viewed keeps (ADR-978): viewed again, one moves to the
+ * top; the oldest go to make room.
+ */
+export const ACCOUNT_VIEWED_MAX = 20;
 
 /** What a shopper typed to sign in, and how they asked for the code. */
 export interface AccountLoginStartRequest {

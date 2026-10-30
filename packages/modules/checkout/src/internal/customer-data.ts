@@ -110,7 +110,14 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
       added_at: string | Date;
     }>(sql`
       SELECT phone, product_id, added_at FROM checkout.account_wishlist_items
-       WHERE shop_id = ${shopId}
+       WHERE shop_id = ${shopId} AND list = 'wishlist'
+         AND (customer_id = ${customer.id}
+              OR phone = ANY(${sql.param(customer.phones)}::text[]))
+       ORDER BY added_at DESC, product_id`);
+    // The products they viewed, kept with their account (ADR-978).
+    const { rows: viewed } = await tx.execute<{ product_id: string; added_at: string | Date }>(sql`
+      SELECT product_id, added_at FROM checkout.account_wishlist_items
+       WHERE shop_id = ${shopId} AND list = 'viewed'
          AND (customer_id = ${customer.id}
               OR phone = ANY(${sql.param(customer.phones)}::text[]))
        ORDER BY added_at DESC, product_id`);
@@ -146,6 +153,11 @@ export const CHECKOUT_CUSTOMER_DATA: CustomerDataHandler = {
         productId: toPublicId('product', row.product_id),
         addedAt: toDate(row.added_at),
         ...(row.phone && { number: row.phone }),
+      })),
+      // The products they viewed (ADR-978), the latest first.
+      recentlyViewed: viewed.map((row) => ({
+        productId: toPublicId('product', row.product_id),
+        viewedAt: toDate(row.added_at),
       })),
       // Their address book (ADR-583), the default first.
       addresses: book.map((record) => {

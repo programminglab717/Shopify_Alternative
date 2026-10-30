@@ -57,6 +57,8 @@ export type CoreBackend = Pick<
   | 'accountWishlist'
   | 'accountWishlistAdd'
   | 'accountWishlistRemove'
+  | 'accountViewed'
+  | 'accountViewedAdd'
   | 'accountAddresses'
   | 'accountAddressSave'
   | 'accountAddressDelete'

@@ -452,6 +452,70 @@ export const PRODUCTS_BY_ID_QUERY = /* GraphQL */ `
   }
 `;
 
+// The products a signed-in shopper viewed, kept with their account (ADR-978): those their browser
+// kept added, the latest first, and the list read back as cards.
+
+export const CUSTOMER_RECENTLY_VIEWED_ADD_MUTATION = /* GraphQL */ `
+  mutation CustomerRecentlyViewedAdd(
+    $customerAccessToken: String!
+    $productIds: [ID!]!
+    $language: LanguageCode = EN
+  ) @inContext(language: $language) {
+    customerRecentlyViewedAdd(customerAccessToken: $customerAccessToken, productIds: $productIds) {
+      customer {
+        recentlyViewed(first: 9) {
+          nodes {
+            id
+            handle
+            title
+            availableForSale
+            featuredImage {
+              url(transform: { maxWidth: 600 })
+              altText
+              width
+              height
+            }
+            priceRange {
+              minVariantPrice {
+                amount
+                currencyCode
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_RECENTLY_VIEWED_QUERY = /* GraphQL */ `
+  query CustomerRecentlyViewed($customerAccessToken: String!, $language: LanguageCode = EN)
+  @inContext(language: $language) {
+    customer(customerAccessToken: $customerAccessToken) {
+      recentlyViewed(first: 9) {
+        nodes {
+          id
+          handle
+          title
+          availableForSale
+          featuredImage {
+            url(transform: { maxWidth: 600 })
+            altText
+            width
+            height
+          }
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 // The shopper's own data (ADR-962, ADR-963): its file to download, or its erasure asked for.
 
 export const CUSTOMER_DATA_EXPORT_MUTATION = /* GraphQL */ `

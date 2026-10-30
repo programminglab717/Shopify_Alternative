@@ -807,6 +807,7 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
     const signedIn = (token: string) => token === TOKEN && !signedOut.includes(token);
     /** Their wishlist, the newest first: a product the shop no longer sells among them. */
     let wished: string[] = ['gone-product'];
+    let seen: string[] = [];
     const kept: StorefrontApiAccounts = {
       sendCode: (request) => {
         asked.push(request);
@@ -887,6 +888,12 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
         if (!signedIn(token)) return Promise.resolve(null);
         wished = wished.filter((each) => each !== id);
         return Promise.resolve(wished);
+      },
+      viewed: (token) => Promise.resolve(signedIn(token) ? seen : null),
+      viewedAdd: (token, ids) => {
+        if (!signedIn(token)) return Promise.resolve(null);
+        seen = [...ids, ...seen.filter((id) => !ids.includes(id))].slice(0, 20);
+        return Promise.resolve(seen);
       },
       dataExport: (token) => {
         if (busy) return Promise.resolve('too_many_requests');
@@ -1140,6 +1147,38 @@ describe("Shoppers' accounts through the Storefront API (ADR-943)", () => {
       customer: null,
       customerUserErrors: [{ code: 'UNIDENTIFIED_CUSTOMER' }],
     });
+  });
+
+  it('keeps the products the signed-in shopper viewed, the latest first (ADR-978)', async () => {
+    const at = { ...api(), accounts: accounts().kept };
+    const other = sample.products.find((product) => product.id !== lawn.id)!;
+    const VIEWED = `customer { recentlyViewed(first: 10) { nodes { handle } } }
+      customerUserErrors { code }`;
+    const add = (ids: string[], token = TOKEN) =>
+      ask(
+        `mutation ($token: String!, $ids: [ID!]!) {
+          customerRecentlyViewedAdd(customerAccessToken: $token, productIds: $ids) { ${VIEWED} } }`,
+        { token, ids: ids.map((id) => `gid://hatti/Product/${id}`) },
+        at,
+      );
+    await add([lawn.id]);
+    // Viewed again, it moves to the top.
+    expect((await add([other.id])).data.customerRecentlyViewedAdd).toEqual({
+      customer: { recentlyViewed: { nodes: [{ handle: other.handle }, { handle: lawn.handle }] } },
+      customerUserErrors: [],
+    });
+    expect(
+      (await add([lawn.id])).data.customerRecentlyViewedAdd.customer.recentlyViewed.nodes,
+    ).toEqual([{ handle: lawn.handle }, { handle: other.handle }]);
+    const read = await ask(
+      `query ($token: String!) { customer(customerAccessToken: $token) { recentlyViewed(first: 1) { nodes { handle } } } }`,
+      { token: TOKEN },
+      at,
+    );
+    expect(read.data.customer.recentlyViewed.nodes).toEqual([{ handle: lawn.handle }]);
+    expect(
+      (await add([lawn.id], 'someone-else-0123456789')).data.customerRecentlyViewedAdd,
+    ).toEqual({ customer: null, customerUserErrors: [{ code: 'UNIDENTIFIED_CUSTOMER' }] });
   });
 
   it("gives the signed-in shopper's orders, a page at a time, and signs them out", async () => {

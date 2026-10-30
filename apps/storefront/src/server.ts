@@ -2664,6 +2664,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
               wishlist: (token) => core.accountWishlist(found.shopId, token),
               wishlistAdd: (token, ids) => core.accountWishlistAdd(found.shopId, token, ids),
               wishlistRemove: (token, id) => core.accountWishlistRemove(found.shopId, token, id),
+              viewed: (token) => core.accountViewed(found.shopId, token),
+              viewedAdd: (token, ids) => core.accountViewedAdd(found.shopId, token, ids),
               dataExport: async (token) =>
                 (await dataRequestsLeft())
                   ? core.accountDataExport(found.shopId, token)

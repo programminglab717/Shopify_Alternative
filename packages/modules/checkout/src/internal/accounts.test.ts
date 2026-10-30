@@ -1039,6 +1039,36 @@ describe.skipIf(!server)("Shoppers' accounts, signed in to by a code (CUS-02, AD
     expect(await f.accounts.addToWishlist(f.a.shopId, token, [lawn])).toBeNull();
   });
 
+  it('keeps the products a shopper viewed with their account, apart from their wishlist (ADR-978)', async () => {
+    const products = await productsOf(Array.from({ length: 22 }, (_, index) => `Viewed ${index}`));
+    const [kurta, shawl, dupatta] = products as [string, string, string];
+    const token = await signIn(JAZZ);
+    expect(await f.accounts.recentlyViewed(f.a.shopId, token)).toEqual([]);
+    expect(await f.accounts.addToRecentlyViewed(f.a.shopId, token, [kurta, shawl])).toEqual([
+      kurta,
+      shawl,
+    ]);
+    // Viewed again, it moves to the top, unlike the wishlist's.
+    expect(await f.accounts.addToRecentlyViewed(f.a.shopId, token, [dupatta, shawl])).toEqual([
+      dupatta,
+      shawl,
+      kurta,
+    ]);
+    // Its own list: the wishlist knows nothing of it, nor it of the wishlist.
+    expect(await f.accounts.wishlist(f.a.shopId, token)).toEqual([]);
+    await f.accounts.addToWishlist(f.a.shopId, token, [kurta]);
+    expect(await f.accounts.recentlyViewed(f.a.shopId, token)).toEqual([dupatta, shawl, kurta]);
+    expect(await f.accounts.removeFromWishlist(f.a.shopId, token, kurta)).toEqual([]);
+    expect(await f.accounts.recentlyViewed(f.a.shopId, token)).toEqual([dupatta, shawl, kurta]);
+    // The newest twenty kept.
+    const all = (await f.accounts.addToRecentlyViewed(f.a.shopId, token, products.slice(3)))!;
+    expect(all).toHaveLength(20);
+    expect(all.slice(0, 19)).toEqual(products.slice(3));
+    expect(all[19]).toBe(dupatta);
+    // Without a session, nothing.
+    expect(await f.accounts.recentlyViewed(f.a.shopId, 'x'.repeat(43))).toBeNull();
+  });
+
   it('keeps the newest 100, the oldest going to make room (ADR-575)', async () => {
     const titles = Array.from({ length: 103 }, (_, index) => `Product ${index + 1}`);
     const products = await productsOf(titles);

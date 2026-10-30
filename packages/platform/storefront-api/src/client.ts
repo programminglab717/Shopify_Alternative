@@ -856,6 +856,34 @@ export class StorefrontApiClient {
     );
   }
 
+  /** The products the account the cookie's `token` names viewed (ADR-978); null without one. */
+  async accountViewed(shopId: string, token: string | null): Promise<string[] | null> {
+    if (!token) return null;
+    return this.#wishlist(
+      await this.#request('GET', accountPath(shopId, 'viewed'), null, undefined, {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      }),
+    );
+  }
+
+  /**
+   * Adds `productIds`, the latest first, to the products the account the cookie's `token` names
+   * viewed (ADR-978): the list as it is now; null without a session.
+   */
+  async accountViewedAdd(
+    shopId: string,
+    token: string | null,
+    productIds: readonly string[],
+  ): Promise<string[] | null> {
+    if (!token) return null;
+    const body: AccountWishlistAddRequest = { productIds: [...productIds] };
+    return this.#wishlist(
+      await this.#request('POST', accountPath(shopId, 'viewed'), null, body, {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      }),
+    );
+  }
+
   /**
    * Takes the product `productId` off the wishlist of the account the cookie's `token` names
    * (ADR-575): the wishlist as it is now; null without a session.
