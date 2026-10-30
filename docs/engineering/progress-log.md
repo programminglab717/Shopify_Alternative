@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Margins abroad by tag
+### 39103e3 · Margins abroad by tag
 
 * **An expansion store's margin by tag**, after a product's type's and vendor's ([ADR-976](../architecture/13-decision-log.md#adr-976--an-expansion-stores-margin-by-tag)).
 * 5126 tests (none new: the margins' tests ask it).
