@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-977 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-981 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -985,6 +985,10 @@
 | 975 | A week's or a month's sales abroad are its days', each at that day's rate | Accepted |
 | 976 | An expansion store's margin by tag | Accepted |
 | 977 | A draft the shop took out of a running experiment may be let back in | Accepted |
+| 978 | Products a shopper viewed are kept with their account, and read and added through the Storefront API | Accepted |
+| 979 | The sales report shows the owner's stores abroad beside this shop, in the report's own period | Accepted |
+| 980 | A collection's buy button may lead with one of its products, across, above the rest | Accepted |
+| 981 | An expansion store's margin by a metafield's value, after a product's tags' | Accepted |
 
 ---
 
@@ -31073,7 +31077,7 @@
     snippet shows it.
 * **Consequences:**
   * A shop's products fit a narrow sidebar or a row across a page as well as a grid.
-  * Not yet: a layout per product within a collection.
+  * Not yet: a layout per product within a collection (one product featured, built, ADR-980).
 
 ## ADR-950 · hatti function run --order tries a function on one of the shop's own orders, made into the input checkout would give it
 
@@ -31203,7 +31207,7 @@
     and what all the stores sold.
 * **Consequences:**
   * An owner sees a store abroad's sales grow, or not, beside their own, on one chart.
-  * Not yet: the same chart in the sales report; each day at that day's rate (built, ADR-974).
+  * Not yet: the same chart in the sales report (built, ADR-979); each day at that day's rate (built, ADR-974).
 
 ## ADR-956 · The Storefront API gives products and collections by their IDs at once, as Shopify's nodes
 
@@ -31320,7 +31324,7 @@
     have loaded.
 * **Consequences:**
   * A shopper finds again what they looked at, as on the shop's own pages.
-  * Not yet: recently viewed kept with the shopper's account, across devices.
+  * Not yet: recently viewed kept with the shopper's account, across devices (built, ADR-978).
 
 ## ADR-962 · Shoppers download, or ask to erase, their own data through the Storefront API, as their account page lets them
 
@@ -31610,7 +31614,7 @@
 * **Consequences:**
   * A store's sales abroad are seen as they were worth on their day.
   * Not yet: a week's or month's sales at each of its days' rates (built, ADR-975), and the same
-    chart in the sales report.
+    chart in the sales report (built, ADR-979).
 
 ## ADR-975 · A week's or a month's sales abroad are its days', each at that day's rate
 
@@ -31637,7 +31641,7 @@
   The admin's list offers "Tag" beside "Product type" and "Vendor".
 * **Consequences:**
   * A shop prices a kind of goods abroad by the tags it already uses.
-  * Not yet: a margin by a product's metafield.
+  * Not yet: a margin by a product's metafield (built, ADR-981).
 
 ## ADR-977 · A draft the shop took out of a running experiment may be let back in
 
@@ -31654,3 +31658,77 @@
   * Taking a draft out is no longer final.
   * Some shoppers of a draft let back in saw the live theme for a while, counted in no arm: its
     counts are a little less clean than an arm never stopped.
+
+## ADR-978 · Products a shopper viewed are kept with their account, and read and added through the Storefront API
+
+* **Context:** ADR-961's headless starter lists the products a shopper looked at, kept in the
+  browser: a shopper who signs in on their phone sees none of what they viewed on their laptop.
+  ADR-961 left recently viewed kept with the account, across devices, as not yet.
+* **Decision:**
+  * **Kept beside the wishlist** (ADR-956): `checkout.account_wishlist_items` gains a `list`,
+    `wishlist` or `viewed`, its unique keys taking it in. Viewing a product again moves it to the
+    front; twenty at most are kept, the oldest dropped, as the wishlist keeps its own most.
+    Joining a guest's account to a signed-in one moves both lists.
+  * **Storefront API:** `customer { recentlyViewed }`, newest first, as products, and
+    `customerRecentlyViewedAdd(customerAccessToken, productId)`; a product no longer sold is left
+    out.
+  * **The shopper's data** (ADR-962): the export gives the products viewed beside the wishlist;
+    erasing the account erases them.
+  * **Starter:** a signed-in shopper's product page adds the product to their account's list, and
+    "Recently viewed" reads it, on any device; a guest's stays in the browser as before.
+* **Consequences:**
+  * A shopper finds again what they looked at on another device, once signed in.
+  * Not yet: the browser's list joined to the account on signing in.
+
+
+## ADR-979 · The sales report shows the owner's stores abroad beside this shop, in the report's own period
+
+* **Context:** ADR-955 put every store's sales by day on one chart, on the expansion stores'
+  page, and ADR-974 put each day at its own rate. An owner reading the sales report had to go
+  there to see the stores abroad beside it. ADR-955 and ADR-974 left the same chart in the sales
+  report as not yet.
+* **Decision:** the analytics page's sales report, for the shop's owner, shows the stores' chart
+  under its own, in the period the report is set to (7, 30 or 90 days), the chart's own period
+  choice hidden there. It is shown only where the owner has stores abroad; a manager, who sees
+  none of the other shops' figures, does not see it.
+* **Consequences:**
+  * The owner sees their shops abroad beside this one without leaving the report.
+  * Not yet: the chart in a custom report, or in its emailed schedule.
+
+
+## ADR-980 · A collection's buy button may lead with one of its products, across, above the rest
+
+* **Context:** ADR-949 lays a collection's buy button out as a grid, a list or a carousel, every
+  product alike. A shop putting its collection on a blog often wants one product, a new arrival or
+  a best seller, shown larger first. ADR-949 left a layout per product within a collection as not
+  yet.
+* **Decision:**
+  * **The snippet's `data-featured`** names one product by its handle, for a collection's embed
+    alone; it is cut to the letters a handle has.
+  * **The script** reads that product as a product's button reads it and shows it across, its
+    photo beside it, under the collection's heading and above the others, which then leave it
+    out. A product the storefront no longer shows leaves nothing above them.
+  * **Admin:** a collection's buy button card offers "Featured product" from its active products,
+    and the snippet shows it.
+* **Consequences:**
+  * A shop leads its embedded collection with the product it wants seen.
+  * Not yet: more than one product featured, or another layout for the one featured.
+
+
+## ADR-981 · An expansion store's margin by a metafield's value, after a product's tags'
+
+* **Context:** ADR-971 and ADR-976 give an expansion store a margin by product type, vendor or
+  tag. Shops that describe their goods in metafields (ADR-903), a fabric or a season, had to
+  repeat that as tags to price by it. ADR-976 left a margin by a product's metafield as not yet.
+* **Decision:** a margin `by` `METAFIELD`, with its `key` as `namespace.key` and the `value` the
+  product's metafield must hold, kept with the others (twenty at most in all). The value is
+  matched whole, letter case and spaces at the ends aside, so a list metafield matches by its
+  whole value, not by one item of it. A product's margin is taken in this order: its own, its
+  collection's, its type's, its vendor's, its first tag's in the list, then the first metafield
+  value in the list that it holds, then the store's. A `key` is kept for a metafield's margin
+  alone. The admin's list offers "A metafield's value", asking which metafield beside it.
+* **Consequences:**
+  * A shop prices goods abroad by the facts it already keeps in metafields.
+  * A change to a metafield alone does not mark the product changed, so it is copied at the
+    store's next copy rather than at once.
+  * Not yet: matching one item of a list metafield.
