@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-965 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-966 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -973,6 +973,7 @@
 | 963 | The headless starter's account page lets shoppers download or ask to erase their own data | Accepted |
 | 964 | A shop chooses how often, and how many times, overdue payment terms are reminded | Accepted |
 | 965 | A shop chooses how long before the due date payment terms are first reminded, or not before it | Accepted |
+| 966 | The admin's and the console's tests check each screen's accessibility with axe | Accepted |
 
 ---
 
@@ -31393,3 +31394,30 @@
 * **Consequences:**
   * Each shop's customers hear of their dates as its trade expects.
   * Not yet: reminders by the customer, some on terms told more often than others.
+
+## ADR-966 · The admin's and the console's tests check each screen's accessibility with axe
+
+* **Context:** The design system (design §8) asks for WCAG 2.2 AA in the admin, checked
+  automatically in CI with axe. The admin's tests find what they press by its label and role,
+  which catches a field or button with no name, but nothing checked the rest: headings in order,
+  pictures with words, landmarks.
+* **Decision:**
+  * **axe-core** (MPL-2.0, free) reads a screen in the admin's and the console's tests: the
+    first screen each test file renders, once its test is done, and any rule it breaks fails
+    that test with what broke and where. Once a file, not once a test: run after each test, the
+    suite took past its time on a busy machine.
+  * **The page as it was:** Testing Library's cleanup empties the page before a setup file's
+    hooks run, so the check keeps the page as cleanup found it and reads that.
+  * **Rules left out, each for a reason:** colour contrast, as tests lay nothing out (the
+    tokens' tests check every pair the design system uses); regions, as tests render screens
+    alone; the side bar and the phone's bar being the one main navigation, shown at different
+    widths; and a photo's description saying what the page says, being the merchant's words.
+    An embedded app's or a theme's preview frame is left to its own page.
+  * **What it found, fixed:** four headings that skipped a level (an app's webhooks, a rider's
+    deliveries and hand-over, a saved reply) are second-level now.
+  * The check has tests of its own: a field without a label, a button without a name, a picture
+    without words and a skipped heading are each caught.
+* **Consequences:**
+  * A screen that breaks an accessibility rule fails CI, as the design system said.
+  * Not yet: contrast and focus order checked in a real browser, the storefront's themes and
+    checkout checked the same way, and TalkBack tried by hand in English and Urdu.

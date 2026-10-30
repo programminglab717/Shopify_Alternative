@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
+### Accessibility checked as the tests run
+
+* **The admin's and the console's tests check each screen's accessibility with axe** (design
+  §8), and four headings that skipped a level take their place ([ADR-966](../architecture/13-decision-log.md#adr-966--the-admins-and-the-consoles-tests-check-each-screens-accessibility-with-axe)).
+* 5024 tests (3 new).
+
 ### d10e354 · Payment terms reminded before the date as the shop chose
 
 * **A shop chooses how long before the due date payment terms are first reminded**, or not
