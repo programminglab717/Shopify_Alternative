@@ -55,7 +55,9 @@
   },
   "accessibility": {
     "skip_to_content": "Skip to content",
-    "breadcrumbs": "Breadcrumbs"
+    "breadcrumbs": "Breadcrumbs",
+    "announcement": "Announcement",
+    "chat": "Chat with the shop"
   },
   "products": {
     "product": {

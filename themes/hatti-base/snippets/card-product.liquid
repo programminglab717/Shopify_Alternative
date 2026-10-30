@@ -35,7 +35,12 @@
         <span class="badge badge--sale">{{ 'products.product.on_sale' | t }}</span>
       {%- endif -%}
     </div>
-    <h3 class="card__title" dir="auto">{{ product.title | escape }}</h3>
+    {%- comment -%}
+      A third-level heading under a section's own, unless the page's heading is the one above it,
+      as on a collection's page (ADR-967).
+    {%- endcomment -%}
+    {%- assign level = heading | default: 3 -%}
+    <h{{ level }} class="card__title" dir="auto">{{ product.title | escape }}</h{{ level }}>
     {%- if product.combined_listing.one_card -%}
       {%- assign values = product.combined_listing.values -%}
       <p class="card__values" dir="auto">

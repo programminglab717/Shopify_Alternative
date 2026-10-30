@@ -55,7 +55,9 @@
   },
   "accessibility": {
     "skip_to_content": "مواد پر جائیں",
-    "breadcrumbs": "آپ یہاں ہیں"
+    "breadcrumbs": "آپ یہاں ہیں",
+    "announcement": "اعلان",
+    "chat": "دکان سے بات کریں"
   },
   "products": {
     "product": {

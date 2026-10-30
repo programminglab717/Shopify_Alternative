@@ -8,6 +8,8 @@ import {
 import { chooseDiscounts, type DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX } from '@hatti/tax/public';
+import axe from 'axe-core';
+import { Window } from 'happy-dom';
 import { describe, expect, it } from 'vitest';
 import { CONTACT_SCRIPT, TOTALS_SCRIPT, checkoutPage } from './checkout-pages.js';
 import { EMPTY_FORM, type CheckoutShop, type CheckoutView } from './checkout.service.js';
@@ -186,6 +188,57 @@ function openView(
 }
 
 describe('checkoutPage', () => {
+  it('breaks no accessibility rule, open, with errors beside its boxes, refused, or placed (ADR-967)', async () => {
+    /** The rules the page breaks, as axe reads it in a window of its own, its scripts out. */
+    const problemsOf = async (html: string) => {
+      const window = new Window({
+        settings: {
+          enableJavaScriptEvaluation: true,
+          suppressInsecureJavaScriptEnvironmentWarning: true,
+        },
+      });
+      window.document.write(html.replace(/<script\b[\s\S]*?<\/script>/gi, ''));
+      window.eval(axe.source);
+      const inside = (window as unknown as { axe: typeof axe }).axe;
+      // Nothing is laid out to compare colours by; the map's frame is the tiles' own page.
+      const { violations } = await inside.run(window.document as unknown as axe.ElementContext, {
+        rules: { 'color-contrast': { enabled: false } },
+        iframes: false,
+      });
+      await window.happyDOM.close();
+      return violations.map((each) => `${each.id}: ${each.nodes[0]?.html.slice(0, 160)}`);
+    };
+    const pages = {
+      open: checkoutPage(openView()),
+      errors: checkoutPage(
+        openView({
+          form: { ...EMPTY_FORM, phone: '12345' },
+          problem: {
+            kind: 'address',
+            errors: [
+              { field: ['phone'], code: 'INVALID', message: 'Phone must be a Pakistani mobile' },
+              { field: ['city'], code: 'BLANK', message: "City can't be blank" },
+            ],
+          },
+        }),
+      ),
+      refused: checkoutPage(openView({ problem: { kind: 'refused' } })),
+      placed: checkoutPage({
+        kind: 'placed',
+        shop: SHOP,
+        order: ORDER,
+        online: null,
+        payment: null,
+        storeCredit: 0n,
+        giftCards: [],
+        pickup: null,
+      }),
+    };
+    const found: Record<string, string[]> = {};
+    for (const [name, page] of Object.entries(pages)) found[name] = await problemsOf(page.html);
+    expect(found).toEqual({ open: [], errors: [], refused: [], placed: [] });
+  });
+
   it('shows the cart, what delivery costs where, and the form, its one script adding a pin', () => {
     const page = checkoutPage(openView());
     expect(page.status).toBe(200);

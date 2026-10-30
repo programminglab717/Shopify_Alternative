@@ -1,5 +1,8 @@
 {%- if section.settings.text != blank -%}
-  <p class="announcement" dir="auto">{{ section.settings.text | escape }}</p>
+  {%- comment -%} A landmark of its own, for screen readers to find it by (ADR-967). {%- endcomment -%}
+  <aside aria-label="{{ 'accessibility.announcement' | t | escape }}">
+    <p class="announcement" dir="auto">{{ section.settings.text | escape }}</p>
+  </aside>
 {%- endif -%}
 
 {% schema %}
