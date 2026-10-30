@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Each day's sales abroad at that day's rate
+### f98375c · Each day's sales abroad at that day's rate
 
 * **Each day's currency rates are kept, and the stores' chart puts each day's sales at that
   day's rate**, the total its days' ([ADR-974](../architecture/13-decision-log.md#adr-974--each-days-currency-rates-are-kept-and-the-stores-chart-puts-each-days-sales-at-that-days-rate)).
