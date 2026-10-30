@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
+### 958b8de · The admin's accessibility hook given a test's time
+
+* **CI failed on 6561450** in a file the push did not touch: the admin's stock rules test, its
+  first screen read by axe in an `afterEach` hook (ADR-966), ran past the hook's 10 seconds, the
+  default, on a busy runner (15 seconds for the test there, one locally); the next test then found
+  the page the hook had not yet taken away.
+* **The admin's and console's hooks now have 20 seconds**, as their tests do, and axe is asked for
+  the rules broken alone, as the storefront's are (ADR-967).
+
 ### 547e072 · An expansion store's margin by a metafield's value
 
 * **A margin by a metafield's value**, its `namespace.key` named, after a product's tags' and
