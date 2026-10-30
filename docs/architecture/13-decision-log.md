@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-976 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-977 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -984,6 +984,7 @@
 | 974 | Each day's currency rates are kept, and the stores' chart puts each day's sales at that day's rate | Accepted |
 | 975 | A week's or a month's sales abroad are its days', each at that day's rate | Accepted |
 | 976 | An expansion store's margin by tag | Accepted |
+| 977 | A draft the shop took out of a running experiment may be let back in | Accepted |
 
 ---
 
@@ -31531,7 +31532,7 @@
   * A shop tries a new idea without starting over.
   * A draft added late is compared with the live theme's sessions since the experiment began,
     not only since it joined; the admin says it needs time to catch up.
-  * Not yet: a draft taken out let back in.
+  * Not yet: a draft taken out let back in (built, ADR-977).
 
 ## ADR-971 · An expansion store's margin by product type or vendor
 
@@ -31637,3 +31638,19 @@
 * **Consequences:**
   * A shop prices a kind of goods abroad by the tags it already uses.
   * Not yet: a margin by a product's metafield.
+
+## ADR-977 · A draft the shop took out of a running experiment may be let back in
+
+* **Context:** ADR-970 lets a shop take a draft out of a running experiment, its arm stopped and
+  its counts kept. A shop that took one out by mistake, or wants it back after a fix, had to start
+  over; ADR-970 left letting it back in as not yet.
+* **Decision:** `themeExperimentDraftLetBackIn(id, themeId)` lets a draft the shop took out back
+  in: its arm goes on, its counts from where they stopped, its share of shoppers still to come as
+  before. Those of its shoppers shown the live theme meanwhile, their cookie keeping the arm, see
+  the draft again. A draft Hatti stopped as it sold clearly worse (ADR-939) stays stopped, and one
+  still showing is refused. The admin offers "Let … back in" for each draft taken out; it is in the
+  shop's activity log.
+* **Consequences:**
+  * Taking a draft out is no longer final.
+  * Some shoppers of a draft let back in saw the live theme for a while, counted in no arm: its
+    counts are a little less clean than an arm never stopped.
