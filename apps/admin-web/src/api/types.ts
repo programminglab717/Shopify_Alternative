@@ -4881,9 +4881,14 @@ export interface ExpansionStore {
   groupMargins: ExpansionGroupMargin[];
 }
 
-/** A product type's, vendor's or tag's margin over an expansion store's rate (ADR-971, ADR-976). */
+/**
+ * A product type's, vendor's or tag's margin over an expansion store's rate (ADR-971, ADR-976), or
+ * that of the products whose metafield holds a value (ADR-981).
+ */
 export interface ExpansionGroupMargin {
-  by: 'PRODUCT_TYPE' | 'VENDOR' | 'TAG';
+  by: 'PRODUCT_TYPE' | 'VENDOR' | 'TAG' | 'METAFIELD';
+  /** By METAFIELD, its namespace.key; absent or null otherwise. */
+  key?: string | null;
   value: string;
   marginPercent: number;
 }

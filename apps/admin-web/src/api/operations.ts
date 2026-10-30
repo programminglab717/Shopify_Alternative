@@ -9962,6 +9962,7 @@ const EXPANSION_STORE = /* GraphQL */ `
     }
     groupMargins {
       by
+      key
       value
       marginPercent
     }

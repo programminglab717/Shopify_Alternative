@@ -631,8 +631,9 @@ function ProductMargins({
 }
 
 /**
- * Margins by product type, vendor (ADR-971) or tag (ADR-976), after a product's own and its
- * collection's, a type's before a vendor's and a vendor's before a tag's: twenty at most.
+ * Margins by product type, vendor (ADR-971), tag (ADR-976) or a metafield's value (ADR-981),
+ * after a product's own and its collection's, a type's before a vendor's, a vendor's before a
+ * tag's and a tag's before a metafield's: twenty at most.
  */
 function GroupMargins({
   store,
@@ -647,13 +648,14 @@ function GroupMargins({
   const [rows, setRows] = useState(
     (store.groupMargins ?? []).map((each) => ({
       by: each.by,
+      key: each.key ?? '',
       value: each.value,
       margin: String(each.marginPercent),
     })),
   );
   const change = (at: number, row: Partial<(typeof rows)[number]>) =>
     setRows(rows.map((each, index) => (index === at ? { ...each, ...row } : each)));
-  const kinds = (['PRODUCT_TYPE', 'VENDOR', 'TAG'] as const).map((value) => ({
+  const kinds = (['PRODUCT_TYPE', 'VENDOR', 'TAG', 'METAFIELD'] as const).map((value) => ({
     value,
     label: t(`expansion.groupBy.${value}`),
   }));
@@ -662,13 +664,29 @@ function GroupMargins({
       <legend className="text-sm font-medium">{t('expansion.groupMargins')}</legend>
       <p className="text-sm text-muted">{t('expansion.groupMarginsHint')}</p>
       {rows.map((row, at) => (
-        <div key={at} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_2fr_1fr_auto]">
+        <div
+          key={at}
+          className={
+            row.by === 'METAFIELD'
+              ? 'grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]'
+              : 'grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_2fr_1fr_auto]'
+          }
+        >
           <SelectField
             label={t('expansion.groupBy')}
             value={row.by}
             options={kinds}
             onChange={(by) => change(at, { by })}
           />
+          {row.by === 'METAFIELD' && (
+            <TextField
+              label={t('expansion.groupKey')}
+              dir="ltr"
+              placeholder="custom.fabric"
+              value={row.key}
+              onChange={(event) => change(at, { key: event.target.value })}
+            />
+          )}
           <TextField
             label={t('expansion.groupValue')}
             dir="auto"
@@ -695,7 +713,9 @@ function GroupMargins({
         {rows.length < 20 && (
           <Button
             variant="secondary"
-            onClick={() => setRows([...rows, { by: 'PRODUCT_TYPE', value: '', margin: '0' }])}
+            onClick={() =>
+              setRows([...rows, { by: 'PRODUCT_TYPE', key: '', value: '', margin: '0' }])
+            }
           >
             {t('expansion.addGroupMargin')}
           </Button>
@@ -708,6 +728,8 @@ function GroupMargins({
             onSave(
               rows.map((row) => ({
                 by: row.by,
+                // A metafield's namespace.key, a metafield's alone.
+                ...(row.by === 'METAFIELD' ? { key: row.key.trim() } : {}),
                 value: row.value.trim(),
                 marginPercent: Number(row.margin.trim() || '0'),
               })),

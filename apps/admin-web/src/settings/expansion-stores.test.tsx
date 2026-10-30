@@ -302,31 +302,44 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
     expect(sentOf(fake, 'Products')[0]).toEqual({ first: 10, query: 'sofa' });
   });
 
-  it('gives a product type, a vendor and a tag a margin of their own (ADR-971, ADR-976)', async () => {
+  it('gives a product type, a vendor, a tag and a metafield a margin of their own (ADR-971, ADR-976, ADR-981)', async () => {
     const fake = core();
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/settings/expansion-stores');
     await screen.findByLabelText('Price rate');
     type('Price rate', '0.0036');
     fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
-    const add = await screen.findByRole('button', { name: 'Add a product type, vendor or tag' });
+    const add = await screen.findByRole('button', {
+      name: 'Add a product type, vendor, tag or metafield',
+    });
     fireEvent.click(add);
     fireEvent.click(add);
     fireEvent.click(add);
-    const [, vendor, tag] = screen.getAllByLabelText('Of') as HTMLSelectElement[];
+    fireEvent.click(add);
+    const [, vendor, tag, field] = screen.getAllByLabelText('Of') as HTMLSelectElement[];
     fireEvent.change(vendor!, { target: { value: 'VENDOR' } });
     fireEvent.change(tag!, { target: { value: 'TAG' } });
-    const [furniture, gul, bridal] = screen.getAllByLabelText('Product type, vendor or tag');
+    // A metafield's value asks which metafield too.
+    expect(screen.queryByLabelText('Metafield (namespace.key)')).toBeNull();
+    fireEvent.change(field!, { target: { value: 'METAFIELD' } });
+    fireEvent.change(screen.getByLabelText('Metafield (namespace.key)'), {
+      target: { value: ' custom.fabric ' },
+    });
+    const [furniture, gul, bridal, lawn] = screen.getAllByLabelText(
+      'Product type, vendor, tag or value',
+    );
     fireEvent.change(furniture!, { target: { value: ' Furniture ' } });
     fireEvent.change(gul!, { target: { value: 'Gul Ahmed' } });
     fireEvent.change(bridal!, { target: { value: 'bridal' } });
-    const [first, second, third] = screen.getAllByLabelText('Margin (%)');
+    fireEvent.change(lawn!, { target: { value: 'Lawn' } });
+    const [first, second, third, fourth] = screen.getAllByLabelText('Margin (%)');
     fireEvent.change(first!, { target: { value: '40' } });
     fireEvent.change(second!, { target: { value: '15' } });
     fireEvent.change(third!, { target: { value: '25' } });
+    fireEvent.change(fourth!, { target: { value: '35' } });
     fireEvent.click(
       screen.getByRole('button', {
-        name: "Save Zari Abroad's margins by product type, vendor and tag",
+        name: "Save Zari Abroad's margins by product type, vendor, tag and metafield",
       }),
     );
     await waitFor(() =>
@@ -337,12 +350,13 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
             { by: 'PRODUCT_TYPE', value: 'Furniture', marginPercent: 40 },
             { by: 'VENDOR', value: 'Gul Ahmed', marginPercent: 15 },
             { by: 'TAG', value: 'bridal', marginPercent: 25 },
+            { by: 'METAFIELD', key: 'custom.fabric', value: 'Lawn', marginPercent: 35 },
           ],
         },
       ]),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Remove the margin of Gul Ahmed' }));
-    expect(screen.getAllByLabelText('Product type, vendor or tag')).toHaveLength(2);
+    expect(screen.getAllByLabelText('Product type, vendor, tag or value')).toHaveLength(3);
   });
 
   it("shows each store's sales on one page, and all of them together in rupees (ADR-932)", async () => {

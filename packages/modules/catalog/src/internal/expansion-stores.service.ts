@@ -16,7 +16,7 @@ export const EXPANSION_STORE_LIMITS = {
   collectionMargins: 10,
   /** Products given a margin of their own (ADR-960). */
   productMargins: 25,
-  /** Product types, vendors and tags given a margin of their own (ADR-971, ADR-976). */
+  /** Product types, vendors, tags and metafields' values given a margin of their own (ADR-971, ADR-976, ADR-981). */
   groupMargins: 20,
   /** The longest product type, vendor or tag, as products keep them. */
   groupName: 255,
@@ -34,20 +34,26 @@ export interface ExpansionProductMargin {
   marginPercent: number;
 }
 
-/** What a margin by product type, vendor (ADR-971) or tag (ADR-976) matches. */
-export const EXPANSION_GROUP_KINDS = ['product_type', 'vendor', 'tag'] as const;
+/** What a margin by product type, vendor (ADR-971), tag (ADR-976) or metafield (ADR-981) matches. */
+export const EXPANSION_GROUP_KINDS = ['product_type', 'vendor', 'tag', 'metafield'] as const;
 export type ExpansionGroupKind = (typeof EXPANSION_GROUP_KINDS)[number];
 
 /**
  * A product type's or a vendor's products put a margin of their own over the store's rate
  * (ADR-971), after a product's own and its collections', before the store's: `value` matched as
- * the products give it, letter case aside.
+ * the products give it, letter case aside. By a metafield (ADR-981), the products whose metafield
+ * `key`, as `namespace.key`, holds `value`.
  */
 export interface ExpansionGroupMargin {
   by: ExpansionGroupKind;
+  /** The metafield's `namespace.key`, for a margin by metafield alone. */
+  key?: string;
   value: string;
   marginPercent: number;
 }
+
+/** A product metafield's `namespace.key`, each part as metafields keep it (ADR-981). */
+const METAFIELD_KEY = /^[A-Za-z0-9_-]{2,64}\.[A-Za-z0-9_-]{2,64}$/;
 
 /**
  * Copying as products change (ADR-913): once the shop's products have been left alone
@@ -433,9 +439,10 @@ export class ExpansionStoreService {
    * Gives the shop's products of each product type or vendor of `margins` a margin of their own
    * over `targetShopId`'s rate (ADR-971), after a product's own and its collections', before the
    * store's: a product of a type given one takes its type's before its vendor's, and its vendor's
-   * before its tags' (ADR-976), the first tag in the list it has. Twenty at most, each type,
-   * vendor or tag once, letter case aside; none takes them all away. A type or vendor no
-   * product has yet is kept, for the products to come.
+   * before its tags' (ADR-976), the first tag in the list it has, and its tags' before its
+   * metafields' (ADR-981), the first in the list whose metafield holds the value given. Twenty at
+   * most, each type, vendor, tag or metafield's value once, letter case aside; none takes them
+   * all away. A type or vendor no product has yet is kept, for the products to come.
    */
   async setGroupMargins(
     tenant: TenantContext,
@@ -447,7 +454,7 @@ export class ExpansionStoreService {
       return failOne(
         ['margins'],
         'INVALID',
-        `${most.groupMargins} product types, vendors and tags at most have a margin of their own`,
+        `${most.groupMargins} product types, vendors, tags and metafields at most have a margin of their own`,
       );
     }
     const kept: ExpansionGroupMargin[] = [];
@@ -457,14 +464,22 @@ export class ExpansionStoreService {
         return failOne(
           ['margins', String(at), 'by'],
           'INVALID',
-          'Choose a product type, vendor or tag',
+          'Choose a product type, vendor, tag or metafield',
+        );
+      }
+      const key = margin.by === 'metafield' ? (margin.key ?? '').trim() : undefined;
+      if (key !== undefined && !METAFIELD_KEY.test(key)) {
+        return failOne(
+          ['margins', String(at), 'key'],
+          'INVALID',
+          'Name the metafield as namespace.key',
         );
       }
       if (value === '' || value.length > most.groupName) {
         return failOne(
           ['margins', String(at), 'value'],
           'INVALID',
-          `Name the product type, vendor or tag, ${most.groupName} characters at most`,
+          `Name the product type, vendor, tag or value, ${most.groupName} characters at most`,
         );
       }
       const percent = margin.marginPercent;
@@ -477,12 +492,23 @@ export class ExpansionStoreService {
       }
       if (
         kept.some(
-          (each) => each.by === margin.by && each.value.toLowerCase() === value.toLowerCase(),
+          (each) =>
+            each.by === margin.by &&
+            each.key === key &&
+            each.value.toLowerCase() === value.toLowerCase(),
         )
       ) {
-        return failOne(['margins'], 'INVALID', 'Give each product type, vendor and tag one margin');
+        return failOne(
+          ['margins'],
+          'INVALID',
+          "Give each product type, vendor, tag and metafield's value one margin",
+        );
       }
-      kept.push({ by: margin.by, value, marginPercent: percent });
+      kept.push(
+        key === undefined
+          ? { by: margin.by, value, marginPercent: percent }
+          : { by: margin.by, key, value, marginPercent: percent },
+      );
     }
     const json = JSON.stringify(kept);
     const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
@@ -663,9 +689,11 @@ export class ExpansionStoreService {
 }
 
 /**
- * The margin of each product of the shop's whose type, vendor (ADR-971) or tags (ADR-976)
- * `margins` give one, by its handle, in the caller's transaction: its type's before its vendor's,
- * its vendor's before its tags', the first of its tags in `margins`' order; letter case aside.
+ * The margin of each product of the shop's whose type, vendor (ADR-971), tags (ADR-976) or
+ * metafields (ADR-981) `margins` give one, by its handle, in the caller's transaction: its type's
+ * before its vendor's, its vendor's before its tags', the first of its tags in `margins`' order,
+ * its tags' before its metafields', the first in `margins`' order; letter case aside. A
+ * metafield's value is matched as kept, so a list's whole value, not one of its items.
  */
 async function groupMarginsByHandleIn(
   tx: Tx,
@@ -681,26 +709,47 @@ async function groupMarginsByHandleIn(
   const types = of('product_type');
   const vendors = of('vendor');
   const tags = of('tag');
+  // Each metafield's value as `namespace.key`, a line break, then its value, letter case aside.
+  const fields = new Map(
+    margins
+      .filter((margin) => margin.by === 'metafield' && margin.key)
+      .map((margin) => [`${margin.key}\n${margin.value.toLowerCase()}`, margin.marginPercent]),
+  );
+  const keys = [...new Set([...fields.keys()].map((field) => field.split('\n')[0]!))];
   const { rows } = await tx.execute<{
     handle: string;
     product_type: string | null;
     vendor: string | null;
     tags: string[];
+    fields: string[];
   }>(sql`
-    SELECT handle, product_type, vendor, tags FROM catalog.products
-     WHERE shop_id = ${shopId}
-       AND (lower(btrim(product_type)) = ANY(${sql.param([...types.keys()])}::text[])
-            OR lower(btrim(vendor)) = ANY(${sql.param([...vendors.keys()])}::text[])
-            OR EXISTS (SELECT 1 FROM unnest(tags) AS tag
-                        WHERE lower(btrim(tag)) = ANY(${sql.param([...tags.keys()])}::text[])))`);
+    SELECT p.handle, p.product_type, p.vendor, p.tags,
+           COALESCE((SELECT array_agg(m.namespace || '.' || m.key || E'\n' || lower(btrim(m.value)))
+                       FROM catalog.metafields m
+                      WHERE m.shop_id = p.shop_id AND m.product_id = p.id
+                        AND m.namespace || '.' || m.key = ANY(${sql.param(keys)}::text[])),
+                    '{}') AS fields
+      FROM catalog.products p
+     WHERE p.shop_id = ${shopId}
+       AND (lower(btrim(p.product_type)) = ANY(${sql.param([...types.keys()])}::text[])
+            OR lower(btrim(p.vendor)) = ANY(${sql.param([...vendors.keys()])}::text[])
+            OR EXISTS (SELECT 1 FROM unnest(p.tags) AS tag
+                        WHERE lower(btrim(tag)) = ANY(${sql.param([...tags.keys()])}::text[]))
+            OR EXISTS (SELECT 1 FROM catalog.metafields m
+                        WHERE m.shop_id = p.shop_id AND m.product_id = p.id
+                          AND m.namespace || '.' || m.key || E'\n' || lower(btrim(m.value))
+                              = ANY(${sql.param([...fields.keys()])}::text[])))`);
   const chosen = new Map<string, number>();
   for (const row of rows) {
     const own = new Set(row.tags.map((tag) => tag.trim().toLowerCase()));
     const tagged = [...tags].find(([tag]) => own.has(tag))?.[1];
+    const held = new Set(row.fields);
+    const fielded = [...fields].find(([field]) => held.has(field))?.[1];
     const percent =
       types.get(row.product_type?.trim().toLowerCase() ?? '') ??
       vendors.get(row.vendor?.trim().toLowerCase() ?? '') ??
-      tagged;
+      tagged ??
+      fielded;
     if (percent !== undefined) chosen.set(row.handle, percent);
   }
   return chosen;

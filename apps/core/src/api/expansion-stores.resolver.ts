@@ -95,16 +95,24 @@ export class ExpansionProductMargin {
 
 @ObjectType({
   description:
-    "A product type's, vendor's or tag's products put a margin of their own over an expansion " +
-    "store's rate, after a product's own and its collections', before the store's (ADR-971, " +
-    'ADR-976).',
+    "A product type's, vendor's or tag's products, or those whose metafield holds a value, put a " +
+    "margin of their own over an expansion store's rate, after a product's own and its " +
+    "collections', before the store's (ADR-971, ADR-976, ADR-981).",
 })
 export class ExpansionGroupMargin {
-  @Field({ description: 'PRODUCT_TYPE, VENDOR or TAG (ADR-976).' })
+  @Field({ description: 'PRODUCT_TYPE, VENDOR, TAG (ADR-976) or METAFIELD (ADR-981).' })
   by!: string;
 
+  @Field(() => String, {
+    nullable: true,
+    description: "By METAFIELD, the product metafield's namespace.key; null otherwise.",
+  })
+  key!: string | null;
+
   @Field({
-    description: 'The product type, vendor or tag, as products give it, letter case aside.',
+    description:
+      "The product type, vendor or tag, or the metafield's value, as products give it, letter " +
+      'case aside.',
   })
   value!: string;
 
@@ -114,10 +122,16 @@ export class ExpansionGroupMargin {
 
 @InputType()
 export class ExpansionGroupMarginInput {
-  @Field({ description: 'PRODUCT_TYPE, VENDOR or TAG (ADR-976).' })
+  @Field({ description: 'PRODUCT_TYPE, VENDOR, TAG (ADR-976) or METAFIELD (ADR-981).' })
   by!: string;
 
-  @Field({ description: 'The product type, vendor or tag.' })
+  @Field(() => String, {
+    nullable: true,
+    description: "By METAFIELD, the product metafield's namespace.key, as custom.fabric.",
+  })
+  key?: string | null;
+
+  @Field({ description: "The product type, vendor or tag, or the metafield's value." })
   value!: string;
 
   @Field(() => Int, { description: 'A whole percent, 0 to 100.' })
@@ -205,9 +219,9 @@ export class ExpansionStore {
 
   @Field(() => [ExpansionGroupMargin], {
     description:
-      'Product types, vendors and tags whose products are put a margin of their own over its ' +
-      "rate, after a product's own and its collections', a type's before a vendor's and a " +
-      "vendor's before a tag's (ADR-971, ADR-976).",
+      'Product types, vendors, tags and metafields whose products are put a margin of their own ' +
+      "over its rate, after a product's own and its collections', a type's before a vendor's, a " +
+      "vendor's before a tag's and a tag's before a metafield's (ADR-971, ADR-976, ADR-981).",
   })
   groupMargins!: ExpansionGroupMargin[];
 
@@ -678,10 +692,11 @@ export class ExpansionStoreResolver {
 
   @Mutation(() => ExpansionStorePayload, {
     description:
-      "Gives this shop's products of each product type, vendor or tag (ADR-976) listed a margin of " +
-      'their own ' +
-      "over the expansion store's rate (ADR-971), after a product's own and its collections', " +
-      "before the store's; a product's type's before its vendor's, its vendor's before its tags'. " +
+      "Gives this shop's products of each product type, vendor or tag (ADR-976) listed, or whose " +
+      "metafield holds a value listed (ADR-981), a margin of their own over the expansion store's " +
+      "rate (ADR-971), after a product's own and its collections', before the store's; a " +
+      "product's type's before its vendor's, its vendor's before its tags', its tags' before its " +
+      "metafields'. " +
       'Twenty at most; none takes ' +
       'them away. Copying as products change copies them again. The owner alone, of both shops, ' +
       'having signed in lately.',
@@ -706,6 +721,7 @@ export class ExpansionStoreResolver {
         target,
         margins.map((margin) => ({
           by: margin.by.toLowerCase() as ExpansionGroupKind,
+          ...(margin.key ? { key: margin.key } : {}),
           value: margin.value,
           marginPercent: margin.marginPercent,
         })),
@@ -735,6 +751,7 @@ export class ExpansionStoreResolver {
         .map((margin) =>
           Object.assign(new ExpansionGroupMargin(), {
             by: margin.by.toUpperCase(),
+            key: margin.key ?? null,
             value: margin.value,
             marginPercent: margin.marginPercent,
           }),

@@ -295,16 +295,20 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     ).toEqual([]);
     const GROUP_MARGINS = `mutation ($shopId: ID!, $margins: [ExpansionGroupMarginInput!]!) {
       expansionStoreGroupMarginsSet(shopId: $shopId, margins: $margins) {
-        expansionStore { groupMargins { by value marginPercent } }
+        expansionStore { groupMargins { by key value marginPercent } }
         userErrors { field message } } }`;
-    const groupMargins = (list: { by: string; value: string; marginPercent: number }[]) =>
+    const groupMargins = (
+      list: { by: string; key?: string; value: string; marginPercent: number }[],
+    ) =>
       value(owner.token, zari, GROUP_MARGINS, {
         shopId: toPublicId('shop', abroad),
         margins: list,
       });
     expect(
       (await groupMargins([{ by: 'COLOUR', value: 'Red', marginPercent: 5 }])).userErrors,
-    ).toEqual([{ field: ['margins', '0', 'by'], message: 'Choose a product type, vendor or tag' }]);
+    ).toEqual([
+      { field: ['margins', '0', 'by'], message: 'Choose a product type, vendor, tag or metafield' },
+    ]);
     expect(
       (
         await groupMargins([
@@ -313,7 +317,10 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
         ])
       ).userErrors,
     ).toEqual([
-      { field: ['margins'], message: 'Give each product type, vendor and tag one margin' },
+      {
+        field: ['margins'],
+        message: "Give each product type, vendor, tag and metafield's value one margin",
+      },
     ]);
     expect(
       (
@@ -324,8 +331,8 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       ).expansionStore,
     ).toEqual({
       groupMargins: [
-        { by: 'VENDOR', value: 'Zari', marginPercent: 40 },
-        { by: 'PRODUCT_TYPE', value: 'kurtas', marginPercent: 30 },
+        { by: 'VENDOR', key: null, value: 'Zari', marginPercent: 40 },
+        { by: 'PRODUCT_TYPE', key: null, value: 'kurtas', marginPercent: 30 },
       ],
     });
     await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
@@ -349,6 +356,54 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       { by: 'TAG', value: 'winter', marginPercent: 90 },
       { by: 'TAG', value: 'lawn', marginPercent: 60 },
       { by: 'TAG', value: 'EID', marginPercent: 70 },
+    ]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '16.99', currencyCode: 'USD' } },
+    ]);
+    // Its metafield's after its tags' (ADR-981): the kurta's fabric lawn, 50%, $15.99; the
+    // first in the list it holds, letter case aside.
+    expect(
+      (
+        await value(
+          owner.token,
+          zari,
+          `mutation ($id: ID!) { metafieldsSet(metafields: [
+            { ownerId: $id, namespace: "custom", key: "fabric", type: "single_line_text_field", value: "Lawn" },
+            { ownerId: $id, namespace: "custom", key: "season", type: "single_line_text_field", value: "Summer" }
+          ]) { userErrors { message } } }`,
+          { id: kurta },
+        )
+      ).userErrors,
+    ).toEqual([]);
+    expect(
+      (await groupMargins([{ by: 'METAFIELD', key: 'fabric', value: 'Lawn', marginPercent: 50 }]))
+        .userErrors,
+    ).toEqual([{ field: ['margins', '0', 'key'], message: 'Name the metafield as namespace.key' }]);
+    expect(
+      (
+        await groupMargins([
+          { by: 'METAFIELD', key: 'custom.fabric', value: 'silk', marginPercent: 90 },
+          { by: 'METAFIELD', key: 'custom.fabric', value: 'LAWN', marginPercent: 50 },
+          { by: 'METAFIELD', key: 'custom.season', value: 'summer', marginPercent: 70 },
+          { by: 'VENDOR', key: 'custom.fabric', value: 'Elsewhere', marginPercent: 5 },
+        ])
+      ).expansionStore.groupMargins,
+    ).toEqual([
+      { by: 'METAFIELD', key: 'custom.fabric', value: 'silk', marginPercent: 90 },
+      { by: 'METAFIELD', key: 'custom.fabric', value: 'LAWN', marginPercent: 50 },
+      { by: 'METAFIELD', key: 'custom.season', value: 'summer', marginPercent: 70 },
+      // A key is a metafield's alone.
+      { by: 'VENDOR', key: null, value: 'Elsewhere', marginPercent: 5 },
+    ]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '15.99', currencyCode: 'USD' } },
+    ]);
+    // Its tags' still before its metafields'.
+    await groupMargins([
+      { by: 'METAFIELD', key: 'custom.fabric', value: 'lawn', marginPercent: 50 },
+      { by: 'TAG', value: 'lawn', marginPercent: 60 },
     ]);
     await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
     expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([

@@ -6210,27 +6210,33 @@ type ExpansionCopy {
 }
 
 """
-A product type's, vendor's or tag's products put a margin of their own over an expansion store's rate, after a product's own and its collections', before the store's (ADR-971, ADR-976).
+A product type's, vendor's or tag's products, or those whose metafield holds a value, put a margin of their own over an expansion store's rate, after a product's own and its collections', before the store's (ADR-971, ADR-976, ADR-981).
 """
 type ExpansionGroupMargin {
-  """PRODUCT_TYPE, VENDOR or TAG (ADR-976)."""
+  """PRODUCT_TYPE, VENDOR, TAG (ADR-976) or METAFIELD (ADR-981)."""
   by: String!
+
+  """By METAFIELD, the product metafield's namespace.key; null otherwise."""
+  key: String
   marginPercent: Int!
 
   """
-  The product type, vendor or tag, as products give it, letter case aside.
+  The product type, vendor or tag, or the metafield's value, as products give it, letter case aside.
   """
   value: String!
 }
 
 input ExpansionGroupMarginInput {
-  """PRODUCT_TYPE, VENDOR or TAG (ADR-976)."""
+  """PRODUCT_TYPE, VENDOR, TAG (ADR-976) or METAFIELD (ADR-981)."""
   by: String!
+
+  """By METAFIELD, the product metafield's namespace.key, as custom.fabric."""
+  key: String
 
   """A whole percent, 0 to 100."""
   marginPercent: Int!
 
-  """The product type, vendor or tag."""
+  """The product type, vendor or tag, or the metafield's value."""
   value: String!
 }
 
@@ -6275,7 +6281,7 @@ type ExpansionStore {
   followRate: Boolean!
 
   """
-  Product types, vendors and tags whose products are put a margin of their own over its rate, after a product's own and its collections', a type's before a vendor's and a vendor's before a tag's (ADR-971, ADR-976).
+  Product types, vendors, tags and metafields whose products are put a margin of their own over its rate, after a product's own and its collections', a type's before a vendor's, a vendor's before a tag's and a tag's before a metafield's (ADR-971, ADR-976, ADR-981).
   """
   groupMargins: [ExpansionGroupMargin!]!
   lastCopy: ExpansionCopy
@@ -10793,7 +10799,7 @@ type Mutation {
   expansionStoreFollowRateSet(enabled: Boolean!, shopId: ID!): ExpansionStorePayload!
 
   """
-  Gives this shop's products of each product type, vendor or tag (ADR-976) listed a margin of their own over the expansion store's rate (ADR-971), after a product's own and its collections', before the store's; a product's type's before its vendor's, its vendor's before its tags'. Twenty at most; none takes them away. Copying as products change copies them again. The owner alone, of both shops, having signed in lately.
+  Gives this shop's products of each product type, vendor or tag (ADR-976) listed, or whose metafield holds a value listed (ADR-981), a margin of their own over the expansion store's rate (ADR-971), after a product's own and its collections', before the store's; a product's type's before its vendor's, its vendor's before its tags', its tags' before its metafields'. Twenty at most; none takes them away. Copying as products change copies them again. The owner alone, of both shops, having signed in lately.
   """
   expansionStoreGroupMarginsSet(margins: [ExpansionGroupMarginInput!]!, shopId: ID!): ExpansionStorePayload!
 
