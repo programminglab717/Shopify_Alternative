@@ -248,10 +248,10 @@ export function AppWebhooks({
       aria-label={t('webhooks.of', { name: app.name })}
       className="flex flex-col gap-2 rounded-control bg-canvas p-3"
     >
-      <h3 className="flex items-center gap-2 font-medium">
+      <h2 className="flex items-center gap-2 font-medium">
         <Webhook aria-hidden className="size-5 text-secondary" />
         {t('webhooks.title')}
-      </h3>
+      </h2>
       {subscriptions.length === 0 && !adding && (
         <p className="text-secondary">{t('webhooks.none')}</p>
       )}

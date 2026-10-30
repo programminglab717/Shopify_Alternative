@@ -131,9 +131,9 @@ function ReplyRow({ reply, works }: { reply: SavedReplyValue; works: boolean }) 
   }
   return (
     <li className="flex flex-col gap-2 p-4">
-      <h3 className="font-semibold" dir="auto">
+      <h2 className="font-semibold" dir="auto">
         {reply.title}
-      </h3>
+      </h2>
       <p className="whitespace-pre-wrap text-secondary" dir="auto">
         {reply.body}
       </p>

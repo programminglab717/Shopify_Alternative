@@ -47,7 +47,7 @@ export default defineConfig({
   build: { sourcemap: true, target: 'es2022' },
   test: {
     environment: 'happy-dom',
-    setupFiles: ['./src/test-setup.ts'],
+    setupFiles: ['./src/accessibility-check.ts', './src/test-setup.ts'],
     testTimeout: 20_000,
   },
 });

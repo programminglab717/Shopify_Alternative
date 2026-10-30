@@ -270,7 +270,7 @@ function RiderCard({ rider }: { rider: RiderValue }) {
           <ErrorState message={errorText(detail.error, t)} />
         ) : (
           <>
-            <h3 className="font-medium">{t('riders.deliveries')}</h3>
+            <h2 className="font-medium">{t('riders.deliveries')}</h2>
             {detail.data.riderDeliveries.length === 0 ? (
               <p className="text-secondary">{t('riders.noDeliveries')}</p>
             ) : (
@@ -315,7 +315,7 @@ function RiderCard({ rider }: { rider: RiderValue }) {
             {takesCash && (
               <>
                 <form onSubmit={(event) => void onHandOver(event)} className="flex flex-col gap-2">
-                  <h3 className="font-medium">{t('riders.handOver')}</h3>
+                  <h2 className="font-medium">{t('riders.handOver')}</h2>
                   <div className="grid gap-3 md:grid-cols-2">
                     <TextField
                       label={t('riders.amount')}
