@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-964 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-965 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -972,6 +972,7 @@
 | 962 | Shoppers download, or ask to erase, their own data through the Storefront API, as their account page lets them | Accepted |
 | 963 | The headless starter's account page lets shoppers download or ask to erase their own data | Accepted |
 | 964 | A shop chooses how often, and how many times, overdue payment terms are reminded | Accepted |
+| 965 | A shop chooses how long before the due date payment terms are first reminded, or not before it | Accepted |
 
 ---
 
@@ -31372,3 +31373,23 @@
 * **Consequences:**
   * Each shop chases its late payers as its trade does, without staff doing it by hand.
   * Not yet: the days before the date chosen by the shop.
+
+## ADR-965 · A shop chooses how long before the due date payment terms are first reminded, or not before it
+
+* **Context:** ADR-964 lets a shop choose how often, and how many times, overdue payment terms
+  are reminded, and left the reminder before the due date at ADR-945's three days. A wholesaler
+  whose resellers pay at month's end wants them told a week before; one whose customers take a
+  reminder before the date as pressure wants none.
+* **Decision:**
+  * **Migration 0427** adds an order setting: the days before an order on terms falls due that
+    its customer is first reminded, 1 to 7, or 0 for none before it; three by default.
+  * **The sweep reads it per shop:** an order is reminded before its date once it falls due
+    within that many days, and no sooner than halfway from the order to its date, as before.
+    With 0, no order is reminded before its date; past it, as ADR-964 says.
+  * **The worker finds a shop's orders** due within its own days, or past due, so a shop with a
+    week is found a week ahead, and one with none only once its orders are past due.
+  * **`orderSettings` and `orderSettingsUpdate`** give and take `termsBeforeDays`; admin's
+    "Payment terms reminders" asks for the days before the date as well.
+* **Consequences:**
+  * Each shop's customers hear of their dates as its trade expects.
+  * Not yet: reminders by the customer, some on terms told more often than others.
