@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### The shop's own payment terms reminders
+### 3cf7ad8 · The shop's own payment terms reminders
 
 * **A shop chooses how often, and how many times, overdue payment terms are reminded** ([ADR-964](../architecture/13-decision-log.md#adr-964--a-shop-chooses-how-often-and-how-many-times-overdue-payment-terms-are-reminded)).
 * 5020 tests (2 new).
