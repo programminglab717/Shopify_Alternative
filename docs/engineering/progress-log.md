@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Accessibility checked as the tests run
+### 34722b6 · Accessibility checked as the tests run
 
 * **The admin's and the console's tests check each screen's accessibility with axe** (design
   §8), and four headings that skipped a level take their place ([ADR-966](../architecture/13-decision-log.md#adr-966--the-admins-and-the-consoles-tests-check-each-screens-accessibility-with-axe)).
