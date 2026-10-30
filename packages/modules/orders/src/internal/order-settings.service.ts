@@ -87,6 +87,12 @@ export interface OrderSettingsRecord {
    * Desk, the one with the fewest waiting (ADR-654).
    */
   shareNewOrders: boolean;
+  /**
+   * The days between reminders of an order on payment terms still owed past its date, and how
+   * many are sent past it (ADR-964).
+   */
+  termsReminderDays: number;
+  termsOverdueReminders: number;
   /** Null while the shop has the defaults. */
   updatedAt: Date | null;
 }
@@ -109,6 +115,8 @@ export interface OrderSettingsInput {
   confirmationCalls?: ConfirmationCallsValue;
   staffDiscountPercent?: number | null;
   shareNewOrders?: boolean;
+  termsReminderDays?: number;
+  termsOverdueReminders?: number;
 }
 
 /** Which orders' customers are called to confirm them (ADR-611). */
@@ -181,7 +189,15 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   confirmationCalls: 'off',
   staffDiscountPercent: null,
   shareNewOrders: false,
+  termsReminderDays: 7,
+  termsOverdueReminders: 4,
 };
+
+/** The days between overdue reminders, and how many past the date (ADR-964). */
+export const TERMS_REMINDER_LIMITS = {
+  days: { min: 1, max: 30 },
+  times: { min: 1, max: 4 },
+} as const;
 
 /** What a shop may let staff take off an order, as a percentage of its items (ADR-651). */
 export const STAFF_DISCOUNT_PERCENT = { min: 0, max: 100 } as const;
@@ -213,13 +229,15 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     confirmation_calls: ConfirmationCallsValue;
     staff_discount_percent: number | null;
     share_new_orders: boolean;
+    terms_reminder_days: number;
+    terms_overdue_reminders: number;
     updated_at: string;
   }>(sql`
     SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
            desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
            cancel_unpaid_after_hours, upsell_percent_off, credit_back_on_return,
            hold_when_refused, return_window_days, confirmation_calls, staff_discount_percent,
-           share_new_orders, updated_at
+           share_new_orders, terms_reminder_days, terms_overdue_reminders, updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -241,6 +259,8 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     confirmationCalls: row.confirmation_calls,
     staffDiscountPercent: row.staff_discount_percent,
     shareNewOrders: row.share_new_orders,
+    termsReminderDays: row.terms_reminder_days,
+    termsOverdueReminders: row.terms_overdue_reminders,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
@@ -261,6 +281,8 @@ function checkOrderSettings(
     upsellPercentOff,
     staffDiscountPercent,
     returnWindowDays,
+    termsReminderDays,
+    termsOverdueReminders,
   } = current;
   if (input.callingHours !== undefined) {
     callingHours = null;
@@ -350,6 +372,22 @@ function checkOrderSettings(
       STAFF_DISCOUNT_PERCENT,
     );
   }
+  if (input.termsReminderDays !== undefined) {
+    termsReminderDays =
+      check.integer(
+        ['input', 'termsReminderDays'],
+        input.termsReminderDays,
+        TERMS_REMINDER_LIMITS.days,
+      ) ?? termsReminderDays;
+  }
+  if (input.termsOverdueReminders !== undefined) {
+    termsOverdueReminders =
+      check.integer(
+        ['input', 'termsOverdueReminders'],
+        input.termsOverdueReminders,
+        TERMS_REMINDER_LIMITS.times,
+      ) ?? termsOverdueReminders;
+  }
   if (check.errors.length > before) return null;
   return {
     customerCancellation: input.customerCancellation ?? current.customerCancellation,
@@ -366,6 +404,8 @@ function checkOrderSettings(
     confirmationCalls: input.confirmationCalls ?? current.confirmationCalls,
     staffDiscountPercent,
     shareNewOrders: input.shareNewOrders ?? current.shareNewOrders,
+    termsReminderDays,
+    termsOverdueReminders,
   };
 }
 
@@ -389,6 +429,8 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
     confirmationCalls: settings.confirmationCalls,
     staffDiscountPercent: settings.staffDiscountPercent,
     shareNewOrders: settings.shareNewOrders,
+    termsReminderDays: settings.termsReminderDays,
+    termsOverdueReminders: settings.termsOverdueReminders,
   };
 }
 
@@ -422,7 +464,7 @@ export class OrderSettingsService {
                 desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
                 cancel_unpaid_after_hours, upsell_percent_off, credit_back_on_return,
                 hold_when_refused, return_window_days, confirmation_calls, staff_discount_percent,
-                share_new_orders)
+                share_new_orders, terms_reminder_days, terms_overdue_reminders)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
                 ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
                 ${next.deskWaitsForReminder}, ${next.cancelUnreachableAfterDays},
@@ -430,7 +472,8 @@ export class OrderSettingsService {
                 ${next.upsellPercentOff},
                 ${next.creditBackOnReturn}, ${next.holdWhenRefused}, ${next.returnWindowDays},
                 ${next.confirmationCalls},
-                ${next.staffDiscountPercent}, ${next.shareNewOrders})
+                ${next.staffDiscountPercent}, ${next.shareNewOrders}, ${next.termsReminderDays},
+                ${next.termsOverdueReminders})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
                        calling_opens = excluded.calling_opens,
@@ -447,6 +490,8 @@ export class OrderSettingsService {
                        confirmation_calls = excluded.confirmation_calls,
                        staff_discount_percent = excluded.staff_discount_percent,
                        share_new_orders = excluded.share_new_orders,
+                       terms_reminder_days = excluded.terms_reminder_days,
+                       terms_overdue_reminders = excluded.terms_overdue_reminders,
                        version = orders.order_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<OrderSettingsUpdatedPayload>(tx, tenant.shopId, {

@@ -3033,6 +3033,12 @@ const en = {
   'orderPolicies.returnWindow': 'Days after delivery customers may ask for a return',
   'orderPolicies.returnWindowHint':
     "1 to 30; leave it empty to take none online. They ask from their order's page, and you approve or decline under Returns.",
+  'orderPolicies.terms': 'Payment terms reminders',
+  'orderPolicies.termsHint':
+    'A customer still owing on an order on payment terms past its date is reminded again on WhatsApp and by email.',
+  'orderPolicies.termsDays': 'Days between reminders',
+  'orderPolicies.termsTimes': 'Reminders past the date',
+  'orderPolicies.termsTimesHint': '1 to 4. Then the rest is yours to chase.',
   'orderPolicies.staffDiscount': 'Most staff take off an order, in %',
   'orderPolicies.staffDiscountHint':
     'Of what its items cost; blank for any. Owners, managers and roles that give any discount take off more.',
@@ -10335,6 +10341,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.returnWindow': 'ڈیلیوری کے بعد کتنے دن گاہک واپسی کی درخواست کر سکتے ہیں',
   'orderPolicies.returnWindowHint':
     '1 سے 30؛ آن لائن کوئی واپسی نہ لینی ہو تو خالی چھوڑیں۔ وہ اپنے آرڈر کے صفحے سے درخواست کرتے ہیں، اور آپ واپسیوں میں منظور یا نامنظور کرتے ہیں۔',
+  'orderPolicies.terms': 'ادائیگی کی مدت کی یاد دہانیاں',
+  'orderPolicies.termsHint':
+    'مدت والے آرڈر پر تاریخ گزرنے کے بعد بھی جس گاہک کی رقم باقی ہو اسے واٹس ایپ اور ای میل پر دوبارہ یاد دلایا جاتا ہے۔',
+  'orderPolicies.termsDays': 'یاد دہانیوں کے درمیان دن',
+  'orderPolicies.termsTimes': 'تاریخ کے بعد یاد دہانیاں',
+  'orderPolicies.termsTimesHint': '1 سے 4۔ اس کے بعد وصولی آپ کے ذمے۔',
   'orderPolicies.staffDiscount': 'عملہ آرڈر پر زیادہ سے زیادہ کتنی رعایت دے (%)',
   'orderPolicies.staffDiscountHint':
     'آئٹمز کی قیمت کا فیصد، بغیر حد کے لیے خالی چھوڑیں۔ مالک، مینیجر اور وہ رول جو کوئی بھی رعایت دے سکتے ہیں، زیادہ دے سکتے ہیں۔',

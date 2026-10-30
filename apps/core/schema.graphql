@@ -13868,6 +13868,16 @@ type OrderSettings {
   """
   staffDiscountPercent: Int
 
+  """
+  How many reminders an order on payment terms still owed is sent past its date, 1 to 4 (ADR-964): 4 unless the shop chose otherwise.
+  """
+  termsOverdueReminders: Int!
+
+  """
+  The days between reminders of an order on payment terms still owed past its date (ADR-964): 7 unless the shop chose otherwise.
+  """
+  termsReminderDays: Int!
+
   """When the shop last changed them; none while it has the defaults."""
   updatedAt: DateTime
 
@@ -13905,6 +13915,12 @@ input OrderSettingsInput {
 
   """0 to 100; null for no limit."""
   staffDiscountPercent: Int
+
+  """1 to 4."""
+  termsOverdueReminders: Int
+
+  """1 to 30."""
+  termsReminderDays: Int
 
   """0 to 50; null for no offer."""
   upsellPercentOff: Int

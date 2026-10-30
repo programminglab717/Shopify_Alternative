@@ -20,11 +20,15 @@ export class PaymentTermsReminders {
     const soon = new Date(at.getTime() + PAYMENT_TERMS_REMINDERS.beforeMs).toISOString();
     const { rows: shops } = await this.database.system((tx) =>
       tx.execute<{ shop_id: string }>(sql`
-        SELECT DISTINCT shop_id FROM orders.orders
-         WHERE payment_due_at IS NOT NULL
-           AND terms_reminded < ${1 + PAYMENT_TERMS_REMINDERS.overdue}
-           AND payment_due_at <= ${soon}::timestamptz
-           AND status <> 'cancelled' AND amount_paid < total`),
+        SELECT DISTINCT o.shop_id FROM orders.orders o
+          LEFT JOIN orders.order_settings s ON s.shop_id = o.shop_id
+         WHERE o.payment_due_at IS NOT NULL
+           -- As many past the date as the shop chose (ADR-964).
+           AND o.terms_reminded < 1 + LEAST(coalesce(s.terms_overdue_reminders,
+                                                     ${PAYMENT_TERMS_REMINDERS.overdue}),
+                                            ${PAYMENT_TERMS_REMINDERS.overdue})
+           AND o.payment_due_at <= ${soon}::timestamptz
+           AND o.status <> 'cancelled' AND o.amount_paid < o.total`),
     );
     let reminded = 0;
     for (const { shop_id: shopId } of shops) {

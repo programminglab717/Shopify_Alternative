@@ -5,7 +5,7 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { BankTransferService, type OrderService } from '@hatti/orders/public';
+import { BankTransferService, OrderSettingsService, type OrderService } from '@hatti/orders/public';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PaymentTermsReminders } from './payment-terms-reminders.js';
@@ -174,5 +174,27 @@ describe.skipIf(!server)('Customers on payment terms reminded (ADR-945, ADR-954)
       [late],
     );
     expect(weekly.map((row) => row.payload.reminder ?? 1)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('reminds as often, and as many times, as the shop chose (ADR-964)', async () => {
+    // a's: every three days, twice past the date.
+    unwrap(
+      await new OrderSettingsService(database).update(a, {
+        termsReminderDays: 3,
+        termsOverdueReminders: 2,
+      }),
+    );
+    const late = await onTerms(a, 20);
+    const day = 86_400_000;
+    const counts: number[] = [];
+    for (const days of [0, 2, 3, 6, 9]) {
+      await sweeps.sweep(new Date(Date.now() + days * day + 60_000));
+      counts.push(await reminded(late));
+    }
+    // Overdue at once, again three days on, and no more.
+    expect(counts).toEqual([2, 2, 3, 3, 3]);
+    expect(
+      (await new OrderSettingsService(database).update(a, { termsOverdueReminders: 5 })).ok,
+    ).toBe(false);
   });
 });

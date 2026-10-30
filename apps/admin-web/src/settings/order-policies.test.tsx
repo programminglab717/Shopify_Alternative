@@ -209,6 +209,24 @@ describe('Order policies', () => {
     );
   });
 
+  it('reminds overdue payment terms as often, and as many times, as the shop says (ADR-964)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    // A week and four times, unless the shop chose otherwise.
+    const days = (await screen.findByLabelText('Days between reminders')) as HTMLInputElement;
+    expect(days.value).toBe('7');
+    expect((screen.getByLabelText('Reminders past the date') as HTMLInputElement).value).toBe('4');
+    type('Days between reminders', '3');
+    type('Reminders past the date', '2');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([
+      { input: { termsReminderDays: 3, termsOverdueReminders: 2 } },
+    ]);
+  });
+
   it("holds a customer's next orders when they refuse a parcel, where the shop says so (ADR-674)", async () => {
     const fake = core('owner');
     vi.stubGlobal('fetch', fake.fetcher);

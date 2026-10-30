@@ -59,6 +59,8 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   upsellPercentOff: 'orderPolicies.upsellPercent',
   staffDiscountPercent: 'orderPolicies.staffDiscount',
   returnWindowDays: 'orderPolicies.returnWindow',
+  termsReminderDays: 'orderPolicies.termsDays',
+  termsOverdueReminders: 'orderPolicies.termsTimes',
 };
 
 /** A number of whole units as typed, or blank for none; what is not one stays NaN. */
@@ -83,6 +85,8 @@ function orderInputOf(state: {
   returnWindow: string;
   calls: ConfirmationCalls;
   staffDiscount: string;
+  termsDays: string;
+  termsTimes: string;
 }) {
   return {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
@@ -100,6 +104,8 @@ function orderInputOf(state: {
     returnWindowDays: wholeOrNone(state.returnWindow),
     confirmationCalls: state.calls,
     staffDiscountPercent: wholeOrNone(state.staffDiscount),
+    termsReminderDays: wholeOrNone(state.termsDays),
+    termsOverdueReminders: wholeOrNone(state.termsTimes),
   };
 }
 
@@ -134,6 +140,9 @@ function stateOf(settings: OrderSettings) {
       settings.staffDiscountPercent === null || settings.staffDiscountPercent === undefined
         ? ''
         : String(settings.staffDiscountPercent),
+    // A week and four times unless the shop chose otherwise (ADR-964).
+    termsDays: String(settings.termsReminderDays ?? 7),
+    termsTimes: String(settings.termsOverdueReminders ?? 4),
   };
 }
 
@@ -368,6 +377,26 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
           value={state.staffDiscount}
           onChange={(event) => set({ staffDiscount: event.target.value })}
         />
+      </FormSection>
+
+      <FormSection title={t('orderPolicies.terms')} hint={t('orderPolicies.termsHint')}>
+        <Pair>
+          <TextField
+            label={t('orderPolicies.termsDays')}
+            inputMode="numeric"
+            ltr
+            value={state.termsDays}
+            onChange={(event) => set({ termsDays: event.target.value })}
+          />
+          <TextField
+            label={t('orderPolicies.termsTimes')}
+            hint={t('orderPolicies.termsTimesHint')}
+            inputMode="numeric"
+            ltr
+            value={state.termsTimes}
+            onChange={(event) => set({ termsTimes: event.target.value })}
+          />
+        </Pair>
       </FormSection>
 
       <FormSection title={t('orderPolicies.upsell')} hint={t('orderPolicies.upsellHint')}>

@@ -4081,6 +4081,12 @@ export interface OrderSettings {
    */
   staffDiscountPercent?: number | null;
   /**
+   * The days between overdue reminders of payment terms, and how many past the date (ADR-964);
+   * absent where a fake core leaves them out.
+   */
+  termsReminderDays?: number;
+  termsOverdueReminders?: number;
+  /**
    * Whether new orders that need a call go to the agents on duty at the desk (ADR-654); absent
    * where a fake core leaves it out.
    */

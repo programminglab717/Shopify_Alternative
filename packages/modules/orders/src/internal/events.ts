@@ -339,6 +339,9 @@ export interface OrderSettingsUpdatedPayload {
   staffDiscountPercent: number | null;
   /** Whether new orders are shared out among agents on duty (ADR-654). */
   shareNewOrders: boolean;
+  /** The days between overdue reminders of payment terms, and how many past the date (ADR-964). */
+  termsReminderDays: number;
+  termsOverdueReminders: number;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

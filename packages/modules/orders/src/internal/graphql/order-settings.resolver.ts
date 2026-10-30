@@ -70,6 +70,12 @@ export class OrderSettingsResolver {
         staffDiscountPercent: input.staffDiscountPercent,
       }),
       ...(typeof input.shareNewOrders === 'boolean' && { shareNewOrders: input.shareNewOrders }),
+      ...(typeof input.termsReminderDays === 'number' && {
+        termsReminderDays: input.termsReminderDays,
+      }),
+      ...(typeof input.termsOverdueReminders === 'number' && {
+        termsOverdueReminders: input.termsOverdueReminders,
+      }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -99,6 +105,8 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     confirmationCalls: record.confirmationCalls.toUpperCase() as ConfirmationCalls,
     staffDiscountPercent: record.staffDiscountPercent,
     shareNewOrders: record.shareNewOrders,
+    termsReminderDays: record.termsReminderDays,
+    termsOverdueReminders: record.termsOverdueReminders,
     updatedAt: record.updatedAt,
   });
 }

@@ -6,6 +6,7 @@ import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type OrderPaymentTermsRemindedPayload } from './events.js';
+import { orderSettingsIn } from './order-settings.service.js';
 
 // What wholesale customers owe on orders on payment terms (CUS-06, ADR-888): each customer's
 // orders still owed, what they come to, and what of it is past its due date, the most overdue
@@ -19,9 +20,12 @@ export const PAYMENT_TERMS_REMINDERS = {
   beforeMs: 3 * 86_400_000,
   /** The reminder after it: this long past it, the day's grace for a transfer on its way. */
   afterMs: 86_400_000,
-  /** Past it, reminded again this often while owed (ADR-954)... */
+  /**
+   * Past it, reminded again this often while owed (ADR-954)... A shop's own, in days, takes its
+   * place (ADR-964).
+   */
   againMs: 7 * 86_400_000,
-  /** ...this many times past it in all. */
+  /** ...this many times past it in all, at most; a shop's own may be fewer. */
   overdue: 4,
   /** Orders one sweep of a shop reminds at most, the earliest due first. */
   batch: 200,
@@ -40,9 +44,11 @@ export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Pr
   const now = at.toISOString();
   const soon = new Date(at.getTime() + PAYMENT_TERMS_REMINDERS.beforeMs).toISOString();
   const late = new Date(at.getTime() - PAYMENT_TERMS_REMINDERS.afterMs).toISOString();
-  const again = new Date(at.getTime() - PAYMENT_TERMS_REMINDERS.againMs).toISOString();
+  // As often, and as many times, as the shop chose (ADR-964).
+  const settings = await orderSettingsIn(tx, shopId);
+  const again = new Date(at.getTime() - settings.termsReminderDays * 86_400_000).toISOString();
   // 0 none, 1 the reminder before, 2 on the reminders past the date.
-  const most = 1 + PAYMENT_TERMS_REMINDERS.overdue;
+  const most = 1 + Math.min(settings.termsOverdueReminders, PAYMENT_TERMS_REMINDERS.overdue);
   const { rows } = await tx.execute<{
     id: string;
     stage: OrderPaymentTermsRemindedPayload['stage'];

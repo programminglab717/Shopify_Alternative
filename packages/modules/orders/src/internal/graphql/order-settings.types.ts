@@ -169,6 +169,20 @@ export class OrderSettings {
   })
   shareNewOrders!: boolean;
 
+  @Field(() => Int, {
+    description:
+      'The days between reminders of an order on payment terms still owed past its date ' +
+      '(ADR-964): 7 unless the shop chose otherwise.',
+  })
+  termsReminderDays!: number;
+
+  @Field(() => Int, {
+    description:
+      'How many reminders an order on payment terms still owed is sent past its date, 1 to 4 ' +
+      '(ADR-964): 4 unless the shop chose otherwise.',
+  })
+  termsOverdueReminders!: number;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -228,6 +242,12 @@ export class OrderSettingsInput {
 
   @Field(() => Boolean, { nullable: true })
   shareNewOrders?: boolean | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 30.' })
+  termsReminderDays?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 4.' })
+  termsOverdueReminders?: number | null;
 }
 
 @ObjectType()
