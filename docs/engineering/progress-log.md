@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### An experiment's draft let back in
+### 6f32a3b · An experiment's draft let back in
 
 * **A draft the shop took out of a running experiment may be let back in**; one Hatti stopped
   stays stopped ([ADR-977](../architecture/13-decision-log.md#adr-977--a-draft-the-shop-took-out-of-a-running-experiment-may-be-let-back-in)).
