@@ -25,6 +25,16 @@ const STOCK_COLUMNS = [
   { key: 'stock_value', title: 'Stock value', kind: 'AMOUNT', trueProfit: false },
 ];
 
+const STORES_COLUMNS = [
+  { key: 'orders', title: 'Orders', kind: 'NUMBER', trueProfit: false },
+  {
+    key: 'total_sales_here',
+    title: "Total sales in this shop's currency",
+    kind: 'AMOUNT',
+    trueProfit: false,
+  },
+];
+
 const MONTHLY: CustomReportValue = {
   id: 'crep_1',
   name: 'Monthly by channel',
@@ -48,7 +58,9 @@ function core(role: StaffRole) {
                 ? PRODUCT_COLUMNS
                 : variables.breakdown === 'STOCK'
                   ? STOCK_COLUMNS
-                  : SALES_COLUMNS,
+                  : variables.breakdown === 'STORES'
+                    ? STORES_COLUMNS
+                    : SALES_COLUMNS,
           };
         case 'CustomReport': {
           const report = reports.find((each) => each.id === variables.id) ?? null;
@@ -246,6 +258,39 @@ describe('Custom reports in the admin (ANL-06, ADR-819)', () => {
         },
       },
     ]);
+  });
+
+  it('offers the owner a report of this shop and each store abroad, and no one else (ADR-985)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/analytics/reports');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New report' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Stores' } });
+    fireEvent.change(screen.getByLabelText('Rows'), { target: { value: 'STORES' } });
+    expect(
+      ((await screen.findByLabelText("Total sales in this shop's currency")) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Save report' }));
+    expect(await screen.findByRole('heading', { name: 'Stores' })).toBeTruthy();
+    expect(sentOf(fake, 'CustomReportCreate')).toEqual([
+      {
+        input: {
+          name: 'Stores',
+          breakdown: 'STORES',
+          columns: ['orders', 'total_sales_here'],
+          period: 'LAST_12_MONTHS',
+        },
+      },
+    ]);
+    cleanup();
+
+    vi.stubGlobal('fetch', core('marketer').fetcher);
+    renderAdmin('/shop_1/analytics/reports');
+    fireEvent.click(await screen.findByRole('button', { name: 'New report' }));
+    const rows = screen.getByLabelText('Rows') as HTMLSelectElement;
+    expect([...rows.options].map((option) => option.value)).not.toContain('STORES');
   });
 
   it('shows a report, downloads it, emails it on a schedule, changes it and deletes it', async () => {

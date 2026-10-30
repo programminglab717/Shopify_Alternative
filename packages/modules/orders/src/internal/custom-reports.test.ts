@@ -8,9 +8,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   CUSTOM_REPORT_LIMITS,
   CustomReportService,
+  StoreSalesSource,
   reportFilename,
   reportPeriodDays,
   type CustomReportInput,
+  type StoreSales,
 } from './custom-reports.js';
 import { SalesReportService } from './sales-report.service.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
@@ -280,6 +282,54 @@ describe.skipIf(!server)('Custom reports (ANL-06, ADR-817)', () => {
     const before = { placedFrom: new Date('2026-01-01'), placedBefore: new Date('2026-02-01') };
     const then = unwrap(await reports.run(f.a, report, true, at, before));
     expect(then.rows.map((row) => row.values[2])).toEqual([0, 0]);
+  });
+
+  it("reports the owner's stores abroad beside this shop, through the core's source (ADR-985)", async () => {
+    expect(
+      errorsOf(
+        await reports.create(f.a, { ...BY_DAY, breakdown: 'stores', columns: ['net_sales'] }),
+      ),
+    ).toEqual([['input.columns.0', 'INVALID']]);
+    const report = unwrap(
+      await reports.create(f.a, {
+        name: 'Stores',
+        breakdown: 'stores',
+        columns: ['total_sales_here', 'orders'],
+        period: 'last_30_days',
+      }),
+    );
+    const at = new Date('2026-10-05T08:00:00Z');
+    // Without the core's source, none is run.
+    expect(errorsOf(await reports.run(f.a, report, true, at))).toEqual([['breakdown', 'INVALID']]);
+    const asked: [string, Date, Date][] = [];
+    class Stores extends StoreSalesSource {
+      async salesOf(tenant: typeof f.a, placedFrom: Date, placedBefore: Date) {
+        asked.push([tenant.shopId, placedFrom, placedBefore]);
+        const value: StoreSales[] = [
+          { shopId: f.a.shopId, name: 'Zari', here: true, orders: 3, totalSalesHere: 450_000n },
+          { shopId: 'b', name: 'Zari Abroad', here: false, orders: 2, totalSalesHere: 900_000n },
+        ];
+        return { ok: true as const, value };
+      }
+    }
+    const withStores = new CustomReportService(
+      f.db,
+      new SalesReportService(f.db),
+      new InventoryReportService(f.db, new VariantService(f.db)),
+      new Stores(),
+    );
+    const ran = unwrap(await withStores.run(f.a, report, true, at));
+    // Over the report's own period.
+    expect(asked).toEqual([[f.a.shopId, ran.placedFrom, ran.placedBefore]]);
+    expect(ran.columns.map((column) => [column.key, column.kind])).toEqual([
+      ['total_sales_here', 'amount'],
+      ['orders', 'number'],
+    ]);
+    expect(ran.rows).toEqual([
+      { key: f.a.shopId, label: 'Zari', values: [450_000n, 3] },
+      { key: 'b', label: 'Zari Abroad', values: [900_000n, 2] },
+    ]);
+    expect(ran.totals).toEqual([1_350_000n, 5]);
   });
 
   it('exports a report as a workbook of one sheet, its total last', async () => {

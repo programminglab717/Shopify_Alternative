@@ -42,11 +42,7 @@ export class ExpansionCopier {
    * too; null for a shop closed, or with none.
    */
   async ownerOf(shopId: string): Promise<string | null> {
-    const { rows } = await this.db.tenant(shopId, (tx) =>
-      tx.execute<{ user_id: string }>(sql`
-        SELECT user_id FROM identity.staff_phones(${shopId}) WHERE role = 'owner' LIMIT 1`),
-    );
-    return rows[0]?.user_id ?? null;
+    return shopOwnerOf(this.db, shopId);
   }
 
   /** Whether `userId` is the owner of `shopId`. */
@@ -151,4 +147,16 @@ export class ExpansionCopier {
     }
     return copied;
   }
+}
+
+/**
+ * The owner of `shopId`, as the shop's staff list has them for the app's login, the worker's
+ * too; null for a shop closed, or with none.
+ */
+export async function shopOwnerOf(db: Database, shopId: string): Promise<string | null> {
+  const { rows } = await db.tenant(shopId, (tx) =>
+    tx.execute<{ user_id: string }>(sql`
+      SELECT user_id FROM identity.staff_phones(${shopId}) WHERE role = 'owner' LIMIT 1`),
+  );
+  return rows[0]?.user_id ?? null;
 }

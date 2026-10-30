@@ -54,6 +54,7 @@ export const BREAKDOWNS: readonly CustomReportBreakdown[] = [
   'CUSTOMER',
   'CITY',
   'STOCK',
+  'STORES',
 ];
 
 export const PERIODS: readonly CustomReportPeriod[] = [
@@ -73,15 +74,22 @@ export const PERIODS: readonly CustomReportPeriod[] = [
 const FREQUENCIES: readonly OrderExportFrequency[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
 
 /** What a new report shows until the shop chooses. */
-const USUAL: Readonly<Record<'sales' | 'products' | 'stock', string[]>> = {
+const USUAL: Readonly<Record<'sales' | 'products' | 'stock' | 'stores', string[]>> = {
   sales: ['orders', 'net_sales', 'total_sales'],
   products: ['units_sold', 'gross_sales'],
   stock: ['on_hand', 'units_sold', 'stock_value'],
+  stores: ['orders', 'total_sales_here'],
 };
 
 /** Which kind of report a breakdown makes: each kind has columns of its own. */
 function kindOf(breakdown: CustomReportBreakdown): keyof typeof USUAL {
-  return breakdown === 'PRODUCT' ? 'products' : breakdown === 'STOCK' ? 'stock' : 'sales';
+  return breakdown === 'PRODUCT'
+    ? 'products'
+    : breakdown === 'STOCK'
+      ? 'stock'
+      : breakdown === 'STORES'
+        ? 'stores'
+        : 'sales';
 }
 
 type Draft = Omit<CustomReportValue, 'id'>;
@@ -115,8 +123,15 @@ function ReportEditor({
   onSave: (draft: Draft) => Promise<string | null>;
 }) {
   const { t } = useLocale();
+  const shop = useShop();
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState<string | null>(null);
+  // The owner's stores abroad are the owner's to report on alone (ADR-985); a report of them
+  // another opens still says so.
+  const breakdowns =
+    shop.role === 'owner' || initial.breakdown === 'STORES'
+      ? BREAKDOWNS
+      : BREAKDOWNS.filter((each) => each !== 'STORES');
   const columns = useAdminQuery<CustomReportColumnsData>(
     ['customReportColumns', draft.breakdown],
     CustomReportColumnsQuery,
@@ -157,7 +172,7 @@ function ReportEditor({
         <SelectField<CustomReportBreakdown>
           label={t('reports.breakdown')}
           value={draft.breakdown}
-          options={BREAKDOWNS.map((each) => ({
+          options={breakdowns.map((each) => ({
             value: each,
             label: t(`reports.breakdown.${each}` as MessageKey),
           }))}

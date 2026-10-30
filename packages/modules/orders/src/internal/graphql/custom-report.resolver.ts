@@ -84,7 +84,9 @@ export function toReportResult(
             ? toPublicId('product', row.key)
             : breakdown === 'source' && row.key
               ? row.key.toUpperCase()
-              : row.key,
+              : breakdown === 'stores' && row.key
+                ? toPublicId('shop', row.key)
+                : row.key,
         label: row.label,
         values: text(row.values),
       }),

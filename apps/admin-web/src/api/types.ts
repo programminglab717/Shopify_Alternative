@@ -3582,7 +3582,8 @@ export type CustomReportBreakdown =
   | 'CAMPAIGN'
   | 'CUSTOMER'
   | 'CITY'
-  | 'STOCK';
+  | 'STOCK'
+  | 'STORES';
 
 export type CustomReportPeriod =
   | 'TODAY'

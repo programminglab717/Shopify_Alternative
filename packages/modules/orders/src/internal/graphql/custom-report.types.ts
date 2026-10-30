@@ -22,6 +22,7 @@ export enum CustomReportBreakdown {
   CUSTOMER = 'CUSTOMER',
   CITY = 'CITY',
   STOCK = 'STOCK',
+  STORES = 'STORES',
 }
 
 registerEnumType(CustomReportBreakdown, {
@@ -41,6 +42,12 @@ registerEnumType(CustomReportBreakdown, {
       description:
         'The 250 tracked variants with the most on hand: what each has now, and what sold of it ' +
         'over the period, as the inventory report has them (ADR-910).',
+    },
+    STORES: {
+      description:
+        "This shop, then the owner's expansion stores they still own, each's orders and total " +
+        "sales in this shop's currency at each day's rate, as the stores' page has them " +
+        "(ADR-985). Run by the shop's owner alone.",
     },
   },
 });

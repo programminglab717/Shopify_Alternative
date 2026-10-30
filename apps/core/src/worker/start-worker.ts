@@ -192,6 +192,7 @@ import { StaffAlerts } from './staff-alerts.js';
 import { ArrivingReceipts } from './arriving-receipts.js';
 import { ExpansionAutoCopy } from './expansion-auto-copy.js';
 import { ExpansionCopier } from '../expansion-copier.js';
+import { ExpansionSales } from '../expansion-sales.js';
 import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
 import { StatusShopNotices } from './status-shop-notices.js';
@@ -994,6 +995,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
             database,
             new SalesReportService(database),
             new InventoryReportService(database, new VariantService(database)),
+            // The owner's stores abroad, for reports of them (ADR-985).
+            new ExpansionSales(database, new ExpansionStoreService(database)),
           ),
           new BillingService(
             database,

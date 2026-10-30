@@ -19,22 +19,11 @@ import {
 } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
-import { isCurrencyCode, money } from '@hatti/money';
-import {
-  SalesInterval,
-  SalesReportService,
-  netSales,
-  tallyOf,
-  totalSales,
-  type SalesIntervalValue,
-} from '@hatti/orders/public';
+import { money } from '@hatti/money';
+import { SalesInterval, type SalesIntervalValue } from '@hatti/orders/public';
 import { ExpansionCopier } from '../expansion-copier.js';
-import {
-  convertBetween,
-  dayRateBetween,
-  rupeeRatesByDayIn,
-  rupeeRatesIn,
-} from '../expansion-rates.js';
+import { ExpansionSales } from '../expansion-sales.js';
+import { dayRateBetween, rupeeRatesIn } from '../expansion-rates.js';
 import {
   Args,
   Field,
@@ -327,15 +316,12 @@ function owner(tenant: TenantContext): Extract<TenantContext['actor'], { kind: '
  */
 @Resolver(() => ExpansionStore)
 export class ExpansionStoreResolver {
-  readonly #sales: SalesReportService;
-
   constructor(
     private readonly db: Database,
     private readonly stores: ExpansionStoreService,
     private readonly copier: ExpansionCopier,
-  ) {
-    this.#sales = new SalesReportService(db);
-  }
+    private readonly sales: ExpansionSales,
+  ) {}
 
   @Query(() => [ExpansionStoreSales], {
     description:
@@ -358,103 +344,34 @@ export class ExpansionStoreResolver {
     interval: SalesInterval,
   ): Promise<ExpansionStoreSales[]> {
     const actor = owner(tenant);
-    const linked = await this.stores.list(tenant);
-    const shops = [tenant.shopId];
-    for (const record of linked) {
-      if (await this.copier.owns(actor.userId, record.targetShopId))
-        shops.push(record.targetShopId);
-    }
-    const { timezone } = await this.db.tenant(tenant.shopId, (tx) =>
-      shopProfile(tx, tenant.shopId),
-    );
-    // Each day at its own rate, in this shop's time (ADR-974).
-    const dayOf = (at: Date) =>
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(at);
-    const rows: ExpansionStoreSales[] = [];
-    let ratesOn: ((day: string) => Map<string, bigint>) | null = null;
-    for (const shopId of shops) {
-      // Each store's days are this shop's, for one chart of them all.
-      const periods = await this.#sales.periodsOf(
-        shopId,
-        {
-          placedFrom,
-          placedBefore,
-          interval: interval.toLowerCase() as SalesIntervalValue,
-        },
-        timezone,
-      );
-      if (!periods.ok) throw badUserInput(periods.errors[0]!.message);
-      // A week or a month is its days, each at its own rate (ADR-975): read by day as well.
-      const days =
-        interval === SalesInterval.DAY
-          ? periods
-          : await this.#sales.periodsOf(
-              shopId,
-              { placedFrom, placedBefore, interval: 'day' },
-              timezone,
-            );
-      if (!days.ok) throw badUserInput(days.errors[0]!.message);
-      const profile = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
-      const currency = isCurrencyCode(profile.currency) ? profile.currency : 'PKR';
-      // Every store's days are the same: their rates are read once.
-      ratesOn ??= await this.db.tenant(tenant.shopId, (tx) =>
-        rupeeRatesByDayIn(
-          tx,
-          days.value.map((each) => dayOf(each.start)),
+    const read = await this.sales.of(tenant, actor.userId, {
+      placedFrom,
+      placedBefore,
+      interval: interval.toLowerCase() as SalesIntervalValue,
+    });
+    if (!read.ok) throw badUserInput(read.errors[0]!.message);
+    const here = (amount: bigint | null) =>
+      amount === null ? null : Money.from(money(amount, tenant.currency));
+    return read.value.map((shop) =>
+      Object.assign(new ExpansionStoreSales(), {
+        shopId: toPublicId('shop', shop.shopId),
+        name: shop.name,
+        here: shop.here,
+        currencyCode: shop.currency,
+        orders: shop.orders,
+        netSales: Money.from(money(shop.netSales, shop.currency)),
+        totalSales: Money.from(money(shop.totalSales, shop.currency)),
+        totalSalesHere: here(shop.totalSalesHere),
+        periods: shop.periods.map((period) =>
+          Object.assign(new ExpansionStoreSalesPeriod(), {
+            start: period.start,
+            orders: period.orders,
+            totalSales: Money.from(money(period.totalSales, shop.currency)),
+            totalSalesHere: here(period.totalSalesHere),
+          }),
         ),
-      );
-      const rates = ratesOn;
-      const totals = tallyOf(periods.value);
-      const total = totalSales(totals);
-      // Each day at its rate, then each period the sum of its days.
-      const dayHeres = days.value.map((each) =>
-        convertBetween(rates(dayOf(each.start)), totalSales(each), currency, tenant.currency),
-      );
-      const heres = periods.value.map((period, at) => {
-        const until = periods.value[at + 1]?.start.getTime() ?? Infinity;
-        let sum = 0n;
-        for (const [index, each] of days.value.entries()) {
-          const start = each.start.getTime();
-          if (start < period.start.getTime() || start >= until) continue;
-          const converted = dayHeres[index]!;
-          if (converted === null) return null;
-          sum += converted;
-        }
-        return sum;
-      });
-      const here = (amount: bigint | null) =>
-        amount === null ? null : Money.from(money(amount, tenant.currency));
-      // The whole period's is its periods', each at its own day's rate.
-      const totalHere = heres.some((each) => each === null)
-        ? null
-        : heres.reduce<bigint>((sum, each) => sum + each!, 0n);
-      rows.push(
-        Object.assign(new ExpansionStoreSales(), {
-          shopId: toPublicId('shop', shopId),
-          name: profile.name,
-          here: shopId === tenant.shopId,
-          currencyCode: currency,
-          orders: totals.orders,
-          netSales: Money.from(money(netSales(totals), currency)),
-          totalSales: Money.from(money(total, currency)),
-          totalSalesHere: here(totalHere),
-          periods: periods.value.map((period, at) =>
-            Object.assign(new ExpansionStoreSalesPeriod(), {
-              start: period.start,
-              orders: period.orders,
-              totalSales: Money.from(money(totalSales(period), currency)),
-              totalSalesHere: here(heres[at]!),
-            }),
-          ),
-        }),
-      );
-    }
-    return rows;
+      }),
+    );
   }
 
   @Query(() => [ExpansionStore], { description: "The shop's expansion stores, oldest first." })

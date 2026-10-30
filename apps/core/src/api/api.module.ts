@@ -16,7 +16,7 @@ import {
   type HattiTax,
   type SupportContact,
 } from '@hatti/billing/public';
-import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
+import { CatalogModule, CopiedVariantStock, ExpansionStoreService } from '@hatti/catalog/public';
 import {
   CheckoutFunctions,
   CheckoutModule,
@@ -51,7 +51,13 @@ import {
   type WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
-import { DARAZ_CLIENT, DarazClient, MapTiles, OrdersModule } from '@hatti/orders/public';
+import {
+  DARAZ_CLIENT,
+  DarazClient,
+  MapTiles,
+  OrdersModule,
+  StoreSalesSource,
+} from '@hatti/orders/public';
 import { type PaymentGateways, PaymentsModule } from '@hatti/payments/public';
 import { PricingModule } from '@hatti/pricing/public';
 import { TaxModule } from '@hatti/tax/public';
@@ -74,6 +80,7 @@ import { AppSessionResolver } from './app-sessions.resolver.js';
 import { ThemeStoreResolver } from './theme-store.resolver.js';
 import { AppChargeResolver } from './app-charges.resolver.js';
 import { ExpansionCopier } from '../expansion-copier.js';
+import { ExpansionSales } from '../expansion-sales.js';
 import { ExpansionStoreResolver } from './expansion-stores.resolver.js';
 import { FunctionInputsResolver } from './function-inputs.resolver.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
@@ -242,6 +249,11 @@ export interface ApiModuleOptions {
 @Module({})
 class InfrastructureModule {
   static forRoot(options: ApiModuleOptions): DynamicModule {
+    // What the owner's shops sold, for their page and for custom reports of them (ADR-985).
+    const expansionSales = new ExpansionSales(
+      options.database,
+      new ExpansionStoreService(options.database),
+    );
     return {
       module: InfrastructureModule,
       providers: [
@@ -291,6 +303,8 @@ class InfrastructureModule {
         { provide: SecretBox, useValue: options.identity.secretBox },
         // A duplicated product's stock settings, which the catalog asks the inventory for (ADR-343).
         { provide: CopiedVariantStock, useClass: InventoryCopiedVariantStock },
+        { provide: ExpansionSales, useValue: expansionSales },
+        { provide: StoreSalesSource, useValue: expansionSales },
       ],
       exports: [
         Database,
@@ -308,6 +322,8 @@ class InfrastructureModule {
         DropTokens,
         DeliveryCodeSender,
         CopiedVariantStock,
+        ExpansionSales,
+        StoreSalesSource,
       ],
     };
   }

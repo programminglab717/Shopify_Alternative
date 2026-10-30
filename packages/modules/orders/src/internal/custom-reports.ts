@@ -15,7 +15,7 @@ import {
 } from '@hatti/inventory/public';
 import { money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { XLSX_CONTENT_TYPE, toXlsxWorkbook, type XlsxCell, type XlsxColumn } from '@hatti/xlsx';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { itemName } from './rules.js';
 import { periodLabel } from './sales-report-export.js';
@@ -48,7 +48,7 @@ export const CUSTOM_REPORT_LIMITS = {
 
 /**
  * What a report's rows are: days, weeks from Monday or months, products, the sales report's
- * dimensions, or variants' stock (ADR-910).
+ * dimensions, variants' stock (ADR-910), or this shop and the owner's stores abroad (ADR-985).
  */
 export const REPORT_BREAKDOWNS = [
   'day',
@@ -61,6 +61,7 @@ export const REPORT_BREAKDOWNS = [
   'customer',
   'city',
   'stock',
+  'stores',
 ] as const;
 export type ReportBreakdown = (typeof REPORT_BREAKDOWNS)[number];
 
@@ -184,6 +185,45 @@ export const STOCK_REPORT_COLUMNS: Readonly<Record<string, ColumnDefinition<Inve
     },
   };
 
+/**
+ * What one of the owner's shops sold over a report's period (ADR-985): this shop, or an expansion
+ * store of it (ADR-859), its total in this shop's currency at each day's rate (ADR-974).
+ */
+export interface StoreSales {
+  shopId: string;
+  name: string;
+  /** This shop, rather than a store abroad. */
+  here: boolean;
+  orders: number;
+  /** Its total sales in this shop's currency's minor units; null where a day had no rate. */
+  totalSalesHere: bigint | null;
+}
+
+/**
+ * The owner's shops' sales, which the core reads across them (ADR-985); a report of stores is
+ * not run where there is none. It refuses all but the shop's owner, as the stores' page does.
+ */
+export abstract class StoreSalesSource {
+  abstract salesOf(
+    tenant: TenantContext,
+    placedFrom: Date,
+    placedBefore: Date,
+  ): Promise<MutationResult<StoreSales[]>>;
+}
+
+/**
+ * The columns of a report of the owner's stores (ADR-985): amounts in this shop's currency alone,
+ * as the stores sell in their own.
+ */
+export const STORES_REPORT_COLUMNS: Readonly<Record<string, ColumnDefinition<StoreSales>>> = {
+  orders: { title: 'Orders', kind: 'number', value: (s) => s.orders },
+  total_sales_here: {
+    title: "Total sales in this shop's currency",
+    kind: 'amount',
+    value: (s) => s.totalSalesHere,
+  },
+};
+
 /** The columns a breakdown takes. */
 export function reportColumnsOf(
   breakdown: ReportBreakdown,
@@ -192,7 +232,9 @@ export function reportColumnsOf(
     ? PRODUCT_REPORT_COLUMNS
     : breakdown === 'stock'
       ? STOCK_REPORT_COLUMNS
-      : SALES_REPORT_COLUMNS;
+      : breakdown === 'stores'
+        ? STORES_REPORT_COLUMNS
+        : SALES_REPORT_COLUMNS;
 }
 
 export interface CustomReportInput {
@@ -352,7 +394,9 @@ function checked(input: CustomReportInput): MutationResult<CustomReportInput> {
         ? `A report of products has no column "${columns[unknown]}"`
         : input.breakdown === 'stock'
           ? `A report of stock has no column "${columns[unknown]}"`
-          : `A report of sales has no column "${columns[unknown]}"`,
+          : input.breakdown === 'stores'
+            ? `A report of stores has no column "${columns[unknown]}"`
+            : `A report of sales has no column "${columns[unknown]}"`,
     );
   }
   return { ok: true, value: { ...input, name, columns } };
@@ -376,6 +420,10 @@ export class CustomReportService {
     private readonly db: Database,
     private readonly sales: SalesReportService,
     private readonly stock: InventoryReportService,
+    /** The owner's shops' sales, for a report of stores (ADR-985); without it, none runs. */
+    @Optional()
+    @Inject(StoreSalesSource)
+    private readonly stores: StoreSalesSource | null = null,
   ) {}
 
   async list(tenant: TenantContext): Promise<CustomReportRecord[]> {
@@ -521,6 +569,7 @@ export class CustomReportService {
     if (breakdown === 'stock') {
       return { ok: true, value: await this.stockOf(tenant, report, at, placedFrom, placedBefore) };
     }
+    if (breakdown === 'stores') return this.storesOf(tenant, report, placedFrom, placedBefore);
     const interval = INTERVALS[breakdown];
     const result = await this.sales.report(tenant, {
       placedFrom,
@@ -567,6 +616,49 @@ export class CustomReportService {
         columns: shown.map((key) => ({ key, title: known[key]!.title, kind: known[key]!.kind })),
         rows,
         totals: breakdown === 'product' ? null : values(sales.totals),
+      },
+    };
+  }
+
+  /**
+   * A report of stores (ADR-985): this shop, then the owner's stores abroad they still own, as the
+   * stores' page shows them; its total all of them, in this shop's currency. The owner's alone.
+   */
+  private async storesOf(
+    tenant: TenantContext,
+    report: Pick<CustomReportInput, 'columns'>,
+    placedFrom: Date,
+    placedBefore: Date,
+  ): Promise<MutationResult<CustomReportResult>> {
+    if (!this.stores) {
+      return failOne(['breakdown'], 'INVALID', 'Reports of stores are not run here');
+    }
+    const read = await this.stores.salesOf(tenant, placedFrom, placedBefore);
+    if (!read.ok) return read;
+    const shown = report.columns.filter((key) => key in STORES_REPORT_COLUMNS);
+    const sum = (values: readonly (bigint | null)[]) =>
+      values.some((value) => value === null)
+        ? null
+        : values.reduce<bigint>((total, value) => total + value!, 0n);
+    const totalOf: Partial<Record<string, ReportValue>> = {
+      orders: read.value.reduce((total, store) => total + store.orders, 0),
+      total_sales_here: sum(read.value.map((store) => store.totalSalesHere)),
+    };
+    return {
+      ok: true,
+      value: {
+        placedFrom,
+        placedBefore,
+        columns: shown.map((key) => {
+          const { title, kind } = STORES_REPORT_COLUMNS[key]!;
+          return { key, title, kind };
+        }),
+        rows: read.value.map((store) => ({
+          key: store.shopId,
+          label: store.name,
+          values: shown.map((key) => STORES_REPORT_COLUMNS[key]!.value(store)),
+        })),
+        totals: shown.map((key) => totalOf[key] ?? null),
       },
     };
   }
@@ -681,6 +773,7 @@ const BREAKDOWN_HEADERS: Record<ReportBreakdown, string> = {
   customer: 'Customer',
   city: 'City',
   stock: 'Variant',
+  stores: 'Store',
 };
 
 /** A report's rows as a workbook of one sheet named for it. */

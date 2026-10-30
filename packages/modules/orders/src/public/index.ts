@@ -366,9 +366,12 @@ export {
   CustomReportService,
   REPORT_BREAKDOWNS,
   REPORT_PERIODS,
+  STORES_REPORT_COLUMNS,
+  StoreSalesSource,
   type CustomReportRecord,
   type ReportBreakdown,
   type ReportPeriod,
+  type StoreSales,
 } from '../internal/custom-reports.js';
 export {
   SALES_DIMENSIONS,

@@ -711,6 +711,37 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
         totalSalesHere: { amount: '7645.21', currencyCode: 'PKR' },
       },
     ]);
+    // The same in a custom report of stores (ADR-985), its total all of them in this shop's.
+    const report = (await value(
+      owner.token,
+      lahore,
+      `mutation ($input: CustomReportInput!) {
+        customReportCreate(input: $input) { customReport { id } userErrors { message } } }`,
+      {
+        input: {
+          name: 'Stores',
+          breakdown: 'STORES',
+          columns: ['orders', 'total_sales_here'],
+          period: 'TODAY',
+        },
+      },
+    )) as { customReport: { id: string } };
+    const RUN = `query ($id: ID!, $from: DateTime, $before: DateTime) {
+      customReportRun(id: $id, placedFrom: $from, placedBefore: $before) {
+        rows { key label values } totals } }`;
+    const run = { id: report.customReport.id, ...period };
+    expect(await value(owner.token, lahore, RUN, run)).toEqual({
+      rows: [
+        { key: shop(lahore), label: 'Lahore Lawn', values: ['1', '3500.00'] },
+        { key: shop(dubai), label: 'Dubai Lawn', values: ['1', '7645.21'] },
+      ],
+      totals: ['2', '11145.21'],
+    });
+    // Another of the shop's staff who reads reports runs none of it.
+    const reader = await account([[lahore, 'manager']]);
+    expect((await data(reader.token, lahore, RUN, run)).errors?.[0]?.message).toBe(
+      "Only the shop's owner reads what its expansion stores sold",
+    );
     // Day by day in Lahore's time, whatever Dubai's (ADR-955): yesterday and today in Karachi,
     // each store's days the same, today's its order.
     await admin.query(`UPDATE control.shops SET timezone = 'Asia/Dubai' WHERE id = $1`, [dubai]);
