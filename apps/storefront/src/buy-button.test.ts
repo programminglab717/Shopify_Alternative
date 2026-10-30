@@ -402,4 +402,66 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     expect(missing!.querySelector('.featured')).toBeNull();
     await window.happyDOM.close();
   });
+
+  it('leads a collection with up to three products it features, in its order (ADR-984)', async () => {
+    const origin = 'https://zari.hatti.pk';
+    expect(
+      buyButtonSnippet(origin, 'eid', 'en', {
+        collection: true,
+        featured: ['shawl', 'kurta', 'shawl', '', 'khussa', 'dupatta'],
+      }),
+    ).toContain('data-featured="shawl,kurta,khussa"');
+
+    const product = (handle: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `${origin}/products/${handle}`,
+      image: null,
+      currency: 'PKR',
+      variants: [
+        {
+          id: `v-${handle}`,
+          title: 'Default',
+          available: true,
+          price: '1500.00',
+          compareAtPrice: null,
+        },
+      ],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    // A fourth is one too many; the second, answered first, keeps its place.
+    document.body.innerHTML =
+      '<div data-hatti-buy-collection="eid" data-featured="shawl,kurta,dupatta,khussa"></div>';
+    window.fetch = (async (url: string) => {
+      if (url.endsWith('/products/shawl')) await new Promise((resolve) => setTimeout(resolve, 5));
+      const handle = url.split('/').pop()!;
+      return {
+        ok: true,
+        json: async () =>
+          url.includes('/products/')
+            ? product(handle)
+            : {
+                handle: 'eid',
+                title: 'Eid',
+                url: `${origin}/collections/eid`,
+                products: ['kurta', 'dupatta', 'shawl', 'khussa'].map(product),
+              },
+      };
+    }) as never;
+    const script = document.createElement('script');
+    script.setAttribute('src', `${origin}/buy-button.js`);
+    Object.defineProperty(document, 'currentScript', { value: script });
+    window.eval(BUY_BUTTON_SCRIPT);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    const root = document.querySelector('[data-hatti-buy-collection]')!.shadowRoot!;
+    const titlesOf = (selector: string) =>
+      [...root.querySelectorAll(selector)].map(
+        (cell) => cell.shadowRoot!.querySelector('.title')!.textContent,
+      );
+    expect(titlesOf('.featured')).toEqual(['shawl', 'kurta', 'dupatta']);
+    expect(titlesOf('.grid > div')).toEqual(['khussa']);
+    await window.happyDOM.close();
+  });
 });

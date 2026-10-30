@@ -212,6 +212,17 @@ describe('Collections', () => {
               '<script src="https://zari.hatti.pk/buy-button.js" async></script>',
       ),
     ).toBeTruthy();
+    // Another after it (ADR-984), of those not yet chosen.
+    const second = within(card).getByLabelText(
+      'Featured product 2, after the one before',
+    ) as HTMLSelectElement;
+    expect([...second.options].map((option) => option.textContent)).toEqual(['None', 'Lawn suit']);
+    fireEvent.change(second, { target: { value: 'lawn-suit' } });
+    expect(within(card).getByText(/data-featured="dupatta,lawn-suit"/)).toBeTruthy();
+    // No third: the collection's two active products are both chosen.
+    expect(within(card).queryByLabelText('Featured product 3, after the one before')).toBeNull();
+    fireEvent.change(featured, { target: { value: '' } });
+    expect(within(card).getByText(/data-featured="lawn-suit"/)).toBeTruthy();
   });
 
   it('puts a collection made by hand in order, takes a product out and adds another', async () => {

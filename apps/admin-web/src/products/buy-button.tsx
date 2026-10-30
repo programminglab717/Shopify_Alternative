@@ -6,6 +6,9 @@ import { Button } from '../ui/button';
 import { TextField } from '../ui/field';
 import { FormSection } from './product-form';
 
+/** The most products a collection's embed leads with, as the storefront's script shows (ADR-984). */
+export const BUY_BUTTON_FEATURED = 3;
+
 /** The colour the buttons take until the shop picks its own: the platform's teal. */
 const DEFAULT_COLOR = '#0f766e';
 
@@ -21,7 +24,7 @@ export const BUY_BUTTON_LAYOUTS = {
 /**
  * The snippet another website pastes to show the product, or with `collection` the collection
  * (ADR-925), as the storefront serves it; its buttons in `color` where given, laid out as
- * `layout` says (ADR-949); a collection's led by its product `featured` (ADR-980).
+ * `layout` says (ADR-949); a collection's led by its products `featured` (ADR-980, ADR-984).
  */
 export function buyButtonSnippet(
   storefront: string,
@@ -31,7 +34,7 @@ export function buyButtonSnippet(
     collection?: boolean;
     color?: string | null;
     layout?: string | null;
-    featured?: string | null;
+    featured?: readonly string[];
   } = {},
 ): string {
   const origin = storefront.replace(/\/+$/, '');
@@ -43,8 +46,13 @@ export function buyButtonSnippet(
     BUY_BUTTON_LAYOUTS[options.collection ? 'collection' : 'product'];
   const layout =
     options.layout && layouts.indexOf(options.layout) > 0 ? ` data-layout="${options.layout}"` : '';
-  const lead = options.featured?.replace(/[^a-z0-9-]/g, '');
-  const featured = options.collection && lead ? ` data-featured="${lead}"` : '';
+  const leads = [
+    ...new Set(
+      (options.featured ?? []).map((each) => each.replace(/[^a-z0-9-]/g, '')).filter(Boolean),
+    ),
+  ].slice(0, BUY_BUTTON_FEATURED);
+  const featured =
+    options.collection && leads.length > 0 ? ` data-featured="${leads.join(',')}"` : '';
   return (
     `<div ${kind}="${handle}"${lang}${color}${layout}${featured}></div>\n` +
     `<script src="${origin}/buy-button.js" async></script>`
@@ -56,7 +64,7 @@ export function buyButtonSnippet(
  * (ADR-925): the snippet to paste into a blog, a site or a link page, which shows its photos,
  * prices and variants there, Buy now opening the shop's checkout, in the shop's colour if it
  * picks one. For an active product, as the storefront shows no other. A collection's may lead
- * with one of its `products`, across above the rest (ADR-980).
+ * with up to three of its `products`, across above the rest (ADR-980, ADR-984).
  */
 export function BuyButtonCard({
   handle,
@@ -69,14 +77,14 @@ export function BuyButtonCard({
   storefront: string;
   collection?: boolean;
   active?: boolean;
-  /** A collection's active products, one of which its embed may feature. */
+  /** A collection's active products, which its embed may feature. */
   products?: { handle: string; title: string }[];
 }) {
   const { t } = useLocale();
   const [language, setLanguage] = useState<'en' | 'ur'>('en');
   const [color, setColor] = useState<string | null>(null);
   const [layout, setLayout] = useState<string>(collection ? 'grid' : 'card');
-  const [featured, setFeatured] = useState('');
+  const [featured, setFeatured] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   if (!active || !storefront) return null;
   const snippet = buyButtonSnippet(storefront, handle, language, {
@@ -114,20 +122,33 @@ export function BuyButtonCard({
           setCopied(false);
         }}
       />
-      {collection && products.length > 0 && (
-        <SelectField
-          label={t('buyButton.featured')}
-          value={featured}
-          options={[
-            { value: '', label: t('buyButton.featuredNone') },
-            ...products.map((product) => ({ value: product.handle, label: product.title })),
-          ]}
-          onChange={(value) => {
-            setFeatured(value);
-            setCopied(false);
-          }}
-        />
-      )}
+      {/* Those chosen, then one more to choose while any is left, until three (ADR-984). */}
+      {collection &&
+        [...featured, ...(products.length > featured.length ? [''] : [])]
+          .slice(0, BUY_BUTTON_FEATURED)
+          .map((chosen, at) => (
+            <SelectField
+              key={at}
+              label={
+                at === 0 ? t('buyButton.featured') : t('buyButton.featuredMore', { n: at + 1 })
+              }
+              value={chosen}
+              options={[
+                { value: '', label: t('buyButton.featuredNone') },
+                ...products
+                  .filter(
+                    (product) => product.handle === chosen || !featured.includes(product.handle),
+                  )
+                  .map((product) => ({ value: product.handle, label: product.title })),
+              ]}
+              onChange={(value) => {
+                const next = [...featured];
+                next[at] = value;
+                setFeatured(next.filter(Boolean));
+                setCopied(false);
+              }}
+            />
+          ))}
       <CheckField
         label={t('buyButton.ownColor')}
         checked={color !== null}
