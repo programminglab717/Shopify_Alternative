@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-974 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-975 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -982,6 +982,7 @@
 | 972 | The Storefront API's nodes gives variants by their IDs too, through an index of each variant's product | Accepted |
 | 973 | The Storefront API's node gives one thing by its ID, as nodes does | Accepted |
 | 974 | Each day's currency rates are kept, and the stores' chart puts each day's sales at that day's rate | Accepted |
+| 975 | A week's or a month's sales abroad are its days', each at that day's rate | Accepted |
 
 ---
 
@@ -31606,5 +31607,18 @@
   * The rates of every day in the period are read once, for all the stores.
 * **Consequences:**
   * A store's sales abroad are seen as they were worth on their day.
-  * Not yet: a week's or month's sales at each of its days' rates, and the same chart in the
-    sales report.
+  * Not yet: a week's or month's sales at each of its days' rates (built, ADR-975), and the same
+    chart in the sales report.
+
+## ADR-975 · A week's or a month's sales abroad are its days', each at that day's rate
+
+* **Context:** ADR-974 puts each period of the stores' chart at its first day's rate: right for
+  a day, rough for a week, and rougher for a month in which the dirham moved. ADR-974 left each
+  of a week's or month's days at its own rate as not yet.
+* **Decision:** by week or by month, each store's sales are read by day as well, each day put in
+  this shop's currency at that day's rate, and each week or month is the sum of its days. A day
+  without a rate for the store's currency leaves its period without a sum, as before. By day,
+  nothing more is read.
+* **Consequences:**
+  * A week's and a month's totals agree with their days', and the period's total with both.
+  * Each store's sales are read twice by week or month: a second query of the same orders.
