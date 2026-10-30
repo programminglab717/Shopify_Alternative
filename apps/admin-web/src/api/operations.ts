@@ -5467,6 +5467,7 @@ export const CollectionQuery = /* GraphQL */ `
         nodes {
           id
           title
+          handle
           status
         }
       }

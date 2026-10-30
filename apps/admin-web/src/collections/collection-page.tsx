@@ -438,6 +438,11 @@ export function CollectionPage() {
               handle={collection.handle}
               storefront={query.data.shop?.url ?? ''}
               collection
+              products={collection.products.nodes.flatMap((product) =>
+                product.status === 'ACTIVE' && product.handle
+                  ? [{ handle: product.handle, title: product.title }]
+                  : [],
+              )}
             />
           )}
           <CollectionUrduCard collectionId={collection.id} />

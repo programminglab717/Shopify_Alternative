@@ -10,7 +10,8 @@ import { imageAddress } from './liquid.js';
 // checkout holding all of it (ADR-918). A collection is embedded as a grid of its products, each
 // with its buttons, twelve at a time, Show more giving the next (ADR-937); and the buttons take the
 // shop's colour (ADR-925). A product may be laid out with its photo beside it, and a collection as a
-// list of those or a carousel, rather than a grid (ADR-949).
+// list of those or a carousel, rather than a grid (ADR-949). A collection may lead with one of its
+// products, shown across above the rest and not again among them (ADR-980).
 
 /** A buy button's cart (ADR-918): its lines at most, and as many of each. */
 export const BUY_BUTTON_CART = { lines: 20, quantity: 10 } as const;
@@ -286,9 +287,11 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     '.carousel>div{scroll-snap-align:start}' +
     '.heading{display:block;margin-bottom:.75rem;font-weight:700;font-size:1.2em;color:inherit;text-decoration:none}' +
     '.more{grid-column:1/-1;justify-self:center;padding:.6rem 1.2rem;border:1px solid var(--hatti-color,#0f766e);border-radius:8px;background:#fff;color:var(--hatti-color,#0f766e);font:inherit;font-weight:600;cursor:pointer}' +
-    '.carousel .more{grid-column:auto;align-self:center}';
+    '.carousel .more{grid-column:auto;align-self:center}' +
+    '.featured{margin-bottom:1rem}';
   // A collection (ADR-925): its title, then each of its products as a button of its own, a page
-  // at a time, Show more giving the next (ADR-937); in a grid, a list or a carousel (ADR-949).
+  // at a time, Show more giving the next (ADR-937); in a grid, a list or a carousel (ADR-949);
+  // led by the product the snippet features, across (ADR-980).
   function drawCollection(host, collection, lang) {
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     root.appendChild(el('style', {}, GRID_STYLE));
@@ -296,10 +299,24 @@ export const BUY_BUTTON_SCRIPT = `(function () {
     var shape = layout === 'list' || layout === 'carousel' ? ' ' + layout : '';
     var box = el('div', { lang: lang, dir: lang === 'ur' ? 'rtl' : 'ltr' });
     box.appendChild(el('a', { class: 'heading', href: collection.url, target: '_blank', rel: 'noopener' }, collection.title));
+    var featured = (host.getAttribute('data-featured') || '').replace(/[^a-z0-9-]/g, '');
+    if (featured) {
+      var lead = el('div', { class: 'featured', 'data-layout': 'horizontal' });
+      box.appendChild(lead);
+      fetch(origin + '/buy-button/products/' + encodeURIComponent(featured))
+        .then(function (answer) { return answer.ok ? answer.json() : null; })
+        .then(function (found) {
+          if (found && found.variants && found.variants.length) draw(lead, found, lang);
+          else box.removeChild(lead);
+        })
+        .catch(function () { if (lead.parentNode) box.removeChild(lead); });
+    }
     var grid = el('div', { class: 'grid' + shape });
     box.appendChild(grid);
     function add(page) {
       page.products.forEach(function (product) {
+        // The featured product is shown once, above.
+        if (featured && product.handle === featured) return;
         // A list's products across, their photos beside them.
         var cell = el('div', layout === 'list' ? { 'data-layout': 'horizontal' } : {});
         grid.appendChild(cell);
@@ -357,13 +374,19 @@ export const BUY_BUTTON_SCRIPT = `(function () {
 /**
  * The snippet a shop pastes into another website for the product `handle`, or with
  * `collection` the collection's (ADR-925), in `language`, its buttons in `color` where given, laid
- * out as `layout` says, one of {@link BUY_BUTTON_LAYOUTS} for its kind (ADR-949).
+ * out as `layout` says, one of {@link BUY_BUTTON_LAYOUTS} for its kind (ADR-949); a collection's
+ * led by its product `featured` where given (ADR-980).
  */
 export function buyButtonSnippet(
   origin: string,
   handle: string,
   language: 'en' | 'ur' = 'en',
-  options: { collection?: boolean; color?: string | null; layout?: string | null } = {},
+  options: {
+    collection?: boolean;
+    color?: string | null;
+    layout?: string | null;
+    featured?: string | null;
+  } = {},
 ): string {
   const lang = language === 'ur' ? ' data-language="ur"' : '';
   const color = options.color && COLOR.test(options.color) ? ` data-color="${options.color}"` : '';
@@ -373,8 +396,10 @@ export function buyButtonSnippet(
   // Its default needs saying no more than a layout it hasn't.
   const layout =
     options.layout && layouts.indexOf(options.layout) > 0 ? ` data-layout="${options.layout}"` : '';
+  const lead = options.featured?.replace(/[^a-z0-9-]/g, '');
+  const featured = options.collection && lead ? ` data-featured="${lead}"` : '';
   return (
-    `<div ${kind}="${handle.replace(/[^a-z0-9-]/g, '')}"${lang}${color}${layout}></div>\n` +
+    `<div ${kind}="${handle.replace(/[^a-z0-9-]/g, '')}"${lang}${color}${layout}${featured}></div>\n` +
     `<script src="${origin}${BUY_BUTTON_PATHS.script}" async></script>`
   );
 }

@@ -6314,6 +6314,8 @@ const en = {
   'buyButton.layout.grid': 'A grid of cards',
   'buyButton.layout.list': 'A list, each across',
   'buyButton.layout.carousel': 'A carousel, scrolled sideways',
+  'buyButton.featured': 'Featured product, shown first and across',
+  'buyButton.featuredNone': 'None',
   'certification.title': 'Hatti certification',
   'certification.hint':
     'Read the lessons, then answer the ten questions: {mark} right certify you for a year, and shops see it on your expert profile.',
@@ -13637,6 +13639,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'buyButton.layout.grid': 'کارڈز کا جال',
   'buyButton.layout.list': 'فہرست، ہر ایک آڑا',
   'buyButton.layout.carousel': 'کیروسل، دائیں بائیں سرکنے والا',
+  'buyButton.featured': 'نمایاں پروڈکٹ، سب سے پہلے اور آڑی',
+  'buyButton.featuredNone': 'کوئی نہیں',
   'certification.title': 'Hatti سرٹیفکیشن',
   'certification.hint':
     'اسباق پڑھیں، پھر دس سوالوں کے جواب دیں: {mark} درست ہوں تو آپ ایک سال کے لیے سرٹیفائیڈ ہیں، اور دکانیں یہ آپ کے ماہر پروفائل پر دیکھتی ہیں۔',

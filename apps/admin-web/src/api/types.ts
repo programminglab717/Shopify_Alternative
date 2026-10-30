@@ -2400,7 +2400,15 @@ export interface CollectionData {
     sortOrder: CollectionSortOrder;
     productsCount: number;
     ruleSet: { appliedDisjunctively: boolean; rules: CollectionRule[] } | null;
-    products: { nodes: { id: string; title: string; status: ProductStatus }[] };
+    products: {
+      nodes: {
+        id: string;
+        title: string;
+        /** For a buy button's featured product (ADR-980); absent where a fake core leaves it out. */
+        handle?: string;
+        status: ProductStatus;
+      }[];
+    };
   } | null;
 }
 

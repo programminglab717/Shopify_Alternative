@@ -326,4 +326,80 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     expect(carouselCard!.getAttribute('class')).toBe('card');
     await window.happyDOM.close();
   });
+
+  it('leads a collection with the product it features, across, and not again in its grid (ADR-980)', async () => {
+    const origin = 'https://zari.hatti.pk';
+    expect(
+      buyButtonSnippet(origin, 'eid-edit', 'en', { collection: true, featured: 'lawn-suit' }),
+    ).toContain('<div data-hatti-buy-collection="eid-edit" data-featured="lawn-suit"></div>');
+    // Only a collection features a product, and only by a handle.
+    expect(buyButtonSnippet(origin, 'lawn-suit', 'en', { featured: 'kurta' })).not.toContain(
+      'data-featured',
+    );
+    expect(
+      buyButtonSnippet(origin, 'eid-edit', 'en', { collection: true, featured: '"><x' }),
+    ).toContain('data-featured="x"');
+
+    const product = (handle: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `${origin}/products/${handle}`,
+      image: null,
+      currency: 'PKR',
+      variants: [
+        {
+          id: `v-${handle}`,
+          title: 'Default',
+          available: true,
+          price: '1500.00',
+          compareAtPrice: null,
+        },
+      ],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    document.body.innerHTML =
+      '<div data-hatti-buy-collection="eid" data-featured="dupatta"></div>' +
+      '<div data-hatti-buy-collection="eid" data-featured="gone"></div>';
+    const asked: string[] = [];
+    window.fetch = (async (url: string) => {
+      asked.push(url);
+      if (url.endsWith('/products/gone')) return { ok: false, json: async () => null };
+      return {
+        ok: true,
+        json: async () =>
+          url.includes('/products/')
+            ? product('dupatta')
+            : {
+                handle: 'eid',
+                title: 'Eid',
+                url: `${origin}/collections/eid`,
+                products: [product('kurta'), product('dupatta'), product('shawl')],
+              },
+      };
+    }) as never;
+    const script = document.createElement('script');
+    script.setAttribute('src', `${origin}/buy-button.js`);
+    Object.defineProperty(document, 'currentScript', { value: script });
+    window.eval(BUY_BUTTON_SCRIPT);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(asked).toContain(`${origin}/buy-button/products/dupatta`);
+    const [led, missing] = [...document.querySelectorAll('[data-hatti-buy-collection]')].map(
+      (host) => host.shadowRoot!,
+    );
+    const lead = led!.querySelector('.featured')!;
+    expect(lead.getAttribute('data-layout')).toBe('horizontal');
+    const leadCard = lead.shadowRoot!.querySelector('.card')!;
+    expect(leadCard.getAttribute('class')).toBe('card wide');
+    expect(leadCard.querySelector('.title')!.textContent).toBe('dupatta');
+    const titles = (root: typeof led) =>
+      [...root!.querySelectorAll('.grid > div')].map(
+        (cell) => cell.shadowRoot!.querySelector('.title')!.textContent,
+      );
+    expect(titles(led)).toEqual(['kurta', 'shawl']);
+    // A product no longer sold: the collection as it is, nothing above it.
+    expect(missing!.querySelector('.featured')).toBeNull();
+    await window.happyDOM.close();
+  });
 });

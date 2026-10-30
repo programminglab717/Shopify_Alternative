@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn, type } from '../test-support';
 
-const product = (id: string, title: string, status = 'ACTIVE') => ({ id, title, status });
+const product = (id: string, title: string, status = 'ACTIVE') => ({
+  id,
+  title,
+  handle: title.toLowerCase().replace(/ /g, '-'),
+  status,
+});
 
 const HAND = {
   id: 'col_1',
@@ -185,6 +190,25 @@ describe('Collections', () => {
           node?.tagName === 'PRE' &&
           node.textContent ===
             `<div data-hatti-buy-collection="${HAND.handle}"></div>\n` +
+              '<script src="https://zari.hatti.pk/buy-button.js" async></script>',
+      ),
+    ).toBeTruthy();
+    // Led by one of its products, across (ADR-980): of those the storefront shows.
+    const featured = within(card).getByLabelText(
+      'Featured product, shown first and across',
+    ) as HTMLSelectElement;
+    expect([...featured.options].map((option) => option.textContent)).toEqual([
+      'None',
+      'Lawn suit',
+      'Dupatta',
+    ]);
+    fireEvent.change(featured, { target: { value: 'dupatta' } });
+    expect(
+      within(card).getByText(
+        (_text, node) =>
+          node?.tagName === 'PRE' &&
+          node.textContent ===
+            `<div data-hatti-buy-collection="${HAND.handle}" data-featured="dupatta"></div>\n` +
               '<script src="https://zari.hatti.pk/buy-button.js" async></script>',
       ),
     ).toBeTruthy();
