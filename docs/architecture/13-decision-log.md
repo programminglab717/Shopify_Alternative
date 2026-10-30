@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-967 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-968 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -975,6 +975,7 @@
 | 965 | A shop chooses how long before the due date payment terms are first reminded, or not before it | Accepted |
 | 966 | The admin's and the console's tests check each screen's accessibility with axe | Accepted |
 | 967 | Shoppers' pages in every platform theme, and checkout, are checked with axe | Accepted |
+| 968 | hatti theme check reads a theme's pages through its preview with axe | Accepted |
 
 ---
 
@@ -31445,5 +31446,30 @@
     level there now (a card takes its level from where it sits).
 * **Consequences:**
   * A theme change, or a new theme, that breaks a rule for shoppers fails CI.
-  * Not yet: a partner's theme from the theme store checked when it is reviewed; contrast with
+  * Not yet: a partner's theme from the theme store checked when it is reviewed (built, ADR-968); contrast with
     the shop's own colours; and TalkBack tried by hand.
+
+## ADR-968 · hatti theme check reads a theme's pages through its preview with axe
+
+* **Context:** ADR-967 checks Hatti's own themes with axe as the tests run. A designer's theme
+  for the theme store (ADR-853) is JSON over one of them, with its own settings, sections and
+  words, on a development store; nothing checked it, and Hatti's review list (OWN-47) asked only
+  that it work on a phone, in Urdu and English.
+* **Decision:**
+  * **`hatti theme check --theme <id>`** asks the Admin API for the theme's preview link and
+    reads its home page, `/collections/all`, the first product it links to, the cart and a search,
+    and each again under `/ur/`, with axe in a window of its own (happy-dom's, the page's scripts
+    taken out), as ADR-967 does. It says each rule broken, its impact and the first elements
+    that break it, and exits 1 if any is.
+  * **`--url <preview link>`** checks a preview link with no token, so Hatti's reviewer runs the
+    same check on the development store's preview before listing it. The review list in the
+    developers' guide, the console's partners page and `partner-themes` say so.
+  * Every page is asked for with the link's own `?preview=`, so the theme under check answers,
+    not the shop's live one; a page that does not answer stops the check, as a link gone stale.
+  * Colour contrast is left out, as nothing is laid out; axe-core (MPL-2.0) and happy-dom (MIT)
+    are the CLI's own dependencies.
+* **Consequences:**
+  * A designer finds what the review would before offering a theme.
+  * Not yet: the check run by Hatti itself when a theme is offered, which needs the preview
+    rendered where the core runs; pages of the theme's own templates beyond those five kinds;
+    and contrast with the theme's colours.
