@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-975 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-976 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -983,6 +983,7 @@
 | 973 | The Storefront API's node gives one thing by its ID, as nodes does | Accepted |
 | 974 | Each day's currency rates are kept, and the stores' chart puts each day's sales at that day's rate | Accepted |
 | 975 | A week's or a month's sales abroad are its days', each at that day's rate | Accepted |
+| 976 | An expansion store's margin by tag | Accepted |
 
 ---
 
@@ -31552,7 +31553,7 @@
     margins.
 * **Consequences:**
   * A shop prices whole kinds of goods abroad without keeping collections for them.
-  * Not yet: a margin by tag.
+  * Not yet: a margin by tag (built, ADR-976).
 
 ## ADR-972 · The Storefront API's nodes gives variants by their IDs too, through an index of each variant's product
 
@@ -31622,3 +31623,17 @@
 * **Consequences:**
   * A week's and a month's totals agree with their days', and the period's total with both.
   * Each store's sales are read twice by week or month: a second query of the same orders.
+
+## ADR-976 · An expansion store's margin by tag
+
+* **Context:** ADR-971 gives a product type or a vendor a margin of its own abroad. Shops mark
+  much of what they sell by tag (bridal, winter, handmade), and ADR-971 left a margin by tag as
+  not yet.
+* **Decision:** a margin by product type, vendor or tag (`by`: `TAG`), kept with the others
+  (twenty at most in all), matched as the products give their tags, letter case and spaces at the
+  ends aside. A product's margin is taken in this order: its own (ADR-960), its collection's
+  (ADR-948), its type's, its vendor's, then the first tag in the list that it has, then the store's.
+  The admin's list offers "Tag" beside "Product type" and "Vendor".
+* **Consequences:**
+  * A shop prices a kind of goods abroad by the tags it already uses.
+  * Not yet: a margin by a product's metafield.
