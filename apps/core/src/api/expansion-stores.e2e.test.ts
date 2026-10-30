@@ -698,6 +698,19 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       '7645.21',
     ]);
     expect(dubaiDays!.totalSalesHere.amount).toBe('8395.21');
+    // By week, each week its days', each at its own rate (ADR-975), however the weeks fall.
+    const WEEKS = TOTALS.replace('interval: DAY', 'interval: WEEK');
+    const [, dubaiWeeks] = (await value(owner.token, lahore, WEEKS, {
+      from: new Date(today - day).toISOString(),
+      before: new Date(today + day).toISOString(),
+    })) as {
+      totalSalesHere: { amount: string };
+      periods: { totalSalesHere: { amount: string } }[];
+    }[];
+    expect(dubaiWeeks!.totalSalesHere.amount).toBe('8395.21');
+    expect(
+      dubaiWeeks!.periods.reduce((sum, each) => sum + Number(each.totalSalesHere.amount), 0),
+    ).toBeCloseTo(8395.21, 2);
 
     // Staff but the owner see none of it.
     const manager = await account([[lahore, 'manager']]);

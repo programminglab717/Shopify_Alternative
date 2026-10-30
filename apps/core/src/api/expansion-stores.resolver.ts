@@ -235,8 +235,9 @@ export class ExpansionStoreSalesPeriod {
   @Field(() => Money, {
     nullable: true,
     description:
-      "Its total sales in this shop's currency at its first day's rate (ADR-974), the last the " +
-      'feed gave on or before it; null where the feed has no rate for its currency.',
+      "Its total sales in this shop's currency: each of its days' at that day's rate (ADR-974, " +
+      'ADR-975), the last the feed gave on or before it; null where the feed has no rate for its ' +
+      'currency.',
   })
   totalSalesHere!: Money | null;
 }
@@ -271,8 +272,8 @@ export class ExpansionStoreSales {
   @Field(() => Money, {
     nullable: true,
     description:
-      "Its total sales in this shop's currency: its periods', each at its first day's rate from " +
-      'the currency feed (ADR-974); null where the feed has no rate for its currency.',
+      "Its total sales in this shop's currency: its days', each at that day's rate from the " +
+      'currency feed (ADR-974); null where the feed has no rate for its currency.',
   })
   totalSalesHere!: Money | null;
 
@@ -321,8 +322,8 @@ export class ExpansionStoreResolver {
   @Query(() => [ExpansionStoreSales], {
     description:
       'What this shop and each of its expansion stores sold in a period, on one page (ADR-932): ' +
-      "each in its own currency and in this shop's, each period at its first day's rate " +
-      '(ADR-974), this shop first, then the ' +
+      "each in its own currency and in this shop's, each day at that day's rate (ADR-974, " +
+      'ADR-975), this shop first, then the ' +
       'stores the owner still owns, oldest first, each by day, week or month in this shop’s time ' +
       '(ADR-955). 366 days at most. The owner alone.',
   })
@@ -348,7 +349,7 @@ export class ExpansionStoreResolver {
     const { timezone } = await this.db.tenant(tenant.shopId, (tx) =>
       shopProfile(tx, tenant.shopId),
     );
-    // Each period at the rate of its first day, in this shop's time (ADR-974).
+    // Each day at its own rate, in this shop's time (ADR-974).
     const dayOf = (at: Date) =>
       new Intl.DateTimeFormat('en-CA', {
         timeZone: timezone,
@@ -370,21 +371,44 @@ export class ExpansionStoreResolver {
         timezone,
       );
       if (!periods.ok) throw badUserInput(periods.errors[0]!.message);
+      // A week or a month is its days, each at its own rate (ADR-975): read by day as well.
+      const days =
+        interval === SalesInterval.DAY
+          ? periods
+          : await this.#sales.periodsOf(
+              shopId,
+              { placedFrom, placedBefore, interval: 'day' },
+              timezone,
+            );
+      if (!days.ok) throw badUserInput(days.errors[0]!.message);
       const profile = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
       const currency = isCurrencyCode(profile.currency) ? profile.currency : 'PKR';
-      // Every store's periods are the same: their days' rates are read once.
+      // Every store's days are the same: their rates are read once.
       ratesOn ??= await this.db.tenant(tenant.shopId, (tx) =>
         rupeeRatesByDayIn(
           tx,
-          periods.value.map((period) => dayOf(period.start)),
+          days.value.map((each) => dayOf(each.start)),
         ),
       );
       const rates = ratesOn;
       const totals = tallyOf(periods.value);
       const total = totalSales(totals);
-      const convertedOf = (amount: bigint, start: Date) =>
-        convertBetween(rates(dayOf(start)), amount, currency, tenant.currency);
-      const heres = periods.value.map((period) => convertedOf(totalSales(period), period.start));
+      // Each day at its rate, then each period the sum of its days.
+      const dayHeres = days.value.map((each) =>
+        convertBetween(rates(dayOf(each.start)), totalSales(each), currency, tenant.currency),
+      );
+      const heres = periods.value.map((period, at) => {
+        const until = periods.value[at + 1]?.start.getTime() ?? Infinity;
+        let sum = 0n;
+        for (const [index, each] of days.value.entries()) {
+          const start = each.start.getTime();
+          if (start < period.start.getTime() || start >= until) continue;
+          const converted = dayHeres[index]!;
+          if (converted === null) return null;
+          sum += converted;
+        }
+        return sum;
+      });
       const here = (amount: bigint | null) =>
         amount === null ? null : Money.from(money(amount, tenant.currency));
       // The whole period's is its periods', each at its own day's rate.
