@@ -757,6 +757,29 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     expect(read.data?.customerCredit).toEqual({ creditLimit: { amount: '20000.00' } });
     const cleared = await gql(tokens.owner, SET, { customerId, creditLimit: null });
     expect(cleared.data?.customerCreditLimitSet.credit.creditLimit).toBeNull();
+    // Kept out of reminders (ADR-969), by those who set credit limits.
+    const REMINDED = `mutation ($customerId: ID!, $reminded: Boolean!) {
+      customerTermsRemindersSet(customerId: $customerId, reminded: $reminded) {
+        credit { reminded } userErrors { code }
+      }
+    }`;
+    expect(
+      (await gql(tokens.owner, REMINDED, { customerId, reminded: false })).data
+        ?.customerTermsRemindersSet,
+    ).toEqual({ credit: { reminded: false }, userErrors: [] });
+    expect(
+      (
+        await gql(
+          tokens.owner,
+          'query ($id: ID!) { customerCredit(customerId: $id) { reminded } }',
+          {
+            id: customerId,
+          },
+        )
+      ).data?.customerCredit,
+    ).toEqual({ reminded: false });
+    const notAllowed = await gql(tokens.products, REMINDED, { customerId, reminded: true });
+    expect(notAllowed.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
     expect((await place(30)).data?.orderCreate.userErrors).toEqual([]);
   });
 });

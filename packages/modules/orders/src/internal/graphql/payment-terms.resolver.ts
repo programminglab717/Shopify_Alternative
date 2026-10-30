@@ -81,6 +81,24 @@ export class PaymentTermsResolver {
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
+
+  @Mutation(() => CustomerCreditPayload, {
+    description:
+      "Whether a customer's orders on payment terms are reminded to them, before the due date " +
+      'and past it (ADR-969): false keeps a customer the shop knows well out of reminders.',
+  })
+  @RequireScopes('write_orders')
+  async customerTermsRemindersSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('customerId', { type: () => ID }) customerId: string,
+    @Args('reminded', { type: () => Boolean }) reminded: boolean,
+  ): Promise<CustomerCreditPayload> {
+    const result = await this.terms.setReminded(tenant, customerUuid(customerId), reminded);
+    return Object.assign(new CustomerCreditPayload(), {
+      credit: result.ok ? toCredit(result.value, tenant.currency) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
 }
 
 /** The UUID behind a customer's public ID, or a BAD_USER_INPUT error. */
@@ -96,5 +114,6 @@ function toCredit(credit: Credit, currency: CurrencyCode): CustomerCredit {
     creditLimit: credit.creditLimit === null ? null : amount(credit.creditLimit),
     owed: amount(credit.owed),
     overdue: amount(credit.overdue),
+    reminded: credit.reminded,
   });
 }

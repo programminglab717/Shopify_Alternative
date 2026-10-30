@@ -52,6 +52,13 @@ export class CustomerCredit {
 
   @Field(() => Money)
   overdue!: Money;
+
+  @Field({
+    description:
+      'Whether their orders on terms are reminded to them, before the due date and past it ' +
+      '(ADR-969).',
+  })
+  reminded!: boolean;
 }
 
 @ObjectType()

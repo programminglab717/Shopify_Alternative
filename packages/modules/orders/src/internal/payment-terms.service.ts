@@ -11,7 +11,7 @@ import { orderSettingsIn } from './order-settings.service.js';
 // What wholesale customers owe on orders on payment terms (CUS-06, ADR-888): each customer's
 // orders still owed, what they come to, and what of it is past its due date, the most overdue
 // first, for the shop to chase. Its customer is reminded before the date, and once past it
-// (ADR-945).
+// (ADR-945), unless the shop keeps them out of reminders (ADR-969).
 
 export const TERMS_OWED_LIMITS = { first: 100 } as const;
 
@@ -68,9 +68,12 @@ export async function remindPaymentTermsIn(tx: Tx, shopId: string, at: Date): Pr
            terms_reminded_at = ${now}::timestamptz
      WHERE o.shop_id = ${shopId}
        AND o.id IN (
-         SELECT id FROM orders.orders
+         SELECT id FROM orders.orders owing
           WHERE shop_id = ${shopId} AND payment_due_at IS NOT NULL AND terms_reminded < ${most}
             AND status <> 'cancelled' AND amount_paid < total
+            -- A customer the shop keeps out of reminders (ADR-969).
+            AND NOT EXISTS (SELECT 1 FROM orders.terms_reminders_off r
+                             WHERE r.shop_id = ${shopId} AND r.customer_id = owing.customer_id)
             AND ((terms_reminded < 2 AND payment_due_at <= ${late}::timestamptz)
               OR (terms_reminded >= 2 AND terms_reminded_at <= ${again}::timestamptz)
               OR (terms_reminded = 0 AND payment_due_at > ${now}::timestamptz
@@ -122,6 +125,8 @@ export interface CustomerCredit {
   creditLimit: bigint | null;
   owed: bigint;
   overdue: bigint;
+  /** Whether their orders on terms are reminded to them (ADR-969). */
+  reminded: boolean;
 }
 
 interface OwedRow extends Record<string, unknown> {
@@ -177,6 +182,34 @@ export class PaymentTermsService {
     });
   }
 
+  /**
+   * Whether the customer's orders on payment terms are reminded to them, before the date and
+   * past it (ADR-969): a customer the shop knows well may be kept out. Reminders already sent
+   * stay sent.
+   */
+  async setReminded(
+    tenant: TenantContext,
+    customerId: string,
+    reminded: boolean,
+  ): Promise<MutationResult<CustomerCredit>> {
+    if (!(await this.customers.get(tenant, customerId))) {
+      return fail([{ field: ['customerId'], code: 'NOT_FOUND', message: 'Customer not found' }]);
+    }
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      if (reminded) {
+        await tx.execute(sql`
+          DELETE FROM orders.terms_reminders_off
+           WHERE shop_id = ${tenant.shopId} AND customer_id = ${customerId}`);
+      } else {
+        await tx.execute(sql`
+          INSERT INTO orders.terms_reminders_off (shop_id, customer_id)
+          VALUES (${tenant.shopId}, ${customerId})
+          ON CONFLICT (shop_id, customer_id) DO UPDATE SET updated_at = now()`);
+      }
+      return { ok: true, value: await creditIn(tx, tenant.shopId, customerId) };
+    });
+  }
+
   /** The customers who owe on payment terms, `first` at most, and what all of them owe. */
   async owed(tenant: TenantContext, input: { first: number }): Promise<TermsOwed> {
     const first = Math.min(Math.max(input.first, 1), TERMS_OWED_LIMITS.first);
@@ -221,15 +254,25 @@ export class PaymentTermsService {
   }
 }
 
-/** A customer's credit limit and what they owe on terms now, in the caller's transaction. */
+/**
+ * A customer's credit limit, what they owe on terms now and whether they are reminded of it, in
+ * the caller's transaction.
+ */
 export async function creditIn(
   tx: Tx,
   shopId: string,
   customerId: string,
 ): Promise<CustomerCredit> {
-  const { rows } = await tx.execute<{ limit: string | null; owed: string; overdue: string }>(sql`
+  const { rows } = await tx.execute<{
+    limit: string | null;
+    owed: string;
+    overdue: string;
+    reminded: boolean;
+  }>(sql`
     SELECT (SELECT credit_limit::text FROM orders.credit_limits
              WHERE shop_id = ${shopId} AND customer_id = ${customerId}) AS limit,
+           NOT EXISTS (SELECT 1 FROM orders.terms_reminders_off
+                        WHERE shop_id = ${shopId} AND customer_id = ${customerId}) AS reminded,
            coalesce(sum(o.total - o.amount_paid), 0)::text AS owed,
            coalesce(sum(o.total - o.amount_paid) FILTER (WHERE o.payment_due_at < now()), 0)::text
              AS overdue
@@ -241,6 +284,7 @@ export async function creditIn(
     creditLimit: row.limit === null ? null : BigInt(row.limit),
     owed: BigInt(row.owed),
     overdue: BigInt(row.overdue),
+    reminded: row.reminded,
   };
 }
 

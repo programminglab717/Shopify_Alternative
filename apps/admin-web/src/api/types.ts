@@ -6914,6 +6914,14 @@ export interface CustomerCreditData {
     creditLimit: { amount: string } | null;
     owed: { amount: string };
     overdue: { amount: string };
+    reminded: boolean;
+  };
+}
+
+export interface CustomerTermsRemindersSetData {
+  customerTermsRemindersSet: {
+    credit: { reminded: boolean } | null;
+    userErrors: UserError[];
   };
 }
 

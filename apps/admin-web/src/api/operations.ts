@@ -14004,6 +14004,23 @@ export const CustomerCreditQuery = /* GraphQL */ `
       overdue {
         amount
       }
+      reminded
+    }
+  }
+`;
+
+/** Whether a customer is reminded of their orders on payment terms (ADR-969). */
+export const CustomerTermsRemindersSetMutation = /* GraphQL */ `
+  mutation CustomerTermsRemindersSet($customerId: ID!, $reminded: Boolean!) {
+    customerTermsRemindersSet(customerId: $customerId, reminded: $reminded) {
+      credit {
+        reminded
+      }
+      userErrors {
+        field
+        code
+        message
+      }
     }
   }
 `;

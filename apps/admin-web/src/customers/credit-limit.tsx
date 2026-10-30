@@ -1,13 +1,22 @@
 import { Save } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { CustomerCreditLimitSetMutation, CustomerCreditQuery } from '../api/operations';
-import type { CustomerCreditData, CustomerCreditLimitSetData } from '../api/types';
+import {
+  CustomerCreditLimitSetMutation,
+  CustomerCreditQuery,
+  CustomerTermsRemindersSetMutation,
+} from '../api/operations';
+import type {
+  CustomerCreditData,
+  CustomerCreditLimitSetData,
+  CustomerTermsRemindersSetData,
+} from '../api/types';
 import { gate, permits } from '../auth/permissions';
 import { errorText } from '../i18n/errors';
 import { formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { FormSection, problemText } from '../products/product-form';
+import { CheckField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopDetails } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
@@ -24,7 +33,8 @@ const rupeesOf = (amount: string) => amount.replace(/\.00$/, '');
 
 /**
  * A wholesale customer's credit on payment terms (CUS-06, ADR-907): what they owe on terms and
- * what of it is overdue, and the most they may owe, which an order on terms may not go past.
+ * what of it is overdue, the most they may owe, which an order on terms may not go past, and
+ * whether they are reminded of it (ADR-969).
  */
 export function CreditLimit({ customerId }: { customerId: string }) {
   const { t } = useLocale();
@@ -37,6 +47,9 @@ export function CreditLimit({ customerId }: { customerId: string }) {
   );
   const set = useAdminMutation<CustomerCreditLimitSetData, Record<string, unknown>>(
     CustomerCreditLimitSetMutation,
+  );
+  const remind = useAdminMutation<CustomerTermsRemindersSetData, Record<string, unknown>>(
+    CustomerTermsRemindersSetMutation,
   );
   const [limit, setLimit] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -61,6 +74,24 @@ export function CreditLimit({ customerId }: { customerId: string }) {
         return;
       }
       setLimit(null);
+      setSaved(true);
+      await query.refetch();
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  // Saved as it is ticked, as a switch is.
+  const onRemind = async (reminded: boolean) => {
+    setProblem(null);
+    setSaved(false);
+    try {
+      const { customerTermsRemindersSet } = await remind.mutateAsync({ customerId, reminded });
+      const error = customerTermsRemindersSet.userErrors[0];
+      if (error) {
+        setProblem(problemText(error, t));
+        return;
+      }
       setSaved(true);
       await query.refetch();
     } catch (failure) {
@@ -94,6 +125,14 @@ export function CreditLimit({ customerId }: { customerId: string }) {
               setLimit(event.target.value);
             }}
           />
+          <CheckField
+            label={t('termsCredit.reminded')}
+            hint={t('termsCredit.remindedHint')}
+            checked={credit.reminded}
+            onChange={(checked) => {
+              if (!remind.isPending) void onRemind(checked);
+            }}
+          />
           {problem && <Alert tone="danger">{problem}</Alert>}
           {saved && <Alert tone="success">{t('termsCredit.saved')}</Alert>}
           <Button
@@ -114,6 +153,9 @@ export function CreditLimit({ customerId }: { customerId: string }) {
             ? t('termsCredit.limitIs', { limit: formatMoney(credit.creditLimit.amount, currency) })
             : t('termsCredit.none')}
         </p>
+      )}
+      {credit && !sets && !credit.reminded && (
+        <p className="text-secondary">{t('termsCredit.notReminded')}</p>
       )}
     </FormSection>
   );

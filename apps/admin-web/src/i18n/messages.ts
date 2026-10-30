@@ -2417,6 +2417,10 @@ const en = {
   'termsCredit.none': 'No credit limit.',
   'termsCredit.save': 'Save credit limit',
   'termsCredit.saved': 'Saved.',
+  'termsCredit.reminded': 'Remind them of payments owed',
+  'termsCredit.remindedHint':
+    'On WhatsApp, before the due date and past it, as your order policies say. Turn it off for a customer you know well.',
+  'termsCredit.notReminded': 'Not reminded of payments owed.',
   'credit.title': 'Store credit',
   'credit.hint':
     'What the shop owes them to spend on later orders: refunds given as credit, and credit given by hand.',
@@ -9729,6 +9733,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'termsCredit.none': 'کوئی کریڈٹ حد نہیں۔',
   'termsCredit.save': 'کریڈٹ کی حد محفوظ کریں',
   'termsCredit.saved': 'محفوظ ہو گیا۔',
+  'termsCredit.reminded': 'واجب ادائیگیوں کی یاد دہانی کرائیں',
+  'termsCredit.remindedHint':
+    'واٹس ایپ پر، مقررہ تاریخ سے پہلے اور اس کے بعد، جیسا آپ کی آرڈر پالیسی کہتی ہے۔ جس گاہک کو آپ اچھی طرح جانتے ہیں اس کے لیے بند کر دیں۔',
+  'termsCredit.notReminded': 'واجب ادائیگیوں کی یاد دہانی نہیں کرائی جاتی۔',
   'credit.title': 'اسٹور کریڈٹ',
   'credit.hint':
     'جو دکان نے انہیں بعد کے آرڈرز پر خرچ کرنے کو دینا ہے: کریڈٹ کی صورت میں ریفنڈ، اور ہاتھ سے دیا گیا کریڈٹ۔',

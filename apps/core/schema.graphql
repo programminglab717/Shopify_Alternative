@@ -4844,6 +4844,11 @@ type CustomerCredit {
   creditLimit: Money
   overdue: Money!
   owed: Money!
+
+  """
+  Whether their orders on terms are reminded to them, before the due date and past it (ADR-969).
+  """
+  reminded: Boolean!
 }
 
 type CustomerCreditPayload {
@@ -10563,6 +10568,11 @@ type Mutation {
   A customer's numbers in full, for staff who see them masked, such as a confirmation agent about to call. Every reveal is logged. Roles that see numbers masked without a reveal, such as packers and marketers, are denied.
   """
   customerPhoneReveal(id: ID!): CustomerPhoneRevealPayload!
+
+  """
+  Whether a customer's orders on payment terms are reminded to them, before the due date and past it (ADR-969): false keeps a customer the shop knows well out of reminders.
+  """
+  customerTermsRemindersSet(customerId: ID!, reminded: Boolean!): CustomerCreditPayload!
 
   """Changes a customer's number, name, email, note or tags."""
   customerUpdate(id: ID!, input: CustomerUpdateInput!): CustomerUpdatePayload!

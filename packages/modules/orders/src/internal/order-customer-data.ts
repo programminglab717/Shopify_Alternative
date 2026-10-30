@@ -83,6 +83,15 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
       ON CONFLICT (shop_id, customer_id) DO NOTHING`);
     await tx.execute(sql`
       DELETE FROM orders.credit_limits WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
+    // One kept out of payment terms reminders keeps the customer kept out of them (ADR-969).
+    await tx.execute(sql`
+      INSERT INTO orders.terms_reminders_off (shop_id, customer_id)
+      SELECT shop_id, ${intoId} FROM orders.terms_reminders_off
+       WHERE shop_id = ${shopId} AND customer_id = ${fromId}
+      ON CONFLICT (shop_id, customer_id) DO NOTHING`);
+    await tx.execute(sql`
+      DELETE FROM orders.terms_reminders_off
+       WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
   },
 
   async erase(tx, shopId, customer, actor) {
@@ -93,9 +102,12 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
     // Their subscriptions hold their address and number (ADR-862): no more orders are placed.
     await tx.execute(sql`
       DELETE FROM orders.subscriptions WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
-    // And their credit limit (ADR-907).
+    // And their credit limit (ADR-907), and whether they are reminded (ADR-969).
     await tx.execute(sql`
       DELETE FROM orders.credit_limits WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
+    await tx.execute(sql`
+      DELETE FROM orders.terms_reminders_off
+       WHERE shop_id = ${shopId} AND customer_id = ${customerId}`);
     // Drafts name no customer, and a completed one holds its order's address: they go first.
     await tx.execute(sql`
       DELETE FROM orders.draft_orders d

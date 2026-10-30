@@ -2,7 +2,8 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { PriceListService } from '@hatti/pricing/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PaymentTermsService } from './payment-terms.service.js';
+import { sql } from 'drizzle-orm';
+import { PaymentTermsService, remindPaymentTermsIn } from './payment-terms.service.js';
 import { termsOwed } from './rules.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -102,6 +103,7 @@ describe.skipIf(!server)('Orders on payment terms (CUS-06, ADR-888)', () => {
       creditLimit: null,
       owed: first.total,
       overdue: 0n,
+      reminded: true,
     });
     expect(errorsOf(await terms.setCreditLimit(f.a, customerId, '0'))).toEqual([
       ['creditLimit', 'INVALID'],
@@ -115,6 +117,7 @@ describe.skipIf(!server)('Orders on payment terms (CUS-06, ADR-888)', () => {
       creditLimit: first.total * 2n,
       owed: first.total,
       overdue: 0n,
+      reminded: true,
     });
     await onTerms('0300-1111111', 30);
     const refused = await f.orders.create(f.a, {
@@ -133,6 +136,39 @@ describe.skipIf(!server)('Orders on payment terms (CUS-06, ADR-888)', () => {
     expect((await onTerms('0300-2222222', 30)).paymentTermsDays).toBe(30);
     expect(unwrap(await terms.setCreditLimit(f.a, customerId, null)).creditLimit).toBeNull();
     expect((await onTerms('0300-1111111', 30)).paymentTermsDays).toBe(30);
+  });
+
+  it('keeps a customer the shop knows well out of reminders, and lets them back in (ADR-969)', async () => {
+    const known = await onTerms('0300-1111111', 10);
+    const other = await onTerms('0300-2222222', 10);
+    const customerId = known.customerId!;
+    expect(errorsOf(await terms.setReminded(f.a, known.id, false))).toEqual([
+      ['customerId', 'NOT_FOUND'],
+    ]);
+    expect(unwrap(await terms.setReminded(f.a, customerId, false))).toMatchObject({
+      owed: known.total,
+      reminded: false,
+    });
+    // Twice is no matter; another customer is still reminded.
+    unwrap(await terms.setReminded(f.a, customerId, false));
+    expect((await terms.credit(f.a, other.customerId!)).reminded).toBe(true);
+    const past = new Date(known.paymentDueAt!.getTime() + 2 * DAY_MS);
+    const reminded = () =>
+      f.db.tenant(f.a.shopId, async (tx) => {
+        const { rows } = await tx.execute<{ id: string }>(sql`
+          SELECT id FROM orders.orders WHERE terms_reminded > 0 ORDER BY id`);
+        return rows.map((row) => row.id);
+      });
+    expect(await f.db.tenant(f.a.shopId, (tx) => remindPaymentTermsIn(tx, f.a.shopId, past))).toBe(
+      1,
+    );
+    expect(await reminded()).toEqual([other.id]);
+    // Let back in, they are reminded at the next sweep.
+    expect(unwrap(await terms.setReminded(f.a, customerId, true)).reminded).toBe(true);
+    expect(await f.db.tenant(f.a.shopId, (tx) => remindPaymentTermsIn(tx, f.a.shopId, past))).toBe(
+      1,
+    );
+    expect(await reminded()).toEqual([known.id, other.id].sort());
   });
 
   it('lists who owes, the most overdue first, and finds the orders owed or overdue', async () => {

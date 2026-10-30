@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
@@ -30,8 +30,9 @@ const CUSTOMER = {
   orders: { nodes: [] },
 };
 
-function core(role: StaffRole) {
+function core(role: StaffRole, remindedAtFirst = true) {
   let limit: string | null = null;
+  let reminded = remindedAtFirst;
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Customer':
@@ -45,8 +46,12 @@ function core(role: StaffRole) {
             creditLimit: limit === null ? null : { amount: `${limit}.00` },
             owed: { amount: '36000.00' },
             overdue: { amount: '12000.00' },
+            reminded,
           },
         };
+      case 'CustomerTermsRemindersSet':
+        reminded = variables.reminded as boolean;
+        return { customerTermsRemindersSet: { credit: { reminded }, userErrors: [] } };
       case 'CustomerCreditLimitSet': {
         const given = variables.creditLimit as string | null;
         if (given === '-5') {
@@ -117,6 +122,28 @@ describe("A wholesale customer's credit on payment terms (ADR-907)", () => {
         fake.sent.filter((each) => each.operation === 'CustomerCreditLimitSet').at(-1)?.variables,
       ).toEqual({ customerId: 'cus_1', creditLimit: null }),
     );
+  });
+
+  it('keeps a customer the shop knows well out of payment reminders (ADR-969)', async () => {
+    signedIn();
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/customers/cus_1');
+    const box = (await screen.findByRole('checkbox', {
+      name: /Remind them of payments owed/,
+    })) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    await act(async () => fireEvent.click(box));
+    await waitFor(() => expect(box.checked).toBe(false));
+    expect(fake.sent.filter((each) => each.operation === 'CustomerTermsRemindersSet')).toEqual([
+      expect.objectContaining({ variables: { customerId: 'cus_1', reminded: false } }),
+    ]);
+    // Those who only see it are told, with nothing to tick.
+    cleanup();
+    vi.stubGlobal('fetch', core('accountant', false).fetcher);
+    renderAdmin('/shop_1/customers/cus_1');
+    expect(await screen.findByText('Not reminded of payments owed.')).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /Remind them/ })).toBeNull();
   });
 
   it('only shows the limit to accountants, and nothing to those who see no orders', async () => {
