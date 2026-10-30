@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### The Storefront API's node
+### 2478983 · The Storefront API's node
 
 * **`node(id:)` gives one thing by its ID**, as `nodes` does ([ADR-973](../architecture/13-decision-log.md#adr-973--the-storefront-apis-node-gives-one-thing-by-its-id-as-nodes-does)).
 * 5126 tests (none new: `nodes`' test asks it too).
