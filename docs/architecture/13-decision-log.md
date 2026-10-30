@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-970 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-971 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -978,6 +978,7 @@
 | 968 | hatti theme check reads a theme's pages through its preview with axe | Accepted |
 | 969 | A shop keeps a wholesale customer it knows well out of payment terms reminders | Accepted |
 | 970 | A running theme experiment takes a draft more as its next arm, or has one taken out | Accepted |
+| 971 | An expansion store's margin by product type or vendor | Accepted |
 
 ---
 
@@ -31294,7 +31295,7 @@
     product, "Give Teak sofa a margin", its percent, and Save.
 * **Consequences:**
   * The few products dearer to ship are priced for it, without a collection of their own.
-  * Not yet: a margin by product type or vendor.
+  * Not yet: a margin by product type or vendor (built, ADR-971).
 
 ## ADR-961 · The headless starter shows the products viewed before, on each product's page and the home page, kept by the shopper's browser alone
 
@@ -31526,3 +31527,25 @@
   * A draft added late is compared with the live theme's sessions since the experiment began,
     not only since it joined; the admin says it needs time to catch up.
   * Not yet: a draft taken out let back in.
+
+## ADR-971 · An expansion store's margin by product type or vendor
+
+* **Context:** an expansion store's copied prices take its margin over its rate (ADR-933), a
+  collection's own (ADR-948) or a product's own (ADR-960). A shop whose furniture costs more to
+  ship than its cushions, or whose goods from one vendor cost more to bring in, kept a collection
+  of each by hand. ADR-960 left a margin by product type or vendor as not yet.
+* **Decision:**
+  * **`group_margins`** (migration 0430) on the link: up to twenty, each a product type or a
+    vendor, its name and a whole percent from 0 to 100. Names are matched as products give them,
+    spaces at the ends and letter case aside; each once. A name no product has yet is kept, for
+    the products to come.
+  * **The order a product's margin is taken in:** its own (ADR-960), its first collection's in the
+    list (ADR-948), its product type's, its vendor's, then the store's (ADR-933).
+  * **`expansionStoreGroupMarginsSet(shopId, margins)`** sets them (`by`: `PRODUCT_TYPE` or
+    `VENDOR`), for the owner of both shops having signed in lately, as the other margins are;
+    `ExpansionStore.groupMargins` says them. Changed, copying as products change copies again.
+  * **The admin's expansion store** has a list of them beside its collections' and products'
+    margins.
+* **Consequences:**
+  * A shop prices whole kinds of goods abroad without keeping collections for them.
+  * Not yet: a margin by tag.
