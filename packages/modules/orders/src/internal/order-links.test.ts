@@ -107,6 +107,8 @@ describe.skipIf(!server)('Order links', () => {
       confirmationCalls: 'off',
       staffDiscountPercent: null,
       shareNewOrders: false,
+      termsReminderDays: 7,
+      termsOverdueReminders: 4,
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -140,6 +142,8 @@ describe.skipIf(!server)('Order links', () => {
           confirmationCalls: 'off',
           staffDiscountPercent: null,
           shareNewOrders: false,
+          termsReminderDays: 7,
+          termsOverdueReminders: 4,
           actorKind: 'app',
           actorId: appId,
         },
@@ -166,6 +170,8 @@ describe.skipIf(!server)('Order links', () => {
           confirmationCalls: 'off',
           staffDiscountPercent: null,
           shareNewOrders: false,
+          termsReminderDays: 7,
+          termsOverdueReminders: 4,
         },
       },
     ]);
