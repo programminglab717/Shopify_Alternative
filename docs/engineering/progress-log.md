@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Payment terms reminders kept from a customer
+### d84890f · Payment terms reminders kept from a customer
 
 * **A shop keeps a wholesale customer it knows well out of payment terms reminders**, from the
   customer's page ([ADR-969](../architecture/13-decision-log.md#adr-969--a-shop-keeps-a-wholesale-customer-it-knows-well-out-of-payment-terms-reminders)).
