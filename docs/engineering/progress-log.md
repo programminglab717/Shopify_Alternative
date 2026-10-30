@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### A week's sales abroad as its days'
+### 5e62ee6 · A week's sales abroad as its days'
 
 * **A week's or a month's sales abroad are its days', each at that day's rate** ([ADR-975](../architecture/13-decision-log.md#adr-975--a-weeks-or-a-months-sales-abroad-are-its-days-each-at-that-days-rate)).
 * 5126 tests (none new: the stores' sales test asks it).
