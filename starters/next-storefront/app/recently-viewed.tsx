@@ -8,7 +8,9 @@ import type { Words } from '@/lib/words';
 
 // Products the shopper viewed lately (ADR-961), kept in their browser: on a product's page, it put
 // first and the others shown under it; on the home page, all of them. Signed in, they are kept
-// with their account too (ADR-978), and those viewed on their other devices are shown as well.
+// with their account (ADR-978), and those viewed on their other devices are shown as well: the
+// browser's own join the account's the first time, and it keeps none after (ADR-982), so that each
+// view moves only the product viewed to the front of the account's.
 
 const VIEWED_KEY = 'hatti_viewed';
 /** This product, and the eight before it. */
@@ -47,7 +49,16 @@ export function RecentlyViewed({
     let shown = true;
     // Asked even with none kept here: a signed-in shopper's account may have some.
     void recentProducts(others.slice(0, KEPT - 1), productId).then(
-      (cards) => shown && setProducts(cards),
+      ({ products: cards, kept }) => {
+        if (kept) {
+          try {
+            window.localStorage.removeItem(VIEWED_KEY);
+          } catch {
+            // Sent again with the next view: the account keeps each once.
+          }
+        }
+        if (shown) setProducts(cards);
+      },
       () => undefined,
     );
     return () => {

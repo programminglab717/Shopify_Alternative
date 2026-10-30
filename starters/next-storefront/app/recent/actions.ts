@@ -12,7 +12,8 @@ import type { ProductCard } from '@/lib/types';
 
 // Products the shopper viewed lately (ADR-961): their IDs are kept by their browser, and read here
 // as cards, in one request, in their language. Signed in, they are kept with the shopper's account
-// too (ADR-978): the browser's join the account's, and the account's, from any device, are shown.
+// instead (ADR-978): the browser's join the account's once, and the account's, from any device,
+// are shown; the browser then keeps none of its own (ADR-982).
 
 /** The most shown. */
 const MOST = 8;
@@ -23,9 +24,12 @@ type Viewed = { nodes: (Partial<ProductCard> | null)[] };
 /**
  * The cards of the products the shopper viewed: those `ids` names, in their order, those no longer
  * sold left out. Signed in, `viewing` and `ids` are added to their account's, and its list, but for
- * `viewing`, is shown.
+ * `viewing`, is shown; `kept` says so, for the browser to keep its own no longer.
  */
-export async function recentProducts(ids: unknown, viewing?: unknown): Promise<ProductCard[]> {
+export async function recentProducts(
+  ids: unknown,
+  viewing?: unknown,
+): Promise<{ products: ProductCard[]; kept: boolean }> {
   const wanted = Array.isArray(ids)
     ? ids.filter((id): id is string => typeof id === 'string' && PRODUCT_ID.test(id))
     : [];
@@ -47,19 +51,19 @@ export async function recentProducts(ids: unknown, viewing?: unknown): Promise<P
         language,
       });
       const viewed = customerRecentlyViewedAdd?.customer?.recentlyViewed;
-      if (viewed) return cards(viewed);
+      if (viewed) return { products: cards(viewed), kept: true };
     } else {
       const { customer } = await storefront<{ customer: { recentlyViewed: Viewed } | null }>(
         CUSTOMER_RECENTLY_VIEWED_QUERY,
         { customerAccessToken: token, language },
       );
-      if (customer) return cards(customer.recentlyViewed);
+      if (customer) return { products: cards(customer.recentlyViewed), kept: true };
     }
   }
-  if (wanted.length === 0) return [];
+  if (wanted.length === 0) return { products: [], kept: false };
   const { nodes } = await storefront<Viewed>(PRODUCTS_BY_ID_QUERY, {
     ids: wanted.slice(0, MOST),
     language,
   });
-  return cards({ nodes });
+  return { products: cards({ nodes }), kept: false };
 }
