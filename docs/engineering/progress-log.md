@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Shoppers' pages checked for accessibility
+### f9a3459 · Shoppers' pages checked for accessibility
 
 * **Every platform theme's pages, and checkout, are checked with axe**, in English and Urdu; the
   announcement bar, the WhatsApp button and collection cards take their places ([ADR-967](../architecture/13-decision-log.md#adr-967--shoppers-pages-in-every-platform-theme-and-checkout-are-checked-with-axe)).
