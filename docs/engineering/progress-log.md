@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Payment terms reminded before the date as the shop chose
+### d10e354 · Payment terms reminded before the date as the shop chose
 
 * **A shop chooses how long before the due date payment terms are first reminded**, or not
   before it ([ADR-965](../architecture/13-decision-log.md#adr-965--a-shop-chooses-how-long-before-the-due-date-payment-terms-are-first-reminded-or-not-before-it)).
