@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-971 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-972 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -979,6 +979,7 @@
 | 969 | A shop keeps a wholesale customer it knows well out of payment terms reminders | Accepted |
 | 970 | A running theme experiment takes a draft more as its next arm, or has one taken out | Accepted |
 | 971 | An expansion store's margin by product type or vendor | Accepted |
+| 972 | The Storefront API's nodes gives variants by their IDs too, through an index of each variant's product | Accepted |
 
 ---
 
@@ -31274,7 +31275,7 @@
     with no lookup by the variant's ID.
 * **Consequences:**
   * Every kind of the Storefront API's ID but a variant's can be asked for in one request.
-  * Not yet: variants by `nodes`.
+  * Not yet: variants by `nodes` (built, ADR-972).
 
 ## ADR-960 · An expansion store's copied price may take a margin of its own for a single product, before its collections'
 
@@ -31549,3 +31550,27 @@
 * **Consequences:**
   * A shop prices whole kinds of goods abroad without keeping collections for them.
   * Not yet: a margin by tag.
+
+## ADR-972 · The Storefront API's nodes gives variants by their IDs too, through an index of each variant's product
+
+* **Context:** `nodes` gives products, collections, pages, blogs and articles by their IDs
+  (ADR-956, ADR-959), but not variants, which a headless shop's saved cart lines, wishlists and
+  order lines name by `merchandiseId` alone. The storefront's documents are a product's, with its
+  variants inside: nothing found a variant's product from the variant's ID. ADR-959 left variants
+  as not yet.
+* **Decision:**
+  * **A hash of each variant's product** (`variant-products`, by the variant's ID), written by the
+    publisher beside each product as it is put, and its variants' entries taken off, as its
+    document names them, when it is dropped. A variant a product no longer has may linger,
+    pointing to the product, so the product's own variants have the last word: `nodes` gives null
+    for it.
+  * **`StoreData.productIdsOfVariants(ids)`** reads it in one round trip; `nodes` then reads the
+    variants' products with the products asked for, at once, and gives each `ProductVariant` as a
+    cart line's merchandise is given, its `product` with it. `ProductVariant` implements `Node`.
+  * **The documents' version goes to 17**, so a publisher finding a shop's written in 16 publishes
+    them all again, and the index is filled for every shop's products, not only those written
+    from now.
+* **Consequences:**
+  * A headless shop finds a saved line's variant by its ID, as on Shopify.
+  * Every shop is published once again after the deploy, as for any change of the documents.
+  * Not yet: `node(id:)` for one ID, and variants of products the storefront doesn't show.
