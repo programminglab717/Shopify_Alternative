@@ -297,6 +297,14 @@ describe('The Storefront API (DEV-02, ADR-848)', () => {
       { __typename: 'Product', id: ids[2] },
       expect.objectContaining({ __typename: 'ProductVariant', title: first!.title }),
     ]);
+    // One at a time, by node, as Shopify's.
+    const one = await ask(
+      `query ($id: ID!) { node(id: $id) { __typename ... on ProductVariant { title } } }`,
+      { id: ids[0] },
+    );
+    expect(one.data.node).toEqual({ __typename: 'ProductVariant', title: second!.title });
+    const none = await ask(`{ node(id: "gid://hatti/Product/gone") { id } }`);
+    expect(none).toEqual({ data: { node: null } });
   });
 
   it('searches through the core where a query is given', async () => {

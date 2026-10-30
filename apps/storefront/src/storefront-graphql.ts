@@ -177,6 +177,8 @@ const SDL = /* GraphQL */ `
     Shopify's.
     """
     nodes(ids: [ID!]!): [Node]!
+    "The product, variant, collection, page, blog or article with this ID, as nodes gives it."
+    node(id: ID!): Node
     collection(id: ID, handle: String): Collection
     collections(first: Int, after: String): CollectionConnection!
     cart(id: ID!): Cart
@@ -1777,6 +1779,81 @@ function rootOf(api: StorefrontApiShop) {
     };
   };
 
+  /**
+   * What `nodes` gives for `ids` (ADR-956, ADR-959, ADR-972), in their order, null for one the
+   * shop doesn't show; `node` gives one of them.
+   */
+  const nodesOf = async (ids: readonly string[]) => {
+    if (ids.length > STOREFRONT_API_LIMITS.first) {
+      throw new GraphQLError(`Ask for ${STOREFRONT_API_LIMITS.first} IDs at most`);
+    }
+    // The products at once, with those of the variants asked for, found by the storefront's
+    // index of them (ADR-972); the collections, as the storefront has them, by handle.
+    const variantIds = ids.flatMap((id) => idOf('ProductVariant', id) ?? []);
+    const variantProducts = new Map(
+      (variantIds.length > 0 ? await api.store.productIdsOfVariants(variantIds) : []).flatMap(
+        (productId, at) => (productId ? [[variantIds[at]!, productId] as const] : []),
+      ),
+    );
+    const productIds = [
+      ...new Set([...ids.flatMap((id) => idOf('Product', id) ?? []), ...variantProducts.values()]),
+    ];
+    const products = new Map(
+      (productIds.length > 0 ? await api.store.products(productIds) : []).flatMap((doc) =>
+        doc ? [[doc.id, doc] as const] : [],
+      ),
+    );
+    const collections = new Map<string, CollectionDoc>();
+    if (ids.some((id) => idOf('Collection', id))) {
+      for (const handle of await api.store.handles('collection')) {
+        const doc = await api.store.collectionByHandle(handle);
+        if (doc) collections.set(doc.id, doc);
+      }
+    }
+    // Pages and articles at once, as products (ADR-959); blogs, as collections, by handle.
+    const pageIds = ids.flatMap((id) => idOf('Page', id) ?? []);
+    const pages = new Map(
+      (pageIds.length > 0 ? await api.store.pages(pageIds) : []).flatMap((doc) =>
+        doc ? [[doc.id, doc] as const] : [],
+      ),
+    );
+    const articleIds = ids.flatMap((id) => idOf('Article', id) ?? []);
+    const articles = new Map(
+      (articleIds.length > 0 ? await api.store.articles(articleIds) : []).flatMap((doc) =>
+        doc ? [[doc.id, doc] as const] : [],
+      ),
+    );
+    const blogs = new Map<string, BlogDoc>();
+    const wantsBlogs = ids.some((id) => idOf('Blog', id));
+    if (wantsBlogs || articles.size > 0) {
+      for (const handle of await api.store.handles('blog')) {
+        const doc = await api.store.blogByHandle(handle);
+        if (doc) blogs.set(doc.handle, doc);
+      }
+    }
+    const blogsById = new Map([...blogs.values()].map((doc) => [doc.id, doc]));
+    return ids.map((id) => {
+      const product = products.get(idOf('Product', id) ?? '');
+      if (product) return { __typename: 'Product', ...productOf(product, api) };
+      // A variant its product still has: one it no longer has may linger in the index.
+      const variantId = idOf('ProductVariant', id) ?? '';
+      const itsProduct = products.get(variantProducts.get(variantId) ?? '');
+      const variant = itsProduct?.variants.find((each) => each.id === variantId);
+      if (itsProduct && variant) return variantOf(itsProduct, variant, api);
+      const collection = collections.get(idOf('Collection', id) ?? '');
+      if (collection) return { __typename: 'Collection', ...collectionOf(collection, api) };
+      const page = pages.get(idOf('Page', id) ?? '');
+      if (page) return { __typename: 'Page', ...pageOf(page, api) };
+      const blog = blogsById.get(idOf('Blog', id) ?? '');
+      if (blog) return { __typename: 'Blog', ...blogOf(blog, api) };
+      const article = articles.get(idOf('Article', id) ?? '');
+      const itsBlog = article && blogs.get(article.blogHandle);
+      return article && itsBlog
+        ? { __typename: 'Article', ...articleOf(article, itsBlog, api) }
+        : null;
+    });
+  };
+
   return {
     localization,
     customer: async (args: { customerAccessToken: string }) => {
@@ -2047,79 +2124,8 @@ function rootOf(api: StorefrontApiShop) {
       const ids = terms ? await api.search(terms) : await api.store.productIds();
       return productPage(ids, args, api);
     },
-    nodes: async (args: { ids: string[] }) => {
-      if (args.ids.length > STOREFRONT_API_LIMITS.first) {
-        throw new GraphQLError(`Ask for ${STOREFRONT_API_LIMITS.first} IDs at most`);
-      }
-      // The products at once, with those of the variants asked for, found by the storefront's
-      // index of them (ADR-972); the collections, as the storefront has them, by handle.
-      const variantIds = args.ids.flatMap((id) => idOf('ProductVariant', id) ?? []);
-      const variantProducts = new Map(
-        (variantIds.length > 0 ? await api.store.productIdsOfVariants(variantIds) : []).flatMap(
-          (productId, at) => (productId ? [[variantIds[at]!, productId] as const] : []),
-        ),
-      );
-      const productIds = [
-        ...new Set([
-          ...args.ids.flatMap((id) => idOf('Product', id) ?? []),
-          ...variantProducts.values(),
-        ]),
-      ];
-      const products = new Map(
-        (productIds.length > 0 ? await api.store.products(productIds) : []).flatMap((doc) =>
-          doc ? [[doc.id, doc] as const] : [],
-        ),
-      );
-      const collections = new Map<string, CollectionDoc>();
-      if (args.ids.some((id) => idOf('Collection', id))) {
-        for (const handle of await api.store.handles('collection')) {
-          const doc = await api.store.collectionByHandle(handle);
-          if (doc) collections.set(doc.id, doc);
-        }
-      }
-      // Pages and articles at once, as products (ADR-959); blogs, as collections, by handle.
-      const pageIds = args.ids.flatMap((id) => idOf('Page', id) ?? []);
-      const pages = new Map(
-        (pageIds.length > 0 ? await api.store.pages(pageIds) : []).flatMap((doc) =>
-          doc ? [[doc.id, doc] as const] : [],
-        ),
-      );
-      const articleIds = args.ids.flatMap((id) => idOf('Article', id) ?? []);
-      const articles = new Map(
-        (articleIds.length > 0 ? await api.store.articles(articleIds) : []).flatMap((doc) =>
-          doc ? [[doc.id, doc] as const] : [],
-        ),
-      );
-      const blogs = new Map<string, BlogDoc>();
-      const wantsBlogs = args.ids.some((id) => idOf('Blog', id));
-      if (wantsBlogs || articles.size > 0) {
-        for (const handle of await api.store.handles('blog')) {
-          const doc = await api.store.blogByHandle(handle);
-          if (doc) blogs.set(doc.handle, doc);
-        }
-      }
-      const blogsById = new Map([...blogs.values()].map((doc) => [doc.id, doc]));
-      return args.ids.map((id) => {
-        const product = products.get(idOf('Product', id) ?? '');
-        if (product) return { __typename: 'Product', ...productOf(product, api) };
-        // A variant its product still has: one it no longer has may linger in the index.
-        const variantId = idOf('ProductVariant', id) ?? '';
-        const itsProduct = products.get(variantProducts.get(variantId) ?? '');
-        const variant = itsProduct?.variants.find((each) => each.id === variantId);
-        if (itsProduct && variant) return variantOf(itsProduct, variant, api);
-        const collection = collections.get(idOf('Collection', id) ?? '');
-        if (collection) return { __typename: 'Collection', ...collectionOf(collection, api) };
-        const page = pages.get(idOf('Page', id) ?? '');
-        if (page) return { __typename: 'Page', ...pageOf(page, api) };
-        const blog = blogsById.get(idOf('Blog', id) ?? '');
-        if (blog) return { __typename: 'Blog', ...blogOf(blog, api) };
-        const article = articles.get(idOf('Article', id) ?? '');
-        const itsBlog = article && blogs.get(article.blogHandle);
-        return article && itsBlog
-          ? { __typename: 'Article', ...articleOf(article, itsBlog, api) }
-          : null;
-      });
-    },
+    nodes: (args: { ids: string[] }) => nodesOf(args.ids),
+    node: async (args: { id: string }) => (await nodesOf([args.id]))[0] ?? null,
     collection: async (args: { id?: string | null; handle?: string | null }) => {
       const handle = args.handle ?? null;
       const doc = handle ? await api.store.collectionByHandle(handle) : null;
