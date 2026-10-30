@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-973 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-974 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -981,6 +981,7 @@
 | 971 | An expansion store's margin by product type or vendor | Accepted |
 | 972 | The Storefront API's nodes gives variants by their IDs too, through an index of each variant's product | Accepted |
 | 973 | The Storefront API's node gives one thing by its ID, as nodes does | Accepted |
+| 974 | Each day's currency rates are kept, and the stores' chart puts each day's sales at that day's rate | Accepted |
 
 ---
 
@@ -31199,7 +31200,7 @@
     and what all the stores sold.
 * **Consequences:**
   * An owner sees a store abroad's sales grow, or not, beside their own, on one chart.
-  * Not yet: the same chart in the sales report; each day at that day's rate.
+  * Not yet: the same chart in the sales report; each day at that day's rate (built, ADR-974).
 
 ## ADR-956 · The Storefront API gives products and collections by their IDs at once, as Shopify's nodes
 
@@ -31587,3 +31588,23 @@
 * **Consequences:**
   * A client written for Shopify's `node` works unchanged.
   * Not yet: variants of products the storefront doesn't show.
+
+## ADR-974 · Each day's currency rates are kept, and the stores' chart puts each day's sales at that day's rate
+
+* **Context:** the expansion stores' page (ADR-932, ADR-955) puts each store's sales in this
+  shop's currency at today's rate, every day of the chart alike: a dirham's fall last month made
+  last month's sales abroad look smaller than they were. Only the feed's latest rate was kept
+  (ADR-865). ADR-955 left each day at its own rate as not yet.
+* **Decision:**
+  * **`platform.currency_rate_history`** (migration 0431) keeps the rate the feed gave each day,
+    by currency, beside the latest; the rates already given are its first rows. The worker writes
+    both as a rate changes, so a day the feed gave no new rate takes the last before it.
+  * **Each period of the chart at its first day's rate**, in this shop's time: the last the feed
+    gave on or before that day, or today's for a currency whose history begins after it. A week or
+    a month takes its first day's. The period's total is its periods', each at its own rate, so the
+    chart and the total agree.
+  * The rates of every day in the period are read once, for all the stores.
+* **Consequences:**
+  * A store's sales abroad are seen as they were worth on their day.
+  * Not yet: a week's or month's sales at each of its days' rates, and the same chart in the
+    sales report.
