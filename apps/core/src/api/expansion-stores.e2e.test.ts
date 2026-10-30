@@ -555,11 +555,12 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
        VALUES ('AED', 76.4521, current_date, now())
        ON CONFLICT (currency) DO UPDATE SET rate = excluded.rate`,
     );
-    // As the feed keeps it by its day too (ADR-974), the rates before forgotten.
+    // As the feed keeps it by its day too (ADR-974), the rates before forgotten: a day well
+    // before the test's, so that every day it asks of takes it.
     await admin.query(`DELETE FROM platform.currency_rate_history WHERE currency = 'AED'`);
     await admin.query(
       `INSERT INTO platform.currency_rate_history (currency, rate_date, rate)
-       VALUES ('AED', current_date, 76.4521)`,
+       VALUES ('AED', current_date - 7, 76.4521)`,
     );
     /** An order of `total` minor units in `shop`'s currency, placed now, each its own number. */
     let number = 1001;
@@ -681,14 +682,14 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     ]);
     // Each day at its own rate (ADR-974): yesterday's dirham was Rs 75, so an order of AED 10
     // yesterday is Rs 750, and the period's total is its days', each at its rate.
-    const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(
-      new Date(today - day),
-    );
+    // Karachi's days, as the chart's are: past 19:00 UTC, Karachi's today is UTC's tomorrow.
+    const karachiDay = (at: number) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(at));
+    await admin.query(`DELETE FROM platform.currency_rate_history WHERE currency = 'AED'`);
     await admin.query(
       `INSERT INTO platform.currency_rate_history (currency, rate_date, rate)
-       VALUES ('AED', $1::date, 75.0000), ('AED', current_date, 76.4521)
-       ON CONFLICT (currency, rate_date) DO UPDATE SET rate = excluded.rate`,
-      [yesterday],
+       VALUES ('AED', $1::date, 75.0000), ('AED', $2::date, 76.4521)`,
+      [karachiDay(today - day), karachiDay(today)],
     );
     await order(dubai, 'AED', 1_000, '+923001234568');
     await admin.query(
