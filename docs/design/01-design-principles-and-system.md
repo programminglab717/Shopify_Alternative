@@ -195,8 +195,9 @@ Delivery: Multan, 2-4 din. Kya hum order confirm kar dein?
 
 * **WCAG 2.2 AA** for admin, checkout and reference themes; automated checks in CI (axe) plus
   manual TalkBack testing in English and Urdu. *Built for the admin and the console ([ADR-966](../architecture/13-decision-log.md#adr-966--the-admins-and-the-consoles-tests-check-each-screens-accessibility-with-axe)):
-  each screen the tests render is read by axe; contrast in a real browser, the themes, checkout
-  and TalkBack are still to come.*
+  each screen the tests render is read by axe; and for every platform theme's pages and
+  checkout ([ADR-967](../architecture/13-decision-log.md#adr-967--shoppers-pages-in-every-platform-theme-and-checkout-are-checked-with-axe)). Contrast in a real browser, partners' themes and TalkBack are still to
+  come.*
 * Visible focus states, logical focus order (including RTL), labelled form fields, errors linked to
   fields, no information conveyed by colour alone.
 * Respect OS font scaling up to 200% without breaking critical flows.

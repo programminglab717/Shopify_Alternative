@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-966 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-967 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -974,6 +974,7 @@
 | 964 | A shop chooses how often, and how many times, overdue payment terms are reminded | Accepted |
 | 965 | A shop chooses how long before the due date payment terms are first reminded, or not before it | Accepted |
 | 966 | The admin's and the console's tests check each screen's accessibility with axe | Accepted |
+| 967 | Shoppers' pages in every platform theme, and checkout, are checked with axe | Accepted |
 
 ---
 
@@ -31421,3 +31422,28 @@
   * A screen that breaks an accessibility rule fails CI, as the design system said.
   * Not yet: contrast and focus order checked in a real browser, the storefront's themes and
     checkout checked the same way, and TalkBack tried by hand in English and Urdu.
+
+## ADR-967 · Shoppers' pages in every platform theme, and checkout, are checked with axe
+
+* **Context:** ADR-966 checks the admin's and the console's screens with axe. Shoppers' pages,
+  the themes and checkout, are where most people meet Hatti, many on a phone with a screen
+  reader in Urdu, and nothing checked them; design §8 asks the same of them.
+* **Decision:**
+  * **Every platform theme's pages:** Hatti Base, Lawn, Bazaar, Kundan, Nikhar and Kiryana each
+    render the sample shop's home, product, collection, cart, search and content pages, in
+    English and in Urdu, right to left, and axe reads each. Any rule broken fails the test with
+    the page and the element. A theme added to the library is checked without a test of its own.
+  * **Checkout:** the open checkout, with errors beside its boxes, refused, and the order placed,
+    are read the same way.
+  * **axe runs in a window of its own** (happy-dom's), the page's scripts taken out first, so
+    that nothing but axe's own code runs there; a map's or video's frame is left to its own site.
+    Colour contrast is left out, as nothing is laid out.
+  * **What it found, fixed in Hatti Base**, and so in the themes built on it: the announcement
+    bar and the WhatsApp button were outside any landmark, and are each in a labelled `aside`
+    now, "Announcement" and "Chat with the shop", in English and Urdu; and a collection page's
+    product cards were third-level headings under the page's first-level one, and are second
+    level there now (a card takes its level from where it sits).
+* **Consequences:**
+  * A theme change, or a new theme, that breaks a rule for shoppers fails CI.
+  * Not yet: a partner's theme from the theme store checked when it is reviewed; contrast with
+    the shop's own colours; and TalkBack tried by hand.
