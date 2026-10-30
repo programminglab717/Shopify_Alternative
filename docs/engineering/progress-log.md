@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-30
 
-### Variants by the Storefront API's nodes
+### f5b6a1b · Variants by the Storefront API's nodes
 
 * **`nodes` gives variants by their IDs too**, through an index of each variant's product the
   publisher keeps; every shop is published again once to fill it ([ADR-972](../architecture/13-decision-log.md#adr-972--the-storefront-apis-nodes-gives-variants-by-their-ids-too-through-an-index-of-each-variants-product)).
