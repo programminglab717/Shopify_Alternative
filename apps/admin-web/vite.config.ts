@@ -104,5 +104,8 @@ export default defineConfig({
     // A test waits up to 5 seconds for each thing it looks for (test-setup.ts); one that walks
     // through several pages needs longer than vitest's own 5 seconds on a busy machine.
     testTimeout: 20_000,
+    // Each test file's first screen is read by axe in a hook once its test is done
+    // (accessibility-check.ts), which takes as long as a test may on a busy machine.
+    hookTimeout: 20_000,
   },
 });

@@ -21,7 +21,12 @@ const NOT_JUDGED = {
 /** The rules `root` breaks, each said in a line or more; none where it breaks none. */
 export async function accessibilityProblems(root: Element): Promise<string[]> {
   // An embedded app's or a theme's preview frame is its own page, not the admin's.
-  const { violations } = await axe.run(root, { rules: NOT_JUDGED, iframes: false });
+  const { violations } = await axe.run(root, {
+    rules: NOT_JUDGED,
+    iframes: false,
+    // What passes is not needed, and is most of axe's time.
+    resultTypes: ['violations'],
+  });
   return violations.map(
     (each) =>
       `- ${each.id} (${each.impact ?? 'minor'}): ${each.help}\n  ${each.nodes

@@ -49,5 +49,8 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/accessibility-check.ts', './src/test-setup.ts'],
     testTimeout: 20_000,
+    // Each test file's first screen is read by axe in a hook once its test is done
+    // (accessibility-check.ts), which takes as long as a test may on a busy machine.
+    hookTimeout: 20_000,
   },
 });
