@@ -351,9 +351,12 @@ export {
 } from '../internal/digital-deliveries.js';
 export {
   EXPANSION_AUTO_COPY,
+  EXPANSION_GROUP_KINDS,
   EXPANSION_STORE_LIMITS,
   ExpansionStoreService,
   type ExpansionCollectionMargin,
+  type ExpansionGroupKind,
+  type ExpansionGroupMargin,
   type ExpansionProductMargin,
   type ExpansionCopyDue,
   type ExpansionStoreRecord,

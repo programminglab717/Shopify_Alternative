@@ -281,8 +281,69 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
       { price: { amount: '12.99', currencyCode: 'USD' } },
     ]);
     await productMargins([]);
-    // None: the store's own margin again.
+    // A product type's own margin (ADR-971), after its collection's: the kurta's type 30% over
+    // the rate, $13.99 once the collection's is gone; a vendor's after a type's.
+    expect(
+      (
+        await value(
+          owner.token,
+          zari,
+          'mutation ($id: ID!) { productUpdate(input: { id: $id, productType: "Kurtas", vendor: "Zari" }) { userErrors { message } } }',
+          { id: kurta },
+        )
+      ).userErrors,
+    ).toEqual([]);
+    const GROUP_MARGINS = `mutation ($shopId: ID!, $margins: [ExpansionGroupMarginInput!]!) {
+      expansionStoreGroupMarginsSet(shopId: $shopId, margins: $margins) {
+        expansionStore { groupMargins { by value marginPercent } }
+        userErrors { field message } } }`;
+    const groupMargins = (list: { by: string; value: string; marginPercent: number }[]) =>
+      value(owner.token, zari, GROUP_MARGINS, {
+        shopId: toPublicId('shop', abroad),
+        margins: list,
+      });
+    expect(
+      (await groupMargins([{ by: 'COLOUR', value: 'Red', marginPercent: 5 }])).userErrors,
+    ).toEqual([{ field: ['margins', '0', 'by'], message: 'Choose a product type or vendor' }]);
+    expect(
+      (
+        await groupMargins([
+          { by: 'VENDOR', value: 'Zari', marginPercent: 40 },
+          { by: 'VENDOR', value: ' zari ', marginPercent: 10 },
+        ])
+      ).userErrors,
+    ).toEqual([{ field: ['margins'], message: 'Give each product type and vendor one margin' }]);
+    expect(
+      (
+        await groupMargins([
+          { by: 'VENDOR', value: 'Zari', marginPercent: 40 },
+          { by: 'PRODUCT_TYPE', value: ' kurtas', marginPercent: 30 },
+        ])
+      ).expansionStore,
+    ).toEqual({
+      groupMargins: [
+        { by: 'VENDOR', value: 'Zari', marginPercent: 40 },
+        { by: 'PRODUCT_TYPE', value: 'kurtas', marginPercent: 30 },
+      ],
+    });
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    // Its collection's still first.
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '15.99', currencyCode: 'USD' } },
+    ]);
     await margins([]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '13.99', currencyCode: 'USD' } },
+    ]);
+    // Its vendor's, with no type's.
+    await groupMargins([{ by: 'VENDOR', value: 'zari', marginPercent: 40 }]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '14.99', currencyCode: 'USD' } },
+    ]);
+    await groupMargins([]);
+    // None: the store's own margin again.
     await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
     expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
       { price: { amount: '11.99', currencyCode: 'USD' } },

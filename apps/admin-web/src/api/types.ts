@@ -4869,6 +4869,15 @@ export interface ExpansionStore {
   collectionMargins: { collectionId: string; collectionTitle: string; marginPercent: number }[];
   /** Products with a margin of their own, before their collections' (ADR-960). */
   productMargins: { productId: string; productTitle: string; marginPercent: number }[];
+  /** Product types and vendors with a margin of their own, after collections' (ADR-971). */
+  groupMargins: ExpansionGroupMargin[];
+}
+
+/** A product type's or vendor's margin over an expansion store's rate (ADR-971). */
+export interface ExpansionGroupMargin {
+  by: 'PRODUCT_TYPE' | 'VENDOR';
+  value: string;
+  marginPercent: number;
 }
 
 /** What one of the owner's shops sold in a period (ADR-932). */
@@ -4906,6 +4915,10 @@ export interface ExpansionStorePayloadData {
   expansionStoreFollowRateSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStorePricingSet?: { expansionStore: ExpansionStore | null; userErrors: UserError[] };
   expansionStoreCollectionMarginsSet?: {
+    expansionStore: ExpansionStore | null;
+    userErrors: UserError[];
+  };
+  expansionStoreGroupMarginsSet?: {
     expansionStore: ExpansionStore | null;
     userErrors: UserError[];
   };

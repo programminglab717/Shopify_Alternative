@@ -5,6 +5,7 @@ import {
   CollectionsQuery,
   ExpansionStoreAutoCopySetMutation,
   ExpansionStoreCollectionMarginsSetMutation,
+  ExpansionStoreGroupMarginsSetMutation,
   ExpansionStoreProductMarginsSetMutation,
   ExpansionStoreCopyMutation,
   ExpansionStoreFollowRateSetMutation,
@@ -17,6 +18,7 @@ import {
 } from '../api/operations';
 import type {
   CollectionsData,
+  ExpansionGroupMargin,
   ExpansionStore,
   ExpansionStorePayloadData,
   ExpansionStoreSalesData,
@@ -84,6 +86,10 @@ export function ExpansionStoresPage() {
     ExpansionStorePayloadData,
     { shopId: string; margins: { productId: string; marginPercent: number }[] }
   >(ExpansionStoreProductMarginsSetMutation);
+  const groupMarginsSet = useAdminMutation<
+    ExpansionStorePayloadData,
+    { shopId: string; margins: ExpansionGroupMargin[] }
+  >(ExpansionStoreGroupMarginsSetMutation);
   const recent = useRecentAuthentication();
   const [chosen, setChosen] = useState('');
   const [rate, setRate] = useState('1');
@@ -178,6 +184,17 @@ export function ExpansionStoresPage() {
     setBusy(null);
   };
 
+  const onGroupMargins = async (shopId: string, margins: ExpansionGroupMargin[]) => {
+    setProblem(null);
+    setBusy(`group-margins-${shopId}`);
+    await recent.run(async () => {
+      const done = (await groupMarginsSet.mutateAsync({ shopId, margins }))
+        .expansionStoreGroupMarginsSet!;
+      if (done.userErrors[0]) setProblem(problemText(done.userErrors[0], t));
+    }, onError);
+    setBusy(null);
+  };
+
   const onRemove = async (shopId: string) => {
     setProblem(null);
     try {
@@ -251,6 +268,11 @@ export function ExpansionStoresPage() {
                     store={store}
                     busy={busy === `product-margins-${store.shopId}`}
                     onSave={(margins) => void onProductMargins(store.shopId, margins)}
+                  />
+                  <GroupMargins
+                    store={store}
+                    busy={busy === `group-margins-${store.shopId}`}
+                    onSave={(margins) => void onGroupMargins(store.shopId, margins)}
                   />
                   <CheckField
                     label={t('expansion.auto', { name: store.name })}
@@ -600,6 +622,97 @@ function ProductMargins({
       >
         {t('expansion.save')}
       </Button>
+    </fieldset>
+  );
+}
+
+/**
+ * Margins by product type or vendor (ADR-971), after a product's own and its collection's, a
+ * type's before a vendor's: twenty at most.
+ */
+function GroupMargins({
+  store,
+  busy,
+  onSave,
+}: {
+  store: ExpansionStore;
+  busy: boolean;
+  onSave: (margins: ExpansionGroupMargin[]) => void;
+}) {
+  const { t } = useLocale();
+  const [rows, setRows] = useState(
+    (store.groupMargins ?? []).map((each) => ({
+      by: each.by,
+      value: each.value,
+      margin: String(each.marginPercent),
+    })),
+  );
+  const change = (at: number, row: Partial<(typeof rows)[number]>) =>
+    setRows(rows.map((each, index) => (index === at ? { ...each, ...row } : each)));
+  const kinds = (['PRODUCT_TYPE', 'VENDOR'] as const).map((value) => ({
+    value,
+    label: t(`expansion.groupBy.${value}`),
+  }));
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-sm font-medium">{t('expansion.groupMargins')}</legend>
+      <p className="text-sm text-muted">{t('expansion.groupMarginsHint')}</p>
+      {rows.map((row, at) => (
+        <div key={at} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_2fr_1fr_auto]">
+          <SelectField
+            label={t('expansion.groupBy')}
+            value={row.by}
+            options={kinds}
+            onChange={(by) => change(at, { by })}
+          />
+          <TextField
+            label={t('expansion.groupValue')}
+            dir="auto"
+            value={row.value}
+            onChange={(event) => change(at, { value: event.target.value })}
+          />
+          <TextField
+            label={t('expansion.groupMargin')}
+            inputMode="numeric"
+            dir="ltr"
+            value={row.margin}
+            onChange={(event) => change(at, { margin: event.target.value })}
+          />
+          <Button
+            variant="secondary"
+            aria-label={t('expansion.removeGroupMargin', { value: row.value })}
+            onClick={() => setRows(rows.filter((_, index) => index !== at))}
+          >
+            <Trash2 size={16} aria-hidden />
+          </Button>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {rows.length < 20 && (
+          <Button
+            variant="secondary"
+            onClick={() => setRows([...rows, { by: 'PRODUCT_TYPE', value: '', margin: '0' }])}
+          >
+            {t('expansion.addGroupMargin')}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          busy={busy}
+          aria-label={t('expansion.saveGroupMargins', { name: store.name })}
+          onClick={() =>
+            onSave(
+              rows.map((row) => ({
+                by: row.by,
+                value: row.value.trim(),
+                marginPercent: Number(row.margin.trim() || '0'),
+              })),
+            )
+          }
+        >
+          {t('expansion.save')}
+        </Button>
+      </div>
     </fieldset>
   );
 }

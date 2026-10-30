@@ -81,8 +81,8 @@ export class ExpansionCopier {
     };
     const imported = await this.imports.import(
       there,
-      // Its margin over its rate, its collections' own (ADR-948) and its products' (ADR-960), and
-      // its prices rounded as it asks (ADR-933).
+      // Its margin over its rate, its collections' own (ADR-948), its products' (ADR-960) and its
+      // product types' and vendors' (ADR-971), and its prices rounded as it asks (ADR-933).
       rescaledShopifyPrices(exported.value.csv, Number(link.priceRate), {
         rounding: link.rounding,
         marginPercent: link.marginPercent,
@@ -90,6 +90,7 @@ export class ExpansionCopier {
           tenant,
           link.collectionMargins,
           link.productMargins,
+          link.groupMargins,
         ),
       }),
       { overwrite: true },

@@ -31,6 +31,7 @@ function core(role: StaffRole = 'owner') {
           rounding: 'exact',
           collectionMargins: [],
           productMargins: [],
+          groupMargins: [],
         };
         stores = [made];
         return { expansionStoreSave: { expansionStore: made, userErrors: [] } };
@@ -109,6 +110,9 @@ function core(role: StaffRole = 'owner') {
           expansionStoreProductMarginsSet: { expansionStore: stores[0], userErrors: [] },
         };
       }
+      case 'ExpansionStoreGroupMarginsSet':
+        stores = stores.map((each) => ({ ...each, groupMargins: variables.margins }));
+        return { expansionStoreGroupMarginsSet: { expansionStore: stores[0], userErrors: [] } };
       case 'ExpansionStorePricingSet':
         stores = stores.map((each) => ({
           ...each,
@@ -296,6 +300,42 @@ describe('Expansion stores (CH-11, ADR-859)', () => {
     );
     // Searched as typed, ten at most.
     expect(sentOf(fake, 'Products')[0]).toEqual({ first: 10, query: 'sofa' });
+  });
+
+  it('gives a product type and a vendor a margin of their own (ADR-971)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/expansion-stores');
+    await screen.findByLabelText('Price rate');
+    type('Price rate', '0.0036');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add the expansion store' }));
+    const add = await screen.findByRole('button', { name: 'Add a product type or vendor' });
+    fireEvent.click(add);
+    fireEvent.click(add);
+    const [, vendor] = screen.getAllByLabelText('Of') as HTMLSelectElement[];
+    fireEvent.change(vendor!, { target: { value: 'VENDOR' } });
+    const [furniture, gul] = screen.getAllByLabelText('Product type or vendor');
+    fireEvent.change(furniture!, { target: { value: ' Furniture ' } });
+    fireEvent.change(gul!, { target: { value: 'Gul Ahmed' } });
+    const [first, second] = screen.getAllByLabelText('Margin (%)');
+    fireEvent.change(first!, { target: { value: '40' } });
+    fireEvent.change(second!, { target: { value: '15' } });
+    fireEvent.click(
+      screen.getByRole('button', { name: "Save Zari Abroad's margins by product type and vendor" }),
+    );
+    await waitFor(() =>
+      expect(sentOf(fake, 'ExpansionStoreGroupMarginsSet')).toEqual([
+        {
+          shopId: 'shop_2',
+          margins: [
+            { by: 'PRODUCT_TYPE', value: 'Furniture', marginPercent: 40 },
+            { by: 'VENDOR', value: 'Gul Ahmed', marginPercent: 15 },
+          ],
+        },
+      ]),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the margin of Gul Ahmed' }));
+    expect(screen.getAllByLabelText('Product type or vendor')).toHaveLength(1);
   });
 
   it("shows each store's sales on one page, and all of them together in rupees (ADR-932)", async () => {

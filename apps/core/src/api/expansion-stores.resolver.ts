@@ -11,7 +11,12 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { ExpansionStoreService, type ExpansionStoreRecord } from '@hatti/catalog/public';
+import {
+  EXPANSION_GROUP_KINDS,
+  ExpansionStoreService,
+  type ExpansionGroupKind,
+  type ExpansionStoreRecord,
+} from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { isCurrencyCode, money } from '@hatti/money';
@@ -80,6 +85,34 @@ export class ExpansionProductMargin {
   productTitle!: string;
 
   @Field(() => Int)
+  marginPercent!: number;
+}
+
+@ObjectType({
+  description:
+    "A product type's or a vendor's products put a margin of their own over an expansion store's " +
+    "rate, after a product's own and its collections', before the store's (ADR-971).",
+})
+export class ExpansionGroupMargin {
+  @Field({ description: 'PRODUCT_TYPE or VENDOR.' })
+  by!: string;
+
+  @Field({ description: 'The product type or vendor, as products give it, letter case aside.' })
+  value!: string;
+
+  @Field(() => Int)
+  marginPercent!: number;
+}
+
+@InputType()
+export class ExpansionGroupMarginInput {
+  @Field({ description: 'PRODUCT_TYPE or VENDOR.' })
+  by!: string;
+
+  @Field({ description: 'The product type or vendor.' })
+  value!: string;
+
+  @Field(() => Int, { description: 'A whole percent, 0 to 100.' })
   marginPercent!: number;
 }
 
@@ -161,6 +194,13 @@ export class ExpansionStore {
       'own (ADR-960). A product deleted since is left out.',
   })
   productMargins!: ExpansionProductMargin[];
+
+  @Field(() => [ExpansionGroupMargin], {
+    description:
+      'Product types and vendors whose products are put a margin of their own over its rate, ' +
+      "after a product's own and its collections', a type's before a vendor's (ADR-971).",
+  })
+  groupMargins!: ExpansionGroupMargin[];
 
   @Field(() => String, {
     nullable: true,
@@ -581,6 +621,41 @@ export class ExpansionStoreResolver {
     );
   }
 
+  @Mutation(() => ExpansionStorePayload, {
+    description:
+      "Gives this shop's products of each product type or vendor listed a margin of their own " +
+      "over the expansion store's rate (ADR-971), after a product's own and its collections', " +
+      "before the store's; a product's type's before its vendor's. Twenty at most; none takes " +
+      'them away. Copying as products change copies them again. The owner alone, of both shops, ' +
+      'having signed in lately.',
+  })
+  @RequireScopes('write_products')
+  @RequireRecentAuthentication()
+  async expansionStoreGroupMarginsSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('shopId', { type: () => ID }) shopId: string,
+    @Args('margins', { type: () => [ExpansionGroupMarginInput] })
+    margins: ExpansionGroupMarginInput[],
+  ): Promise<ExpansionStorePayload> {
+    const actor = owner(tenant);
+    const target = tryFromPublicId(shopId, 'shop');
+    if (!target || !(await this.copier.owns(actor.userId, target))) {
+      return this.#payload(tenant, failOne(['shopId'], 'NOT_FOUND', 'No such expansion store'));
+    }
+    return this.#payload(
+      tenant,
+      await this.stores.setGroupMargins(
+        tenant,
+        target,
+        margins.map((margin) => ({
+          by: margin.by.toLowerCase() as ExpansionGroupKind,
+          value: margin.value,
+          marginPercent: margin.marginPercent,
+        })),
+      ),
+    );
+  }
+
   async #shown(tenant: TenantContext, record: ExpansionStoreRecord): Promise<ExpansionStore> {
     const profile = await this.db.tenant(record.targetShopId, (tx) =>
       shopProfile(tx, record.targetShopId),
@@ -598,6 +673,15 @@ export class ExpansionStoreResolver {
       rounding: record.rounding,
       collectionMargins: await this.#margins(record, tenant.shopId),
       productMargins: await this.#productMargins(record, tenant.shopId),
+      groupMargins: record.groupMargins
+        .filter((margin) => EXPANSION_GROUP_KINDS.includes(margin.by))
+        .map((margin) =>
+          Object.assign(new ExpansionGroupMargin(), {
+            by: margin.by.toUpperCase(),
+            value: margin.value,
+            marginPercent: margin.marginPercent,
+          }),
+        ),
       copyError: record.copyError,
       copyFailedAt: record.failedAt,
     });

@@ -16,6 +16,10 @@ export const EXPANSION_STORE_LIMITS = {
   collectionMargins: 10,
   /** Products given a margin of their own (ADR-960). */
   productMargins: 25,
+  /** Product types and vendors given a margin of their own (ADR-971). */
+  groupMargins: 20,
+  /** The longest product type or vendor, as products keep them. */
+  groupName: 255,
 } as const;
 
 /** A collection's products put a margin of their own over the store's rate (ADR-948). */
@@ -27,6 +31,21 @@ export interface ExpansionCollectionMargin {
 /** A product put a margin of its own over the store's rate, over its collections' (ADR-960). */
 export interface ExpansionProductMargin {
   productId: string;
+  marginPercent: number;
+}
+
+/** What a margin by product type or vendor matches (ADR-971). */
+export const EXPANSION_GROUP_KINDS = ['product_type', 'vendor'] as const;
+export type ExpansionGroupKind = (typeof EXPANSION_GROUP_KINDS)[number];
+
+/**
+ * A product type's or a vendor's products put a margin of their own over the store's rate
+ * (ADR-971), after a product's own and its collections', before the store's: `value` matched as
+ * the products give it, letter case aside.
+ */
+export interface ExpansionGroupMargin {
+  by: ExpansionGroupKind;
+  value: string;
   marginPercent: number;
 }
 
@@ -69,6 +88,8 @@ export interface ExpansionStoreRecord {
   collectionMargins: ExpansionCollectionMargin[];
   /** Products put a margin of their own over the rate (ADR-960), before their collections'. */
   productMargins: ExpansionProductMargin[];
+  /** Product types and vendors put a margin of their own, after collections' (ADR-971). */
+  groupMargins: ExpansionGroupMargin[];
   /** Why the last copy as products changed failed, and when; null once one succeeds. */
   copyError: string | null;
   failedAt: Date | null;
@@ -86,13 +107,15 @@ type Row = {
   rounding: PresentmentRounding;
   collection_margins: ExpansionCollectionMargin[];
   product_margins: ExpansionProductMargin[];
+  group_margins: ExpansionGroupMargin[];
   copy_error: string | null;
   failed_at: Date | string | null;
   created_at: Date | string;
 };
 
 const COLUMNS = sql`target_shop_id, price_rate::text, synced_at, last_result, auto_copy, follow_rate,
-  margin_percent, rounding, collection_margins, product_margins, copy_error, failed_at, created_at`;
+  margin_percent, rounding, collection_margins, product_margins, group_margins, copy_error, failed_at,
+  created_at`;
 
 const toRecord = (row: Row): ExpansionStoreRecord => ({
   targetShopId: row.target_shop_id,
@@ -105,6 +128,7 @@ const toRecord = (row: Row): ExpansionStoreRecord => ({
   rounding: row.rounding,
   collectionMargins: row.collection_margins,
   productMargins: row.product_margins,
+  groupMargins: row.group_margins,
   copyError: row.copy_error,
   failedAt: row.failed_at === null ? null : toDate(row.failed_at),
   createdAt: toDate(row.created_at),
@@ -406,18 +430,94 @@ export class ExpansionStoreService {
   }
 
   /**
+   * Gives the shop's products of each product type or vendor of `margins` a margin of their own
+   * over `targetShopId`'s rate (ADR-971), after a product's own and its collections', before the
+   * store's: a product of a type given one takes its type's before its vendor's. Twenty at most,
+   * each type or vendor once, letter case aside; none takes them all away. A type or vendor no
+   * product has yet is kept, for the products to come.
+   */
+  async setGroupMargins(
+    tenant: TenantContext,
+    targetShopId: string,
+    margins: readonly ExpansionGroupMargin[],
+  ): Promise<MutationResult<ExpansionStoreRecord>> {
+    const most = EXPANSION_STORE_LIMITS;
+    if (margins.length > most.groupMargins) {
+      return failOne(
+        ['margins'],
+        'INVALID',
+        `${most.groupMargins} product types and vendors at most have a margin of their own`,
+      );
+    }
+    const kept: ExpansionGroupMargin[] = [];
+    for (const [at, margin] of margins.entries()) {
+      const value = margin.value.trim();
+      if (!EXPANSION_GROUP_KINDS.includes(margin.by)) {
+        return failOne(['margins', String(at), 'by'], 'INVALID', 'Choose a product type or vendor');
+      }
+      if (value === '' || value.length > most.groupName) {
+        return failOne(
+          ['margins', String(at), 'value'],
+          'INVALID',
+          `Name the product type or vendor, ${most.groupName} characters at most`,
+        );
+      }
+      const percent = margin.marginPercent;
+      if (!Number.isInteger(percent) || percent < 0 || percent > most.marginPercent) {
+        return failOne(
+          ['margins', String(at), 'marginPercent'],
+          'INVALID',
+          `Margin percent must be a whole number from 0 to ${most.marginPercent}`,
+        );
+      }
+      if (
+        kept.some(
+          (each) => each.by === margin.by && each.value.toLowerCase() === value.toLowerCase(),
+        )
+      ) {
+        return failOne(['margins'], 'INVALID', 'Give each product type and vendor one margin');
+      }
+      kept.push({ by: margin.by, value, marginPercent: percent });
+    }
+    const json = JSON.stringify(kept);
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<Row>(sql`
+        UPDATE catalog.expansion_stores
+           SET rate_changed_at = CASE WHEN group_margins = ${json}::jsonb
+                                      THEN rate_changed_at ELSE now() END,
+               group_margins = ${json}::jsonb
+         WHERE shop_id = ${tenant.shopId} AND target_shop_id = ${targetShopId}
+        RETURNING ${COLUMNS}`),
+    );
+    return rows[0]
+      ? { ok: true, value: toRecord(rows[0]) }
+      : failOne(['shopId'], 'NOT_FOUND', 'No such expansion store');
+  }
+
+  /**
    * The margin of each product of the shop's that `margins` give one (ADR-948), by its handle, as
-   * its export names it: its first collection's in the list; a product's own (ADR-960) before it.
+   * its export names it: its first collection's in the list; a product's own (ADR-960) before it,
+   * and its type's or vendor's (ADR-971) after it.
    */
   async marginsByHandle(
     tenant: TenantContext,
     margins: readonly ExpansionCollectionMargin[],
     productMargins: readonly ExpansionProductMargin[] = [],
+    groupMargins: readonly ExpansionGroupMargin[] = [],
   ): Promise<Map<string, number>> {
-    if (margins.length === 0 && productMargins.length === 0) return new Map();
+    if (margins.length === 0 && productMargins.length === 0 && groupMargins.length === 0) {
+      return new Map();
+    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const chosen =
-        margins.length > 0 ? await marginsByHandleIn(tx, tenant.shopId, margins) : new Map();
+        groupMargins.length > 0
+          ? await groupMarginsByHandleIn(tx, tenant.shopId, groupMargins)
+          : new Map<string, number>();
+      if (margins.length > 0) {
+        for (const [handle, percent] of await marginsByHandleIn(tx, tenant.shopId, margins)) {
+          chosen.set(handle, percent);
+        }
+      }
       if (productMargins.length > 0) {
         const { rows } = await tx.execute<{ id: string; handle: string }>(sql`
           SELECT id, handle FROM catalog.products
@@ -555,6 +655,42 @@ export class ExpansionStoreService {
     );
     return rows.map((row) => ({ shopId: row.shop_id, targetShopId: row.target_shop_id }));
   }
+}
+
+/**
+ * The margin of each product of the shop's whose type or vendor `margins` give one (ADR-971), by
+ * its handle, in the caller's transaction: its type's before its vendor's, letter case aside.
+ */
+async function groupMarginsByHandleIn(
+  tx: Tx,
+  shopId: string,
+  margins: readonly ExpansionGroupMargin[],
+): Promise<Map<string, number>> {
+  const of = (by: ExpansionGroupKind) =>
+    new Map(
+      margins
+        .filter((margin) => margin.by === by)
+        .map((margin) => [margin.value.toLowerCase(), margin.marginPercent]),
+    );
+  const types = of('product_type');
+  const vendors = of('vendor');
+  const { rows } = await tx.execute<{
+    handle: string;
+    product_type: string | null;
+    vendor: string | null;
+  }>(sql`
+    SELECT handle, product_type, vendor FROM catalog.products
+     WHERE shop_id = ${shopId}
+       AND (lower(btrim(product_type)) = ANY(${sql.param([...types.keys()])}::text[])
+            OR lower(btrim(vendor)) = ANY(${sql.param([...vendors.keys()])}::text[]))`);
+  const chosen = new Map<string, number>();
+  for (const row of rows) {
+    const percent =
+      types.get(row.product_type?.trim().toLowerCase() ?? '') ??
+      vendors.get(row.vendor?.trim().toLowerCase() ?? '');
+    if (percent !== undefined) chosen.set(row.handle, percent);
+  }
+  return chosen;
 }
 
 /** {@link ExpansionStoreService.marginsByHandle}, in the caller's transaction. */
