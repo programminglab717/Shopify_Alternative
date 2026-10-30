@@ -370,7 +370,8 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
           zari,
           `mutation ($id: ID!) { metafieldsSet(metafields: [
             { ownerId: $id, namespace: "custom", key: "fabric", type: "single_line_text_field", value: "Lawn" },
-            { ownerId: $id, namespace: "custom", key: "season", type: "single_line_text_field", value: "Summer" }
+            { ownerId: $id, namespace: "custom", key: "season", type: "single_line_text_field", value: "Summer" },
+            { ownerId: $id, namespace: "custom", key: "occasions", type: "list.single_line_text_field", value: "[\\"Eid\\", \\"Mehndi\\"]" }
           ]) { userErrors { message } } }`,
           { id: kurta },
         )
@@ -399,6 +400,15 @@ describe.skipIf(!server)('Expansion stores (CH-11)', () => {
     await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
     expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
       { price: { amount: '15.99', currencyCode: 'USD' } },
+    ]);
+    // A list of lines by any one of them (ADR-983): Mehndi, 80%, $18.99; not by its whole value.
+    await groupMargins([
+      { by: 'METAFIELD', key: 'custom.occasions', value: '["Eid", "Mehndi"]', marginPercent: 5 },
+      { by: 'METAFIELD', key: 'custom.occasions', value: ' mehndi', marginPercent: 80 },
+    ]);
+    await value(owner.token, zari, COPY, { shopId: toPublicId('shop', abroad) });
+    expect((await value(owner.token, abroad, PRODUCTS)).nodes[0].variants).toEqual([
+      { price: { amount: '18.99', currencyCode: 'USD' } },
     ]);
     // Its tags' still before its metafields'.
     await groupMargins([

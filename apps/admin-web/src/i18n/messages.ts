@@ -5225,7 +5225,7 @@ const en = {
   'expansion.groupMargins':
     'Product types, vendors, tags and metafields with a margin of their own',
   'expansion.groupMarginsHint':
-    "After a product's own and its collection's: a type's before a vendor's, a vendor's before a tag's, a tag's before a metafield's, letter case aside. A metafield's value is matched whole.",
+    "After a product's own and its collection's: a type's before a vendor's, a vendor's before a tag's, a tag's before a metafield's, letter case aside. A list of lines matches by any one of them; another metafield by its whole value.",
   'expansion.groupBy': 'Of',
   'expansion.groupBy.PRODUCT_TYPE': 'Product type',
   'expansion.groupBy.VENDOR': 'Vendor',
@@ -12553,7 +12553,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'expansion.saveProductMargins': '{name} کے پروڈکٹ مارجن محفوظ کریں',
   'expansion.groupMargins': 'اپنے مارجن والی پروڈکٹ اقسام، فروشندگان، ٹیگ اور میٹافیلڈ',
   'expansion.groupMarginsHint':
-    'پروڈکٹ کے اپنے اور اس کے کلیکشن کے مارجن کے بعد: قسم کا مارجن فروشندہ سے پہلے، فروشندہ کا ٹیگ سے پہلے، ٹیگ کا میٹافیلڈ سے پہلے، چھوٹے بڑے حروف کا فرق نہیں۔ میٹافیلڈ کی قدر پوری ملائی جاتی ہے۔',
+    'پروڈکٹ کے اپنے اور اس کے کلیکشن کے مارجن کے بعد: قسم کا مارجن فروشندہ سے پہلے، فروشندہ کا ٹیگ سے پہلے، ٹیگ کا میٹافیلڈ سے پہلے، چھوٹے بڑے حروف کا فرق نہیں۔ سطروں کی فہرست اپنی کسی بھی ایک سطر سے ملتی ہے؛ دوسرا میٹافیلڈ اپنی پوری قدر سے۔',
   'expansion.groupBy': 'کس کا',
   'expansion.groupBy.PRODUCT_TYPE': 'پروڈکٹ کی قسم',
   'expansion.groupBy.VENDOR': 'فروشندہ',

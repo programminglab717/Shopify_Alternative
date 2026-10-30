@@ -692,8 +692,8 @@ export class ExpansionStoreService {
  * The margin of each product of the shop's whose type, vendor (ADR-971), tags (ADR-976) or
  * metafields (ADR-981) `margins` give one, by its handle, in the caller's transaction: its type's
  * before its vendor's, its vendor's before its tags', the first of its tags in `margins`' order,
- * its tags' before its metafields', the first in `margins`' order; letter case aside. A
- * metafield's value is matched as kept, so a list's whole value, not one of its items.
+ * its tags' before its metafields', the first in `margins`' order; letter case aside. A list of
+ * lines matches by any one of them (ADR-983); another metafield by its whole value.
  */
 async function groupMarginsByHandleIn(
   tx: Tx,
@@ -723,11 +723,17 @@ async function groupMarginsByHandleIn(
     tags: string[];
     fields: string[];
   }>(sql`
+    WITH held AS (
+      SELECT m.product_id, m.namespace || '.' || m.key || E'\n' || lower(btrim(item)) AS field
+        FROM catalog.metafields m
+       CROSS JOIN LATERAL unnest(
+               CASE WHEN m.type = 'list.single_line_text_field'
+                    THEN ARRAY(SELECT jsonb_array_elements_text(m.value::jsonb))
+                    ELSE ARRAY[m.value] END) AS item
+       WHERE m.shop_id = ${shopId} AND m.product_id IS NOT NULL
+         AND m.namespace || '.' || m.key = ANY(${sql.param(keys)}::text[]))
     SELECT p.handle, p.product_type, p.vendor, p.tags,
-           COALESCE((SELECT array_agg(m.namespace || '.' || m.key || E'\n' || lower(btrim(m.value)))
-                       FROM catalog.metafields m
-                      WHERE m.shop_id = p.shop_id AND m.product_id = p.id
-                        AND m.namespace || '.' || m.key = ANY(${sql.param(keys)}::text[])),
+           COALESCE((SELECT array_agg(held.field) FROM held WHERE held.product_id = p.id),
                     '{}') AS fields
       FROM catalog.products p
      WHERE p.shop_id = ${shopId}
@@ -735,10 +741,9 @@ async function groupMarginsByHandleIn(
             OR lower(btrim(p.vendor)) = ANY(${sql.param([...vendors.keys()])}::text[])
             OR EXISTS (SELECT 1 FROM unnest(p.tags) AS tag
                         WHERE lower(btrim(tag)) = ANY(${sql.param([...tags.keys()])}::text[]))
-            OR EXISTS (SELECT 1 FROM catalog.metafields m
-                        WHERE m.shop_id = p.shop_id AND m.product_id = p.id
-                          AND m.namespace || '.' || m.key || E'\n' || lower(btrim(m.value))
-                              = ANY(${sql.param([...fields.keys()])}::text[])))`);
+            OR EXISTS (SELECT 1 FROM held
+                        WHERE held.product_id = p.id
+                          AND held.field = ANY(${sql.param([...fields.keys()])}::text[])))`);
   const chosen = new Map<string, number>();
   for (const row of rows) {
     const own = new Set(row.tags.map((tag) => tag.trim().toLowerCase()));
